@@ -40,5 +40,4 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   // Only upload source maps if SENTRY_AUTH_TOKEN is set
   silent: !process.env.SENTRY_AUTH_TOKEN,
-  disableLogger: true,
 });
