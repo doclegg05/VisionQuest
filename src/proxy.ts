@@ -13,7 +13,7 @@ import { isAuthorizedInternalRequest, isUrlHostMatch } from "@/lib/csrf";
  * shared CRON_SECRET as a bearer token. Those routes still perform their own
  * route-level authorization checks.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const method = request.method.toUpperCase();
 
   // Only check state-changing methods
