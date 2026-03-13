@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export function getModel(apiKey: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 }
 
 export async function generateResponse(
@@ -56,7 +56,7 @@ export async function generateStructuredResponse(
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
     },
