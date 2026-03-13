@@ -1,0 +1,210 @@
+import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { syncAlertsForStudents } from "@/lib/advising";
+import { prisma } from "@/lib/db";
+import { getCertificationProgress } from "@/lib/certifications";
+
+async function requireTeacher() {
+  const session = await getSession();
+  if (!session || session.role !== "teacher") return null;
+  return session;
+}
+
+// GET — class overview: all students with cross-module progress
+export async function GET(req: Request) {
+  const teacher = await requireTeacher();
+  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const url = new URL(req.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
+  const now = new Date();
+  const upcomingWindow = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7);
+
+  const total = await prisma.student.count({ where: { role: "student" } });
+  const allStudentIds = await prisma.student.findMany({
+    where: { role: "student" },
+    select: { id: true },
+    orderBy: { displayName: "asc" },
+  });
+
+  await syncAlertsForStudents(allStudentIds.map((student) => student.id));
+
+  const students = await prisma.student.findMany({
+    where: { role: "student" },
+    select: {
+      id: true,
+      studentId: true,
+      displayName: true,
+      createdAt: true,
+      progression: { select: { state: true } },
+      goals: {
+        select: { level: true, status: true },
+      },
+      orientationProgress: {
+        where: { completed: true },
+        select: { id: true },
+      },
+      certifications: {
+        select: {
+          status: true,
+          requirements: {
+            select: { templateId: true, completed: true, verifiedBy: true, fileId: true },
+          },
+        },
+      },
+      portfolioItems: { select: { id: true } },
+      resumeData: { select: { id: true } },
+      files: { select: { id: true } },
+      alerts: {
+        where: { status: "open" },
+        select: { id: true, severity: true, title: true, detectedAt: true },
+      },
+      appointments: {
+        where: {
+          status: "scheduled",
+          startsAt: { gte: now },
+        },
+        select: { id: true, startsAt: true },
+        orderBy: { startsAt: "asc" },
+        take: 1,
+      },
+      conversations: {
+        select: { id: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: { displayName: "asc" },
+    skip: (page - 1) * limit,
+    take: limit,
+  });
+
+  // Get orientation total count
+  const orientationTotal = await prisma.orientationItem.count();
+
+  // Get required cert templates count
+  const certTemplates = await prisma.certTemplate.findMany({
+    where: { certType: "ready-to-work" },
+    select: {
+      id: true,
+      required: true,
+      needsFile: true,
+      needsVerify: true,
+    },
+  });
+
+  const overview = students.map((s) => {
+    // Parse progression state
+    let xp = 0;
+    let level = 1;
+    let streak = 0;
+    if (s.progression?.state) {
+      try {
+        const state = JSON.parse(s.progression.state);
+        xp = state.xp || 0;
+        level = state.level || 1;
+        streak = state.streaks?.daily?.current || 0;
+      } catch { /* ignore */ }
+    }
+
+    // Goals summary
+    const goalsByLevel: Record<string, number> = {};
+    for (const g of s.goals) {
+      goalsByLevel[g.level] = (goalsByLevel[g.level] || 0) + 1;
+    }
+    const hasBhag = !!goalsByLevel["bhag"];
+
+    // Cert progress
+    const cert = s.certifications[0];
+    const certDone = cert
+      ? getCertificationProgress(certTemplates, cert.requirements).done
+      : 0;
+    const certPendingVerify = cert
+      ? cert.requirements.filter((r) => r.completed && !r.verifiedBy).length
+      : 0;
+
+    return {
+      id: s.id,
+      studentId: s.studentId,
+      displayName: s.displayName,
+      createdAt: s.createdAt,
+      lastActive: s.conversations[0]?.updatedAt || s.createdAt,
+      xp,
+      level,
+      streak,
+      hasBhag,
+      goalsCount: s.goals.length,
+      orientationDone: s.orientationProgress.length,
+      orientationTotal,
+      certStatus: cert?.status || "not_started",
+      certDone,
+      certTotal: certTemplates.filter((t) => t.required).length,
+      certPendingVerify,
+      openAlertCount: s.alerts.length,
+      nextAppointmentAt: s.appointments[0]?.startsAt ?? null,
+      portfolioItems: s.portfolioItems.length,
+      hasResume: !!s.resumeData,
+      filesCount: s.files.length,
+    };
+  });
+
+  const [alerts, upcomingAppointments] = await Promise.all([
+    prisma.studentAlert.findMany({
+      where: { status: "open" },
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        title: true,
+        summary: true,
+        detectedAt: true,
+        student: {
+          select: {
+            id: true,
+            studentId: true,
+            displayName: true,
+          },
+        },
+      },
+      orderBy: { detectedAt: "desc" },
+      take: 8,
+    }),
+    prisma.appointment.findMany({
+      where: {
+        status: "scheduled",
+        startsAt: {
+          gte: now,
+          lte: upcomingWindow,
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        startsAt: true,
+        endsAt: true,
+        locationType: true,
+        locationLabel: true,
+        student: {
+          select: {
+            id: true,
+            studentId: true,
+            displayName: true,
+          },
+        },
+      },
+      orderBy: { startsAt: "asc" },
+      take: 6,
+    }),
+  ]);
+
+  return NextResponse.json({
+    students: overview,
+    alerts,
+    upcomingAppointments,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  });
+}

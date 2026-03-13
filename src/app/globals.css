@@ -1,26 +1,270 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5ecdc;
+  --foreground: #12263f;
+  --ink-strong: #10253e;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-strong: rgba(255, 255, 255, 0.84);
+  --surface-dark: rgba(7, 23, 43, 0.88);
+  --border: rgba(18, 38, 63, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --accent: #ff9a4d;
+  --accent-strong: #f97316;
+  --accent-secondary: #0f9a92;
+  --accent-tertiary: #ffd27d;
+  --muted: #5f6f84;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #f5ecdc;
+    --foreground: #12263f;
   }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255, 195, 113, 0.42), transparent 24%),
+    radial-gradient(circle at 82% 8%, rgba(15, 154, 146, 0.2), transparent 22%),
+    linear-gradient(180deg, #0d1f35 0%, #17314a 18%, #f7f0e2 48%, #f2e4ca 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), sans-serif;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0.08) 0 2px,
+      transparent 2px 18px
+    );
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.45), transparent 72%);
+  opacity: 0.45;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  left: 15%;
+  right: 15%;
+  bottom: -16rem;
+  height: 26rem;
+  pointer-events: none;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 210, 125, 0.55), transparent 68%);
+  filter: blur(90px);
+  opacity: 0.85;
+}
+
+::selection {
+  background: rgba(255, 154, 77, 0.28);
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.panel {
+  background: var(--surface);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 22px 70px rgba(16, 37, 62, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.panel-strong {
+  background: var(--surface-strong);
+}
+
+.page-shell {
+  width: min(100%, 78rem);
+  margin: 0 auto;
+  padding: 1rem 1rem 4rem;
+}
+
+.page-shell-wide {
+  width: min(100%, 92rem);
+}
+
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(135deg, rgba(7, 23, 43, 0.94), rgba(15, 154, 146, 0.76) 58%, rgba(255, 154, 77, 0.64));
+  color: white;
+  box-shadow: 0 28px 90px rgba(7, 23, 43, 0.2);
+}
+
+.page-hero::after {
+  content: "";
+  position: absolute;
+  right: -12%;
+  bottom: -60%;
+  width: 24rem;
+  height: 24rem;
+  pointer-events: none;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 223, 159, 0.45), transparent 68%);
+}
+
+.page-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255, 241, 222, 0.76);
+}
+
+.page-title {
+  margin-top: 0.6rem;
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: clamp(1.95rem, 4vw, 3.1rem);
+  line-height: 1.03;
+  letter-spacing: -0.05em;
+}
+
+.page-subtitle {
+  margin-top: 0.85rem;
+  max-width: 44rem;
+  color: rgba(238, 245, 255, 0.85);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.surface-section {
+  border-radius: 1.5rem;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 50px rgba(16, 37, 62, 0.1);
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 18px 36px rgba(249, 115, 22, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.05);
+  box-shadow: 0 22px 42px rgba(249, 115, 22, 0.28);
+}
+
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  font-weight: 700;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.secondary-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.field,
+.textarea-field,
+.select-field {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(18, 38, 63, 0.16);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--foreground);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.field::placeholder,
+.textarea-field::placeholder {
+  color: rgba(95, 111, 132, 0.9);
+}
+
+@media (min-width: 768px) {
+  .page-shell {
+    padding: 1.5rem 1.5rem 5rem;
+  }
+
+  .page-hero {
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.75rem;
+  }
+}
+
+/* Focus visible styles for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove focus outline for mouse clicks */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  body::before,
+  body::after,
+  .page-hero::after {
+    display: none;
+  }
 }

@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Visionquest
 
-## Getting Started
+Visionquest is a Next.js portal for the SPOKES workforce development program. It gives students one place to work with Sage, track goals, complete orientation, manage certifications, store files, and build a portfolio. Teachers get dashboards for student progress and content management.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Next.js App Router
+- React 19
+- Prisma + PostgreSQL
+- Google Gemini API
+- Cloudflare R2 for production file storage
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Install dependencies:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. Copy the environment template and fill in your values:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   cp .env.example .env.local
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Generate the Prisma client and run migrations:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   npm run prisma:generate
+   npm run prisma:migrate:deploy
+   ```
 
-## Deploy on Vercel
+4. Start the app:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```bash
+   npm run dev
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Required Environment Variables
+
+See [.env.example](/Users/brittlegg/visionquest/.env.example) for the full list.
+
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `JWT_SECRET`
+- `API_KEY_ENCRYPTION_KEY`
+- `APP_BASE_URL`
+
+## Optional Integrations
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI`
+- `GEMINI_API_KEY`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY`
+- `R2_SECRET_KEY`
+- `R2_BUCKET_NAME`
+
+## Production Checklist
+
+1. Provision PostgreSQL and run `npm run prisma:migrate:deploy`.
+2. Set `JWT_SECRET`, `API_KEY_ENCRYPTION_KEY`, and `APP_BASE_URL` with production values.
+3. Configure `GEMINI_API_KEY` if Sage should work without personal student keys.
+4. Configure `SMTP_*` values if students should be able to reset passwords by email.
+5. Configure Cloudflare R2 credentials if file uploads are enabled in production.
+6. Whitelist the deployed Google OAuth callback URL in Google Cloud if Google sign-in is enabled.
+7. Promote the first teacher account after that user registers:
+
+   ```bash
+   npm run users:promote-teacher -- <student-id-or-email>
+   ```
+
+8. Verify a student can register, reset a password, open Sage, upload a file, and save a portfolio item.
+9. Run:
+
+   ```bash
+   npm run lint
+   npm run build
+   ```
+
+## Scripts
+
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run prisma:generate`
+- `npm run prisma:migrate:deploy`
+- `npm run users:promote-teacher -- <student-id-or-email>`

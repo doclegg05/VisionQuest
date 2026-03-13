@@ -1,0 +1,617 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["visionquest"]
+}
+
+model Student {
+  id             String   @id @default(cuid())
+  studentId      String   @unique
+  displayName    String
+  passwordHash   String
+  email          String?  @unique
+  geminiApiKey   String?
+  role           String   @default("student")
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversations        Conversation[]
+  goals                Goal[]
+  progression          Progression?
+  files                FileUpload[]
+  orientationProgress  OrientationProgress[]
+  certifications       Certification[]
+  portfolioItems       PortfolioItem[]
+  resumeData           ResumeData?
+  passwordResetTokens  PasswordResetToken[]
+  appointments         Appointment[]         @relation("StudentAppointments")
+  advisorAppointments  Appointment[]         @relation("AdvisorAppointments")
+  assignedTasks        StudentTask[]         @relation("AssignedTasks")
+  createdTasks         StudentTask[]         @relation("CreatedTasks")
+  caseNotes            CaseNote[]            @relation("StudentCaseNotes")
+  authoredNotes        CaseNote[]            @relation("AuthoredCaseNotes")
+  alerts               StudentAlert[]
+  availabilityBlocks   AdvisorAvailability[] @relation("AdvisorAvailability")
+  createdOpportunities Opportunity[]         @relation("CreatedOpportunities")
+  applications         Application[]
+  createdEvents        CareerEvent[]         @relation("CreatedEvents")
+  eventRegistrations   EventRegistration[]
+  publicCredentialPage PublicCredentialPage?
+  spokesRecord         SpokesRecord?
+
+  @@schema("visionquest")
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  studentId String
+  module    String
+  stage     String
+  title     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@schema("visionquest")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String   @db.Text
+  metadata       String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@schema("visionquest")
+}
+
+model Goal {
+  id              String   @id @default(cuid())
+  studentId       String
+  level           String
+  parentId        String?
+  content         String   @db.Text
+  status          String   @default("active")
+  sourceMessageId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parent   Goal?   @relation("GoalHierarchy", fields: [parentId], references: [id])
+  children Goal[]  @relation("GoalHierarchy")
+
+  @@schema("visionquest")
+}
+
+model Progression {
+  id        String @id @default(cuid())
+  studentId String @unique
+  state     String
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@schema("visionquest")
+}
+
+model OrientationItem {
+  id          String   @id @default(cuid())
+  label       String
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  required    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  progress OrientationProgress[]
+
+  @@schema("visionquest")
+}
+
+model OrientationProgress {
+  id          String    @id @default(cuid())
+  studentId   String
+  itemId      String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  student Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  item    OrientationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, itemId])
+  @@schema("visionquest")
+}
+
+model LmsLink {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  url         String
+  category    String
+  icon        String?
+  sortOrder   Int      @default(0)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@schema("visionquest")
+}
+
+model SpokesRecord {
+  id                              String    @id @default(cuid())
+  studentId                       String?   @unique
+  firstName                       String
+  lastName                        String
+  referralEmail                   String?
+  county                          String?
+  householdType                   String?
+  requiredParticipationHours      Int?
+  referralDate                    DateTime? @db.Date
+  status                          String    @default("referred")
+  enrolledAt                      DateTime? @db.Date
+  exitDate                        DateTime? @db.Date
+  gender                          String?
+  birthDate                       DateTime? @db.Date
+  race                            String?
+  ethnicity                       String?
+  barriersOnEntry                 String[]  @default([])
+  barriersRemaining               String[]  @default([])
+  jobRetentionStudent             Boolean   @default(false)
+  tabeDate                        DateTime? @db.Date
+  educationalLevel                String?
+  documentedAcademicAchievementAt DateTime? @db.Date
+  highSchoolEquivalencyAt         DateTime? @db.Date
+  familySurveyOfferedAt           DateTime? @db.Date
+  postSecondaryEnteredAt          DateTime? @db.Date
+  postSecondaryProgram            String?
+  unsubsidizedEmploymentAt        DateTime? @db.Date
+  employerName                    String?
+  hourlyWage                      Float?
+  nonCompleterAt                  DateTime? @db.Date
+  nonCompleterReason              String?   @db.Text
+  notes                           String?   @db.Text
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+
+  student             Student?                   @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  checklistProgress   SpokesChecklistProgress[]
+  moduleProgress      SpokesModuleProgress[]
+  employmentFollowUps SpokesEmploymentFollowUp[]
+
+  @@index([status, referralDate])
+  @@index([county, status])
+  @@schema("visionquest")
+}
+
+model SpokesChecklistTemplate {
+  id          String   @id @default(cuid())
+  label       String
+  description String?  @db.Text
+  category    String
+  sortOrder   Int      @default(0)
+  required    Boolean  @default(true)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress SpokesChecklistProgress[]
+
+  @@index([category, sortOrder])
+  @@schema("visionquest")
+}
+
+model SpokesChecklistProgress {
+  id          String    @id @default(cuid())
+  recordId    String
+  templateId  String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  record   SpokesRecord            @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  template SpokesChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([recordId, templateId])
+  @@index([recordId, completed])
+  @@schema("visionquest")
+}
+
+model SpokesModuleTemplate {
+  id          String   @id @default(cuid())
+  label       String
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  required    Boolean  @default(true)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress SpokesModuleProgress[]
+
+  @@index([sortOrder])
+  @@schema("visionquest")
+}
+
+model SpokesModuleProgress {
+  id          String   @id @default(cuid())
+  recordId    String
+  templateId  String
+  completedAt DateTime
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  record   SpokesRecord         @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  template SpokesModuleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([recordId, templateId])
+  @@index([recordId, completedAt])
+  @@schema("visionquest")
+}
+
+model SpokesEmploymentFollowUp {
+  id               String   @id @default(cuid())
+  recordId         String
+  checkpointMonths Int
+  status           String
+  checkedAt        DateTime @db.Date
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  record SpokesRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@unique([recordId, checkpointMonths])
+  @@index([recordId, checkedAt])
+  @@schema("visionquest")
+}
+
+model Certification {
+  id          String    @id @default(cuid())
+  studentId   String
+  certType    String    @default("ready-to-work")
+  status      String    @default("in_progress")
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  requirements CertRequirement[]
+
+  @@unique([studentId, certType])
+  @@schema("visionquest")
+}
+
+model CertRequirement {
+  id              String    @id @default(cuid())
+  certificationId String
+  templateId      String
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  fileId          String?
+  notes           String?   @db.Text
+
+  certification Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+  template      CertTemplate  @relation(fields: [templateId], references: [id])
+
+  @@schema("visionquest")
+}
+
+model CertTemplate {
+  id          String  @id @default(cuid())
+  certType    String  @default("ready-to-work")
+  label       String
+  description String? @db.Text
+  url         String?
+  sortOrder   Int     @default(0)
+  required    Boolean @default(true)
+  needsFile   Boolean @default(false)
+  needsVerify Boolean @default(true)
+
+  requirements CertRequirement[]
+
+  @@schema("visionquest")
+}
+
+model PortfolioItem {
+  id          String   @id @default(cuid())
+  studentId   String
+  title       String
+  description String?  @db.Text
+  type        String   @default("project")
+  fileId      String?
+  url         String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@schema("visionquest")
+}
+
+model ResumeData {
+  id        String @id @default(cuid())
+  studentId String @unique
+  data      String @db.Text
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@schema("visionquest")
+}
+
+model FileUpload {
+  id         String   @id @default(cuid())
+  studentId  String
+  filename   String
+  mimeType   String
+  sizeBytes  Int
+  storageKey String
+  category   String   @default("general")
+  uploadedAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@schema("visionquest")
+}
+
+model Appointment {
+  id                 String    @id @default(cuid())
+  studentId          String
+  advisorId          String
+  title              String
+  description        String?   @db.Text
+  startsAt           DateTime
+  endsAt             DateTime
+  status             String    @default("scheduled")
+  locationType       String    @default("virtual")
+  locationLabel      String?
+  meetingUrl         String?
+  notes              String?   @db.Text
+  followUpRequired   Boolean   @default(false)
+  bookingSource      String    @default("teacher")
+  confirmationSentAt DateTime?
+  reminderSentAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  student Student       @relation("StudentAppointments", fields: [studentId], references: [id], onDelete: Cascade)
+  advisor Student       @relation("AdvisorAppointments", fields: [advisorId], references: [id], onDelete: Cascade)
+  tasks   StudentTask[]
+
+  @@index([studentId, startsAt])
+  @@index([advisorId, startsAt])
+  @@index([status, startsAt])
+  @@schema("visionquest")
+}
+
+model AdvisorAvailability {
+  id            String   @id @default(cuid())
+  advisorId     String
+  weekday       Int
+  startMinutes  Int
+  endMinutes    Int
+  slotMinutes   Int      @default(30)
+  locationType  String   @default("virtual")
+  locationLabel String?
+  meetingUrl    String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  advisor Student @relation("AdvisorAvailability", fields: [advisorId], references: [id], onDelete: Cascade)
+
+  @@index([advisorId, weekday, active])
+  @@schema("visionquest")
+}
+
+model StudentTask {
+  id            String    @id @default(cuid())
+  studentId     String
+  createdById   String
+  appointmentId String?
+  title         String
+  description   String?   @db.Text
+  dueAt         DateTime?
+  status        String    @default("open")
+  priority      String    @default("normal")
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student     Student      @relation("AssignedTasks", fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy   Student      @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status, dueAt])
+  @@index([createdById, createdAt])
+  @@schema("visionquest")
+}
+
+model CaseNote {
+  id         String   @id @default(cuid())
+  studentId  String
+  authorId   String
+  category   String   @default("general")
+  body       String   @db.Text
+  visibility String   @default("teacher")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student Student @relation("StudentCaseNotes", fields: [studentId], references: [id], onDelete: Cascade)
+  author  Student @relation("AuthoredCaseNotes", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt(sort: Desc)])
+  @@schema("visionquest")
+}
+
+model StudentAlert {
+  id         String    @id @default(cuid())
+  studentId  String
+  alertKey   String    @unique
+  type       String
+  severity   String    @default("medium")
+  status     String    @default("open")
+  title      String
+  summary    String    @db.Text
+  sourceType String?
+  sourceId   String?
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, status, detectedAt(sort: Desc)])
+  @@index([status, severity, detectedAt(sort: Desc)])
+  @@schema("visionquest")
+}
+
+model Opportunity {
+  id          String    @id @default(cuid())
+  title       String
+  company     String
+  type        String    @default("job")
+  location    String?
+  url         String?
+  description String?   @db.Text
+  status      String    @default("open")
+  deadline    DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy    Student?      @relation("CreatedOpportunities", fields: [createdById], references: [id], onDelete: SetNull)
+  applications Application[]
+
+  @@index([status, deadline])
+  @@schema("visionquest")
+}
+
+model Application {
+  id            String    @id @default(cuid())
+  studentId     String
+  opportunityId String
+  status        String    @default("saved")
+  notes         String?   @db.Text
+  resumeFileId  String?
+  appliedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, opportunityId])
+  @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+model CareerEvent {
+  id                   String   @id @default(cuid())
+  title                String
+  description          String?  @db.Text
+  startsAt             DateTime
+  endsAt               DateTime
+  location             String?
+  virtualUrl           String?
+  capacity             Int?
+  registrationRequired Boolean  @default(true)
+  status               String   @default("scheduled")
+  createdById          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  createdBy     Student?            @relation("CreatedEvents", fields: [createdById], references: [id], onDelete: SetNull)
+  registrations EventRegistration[]
+
+  @@index([status, startsAt])
+  @@schema("visionquest")
+}
+
+model EventRegistration {
+  id           String   @id @default(cuid())
+  studentId    String
+  eventId      String
+  status       String   @default("registered")
+  registeredAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  event   CareerEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, eventId])
+  @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+model PublicCredentialPage {
+  id        String   @id @default(cuid())
+  studentId String   @unique
+  slug      String   @unique
+  headline  String?
+  summary   String?  @db.Text
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@schema("visionquest")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  studentId String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, expiresAt])
+  @@schema("visionquest")
+}
+
+model RateLimitEntry {
+  key       String   @id
+  count     Int      @default(0)
+  resetTime DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resetTime])
+  @@schema("visionquest")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  String?
+  action     String
+  targetType String
+  targetId   String?
+  summary    String?
+  metadata   String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@schema("visionquest")
+}

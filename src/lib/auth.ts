@@ -1,0 +1,108 @@
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
+import { prisma } from "./db";
+
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
+const TOKEN_TTL = "7d";
+const COOKIE_NAME = "vq-session";
+
+interface SessionClaims {
+  sub: string;
+  role: string;
+  sv: number;
+}
+
+// --- Password hashing ---
+
+export function hashPassword(password: string): { hash: string; salt: string } {
+  const salt = crypto.randomBytes(32).toString("hex");
+  const hash = crypto
+    .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+    .toString("hex");
+  return { hash: `${salt}:${hash}`, salt };
+}
+
+export function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const candidate = crypto
+    .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+    .toString("hex");
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(candidate));
+}
+
+// --- JWT ---
+
+export function signToken(studentId: string, role: string, sessionVersion: number): string {
+  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+}
+
+export function verifyToken(token: string): SessionClaims | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as Partial<SessionClaims>;
+    if (
+      typeof payload.sub !== "string" ||
+      typeof payload.role !== "string" ||
+      typeof payload.sv !== "number"
+    ) {
+      return null;
+    }
+    return payload as SessionClaims;
+  } catch {
+    return null;
+  }
+}
+
+// --- Session helpers ---
+
+export async function setSessionCookie(studentId: string, role: string, sessionVersion: number) {
+  const token = signToken(studentId, role, sessionVersion);
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    path: "/",
+  });
+  return token;
+}
+
+export async function getSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+
+  const claims = verifyToken(token);
+  if (!claims) return null;
+
+  const student = await prisma.student.findUnique({
+    where: { id: claims.sub },
+    select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true },
+  });
+
+  if (!student || student.sessionVersion !== claims.sv) return null;
+  return {
+    id: student.id,
+    studentId: student.studentId,
+    displayName: student.displayName,
+    role: student.role,
+  };
+}
+
+export async function clearSession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
+}
+
+// --- Normalize student ID ---
+
+export function normalizeStudentId(raw: string): string {
+  return raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, "");
+}
+
+export function normalizeEmail(raw: string): string {
+  return raw.trim().toLowerCase();
+}
