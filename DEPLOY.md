@@ -6,7 +6,7 @@
 - Supabase account (free tier works)
 - Render account (Starter plan or above)
 - Google AI Studio account (for Gemini API key)
-- (Optional) Cloudflare R2 bucket for file storage
+- Supabase Storage enabled (same project — for file uploads)
 - (Optional) Google Cloud project for OAuth
 - (Optional) SMTP provider for password reset emails
 - (Optional) Sentry project for error tracking
@@ -32,7 +32,20 @@
 2. Create an API key (free tier: 60 requests/minute)
 3. Save as `GEMINI_API_KEY`
 
-## Step 3: Generate Secrets
+## Step 3: Set Up Supabase Storage
+
+1. In your Supabase project, go to **Storage** in the sidebar
+2. Click **New bucket**, name it `uploads`, set it to **private**
+3. Go to **Storage → S3 Connection** (or **Project Settings → API**)
+4. Note your S3 endpoint: `https://<project-ref>.supabase.co/storage/v1/s3`
+5. Generate S3 access keys — save the **Access Key ID** and **Secret Access Key**
+6. Set these env vars:
+   - `STORAGE_ENDPOINT` = the S3 endpoint above
+   - `STORAGE_BUCKET` = `uploads`
+   - `STORAGE_ACCESS_KEY` = the access key ID
+   - `STORAGE_SECRET_KEY` = the secret key
+
+## Step 4: Generate Secrets
 
 Run locally:
 
@@ -74,15 +87,16 @@ openssl rand -base64 32
 | `API_KEY_ENCRYPTION_KEY` | Output of `openssl rand -base64 32` |
 | `APP_BASE_URL` | `https://your-app.onrender.com` |
 | `GEMINI_API_KEY` | From Google AI Studio |
+| `STORAGE_ENDPOINT` | Supabase S3 endpoint |
+| `STORAGE_BUCKET` | `uploads` |
+| `STORAGE_ACCESS_KEY` | Supabase S3 access key |
+| `STORAGE_SECRET_KEY` | Supabase S3 secret key |
 
 ### Optional Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `R2_ACCOUNT_ID` | Cloudflare R2 account ID |
-| `R2_ACCESS_KEY` | R2 access key |
-| `R2_SECRET_KEY` | R2 secret key |
-| `R2_BUCKET_NAME` | R2 bucket name |
+| `STORAGE_REGION` | S3 region (default: `us-east-1`) |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | `https://your-app.onrender.com/api/auth/google/callback` |

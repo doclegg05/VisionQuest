@@ -7,34 +7,64 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 const IS_DEV = process.env.NODE_ENV !== "production";
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
-// R2 config (production)
+// Supabase Storage S3-compatible config
+const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT || "";
+const STORAGE_REGION = process.env.STORAGE_REGION || "us-east-1";
+const STORAGE_BUCKET = process.env.STORAGE_BUCKET || "";
+const STORAGE_ACCESS_KEY = process.env.STORAGE_ACCESS_KEY || "";
+const STORAGE_SECRET_KEY = process.env.STORAGE_SECRET_KEY || "";
+const HAS_STORAGE_CONFIG = Boolean(STORAGE_ENDPOINT && STORAGE_BUCKET && STORAGE_ACCESS_KEY && STORAGE_SECRET_KEY);
+
+// Legacy R2 support — if R2 vars are set but new vars aren't, use R2
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
-const R2_ENDPOINT = R2_ACCOUNT_ID
-  ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
-  : "";
 const R2_BUCKET = process.env.R2_BUCKET_NAME || "";
 const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY || "";
 const R2_SECRET_KEY = process.env.R2_SECRET_KEY || "";
 const HAS_R2_CONFIG = Boolean(R2_ACCOUNT_ID && R2_BUCKET && R2_ACCESS_KEY && R2_SECRET_KEY);
 
-const r2Client = !IS_DEV && HAS_R2_CONFIG
-  ? new S3Client({
+function buildS3Client(): S3Client | null {
+  if (IS_DEV && !HAS_STORAGE_CONFIG && !HAS_R2_CONFIG) return null;
+
+  if (HAS_STORAGE_CONFIG) {
+    return new S3Client({
+      region: STORAGE_REGION,
+      endpoint: STORAGE_ENDPOINT,
+      credentials: {
+        accessKeyId: STORAGE_ACCESS_KEY,
+        secretAccessKey: STORAGE_SECRET_KEY,
+      },
+      forcePathStyle: true,
+    });
+  }
+
+  if (HAS_R2_CONFIG) {
+    return new S3Client({
       region: "auto",
-      endpoint: R2_ENDPOINT,
+      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: R2_ACCESS_KEY,
         secretAccessKey: R2_SECRET_KEY,
       },
-    })
-  : null;
+    });
+  }
 
-function getR2Client(): S3Client {
-  if (!r2Client || !R2_BUCKET) {
+  return null;
+}
+
+const s3Client = buildS3Client();
+const BUCKET = STORAGE_BUCKET || R2_BUCKET;
+
+function getS3Client(): S3Client {
+  if (!s3Client || !BUCKET) {
     throw new Error(
-      "Cloudflare R2 is not fully configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, and R2_BUCKET_NAME."
+      "File storage is not configured. Set STORAGE_ENDPOINT, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, and STORAGE_BUCKET."
     );
   }
-  return r2Client;
+  return s3Client;
+}
+
+function shouldUseLocalDisk(): boolean {
+  return IS_DEV && !s3Client;
 }
 
 function isTransformableBody(body: unknown): body is { transformToByteArray: () => Promise<Uint8Array> } {
@@ -71,24 +101,24 @@ export function generateStorageKey(studentId: string, filename: string): string 
 
 /**
  * Upload a file buffer to storage.
- * Dev: saves to local ./uploads/ directory
- * Prod: uploads to Cloudflare R2 via S3-compatible API
+ * Dev (no config): saves to local ./uploads/ directory
+ * Prod: uploads via S3-compatible API (Supabase Storage or Cloudflare R2)
  */
 export async function uploadFile(
   storageKey: string,
   buffer: Buffer,
   mimeType: string
 ): Promise<void> {
-  if (IS_DEV) {
+  if (shouldUseLocalDisk()) {
     const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, buffer);
     return;
   }
 
-  await getR2Client().send(
+  await getS3Client().send(
     new PutObjectCommand({
-      Bucket: R2_BUCKET,
+      Bucket: BUCKET,
       Key: storageKey,
       Body: buffer,
       ContentType: mimeType,
@@ -100,7 +130,7 @@ export async function uploadFile(
  * Download a file from storage.
  */
 export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
-  if (IS_DEV) {
+  if (shouldUseLocalDisk()) {
     const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
     try {
       const buffer = await fs.readFile(filePath);
@@ -119,9 +149,9 @@ export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer
   }
 
   try {
-    const result = await getR2Client().send(
+    const result = await getS3Client().send(
       new GetObjectCommand({
-        Bucket: R2_BUCKET,
+        Bucket: BUCKET,
         Key: storageKey,
       })
     );
@@ -149,7 +179,7 @@ export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer
  * Delete a file from storage.
  */
 export async function deleteFile(storageKey: string): Promise<void> {
-  if (IS_DEV) {
+  if (shouldUseLocalDisk()) {
     const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
     try {
       await fs.unlink(filePath);
@@ -159,9 +189,9 @@ export async function deleteFile(storageKey: string): Promise<void> {
     return;
   }
 
-  await getR2Client().send(
+  await getS3Client().send(
     new DeleteObjectCommand({
-      Bucket: R2_BUCKET,
+      Bucket: BUCKET,
       Key: storageKey,
     })
   );
