@@ -47,3 +47,7 @@ services:
         sync: false
       - key: CRON_SECRET
         generateValue: true
+      - key: SENTRY_DSN
+        sync: false
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false

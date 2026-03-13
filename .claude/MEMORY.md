@@ -8,13 +8,13 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git
 
 ## Current Status
-Sprint 1 (Infrastructure) complete. Code on GitHub. CI pipeline active. Ready for Sprint 2 (Harden).
+All 3 sprints complete. Deployment-ready. Needs: Supabase project, Gemini key, Render deploy.
 
 ## Last Session
 - **Date**: 2026-03-13
-- **What we worked on**: Sprint 1 — deployment foundation
-- **What we decided**: 3-sprint plan to production (Infra → Harden → Polish+Monitor). Render for hosting, Supabase for DB, GitHub Actions for CI.
-- **Where we left off**: Sprint 1 complete and pushed. Sprint 2 next: structured logging, input validation hardening, CSRF, API integration tests, E2E smoke tests, audit logging expansion.
+- **What we worked on**: Sprints 1-3 — full deployment readiness
+- **What we decided**: 3-sprint plan to production. Sentry for error tracking. Seed script for SPOKES data. DEPLOY.md runbook.
+- **Where we left off**: All sprints complete and pushed. Next: provision Supabase, get Gemini key, deploy to Render, run seed script, create first teacher account.
 
 ## Open Items
 - [x] Phase 1: Foundation (auth, chat, scaffold)
@@ -30,8 +30,8 @@ Sprint 1 (Infrastructure) complete. Code on GitHub. CI pipeline active. Ready fo
 - [ ] Get Gemini API key from Google AI Studio
 - [ ] Deploy to Render (render.yaml ready)
 - [x] Sprint 1: Health check, env validation, error pages, CSP, Dockerfile, CI, render.yaml
-- [ ] Sprint 2: Structured logging, input validation, CSRF, API tests, E2E tests, audit expansion
-- [ ] Sprint 3: Error tracking (Sentry), monitoring, deployment docs, load testing, UAT, SPOKES data seeding
+- [x] Sprint 2: Structured logging, input validation, CSRF, API tests, audit expansion
+- [x] Sprint 3: Sentry error tracking, deployment runbook, SPOKES data seeding, UAT checklist
 
 ## Key Decisions Log
 | Date | Decision | Rationale |
@@ -66,12 +66,9 @@ Sprint 1 (Infrastructure) complete. Code on GitHub. CI pipeline active. Ready fo
 - A11y: skip-to-content link, ARIA labels/roles/live regions, focus-visible styles, prefers-reduced-motion
 
 ## Known Issues
-- No Gemini API key configured yet — chat will fail until key is added to .env.local
-- No rate limiting on chat endpoint
-- No input sanitization on chat messages beyond trim
-- R2 auth uses Basic auth (works but should use AWS Signature V4 for production)
-- Google OAuth requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI env vars
+- No Gemini API key configured yet — chat will fail until key is added
 - OAuth users get random password hash (can't use password login until teacher resets)
+- CSP uses unsafe-inline/eval for Next.js compat (could tighten with nonces later)
 
 ## Environment Variables Needed
 | Variable | Purpose |

@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -20,7 +21,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
-              "connect-src 'self'",
+              "connect-src 'self' https://*.ingest.sentry.io",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -36,4 +37,8 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Only upload source maps if SENTRY_AUTH_TOKEN is set
+  silent: !process.env.SENTRY_AUTH_TOKEN,
+  disableLogger: true,
+});
