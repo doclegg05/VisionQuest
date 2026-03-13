@@ -54,7 +54,7 @@ Run locally:
 openssl rand -hex 32
 
 # API key encryption key (base64-encoded 32 bytes)
-openssl rand -base64 32
+openssl rand -base64 32 | tr -d '\n'
 ```
 
 ## Step 4: Deploy to Render
@@ -66,6 +66,8 @@ openssl rand -base64 32
 3. Connect the GitHub repo
 4. Render reads `render.yaml` and creates the web service plus the hourly reminder cron service
 5. Fill in the environment variables when prompted
+6. If you edit them later, do it in each service's **Environment** page in Render. Variables marked with `sync: false`
+   in [render.yaml](/Users/brittlegg/visionquest/render.yaml) are not meant to be managed only from git after the initial setup.
 
 ### Option B: Manual
 
@@ -84,6 +86,11 @@ node scripts/run-appointment-reminders.mjs
 The cron job needs `APP_BASE_URL` and `CRON_SECRET`.
 
 ### Required Environment Variables
+
+Render input rules:
+- In the Render dashboard value fields, paste raw values without surrounding quotes.
+- Do not use Render Secret Files for these settings; use standard environment variables.
+- If you use Render's `.env` import flow, valid `.env` syntax is fine.
 
 | Variable | Value |
 |----------|-------|

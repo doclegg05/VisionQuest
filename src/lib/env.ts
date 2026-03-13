@@ -1,6 +1,6 @@
 /**
  * Environment variable validation — imported at app startup.
- * Throws immediately if a required variable is missing so deploys fail fast.
+ * Throws immediately if a required variable is missing or malformed so deploys fail fast.
  */
 
 function required(name: string): string {
@@ -16,6 +16,69 @@ function required(name: string): string {
 
 function optional(name: string): string | undefined {
   return process.env[name] || undefined;
+}
+
+function assertNoSurroundingQuotes(name: string, value: string) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    throw new Error(
+      `${name} appears to include surrounding quotes. ` +
+        `If you are setting this in the Render dashboard, paste the raw value without quotes.`
+    );
+  }
+}
+
+function assertUrlLike(name: string, value: string, protocols: string[]) {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${name} must be a valid URL.`);
+  }
+
+  if (!protocols.includes(parsed.protocol)) {
+    throw new Error(`${name} must use one of these protocols: ${protocols.join(", ")}.`);
+  }
+}
+
+function assertBase64Key(name: string, value: string, bytes: number) {
+  assertNoSurroundingQuotes(name, value);
+  const decoded = Buffer.from(value, "base64");
+  if (decoded.length !== bytes) {
+    throw new Error(`${name} must be a base64-encoded ${bytes}-byte value.`);
+  }
+}
+
+function assertMinLength(name: string, value: string, minLength: number) {
+  if (value.length < minLength) {
+    throw new Error(`${name} must be at least ${minLength} characters long.`);
+  }
+}
+
+function validateDatabaseUrl(name: string, value: string) {
+  assertNoSurroundingQuotes(name, value);
+  assertUrlLike(name, value, ["postgresql:", "postgres:"]);
+}
+
+function validateAppBaseUrl(value: string) {
+  assertNoSurroundingQuotes("APP_BASE_URL", value);
+  assertUrlLike("APP_BASE_URL", value, ["https:", "http:"]);
+}
+
+function validateGoogleRedirectUri(value?: string) {
+  if (!value) return;
+  assertNoSurroundingQuotes("GOOGLE_REDIRECT_URI", value);
+  assertUrlLike("GOOGLE_REDIRECT_URI", value, ["https:", "http:"]);
+}
+
+function validateSmtpPort(value?: string) {
+  if (!value) return;
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new Error("SMTP_PORT must be a positive integer.");
+  }
 }
 
 export const env = {
@@ -54,3 +117,21 @@ export const env = {
 
   NODE_ENV: process.env.NODE_ENV || "development",
 } as const;
+
+export function validateRuntimeEnv() {
+  validateDatabaseUrl("DATABASE_URL", env.DATABASE_URL);
+  if (env.DIRECT_URL) {
+    validateDatabaseUrl("DIRECT_URL", env.DIRECT_URL);
+  }
+
+  assertNoSurroundingQuotes("JWT_SECRET", env.JWT_SECRET);
+  assertMinLength("JWT_SECRET", env.JWT_SECRET, 32);
+  assertBase64Key("API_KEY_ENCRYPTION_KEY", env.API_KEY_ENCRYPTION_KEY, 32);
+  validateAppBaseUrl(env.APP_BASE_URL);
+  validateGoogleRedirectUri(env.GOOGLE_REDIRECT_URI);
+  validateSmtpPort(env.SMTP_PORT);
+
+  if (env.CRON_SECRET) {
+    assertNoSurroundingQuotes("CRON_SECRET", env.CRON_SECRET);
+  }
+}
