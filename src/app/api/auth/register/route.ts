@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const token = await setSessionCookie(student.id, student.role, student.sessionVersion);
+    await setSessionCookie(student.id, student.role, student.sessionVersion);
 
     await logAuditEvent({
       actorId: student.id,
@@ -85,7 +85,6 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-      token,
       student: {
         id: student.id,
         studentId: student.studentId,

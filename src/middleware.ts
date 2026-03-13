@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorizedInternalRequest, isUrlHostMatch } from "@/lib/csrf";
 
 /**
  * CSRF protection via Origin header validation.
@@ -7,6 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
  * verify the Origin or Referer header matches the app's host. This prevents
  * cross-site request forgery without requiring tokens, leveraging the browser's
  * guarantee that Origin cannot be spoofed by JavaScript.
+ *
+ * Internal automation routes can bypass Origin validation when they present the
+ * shared CRON_SECRET as a bearer token. Those routes still perform their own
+ * route-level authorization checks.
  */
 export function middleware(request: NextRequest) {
   const method = request.method.toUpperCase();
@@ -29,33 +34,30 @@ export function middleware(request: NextRequest) {
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
   const host = request.headers.get("host");
+  const authorization = request.headers.get("authorization");
 
   // In development, be lenient (tools like Postman don't send Origin)
   if (process.env.NODE_ENV !== "production") {
     return NextResponse.next();
   }
 
-  // At least one of Origin or Referer must be present and match the host
-  if (origin) {
-    try {
-      const originUrl = new URL(origin);
-      if (originUrl.host === host) {
-        return NextResponse.next();
-      }
-    } catch {
-      // Malformed origin — reject
-    }
+  if (
+    isAuthorizedInternalRequest(
+      request.nextUrl.pathname,
+      authorization,
+      process.env.CRON_SECRET
+    )
+  ) {
+    return NextResponse.next();
   }
 
-  if (referer) {
-    try {
-      const refererUrl = new URL(referer);
-      if (refererUrl.host === host) {
-        return NextResponse.next();
-      }
-    } catch {
-      // Malformed referer — reject
-    }
+  // At least one of Origin or Referer must be present and match the host
+  if (isUrlHostMatch(origin, host)) {
+    return NextResponse.next();
+  }
+
+  if (isUrlHostMatch(referer, host)) {
+    return NextResponse.next();
   }
 
   return NextResponse.json(

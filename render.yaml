@@ -53,3 +53,20 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
+  - type: cron
+    name: visionquest-appointment-reminders
+    runtime: node
+    schedule: "0 * * * *"
+    buildCommand: "true"
+    startCommand: node scripts/run-appointment-reminders.mjs
+    envVars:
+      - key: APP_BASE_URL
+        fromService:
+          type: web
+          name: visionquest
+          envVarKey: APP_BASE_URL
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: visionquest
+          envVarKey: CRON_SECRET

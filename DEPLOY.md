@@ -64,7 +64,7 @@ openssl rand -base64 32
 1. Go to [Render Dashboard](https://dashboard.render.com)
 2. Click **New → Blueprint**
 3. Connect the GitHub repo
-4. Render reads `render.yaml` and creates the service
+4. Render reads `render.yaml` and creates the web service plus the hourly reminder cron service
 5. Fill in the environment variables when prompted
 
 ### Option B: Manual
@@ -75,6 +75,13 @@ openssl rand -base64 32
    - **Start command**: `npm run prisma:migrate:deploy && npm start`
    - **Health check path**: `/api/health`
 3. Add environment variables (see below)
+4. Add a separate hourly cron job that runs:
+
+```bash
+node scripts/run-appointment-reminders.mjs
+```
+
+The cron job needs `APP_BASE_URL` and `CRON_SECRET`.
 
 ### Required Environment Variables
 
