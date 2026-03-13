@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { isValidEmail } from "@/lib/validation";
+import { isValidEmail, MAX_LENGTHS } from "@/lib/validation";
+import { logAuditEvent } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,14 +22,23 @@ export async function POST(req: NextRequest) {
     if (!studentId || studentId.length < 3) {
       return NextResponse.json({ error: "Student ID must be at least 3 characters." }, { status: 400 });
     }
-    if (!displayName || displayName.length < 1) {
+    if (studentId.length > MAX_LENGTHS.studentId) {
+      return NextResponse.json({ error: `Student ID must be ${MAX_LENGTHS.studentId} characters or fewer.` }, { status: 400 });
+    }
+    if (!displayName) {
       return NextResponse.json({ error: "Display name is required." }, { status: 400 });
+    }
+    if (displayName.length > MAX_LENGTHS.displayName) {
+      return NextResponse.json({ error: `Display name must be ${MAX_LENGTHS.displayName} characters or fewer.` }, { status: 400 });
     }
     if (!email || !isValidEmail(email)) {
       return NextResponse.json({ error: "A valid email address is required." }, { status: 400 });
     }
     if (!password || password.length < 6) {
       return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+    }
+    if (password.length > MAX_LENGTHS.password) {
+      return NextResponse.json({ error: `Password must be ${MAX_LENGTHS.password} characters or fewer.` }, { status: 400 });
     }
 
     const existing = await prisma.student.findFirst({
@@ -63,6 +74,16 @@ export async function POST(req: NextRequest) {
 
     const token = await setSessionCookie(student.id, student.role, student.sessionVersion);
 
+    await logAuditEvent({
+      actorId: student.id,
+      actorRole: student.role,
+      action: "auth.register",
+      targetType: "student",
+      targetId: student.id,
+      summary: `New student registered: ${student.studentId}.`,
+      metadata: { ip },
+    });
+
     return NextResponse.json({
       token,
       student: {
@@ -73,7 +94,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Register error:", error);
+    logger.error("Register error", { error: String(error) });
     return NextResponse.json({ error: "Registration failed." }, { status: 500 });
   }
 }

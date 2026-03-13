@@ -8,6 +8,7 @@ import {
 } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 async function requireTeacher() {
   const session = await getSession();
@@ -117,7 +118,7 @@ export async function POST(
   try {
     await sendAppointmentConfirmation(appointment.id);
   } catch (error) {
-    console.error("Failed to send appointment confirmation:", error);
+    logger.error("Failed to send appointment confirmation", { error: String(error) });
   }
 
   return NextResponse.json({ appointment });

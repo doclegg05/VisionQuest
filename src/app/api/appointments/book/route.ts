@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
   try {
     await sendAppointmentConfirmation(appointment.id);
   } catch (error) {
-    console.error("Failed to send appointment confirmation:", error);
+    logger.error("Failed to send appointment confirmation", { error: String(error) });
   }
 
   return NextResponse.json({ appointment });

@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/rate-limit";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -82,6 +83,15 @@ export async function POST(req: NextRequest) {
     data: { geminiApiKey: encrypt(apiKey) },
   });
 
+  await logAuditEvent({
+    actorId: session.id,
+    actorRole: session.role,
+    action: "settings.api_key_saved",
+    targetType: "student",
+    targetId: session.id,
+    summary: `Student saved a new Gemini API key.`,
+  });
+
   return Response.json({ success: true });
 }
 
@@ -94,6 +104,15 @@ export async function DELETE() {
   await prisma.student.update({
     where: { id: session.id },
     data: { geminiApiKey: null },
+  });
+
+  await logAuditEvent({
+    actorId: session.id,
+    actorRole: session.role,
+    action: "settings.api_key_deleted",
+    targetType: "student",
+    targetId: session.id,
+    summary: `Student deleted their Gemini API key.`,
   });
 
   return Response.json({ success: true });

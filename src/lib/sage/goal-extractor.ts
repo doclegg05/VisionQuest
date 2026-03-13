@@ -1,4 +1,5 @@
 import { generateStructuredResponse } from "../gemini";
+import { logger } from "@/lib/logger";
 
 const EXTRACTION_PROMPT = `You analyze conversations between Sage (an AI mentor) and a student in a goal-setting program.
 
@@ -64,7 +65,7 @@ export async function extractGoals(
       xp_events: parsed.xp_events || [],
     };
   } catch (error) {
-    console.error("Goal extraction failed:", error);
+    logger.error("Goal extraction failed", { error: String(error) });
     return { goals_found: [], stage_complete: false, xp_events: [] };
   }
 }

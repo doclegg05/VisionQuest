@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyPassword, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { logAuditEvent } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,10 +22,29 @@ export async function POST(req: NextRequest) {
 
     const student = await prisma.student.findUnique({ where: { studentId } });
     if (!student || !verifyPassword(password, student.passwordHash)) {
-      return NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
+      const resp = NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
+      logAuditEvent({
+        actorId: null,
+        actorRole: null,
+        action: "auth.login_failed",
+        targetType: "student",
+        summary: `Failed login attempt for student ID "${studentId}".`,
+        metadata: { ip },
+      });
+      return resp;
     }
 
     const token = await setSessionCookie(student.id, student.role, student.sessionVersion);
+
+    await logAuditEvent({
+      actorId: student.id,
+      actorRole: student.role,
+      action: "auth.login",
+      targetType: "student",
+      targetId: student.id,
+      summary: `Login successful for ${student.studentId}.`,
+      metadata: { ip },
+    });
 
     return NextResponse.json({
       token,
@@ -35,7 +56,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", { error: String(error) });
     return NextResponse.json({ error: "Login failed." }, { status: 500 });
   }
 }

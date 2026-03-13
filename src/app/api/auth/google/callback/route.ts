@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { setSessionCookie, hashPassword, normalizeEmail } from "@/lib/auth";
 import crypto from "crypto";
+import { logAuditEvent } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -123,9 +125,18 @@ export async function GET(req: NextRequest) {
     // Set session cookie
     await setSessionCookie(student.id, student.role, student.sessionVersion);
 
+    await logAuditEvent({
+      actorId: student.id,
+      actorRole: student.role,
+      action: "auth.google_login",
+      targetType: "student",
+      targetId: student.id,
+      summary: `Google OAuth login for ${student.studentId}.`,
+    });
+
     return NextResponse.redirect(new URL("/chat", req.url));
   } catch (err) {
-    console.error("OAuth callback error:", err);
+    logger.error("OAuth callback error", { error: String(err) });
     return NextResponse.redirect(new URL("/?error=oauth_failed", req.url));
   }
 }

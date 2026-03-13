@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/storage";
+import { logger } from "@/lib/logger";
 
 // GET — list student's files
 export async function GET() {
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   try {
     await uploadFile(storageKey, buffer, file.type);
   } catch (err) {
-    console.error("File upload failed:", err);
+    logger.error("File upload failed", { error: String(err) });
     return NextResponse.json({ error: "Failed to upload file to storage." }, { status: 500 });
   }
 
@@ -74,7 +75,7 @@ export async function DELETE(req: Request) {
   try {
     await deleteFile(file.storageKey);
   } catch (err) {
-    console.warn("Failed to delete file from storage (orphaned file):", file.storageKey, err);
+    logger.warn("Failed to delete file from storage (orphaned file)", { storageKey: file.storageKey, error: String(err) });
   }
   await prisma.fileUpload.delete({ where: { id } });
 

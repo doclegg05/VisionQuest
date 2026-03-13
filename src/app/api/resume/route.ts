@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export interface ResumeContent {
   objective: string;
@@ -32,7 +33,7 @@ export async function GET() {
     try {
       data = JSON.parse(resume.data);
     } catch (err) {
-      console.warn("Failed to parse resume data for student", session.id, err);
+      logger.warn("Failed to parse resume data for student", { studentId: session.id, error: String(err) });
     }
   }
   return NextResponse.json({ resume: data, displayName: session.displayName });

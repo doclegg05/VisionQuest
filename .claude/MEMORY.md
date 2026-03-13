@@ -5,16 +5,16 @@
 - **Description**: AI-coach-driven program portal for SPOKES workforce development (adults on TANF/SNAP). AI coach named "Sage" guides students through goal-setting, orientation, certification tracking, portfolio building, and employability skills.
 - **Tech stack**: Next.js 15 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL), Google Gemini API, Tailwind CSS
 - **Hosting**: Render.com
-- **Repo**: Not yet pushed to GitHub
+- **Repo**: https://github.com/doclegg05/VisionQuest.git
 
 ## Current Status
-All 8 phases complete. 37 routes compiling. Ready for deployment setup (GitHub, Turso, Gemini key, Render).
+Sprint 1 (Infrastructure) complete. Code on GitHub. CI pipeline active. Ready for Sprint 2 (Harden).
 
 ## Last Session
-- **Date**: 2026-03-11
-- **What we worked on**: Phases 7-8 (Teacher Dashboard + Polish)
-- **What we decided**: Google OAuth for school accounts, skip-to-content + ARIA for a11y, mobile "More" drawer for nav overflow, teacher can reset student passwords
-- **Where we left off**: All phases complete. Next: GitHub repo, Turso, Gemini API key, deploy to Render.
+- **Date**: 2026-03-13
+- **What we worked on**: Sprint 1 — deployment foundation
+- **What we decided**: 3-sprint plan to production (Infra → Harden → Polish+Monitor). Render for hosting, Supabase for DB, GitHub Actions for CI.
+- **Where we left off**: Sprint 1 complete and pushed. Sprint 2 next: structured logging, input validation hardening, CSRF, API integration tests, E2E smoke tests, audit logging expansion.
 
 ## Open Items
 - [x] Phase 1: Foundation (auth, chat, scaffold)
@@ -25,10 +25,13 @@ All 8 phases complete. 37 routes compiling. Ready for deployment setup (GitHub, 
 - [x] Phase 6: Employability Skills (linked as cert requirements, not standalone)
 - [x] Phase 7: Teacher Dashboard (class overview, student detail, cert verify, CSV export)
 - [x] Phase 8: Polish (mobile nav, Google OAuth, a11y, teacher password reset)
-- [ ] Set up GitHub repo and push
+- [x] Set up GitHub repo and push
 - [ ] Set up Supabase project and add connection strings to .env.local
 - [ ] Get Gemini API key from Google AI Studio
-- [ ] Deploy to Render
+- [ ] Deploy to Render (render.yaml ready)
+- [x] Sprint 1: Health check, env validation, error pages, CSP, Dockerfile, CI, render.yaml
+- [ ] Sprint 2: Structured logging, input validation, CSRF, API tests, E2E tests, audit expansion
+- [ ] Sprint 3: Error tracking (Sentry), monitoring, deployment docs, load testing, UAT, SPOKES data seeding
 
 ## Key Decisions Log
 | Date | Decision | Rationale |
@@ -44,6 +47,9 @@ All 8 phases complete. 37 routes compiling. Ready for deployment setup (GitHub, 
 | 2026-03-11 | Nav: replaced Skills with Files | Skills integrated into Certifications, Files page more useful |
 | 2026-03-11 | Google OAuth via standard OAuth 2.0 flow | No extra deps, school Google accounts |
 | 2026-03-11 | Dashboard module card: Files replaces Skills | Consistent with nav change |
+| 2026-03-13 | 3-sprint deployment plan | Sprint 1: infra, Sprint 2: harden, Sprint 3: polish+monitor |
+| 2026-03-13 | Standalone Next.js output for Docker | Smaller container, faster cold starts on Render |
+| 2026-03-13 | CSP with unsafe-inline/eval for Next.js compat | Next.js requires inline scripts; tighten with nonces in Sprint 3 |
 
 ## Architecture Notes
 - Auth: JWT in httpOnly cookies, PBKDF2 password hashing

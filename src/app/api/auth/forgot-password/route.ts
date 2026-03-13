@@ -5,6 +5,7 @@ import { generatePasswordResetToken } from "@/lib/password-reset";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail } from "@/lib/validation";
+import { logger } from "@/lib/logger";
 
 function getAppBaseUrl(req: NextRequest): string {
   return (process.env.APP_BASE_URL || new URL("/", req.url).toString()).replace(/\/$/, "");
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
       ].join(""),
     });
   } catch (error) {
-    console.error("Password reset email failed:", error);
+    logger.error("Password reset email failed", { error: String(error) });
     await prisma.passwordResetToken.deleteMany({
       where: { studentId: student.id, tokenHash },
     });

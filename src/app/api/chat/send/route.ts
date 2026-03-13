@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, determineStage, ConversationStage } from "@/lib/sage/system-prompts";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { parseState, createInitialState, recordGoalSet, recordChatSession } from "@/lib/progression/engine";
+import { logger } from "@/lib/logger";
 
 const PLATFORM_GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest) {
                 newGoals.push(goal.level);
                 existingLevels.add(goal.level);
               } catch (err) {
-                console.error(`Failed to create goal (level=${goal.level}):`, err);
+                logger.error("Failed to create goal", { level: goal.level, error: String(err) });
               }
             }
           }
@@ -221,7 +222,7 @@ export async function POST(req: NextRequest) {
               }
               await saveProgression(session.id, state);
             } catch (err) {
-              console.error("Failed to save progression for new goals:", err);
+              logger.error("Failed to save progression for new goals", { error: String(err) });
             }
           }
 
@@ -238,7 +239,7 @@ export async function POST(req: NextRequest) {
                 data: { stage: newStage },
               });
             } catch (err) {
-              console.error("Failed to update conversation stage:", err);
+              logger.error("Failed to update conversation stage", { error: String(err) });
             }
           }
 
@@ -255,14 +256,14 @@ export async function POST(req: NextRequest) {
               });
             }
           } catch (err) {
-            console.error("Failed to generate conversation title:", err);
+            logger.error("Failed to generate conversation title", { error: String(err) });
           }
-        }).catch((err) => console.error("Goal extraction error:", err));
+        }).catch((err) => logger.error("Goal extraction error", { error: String(err) }));
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversation.id })}\n\n`));
         controller.close();
       } catch (error) {
-        console.error("Stream error:", error);
+        logger.error("Stream error", { error: String(error) });
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Failed to generate response." })}\n\n`));
         controller.close();
       }
