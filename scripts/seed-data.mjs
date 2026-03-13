@@ -53,17 +53,16 @@ const SPOKES_CHECKLIST = [
   { label: "TABE assessment completed", category: "orientation", sortOrder: 4, required: true },
   { label: "Learning needs screening", category: "orientation", sortOrder: 5, required: true },
   { label: "Family survey offered", category: "orientation", sortOrder: 6, required: true },
-  // Program category
-  { label: "Attendance tracking started", category: "program", sortOrder: 0, required: true },
-  { label: "Four-week schedule assigned", category: "program", sortOrder: 1, required: true },
-  { label: "Advisor assigned", category: "program", sortOrder: 2, required: true },
-  { label: "First advising session completed", category: "program", sortOrder: 3, required: true },
-  { label: "Career pathway identified", category: "program", sortOrder: 4, required: true },
-  // Exit category
-  { label: "Exit interview completed", category: "exit", sortOrder: 0, required: true },
-  { label: "Employer name documented", category: "exit", sortOrder: 1, required: false },
-  { label: "Hourly wage documented", category: "exit", sortOrder: 2, required: false },
-  { label: "30-day follow-up scheduled", category: "exit", sortOrder: 3, required: true },
+  // Program file category
+  { label: "Student information form", category: "program_file", sortOrder: 0, required: true },
+  { label: "Emergency contact form", category: "program_file", sortOrder: 1, required: true },
+  { label: "Media release form", category: "program_file", sortOrder: 2, required: false },
+  { label: "Direct deposit authorization", category: "program_file", sortOrder: 3, required: false },
+  { label: "Dress code acknowledgment", category: "program_file", sortOrder: 4, required: true },
+  { label: "Attendance verification form", category: "program_file", sortOrder: 5, required: true },
+  { label: "WV family survey", category: "program_file", sortOrder: 6, required: true },
+  { label: "Career pathway plan", category: "program_file", sortOrder: 7, required: true },
+  { label: "Recommended referrals documented", category: "program_file", sortOrder: 8, required: false },
 ];
 
 // ---------- SPOKES Module Templates ----------
