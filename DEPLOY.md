@@ -16,11 +16,11 @@
 ## Step 1: Provision Supabase Database
 
 1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to **Project Settings → Database**
-3. Copy the **Connection string (URI)** — this is `DATABASE_URL`
-   - Use the **Transaction (port 6543)** version with `?pgbouncer=true`
-4. Copy the **Direct connection** string — this is `DIRECT_URL`
-   - Uses port 5432, needed for Prisma migrations
+2. Go to **Connect**
+3. Copy the **Session pooler** connection string — use this as `DATABASE_URL`
+   - On Render, this is the safest choice because it uses an IPv4-compatible pooler host such as `aws-0-<region>.pooler.supabase.com`
+4. Use the same **Session pooler** string for `DIRECT_URL` if Render cannot reach the direct `db.<project-ref>.supabase.co` host
+   - If you later have an IPv4-compatible direct connection, you can switch `DIRECT_URL` to that direct string for Prisma migrations
 5. Go to **SQL Editor** and run:
    ```sql
    CREATE SCHEMA IF NOT EXISTS visionquest;
@@ -74,7 +74,7 @@ openssl rand -base64 32 | tr -d '\n'
 1. **New → Web Service** → connect GitHub repo
 2. Settings:
    - **Build command**: `npm ci && npx prisma generate && npm run build`
-   - **Start command**: `npm run prisma:migrate:deploy && npm start`
+   - **Start command**: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
    - **Health check path**: `/api/health`
 3. Add environment variables (see below)
 4. Add a separate hourly cron job that runs:
@@ -95,8 +95,8 @@ Render input rules:
 | Variable | Value |
 |----------|-------|
 | `NODE_ENV` | `production` |
-| `DATABASE_URL` | Supabase pooled connection string |
-| `DIRECT_URL` | Supabase direct connection string |
+| `DATABASE_URL` | Supabase Session pooler connection string |
+| `DIRECT_URL` | Same Session pooler string on Render unless you have an IPv4-compatible direct connection |
 | `JWT_SECRET` | Output of `openssl rand -hex 32` |
 | `API_KEY_ENCRYPTION_KEY` | Output of `openssl rand -base64 32` |
 | `APP_BASE_URL` | `https://your-app.onrender.com` |
