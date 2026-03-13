@@ -263,8 +263,10 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversation.id })}\n\n`));
         controller.close();
       } catch (error) {
-        logger.error("Stream error", { error: String(error) });
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Failed to generate response." })}\n\n`));
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const errName = error instanceof Error ? error.name : "Unknown";
+        logger.error("Stream error", { name: errName, message: errMsg, error: String(error) });
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `Failed to generate response: ${errMsg}` })}\n\n`));
         controller.close();
       }
     },
