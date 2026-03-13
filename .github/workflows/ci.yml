@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+          JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+          API_KEY_ENCRYPTION_KEY: "Y2ktdGVzdC1rZXktbm90LXJlYWwtMzI="
+          APP_BASE_URL: "http://localhost:3000"
+
+      - name: Run tests
+        run: npm test
