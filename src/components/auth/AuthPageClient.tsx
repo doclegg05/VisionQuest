@@ -298,9 +298,17 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
             )}
 
-            <p className="mt-6 text-center text-xs leading-5 text-[var(--muted)]">
-              SPOKES Workforce Development Program
-            </p>
+            <div className="mt-6 flex flex-col items-center gap-2">
+              <a
+                href="/teacher-register"
+                className="text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+              >
+                Teacher? Register here
+              </a>
+              <p className="text-xs leading-5 text-[var(--muted)]">
+                SPOKES Workforce Development Program
+              </p>
+            </div>
           </div>
         </section>
       </div>
