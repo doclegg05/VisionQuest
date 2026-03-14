@@ -21,7 +21,7 @@ export async function GET(req: Request) {
         async start(controller) {
           try {
             const chat = model.startChat({
-              systemInstruction: "You are a helpful assistant. Reply briefly.",
+              systemInstruction: { parts: [{ text: "You are a helpful assistant. Reply briefly." }] },
               history: [],
             });
             const result = await chat.sendMessageStream("Say hello in one sentence.");
