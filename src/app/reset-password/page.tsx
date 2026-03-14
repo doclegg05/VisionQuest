@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import BrandLockup from "@/components/ui/BrandLockup";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -61,10 +62,11 @@ function ResetPasswordForm() {
 
   return (
     <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
+      <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
       <p className="page-eyebrow text-[var(--muted)]">Account recovery</p>
       <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Choose a new password</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Create a new password for your Visionquest account. You will be signed in right after the reset succeeds.
+        Create a new password for your VisionQuest account. You will be signed in right after the reset succeeds.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">

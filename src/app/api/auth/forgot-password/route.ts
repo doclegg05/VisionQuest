@@ -79,18 +79,18 @@ export async function POST(req: NextRequest) {
   try {
     await sendEmail({
       to: student.email,
-      subject: "Reset your Visionquest password",
+      subject: "Reset your VisionQuest password",
       text: [
         `Hi ${student.displayName},`,
         "",
-        "We received a request to reset your Visionquest password.",
+        "We received a request to reset your VisionQuest password.",
         `Use this link within the next hour: ${resetUrl}`,
         "",
         "If you did not request this, you can ignore this email.",
       ].join("\n"),
       html: [
         `<p>Hi ${student.displayName},</p>`,
-        "<p>We received a request to reset your Visionquest password.</p>",
+        "<p>We received a request to reset your VisionQuest password.</p>",
         `<p><a href="${resetUrl}">Reset your password</a></p>`,
         "<p>This link expires in 1 hour.</p>",
         "<p>If you did not request this, you can ignore this email.</p>",

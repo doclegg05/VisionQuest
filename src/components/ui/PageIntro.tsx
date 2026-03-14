@@ -9,7 +9,7 @@ interface PageIntroProps {
 }
 
 export default function PageIntro({
-  eyebrow = "Visionquest",
+  eyebrow = "SPOKES VisionQuest",
   title,
   description,
   actions,

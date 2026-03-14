@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import BrandLockup from "./BrandLockup";
 
 const NAV_ITEMS = [
   { href: "/chat", label: "Sage", icon: "💬" },
@@ -60,10 +61,12 @@ export default function NavBar({ studentName, role }: NavBarProps) {
   return (
     <>
       <div className="md:hidden fixed left-3 right-3 top-3 z-50 flex items-center justify-between rounded-[1.6rem] border border-white/50 bg-[rgba(255,255,255,0.84)] px-4 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur">
-        <div>
-          <span className="font-display text-lg text-[var(--ink-strong)]">Visionquest</span>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">Guided progress</p>
-        </div>
+        <BrandLockup
+          href="/dashboard"
+          size="sm"
+          title="VisionQuest"
+          subtitle="SPOKES Portal"
+        />
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-[var(--muted)]">{studentName}</span>
           <button
@@ -179,9 +182,14 @@ export default function NavBar({ studentName, role }: NavBarProps) {
         aria-label="Main navigation"
       >
         <div className="border-b border-white/10 p-6">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-white/45">SPOKES Portal</p>
-          <h1 className="mt-3 font-display text-[2rem]">Visionquest</h1>
-          <p className="mt-2 text-sm leading-6 text-white/68">
+          <BrandLockup
+            href="/dashboard"
+            size="md"
+            title="VisionQuest"
+            subtitle="SPOKES Program Portal"
+            theme="dark"
+          />
+          <p className="mt-4 text-sm leading-6 text-white/68">
             A guided path from big vision to daily wins.
           </p>
         </div>

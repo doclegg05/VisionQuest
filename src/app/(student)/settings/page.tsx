@@ -128,7 +128,7 @@ export default function SettingsPage() {
               {
                 step: "4",
                 title: "Copy and save it",
-                body: "Gemini keys usually begin with AIza. Paste it below and Visionquest will verify it before saving.",
+                body: "Gemini keys usually begin with AIza. Paste it below and VisionQuest will verify it before saving.",
               },
             ].map((item) => (
               <div key={item.step} className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-white/70 p-4">

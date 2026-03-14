@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import BrandLockup from "@/components/ui/BrandLockup";
 
 export default function TeacherRegisterPage() {
   const [teacherKey, setTeacherKey] = useState("");
@@ -51,6 +52,7 @@ export default function TeacherRegisterPage() {
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-xl items-center">
         <div className="panel panel-strong w-full rounded-[2rem] p-6 md:p-10">
           <div className="mb-8">
+            <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
             <p className="page-eyebrow text-[var(--muted)]">Teacher access</p>
             <h1 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
               Teacher Registration

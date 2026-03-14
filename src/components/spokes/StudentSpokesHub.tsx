@@ -159,7 +159,7 @@ export default function StudentSpokesHub({
       {!record ? (
         <div className="surface-section p-6">
           <p className="text-sm leading-6 text-[var(--muted)]">
-            Your official SPOKES record has not been set up in Visionquest yet. Your instructor can publish it here
+            Your official SPOKES record has not been set up in VisionQuest yet. Your instructor can publish it here
             once referral and program paperwork are ready.
           </p>
         </div>

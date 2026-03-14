@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import BrandLockup from "@/components/ui/BrandLockup";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to register or sign in.",
@@ -87,12 +88,17 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(255,223,159,0.26),transparent_24%),radial-gradient(circle_at_85%_12%,rgba(255,255,255,0.14),transparent_20%)]" />
           <div className="relative flex h-full flex-col">
             <div className="max-w-2xl">
-              <p className="page-eyebrow">SPOKES workforce development</p>
+              <BrandLockup
+                size="md"
+                theme="dark"
+                subtitle="SPOKES Workforce Development"
+                priority
+              />
               <h1 className="mt-4 font-display text-[clamp(2.7rem,5vw,5rem)] leading-[0.96] tracking-[-0.06em]">
                 Build momentum, one brave step at a time.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-7 text-white/80 md:text-lg">
-                Visionquest gives students a grounded, hopeful place to set goals,
+                VisionQuest gives students a grounded, hopeful place to set goals,
                 stay organized, and keep moving toward work, stability, and self-sufficiency.
               </p>
             </div>

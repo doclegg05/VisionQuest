@@ -7,6 +7,7 @@ import ChatInput from "./ChatInput";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
+import BrandLockup from "@/components/ui/BrandLockup";
 
 interface Message {
   id: string;
@@ -288,10 +289,15 @@ export default function ChatWindow() {
           <div className="mx-auto max-w-4xl space-y-4">
             {messages.length === 0 && !isLoading && (
               <div className="mt-20 text-center text-[var(--muted)]">
-                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[2rem] bg-[linear-gradient(135deg,rgba(249,115,22,0.12),rgba(15,154,146,0.18))] text-4xl shadow-[0_20px_50px_rgba(16,37,62,0.08)]">
-                  🌟
+                <div className="mx-auto mb-5 flex justify-center">
+                  <BrandLockup
+                    size="md"
+                    title="VisionQuest"
+                    subtitle="SPOKES Workforce Development"
+                    align="center"
+                  />
                 </div>
-                <p className="font-display text-3xl text-[var(--ink-strong)]">Welcome to Visionquest</p>
+                <p className="font-display text-3xl text-[var(--ink-strong)]">Welcome to VisionQuest</p>
                 <p className="mt-3 text-sm leading-6">
                   Send a message to start talking with Sage about your goals, next steps, or what feels stuck.
                 </p>

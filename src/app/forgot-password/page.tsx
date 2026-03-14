@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import BrandLockup from "@/components/ui/BrandLockup";
 
 export default function ForgotPasswordPage() {
   const [login, setLogin] = useState("");
@@ -39,6 +40,7 @@ export default function ForgotPasswordPage() {
     <main className="relative min-h-screen px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-2xl items-center">
         <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
+          <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
           <p className="page-eyebrow text-[var(--muted)]">Account recovery</p>
           <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Reset your password</h1>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)]">

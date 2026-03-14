@@ -1,0 +1,87 @@
+import Image from "next/image";
+import Link from "next/link";
+
+interface BrandLockupProps {
+  href?: string;
+  title?: string;
+  subtitle?: string;
+  size?: "sm" | "md" | "lg";
+  theme?: "light" | "dark";
+  align?: "left" | "center";
+  priority?: boolean;
+}
+
+const SIZE_MAP = {
+  sm: {
+    imageWidth: 54,
+    imageHeight: 36,
+    titleClassName: "text-base",
+    subtitleClassName: "text-[10px] tracking-[0.18em]",
+    gapClassName: "gap-2.5",
+  },
+  md: {
+    imageWidth: 76,
+    imageHeight: 50,
+    titleClassName: "text-xl",
+    subtitleClassName: "text-[11px] tracking-[0.2em]",
+    gapClassName: "gap-3",
+  },
+  lg: {
+    imageWidth: 108,
+    imageHeight: 72,
+    titleClassName: "text-[1.85rem]",
+    subtitleClassName: "text-xs tracking-[0.22em]",
+    gapClassName: "gap-4",
+  },
+} as const;
+
+export default function BrandLockup({
+  href,
+  title = "VisionQuest",
+  subtitle = "SPOKES Workforce Development",
+  size = "md",
+  theme = "light",
+  align = "left",
+  priority = false,
+}: BrandLockupProps) {
+  const sizeConfig = SIZE_MAP[size];
+  const isDark = theme === "dark";
+  const wrapperClassName = `inline-flex items-center ${sizeConfig.gapClassName} ${
+    align === "center" ? "justify-center text-center" : ""
+  }`;
+  const titleClassName = `font-display leading-none ${sizeConfig.titleClassName} ${
+    isDark ? "text-white" : "text-[var(--ink-strong)]"
+  }`;
+  const subtitleClassName = `mt-1 uppercase ${sizeConfig.subtitleClassName} ${
+    isDark ? "text-white/60" : "text-[var(--muted)]"
+  }`;
+
+  const content = (
+    <div className={wrapperClassName}>
+      <div className="relative shrink-0 overflow-hidden rounded-[1rem] bg-white/85 p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
+        <Image
+          src="/spokes-logo.png"
+          alt="SPOKES logo"
+          width={sizeConfig.imageWidth}
+          height={sizeConfig.imageHeight}
+          priority={priority}
+          className="h-auto w-auto max-w-full"
+        />
+      </div>
+      <div>
+        <p className={titleClassName}>{title}</p>
+        <p className={subtitleClassName}>{subtitle}</p>
+      </div>
+    </div>
+  );
+
+  if (!href) {
+    return content;
+  }
+
+  return (
+    <Link href={href} className="inline-flex">
+      {content}
+    </Link>
+  );
+}
