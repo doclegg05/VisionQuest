@@ -13,7 +13,7 @@ export async function generateResponse(
   const model = getModel(apiKey);
 
   const chat = model.startChat({
-    systemInstruction: { parts: [{ text: systemPrompt }] },
+    systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
     history: messages.slice(0, -1).map((m) => ({
       role: m.role,
       parts: [{ text: m.content }],
@@ -33,7 +33,7 @@ export async function* streamResponse(
   const model = getModel(apiKey);
 
   const chat = model.startChat({
-    systemInstruction: { parts: [{ text: systemPrompt }] },
+    systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
     history: messages.slice(0, -1).map((m) => ({
       role: m.role,
       parts: [{ text: m.content }],
@@ -63,7 +63,7 @@ export async function generateStructuredResponse(
   });
 
   const chat = model.startChat({
-    systemInstruction: { parts: [{ text: systemPrompt }] },
+    systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
     history: messages.slice(0, -1).map((m) => ({
       role: m.role,
       parts: [{ text: m.content }],
