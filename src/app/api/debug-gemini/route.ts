@@ -12,18 +12,17 @@ export async function GET(req: Request) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     if (testStream) {
-      // Test SSE streaming — same pattern as Sage chat
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: "You are a helpful assistant. Reply briefly.",
+      });
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            const chat = model.startChat({
-              systemInstruction: { role: "user", parts: [{ text: "You are a helpful assistant. Reply briefly." }] },
-              history: [],
-            });
+            const chat = model.startChat({ history: [] });
             const result = await chat.sendMessageStream("Say hello in one sentence.");
             let full = "";
             for await (const chunk of result.stream) {
@@ -52,7 +51,7 @@ export async function GET(req: Request) {
       });
     }
 
-    // Non-streaming test
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent("Say hello in one sentence.");
     const text = result.response.text();
     return NextResponse.json({ status: "ok", response: text, keyPrefix: apiKey.slice(0, 10) + "..." });

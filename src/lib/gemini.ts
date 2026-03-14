@@ -1,8 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export function getModel(apiKey: string) {
+const MODEL_NAME = "gemini-2.5-flash";
+
+export function getModel(apiKey: string, systemInstruction?: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  return genAI.getGenerativeModel({
+    model: MODEL_NAME,
+    ...(systemInstruction ? { systemInstruction } : {}),
+  });
 }
 
 export async function generateResponse(
@@ -10,10 +15,9 @@ export async function generateResponse(
   systemPrompt: string,
   messages: { role: "user" | "model"; content: string }[]
 ) {
-  const model = getModel(apiKey);
+  const model = getModel(apiKey, systemPrompt);
 
   const chat = model.startChat({
-    systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
     history: messages.slice(0, -1).map((m) => ({
       role: m.role,
       parts: [{ text: m.content }],
@@ -30,10 +34,9 @@ export async function* streamResponse(
   systemPrompt: string,
   messages: { role: "user" | "model"; content: string }[]
 ) {
-  const model = getModel(apiKey);
+  const model = getModel(apiKey, systemPrompt);
 
   const chat = model.startChat({
-    systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
     history: messages.slice(0, -1).map((m) => ({
       role: m.role,
       parts: [{ text: m.content }],
@@ -56,14 +59,14 @@ export async function generateStructuredResponse(
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: MODEL_NAME,
+    systemInstruction: systemPrompt,
     generationConfig: {
       responseMimeType: "application/json",
     },
   });
 
   const chat = model.startChat({
-    systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
     history: messages.slice(0, -1).map((m) => ({
       role: m.role,
       parts: [{ text: m.content }],

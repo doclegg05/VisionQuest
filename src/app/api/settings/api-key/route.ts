@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const testAI = new GoogleGenerativeAI(apiKey);
-    const model = testAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = testAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     await model.generateContent("Say hi in one word.");
   } catch {
     return Response.json(
