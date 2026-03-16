@@ -3,6 +3,8 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
+import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
+import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to register or sign in.",
@@ -39,6 +41,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [securityQuestions, setSecurityQuestions] = useState(createEmptySecurityQuestionAnswers());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -54,11 +57,19 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
     try {
       const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const body: Record<string, string> = { studentId, password };
-      if (mode === "register") {
-        body.displayName = displayName;
-        body.email = email;
-      }
+      const body =
+        mode === "register"
+          ? {
+              studentId,
+              password,
+              displayName,
+              email,
+              securityQuestions,
+            }
+          : {
+              studentId,
+              password,
+            };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -237,6 +248,14 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                     className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                   />
                 </div>
+              )}
+
+              {mode === "register" && (
+                <SecurityQuestionAnswerFields
+                  answers={securityQuestions}
+                  onChange={setSecurityQuestions}
+                  idPrefix="register-security-question"
+                />
               )}
 
               <div>

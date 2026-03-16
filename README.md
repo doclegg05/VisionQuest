@@ -39,7 +39,7 @@ Visionquest is a Next.js portal for the SPOKES workforce development program. It
 
 ## Required Environment Variables
 
-See [.env.example](/Users/brittlegg/visionquest/.env.example) for the full list.
+See [.env.example](./.env.example) for the full list.
 
 - `DATABASE_URL`
 - `DIRECT_URL`
@@ -76,7 +76,7 @@ See [.env.example](/Users/brittlegg/visionquest/.env.example) for the full list.
 5. Configure `GEMINI_API_KEY` if Sage should work without personal student keys.
 6. Configure `SMTP_*` values if students should be able to reset passwords by email.
 7. Configure storage credentials if file uploads are enabled in production.
-8. If you deploy on Render with [render.yaml](/Users/brittlegg/visionquest/render.yaml), the reminder cron service is provisioned automatically. Otherwise, schedule `node scripts/run-appointment-reminders.mjs` hourly with `APP_BASE_URL` and `CRON_SECRET`.
+8. If you deploy on Render with [render.yaml](./render.yaml), the reminder cron service is provisioned automatically. Otherwise, schedule `node scripts/run-appointment-reminders.mjs` hourly with `APP_BASE_URL` and `CRON_SECRET`.
 9. Whitelist the deployed Google OAuth callback URL in Google Cloud if Google sign-in is enabled.
 10. Promote the first teacher account after that user registers:
 
@@ -89,6 +89,7 @@ See [.env.example](/Users/brittlegg/visionquest/.env.example) for the full list.
 
    ```bash
    npm run lint
+   npm run test
    npm run build
    ```
 
@@ -100,6 +101,7 @@ See [.env.example](/Users/brittlegg/visionquest/.env.example) for the full list.
 - `npm run lint`
 - `npm run typecheck`
 - `npm run test`
+- `npm run test:smoke` (boots a local dev server with smoke-safe env defaults; override `SMOKE_BASE_URL` if needed)
 - `npm run prisma:generate`
 - `npm run prisma:migrate:deploy`
 - `npm run users:promote-teacher -- <student-id-or-email>`

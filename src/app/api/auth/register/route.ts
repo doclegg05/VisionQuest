@@ -5,6 +5,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail, MAX_LENGTHS } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { validateSecurityQuestionAnswers } from "@/lib/security-questions";
+import { hashSecurityAnswers } from "@/lib/security-question-auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +20,7 @@ export async function POST(req: NextRequest) {
     const displayName = (body.displayName || "").trim();
     const password = (body.password || "").trim();
     const email = normalizeEmail(body.email || "");
+    const securityQuestionsResult = validateSecurityQuestionAnswers(body.securityQuestions);
 
     if (!studentId || studentId.length < 3) {
       return NextResponse.json({ error: "Student ID must be at least 3 characters." }, { status: 400 });
@@ -39,6 +42,9 @@ export async function POST(req: NextRequest) {
     }
     if (password.length > MAX_LENGTHS.password) {
       return NextResponse.json({ error: `Password must be ${MAX_LENGTHS.password} characters or fewer.` }, { status: 400 });
+    }
+    if (securityQuestionsResult.error) {
+      return NextResponse.json({ error: securityQuestionsResult.error }, { status: 400 });
     }
 
     const existing = await prisma.student.findFirst({
@@ -69,6 +75,9 @@ export async function POST(req: NextRequest) {
         passwordHash: hash,
         email,
         role: "student",
+        securityQuestionAnswers: {
+          create: hashSecurityAnswers(securityQuestionsResult.answers),
+        },
       },
     });
 

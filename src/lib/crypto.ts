@@ -38,7 +38,7 @@ export function encrypt(plaintext: string): string {
 export function decrypt(ciphertext: string): string {
   const key = getEncryptionKey();
   const [ivB64, encB64, tagB64] = ciphertext.split(":");
-  if (!ivB64 || !encB64 || !tagB64) {
+  if (ivB64 === undefined || encB64 === undefined || tagB64 === undefined) {
     throw new Error("Invalid encrypted value format");
   }
 

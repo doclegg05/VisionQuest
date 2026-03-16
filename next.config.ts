@@ -1,7 +1,16 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+const repoRoot = path.dirname(fileURLToPath(import.meta.url));
+const isWindows = process.platform === "win32";
+
 const nextConfig: NextConfig = {
+  output: isWindows ? undefined : "standalone",
+  turbopack: {
+    root: repoRoot,
+  },
   async headers() {
     return [
       {
@@ -12,20 +21,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "X-XSS-Protection", value: "0" },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob:",
-              "connect-src 'self' https://*.ingest.sentry.io",
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-            ].join("; "),
-          },
+          // CSP is now set dynamically in middleware.ts with per-request nonces
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",

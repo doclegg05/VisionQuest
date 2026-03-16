@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { isTaskPriority, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
+import { sendNotification } from "@/lib/notifications";
 
 async function requireTeacher() {
   const session = await getSession();
@@ -93,6 +95,13 @@ export async function POST(
       priority: task.priority,
     },
   });
+
+  // Push in-app notification to student
+  sendNotification(studentId, {
+    type: "task",
+    title: "New task assigned",
+    body: `"${title}"${dueAt ? ` — due ${dueAt.toLocaleDateString()}` : ""}`,
+  }).catch((err) => logger.error("Failed to send notification", { error: String(err) }));
 
   return NextResponse.json({ task });
 }

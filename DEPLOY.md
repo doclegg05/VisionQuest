@@ -67,7 +67,7 @@ openssl rand -base64 32 | tr -d '\n'
 4. Render reads `render.yaml` and creates the web service plus the hourly reminder cron service
 5. Fill in the environment variables when prompted
 6. If you edit them later, do it in each service's **Environment** page in Render. Variables marked with `sync: false`
-   in [render.yaml](/Users/brittlegg/visionquest/render.yaml) are not meant to be managed only from git after the initial setup.
+   in [render.yaml](./render.yaml) are not meant to be managed only from git after the initial setup.
 
 ### Option B: Manual
 
@@ -122,6 +122,9 @@ Render input rules:
 | `CRON_SECRET` | Shared secret for internal cron routes |
 | `SENTRY_DSN` | Sentry DSN for server-side error tracking |
 | `NEXT_PUBLIC_SENTRY_DSN` | Same DSN for client-side error tracking |
+
+Blueprint note:
+`render.yaml` auto-generates `JWT_SECRET` and `CRON_SECRET`, but `API_KEY_ENCRYPTION_KEY` must be set manually because it has to be a base64-encoded 32-byte key.
 
 ## Step 5: Run Migrations
 

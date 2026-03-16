@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Manrope, Sora } from "next/font/google";
 import "./globals.css";
 
@@ -27,14 +28,17 @@ export const viewport: Viewport = {
   themeColor: "#10253e",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headerStore = await headers();
+  const nonce = headerStore.get("x-csp-nonce") ?? "";
+
   return (
-    <html lang="en">
-      <body className={`${manrope.variable} ${sora.variable} antialiased`}>
+    <html lang="en" nonce={nonce}>
+      <body className={`${manrope.variable} ${sora.variable} antialiased`} nonce={nonce}>
         {/* Skip to main content link for keyboard users */}
         <a
           href="#main-content"

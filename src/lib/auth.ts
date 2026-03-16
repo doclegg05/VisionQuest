@@ -3,8 +3,6 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
 const TOKEN_TTL = "7d";
 const COOKIE_NAME = "vq-session";
 
@@ -12,6 +10,14 @@ interface SessionClaims {
   sub: string;
   role: string;
   sv: number;
+}
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is required");
+  }
+  return secret;
 }
 
 // --- Password hashing ---
@@ -36,12 +42,12 @@ export function verifyPassword(password: string, stored: string): boolean {
 // --- JWT ---
 
 export function signToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), { expiresIn: TOKEN_TTL });
 }
 
 export function verifyToken(token: string): SessionClaims | null {
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as Partial<SessionClaims>;
+    const payload = jwt.verify(token, getJwtSecret()) as Partial<SessionClaims>;
     if (
       typeof payload.sub !== "string" ||
       typeof payload.role !== "string" ||

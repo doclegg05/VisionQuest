@@ -7,8 +7,13 @@ on:
     branches: [main]
 
 jobs:
-  lint-typecheck-build:
+  verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
 
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +22,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
       - run: npm ci
 
@@ -29,13 +38,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
-        run: npm run build
-        env:
-          DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
-          JWT_SECRET: "ci-test-secret-not-real-at-all-32"
-          API_KEY_ENCRYPTION_KEY: "Y2ktdGVzdC1rZXktbm90LXJlYWwtMzI="
-          APP_BASE_URL: "http://localhost:3000"
-
       - name: Run tests
         run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
+          python -m playwright install chromium
+
+      - name: Run smoke tests
+        run: npm run test:smoke
+        env:
+          SMOKE_SERVER_SCRIPT: start

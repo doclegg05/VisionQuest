@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withErrorHandler, unauthorized } from "@/lib/api-error";
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const events = await prisma.careerEvent.findMany({
     where: { status: { not: "archived" } },
@@ -28,4 +29,4 @@ export async function GET() {
       registration: event.registrations.find((registration) => registration.studentId === session.id) || null,
     })),
   });
-}
+});

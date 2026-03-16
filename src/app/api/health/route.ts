@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getMissingRequiredTables } from "@/lib/health";
 
 export const dynamic = "force-dynamic";
-
-const REQUIRED_TABLES = [
-  'visionquest."Student"',
-  'visionquest."RateLimitEntry"',
-  'visionquest."AuditLog"',
-] as const;
 
 export async function GET() {
   const start = Date.now();
@@ -15,16 +10,7 @@ export async function GET() {
   try {
     // Verify database connectivity and signup-critical tables.
     await prisma.$queryRaw`SELECT 1`;
-    const tableChecks = await Promise.all(
-      REQUIRED_TABLES.map((tableName) =>
-        prisma.$queryRaw<Array<{ exists: string | null }>>`
-          SELECT to_regclass(${tableName}) AS exists
-        `
-      )
-    );
-    const missingTables = tableChecks
-      .map((rows, index) => (rows[0]?.exists ? null : REQUIRED_TABLES[index]))
-      .filter((tableName): tableName is (typeof REQUIRED_TABLES)[number] => tableName !== null);
+    const missingTables = await getMissingRequiredTables(prisma);
 
     if (missingTables.length > 0) {
       return NextResponse.json(
@@ -52,7 +38,8 @@ export async function GET() {
       },
       { status: 200 }
     );
-  } catch {
+  } catch (error) {
+    console.error("Health check failed", error);
     return NextResponse.json(
       {
         status: "unhealthy",

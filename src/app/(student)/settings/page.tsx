@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import PageIntro from "@/components/ui/PageIntro";
+import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
+import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
@@ -12,14 +14,26 @@ export default function SettingsPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showTutorial, setShowTutorial] = useState(true);
 
+  const [securityQuestions, setSecurityQuestions] = useState(createEmptySecurityQuestionAnswers());
+  const [recoveryConfigured, setRecoveryConfigured] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [recoveryError, setRecoveryError] = useState("");
+
   useEffect(() => {
-    fetch("/api/settings/api-key")
-      .then((r) => r.json())
-      .then((data) => {
-        setHasKey(data.hasKey);
-        setKeyHint(data.keyHint);
-        setPlatformKeyConfigured(Boolean(data.platformKeyConfigured));
-        if (data.hasKey || data.platformKeyConfigured) setShowTutorial(false);
+    Promise.all([
+      fetch("/api/settings/api-key").then((response) => response.json()),
+      fetch("/api/settings/security-questions").then((response) => response.json()),
+    ])
+      .then(([apiKeyData, recoveryData]) => {
+        setHasKey(apiKeyData.hasKey);
+        setKeyHint(apiKeyData.keyHint);
+        setPlatformKeyConfigured(Boolean(apiKeyData.platformKeyConfigured));
+        if (apiKeyData.hasKey || apiKeyData.platformKeyConfigured) setShowTutorial(false);
+
+        setRecoveryConfigured(Boolean(recoveryData.configured));
+      })
+      .catch(() => {
+        setErrorMsg("We could not load your current settings.");
       });
   }, []);
 
@@ -55,13 +69,102 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveRecovery = async () => {
+    setRecoveryStatus("saving");
+    setRecoveryError("");
+
+    try {
+      const res = await fetch("/api/settings/security-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ securityQuestions }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setRecoveryStatus("error");
+        setRecoveryError(data.error || "We could not save your classroom recovery questions.");
+        return;
+      }
+
+      setRecoveryConfigured(true);
+      setRecoveryStatus("success");
+      setSecurityQuestions(createEmptySecurityQuestionAnswers());
+      setTimeout(() => setRecoveryStatus("idle"), 3000);
+    } catch {
+      setRecoveryStatus("error");
+      setRecoveryError("We could not contact the server. Please try again.");
+    }
+  };
+
   return (
     <div className="page-shell">
       <PageIntro
         eyebrow="Configuration"
         title="Settings"
-        description="Sage can run on the program's shared Gemini key or a personal key you add here."
+        description="Manage Sage access and the classroom-only recovery questions used for internal password resets."
       />
+
+      <div className="surface-section mb-6 p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="page-eyebrow text-[var(--muted)]">Classroom recovery</p>
+            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
+              Recovery questions
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+              This lower-security reset option is meant only for your classroom deployment. If you forget your password, you can answer these questions and choose a new one without email.
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+              recoveryConfigured
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-amber-100 text-amber-800"
+            }`}
+          >
+            {recoveryConfigured ? "Configured" : "Not set up yet"}
+          </span>
+        </div>
+
+        {recoveryConfigured && (
+          <p className="mt-4 text-sm text-[var(--muted)]">
+            Updating the questions here replaces your previous classroom recovery answers. You will need to enter all three answers again to save changes.
+          </p>
+        )}
+
+        <div className="mt-6">
+          <SecurityQuestionAnswerFields
+            answers={securityQuestions}
+            onChange={setSecurityQuestions}
+            idPrefix="settings-security-question"
+            title="Save your three recovery answers"
+            description="Keep the answers memorable but not obvious. Answers are stored as hashes, not plain text."
+          />
+        </div>
+
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleSaveRecovery}
+            disabled={recoveryStatus === "saving"}
+            type="button"
+            className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {recoveryStatus === "saving"
+              ? "Saving..."
+              : recoveryConfigured
+                ? "Update recovery questions"
+                : "Save recovery questions"}
+          </button>
+
+          {recoveryStatus === "success" && (
+            <p className="text-sm text-emerald-600">Recovery questions saved.</p>
+          )}
+          {recoveryStatus === "error" && (
+            <p className="text-sm text-red-600">{recoveryError}</p>
+          )}
+        </div>
+      </div>
 
       {(hasKey || platformKeyConfigured) && (
         <div className="surface-section mb-6 flex items-center justify-between gap-4 p-5">

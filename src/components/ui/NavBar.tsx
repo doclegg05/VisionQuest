@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import BrandLockup from "./BrandLockup";
+import NotificationBell from "./NotificationBell";
 
 const NAV_ITEMS = [
   { href: "/chat", label: "Sage", icon: "💬" },
@@ -67,8 +68,11 @@ export default function NavBar({ studentName, role }: NavBarProps) {
           title="VisionQuest"
           subtitle="SPOKES Portal"
         />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-[var(--muted)]">{studentName}</span>
+          <div className="text-[var(--ink-strong)]">
+            <NotificationBell />
+          </div>
           <button
             onClick={handleLogout}
             type="button"
@@ -250,14 +254,17 @@ export default function NavBar({ studentName, role }: NavBarProps) {
               <p className="text-sm font-semibold">{studentName}</p>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">{role}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              type="button"
-              className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label="Log out"
-            >
-              Log out
-            </button>
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <button
+                onClick={handleLogout}
+                type="button"
+                className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="Log out"
+              >
+                Log out
+              </button>
+            </div>
           </div>
         </div>
       </aside>

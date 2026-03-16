@@ -3,11 +3,12 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress, validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
+import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
 
 // GET — get student's certification with requirements
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   // Get all templates
   const templates = await prisma.certTemplate.findMany({
@@ -77,17 +78,15 @@ export async function GET() {
     total,
     done,
   });
-}
+});
 
 // POST — mark a requirement as completed (self-report)
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const { requirementId, completed, fileId, notes } = await req.json();
-  if (!requirementId) {
-    return NextResponse.json({ error: "requirementId is required" }, { status: 400 });
-  }
+  if (!requirementId) throw badRequest("requirementId is required");
 
   // Verify the requirement belongs to this student's certification
   const requirement = await prisma.certRequirement.findFirst({
@@ -107,7 +106,7 @@ export async function POST(req: Request) {
   });
 
   if (!requirement || requirement.certification.studentId !== session.id) {
-    return NextResponse.json({ error: "Requirement not found" }, { status: 404 });
+    throw notFound("Requirement not found");
   }
 
   if (fileId !== undefined && fileId !== null) {
@@ -116,9 +115,7 @@ export async function POST(req: Request) {
       select: { id: true },
     });
 
-    if (!file) {
-      return NextResponse.json({ error: "Attached file was not found." }, { status: 400 });
-    }
+    if (!file) throw notFound("Attached file was not found");
   }
 
   const nextState = {
@@ -130,9 +127,7 @@ export async function POST(req: Request) {
   if (typeof completed === "boolean" || fileId !== undefined) {
     const validationError = validateRequirementUpdate(requirement.template, nextState);
 
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
-    }
+    if (validationError) throw badRequest(validationError);
   }
 
   const data: Record<string, unknown> = {};
@@ -156,4 +151,4 @@ export async function POST(req: Request) {
   await recomputeCertificationStatus(requirement.certificationId, requirement.template.certType);
 
   return NextResponse.json({ ok: true });
-}
+});

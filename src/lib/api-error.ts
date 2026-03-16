@@ -1,0 +1,77 @@
+import { NextResponse } from "next/server";
+import { logger } from "./logger";
+
+/**
+ * Structured API error with HTTP status code.
+ * Throw from any route handler wrapped by `withErrorHandler`.
+ */
+export class ApiError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+// --- Factory helpers ---
+
+export function unauthorized(msg = "Unauthorized") {
+  return new ApiError(401, msg, "UNAUTHORIZED");
+}
+
+export function badRequest(msg: string) {
+  return new ApiError(400, msg, "BAD_REQUEST");
+}
+
+export function notFound(msg = "Not found") {
+  return new ApiError(404, msg, "NOT_FOUND");
+}
+
+export function conflict(msg: string) {
+  return new ApiError(409, msg, "CONFLICT");
+}
+
+export function rateLimited(msg = "Too many requests, please try again later") {
+  return new ApiError(429, msg, "RATE_LIMITED");
+}
+
+// --- Error response builder ---
+
+function errorResponse(status: number, message: string, code?: string) {
+  return NextResponse.json(
+    { error: message, ...(code && { code }) },
+    { status },
+  );
+}
+
+/**
+ * Wraps a Next.js route handler with standardized error handling.
+ *
+ * Usage:
+ *   export const GET = withErrorHandler(async (req) => {
+ *     const session = await getSession();
+ *     if (!session) throw unauthorized();
+ *     // ... return NextResponse.json(...)
+ *   });
+ */
+export function withErrorHandler<
+  Args extends unknown[],
+>(
+  handler: (...args: Args) => Promise<Response>,
+): (...args: Args) => Promise<Response> {
+  return async (...args: Args) => {
+    try {
+      return await handler(...args);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        return errorResponse(err.statusCode, err.message, err.code);
+      }
+
+      logger.error("Unhandled API error", { error: String(err) });
+      return errorResponse(500, "Internal server error", "INTERNAL_ERROR");
+    }
+  };
+}

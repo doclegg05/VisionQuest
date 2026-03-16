@@ -8,6 +8,7 @@ import { buildSystemPrompt, determineStage, ConversationStage } from "@/lib/sage
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { parseState, createInitialState, recordGoalSet, recordChatSession } from "@/lib/progression/engine";
 import { logger } from "@/lib/logger";
+import { invalidatePrefix } from "@/lib/cache";
 
 const PLATFORM_GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -27,6 +28,7 @@ async function saveProgression(studentId: string, state: ReturnType<typeof creat
     update: { state: JSON.stringify(state) },
     create: { studentId, state: JSON.stringify(state) },
   });
+  invalidatePrefix(`progression:${studentId}`);
 }
 
 export async function POST(req: NextRequest) {
@@ -211,6 +213,10 @@ export async function POST(req: NextRequest) {
                 logger.error("Failed to create goal", { level: goal.level, error: String(err) });
               }
             }
+          }
+
+          if (newGoals.length > 0) {
+            invalidatePrefix(`goals:${session.id}`);
           }
 
           // Award XP for new goals

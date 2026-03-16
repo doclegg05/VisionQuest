@@ -3,11 +3,12 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/storage";
 import { logger } from "@/lib/logger";
+import { ApiError, withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
 
 // GET — list student's files
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const files = await prisma.fileUpload.findMany({
     where: { studentId: session.id },
@@ -15,25 +16,21 @@ export async function GET() {
   });
 
   return NextResponse.json({ files });
-}
+});
 
 // POST — upload a file
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const category = (formData.get("category") as string) || "general";
 
-  if (!file) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
-  }
+  if (!file) throw badRequest("No file provided");
 
   const validationError = validateFile({ size: file.size, type: file.type });
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 });
-  }
+  if (validationError) throw badRequest(validationError);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const storageKey = generateStorageKey(session.id, file.name);
@@ -42,7 +39,7 @@ export async function POST(req: Request) {
     await uploadFile(storageKey, buffer, file.type);
   } catch (err) {
     logger.error("File upload failed", { error: String(err) });
-    return NextResponse.json({ error: "Failed to upload file to storage." }, { status: 500 });
+    throw new ApiError(500, "Failed to upload file to storage");
   }
 
   const record = await prisma.fileUpload.create({
@@ -57,20 +54,20 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ file: record });
-}
+});
 
 // DELETE — delete a file
-export async function DELETE(req: Request) {
+export const DELETE = withErrorHandler(async (req: Request) => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const { id } = await req.json();
-  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (!id) throw badRequest("id is required");
 
   const file = await prisma.fileUpload.findFirst({
     where: { id, studentId: session.id },
   });
-  if (!file) return NextResponse.json({ error: "File not found" }, { status: 404 });
+  if (!file) throw notFound("File not found");
 
   try {
     await deleteFile(file.storageKey);
@@ -80,4 +77,4 @@ export async function DELETE(req: Request) {
   await prisma.fileUpload.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });
-}
+});

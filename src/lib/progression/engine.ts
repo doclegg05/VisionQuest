@@ -21,7 +21,7 @@ export const ACHIEVEMENT_DEFS: Record<string, { label: string; desc: string }> =
   "xp:monthly_set":      { label: "Monthly Mapper",      desc: "Set a monthly goal" },
   "xp:weekly_set":       { label: "Weekly Warrior",       desc: "Set a weekly goal" },
   "xp:daily_set":        { label: "Daily Driver",         desc: "Set a daily goal" },
-  "xp:tasks_set":        { label: "Action Taker",         desc: "Created action tasks" },
+  "xp:task_set":         { label: "Action Taker",         desc: "Created action tasks" },
   "xp:daily_checkin":    { label: "Check-In Champ",       desc: "Completed a daily check-in" },
   "xp:task_complete":    { label: "Task Crusher",          desc: "Completed a task" },
   "xp:growth_prompt":    { label: "Deep Thinker",          desc: "Reflected on a growth prompt" },

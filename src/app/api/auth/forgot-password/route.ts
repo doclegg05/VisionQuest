@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (!isEmailDeliveryConfigured()) {
     return NextResponse.json({
       ok: true,
-      message: "Password reset email is not configured here yet. Please contact your program staff for help signing in.",
+      message: "Password reset email is not configured here yet. Use the classroom recovery questions below or contact your program staff.",
     });
   }
 

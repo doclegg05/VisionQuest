@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
+import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
 
 // GET — list student's portfolio items
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const items = await prisma.portfolioItem.findMany({
     where: { studentId: session.id },
@@ -14,26 +15,24 @@ export async function GET() {
   });
 
   return NextResponse.json({ items });
-}
+});
 
 // POST — create a portfolio item
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req: Request) => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const { title, description, type, fileId, url } = await req.json();
-  if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
+  if (!title) throw badRequest("title is required");
   if (url && !isValidUrl(url)) {
-    return NextResponse.json({ error: "Invalid URL. Only http and https URLs are allowed." }, { status: 400 });
+    throw badRequest("Invalid URL. Only http and https URLs are allowed");
   }
   if (fileId) {
     const file = await prisma.fileUpload.findFirst({
       where: { id: fileId, studentId: session.id },
       select: { id: true },
     });
-    if (!file) {
-      return NextResponse.json({ error: "Attached file was not found." }, { status: 400 });
-    }
+    if (!file) throw notFound("Attached file was not found");
   }
 
   const maxOrder = await prisma.portfolioItem.aggregate({
@@ -54,31 +53,29 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ item });
-}
+});
 
 // PUT — update a portfolio item
-export async function PUT(req: Request) {
+export const PUT = withErrorHandler(async (req: Request) => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const { id, title, description, type, fileId, url } = await req.json();
-  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (!id) throw badRequest("id is required");
 
   const existing = await prisma.portfolioItem.findFirst({
     where: { id, studentId: session.id },
   });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) throw notFound("Not found");
   if (url && !isValidUrl(url)) {
-    return NextResponse.json({ error: "Invalid URL. Only http and https URLs are allowed." }, { status: 400 });
+    throw badRequest("Invalid URL. Only http and https URLs are allowed");
   }
   if (fileId) {
     const file = await prisma.fileUpload.findFirst({
       where: { id: fileId, studentId: session.id },
       select: { id: true },
     });
-    if (!file) {
-      return NextResponse.json({ error: "Attached file was not found." }, { status: 400 });
-    }
+    if (!file) throw notFound("Attached file was not found");
   }
 
   const data: Record<string, unknown> = {};
@@ -90,21 +87,21 @@ export async function PUT(req: Request) {
 
   const item = await prisma.portfolioItem.update({ where: { id }, data });
   return NextResponse.json({ item });
-}
+});
 
 // DELETE — remove a portfolio item
-export async function DELETE(req: Request) {
+export const DELETE = withErrorHandler(async (req: Request) => {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session) throw unauthorized();
 
   const { id } = await req.json();
-  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (!id) throw badRequest("id is required");
 
   const existing = await prisma.portfolioItem.findFirst({
     where: { id, studentId: session.id },
   });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) throw notFound("Not found");
 
   await prisma.portfolioItem.delete({ where: { id } });
   return NextResponse.json({ ok: true });
-}
+});
