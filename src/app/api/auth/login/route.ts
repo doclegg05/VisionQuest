@@ -34,6 +34,10 @@ export async function POST(req: NextRequest) {
       return resp;
     }
 
+    if (!student.isActive) {
+      return NextResponse.json({ error: "This account has been deactivated. Please contact your instructor." }, { status: 403 });
+    }
+
     await setSessionCookie(student.id, student.role, student.sessionVersion);
 
     await logAuditEvent({

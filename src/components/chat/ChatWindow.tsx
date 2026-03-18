@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { useProgression } from "@/components/progression/ProgressionProvider";
 
 interface Message {
   id: string;
@@ -24,7 +26,9 @@ async function getErrorMessage(res: Response) {
   }
 }
 
-export default function ChatWindow() {
+function ChatWindowInner() {
+  const searchParams = useSearchParams();
+  const { checkProgression } = useProgression();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -238,6 +242,8 @@ export default function ChatWindow() {
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingContent("");
         pollForGoals(prevGoalCount);
+        // Check for XP/achievement/level changes
+        setTimeout(() => checkProgression(), 2000);
       } catch (err) {
         console.error("Send error:", err);
         const message = err instanceof Error ? err.message : "Sorry, I had trouble responding. Please try again.";
@@ -256,8 +262,31 @@ export default function ChatWindow() {
         setIsLoading(false);
       }
     },
-    [conversationId, pollForGoals, refreshConversationList]
+    [conversationId, pollForGoals, refreshConversationList, checkProgression]
   );
+
+  // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
+  useEffect(() => {
+    const topic = searchParams.get("topic");
+    const name = searchParams.get("name");
+
+    if (topic && name && messages.length === 0 && !conversationId) {
+      let autoMessage = "";
+      if (topic === "form") {
+        autoMessage = `Can you tell me about the "${name}" form? What is it for and what do I need to know about it?`;
+      } else if (topic === "cert") {
+        autoMessage = `I'd like to learn about the ${name} certification. What does it involve and how do I get started?`;
+      } else if (topic === "platform") {
+        autoMessage = `Can you help me understand how to use ${name}? How do I get started with it?`;
+      } else {
+        autoMessage = `I have a question about ${name}.`;
+      }
+
+      // Auto-send after a brief delay to let the UI render
+      setTimeout(() => handleSend(autoMessage), 500);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative flex h-[72vh] min-h-[72vh]">
@@ -365,5 +394,13 @@ export default function ChatWindow() {
         />
       )}
     </div>
+  );
+}
+
+export default function ChatWindow() {
+  return (
+    <Suspense>
+      <ChatWindowInner />
+    </Suspense>
   );
 }

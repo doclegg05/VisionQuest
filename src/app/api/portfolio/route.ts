@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
 import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { parseState, createInitialState, recordPortfolioItem } from "@/lib/progression/engine";
+import { logger } from "@/lib/logger";
 
 // GET — list student's portfolio items
 export const GET = withErrorHandler(async () => {
@@ -51,6 +53,21 @@ export const POST = withErrorHandler(async (req: Request) => {
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
     },
   });
+
+  // Record portfolio progression
+  try {
+    const progExisting = await prisma.progression.findUnique({ where: { studentId: session.id } });
+    const progState = progExisting ? parseState(progExisting.state) : createInitialState();
+    const portfolioType = (type === "resume") ? "resume" : "item";
+    recordPortfolioItem(progState, portfolioType);
+    await prisma.progression.upsert({
+      where: { studentId: session.id },
+      update: { state: JSON.stringify(progState) },
+      create: { studentId: session.id, state: JSON.stringify(progState) },
+    });
+  } catch (err) {
+    logger.error("Failed to record portfolio progression", { error: String(err) });
+  }
 
   return NextResponse.json({ item });
 });

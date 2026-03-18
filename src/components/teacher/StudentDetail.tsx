@@ -2,6 +2,9 @@
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import GoalTree from "./GoalTree";
+import ReadinessScore from "@/components/ui/ReadinessScore";
+import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 
 interface GoalData {
   id: string;
@@ -51,6 +54,10 @@ interface ConversationSummary {
   title: string | null;
   updatedAt: string;
   lastMessagePreview: string | null;
+  messageCount: number;
+  userMessageCount: number;
+  createdAt: string;
+  duration: number | null;
 }
 
 interface PortfolioItemData {
@@ -155,6 +162,7 @@ interface StudentData {
     displayName: string;
     email: string | null;
     createdAt: string;
+    isActive: boolean;
   };
   progression: {
     xp: number;
@@ -162,6 +170,8 @@ interface StudentData {
     streaks: { daily: { current: number; longest: number } };
     achievements: string[];
   };
+  readinessScore: number;
+  readinessBreakdown: ReadinessBreakdown;
   goals: GoalData[];
   orientation: {
     items: OrientationItemData[];
@@ -188,7 +198,6 @@ interface StudentData {
   conversations: ConversationSummary[];
 }
 
-const GOAL_LEVELS = ["bhag", "monthly", "weekly", "daily", "task"];
 const NOTE_CATEGORIES = [
   { value: "general", label: "General" },
   { value: "check_in", label: "Check-in" },
@@ -227,6 +236,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [resetStatus, setResetStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [deactivating, setDeactivating] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [showAllConversations, setShowAllConversations] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
@@ -324,6 +336,26 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       }
     } catch {
       setResetStatus("error");
+    }
+  }
+
+  async function toggleStudentStatus() {
+    if (!data) return;
+    setDeactivating(true);
+    try {
+      const res = await fetch(`/api/teacher/students/${studentId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !data.student.isActive }),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch (err) {
+      console.error("Failed to toggle student status:", err);
+    } finally {
+      setDeactivating(false);
+      setConfirmDeactivate(false);
     }
   }
 
@@ -487,6 +519,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const {
     student,
     progression,
+    readinessScore,
+    readinessBreakdown,
     goals,
     orientation,
     certification,
@@ -578,9 +612,68 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 </span>
               </div>
             )}
+
+            {/* Account Status */}
+            <div className="mt-4 flex items-center gap-3">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                student.isActive
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-red-100 text-red-700"
+              }`}>
+                {student.isActive ? "Active" : "Inactive"}
+              </span>
+              <span className="text-xs text-[var(--muted)]">
+                Registered {new Date(student.createdAt).toLocaleDateString()}
+              </span>
+              {student.email && (
+                <span className="text-xs text-[var(--muted)]">{student.email}</span>
+              )}
+            </div>
+
+            {/* Deactivate/Reactivate */}
+            <div className="mt-3">
+              {!confirmDeactivate ? (
+                <button
+                  onClick={() => setConfirmDeactivate(true)}
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
+                    student.isActive
+                      ? "border border-red-200 text-red-600 hover:bg-red-50"
+                      : "border border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                  }`}
+                >
+                  {student.isActive ? "Deactivate Account" : "Reactivate Account"}
+                </button>
+              ) : (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm text-red-800">
+                    {student.isActive
+                      ? "This will log the student out and prevent future login. Their data is preserved."
+                      : "This will allow the student to log in again."}
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={toggleStudentStatus}
+                      disabled={deactivating}
+                      className={`rounded-lg px-4 py-2 text-xs font-semibold text-white ${
+                        student.isActive ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
+                      }`}
+                    >
+                      {deactivating ? "Processing..." : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeactivate(false)}
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="flex gap-4 text-center flex-wrap">
+          <div className="flex gap-4 text-center flex-wrap items-start">
+            <ReadinessScore score={readinessScore} size="sm" />
             <div>
               <p className="text-lg font-bold text-blue-600">Lv {progression.level}</p>
               <p className="text-xs text-gray-400">{progression.xp} XP</p>
@@ -1039,38 +1132,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Goals ({goals.length})</h3>
-        {goals.length === 0 ? (
-          <p className="text-sm text-gray-400">No goals set yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {GOAL_LEVELS.map((level) => {
-              const levelGoals = goals.filter((goal) => goal.level === level);
-              if (levelGoals.length === 0) return null;
-
-              return (
-                <div key={level}>
-                  <p className="text-xs font-medium text-gray-500 uppercase mb-1">{level}</p>
-                  {levelGoals.map((goal) => (
-                    <div key={goal.id} className="flex items-start gap-2 ml-2 mb-1">
-                      <span
-                        className={`text-xs mt-0.5 ${
-                          goal.status === "completed"
-                            ? "text-green-500"
-                            : goal.status === "active"
-                              ? "text-blue-500"
-                              : "text-gray-400"
-                        }`}
-                      >
-                        {goal.status === "completed" ? "✓" : "○"}
-                      </span>
-                      <p className="text-sm text-gray-700">{goal.content}</p>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <GoalTree goals={goals} />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -1315,29 +1377,41 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           <p className="text-sm text-gray-400">No conversations yet.</p>
         ) : (
           <div className="space-y-2">
-            {conversations.slice(0, 10).map((conversation) => (
-              <div key={conversation.id} className="border border-gray-100 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded capitalize">
-                      {conversation.module}
-                    </span>
-                    <span className="text-xs text-gray-400 capitalize">{conversation.stage}</span>
+            {(showAllConversations ? conversations : conversations.slice(0, 20)).map((conv) => (
+              <div key={conv.id} className="surface-section p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{conv.module === "goal" ? "\uD83C\uDFAF" : "\uD83D\uDCAC"}</span>
+                      <p className="text-sm font-semibold text-[var(--ink-strong)]">
+                        {conv.title || `${conv.stage} conversation`}
+                      </p>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-secondary)]">
+                        {conv.stage}
+                      </span>
+                      <span className="text-[10px] text-[var(--muted)]">
+                        {conv.messageCount} messages ({conv.userMessageCount} from student)
+                      </span>
+                    </div>
+                    {conv.lastMessagePreview && (
+                      <p className="mt-2 text-xs text-[var(--muted)] line-clamp-2">&ldquo;{conv.lastMessagePreview}&rdquo;</p>
+                    )}
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(conversation.updatedAt).toLocaleDateString()}
+                  <span className="shrink-0 text-[10px] text-[var(--muted)]">
+                    {new Date(conv.updatedAt).toLocaleDateString()}
                   </span>
                 </div>
-                {conversation.title && <p className="text-sm font-medium text-gray-700">{conversation.title}</p>}
-                {conversation.lastMessagePreview && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{conversation.lastMessagePreview}</p>
-                )}
               </div>
             ))}
-            {conversations.length > 10 && (
-              <p className="text-xs text-gray-400 text-center">
-                Showing 10 of {conversations.length} conversations
-              </p>
+            {!showAllConversations && conversations.length > 20 && (
+              <button
+                onClick={() => setShowAllConversations(true)}
+                className="w-full text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] py-2"
+              >
+                Show all {conversations.length} conversations
+              </button>
             )}
           </div>
         )}

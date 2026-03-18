@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { syncStudentAlerts } from "@/lib/advising";
@@ -9,6 +10,8 @@ import {
   getXpProgress,
   parseState,
 } from "@/lib/progression/engine";
+import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
+import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import DashboardClient from "./DashboardClient";
 
 const MODULES = [
@@ -18,10 +21,12 @@ const MODULES = [
   { href: "/orientation", label: "Orientation", icon: "📋", description: "Handle onboarding steps and know what’s left.", glow: "from-emerald-300/40 via-green-200/10 to-transparent" },
   { href: "/spokes", label: "My SPOKES Record", icon: "🧭", description: "See the official referral, paperwork, modules, and follow-up milestones your teacher tracks.", glow: "from-lime-300/40 via-emerald-200/10 to-transparent" },
   { href: "/courses", label: "Courses", icon: "📚", description: "Browse learning resources curated for the program.", glow: "from-violet-300/40 via-fuchsia-200/10 to-transparent" },
+  { href: "/resources", label: "Resources", icon: "📄", description: "Reference guide for program forms, certification documents, and compliance paperwork.", glow: "from-slate-300/40 via-zinc-200/10 to-transparent" },
   { href: "/opportunities", label: "Opportunities", icon: "🚀", description: "Track jobs, internships, and other openings worth acting on.", glow: "from-cyan-300/40 via-sky-200/10 to-transparent" },
   { href: "/events", label: "Events", icon: "🎟️", description: "Register for workshops, hiring events, and networking opportunities.", glow: "from-pink-300/40 via-rose-200/10 to-transparent" },
   { href: "/certifications", label: "Certifications", icon: "🏆", description: "Track progress toward your Ready to Work credential.", glow: "from-yellow-300/45 via-amber-200/10 to-transparent" },
   { href: "/portfolio", label: "Portfolio", icon: "💼", description: "Collect evidence of your skills and achievements.", glow: "from-rose-300/40 via-orange-200/10 to-transparent" },
+  { href: "/vision-board", label: "Vision Board", icon: "📌", description: "Pin your dreams, goals, and inspirations to a personal corkboard.", glow: "from-amber-300/40 via-yellow-200/10 to-transparent" },
   { href: "/files", label: "My Files", icon: "📁", description: "Keep documents and uploads organized in one place.", glow: "from-indigo-300/40 via-sky-200/10 to-transparent" },
 ];
 
@@ -74,9 +79,30 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  // Redirect brand-new students to the welcome flow
+  if (goalCount === 0 && !progression) {
+    const convCount = await prisma.conversation.count({ where: { studentId: session.id } });
+    if (convCount === 0) {
+      redirect("/welcome");
+    }
+  }
+
   const state = progression ? parseState(progression.state) : createInitialState();
+  const readiness = computeReadinessScore(state);
   const xpProgress = getXpProgress(state);
   const achievements = getAchievementsWithDefs(state);
+
+  const lastLevelUp = state.levelUpHistory?.length > 0
+    ? { ...state.levelUpHistory[state.levelUpHistory.length - 1] }
+    : null;
+
+  // Get goal suggestions from BHAG
+  const activeGoals = await prisma.goal.findMany({
+    where: { studentId: session.id, status: "active" },
+    select: { content: true },
+  });
+  const goalTexts = activeGoals.map(g => g.content);
+  const goalMatchResult = matchGoalsToPlatforms(goalTexts);
 
   return (
     <div className="page-shell">
@@ -125,6 +151,16 @@ export default async function DashboardPage() {
           dueAt: task.dueAt ? task.dueAt.toISOString() : null,
         }))}
         alertCount={alertCount}
+        lastLevelUp={lastLevelUp}
+        xp={state.xp}
+        hasGoals={goalCount > 0}
+        orientationComplete={state.orientationComplete || false}
+        certificationsStarted={state.certificationsStarted || 0}
+        platformsVisited={state.platformsVisited?.length || 0}
+        resumeCreated={state.resumeCreated || false}
+        goalSuggestions={goalMatchResult.suggestions}
+        readinessScore={readiness.score}
+        readinessBreakdown={readiness.breakdown}
       />
 
       <div className="mb-4 mt-8 flex items-end justify-between gap-4">

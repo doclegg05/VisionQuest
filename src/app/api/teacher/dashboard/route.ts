@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { syncAlertsForStudents } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress } from "@/lib/certifications";
+import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
 async function requireTeacher() {
   const session = await getSession();
@@ -18,12 +19,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
+  const showInactive = url.searchParams.get("showInactive") === "true";
   const now = new Date();
   const upcomingWindow = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7);
 
-  const total = await prisma.student.count({ where: { role: "student" } });
+  const studentWhere = { role: "student" as const, ...(showInactive ? {} : { isActive: true }) };
+  const total = await prisma.student.count({ where: studentWhere });
   const allStudentIds = await prisma.student.findMany({
-    where: { role: "student" },
+    where: studentWhere,
     select: { id: true },
     orderBy: { displayName: "asc" },
   });
@@ -31,12 +34,13 @@ export async function GET(req: Request) {
   await syncAlertsForStudents(allStudentIds.map((student) => student.id));
 
   const students = await prisma.student.findMany({
-    where: { role: "student" },
+    where: studentWhere,
     select: {
       id: true,
       studentId: true,
       displayName: true,
       createdAt: true,
+      isActive: true,
       progression: { select: { state: true } },
       goals: {
         select: { level: true, status: true },
@@ -99,19 +103,29 @@ export async function GET(req: Request) {
     let xp = 0;
     let level = 1;
     let streak = 0;
+    let longestStreak = 0;
+    let platformsVisited: string[] = [];
+    let portfolioShared = false;
     if (s.progression?.state) {
       try {
         const state = JSON.parse(s.progression.state);
         xp = state.xp || 0;
         level = state.level || 1;
         streak = state.streaks?.daily?.current || 0;
+        longestStreak = state.streaks?.daily?.longest || 0;
+        platformsVisited = state.platformsVisited || [];
+        portfolioShared = !!state.portfolioShared;
       } catch { /* ignore */ }
     }
 
     // Goals summary
     const goalsByLevel: Record<string, number> = {};
+    const completedGoalLevels: string[] = [];
     for (const g of s.goals) {
       goalsByLevel[g.level] = (goalsByLevel[g.level] || 0) + 1;
+      if (g.status === "completed" && !completedGoalLevels.includes(g.level)) {
+        completedGoalLevels.push(g.level);
+      }
     }
     const hasBhag = !!goalsByLevel["bhag"];
 
@@ -124,11 +138,28 @@ export async function GET(req: Request) {
       ? cert.requirements.filter((r) => r.completed && !r.verifiedBy).length
       : 0;
 
+    // Readiness score
+    const readiness = computeReadinessScore(
+      {
+        orientationComplete: s.orientationProgress.length >= orientationTotal && orientationTotal > 0,
+        completedGoalLevels,
+        certificationsEarned: certDone,
+        portfolioItemCount: s.portfolioItems.length,
+        resumeCreated: !!s.resumeData,
+        portfolioShared,
+        platformsVisited,
+        longestStreak,
+        level,
+      },
+      certTemplates.filter((t) => t.required).length
+    );
+
     return {
       id: s.id,
       studentId: s.studentId,
       displayName: s.displayName,
       createdAt: s.createdAt,
+      isActive: s.isActive,
       lastActive: s.conversations[0]?.updatedAt || s.createdAt,
       xp,
       level,
@@ -146,6 +177,7 @@ export async function GET(req: Request) {
       portfolioItems: s.portfolioItems.length,
       hasResume: !!s.resumeData,
       filesCount: s.files.length,
+      readinessScore: readiness.score,
     };
   });
 

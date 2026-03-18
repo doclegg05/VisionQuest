@@ -17,6 +17,7 @@ model Student {
   email          String?  @unique
   geminiApiKey   String?
   role           String   @default("student")
+  isActive       Boolean  @default(true)
   sessionVersion Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -46,6 +47,8 @@ model Student {
   publicCredentialPage PublicCredentialPage?
   spokesRecord         SpokesRecord?
   notifications        Notification[]
+  formSubmissions      FormSubmission[]
+  visionBoardItems     VisionBoardItem[]
 
   @@schema("visionquest")
 }
@@ -646,5 +649,47 @@ model AuditLog {
 
   @@index([createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])
+  @@schema("visionquest")
+}
+
+model FormSubmission {
+  id         String    @id @default(cuid())
+  studentId  String
+  formId     String
+  fileId     String
+  status     String    @default("pending")
+  reviewedBy String?
+  reviewedAt DateTime?
+  notes      String?   @db.Text
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, formId])
+  @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+model VisionBoardItem {
+  id        String   @id @default(cuid())
+  studentId String
+  type      String
+  content   String?  @db.Text
+  fileId    String?
+  goalId    String?
+  posX      Float    @default(50)
+  posY      Float    @default(50)
+  width     Float    @default(20)
+  rotation  Float    @default(0)
+  color     String?
+  pinColor  String   @default("red")
+  zIndex    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
   @@schema("visionquest")
 }

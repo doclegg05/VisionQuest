@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import OrientationFormDetail from "./OrientationFormDetail";
+import { useProgression } from "@/components/progression/ProgressionProvider";
 
 interface OrientationItem {
   id: string;
@@ -12,14 +14,31 @@ interface OrientationItem {
 }
 
 export default function OrientationChecklist() {
+  const { checkProgression } = useProgression();
   const [items, setItems] = useState<OrientationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
+
+  const fetchFormStatuses = useCallback(() => {
+    fetch("/api/forms/status")
+      .then(res => res.ok ? res.json() : { submissions: [] })
+      .then(data => {
+        const statusMap: Record<string, string> = {};
+        for (const sub of data.submissions) {
+          statusMap[sub.formId] = sub.status;
+        }
+        setFormStatuses(statusMap);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+    fetchFormStatuses();
+  }, [fetchFormStatuses]);
 
   async function fetchItems() {
     try {
@@ -46,13 +65,23 @@ export default function OrientationChecklist() {
         body: JSON.stringify({ itemId, completed }),
       });
       if (res.ok) {
-        setItems((prev) =>
-          prev.map((item) =>
+        setItems((prev) => {
+          const updated = prev.map((item) =>
             item.id === itemId
               ? { ...item, completed, completedAt: completed ? new Date().toISOString() : null }
               : item
-          )
-        );
+          );
+
+          // Check if orientation is now complete (using updated array, not stale state)
+          const allDone = completed && updated.every(i => i.completed);
+          if (allDone) {
+            fetch("/api/orientation/complete", { method: "POST" })
+              .then(() => setTimeout(() => checkProgression(), 500))
+              .catch(() => {});
+          }
+
+          return updated;
+        });
       }
     } catch (err) {
       console.error("Failed to toggle item:", err);
@@ -107,36 +136,53 @@ export default function OrientationChecklist() {
       {/* Checklist */}
       <div className="space-y-2">
         {items.map((item) => (
-          <label
-            key={item.id}
-            className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-              item.completed
-                ? "bg-green-50 border-green-200"
-                : "bg-white border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={item.completed}
-              disabled={toggling === item.id}
-              onChange={() => toggleItem(item.id, !item.completed)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-            />
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium ${item.completed ? "text-green-800 line-through" : "text-gray-900"}`}>
-                {item.label}
-                {item.required && (
-                  <span className="ml-1 text-xs text-red-400 font-normal">*</span>
+          <div key={item.id}>
+            <label
+              className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                item.completed
+                  ? "bg-green-50 border-green-200"
+                  : "bg-white border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={item.completed}
+                disabled={toggling === item.id}
+                onChange={() => toggleItem(item.id, !item.completed)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <div
+                className="flex-1 min-w-0 cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setExpandedItem(expandedItem === item.id ? null : item.id);
+                }}
+              >
+                <p className={`text-sm font-medium ${item.completed ? "text-green-800 line-through" : "text-gray-900"}`}>
+                  {item.label}
+                  {item.required && (
+                    <span className="ml-1 text-xs text-red-400 font-normal">*</span>
+                  )}
+                </p>
+                {item.description && (
+                  <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
                 )}
-              </p>
-              {item.description && (
-                <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+              </div>
+              <span className={`text-[var(--muted)] text-xs transition-transform ${expandedItem === item.id ? "rotate-90" : ""}`}>
+                ▶
+              </span>
+              {item.completed && (
+                <span className="text-green-500 text-sm">✓</span>
               )}
-            </div>
-            {item.completed && (
-              <span className="text-green-500 text-sm">✓</span>
+            </label>
+            {expandedItem === item.id && (
+              <OrientationFormDetail
+                itemLabel={item.label}
+                formStatuses={formStatuses}
+                onUploadComplete={fetchFormStatuses}
+              />
             )}
-          </label>
+          </div>
         ))}
       </div>
 

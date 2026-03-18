@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
+import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
 async function requireTeacher() {
   const session = await getSession();
@@ -28,6 +29,7 @@ export async function GET(
       studentId: true,
       displayName: true,
       email: true,
+      isActive: true,
       createdAt: true,
       progression: { select: { state: true } },
       goals: {
@@ -206,10 +208,10 @@ export async function GET(
           title: true,
           createdAt: true,
           updatedAt: true,
+          _count: { select: { messages: true } },
           messages: {
             select: { role: true, content: true, createdAt: true },
             orderBy: { createdAt: "desc" },
-            take: 1, // just get most recent message for summary
           },
         },
         orderBy: { updatedAt: "desc" },
@@ -233,24 +235,58 @@ export async function GET(
   });
 
   // Parse progression
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rawProgression: any = null;
   let progression = { xp: 0, level: 1, streaks: { daily: { current: 0, longest: 0 } }, achievements: [] as string[] };
   if (student.progression?.state) {
     try {
-      progression = JSON.parse(student.progression.state);
+      rawProgression = JSON.parse(student.progression.state);
+      progression = rawProgression;
     } catch { /* ignore */ }
   }
 
-  // Build conversation summaries (most recent message preview, not full transcripts)
-  const conversationSummaries = student.conversations.map((c) => ({
-    id: c.id,
-    module: c.module,
-    stage: c.stage,
-    title: c.title,
-    updatedAt: c.updatedAt,
-    lastMessagePreview: c.messages[0]
-      ? c.messages[0].content.substring(0, 150) + (c.messages[0].content.length > 150 ? "..." : "")
-      : null,
-  }));
+  // Compute readiness score
+  const certDoneCount = student.certifications[0]
+    ? student.certifications[0].requirements.filter((r) => r.completed).length
+    : 0;
+  const readinessResult = computeReadinessScore(
+    {
+      orientationComplete: rawProgression?.orientationComplete ?? false,
+      completedGoalLevels: rawProgression?.completedGoalLevels ?? [],
+      certificationsEarned: certDoneCount,
+      portfolioItemCount: rawProgression?.portfolioItemCount ?? student.portfolioItems.length,
+      resumeCreated: rawProgression?.resumeCreated ?? !!student.resumeData,
+      portfolioShared: rawProgression?.portfolioShared ?? false,
+      platformsVisited: rawProgression?.platformsVisited ?? [],
+      longestStreak: rawProgression?.streaks?.daily?.longest ?? rawProgression?.longestStreak ?? 0,
+      level: rawProgression?.level ?? 1,
+    },
+    certTemplates.filter((t) => t.required).length || 19,
+  );
+
+  // Build conversation summaries (message stats + preview, not full transcripts)
+  const conversationSummaries = student.conversations.map((c) => {
+    const lastMsg = c.messages[0] ?? null;
+    const firstMsg = c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+    const userMessageCount = c.messages.filter((m) => m.role === "user").length;
+
+    return {
+      id: c.id,
+      module: c.module,
+      stage: c.stage,
+      title: c.title,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      messageCount: c._count.messages,
+      userMessageCount,
+      duration: firstMsg && lastMsg
+        ? { firstMessageAt: firstMsg.createdAt.toISOString(), lastMessageAt: lastMsg.createdAt.toISOString() }
+        : null,
+      lastMessagePreview: lastMsg
+        ? lastMsg.content.substring(0, 150) + (lastMsg.content.length > 150 ? "..." : "")
+        : null,
+    };
+  });
 
   return NextResponse.json({
     student: {
@@ -258,9 +294,12 @@ export async function GET(
       studentId: student.studentId,
       displayName: student.displayName,
       email: student.email,
+      isActive: student.isActive,
       createdAt: student.createdAt,
     },
     progression,
+    readinessScore: readinessResult.score,
+    readinessBreakdown: readinessResult.breakdown,
     goals: student.goals,
     orientation: {
       items: orientationItems,

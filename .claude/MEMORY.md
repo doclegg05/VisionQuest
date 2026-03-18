@@ -3,86 +3,65 @@
 ## Project Overview
 - **Name**: Visionquest
 - **Description**: AI-coach-driven program portal for SPOKES workforce development (adults on TANF/SNAP). AI coach named "Sage" guides students through goal-setting, orientation, certification tracking, portfolio building, and employability skills.
-- **Tech stack**: Next.js 15 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL), Google Gemini API, Tailwind CSS
-- **Hosting**: Render.com
+- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 2.5 Flash, Tailwind CSS 4, Sentry
+- **Hosting**: Render.com (free tier)
 - **Repo**: https://github.com/doclegg05/VisionQuest.git
+- **Live URL**: https://visionquest.onrender.com
 
 ## Current Status
-All 3 sprints complete. Deployment-ready. Needs: Supabase project, Gemini key, Render deploy.
+Deployed and live. Sage AI coach working. Student registration/login working. Teacher registration at `/teacher-register`.
 
 ## Last Session
 - **Date**: 2026-03-13
-- **What we worked on**: Sprints 1-3 — full deployment readiness
-- **What we decided**: 3-sprint plan to production. Sentry for error tracking. Seed script for SPOKES data. DEPLOY.md runbook.
-- **Where we left off**: All sprints complete and pushed. Next: provision Supabase, get Gemini key, deploy to Render, run seed script, create first teacher account.
+- **What we worked on**: Full deployment to Render — env vars, build fixes, Gemini model upgrade, streaming fix
+- **What we decided**:
+  - Removed `output: "standalone"` (not needed for Render, breaks static file serving)
+  - Moved all devDependencies to dependencies (Render skips devDeps in production)
+  - Upgraded Gemini from 2.0-flash to 2.5-flash (2.0 retired by Google)
+  - systemInstruction must be at model level, not chat level
+  - Separate teacher registration page with TEACHER_KEY validation
+- **Where we left off**: App is live and working. Sage responds. Still need to test: file upload, orientation checklist, teacher registration flow, teacher dashboard.
 
 ## Open Items
-- [x] Phase 1: Foundation (auth, chat, scaffold)
-- [x] Phase 2: Goal setting + progression engine
-- [x] Phase 3: Orientation + LMS Hub
-- [x] Phase 4: Certifications + File upload (R2)
-- [x] Phase 5: Portfolio + Resume builder
-- [x] Phase 6: Employability Skills (linked as cert requirements, not standalone)
-- [x] Phase 7: Teacher Dashboard (class overview, student detail, cert verify, CSV export)
-- [x] Phase 8: Polish (mobile nav, Google OAuth, a11y, teacher password reset)
-- [x] Set up GitHub repo and push
-- [ ] Set up Supabase project and add connection strings to .env.local
-- [ ] Get Gemini API key from Google AI Studio
-- [ ] Deploy to Render (render.yaml ready)
-- [x] Sprint 1: Health check, env validation, error pages, CSP, Dockerfile, CI, render.yaml
-- [x] Sprint 2: Structured logging, input validation, CSRF, API tests, audit expansion
-- [x] Sprint 3: Sentry error tracking, deployment runbook, SPOKES data seeding, UAT checklist
+- [x] Deploy to Render
+- [x] Sage AI coach working in production
+- [x] Student registration & login
+- [ ] Test file upload (Supabase Storage)
+- [ ] Test orientation checklist (should show 10 items)
+- [ ] Test teacher registration at `/teacher-register`
+- [ ] Test teacher dashboard at `/teacher`
+- [ ] Set up Google OAuth (optional)
+- [ ] Set up SMTP for password reset emails (optional)
+- [ ] Remove TEACHER_KEY from student-facing .env if not needed locally
 
 ## Key Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-03-11 | New project, not modify SPOKES app | Clean architecture, conversation-first design requires fundamentally different UX |
-| 2026-03-11 | Next.js 15 + TypeScript | Full framework for rich chat UI, SSR, API routes |
-| 2026-03-11 | Prisma 6 over Prisma 7 | Prisma 7 has breaking config changes, less documented |
-| 2026-03-11 | Gemini free tier | Zero cost, generous limits, good quality for coaching |
-| 2026-03-11 | Conversation-first (not form-first) | Sage leads the experience; goals extracted from dialogue |
-| 2026-03-11 | Named coach "Sage" | Wise, calm, non-judgmental mentor personality |
-| 2026-03-11 | Teachers see AI summaries, not transcripts | Protects student trust and privacy |
-| 2026-03-11 | Employability Skills as cert requirement links | Lessons on GitHub Pages, incomplete (~1yr), avoids duplicate tracking |
-| 2026-03-11 | Nav: replaced Skills with Files | Skills integrated into Certifications, Files page more useful |
-| 2026-03-11 | Google OAuth via standard OAuth 2.0 flow | No extra deps, school Google accounts |
-| 2026-03-11 | Dashboard module card: Files replaces Skills | Consistent with nav change |
-| 2026-03-13 | 3-sprint deployment plan | Sprint 1: infra, Sprint 2: harden, Sprint 3: polish+monitor |
-| 2026-03-13 | Standalone Next.js output for Docker | Smaller container, faster cold starts on Render |
-| 2026-03-13 | CSP with unsafe-inline/eval for Next.js compat | Next.js requires inline scripts; tighten with nonces in Sprint 3 |
+| 2026-03-11 | Next.js + Prisma + Gemini stack | Full framework, free AI tier, conversation-first UX |
+| 2026-03-11 | Named AI coach "Sage" | Wise, calm, non-judgmental mentor personality |
+| 2026-03-13 | Supabase Storage over Cloudflare R2 | Single service for DB + files, simpler architecture |
+| 2026-03-13 | Sentry for error tracking | Client + server + edge, free tier sufficient |
+| 2026-03-13 | Standalone output mode via render.yaml | Uses `node .next/standalone/server.js` for smaller container |
+| 2026-03-13 | All deps in dependencies (no devDeps) | Render sets NODE_ENV=production before build, skips devDeps |
+| 2026-03-13 | Gemini 2.5-flash with model-level systemInstruction | 2.0-flash retired; chat-level systemInstruction breaks streaming |
+| 2026-03-13 | Separate /teacher-register page | Clear UX separation, requires TEACHER_KEY for authorization |
 
 ## Architecture Notes
-- Auth: JWT in httpOnly cookies, PBKDF2 password hashing
+- Auth: JWT in httpOnly cookies (SameSite=strict), PBKDF2-SHA512 password hashing
 - Chat: SSE streaming from `/api/chat/send`, two-call pattern (conversation + async goal extraction)
-- Goal extraction: Gemini structured JSON output, confidence > 0.7 threshold
-- System prompts: layered (personality + guardrails + platform knowledge + stage-specific)
-- Stage determination: based on which goal levels exist in DB
-- Student routes under `(student)` route group with server-side auth check in layout
-- Teacher routes under `(teacher)` route group with teacher role check
-- File storage: local `./uploads/` in dev, Cloudflare R2 in prod
-- Cert system: CertTemplate (teacher defines), CertRequirement (student progress), auto-creates on first visit
-- Google OAuth: standard flow (no library), auto-creates student account from Google profile
-- Teacher dashboard: /teacher (class overview), /teacher/students/[id] (detail + cert verify + password reset)
-- A11y: skip-to-content link, ARIA labels/roles/live regions, focus-visible styles, prefers-reduced-motion
+- Gemini: systemInstruction set at `getGenerativeModel()` level, MODEL_NAME constant in `src/lib/gemini.ts`
+- File storage: local `./uploads/` in dev, Supabase Storage (S3-compatible) in prod
+- CSRF: Origin header validation middleware for all POST/PUT/PATCH/DELETE to /api/*
+- Student routes: `(student)` route group, Teacher routes: `(teacher)` route group
+
+## Production Environment
+- **Render Start Command**: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
+- **Render Build Command**: `npm ci && npx prisma generate && npm run build`
+- **Env file**: `~/Desktop/render.env` (clean copy for Render import)
+- **TEACHER_KEY**: Stored in Render env vars and `.env.local` only (not tracked in git)
 
 ## Known Issues
-- No Gemini API key configured yet — chat will fail until key is added
+- Free tier Render instances sleep after inactivity (30-60s cold start)
 - OAuth users get random password hash (can't use password login until teacher resets)
-- CSP uses unsafe-inline/eval for Next.js compat (could tighten with nonces later)
-
-## Environment Variables Needed
-| Variable | Purpose |
-|----------|---------|
-| `GEMINI_API_KEY` | Google AI Studio API key (free) |
-| `JWT_SECRET` | Token signing secret |
-| `TEACHER_KEY` | Teacher registration code |
-| `DATABASE_URL` | Supabase pooled connection string (port 6543, `?pgbouncer=true`) |
-| `DIRECT_URL` | Supabase direct connection string (port 5432, for migrations) |
-| `R2_ACCOUNT_ID` | Cloudflare account ID |
-| `R2_ACCESS_KEY` | R2 access key |
-| `R2_SECRET_KEY` | R2 secret key |
-| `R2_BUCKET_NAME` | R2 bucket name |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | OAuth callback URL |
-| `NODE_ENV` | `production` |
+- No CSP headers configured yet (could add with nonces for Next.js compat)
+- content/ directory has SPOKES reference materials but is not yet integrated into Sage AI (no RAG pipeline)

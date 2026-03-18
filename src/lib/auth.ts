@@ -86,10 +86,10 @@ export async function getSession() {
 
   const student = await prisma.student.findUnique({
     where: { id: claims.sub },
-    select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true },
+    select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true, isActive: true },
   });
 
-  if (!student || student.sessionVersion !== claims.sv) return null;
+  if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
   return {
     id: student.id,
     studentId: student.studentId,

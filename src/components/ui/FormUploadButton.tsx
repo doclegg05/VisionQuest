@@ -1,0 +1,128 @@
+"use client";
+
+import { useRef, useState } from "react";
+
+interface FormUploadButtonProps {
+  formId: string;
+  currentStatus?: "pending" | "approved" | "rejected" | null;
+  onUploadComplete?: () => void;
+}
+
+export default function FormUploadButton({
+  formId,
+  currentStatus,
+  onUploadComplete,
+}: FormUploadButtonProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("formId", formId);
+
+      const res = await fetch("/api/forms/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Upload failed.");
+      } else {
+        onUploadComplete?.();
+      }
+    } catch {
+      setError("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  // Status badge rendering
+  if (currentStatus === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+        ✓ Approved
+      </span>
+    );
+  }
+
+  if (currentStatus === "pending") {
+    return (
+      <div className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700">
+          ⏳ Pending Review
+        </span>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="text-[10px] font-semibold text-[var(--muted)] hover:text-[var(--ink-strong)]"
+        >
+          Re-upload
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+    );
+  }
+
+  if (currentStatus === "rejected") {
+    return (
+      <div className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-600">
+          ✗ Rejected
+        </span>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="text-[10px] font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+        >
+          {uploading ? "Uploading..." : "Re-upload"}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+    );
+  }
+
+  // No submission yet — show upload button
+  return (
+    <div>
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-[10px] font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)] disabled:opacity-50"
+      >
+        📎 {uploading ? "Uploading..." : "Upload Form"}
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      {error && <p className="mt-1 text-[10px] text-red-500">{error}</p>}
+    </div>
+  );
+}

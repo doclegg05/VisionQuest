@@ -4,6 +4,10 @@ import Link from "next/link";
 import XpBar from "@/components/ui/XpBar";
 import StreakBadge from "@/components/ui/StreakBadge";
 import AchievementList from "@/components/ui/AchievementList";
+import RecentActivity from "@/components/ui/RecentActivity";
+import SuggestedActions from "@/components/ui/SuggestedActions";
+import ReadinessScore from "@/components/ui/ReadinessScore";
+import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 
 interface DashboardClientProps {
   level: number;
@@ -32,6 +36,16 @@ interface DashboardClientProps {
     status: string;
   }[];
   alertCount: number;
+  lastLevelUp: { level: number; at: string; reason: string } | null;
+  xp: number;
+  hasGoals: boolean;
+  orientationComplete: boolean;
+  certificationsStarted: number;
+  platformsVisited: number;
+  resumeCreated: boolean;
+  goalSuggestions: string[];
+  readinessScore: number;
+  readinessBreakdown: ReadinessBreakdown;
 }
 
 export default function DashboardClient({
@@ -43,6 +57,16 @@ export default function DashboardClient({
   nextAppointment,
   tasks,
   alertCount,
+  lastLevelUp,
+  xp,
+  hasGoals,
+  orientationComplete,
+  certificationsStarted,
+  platformsVisited,
+  resumeCreated,
+  goalSuggestions,
+  readinessScore,
+  readinessBreakdown,
 }: DashboardClientProps) {
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -53,6 +77,12 @@ export default function DashboardClient({
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* Job Readiness Score */}
+      <div className="surface-section p-5 flex flex-col items-center md:col-span-2">
+        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Job Readiness Score</h3>
+        <ReadinessScore score={readinessScore} breakdown={readinessBreakdown} />
+      </div>
+
       {/* XP & Level */}
       <div className="surface-section p-5">
         <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Your Progress</h3>
@@ -74,6 +104,31 @@ export default function DashboardClient({
           Achievements ({achievements.length})
         </h3>
         <AchievementList achievements={achievements} />
+      </div>
+
+      {/* Suggested Next Steps */}
+      <div className="surface-section p-5">
+        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Suggested Next Steps</h3>
+        <SuggestedActions
+          hasGoals={hasGoals}
+          orientationComplete={orientationComplete}
+          certificationsStarted={certificationsStarted}
+          platformsVisited={platformsVisited}
+          resumeCreated={resumeCreated}
+          currentStreak={currentStreak}
+          goalSuggestions={goalSuggestions}
+        />
+      </div>
+
+      {/* Recent Activity */}
+      <div className="surface-section p-5">
+        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Recent Wins</h3>
+        <RecentActivity
+          achievements={achievements}
+          lastLevelUp={lastLevelUp}
+          currentStreak={currentStreak}
+          xp={xp}
+        />
       </div>
 
       <div className="surface-section p-5">

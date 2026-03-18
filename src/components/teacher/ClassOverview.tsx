@@ -26,6 +26,8 @@ interface StudentOverview {
   portfolioItems: number;
   hasResume: boolean;
   filesCount: number;
+  isActive: boolean;
+  readinessScore: number;
 }
 
 interface DashboardAlert {
@@ -56,7 +58,7 @@ interface UpcomingAppointment {
   };
 }
 
-type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDone";
+type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDone" | "readinessScore";
 
 export default function ClassOverview() {
   const [students, setStudents] = useState<StudentOverview[]>([]);
@@ -69,6 +71,8 @@ export default function ClassOverview() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [showInactive, setShowInactive] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
   const applyStudentPage = useCallback((data: {
     students?: StudentOverview[];
@@ -89,7 +93,8 @@ export default function ClassOverview() {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiFetch(`/api/teacher/dashboard?page=${p}&limit=50`);
+      const url = `/api/teacher/dashboard?page=${p}&limit=50${showInactive ? "&showInactive=true" : ""}`;
+      const response = await apiFetch(url);
       const data = await response.json();
       applyStudentPage(data);
     } catch {
@@ -97,12 +102,13 @@ export default function ClassOverview() {
     } finally {
       setLoading(false);
     }
-  }, [applyStudentPage]);
+  }, [applyStudentPage, showInactive]);
 
   useEffect(() => {
-    async function loadInitialStudents() {
+    async function loadStudents() {
       try {
-        const response = await apiFetch("/api/teacher/dashboard?page=1&limit=50");
+        const url = `/api/teacher/dashboard?page=1&limit=50${showInactive ? "&showInactive=true" : ""}`;
+        const response = await apiFetch(url);
         const data = await response.json();
         applyStudentPage(data);
       } catch {
@@ -112,8 +118,8 @@ export default function ClassOverview() {
       }
     }
 
-    void loadInitialStudents();
-  }, [applyStudentPage]);
+    void loadStudents();
+  }, [applyStudentPage, showInactive]);
 
   function handleSort(key: SortKey) {
     if (sortBy === key) {
@@ -137,6 +143,7 @@ export default function ClassOverview() {
       else if (sortBy === "xp") cmp = a.xp - b.xp;
       else if (sortBy === "certDone") cmp = a.certDone - b.certDone;
       else if (sortBy === "orientationDone") cmp = a.orientationDone - b.orientationDone;
+      else if (sortBy === "readinessScore") cmp = a.readinessScore - b.readinessScore;
       return sortDir === "desc" ? -cmp : cmp;
     });
 
@@ -316,7 +323,124 @@ export default function ClassOverview() {
         </a>
       </div>
 
-      {/* Student Table */}
+      {/* View & Filter Controls */}
+      <div className="flex items-center gap-3 mb-4">
+        {/* View toggle */}
+        <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+              viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+            }`}
+          >
+            Table
+          </button>
+          <button
+            onClick={() => setViewMode("cards")}
+            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+              viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+            }`}
+          >
+            Cards
+          </button>
+        </div>
+
+        {/* Inactive toggle */}
+        <label className="flex items-center gap-2 text-xs text-[var(--muted)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-gray-300 text-[var(--accent-secondary)]"
+          />
+          Show inactive students
+        </label>
+      </div>
+
+      {/* Student Cards View */}
+      {viewMode === "cards" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((s) => (
+            <Link
+              key={s.id}
+              href={`/teacher/students/${s.id}`}
+              prefetch={false}
+              className={`surface-section group p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg ${!s.isActive ? "opacity-50" : ""}`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  {/* Activity dot */}
+                  {(() => {
+                    if (!s.isActive) return <span className="h-2.5 w-2.5 rounded-full bg-gray-300" />;
+                    const lastActive = s.lastActive ? new Date(s.lastActive) : null;
+                    const daysSince = lastActive ? Math.floor((Date.now() - lastActive.getTime()) / 86400000) : Infinity;
+                    if (daysSince <= 1) return <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />;
+                    if (daysSince <= 7) return <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />;
+                    return <span className="h-2.5 w-2.5 rounded-full bg-red-400" />;
+                  })()}
+                  <p className="font-display text-base text-[var(--ink-strong)]">{s.displayName}</p>
+                </div>
+                {!s.isActive && (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Inactive</span>
+                )}
+              </div>
+
+              {/* Level & XP */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+                  Lvl {s.level}
+                </span>
+                <span className="text-xs text-[var(--muted)]">{s.xp} XP</span>
+                {s.streak > 0 && <span className="text-xs">🔥 {s.streak}</span>}
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  s.readinessScore >= 75
+                    ? "bg-emerald-100 text-emerald-700"
+                    : s.readinessScore >= 50
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-orange-100 text-orange-700"
+                }`}>
+                  {s.readinessScore}% Ready
+                </span>
+              </div>
+
+              {/* Progress bars */}
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-[10px] text-[var(--muted)] mb-0.5">
+                    <span>Orientation</span>
+                    <span>{s.orientationDone}/{s.orientationTotal}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-400" style={{ width: `${s.orientationTotal > 0 ? (s.orientationDone / s.orientationTotal) * 100 : 0}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[10px] text-[var(--muted)] mb-0.5">
+                    <span>Certifications</span>
+                    <span>{s.certDone}/{s.certTotal}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full rounded-full bg-amber-400" style={{ width: `${s.certTotal > 0 ? (s.certDone / s.certTotal) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom row */}
+              <div className="mt-3 flex items-center justify-between text-[10px] text-[var(--muted)]">
+                <span>{s.goalsCount} goals {s.hasBhag && "• BHAG ✓"}</span>
+                {s.certPendingVerify > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 font-semibold">{s.certPendingVerify} pending</span>
+                )}
+                {s.openAlertCount > 0 && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600 font-semibold">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+
+      /* Student Table */
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -346,6 +470,12 @@ export default function ClassOverview() {
                 >
                   Certification {getSortIcon("certDone")}
                 </th>
+                <th
+                  className="text-center px-3 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  onClick={() => handleSort("readinessScore")}
+                >
+                  Readiness {getSortIcon("readinessScore")}
+                </th>
                 <th className="text-center px-3 py-3 font-medium text-gray-600">Goals</th>
                 <th className="text-center px-3 py-3 font-medium text-gray-600">Portfolio</th>
                 <th
@@ -359,17 +489,28 @@ export default function ClassOverview() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-400">
+                  <td colSpan={8} className="text-center py-8 text-gray-400">
                     {search ? "No students match your search" : "No students enrolled yet"}
                   </td>
                 </tr>
               ) : (
                 filtered.map((s) => (
-                  <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <tr key={s.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors${!s.isActive ? " opacity-50" : ""}`}>
                     <td className="px-4 py-3">
                       <Link href={`/teacher/students/${s.id}`} className="hover:text-blue-600">
-                        <p className="font-medium text-gray-900">{s.displayName}</p>
-                        <p className="text-xs text-gray-400">{s.studentId}</p>
+                        <div className="flex items-center gap-2">
+                          {/* Activity indicator */}
+                          {(() => {
+                            if (!s.isActive) return <span className="h-2 w-2 rounded-full bg-gray-300" title="Inactive" />;
+                            const lastActive = s.lastActive ? new Date(s.lastActive) : null;
+                            const daysSince = lastActive ? Math.floor((Date.now() - lastActive.getTime()) / 86400000) : Infinity;
+                            if (daysSince <= 1) return <span className="h-2 w-2 rounded-full bg-emerald-400" title="Active today" />;
+                            if (daysSince <= 7) return <span className="h-2 w-2 rounded-full bg-amber-400" title={`Active ${daysSince}d ago`} />;
+                            return <span className="h-2 w-2 rounded-full bg-red-400" title={`Inactive ${daysSince}d`} />;
+                          })()}
+                          <p className="font-medium text-gray-900">{s.displayName}</p>
+                        </div>
+                        <p className="text-xs text-gray-400 ml-4">{s.studentId}</p>
                         {s.openAlertCount > 0 && (
                           <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                             {s.openAlertCount} alert{s.openAlertCount === 1 ? "" : "s"}
@@ -406,6 +547,17 @@ export default function ClassOverview() {
                           {s.certPendingVerify} to verify
                         </p>
                       )}
+                    </td>
+                    <td className="text-center px-3 py-3">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        s.readinessScore >= 75
+                          ? "bg-emerald-100 text-emerald-700"
+                          : s.readinessScore >= 50
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-orange-100 text-orange-700"
+                      }`}>
+                        {s.readinessScore}%
+                      </span>
                     </td>
                     <td className="text-center px-3 py-3">
                       <span className="text-xs text-gray-600">{s.goalsCount}</span>
@@ -459,6 +611,7 @@ export default function ClassOverview() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

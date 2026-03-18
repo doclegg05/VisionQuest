@@ -1,4 +1,5 @@
 import { BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE } from "./personality";
+import { SPOKES_PROGRAM_KNOWLEDGE, getRelevantContent } from "./knowledge-base";
 
 export type ConversationStage =
   | "onboarding"
@@ -28,7 +29,8 @@ Their BHAG should be:
 - Something THEY care about (not what others expect)
 - Stated in their own words
 When the BHAG feels solid, confirm it with them and celebrate the clarity.
-Then gently suggest: "Now let's think about what you could do THIS month to start moving toward that."`,
+Then gently suggest: "Now let's think about what you could do THIS month to start moving toward that."
+If the student seems excited about their BHAG, mention: "You can also add images and notes to your Vision Board to keep this dream visible — it's a great way to stay motivated."`,
 
   monthly: `CURRENT TASK: Help the student set 1-3 monthly goals that move toward their BHAG.
 Their BHAG is: "{bhag}"
@@ -69,10 +71,11 @@ Help them reflect:
 Be honest but kind. Progress isn't linear and that's okay.`,
 
   orientation: `CURRENT TASK: Guide the student through SPOKES program orientation.
-Walk them through what the program offers, what's expected, and help them feel welcome. If they have questions about paperwork or requirements, help them understand the process. Make them feel like they belong here.`,
+Walk them through what the program offers and what's expected. The orientation process includes completing these forms: Student Profile, Personal Attendance Contract, Rights and Responsibilities, Dress Code Policy, Release of Information, Media Release, Technology Acceptable Use Policy, Employment Portfolio Checklist, Learning Needs Screening, CTE Learning Styles Assessment, and the Non-Discrimination Notice.
+Help them understand each form's purpose without overwhelming them. Take it one step at a time. Make them feel like they belong here. If they ask about specific forms or procedures, use your SPOKES knowledge to give clear answers.`,
 
   general: `CURRENT TASK: Answer the student's question about the Visionquest platform or the SPOKES program.
-Be helpful and direct. If you're not sure about something specific to the program, say so and suggest they ask their instructor.`,
+Be helpful and direct. Use your SPOKES program knowledge to answer questions about certifications, learning platforms, forms, schedules, and procedures. Give specific names, URLs, and details when you have them. If you truly don't know something, say so and suggest they ask their instructor.`,
 };
 
 export function buildSystemPrompt(
@@ -84,6 +87,7 @@ export function buildSystemPrompt(
     weekly?: string;
     daily?: string;
     goals_summary?: string;
+    userMessage?: string;
   } = {}
 ): string {
   let stagePrompt = STAGE_PROMPTS[stage];
@@ -108,7 +112,18 @@ export function buildSystemPrompt(
     stagePrompt = stagePrompt.replace("{goals_summary}", context.goals_summary);
   }
 
-  return [BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE, stagePrompt].join("\n\n---\n\n");
+  // Build the prompt with knowledge base
+  const parts = [BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE, SPOKES_PROGRAM_KNOWLEDGE, stagePrompt];
+
+  // Inject topic-specific content based on what the student is asking about
+  if (context.userMessage) {
+    const relevantContent = getRelevantContent(context.userMessage);
+    if (relevantContent) {
+      parts.push(relevantContent);
+    }
+  }
+
+  return parts.join("\n\n---\n\n");
 }
 
 export function determineStage(goals: { level: string }[]): ConversationStage {

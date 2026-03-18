@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import CertificateDownload from "@/components/ui/CertificateDownload";
 
 interface CertRequirement {
   id: string | null;
@@ -24,6 +25,7 @@ interface CertData {
   requirements: CertRequirement[];
   total: number;
   done: number;
+  studentName: string;
 }
 
 export default function CertTracker() {
@@ -274,11 +276,16 @@ export default function CertTracker() {
       </div>
 
       {isComplete && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center space-y-3">
           <p className="text-2xl mb-1">🎉🏆</p>
           <p className="text-sm font-medium text-green-800">
             Congratulations! You&apos;ve completed all certification requirements!
           </p>
+          <CertificateDownload
+            studentName={data.studentName}
+            certificateType="Ready to Work"
+            dateEarned={data.certification?.completedAt || new Date().toISOString()}
+          />
         </div>
       )}
     </div>

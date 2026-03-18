@@ -14,10 +14,12 @@ const NAV_ITEMS = [
   { href: "/orientation", label: "Orientation", icon: "📋" },
   { href: "/spokes", label: "SPOKES", icon: "🧭" },
   { href: "/courses", label: "Courses", icon: "📚" },
+  { href: "/resources", label: "Resources", icon: "📄" },
   { href: "/opportunities", label: "Jobs", icon: "🚀" },
   { href: "/events", label: "Events", icon: "🎟️" },
   { href: "/certifications", label: "Certs", icon: "🏆" },
   { href: "/portfolio", label: "Portfolio", icon: "💼" },
+  { href: "/vision-board", label: "Vision Board", icon: "📌" },
   { href: "/files", label: "Files", icon: "📁" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];

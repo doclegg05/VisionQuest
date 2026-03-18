@@ -1,0 +1,379 @@
+/**
+ * Condensed SPOKES program knowledge base for Sage's system prompt.
+ * This gives Sage always-available knowledge about the program without
+ * needing to retrieve from external sources.
+ */
+
+export const SPOKES_PROGRAM_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
+You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
+
+WHAT IS SPOKES?
+SPOKES stands for Skills, Preparation, Opportunities, Knowledge, Employment, Success. It is a workforce training program operated under West Virginia Adult Education for adults receiving TANF/SNAP benefits through WV Works. The goal is employment and self-sufficiency.
+
+CERTIFICATIONS AVAILABLE (students can earn these):
+1. IC3 Digital Literacy (Internet and Computing Core Certification)
+   - 3 levels: Level 1 (Computing Fundamentals), Level 2 (Key Applications), Level 3 (Living Online)
+   - GS6 standard. Master Certification requires passing all 3 levels.
+   - Practice tests on GMetrix, training via LearnKey videos
+   - Exams administered through Certiport Compass software
+2. Microsoft Office Specialist (MOS)
+   - Word, Excel, PowerPoint, Outlook, Access (2016 editions)
+   - Practice tests on GMetrix. Exams through Certiport.
+   - Voucher request form available for exam fees
+3. Adobe Certified Associate (ACA)
+   - Photoshop, Illustrator, InDesign modules
+4. Intuit Certifications
+   - QuickBooks Certified User
+   - Intuit Bookkeeping Professional
+   - Intuit Personal Finance
+   - Intuit Design for Delight Innovator
+   - Free QuickBooks Online available for educators
+5. ACT WorkKeys National Career Readiness Certificate (NCRC)
+   - Tests: Applied Math, Workplace Documents, Business Writing
+   - Score levels: Bronze, Silver, Gold, Platinum
+   - Maps to O*NET occupations (Silver = 35% of profiled jobs, Gold = 65%, Platinum = 93%)
+   - Students create accounts at act.org
+6. IT Specialist - Cybersecurity
+   - Entry-level cybersecurity certification through Certiport
+7. Customer Service (Through the Customer's Eyes)
+   - Part 1 and Part 2
+   - Training at learn.skillpath.com
+   - Account request via Wufoo form
+8. Critical Career Skills - Generative AI Foundations
+9. Critical Career Skills - Professional Communications
+10. Computer Essentials (Essential Education)
+    - Digital literacy program at essentialed.com/start/wvde
+11. Work Essentials Certificate
+12. Money Essentials Certificate
+13. Burlington English Certificate/Certification (for ESL students)
+14. Bring Your A Game Certificate
+    - Work ethic curriculum covering the 7 A's: Attitude, Attendance, Appearance, Ambition, Accountability, Appreciation, Acceptance
+    - Includes video lessons, Quizizz review quizzes, and SMART Board games
+    - Exam and certificate request via Wufoo forms
+
+SPOKES CERTIFICATES (program milestones, not industry certifications):
+- Certificate of Attendance — based on attendance hours
+- Certificate of Participation — benchmarks documented by instructor
+- Certificate of Completion — completing program requirements
+- Certificate of Achievement — highest level, requires documented benchmarks
+- Ready to Work Certificate — comprehensive readiness certification with specific benchmarks
+
+LEARNING PLATFORMS (where students do coursework):
+1. GMetrix & LearnKey — Certification practice tests and training (IC3, MOS, QuickBooks). Login: gmetrix.net. Register at certiport.pearsonvue.com.
+2. Edgenuity — Online courseware for HSE/academic subjects. Student login: auth.edgenuity.com/Login/Login/Student
+3. Khan Academy — Free math and academic courses. Login: khanacademy.org
+4. Essential Education — Computer Essentials digital literacy. Access: essentialed.com/start/wvde. Use Firefox browser.
+5. Burlington English — ESL/English language learning. Login: burlingtonenglish.com
+6. USA Learns — Free online English courses for ESL students. Homepage: usalearns.org
+7. Crossroads Cafe — ESL video-based learning series. Videos at ket.org.
+8. Aztec — GED/HSE prep software with guides and student handouts
+9. CSMlearn — Career skills and soft skills training. Login: csmlearn.com. Account request via Wufoo form.
+10. Bring Your A Game Anywhere — Work ethic curriculum (7 A's). Includes Quizizz quizzes and SMART Board games.
+11. Through the Customer's Eyes — Customer service training (2 parts). Login: learn.skillpath.com.
+12. Learning Express Library — Free library-based career and test prep resources (see PDF guide for registration)
+13. WV Tourism Works — WV tourism industry training (external program)
+
+STUDENT ONBOARDING FORMS (FY26, current year):
+Required forms for new students:
+- Welcome Letter
+- SPOKES Student Profile (fillable PDF)
+- Personal Attendance Contract (fillable PDF)
+- Rights and Responsibilities (fillable PDF)
+- Dress Code Policy (fillable PDF)
+- Authorization for Release of Information
+- DoHS Release of Information (fillable PDF)
+- Media Release Form
+- Technology Acceptable Use Policy (fillable PDF)
+- Employment Portfolio Checklist (fillable PDF)
+- Learning Needs Screening Instrument
+- CTE Learning Styles Assessment
+- Non-Discrimination Notice
+- Sign-in Sheet (daily attendance)
+- Password Log Template
+- Career Exploration Worksheet (CFWV)
+- WorkKeys Account Creation instructions
+
+DOHS / WV WORKS FORMS:
+- DFA-TS-12 — Activity tracking/time sheet (fillable version available)
+- DFA-WVW-70 — WV Works participant form
+- DFA-WVW-25 — Support services documentation
+- DFA-PRC-1 — Program completion record
+- DFA-SSP-1 — Support services plan
+- Support Services Fact Sheet — overview of available support services
+- Prospective Employer Letter — template for ESP/EIP employer outreach
+- Dental Services through WV Works (2025) — dental benefit information
+
+PROGRAM STRUCTURE:
+- 4-week rotating schedule (see Sample SPOKES Four-Week Schedule)
+- Tracks student progress via SPOKES Student Tracker spreadsheet
+- Reports through SPOKES Database (see Database Handbook)
+- Curriculum based on SPOKES Life and Employability Skills Curriculum
+- Students build an Employment Portfolio documenting their achievements
+- Ready to Work certification is the comprehensive goal
+
+ADMINISTRATOR RESOURCES:
+- Educator Evaluation Procedures & Timeline (on Schoology)
+- Professional Growth & Development Plan
+- Employee Acceptable Use Policy (AUP)
+- Personnel Confidentiality Agreement
+- Administrative Guide (PY25)
+- Request for Training form (Wufoo)`;
+
+/**
+ * Topic-specific detailed content that gets injected when relevant.
+ * Keys are topic identifiers, values are detailed content blocks.
+ */
+export const TOPIC_CONTENT: Record<string, string> = {
+  certifications_ic3: `IC3 DIGITAL LITERACY CERTIFICATION (detailed):
+IC3 (Internet and Computing Core Certification) is the global standard for digital literacy.
+- GS6 Standard with 3 levels:
+  Level 1: Computing Fundamentals — hardware, software, OS basics
+  Level 2: Key Applications — word processing, spreadsheets, presentations
+  Level 3: Living Online — internet, email, social media, digital citizenship
+- Master Certification: Pass all 3 levels
+- Preparation: LearnKey video training + GMetrix practice tests
+- Testing: Certiport Compass software (downloaded to test computers)
+- Registration: certiport.pearsonvue.com (both instructors and students)
+- Certificates and score reports printed from Certiport portal
+- Technical requirements and disability accommodations available through Certiport`,
+
+  certifications_mos: `MICROSOFT OFFICE SPECIALIST (MOS) CERTIFICATION (detailed):
+Industry-recognized certification for Microsoft Office proficiency.
+- Available exams: Word, Excel, PowerPoint, Outlook, Access (2016 editions)
+- Preparation: GMetrix practice tests + LearnKey training videos
+- Testing: Certiport Compass software
+- Exam voucher request: Wufoo form (provided by program)
+- Exam objectives available for each application (PDF documents)
+- Required passing scores set by Microsoft
+- Full certifications list: docs.microsoft.com/en-us/learn/certifications`,
+
+  certifications_workkeys: `ACT WORKKEYS NATIONAL CAREER READINESS CERTIFICATE (NCRC) (detailed):
+Nationally recognized credential measuring workplace skills.
+- Three assessments: Applied Math, Workplace Documents, Business Writing
+- Certificate levels based on scores:
+  Bronze: Foundational workplace skills
+  Silver: Qualifies for ~35% of profiled occupations
+  Gold: Qualifies for ~65% of profiled occupations
+  Platinum: Qualifies for ~93% of profiled occupations
+- O*NET occupation mapping shows which jobs match each score level
+- Student account creation: act.org (step-by-step guide available)
+- Curriculum course outlines available for preparation
+- Matching WorkKeys scores to jobs exercise available`,
+
+  certifications_intuit: `INTUIT CERTIFICATIONS (detailed):
+Four certification paths through Intuit/Certiport:
+1. QuickBooks Certified User — bookkeeping and accounting software proficiency
+   - Study guide available from Certiport
+   - Free QuickBooks Online access for educators
+2. Intuit Bookkeeping Professional — professional bookkeeping skills
+3. Intuit Personal Finance — personal financial management
+4. Intuit Design for Delight Innovator — design thinking and innovation
+- All exams through Certiport
+- Free software and resources at intuit.com/partners/education-program`,
+
+  certifications_customer_service: `CUSTOMER SERVICE TRAINING — THROUGH THE CUSTOMER'S EYES (detailed):
+Two-part customer service certification program:
+- Part 1: Foundations of customer service, communication, professionalism
+- Part 2: Advanced customer interactions, conflict resolution, service excellence
+- Platform: learn.skillpath.com (SkillPath)
+- Account setup: Request student accounts via Wufoo form
+- Students receive Customer Service Certificate upon completion of both parts`,
+
+  certifications_adobe: `ADOBE CERTIFIED ASSOCIATE (ACA) (detailed):
+Creative software certification through Adobe/Certiport.
+- Modules: Photoshop, Illustrator, InDesign
+- Module descriptors detail specific skills tested
+- Exams administered through Certiport`,
+
+  certifications_byag: `BRING YOUR A GAME ANYWHERE (detailed):
+Work ethic and employability curriculum teaching the 7 A's:
+1. Attitude — positive mindset and professionalism
+2. Attendance — reliability and punctuality
+3. Appearance — professional presentation
+4. Ambition — goal setting and self-motivation
+5. Accountability — taking responsibility
+6. Appreciation — gratitude and team recognition
+7. Acceptance — diversity and adaptability
+
+- Video lessons for each module (classroom viewing)
+- Quizizz review quizzes for each A (online, interactive)
+- SMART Board review games: Connect 4, Horse Derby, Jeopardy, Tic-Tac-Toe, Vortex
+- Exam: online practice test available, then proctored exam
+- Certificate: request via Wufoo form after passing exam
+- Exam account request: Wufoo form`,
+
+  platform_gmetrix: `GMETRIX & LEARNKEY PLATFORM (detailed):
+Primary certification preparation platform for IC3, MOS, and QuickBooks.
+
+SETUP (step-by-step):
+1. Register at certiport.pearsonvue.com (instructors, proctors, AND students)
+2. Download Compass Test Software from certiport.pearsonvue.com/Support/Install/Compass
+3. Use GMetrix Quick Start Guide for MOS practice tests
+4. IC3 exam administration through Certiport portal
+5. MOS exam vouchers: request via Wufoo form
+6. Print certificates and score reports from Certiport portal
+
+AVAILABLE RESOURCES:
+- GMetrix practice tests (simulated exam environment)
+- LearnKey video training (instructional content)
+- MOS exam objectives: Word, Excel, PowerPoint, Outlook, Access
+- IC3 technical requirements and disability accommodations
+- Microsoft Digital Literacy Course (free)
+- GMetrix proxy hours request form (Wufoo)`,
+
+  platform_edgenuity: `EDGENUITY PLATFORM (detailed):
+Online courseware for HSE (High School Equivalency) and academic subjects.
+- Student login: auth.edgenuity.com/Login/Login/Student
+- Educator login: auth.edgenuity.com/Login/Login/Educator
+- Student-Led Conferences Guide available (Google Doc)
+- IT Support and whitelist info: edgenuity.com/support/it-support
+- Mobile compatible`,
+
+  platform_essential_education: `ESSENTIAL EDUCATION — COMPUTER ESSENTIALS (detailed):
+Digital literacy program teaching fundamental computer skills.
+- Access: essentialed.com/start/wvde (WV-specific portal)
+- Recommended browser: Firefox (download from mozilla.org)
+- Live webinar schedule and recorded webinars available for training
+- Leads to Computer Essentials Certificate of Achievement`,
+
+  platform_burlington_english: `BURLINGTON ENGLISH (detailed):
+ESL/English Language Learning platform for English Language Learners.
+- Teacher login: burlingtonenglish.com
+- Students receive Burlington English Certificate of Achievement or Certification
+- Used for ESL instruction within SPOKES program`,
+
+  platform_khan_academy: `KHAN ACADEMY (detailed):
+Free math and academic courses platform.
+- Login: khanacademy.org
+- Individual student and activity overview reports available for tracking progress
+- Used for math skills, academic preparation, and HSE readiness`,
+
+  onboarding: `STUDENT ONBOARDING PROCESS (detailed):
+New student orientation follows a structured checklist (SPOKES Checklist for Student Orientation and Intake).
+
+REQUIRED FORMS (FY26):
+1. Welcome Letter — program introduction
+2. SPOKES Student Profile — personal information and background
+3. Personal Attendance Contract — attendance expectations agreement
+4. Rights and Responsibilities — student rights and program expectations
+5. Dress Code Policy — professional appearance standards
+6. Authorization for Release of Information — consent for data sharing
+7. DoHS Release of Information — Department of Health Services consent
+8. Media Release Form — consent for photos/videos
+9. Technology Acceptable Use Policy — acceptable use of program technology
+10. Employment Portfolio Checklist — portfolio document tracking
+11. Learning Needs Screening Instrument — identify learning accommodations
+12. CTE Learning Styles Assessment — identify preferred learning style
+13. Non-Discrimination Notice — federal compliance notice
+14. Password Log Template — secure password tracking
+
+ADDITIONAL ORIENTATION:
+- 4-week schedule orientation (two example schedules available)
+- Career Exploration Worksheet (CFWV)
+- WorkKeys account creation instructions
+- Sign-in sheet for daily attendance tracking
+- CFWV Replacement Resources guide`,
+
+  dohs_forms: `DOHS / WV WORKS FORMS (detailed):
+Forms related to the WV Department of Health and Human Services and WV Works program.
+
+- DFA-TS-12 (Rev. 2-24): Activity tracking/time sheet — records daily activities and hours. Fillable version available.
+- DFA-WVW-70 (Rev. 3-5-24): WV Works participant verification form (sample provided)
+- DFA-WVW-25 (Rev. 6-24): Support services documentation and request
+- DFA-PRC-1 (Rev. 1-24): Program completion record — documents program milestones
+- DFA-SSP-1 (1-9-24): Support services plan — outlines support services for participant
+- Support Services Fact Sheet (Rev. 6-22): Overview of all available support services through WV Works (transportation, childcare, work supplies, etc.)
+- Prospective Employer Letter (ESP/EIP): Template letter for employer outreach and job development
+- Dental Services 2025: Information about dental benefits available through WV Works`,
+
+  ready_to_work: `READY TO WORK CERTIFICATION (detailed):
+The Ready to Work Certificate is the comprehensive goal of the SPOKES program.
+- Tracks multiple benchmarks across program participation
+- Attendance Verification Form — documents required attendance hours
+- SPOKES Module Record (FY26) — tracks completion of required modules
+- Checklist for Documentation of Benchmarks available
+- Represents readiness for employment`,
+
+  portfolio: `EMPLOYMENT PORTFOLIO (detailed):
+Students build an Employment Portfolio throughout the program to demonstrate job readiness.
+- Employment Portfolio Checklist (FY26, fillable PDF) — tracks required documents
+- Portfolio includes: resume, certifications earned, work samples, references, cover letter
+- Portfolio is a tangible deliverable students take to job interviews`,
+
+  admin_resources: `ADMINISTRATOR/INSTRUCTOR RESOURCES (detailed):
+Resources for SPOKES program administrators and instructors.
+
+ON SCHOOLOGY:
+- ABE Educator Evaluation Procedures
+- Educator Evaluation Timeline
+- Professional Growth & Development Plan Form
+- Employee Acceptable Use Policy (AUP) — fillable
+- Personnel Confidentiality Agreement — fillable
+- Administrators Guide PY25
+- 34 CFR 463.20(d) 13 Considerations (federal compliance)
+- Additional Staff Request Justification FY2025
+
+FORMS:
+- Request for Training (Wufoo form)
+
+HANDBOOK:
+- 16 handbook sections on Schoology covering: WV Adult Ed Programs, Professional Development, Meeting Learner Needs, Enrollment, Barriers to Success, Assessment Procedures, Career Pathways, Standards-based Instruction, Individual & Group Plans, Retention & Marketing, Performance Standards, HSE Testing, LMS & Hours Documentation, ELL Instruction, Correctional Facility Teaching, SPOKES Program`,
+};
+
+/**
+ * Maps keywords/phrases to topic content keys for on-demand injection.
+ */
+export const TOPIC_KEYWORDS: Record<string, string[]> = {
+  certifications_ic3: ["ic3", "digital literacy", "computing core", "level 1", "level 2", "level 3", "computing fundamentals", "key applications", "living online", "master certification"],
+  certifications_mos: ["mos", "microsoft office", "word certification", "excel certification", "powerpoint certification", "outlook certification", "access certification", "office specialist", "word", "excel", "powerpoint"],
+  certifications_workkeys: ["workkeys", "work keys", "ncrc", "career readiness", "applied math", "workplace documents", "business writing", "bronze", "silver", "gold", "platinum", "o*net", "onet"],
+  certifications_intuit: ["intuit", "quickbooks", "bookkeeping", "personal finance", "design for delight"],
+  certifications_customer_service: ["customer service", "through the customer", "ttce", "skillpath"],
+  certifications_adobe: ["adobe", "photoshop", "illustrator", "indesign", "aca"],
+  certifications_byag: ["a game", "bring your a", "byag", "7 a's", "seven a", "attitude attendance appearance", "work ethic"],
+  platform_gmetrix: ["gmetrix", "learnkey", "certiport", "compass software", "practice test", "exam voucher", "certification exam"],
+  platform_edgenuity: ["edgenuity", "hse", "high school equivalency"],
+  platform_essential_education: ["essential education", "computer essentials", "essentialed", "digital literacy program"],
+  platform_burlington_english: ["burlington english", "burlington"],
+  platform_khan_academy: ["khan academy", "khan"],
+  onboarding: ["onboarding", "orientation", "new student", "enrollment", "intake", "first day", "sign up", "forms i need", "paperwork", "getting started", "dress code", "attendance contract", "welcome letter"],
+  dohs_forms: ["dohs", "dfa", "wv works", "tanf", "snap", "support services", "time sheet", "activity tracking", "employer letter", "dental"],
+  ready_to_work: ["ready to work", "rtw", "module record", "attendance verification", "benchmarks"],
+  portfolio: ["portfolio", "resume", "employment portfolio", "job readiness", "cover letter"],
+  admin_resources: ["administrator", "instructor resource", "evaluation", "professional development", "confidentiality", "aup", "acceptable use", "schoology handbook"],
+};
+
+/**
+ * Given a user message, find matching topics and return additional context to inject.
+ * Returns empty string if no topics match (Sage uses base knowledge).
+ * Limits to top 3 most relevant topics to avoid context bloat.
+ */
+export function getRelevantContent(userMessage: string): string {
+  const messageLower = userMessage.toLowerCase();
+  const matches: { topic: string; score: number }[] = [];
+
+  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
+    let score = 0;
+    for (const keyword of keywords) {
+      if (messageLower.includes(keyword)) {
+        score += keyword.length; // longer matches = more specific = higher score
+      }
+    }
+    if (score > 0) {
+      matches.push({ topic, score });
+    }
+  }
+
+  if (matches.length === 0) return "";
+
+  // Sort by relevance score, take top 3
+  matches.sort((a, b) => b.score - a.score);
+  const topMatches = matches.slice(0, 3);
+
+  const content = topMatches
+    .map((m) => TOPIC_CONTENT[m.topic])
+    .filter(Boolean)
+    .join("\n\n---\n\n");
+
+  return content ? `\n\nDETAILED REFERENCE (use this to give specific, accurate answers):\n${content}` : "";
+}

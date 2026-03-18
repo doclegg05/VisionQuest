@@ -6,7 +6,7 @@ import { decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, determineStage, ConversationStage } from "@/lib/sage/system-prompts";
 import { extractGoals } from "@/lib/sage/goal-extractor";
-import { parseState, createInitialState, recordGoalSet, recordChatSession } from "@/lib/progression/engine";
+import { parseState, createInitialState, recordGoalSet, recordChatSession, recordWeeklyReview, recordMonthlyReview } from "@/lib/progression/engine";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 
@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
     weekly: goalsByLevel["weekly"],
     daily: goalsByLevel["daily"],
     goals_summary: goalsSummary,
+    userMessage,
   });
 
   // Format message history for Gemini
@@ -246,6 +247,28 @@ export async function POST(req: NextRequest) {
               });
             } catch (err) {
               logger.error("Failed to update conversation stage", { error: String(err) });
+            }
+          }
+
+          // Award XP for review conversations
+          if (conversation.stage === "review") {
+            try {
+              const reviewState = await getOrCreateProgression(session.id);
+              const reviewMsgCount = await prisma.message.count({
+                where: { conversationId: conversation.id },
+              });
+              if (reviewMsgCount >= 4) {
+                const hasMonthlyGoal = existingLevels.has("monthly");
+                const hasWeeklyGoal = existingLevels.has("weekly");
+                if (hasMonthlyGoal && hasWeeklyGoal) {
+                  recordWeeklyReview(reviewState);
+                } else if (hasMonthlyGoal) {
+                  recordMonthlyReview(reviewState);
+                }
+                await saveProgression(session.id, reviewState);
+              }
+            } catch (err) {
+              logger.error("Failed to record review XP", { error: String(err) });
             }
           }
 
