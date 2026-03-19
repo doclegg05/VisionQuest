@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import { goalCountsTowardPlan } from "@/lib/goals";
 import { getCertificationProgress } from "@/lib/certifications";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
@@ -15,11 +16,6 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
 
   const studentWhere = { role: "student" as const, ...(showInactive ? {} : { isActive: true }) };
   const total = await prisma.student.count({ where: studentWhere });
-  const allStudentIds = await prisma.student.findMany({
-    where: studentWhere,
-    select: { id: true },
-    orderBy: { displayName: "asc" },
-  });
 
   const students = await prisma.student.findMany({
     where: studentWhere,
@@ -107,11 +103,12 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     }
 
     // Goals summary
+    const planningGoals = s.goals.filter((goal) => goalCountsTowardPlan(goal.status));
     const goalsByLevel: Record<string, number> = {};
     const completedGoalLevels: string[] = [];
-    for (const g of s.goals) {
+    for (const g of planningGoals) {
       goalsByLevel[g.level] = (goalsByLevel[g.level] || 0) + 1;
-      if (g.status === "completed" && !completedGoalLevels.includes(g.level)) {
+      if (!completedGoalLevels.includes(g.level)) {
         completedGoalLevels.push(g.level);
       }
     }
@@ -153,7 +150,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
       level,
       streak,
       hasBhag,
-      goalsCount: s.goals.length,
+      goalsCount: planningGoals.length,
       orientationDone: s.orientationProgress.length,
       orientationTotal,
       certStatus: cert?.status || "not_started",

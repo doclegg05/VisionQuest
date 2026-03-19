@@ -9,6 +9,7 @@ import {
   getXpProgress,
   parseState,
 } from "@/lib/progression/engine";
+import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import DashboardClient from "./DashboardClient";
@@ -35,7 +36,7 @@ export default async function DashboardPage() {
 
   const now = new Date();
   const [goalCount, progression, nextAppointment, tasks, alertCount] = await Promise.all([
-    prisma.goal.count({ where: { studentId: session.id, status: "active" } }),
+    prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id } }),
     prisma.appointment.findFirst({
       where: {
@@ -94,11 +95,11 @@ export default async function DashboardPage() {
     : null;
 
   // Get goal suggestions from BHAG
-  const activeGoals = await prisma.goal.findMany({
-    where: { studentId: session.id, status: "active" },
+  const planningGoals = await prisma.goal.findMany({
+    where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
     select: { content: true },
   });
-  const goalTexts = activeGoals.map(g => g.content);
+  const goalTexts = planningGoals.map((goal) => goal.content);
   const goalMatchResult = matchGoalsToPlatforms(goalTexts);
 
   return (
@@ -108,8 +109,8 @@ export default async function DashboardPage() {
         title={`Welcome back, ${session.displayName}`}
         description={
           goalCount > 0
-            ? `You have ${goalCount} active goal${goalCount === 1 ? "" : "s"}. Keep building steady momentum.`
-            : "Start with Sage to name your first goal and turn it into a plan."
+            ? `You have ${goalCount} goal${goalCount === 1 ? "" : "s"} in your plan. Keep building steady momentum.`
+            : "Start with Sage or add your first goal in My Goals to turn your vision into a plan."
         }
         actions={(
           <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">

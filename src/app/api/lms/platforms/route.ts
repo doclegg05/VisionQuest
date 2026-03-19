@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { PLATFORMS } from "@/lib/spokes/platforms";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { withAuth } from "@/lib/api-error";
@@ -9,7 +10,7 @@ export const GET = withAuth(async (session) => {
   const goals = await prisma.goal.findMany({
     where: {
       studentId: session.id,
-      status: "active",
+      status: { in: [...GOAL_PLANNING_STATUSES] },
       level: { in: ["bhag", "monthly"] },
     },
     select: { content: true },

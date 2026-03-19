@@ -1,5 +1,4 @@
-const GOAL_LEVELS = ["bhag", "monthly", "weekly", "daily", "task"] as const;
-type GoalLevel = (typeof GOAL_LEVELS)[number];
+import { GOAL_LEVELS, type GoalLevel } from "../goals";
 
 const XP_NEXT_LEVEL: Record<number, number> = {
   1: 200,

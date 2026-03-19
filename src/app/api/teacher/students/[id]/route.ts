@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import { buildGoalPlanEntries } from "@/lib/goal-plan";
+import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
 // GET — individual student detail for teacher view
@@ -29,6 +31,25 @@ export const GET = withTeacherAuth(async (
           status: true,
           parentId: true,
           createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
+      goalResourceLinks: {
+        select: {
+          id: true,
+          goalId: true,
+          resourceType: true,
+          resourceId: true,
+          title: true,
+          description: true,
+          url: true,
+          linkType: true,
+          status: true,
+          dueAt: true,
+          notes: true,
+          assignedById: true,
+          createdAt: true,
+          updatedAt: true,
         },
         orderBy: { createdAt: "asc" },
       },
@@ -276,6 +297,12 @@ export const GET = withTeacherAuth(async (
         : null,
     };
   });
+  const goalPlans = serializeGoalPlanEntries(await buildGoalPlanEntries({
+    goals: student.goals,
+    links: student.goalResourceLinks
+      .map((link) => toGoalResourceLinkView(link))
+      .filter((link): link is NonNullable<typeof link> => !!link),
+  }));
 
   return NextResponse.json({
     student: {
@@ -290,6 +317,7 @@ export const GET = withTeacherAuth(async (
     readinessScore: readinessResult.score,
     readinessBreakdown: readinessResult.breakdown,
     goals: student.goals,
+    goalPlans,
     orientation: {
       items: orientationItems,
       progress: student.orientationProgress,

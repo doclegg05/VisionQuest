@@ -3,6 +3,7 @@ import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getCertificationProgress } from "@/lib/certifications";
+import { goalCountsTowardPlan } from "@/lib/goals";
 
 function latestDate(...values: Array<Date | null | undefined>) {
   return values.reduce<Date | null>((latest, value) => {
@@ -141,7 +142,8 @@ export const GET = withTeacherAuth(async (session) => {
       } catch { /* ignore */ }
     }
 
-    const hasBhag = s.goals.some((g) => g.level === "bhag");
+    const planningGoals = s.goals.filter((goal) => goalCountsTowardPlan(goal.status));
+    const hasBhag = planningGoals.some((g) => g.level === "bhag");
     const cert = s.certifications[0];
     const certDone = cert ? getCertificationProgress(certTemplates, cert.requirements).done : 0;
     const pendingVerify = cert ? cert.requirements.filter((r) => r.completed && !r.verifiedBy).length : 0;
@@ -171,7 +173,7 @@ export const GET = withTeacherAuth(async (session) => {
       level,
       xp,
       streak,
-      s.goals.length,
+      planningGoals.length,
       hasBhag ? "Yes" : "No",
       s.orientationProgress.length,
       orientationTotal,

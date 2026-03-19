@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { GOAL_LEVEL_META, GOAL_PLANNING_STATUSES } from "@/lib/goals";
 
 interface VisionBoardToolbarProps {
   onItemAdded: () => void;
@@ -83,7 +84,11 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
   async function loadGoals() {
     setLoadingGoals(true);
     try {
-      const res = await fetch("/api/goals");
+      const params = new URLSearchParams();
+      for (const status of GOAL_PLANNING_STATUSES) {
+        params.append("status", status);
+      }
+      const res = await fetch(`/api/goals?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setGoals(data.goals || []);
@@ -120,14 +125,6 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, []);
-
-  const LEVEL_LABELS: Record<string, string> = {
-    bhag: "Big Vision",
-    monthly: "Monthly",
-    weekly: "Weekly",
-    daily: "Daily",
-    task: "Task",
-  };
 
   return (
     <div className="relative">
@@ -224,7 +221,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
           {loadingGoals ? (
             <p className="text-xs text-[var(--ink-muted)]">Loading goals...</p>
           ) : goals.length === 0 ? (
-            <p className="text-xs text-[var(--ink-muted)]">No goals set yet. Talk to Sage to create your first goal!</p>
+            <p className="text-xs text-[var(--ink-muted)]">No goals in your plan yet. Add one in My Goals or shape one with Sage.</p>
           ) : (
             <div className="max-h-48 space-y-1.5 overflow-y-auto">
               {goals.map((goal) => (
@@ -234,7 +231,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
                   className="w-full rounded-lg border border-[var(--border)] p-2.5 text-left text-xs transition-colors hover:bg-[rgba(15,154,146,0.06)] hover:border-[rgba(15,154,146,0.2)]"
                 >
                   <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[9px] font-semibold text-[var(--accent-secondary)]">
-                    {LEVEL_LABELS[goal.level] || goal.level}
+                    {GOAL_LEVEL_META[goal.level as keyof typeof GOAL_LEVEL_META]?.label || goal.level}
                   </span>
                   <p className="mt-1 text-[var(--ink-strong)]">{goal.content}</p>
                 </button>

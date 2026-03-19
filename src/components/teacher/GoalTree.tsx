@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GOAL_LEVEL_META, goalStatusLabel } from "@/lib/goals";
 
 interface GoalData {
   id: string;
@@ -17,16 +18,18 @@ interface GoalTreeProps {
 
 // Level config
 const LEVEL_CONFIG: Record<string, { label: string; icon: string; color: string; indent: number }> = {
-  bhag: { label: "Big Vision", icon: "🌟", color: "from-amber-100 to-orange-50 border-amber-200", indent: 0 },
-  monthly: { label: "Monthly Goal", icon: "📅", color: "from-sky-50 to-cyan-50 border-sky-200", indent: 1 },
+  bhag: { label: "Big Vision", icon: GOAL_LEVEL_META.bhag.icon, color: "from-amber-100 to-orange-50 border-amber-200", indent: 0 },
+  monthly: { label: "Monthly Goal", icon: GOAL_LEVEL_META.monthly.icon, color: "from-sky-50 to-cyan-50 border-sky-200", indent: 1 },
   weekly: { label: "Weekly Goal", icon: "📋", color: "from-violet-50 to-purple-50 border-violet-200", indent: 2 },
   daily: { label: "Daily Goal", icon: "⚡", color: "from-emerald-50 to-green-50 border-emerald-200", indent: 3 },
-  task: { label: "Action Task", icon: "✅", color: "from-slate-50 to-gray-50 border-slate-200", indent: 4 },
+  task: { label: "Action Task", icon: GOAL_LEVEL_META.task.icon, color: "from-slate-50 to-gray-50 border-slate-200", indent: 4 },
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-emerald-100 text-emerald-700" },
-  completed: { label: "Done", className: "bg-sky-100 text-sky-700" },
+  in_progress: { label: "In Progress", className: "bg-sky-100 text-sky-700" },
+  blocked: { label: "Blocked", className: "bg-amber-100 text-amber-800" },
+  completed: { label: "Done", className: "bg-violet-100 text-violet-700" },
   abandoned: { label: "Dropped", className: "bg-gray-100 text-gray-500" },
 };
 
@@ -37,7 +40,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
     return (
       <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-6 text-center text-sm text-[var(--ink-muted)]">
         <p className="text-2xl mb-2">🎯</p>
-        <p>No goals set yet. Goals appear here after the student talks to Sage.</p>
+        <p>No goals set yet. Goals appear here after the student talks to Sage or adds them manually.</p>
       </div>
     );
   }
@@ -84,7 +87,10 @@ export default function GoalTree({ goals }: GoalTreeProps) {
             {!isCollapsed && (
               <div className="ml-4 mt-1 space-y-1.5 border-l-2 border-[rgba(18,38,63,0.08)] pl-3">
                 {levelGoals.map((goal) => {
-                  const status = STATUS_BADGE[goal.status] || STATUS_BADGE.active;
+                  const status = STATUS_BADGE[goal.status] || {
+                    label: goalStatusLabel(goal.status),
+                    className: "bg-slate-100 text-slate-600",
+                  };
                   return (
                     <div
                       key={goal.id}

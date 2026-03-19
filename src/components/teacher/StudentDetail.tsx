@@ -3,8 +3,10 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import GoalTree from "./GoalTree";
+import GoalSupportPlanner from "./GoalSupportPlanner";
 import ReadinessScore from "@/components/ui/ReadinessScore";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
+import type { GoalPlanEntry } from "@/lib/goal-resource-links";
 
 interface GoalData {
   id: string;
@@ -173,6 +175,7 @@ interface StudentData {
   readinessScore: number;
   readinessBreakdown: ReadinessBreakdown;
   goals: GoalData[];
+  goalPlans: GoalPlanEntry[];
   orientation: {
     items: OrientationItemData[];
     progress: OrientationProgressData[];
@@ -522,6 +525,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     readinessScore,
     readinessBreakdown,
     goals,
+    goalPlans,
     orientation,
     certification,
     publicCredentialPage,
@@ -1132,6 +1136,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Goals ({goals.length})</h3>
+        <div className="mb-5">
+          <GoalSupportPlanner goals={goals} goalPlans={goalPlans} onChanged={loadData} />
+        </div>
         <GoalTree goals={goals} />
       </div>
 
