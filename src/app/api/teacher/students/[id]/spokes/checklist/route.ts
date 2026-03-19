@@ -1,24 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { ensureSpokesRecordForStudent } from "@/lib/spokes";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
-export async function POST(
+export const POST = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+) => {
   const { id } = await params;
   const body = await req.json();
 
@@ -65,8 +55,8 @@ export async function POST(
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.checklist.update",
     targetType: "spokes_checklist_progress",
     targetId: progress.id,
@@ -78,4 +68,4 @@ export async function POST(
   });
 
   return NextResponse.json({ progress });
-}
+});

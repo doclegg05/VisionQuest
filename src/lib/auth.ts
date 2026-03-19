@@ -2,6 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
+import { cached, invalidatePrefix } from "./cache";
 
 const TOKEN_TTL = "7d";
 const COOKIE_NAME = "vq-session";
@@ -84,10 +85,14 @@ export async function getSession() {
   const claims = verifyToken(token);
   if (!claims) return null;
 
-  const student = await prisma.student.findUnique({
-    where: { id: claims.sub },
-    select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true, isActive: true },
-  });
+  // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
+  const cacheKey = `session:${claims.sub}:${claims.sv}`;
+  const student = await cached(cacheKey, 10, () =>
+    prisma.student.findUnique({
+      where: { id: claims.sub },
+      select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true, isActive: true },
+    }),
+  );
 
   if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
   return {
@@ -96,6 +101,11 @@ export async function getSession() {
     displayName: student.displayName,
     role: student.role,
   };
+}
+
+/** Invalidate cached session when a user's data changes (role change, deactivation, etc.) */
+export function invalidateSessionCache(studentId: string) {
+  invalidatePrefix(`session:${studentId}`);
 }
 
 export async function clearSession() {

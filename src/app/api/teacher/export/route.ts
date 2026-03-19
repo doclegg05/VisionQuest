@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getCertificationProgress } from "@/lib/certifications";
-
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
 
 function latestDate(...values: Array<Date | null | undefined>) {
   return values.reduce<Date | null>((latest, value) => {
@@ -19,10 +13,7 @@ function latestDate(...values: Array<Date | null | undefined>) {
 }
 
 // GET — export class data as CSV
-export async function GET() {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const GET = withTeacherAuth(async (session) => {
   const now = new Date();
 
   const students = await prisma.student.findMany({
@@ -218,8 +209,8 @@ export async function GET() {
   ].join("\n");
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.export.csv",
     targetType: "class",
     summary: "Teacher exported the student progress CSV.",
@@ -234,4 +225,4 @@ export async function GET() {
       "Content-Disposition": `attachment; filename="visionquest-class-export-${new Date().toISOString().split("T")[0]}.csv"`,
     },
   });
-}
+});

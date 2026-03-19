@@ -1,21 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { syncAlertsForStudents } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress } from "@/lib/certifications";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 // GET — class overview: all students with cross-module progress
-export async function GET(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const GET = withTeacherAuth(async (_session, req: Request) => {
   const url = new URL(req.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
@@ -239,4 +230,4 @@ export async function GET(req: Request) {
     limit,
     totalPages: Math.ceil(total / limit),
   });
-}
+});

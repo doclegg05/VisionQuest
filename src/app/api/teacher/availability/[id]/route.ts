@@ -1,27 +1,19 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
-export async function DELETE(
+export const DELETE = withTeacherAuth(async (
+  session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id } = await params;
 
   const block = await prisma.advisorAvailability.findFirst({
     where: {
       id,
-      advisorId: teacher.id,
+      advisorId: session.id,
     },
     select: {
       id: true,
@@ -40,8 +32,8 @@ export async function DELETE(
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "availability.deleted",
     targetType: "advisor_availability",
     targetId: block.id,
@@ -54,4 +46,4 @@ export async function DELETE(
   });
 
   return NextResponse.json({ ok: true });
-}
+});

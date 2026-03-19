@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
 
 function isValidUrl(value: string | null | undefined) {
   if (!value) return true;
@@ -19,10 +13,7 @@ function isValidUrl(value: string | null | undefined) {
   }
 }
 
-export async function GET() {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const GET = withTeacherAuth(async (_session) => {
   const events = await prisma.careerEvent.findMany({
     include: {
       registrations: {
@@ -38,12 +29,9 @@ export async function GET() {
       registrationCount: event.registrations.length,
     })),
   });
-}
+});
 
-export async function POST(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const POST = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
@@ -79,13 +67,13 @@ export async function POST(req: Request) {
       endsAt,
       capacity,
       registrationRequired,
-      createdById: teacher.id,
+      createdById: session.id,
     },
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "event.created",
     targetType: "event",
     targetId: event.id,
@@ -93,12 +81,9 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ event });
-}
+});
 
-export async function PUT(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const PUT = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";
   const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -142,8 +127,8 @@ export async function PUT(req: Request) {
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "event.updated",
     targetType: "event",
     targetId: event.id,
@@ -151,12 +136,9 @@ export async function PUT(req: Request) {
   });
 
   return NextResponse.json({ event });
-}
+});
 
-export async function DELETE(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const DELETE = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) {
@@ -169,8 +151,8 @@ export async function DELETE(req: Request) {
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "event.deleted",
     targetType: "event",
     targetId: event.id,
@@ -178,4 +160,4 @@ export async function DELETE(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

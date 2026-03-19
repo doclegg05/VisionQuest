@@ -72,8 +72,11 @@ export async function POST(req: NextRequest) {
     try {
       apiKey = decrypt(student.geminiApiKey);
     } catch {
-      // Fallback for keys stored before encryption was added
-      apiKey = student.geminiApiKey;
+      // Key failed to decrypt — require re-entry rather than using raw value
+      return new Response(
+        JSON.stringify({ error: "Your API key needs to be re-entered. Please update it in Settings." }),
+        { status: 400 },
+      );
     }
   } else {
     apiKey = PLATFORM_GEMINI_API_KEY;

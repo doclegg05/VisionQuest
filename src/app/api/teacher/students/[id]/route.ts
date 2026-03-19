@@ -1,23 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 // GET — individual student detail for teacher view
-export async function GET(
+export const GET = withTeacherAuth(async (
+  _session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id } = await params;
 
   await syncStudentAlerts(id);
@@ -330,4 +322,4 @@ export async function GET(
     alerts: student.alerts,
     conversations: conversationSummaries,
   });
-}
+});

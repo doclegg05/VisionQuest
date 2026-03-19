@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
 import { getCertificationProgress } from "@/lib/certifications";
 import { logAuditEvent } from "@/lib/audit";
 import { recomputeCertificationStatus, recomputeCertificationStatusesForType } from "@/lib/certification-service";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 // GET — list cert templates or all student cert progress
-export async function GET(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const GET = withTeacherAuth(async (_session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const view = searchParams.get("view"); // "templates" or "students"
 
@@ -65,13 +56,10 @@ export async function GET(req: Request) {
   });
 
   return NextResponse.json({ templates });
-}
+});
 
 // POST — create a cert template
-export async function POST(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const POST = withTeacherAuth(async (session, req: Request) => {
   const { label, description, url, required, needsFile, needsVerify } = await req.json();
   if (!label) return NextResponse.json({ error: "label is required" }, { status: 400 });
   if (url && !isValidUrl(url)) {
@@ -110,8 +98,8 @@ export async function POST(req: Request) {
   }
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.cert_template.create",
     targetType: "cert_template",
     targetId: template.id,
@@ -119,13 +107,10 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ template });
-}
+});
 
 // PUT — update a template or verify a student requirement
-export async function PUT(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const PUT = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
 
   // Verify a student's requirement
@@ -156,15 +141,15 @@ export async function PUT(req: Request) {
     await prisma.certRequirement.update({
       where: { id: requirementId },
       data: {
-        verifiedBy: verified ? teacher.id : null,
+        verifiedBy: verified ? session.id : null,
         verifiedAt: verified ? new Date() : null,
       },
     });
     await recomputeCertificationStatus(requirement.certificationId, requirement.certification.certType);
 
     await logAuditEvent({
-      actorId: teacher.id,
-      actorRole: teacher.role,
+      actorId: session.id,
+      actorRole: session.role,
       action: verified ? "teacher.cert.verify" : "teacher.cert.unverify",
       targetType: "cert_requirement",
       targetId: requirementId,
@@ -199,8 +184,8 @@ export async function PUT(req: Request) {
   await recomputeCertificationStatusesForType(template.certType);
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.cert_template.update",
     targetType: "cert_template",
     targetId: template.id,
@@ -208,13 +193,10 @@ export async function PUT(req: Request) {
   });
 
   return NextResponse.json({ template });
-}
+});
 
 // DELETE — remove a cert template
-export async function DELETE(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const DELETE = withTeacherAuth(async (session, req: Request) => {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
@@ -231,8 +213,8 @@ export async function DELETE(req: Request) {
   }
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.cert_template.delete",
     targetType: "cert_template",
     targetId: id,
@@ -242,4 +224,4 @@ export async function DELETE(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

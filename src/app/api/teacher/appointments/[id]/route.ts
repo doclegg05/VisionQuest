@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { isAppointmentStatus, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
-export async function PATCH(
+export const PATCH = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id } = await params;
   const body = await req.json();
   const nextStatus = typeof body.status === "string" ? body.status.trim() : null;
@@ -65,8 +57,8 @@ export async function PATCH(
 
   await syncStudentAlerts(appointment.studentId);
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "appointment.updated",
     targetType: "appointment",
     targetId: appointment.id,
@@ -79,4 +71,4 @@ export async function PATCH(
   });
 
   return NextResponse.json({ appointment });
-}
+});

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import {
   APPOINTMENT_STATUSES,
   isAvailabilityLocationType,
@@ -11,12 +11,6 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 function isValidUrl(value: string | null | undefined) {
   if (!value) return true;
   try {
@@ -27,13 +21,11 @@ function isValidUrl(value: string | null | undefined) {
   }
 }
 
-export async function POST(
+export const POST = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id: studentId } = await params;
   const body = await req.json();
 
@@ -78,7 +70,7 @@ export async function POST(
   const appointment = await prisma.appointment.create({
     data: {
       studentId,
-      advisorId: teacher.id,
+      advisorId: session.id,
       title,
       description: description || null,
       startsAt,
@@ -103,8 +95,8 @@ export async function POST(
   await syncStudentAlerts(studentId);
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "appointment.created",
     targetType: "student",
     targetId: studentId,
@@ -130,4 +122,4 @@ export async function POST(
   }).catch((err) => logger.error("Failed to send notification", { error: String(err) }));
 
   return NextResponse.json({ appointment });
-}
+});

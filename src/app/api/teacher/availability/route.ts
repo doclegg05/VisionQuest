@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import {
   formatMinutesLabel,
   isAvailabilityLocationType,
@@ -7,12 +7,6 @@ import {
 } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
 
 function isValidUrl(value: string | null | undefined) {
   if (!value) return true;
@@ -24,18 +18,15 @@ function isValidUrl(value: string | null | undefined) {
   }
 }
 
-export async function GET() {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const GET = withTeacherAuth(async (session) => {
   const [blocks, scheduledAppointments] = await Promise.all([
     prisma.advisorAvailability.findMany({
-      where: { advisorId: teacher.id },
+      where: { advisorId: session.id },
       orderBy: [{ weekday: "asc" }, { startMinutes: "asc" }],
     }),
     prisma.appointment.count({
       where: {
-        advisorId: teacher.id,
+        advisorId: session.id,
         status: "scheduled",
         startsAt: { gte: new Date() },
       },
@@ -50,12 +41,9 @@ export async function GET() {
     })),
     scheduledAppointments,
   });
-}
+});
 
-export async function POST(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+export const POST = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   const weekday = Number(body.weekday);
   const startMinutes = minutesFromTimeInput(typeof body.startTime === "string" ? body.startTime : "");
@@ -86,7 +74,7 @@ export async function POST(req: Request) {
 
   const block = await prisma.advisorAvailability.create({
     data: {
-      advisorId: teacher.id,
+      advisorId: session.id,
       weekday,
       startMinutes,
       endMinutes,
@@ -98,8 +86,8 @@ export async function POST(req: Request) {
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "availability.created",
     targetType: "advisor_availability",
     targetId: block.id,
@@ -114,4 +102,4 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ block });
-}
+});

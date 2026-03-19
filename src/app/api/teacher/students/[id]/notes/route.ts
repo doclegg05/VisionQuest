@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { isNoteCategory } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
-export async function POST(
+export const POST = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id: studentId } = await params;
   const body = await req.json();
 
@@ -46,7 +38,7 @@ export async function POST(
   const created = await prisma.caseNote.create({
     data: {
       studentId,
-      authorId: teacher.id,
+      authorId: session.id,
       category,
       body: note,
       visibility: "teacher",
@@ -59,8 +51,8 @@ export async function POST(
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "note.created",
     targetType: "student",
     targetId: studentId,
@@ -72,4 +64,4 @@ export async function POST(
   });
 
   return NextResponse.json({ note: created });
-}
+});

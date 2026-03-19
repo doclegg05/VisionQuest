@@ -1,23 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 // POST — reset a student's password
-export async function POST(
+export const POST = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id } = await params;
   const { newPassword } = await req.json();
 
@@ -48,8 +40,8 @@ export async function POST(
   ]);
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.password.reset",
     targetType: "student",
     targetId: id,
@@ -60,4 +52,4 @@ export async function POST(
   });
 
   return NextResponse.json({ ok: true });
-}
+});

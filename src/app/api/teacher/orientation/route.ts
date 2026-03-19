@@ -1,34 +1,19 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 // GET — list all orientation items (teacher view)
-export async function GET() {
-  if (!(await requireTeacher())) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const GET = withTeacherAuth(async (_session) => {
   const items = await prisma.orientationItem.findMany({
     orderBy: { sortOrder: "asc" },
   });
 
   return NextResponse.json({ items });
-}
+});
 
 // POST — create a new orientation item
-export async function POST(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const POST = withTeacherAuth(async (session, req: Request) => {
   const { label, description, required } = await req.json();
   if (!label) {
     return NextResponse.json({ error: "label is required" }, { status: 400 });
@@ -42,8 +27,8 @@ export async function POST(req: Request) {
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.orientation.create",
     targetType: "orientation_item",
     targetId: item.id,
@@ -51,15 +36,10 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ item });
-}
+});
 
 // PUT — update an orientation item
-export async function PUT(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const PUT = withTeacherAuth(async (session, req: Request) => {
   const { id, label, description, required, sortOrder } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
@@ -72,8 +52,8 @@ export async function PUT(req: Request) {
   const item = await prisma.orientationItem.update({ where: { id }, data });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.orientation.update",
     targetType: "orientation_item",
     targetId: item.id,
@@ -81,15 +61,10 @@ export async function PUT(req: Request) {
   });
 
   return NextResponse.json({ item });
-}
+});
 
 // DELETE — remove an orientation item
-export async function DELETE(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const DELETE = withTeacherAuth(async (session, req: Request) => {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
@@ -103,8 +78,8 @@ export async function DELETE(req: Request) {
   await prisma.orientationItem.delete({ where: { id } });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.orientation.delete",
     targetType: "orientation_item",
     targetId: id,
@@ -112,4 +87,4 @@ export async function DELETE(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

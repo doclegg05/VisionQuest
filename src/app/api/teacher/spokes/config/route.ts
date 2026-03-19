@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
 
 function isTemplateEntity(value: unknown): value is "checklist" | "module" {
   return value === "checklist" || value === "module";
 }
 
-export async function GET() {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const GET = withTeacherAuth(async (_session) => {
   const [checklistTemplates, moduleTemplates] = await Promise.all([
     prisma.spokesChecklistTemplate.findMany({
       orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { label: "asc" }],
@@ -29,14 +18,9 @@ export async function GET() {
   ]);
 
   return NextResponse.json({ checklistTemplates, moduleTemplates });
-}
+});
 
-export async function POST(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const POST = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   if (!isTemplateEntity(body.entity)) {
     return NextResponse.json({ error: "entity must be checklist or module." }, { status: 400 });
@@ -67,8 +51,8 @@ export async function POST(req: Request) {
     });
 
     await logAuditEvent({
-      actorId: teacher.id,
-      actorRole: teacher.role,
+      actorId: session.id,
+      actorRole: session.role,
       action: "teacher.spokes.checklist_template.create",
       targetType: "spokes_checklist_template",
       targetId: template.id,
@@ -94,8 +78,8 @@ export async function POST(req: Request) {
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.module_template.create",
     targetType: "spokes_module_template",
     targetId: template.id,
@@ -103,14 +87,9 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ template });
-}
+});
 
-export async function PUT(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const PUT = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   if (!isTemplateEntity(body.entity)) {
     return NextResponse.json({ error: "entity must be checklist or module." }, { status: 400 });
@@ -143,8 +122,8 @@ export async function PUT(req: Request) {
     });
 
     await logAuditEvent({
-      actorId: teacher.id,
-      actorRole: teacher.role,
+      actorId: session.id,
+      actorRole: session.role,
       action: "teacher.spokes.checklist_template.update",
       targetType: "spokes_checklist_template",
       targetId: template.id,
@@ -172,8 +151,8 @@ export async function PUT(req: Request) {
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.module_template.update",
     targetType: "spokes_module_template",
     targetId: template.id,
@@ -181,14 +160,9 @@ export async function PUT(req: Request) {
   });
 
   return NextResponse.json({ template });
-}
+});
 
-export async function DELETE(req: Request) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+export const DELETE = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   if (!isTemplateEntity(body.entity)) {
     return NextResponse.json({ error: "entity must be checklist or module." }, { status: 400 });
@@ -205,8 +179,8 @@ export async function DELETE(req: Request) {
     await prisma.spokesChecklistTemplate.delete({ where: { id: body.id } });
 
     await logAuditEvent({
-      actorId: teacher.id,
-      actorRole: teacher.role,
+      actorId: session.id,
+      actorRole: session.role,
       action: "teacher.spokes.checklist_template.delete",
       targetType: "spokes_checklist_template",
       targetId: body.id,
@@ -223,8 +197,8 @@ export async function DELETE(req: Request) {
   await prisma.spokesModuleTemplate.delete({ where: { id: body.id } });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.module_template.delete",
     targetType: "spokes_module_template",
     targetId: body.id,
@@ -232,4 +206,4 @@ export async function DELETE(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

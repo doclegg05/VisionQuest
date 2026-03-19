@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { ensureSpokesRecordForStudent } from "@/lib/spokes";
-
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
 
 function parseRequiredDate(value: unknown) {
   if (typeof value !== "string" || !value) return null;
@@ -21,15 +15,11 @@ function parseCheckpoint(value: unknown) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-export async function POST(
+export const POST = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+) => {
   const { id } = await params;
   const body = await req.json();
   const checkpointMonths = parseCheckpoint(body.checkpointMonths);
@@ -73,8 +63,8 @@ export async function POST(
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.follow_up.update",
     targetType: "spokes_employment_follow_up",
     targetId: followUp.id,
@@ -85,17 +75,13 @@ export async function POST(
   });
 
   return NextResponse.json({ followUp });
-}
+});
 
-export async function DELETE(
+export const DELETE = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+) => {
   const { id } = await params;
   const body = await req.json();
   const checkpointMonths = parseCheckpoint(body.checkpointMonths);
@@ -121,8 +107,8 @@ export async function DELETE(
   await prisma.spokesEmploymentFollowUp.delete({ where: { id: existing.id } });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.follow_up.delete",
     targetType: "spokes_employment_follow_up",
     targetId: existing.id,
@@ -133,4 +119,4 @@ export async function DELETE(
   });
 
   return NextResponse.json({ ok: true });
-}
+});

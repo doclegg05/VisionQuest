@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
-
 // PATCH — toggle a student's active status
-export async function PATCH(
+export const PATCH = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+) => {
   const { id } = await params;
   const body = await req.json();
   const isActive = body.isActive;
@@ -46,8 +38,8 @@ export async function PATCH(
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: isActive ? "teacher.student.reactivate" : "teacher.student.deactivate",
     targetType: "student",
     targetId: id,
@@ -55,4 +47,4 @@ export async function PATCH(
   });
 
   return NextResponse.json({ ok: true, isActive });
-}
+});

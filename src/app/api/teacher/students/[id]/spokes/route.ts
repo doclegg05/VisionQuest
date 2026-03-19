@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { buildSpokesSummary, ensureSpokesRecordForStudent } from "@/lib/spokes";
-
-async function requireTeacher() {
-  const session = await getSession();
-  if (!session || session.role !== "teacher") return null;
-  return session;
-}
 
 function parseOptionalDate(value: unknown) {
   if (!value || typeof value !== "string") return null;
@@ -41,15 +35,11 @@ function coerceStringArray(value: unknown) {
   return [];
 }
 
-export async function GET(
+export const GET = withTeacherAuth(async (
+  _session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+) => {
   const { id } = await params;
   const student = await prisma.student.findUnique({
     where: { id },
@@ -107,17 +97,13 @@ export async function GET(
     moduleTemplates,
     summary,
   });
-}
+});
 
-export async function PUT(
+export const PUT = withTeacherAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const teacher = await requireTeacher();
-  if (!teacher) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+) => {
   const { id } = await params;
   const existingRecord = await ensureSpokesRecordForStudent(id);
   const body = await req.json();
@@ -223,8 +209,8 @@ export async function PUT(
   });
 
   await logAuditEvent({
-    actorId: teacher.id,
-    actorRole: teacher.role,
+    actorId: session.id,
+    actorRole: session.role,
     action: "teacher.spokes.record.update",
     targetType: "spokes_record",
     targetId: record.id,
@@ -236,4 +222,4 @@ export async function PUT(
   });
 
   return NextResponse.json({ record });
-}
+});
