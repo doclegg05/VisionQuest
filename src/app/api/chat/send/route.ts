@@ -7,9 +7,11 @@ import { parseState, createInitialState, recordChatSession } from "@/lib/progres
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { withAuth } from "@/lib/api-error";
+import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { getOrCreateConversation, saveMessage } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
+import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 
 // ─── Progression helpers (used during stream) ───────────────────────────────
 
@@ -33,17 +35,9 @@ async function saveProgression(studentId: string, state: ReturnType<typeof creat
 // ─── Route handler ──────────────────────────────────────────────────────────
 
 export const POST = withAuth(async (session, req: NextRequest) => {
-  const body = await req.json();
-  const userMessage = (body.message || "").trim();
+  const body = await parseBody(req, chatSendSchema);
+  const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;
-
-  // Validate
-  if (!userMessage) {
-    return new Response(JSON.stringify({ error: "Message is required." }), { status: 400 });
-  }
-  if (userMessage.length > 10000) {
-    return new Response(JSON.stringify({ error: "Message too long. Maximum 10,000 characters." }), { status: 400 });
-  }
 
   // Rate limit
   const rl = await rateLimit(`chat:${session.id}`, 60, 60 * 60 * 1000);
@@ -62,7 +56,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
   // Build system prompt context
   const goals = await prisma.goal.findMany({
-    where: { studentId: session.id, status: "active" },
+    where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
   });
   const goalsByLevel: Record<string, string> = {};
   for (const g of goals) goalsByLevel[g.level] = g.content;
@@ -75,7 +69,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     daily: goalsByLevel["daily"],
     goals_summary: goals.length > 0
       ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
-      : "No goals set yet.",
+      : "No planning goals set yet.",
     userMessage,
   });
 

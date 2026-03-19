@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
+import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 
 /**
  * Load an existing conversation or create a new one.
@@ -21,7 +22,7 @@ export async function getOrCreateConversation(
 
   // New conversation — determine stage from existing goals
   const goals = await prisma.goal.findMany({
-    where: { studentId, status: "active" },
+    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
     select: { level: true },
   });
   const stage = determineStage(goals);

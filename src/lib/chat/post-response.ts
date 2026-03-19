@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
+import { ensureGoalLevelProgression } from "@/lib/goal-progression";
+import { GOAL_PLANNING_STATUSES, isGoalLevel, type GoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
 import {
   parseState,
   createInitialState,
-  recordGoalSet,
   recordWeeklyReview,
   recordMonthlyReview,
 } from "@/lib/progression/engine";
@@ -75,17 +76,22 @@ export async function handlePostResponse({
 
   // 2. Create new goal records
   const existingGoals = await prisma.goal.findMany({
-    where: { studentId, status: "active" },
+    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
     select: { level: true },
   });
   const existingLevels = new Set(existingGoals.map((g) => g.level));
-  const newGoals: string[] = [];
+  const newGoals: GoalLevel[] = [];
 
   for (const goal of extracted.goals_found) {
+    const content = goal.content.trim();
+    if (!isGoalLevel(goal.level) || !content) {
+      continue;
+    }
+
     if (!existingLevels.has(goal.level)) {
       try {
         await prisma.goal.create({
-          data: { studentId, level: goal.level, content: goal.content, status: "active" },
+          data: { studentId, level: goal.level, content, status: "active" },
         });
         newGoals.push(goal.level);
         existingLevels.add(goal.level);
@@ -102,11 +108,7 @@ export async function handlePostResponse({
   // 3. Award XP for new goals
   if (newGoals.length > 0) {
     try {
-      const state = await getOrCreateProgression(studentId);
-      for (const level of newGoals) {
-        recordGoalSet(state, level);
-      }
-      await saveProgression(studentId, state);
+      await ensureGoalLevelProgression(studentId, newGoals);
     } catch (err) {
       logger.error("Failed to save progression for new goals", { error: String(err) });
     }
@@ -116,7 +118,7 @@ export async function handlePostResponse({
   if (extracted.stage_complete) {
     try {
       const updatedGoals = await prisma.goal.findMany({
-        where: { studentId, status: "active" },
+        where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
         select: { level: true },
       });
       const newStage = determineStage(updatedGoals);

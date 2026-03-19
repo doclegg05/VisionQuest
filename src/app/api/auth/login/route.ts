@@ -4,6 +4,7 @@ import { verifyPassword, normalizeStudentId, setSessionCookie } from "@/lib/auth
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
+import { parseBody, loginSchema } from "@/lib/schemas";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -11,13 +12,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!rl.success) {
     return NextResponse.json({ error: "Too many login attempts. Please try again later." }, { status: 429 });
   }
-  const body = await req.json();
-  const studentId = normalizeStudentId(body.studentId || "");
-  const password = (body.password || "").trim();
 
-  if (!studentId || !password) {
-    return NextResponse.json({ error: "Student ID and password are required." }, { status: 400 });
-  }
+  const body = await parseBody(req, loginSchema);
+  const studentId = normalizeStudentId(body.studentId);
+  const password = body.password.trim();
 
   const student = await prisma.student.findUnique({ where: { studentId } });
   if (!student || !verifyPassword(password, student.passwordHash)) {
