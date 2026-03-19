@@ -61,7 +61,9 @@ export default function DocumentCard({
         href: url,
         download: doc.title,
       });
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
       setDownloadError(true);

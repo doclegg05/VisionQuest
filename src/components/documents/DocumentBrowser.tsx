@@ -57,11 +57,15 @@ export default function DocumentBrowser({
   const [fetchKey, setFetchKey] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Debounce search input
+  // Debounce search input; clear timer on unmount
   const handleSearch = useCallback((value: string) => {
     setSearchInput(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setSearchQuery(value), 300);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
   // Fetch documents from API

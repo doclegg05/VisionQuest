@@ -48,7 +48,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   // Derive a safe filename from the title + original extension
   const lastSegment = doc.storageKey.split("/").pop() ?? "";
   const ext = lastSegment.includes(".") ? lastSegment.split(".").pop()! : "pdf";
-  const safeTitle = doc.title.replace(/[^a-zA-Z0-9._\- ]/g, "_").replace(/\.+$/, "").slice(0, 200);
+  const safeTitle = doc.title.replace(/[^a-zA-Z0-9._\- ]/g, "_").replace(/"+/g, "").replace(/\.+$/, "").slice(0, 200);
   const filename = `${safeTitle}.${ext}`;
 
   const disposition = mode === "download"
