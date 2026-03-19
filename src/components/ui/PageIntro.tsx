@@ -17,7 +17,7 @@ export default function PageIntro({
 }: PageIntroProps) {
   return (
     <section className="page-hero">
-      <div className="max-w-3xl">
+      <div className="min-w-0 max-w-3xl flex-1">
         <p className="page-eyebrow">{eyebrow}</p>
         <h1 className="page-title">{title}</h1>
         <p className="page-subtitle">{description}</p>

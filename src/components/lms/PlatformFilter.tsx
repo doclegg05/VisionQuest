@@ -21,7 +21,7 @@ export default function PlatformFilter({
   onToggleGoalMatch,
 }: PlatformFilterProps) {
   const chipBase =
-    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap";
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap";
   const chipActive =
     "bg-[var(--ink-strong)] text-white shadow-sm";
   const chipInactive =
@@ -30,7 +30,7 @@ export default function PlatformFilter({
     "bg-[var(--accent-strong)] text-white shadow-sm";
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+    <div className="scrollbar-hide -mx-1 flex flex-nowrap items-center gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
       {/* All chip */}
       <button
         onClick={() => onSelect("all")}

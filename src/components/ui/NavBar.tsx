@@ -63,22 +63,26 @@ export default function NavBar({ studentName, role }: NavBarProps) {
 
   return (
     <>
-      <div className="md:hidden fixed left-3 right-3 top-3 z-50 flex items-center justify-between rounded-[1.6rem] border border-white/50 bg-[rgba(255,255,255,0.84)] px-4 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur">
-        <BrandLockup
-          href="/dashboard"
-          size="sm"
-          title="VisionQuest"
-          subtitle="SPOKES Portal"
-        />
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--ink-muted)]">{studentName}</span>
+      <div className="md:hidden fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-white/50 bg-[rgba(255,255,255,0.84)] px-3.5 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur">
+        <div className="min-w-0 flex-1">
+          <BrandLockup
+            href="/dashboard"
+            size="sm"
+            title="VisionQuest"
+            subtitle="Portal"
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 min-[430px]:gap-2">
+          <span className="hidden max-w-[8rem] truncate text-right text-sm font-medium text-[var(--ink-muted)] min-[430px]:block">
+            {studentName}
+          </span>
           <div className="text-[var(--ink-strong)]">
             <NotificationBell />
           </div>
           <button
             onClick={handleLogout}
             type="button"
-            className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+            className="rounded-full border border-[rgba(18,38,63,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)] min-[390px]:text-xs"
             aria-label="Log out"
           >
             Log out
@@ -97,7 +101,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
               key={item.href}
               href={item.href}
               prefetch={false}
-              className={`flex flex-1 flex-col items-center py-3 text-xs transition-colors
+              className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors
                 ${pathname === item.href ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
               aria-current={pathname === item.href ? "page" : undefined}
             >
@@ -106,13 +110,13 @@ export default function NavBar({ studentName, role }: NavBarProps) {
               }`}>
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span className="text-center">{item.label}</span>
             </Link>
           ))}
           <button
             onClick={() => setMoreOpen(!moreOpen)}
             type="button"
-            className={`flex flex-1 flex-col items-center py-3 text-xs transition-colors
+            className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors
               ${isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
             aria-expanded={moreOpen}
             aria-label="More navigation options"
@@ -122,7 +126,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             }`}>
               •••
             </span>
-            <span>More</span>
+            <span className="text-center">More</span>
           </button>
         </div>
       </nav>
@@ -139,14 +143,14 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             aria-label="More navigation options"
             className="panel panel-strong md:hidden fixed bottom-24 left-3 right-3 z-50 rounded-[1.75rem] p-4"
           >
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {MOBILE_MORE.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   prefetch={false}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex flex-col items-center rounded-[1.1rem] py-3 text-xs transition-colors
+                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors
                     ${pathname === item.href
                       ? "bg-[rgba(16,37,62,0.08)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
@@ -154,12 +158,12 @@ export default function NavBar({ studentName, role }: NavBarProps) {
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
                   <span className="mb-1 text-2xl">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="text-center leading-4">{item.label}</span>
                 </Link>
               ))}
             </div>
             {role === "teacher" && (
-              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-[rgba(18,38,63,0.08)] pt-3">
+              <div className="mt-3 grid grid-cols-1 gap-2 border-t border-[rgba(18,38,63,0.08)] pt-3 sm:grid-cols-2">
                 {TEACHER_ITEMS.map((item) => (
                   <Link
                     key={item.href}
@@ -251,12 +255,12 @@ export default function NavBar({ studentName, role }: NavBarProps) {
         </nav>
 
         <div className="border-t border-white/10 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">{studentName}</p>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-sm font-semibold leading-5">{studentName}</p>
               <p className="text-xs uppercase tracking-[0.18em] text-white/45">{role}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <NotificationBell />
               <button
                 onClick={handleLogout}

@@ -113,12 +113,12 @@ export default function LmsManager() {
     setForm({ title: "", description: "", url: "", category: CATEGORIES[0], icon: "" });
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading...</p>;
 
   if (error) return (
-    <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchLinks} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+    <div className="surface-section px-6 py-10 text-center">
+      <p className="mb-4 text-sm text-red-600">{error}</p>
+      <button onClick={fetchLinks} className="primary-button px-4 py-2 text-sm">
         Try Again
       </button>
     </div>
@@ -135,41 +135,41 @@ export default function LmsManager() {
     <div className="space-y-4">
       {/* Link list grouped by category */}
       {links.length === 0 ? (
-        <div className="text-center text-gray-400 py-8 text-sm">
+        <div className="surface-section py-8 text-center text-sm text-[var(--ink-muted)]">
           No course links yet. Add one to get started.
         </div>
       ) : (
         Object.entries(grouped).map(([category, catLinks]) => (
           <div key={category}>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
               {category} ({catLinks.length})
             </h3>
-            <div className="space-y-2 mb-4">
+            <div className="mb-4 space-y-2">
               {catLinks.map((link) => (
                 <div
                   key={link.id}
-                  className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3"
+                  className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-[var(--ink-strong)]">
                       {link.icon && <span className="mr-1">{link.icon}</span>}
                       {link.title}
                     </p>
                     {link.description && (
-                      <p className="text-xs text-gray-500 mt-0.5">{link.description}</p>
+                      <p className="mt-0.5 text-xs leading-5 text-[var(--ink-muted)]">{link.description}</p>
                     )}
-                    <p className="text-xs text-blue-500 mt-1 truncate">{link.url}</p>
+                    <p className="mt-1 break-all text-xs leading-5 text-[var(--accent-secondary)]">{link.url}</p>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     <button
                       onClick={() => startEdit(link)}
-                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1"
+                      className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDelete(link.id)}
-                      className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
+                      className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
                     >
                       Delete
                     </button>
@@ -183,8 +183,8 @@ export default function LmsManager() {
 
       {/* Add/Edit form */}
       {showForm ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">
+        <div className="surface-section space-y-3 p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
             {editingId ? "Edit Link" : "New Course Link"}
           </h3>
           <input
@@ -192,27 +192,27 @@ export default function LmsManager() {
             placeholder="Title (e.g., 'Google IT Certificate')"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
           />
           <input
             type="text"
             placeholder="Description (optional)"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
           />
           <input
             type="url"
             placeholder="URL (e.g., https://coursera.org/...)"
             value={form.url}
             onChange={(e) => setForm({ ...form, url: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
           />
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="select-field flex-1 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -223,19 +223,19 @@ export default function LmsManager() {
               placeholder="Icon emoji"
               value={form.icon}
               onChange={(e) => setForm({ ...form, icon: e.target.value })}
-              className="w-20 text-sm border border-gray-200 rounded-lg px-3 py-2 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="field w-full px-3 py-2.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)] sm:w-24"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleSave}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="primary-button px-4 py-2 text-sm"
             >
               {editingId ? "Save Changes" : "Add Link"}
             </button>
             <button
               onClick={resetForm}
-              className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
+              className="rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
             >
               Cancel
             </button>
@@ -244,7 +244,7 @@ export default function LmsManager() {
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.18)] p-3 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]"
         >
           + Add Course Link
         </button>

@@ -74,17 +74,17 @@ export default function DocumentCard({
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-white/60 px-4 py-3 transition-shadow hover:shadow-sm">
-        <span className="text-lg">{icon}</span>
+      <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-white/60 px-4 py-3 transition-shadow hover:shadow-sm sm:flex-row sm:items-center">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[rgba(16,37,62,0.06)] text-lg">{icon}</span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[var(--ink-strong)]">{doc.title}</p>
+          <p className="line-clamp-2 break-words text-sm font-medium leading-5 text-[var(--ink-strong)]">{doc.title}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1 sm:w-auto sm:flex-nowrap">
           <a
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)]"
+            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] sm:flex-none"
             title="View"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -96,7 +96,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] disabled:opacity-40"
+            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] disabled:opacity-40 sm:flex-none"
             title="Download"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -109,35 +109,37 @@ export default function DocumentCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white/60 p-5 transition-shadow hover:shadow-md">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 text-2xl">{icon}</span>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{doc.title}</h3>
-          {doc.description && (
-            <p className="mt-1 text-xs text-[var(--ink-muted)] line-clamp-2">{doc.description}</p>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {doc.sizeBytes ? (
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
-                {formatSize(doc.sizeBytes)}
-              </span>
-            ) : null}
-            {doc.mimeType !== "application/pdf" && (
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
-                {doc.mimeType.split("/").pop()?.toUpperCase()}
-              </span>
+    <div className="rounded-2xl border border-[var(--border)] bg-white/60 p-4 transition-shadow hover:shadow-md sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="mt-0.5 text-2xl">{icon}</span>
+          <div className="min-w-0 flex-1">
+            <h3 className="break-words text-sm font-semibold leading-5 text-[var(--ink-strong)]">{doc.title}</h3>
+            {doc.description && (
+              <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--ink-muted)]">{doc.description}</p>
             )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {doc.sizeBytes ? (
+                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
+                  {formatSize(doc.sizeBytes)}
+                </span>
+              ) : null}
+              {doc.mimeType !== "application/pdf" && (
+                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
+                  {doc.mimeType.split("/").pop()?.toUpperCase()}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <a
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl px-3 py-2 text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] sm:flex-none"
             title="View / Print"
           >
             View
@@ -146,7 +148,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="rounded-xl px-3 py-2 text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] disabled:opacity-40"
+            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] disabled:opacity-40 sm:flex-none"
             title="Download"
           >
             {downloading ? "..." : downloadError ? "Failed" : "Download"}

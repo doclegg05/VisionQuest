@@ -79,14 +79,14 @@ export default function ConversationList({
               key={conv.id}
               onClick={() => onSelect(conv.id)}
               type="button"
-              className={`mb-2 w-full rounded-[1.15rem] border px-4 py-3 text-left transition-colors
+              className={`mb-2 w-full rounded-[1.15rem] border px-4 py-3.5 text-left transition-colors
                 ${activeId === conv.id
                   ? "border-white/40 bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.08)]"
                   : "border-white/8 bg-white/6 text-white/82 hover:bg-white/10"
                 }`}
             >
-              <div className="flex items-center justify-between">
-                <span className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
+              <div className="flex items-start justify-between gap-3">
+                <span className={`min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
                   activeId === conv.id ? "text-[var(--accent-strong)]" : "text-white/55"
                 }`}>
                   {STAGE_LABELS[conv.stage] || conv.stage}
@@ -95,7 +95,7 @@ export default function ConversationList({
                   <span className={`h-2.5 w-2.5 rounded-full ${activeId === conv.id ? "bg-emerald-500" : "bg-emerald-400"}`} />
                 )}
               </div>
-              <p className={`mt-2 text-sm font-medium ${activeId === conv.id ? "text-[var(--ink-strong)]" : "text-white"}`}>
+              <p className={`mt-2 line-clamp-2 break-words text-sm font-medium leading-5 ${activeId === conv.id ? "text-[var(--ink-strong)]" : "text-white"}`}>
                 {conv.title || "New conversation"}
               </p>
               <p className={`mt-1 text-xs ${activeId === conv.id ? "text-[var(--ink-muted)]" : "text-white/45"}`}>

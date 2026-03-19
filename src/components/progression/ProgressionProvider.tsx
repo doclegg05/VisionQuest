@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import XpToast from "@/components/ui/XpToast";
 import AchievementUnlock from "@/components/ui/AchievementUnlock";
 import LevelUpCelebration from "@/components/ui/LevelUpCelebration";
@@ -31,7 +31,7 @@ interface CelebrationItem {
 
 export default function ProgressionProvider({ children }: { children: ReactNode }) {
   const prevStateRef = useRef<{ xp: number; level: number; achievements: string[] } | null>(null);
-  const [queue, setQueue] = useState<CelebrationItem[]>([]);
+  const [, setQueue] = useState<CelebrationItem[]>([]);
   const [current, setCurrent] = useState<CelebrationItem | null>(null);
   const processingRef = useRef(false);
 
@@ -101,27 +101,33 @@ export default function ProgressionProvider({ children }: { children: ReactNode 
     }
   }, []);
 
-  // Initialize on first render — fetch current state without showing celebrations
-  const initializedRef = useRef(false);
-  if (!initializedRef.current) {
-    initializedRef.current = true;
-    // Use a microtask to avoid state updates during render
-    Promise.resolve().then(async () => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInitialProgression() {
       try {
         const res = await fetch("/api/progression");
-        if (res.ok) {
-          const data = await res.json();
-          prevStateRef.current = {
-            xp: data.xp,
-            level: data.level,
-            achievements: (data.achievementsWithDefs || []).map((a: { key: string }) => a.key),
-          };
-        }
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        prevStateRef.current = {
+          xp: data.xp,
+          level: data.level,
+          achievements: (data.achievementsWithDefs || []).map((a: { key: string }) => a.key),
+        };
       } catch {
         // Ignore init errors
       }
-    });
-  }
+    }
+
+    void loadInitialProgression();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <ProgressionContext.Provider value={{ checkProgression }}>

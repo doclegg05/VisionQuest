@@ -289,9 +289,9 @@ function ChatWindowInner() {
   }, []);
 
   return (
-    <div className="relative flex h-[72vh] min-h-[72vh]">
+    <div className="relative flex min-h-[70dvh] overflow-hidden md:h-[72vh] md:min-h-[42rem]">
       <div
-        className={`absolute z-40 h-full w-[19rem] border-r border-white/10 transition-transform md:relative
+        className={`absolute z-40 h-full w-[min(19rem,calc(100vw-1.5rem))] border-r border-white/10 transition-transform md:relative md:w-[19rem]
           ${showSidebar ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <ConversationList
@@ -326,7 +326,7 @@ function ChatWindowInner() {
                     align="center"
                   />
                 </div>
-                <p className="font-display text-3xl text-[var(--ink-strong)]">Welcome to VisionQuest</p>
+                <p className="font-display text-[clamp(1.9rem,6vw,3rem)] text-[var(--ink-strong)]">Welcome to VisionQuest</p>
                 <p className="mt-3 text-sm leading-6">
                   Send a message to start talking with Sage about your goals, next steps, or what feels stuck.
                 </p>

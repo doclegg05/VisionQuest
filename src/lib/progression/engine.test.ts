@@ -439,25 +439,27 @@ describe("recordDailyCheckin — streak milestones", () => {
     assert.ok(state.achievements.includes("streak:30"));
   });
 
-  it("does not award a streak bonus a second time once the achievement is already earned", () => {
+  it("does not award additional XP for a second same-day check-in once the streak was recorded", () => {
     const state = createInitialState();
     withFrozenDate("2026-03-10T12:00:00.000Z", () => recordDailyCheckin(state));
     withFrozenDate("2026-03-11T12:00:00.000Z", () => recordDailyCheckin(state));
     // Day 3 — earns the bonus for the first time
     withFrozenDate("2026-03-12T12:00:00.000Z", () => recordDailyCheckin(state));
     const xpAfterBonus = state.xp;
+    const checkinsAfterBonus = state.dailyCheckinsCount;
 
-    // Same day again (streak stays 3) — bonus must NOT be awarded again
+    // Same day again is ignored entirely because daily check-ins are once per day.
     const result = withFrozenDate("2026-03-12T18:30:00.000Z", () => recordDailyCheckin(state));
-    assert.equal(result.xpGained, 15);
-    assert.equal(state.xp, xpAfterBonus + 15);
+    assert.equal(result.xpGained, 0);
+    assert.equal(state.xp, xpAfterBonus);
+    assert.equal(state.dailyCheckinsCount, checkinsAfterBonus);
   });
 
   it("deduplicates same-day check-ins so the streak count is accurate", () => {
     const state = createInitialState();
     withFrozenDate("2026-03-10T08:00:00.000Z", () => recordDailyCheckin(state));
     withFrozenDate("2026-03-10T20:00:00.000Z", () => recordDailyCheckin(state));
-    // Only 1 unique day in streakDays even though check-in count is 2
+    // Only 1 unique day is recorded because duplicate same-day check-ins are ignored.
     assert.equal(state.streakDays.length, 1);
     assert.equal(state.currentStreak, 1);
   });

@@ -94,9 +94,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   };
 
   return (
-    <main id="main-content" className="relative min-h-screen px-4 py-4 md:px-6 md:py-6">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(7,23,43,0.94),rgba(15,154,146,0.76)_56%,rgba(255,154,77,0.64))] p-8 text-white shadow-[0_32px_120px_rgba(7,23,43,0.25)] md:p-10 lg:p-12">
+    <main id="main-content" className="relative min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
+      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-7xl gap-4 lg:min-h-[calc(100vh-2rem)] lg:grid-cols-[1.15fr_0.85fr] lg:gap-6">
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(7,23,43,0.94),rgba(15,154,146,0.76)_56%,rgba(255,154,77,0.64))] p-5 text-white shadow-[0_32px_120px_rgba(7,23,43,0.25)] sm:p-7 md:p-10 lg:p-12">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(255,223,159,0.26),transparent_24%),radial-gradient(circle_at_85%_12%,rgba(255,255,255,0.14),transparent_20%)]" />
           <div className="relative flex h-full flex-col">
             <div className="max-w-2xl">
@@ -106,20 +106,20 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 subtitle="SPOKES Workforce Development"
                 priority
               />
-              <h1 className="mt-4 font-display text-[clamp(2.7rem,5vw,5rem)] leading-[0.96] tracking-[-0.06em]">
+              <h1 className="mt-4 text-balance font-display text-[clamp(2.2rem,9vw,5rem)] leading-[0.94] tracking-[-0.06em]">
                 Build momentum, one brave step at a time.
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-7 text-white/80 md:text-lg">
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/80 sm:text-base sm:leading-7 md:mt-5 md:text-lg">
                 VisionQuest gives students a grounded, hopeful place to set goals,
                 stay organized, and keep moving toward work, stability, and self-sufficiency.
               </p>
             </div>
 
-            <div className="mt-8 grid gap-3 text-sm text-white/80 md:max-w-2xl">
+            <div className="mt-6 grid gap-2.5 text-sm text-white/80 sm:mt-8 sm:gap-3 md:max-w-2xl">
               {HIGHLIGHTS.map((highlight) => (
                 <div
                   key={highlight}
-                  className="flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm"
+                  className="flex items-start gap-3 rounded-[1.35rem] border border-white/12 bg-white/10 px-3.5 py-3 backdrop-blur-sm sm:rounded-2xl sm:px-4"
                 >
                   <span className="mt-0.5 text-[var(--accent-tertiary)]">✦</span>
                   <p>{highlight}</p>
@@ -127,13 +127,13 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               ))}
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-3">
               {MODULE_SPOTLIGHT.map((module) => (
                 <div
                   key={module.label}
-                  className="rounded-[1.4rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-4 backdrop-blur-sm"
+                  className="rounded-[1.35rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-3.5 backdrop-blur-sm sm:rounded-[1.4rem] sm:p-4"
                 >
-                  <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/14 text-xl">
+                  <div className="mb-2.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/14 text-xl sm:mb-3 sm:h-11 sm:w-11">
                     {module.icon}
                   </div>
                   <p className="font-semibold text-white">{module.label}</p>
@@ -142,16 +142,16 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               ))}
             </div>
 
-            <div className="mt-auto grid gap-3 pt-8 sm:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-white/12 bg-white/10 px-4 py-4 backdrop-blur-sm">
+            <div className="mt-6 grid gap-3 pt-6 sm:mt-auto sm:grid-cols-3 sm:pt-8">
+              <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/55">Sage</p>
                 <p className="mt-2 text-lg font-semibold">Coaching with context</p>
               </div>
-              <div className="rounded-[1.5rem] border border-white/12 bg-white/10 px-4 py-4 backdrop-blur-sm">
+              <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/55">Progression</p>
                 <p className="mt-2 text-lg font-semibold">Wins that stay visible</p>
               </div>
-              <div className="rounded-[1.5rem] border border-white/12 bg-white/10 px-4 py-4 backdrop-blur-sm">
+              <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/55">Portfolio</p>
                 <p className="mt-2 text-lg font-semibold">Proof of readiness</p>
               </div>
@@ -159,9 +159,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
           </div>
         </section>
 
-        <section className="panel panel-strong flex items-center rounded-[2rem] p-5 md:p-8">
+        <section className="panel panel-strong flex items-start rounded-[2rem] p-4 sm:p-5 md:p-8 lg:items-center">
           <div className="w-full">
-            <div className="mb-8">
+            <div className="mb-7 sm:mb-8">
               <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
               <h2 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
                 {mode === "login" ? "Welcome back" : "Create your account"}
@@ -324,14 +324,14 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
             )}
 
-            <div className="mt-8 flex flex-col items-center gap-3">
+            <div className="mt-8 flex flex-col items-center gap-3 sm:gap-4">
               <a
                 href="/teacher-register"
                 className="text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
               >
                 Teacher? Register here
               </a>
-              <div className="flex items-center justify-center gap-4 mt-2">
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
                 <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
               </div>

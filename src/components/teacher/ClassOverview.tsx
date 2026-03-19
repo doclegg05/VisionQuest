@@ -180,12 +180,12 @@ export default function ClassOverview() {
     }).format(new Date(dateStr));
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading class data...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading class data...</p>;
 
   if (error) return (
-    <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={() => fetchStudents()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+    <div className="surface-section px-6 py-10 text-center">
+      <p className="mb-4 text-sm text-red-600">{error}</p>
+      <button onClick={() => fetchStudents()} className="primary-button px-4 py-2 text-sm">
         Try Again
       </button>
     </div>
@@ -220,13 +220,13 @@ export default function ClassOverview() {
                   className="block rounded-[1rem] border border-amber-200 bg-amber-50/80 p-4 transition-colors hover:border-amber-300"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{alert.title}</p>
+                      <p className="mt-1 break-all text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {alert.student.displayName} • {alert.student.studentId}
                       </p>
                     </div>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
                       {alert.severity}
                     </span>
                   </div>
@@ -266,13 +266,13 @@ export default function ClassOverview() {
                   className="block rounded-[1rem] border border-[rgba(15,154,146,0.14)] bg-[rgba(15,154,146,0.08)] p-4 transition-colors hover:border-[rgba(15,154,146,0.28)]"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
+                      <p className="mt-1 break-all text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {appointment.student.displayName} • {appointment.student.studentId}
                       </p>
                     </div>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-secondary)]">
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-secondary)]">
                       {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                     </span>
                   </div>
@@ -287,98 +287,110 @@ export default function ClassOverview() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{totalStudents}</p>
-          <p className="text-xs text-gray-500">Students</p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="surface-section p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Students</p>
+          <p className="mt-3 text-3xl font-bold text-[var(--ink-strong)]">{totalStudents}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-orange-600">{pendingVerifications}</p>
-          <p className="text-xs text-gray-500">Pending Verifications</p>
+        <div className="surface-section p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Pending Verifications</p>
+          <p className="mt-3 text-3xl font-bold text-orange-600">{pendingVerifications}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-rose-600">{studentsNeedingAttention}</p>
-          <p className="text-xs text-gray-500">Need Attention</p>
+        <div className="surface-section p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Need Attention</p>
+          <p className="mt-3 text-3xl font-bold text-rose-600">{studentsNeedingAttention}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">{avgXp}</p>
-          <p className="text-xs text-gray-500">Avg XP</p>
+        <div className="surface-section p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Average XP</p>
+          <p className="mt-3 text-3xl font-bold text-blue-600">{avgXp}</p>
         </div>
       </div>
 
       {/* Search + Export */}
-      <div className="flex gap-3 items-center">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search students..."
-          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
+        <label className="min-w-0 flex-1">
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+            Search students
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or student ID..."
+            className="field px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+          />
+        </label>
         <a
           href="/api/teacher/export"
-          className="text-sm bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 text-gray-600 whitespace-nowrap"
+          className="inline-flex items-center justify-center rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
         >
           Export CSV
         </a>
       </div>
 
       {/* View & Filter Controls */}
-      <div className="flex items-center gap-3 mb-4">
-        {/* View toggle */}
-        <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
-          <button
-            onClick={() => setViewMode("table")}
-            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-              viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
-            }`}
-          >
-            Table
-          </button>
-          <button
-            onClick={() => setViewMode("cards")}
-            className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-              viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
-            }`}
-          >
-            Cards
-          </button>
+      <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-full border border-[var(--border)] bg-white/70 p-1">
+            <button
+              onClick={() => setViewMode("table")}
+              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+                viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+              }`}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode("cards")}
+              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+                viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+              }`}
+            >
+              Cards
+            </button>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--ink-muted)]">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-[var(--accent-secondary)]"
+            />
+            Show inactive students
+          </label>
         </div>
 
-        {/* Inactive toggle */}
-        <label className="flex items-center gap-2 text-xs text-[var(--ink-muted)] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(e) => setShowInactive(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-[var(--accent-secondary)]"
-          />
-          Show inactive students
-        </label>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+          {filtered.length} visible
+        </p>
       </div>
 
       {/* Student Cards View */}
       {viewMode === "cards" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((s) => (
             <Link
               key={s.id}
               href={`/teacher/students/${s.id}`}
               prefetch={false}
-              className={`surface-section group p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg ${!s.isActive ? "opacity-50" : ""}`}
+              className={`surface-section group p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${!s.isActive ? "opacity-50" : ""}`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  {/* Activity dot */}
-                  {(() => {
-                    if (!s.isActive) return <span className="h-2.5 w-2.5 rounded-full bg-gray-300" />;
-                    const lastActive = s.lastActive ? new Date(s.lastActive) : null;
-                    const daysSince = lastActive ? Math.floor((Date.now() - lastActive.getTime()) / 86400000) : Infinity;
-                    if (daysSince <= 1) return <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />;
-                    if (daysSince <= 7) return <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />;
-                    return <span className="h-2.5 w-2.5 rounded-full bg-red-400" />;
-                  })()}
-                  <p className="font-display text-base text-[var(--ink-strong)]">{s.displayName}</p>
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {/* Activity dot */}
+                    {(() => {
+                      if (!s.isActive) return <span className="h-2.5 w-2.5 rounded-full bg-gray-300" />;
+                      const lastActive = s.lastActive ? new Date(s.lastActive) : null;
+                      const daysSince = lastActive ? Math.floor((Date.now() - lastActive.getTime()) / 86400000) : Infinity;
+                      if (daysSince <= 1) return <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />;
+                      if (daysSince <= 7) return <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />;
+                      return <span className="h-2.5 w-2.5 rounded-full bg-red-400" />;
+                    })()}
+                    <p className="break-words font-display text-base leading-5 text-[var(--ink-strong)]">{s.displayName}</p>
+                  </div>
+                  <p className="ml-4 mt-1 break-all text-xs text-[var(--ink-muted)]">{s.studentId}</p>
                 </div>
                 {!s.isActive && (
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Inactive</span>
@@ -386,7 +398,7 @@ export default function ClassOverview() {
               </div>
 
               {/* Level & XP */}
-              <div className="flex items-center gap-3 mb-3">
+              <div className="mb-3 flex flex-wrap items-center gap-2.5">
                 <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
                   Lvl {s.level}
                 </span>
@@ -426,13 +438,15 @@ export default function ClassOverview() {
               </div>
 
               {/* Bottom row */}
-              <div className="mt-3 flex items-center justify-between text-[10px] text-[var(--ink-muted)]">
-                <span>{s.goalsCount} goals {s.hasBhag && "• BHAG ✓"}</span>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-[var(--ink-muted)]">
+                <span className="rounded-full bg-[rgba(16,37,62,0.04)] px-2.5 py-1">
+                  {s.goalsCount} goals {s.hasBhag && "• BHAG ✓"}
+                </span>
                 {s.certPendingVerify > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 font-semibold">{s.certPendingVerify} pending</span>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">{s.certPendingVerify} pending</span>
                 )}
                 {s.openAlertCount > 0 && (
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600 font-semibold">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
+                  <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
                 )}
               </div>
             </Link>
@@ -441,45 +455,45 @@ export default function ClassOverview() {
       ) : (
 
       /* Student Table */
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="surface-section overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[52rem] w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th
-                  className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  className="cursor-pointer px-4 py-3 text-left font-medium text-gray-600 hover:text-gray-900"
                   onClick={() => handleSort("displayName")}
                 >
                   Student {getSortIcon("displayName")}
                 </th>
                 <th
-                  className="text-center px-3 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600 hover:text-gray-900"
                   onClick={() => handleSort("xp")}
                 >
                   Level/XP {getSortIcon("xp")}
                 </th>
                 <th
-                  className="text-center px-3 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600 hover:text-gray-900"
                   onClick={() => handleSort("orientationDone")}
                 >
                   Orientation {getSortIcon("orientationDone")}
                 </th>
                 <th
-                  className="text-center px-3 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600 hover:text-gray-900"
                   onClick={() => handleSort("certDone")}
                 >
                   Certification {getSortIcon("certDone")}
                 </th>
                 <th
-                  className="text-center px-3 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600 hover:text-gray-900"
                   onClick={() => handleSort("readinessScore")}
                 >
                   Readiness {getSortIcon("readinessScore")}
                 </th>
-                <th className="text-center px-3 py-3 font-medium text-gray-600">Goals</th>
-                <th className="text-center px-3 py-3 font-medium text-gray-600">Portfolio</th>
+                <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600">Goals</th>
+                <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600">Portfolio</th>
                 <th
-                  className="text-right px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900"
+                  className="cursor-pointer px-4 py-3 text-right font-medium whitespace-nowrap text-gray-600 hover:text-gray-900"
                   onClick={() => handleSort("lastActive")}
                 >
                   Last Active {getSortIcon("lastActive")}
@@ -497,8 +511,8 @@ export default function ClassOverview() {
                 filtered.map((s) => (
                   <tr key={s.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors${!s.isActive ? " opacity-50" : ""}`}>
                     <td className="px-4 py-3">
-                      <Link href={`/teacher/students/${s.id}`} className="hover:text-blue-600">
-                        <div className="flex items-center gap-2">
+                      <Link href={`/teacher/students/${s.id}`} className="block min-w-0 hover:text-blue-600">
+                        <div className="flex min-w-0 items-center gap-2">
                           {/* Activity indicator */}
                           {(() => {
                             if (!s.isActive) return <span className="h-2 w-2 rounded-full bg-gray-300" title="Inactive" />;
@@ -508,9 +522,9 @@ export default function ClassOverview() {
                             if (daysSince <= 7) return <span className="h-2 w-2 rounded-full bg-amber-400" title={`Active ${daysSince}d ago`} />;
                             return <span className="h-2 w-2 rounded-full bg-red-400" title={`Inactive ${daysSince}d`} />;
                           })()}
-                          <p className="font-medium text-gray-900">{s.displayName}</p>
+                          <p className="break-words font-medium text-gray-900">{s.displayName}</p>
                         </div>
-                        <p className="text-xs text-gray-400 ml-4">{s.studentId}</p>
+                        <p className="ml-4 text-xs break-all text-gray-400">{s.studentId}</p>
                         {s.openAlertCount > 0 && (
                           <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                             {s.openAlertCount} alert{s.openAlertCount === 1 ? "" : "s"}
@@ -590,21 +604,21 @@ export default function ClassOverview() {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+          <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <button
               onClick={() => fetchStudents(page - 1)}
               disabled={page <= 1}
-              className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
-            <span className="text-sm text-gray-500">
+            <span className="text-center text-sm text-gray-500">
               Page {page} of {totalPages}
             </span>
             <button
               onClick={() => fetchStudents(page + 1)}
               disabled={page >= totalPages}
-              className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>

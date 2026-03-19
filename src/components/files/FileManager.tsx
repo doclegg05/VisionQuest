@@ -104,12 +104,12 @@ export default function FileManager() {
     }
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading files...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading files...</p>;
 
   if (error) return (
-    <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchFiles} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+    <div className="surface-section px-6 py-10 text-center">
+      <p className="mb-4 text-sm text-red-600">{error}</p>
+      <button onClick={fetchFiles} className="primary-button px-4 py-2 text-sm">
         Try Again
       </button>
     </div>
@@ -126,11 +126,11 @@ export default function FileManager() {
   return (
     <div className="space-y-6">
       {/* Upload section */}
-      <div className="surface-section p-5">
+      <div className="surface-section p-4 sm:p-5">
         <h3 className="mb-3 text-sm font-semibold text-[var(--ink-strong)]">Upload a File</h3>
-        <div className="flex items-end gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="mb-1 block text-xs text-[var(--ink-muted)]">Category</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--ink-muted)]">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -153,7 +153,7 @@ export default function FileManager() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               type="button"
-              className="primary-button px-4 py-2 text-sm disabled:opacity-50"
+              className="primary-button w-full px-4 py-2.5 text-sm disabled:opacity-50 sm:w-auto"
             >
               {uploading ? "Uploading..." : "Choose File"}
             </button>
@@ -164,42 +164,46 @@ export default function FileManager() {
 
       {/* File list */}
       {files.length === 0 ? (
-        <div className="text-center text-gray-400 py-8">
-          <p className="text-4xl mb-3">📁</p>
+        <div className="surface-section py-10 text-center text-[var(--ink-muted)]">
+          <p className="mb-3 text-4xl">📁</p>
           <p className="text-sm">No files uploaded yet.</p>
         </div>
       ) : (
         Object.entries(grouped).map(([cat, catFiles]) => (
           <div key={cat}>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
               {CATEGORY_LABELS[cat] || cat} ({catFiles.length})
             </h3>
             <div className="space-y-2">
               {catFiles.map((file) => (
                 <div
                   key={file.id}
-                  className="surface-section flex items-center gap-3 p-3"
+                  className="surface-section flex flex-col gap-3 p-3.5 sm:flex-row sm:items-start sm:gap-4"
                 >
-                  <span className="text-xl">{fileIcon(file.mimeType)}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{file.filename}</p>
-                    <p className="text-xs text-gray-400">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[rgba(16,37,62,0.06)] text-lg">
+                      {fileIcon(file.mimeType)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="break-all text-sm font-medium leading-5 text-[var(--ink-strong)]">{file.filename}</p>
+                      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--ink-muted)]">
                       {formatFileSize(file.sizeBytes)} &middot;{" "}
                       {new Date(file.uploadedAt).toLocaleDateString()}
-                    </p>
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <a
                       href={`/api/files/download?id=${file.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1"
+                      className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
                     >
                       View
                     </a>
                     <button
                       onClick={() => handleDelete(file.id, file.filename)}
-                      className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
+                      className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
                     >
                       Delete
                     </button>

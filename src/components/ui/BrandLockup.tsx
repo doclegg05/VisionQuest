@@ -46,7 +46,10 @@ export default function BrandLockup({
 }: BrandLockupProps) {
   const sizeConfig = SIZE_MAP[size];
   const isDark = theme === "dark";
-  const wrapperClassName = `inline-flex items-center ${sizeConfig.gapClassName} ${
+  const stackOnMobile = size !== "sm";
+  const wrapperClassName = `inline-flex max-w-full items-center ${
+    stackOnMobile ? "flex-wrap sm:flex-nowrap" : "flex-nowrap"
+  } ${sizeConfig.gapClassName} ${
     align === "center" ? "justify-center text-center" : ""
   }`;
   const titleClassName = `font-display leading-none ${sizeConfig.titleClassName} ${
@@ -58,7 +61,7 @@ export default function BrandLockup({
 
   const content = (
     <div className={wrapperClassName}>
-      <div className="flex items-stretch gap-1.5 shrink-0">
+      <div className="flex shrink-0 items-stretch gap-1.5">
         <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-white p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
           <Image
             src="/wvae-logo.png"
@@ -80,9 +83,9 @@ export default function BrandLockup({
           />
         </div>
       </div>
-      <div className="ml-1">
-        <p className={titleClassName}>{title}</p>
-        <p className={subtitleClassName}>{subtitle}</p>
+      <div className={`min-w-0 ${stackOnMobile ? "basis-full pt-1.5 sm:basis-auto sm:pt-0" : ""}`}>
+        <p className={`${titleClassName} break-words`}>{title}</p>
+        <p className={`${subtitleClassName} break-words`}>{subtitle}</p>
       </div>
     </div>
   );
@@ -92,7 +95,7 @@ export default function BrandLockup({
   }
 
   return (
-    <Link href={href} className="inline-flex">
+    <Link href={href} className="inline-flex max-w-full">
       {content}
     </Link>
   );
