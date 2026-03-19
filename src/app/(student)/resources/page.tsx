@@ -1,5 +1,5 @@
 import PageIntro from "@/components/ui/PageIntro";
-import ResourceLibrary from "@/components/resources/ResourceLibrary";
+import DocumentBrowser from "@/components/documents/DocumentBrowser";
 
 export default function ResourcesPage() {
   return (
@@ -7,9 +7,11 @@ export default function ResourcesPage() {
       <PageIntro
         eyebrow="Reference library"
         title="Forms & Documents"
-        description="Program forms, certification guides, and compliance documents. Your instructor will provide the actual forms — use this as your reference guide."
+        description="Program forms, certification guides, and compliance documents. View, download, or print any document."
       />
-      <ResourceLibrary />
+      <div className="mt-8">
+        <DocumentBrowser />
+      </div>
     </div>
   );
 }

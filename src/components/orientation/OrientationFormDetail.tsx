@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { FORMS, type SpokesForm } from "@/lib/spokes/forms";
 import FormUploadButton from "@/components/ui/FormUploadButton";
 
@@ -43,6 +44,78 @@ interface OrientationFormDetailProps {
   onUploadComplete?: () => void;
 }
 
+function FormActions({ form }: { form: SpokesForm }) {
+  const [downloading, setDownloading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  const downloadUrl = `/api/forms/download?file=${encodeURIComponent(form.fileName)}&name=${encodeURIComponent(form.fileName)}`;
+  const viewUrl = `/api/forms/download?file=${encodeURIComponent(form.fileName)}&name=${encodeURIComponent(form.fileName)}`;
+
+  async function handleDownload() {
+    setDownloading(true);
+    setNotFound(false);
+    try {
+      const res = await fetch(downloadUrl);
+      if (res.status === 404) {
+        setNotFound(true);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = form.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setNotFound(true);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 w-full">
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* View in browser */}
+        <a
+          href={viewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 rounded-lg bg-[rgba(15,154,146,0.1)] border border-[rgba(15,154,146,0.2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-secondary)] hover:bg-[rgba(15,154,146,0.18)] transition-colors"
+        >
+          <span>👁</span> View
+        </a>
+
+        {/* Download to device */}
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="inline-flex items-center gap-1 rounded-lg bg-[rgba(15,154,146,0.1)] border border-[rgba(15,154,146,0.2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-secondary)] hover:bg-[rgba(15,154,146,0.18)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span>⬇</span> {downloading ? "Downloading…" : "Download"}
+        </button>
+
+        {/* Ask Sage */}
+        <Link
+          href={`/chat?topic=form&name=${encodeURIComponent(form.title)}`}
+          prefetch={false}
+          className="text-[10px] font-semibold text-[var(--accent-secondary)] hover:underline ml-auto"
+        >
+          Ask Sage →
+        </Link>
+      </div>
+
+      {/* File not yet uploaded message */}
+      {notFound && (
+        <p className="text-[10px] text-amber-500 font-medium mt-0.5">
+          ⚠ This document hasn&apos;t been uploaded yet — ask your instructor for a copy.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function OrientationFormDetail({ itemLabel, formStatuses, onUploadComplete }: OrientationFormDetailProps) {
   const relatedForms = findRelatedForms(itemLabel);
 
@@ -70,7 +143,12 @@ export default function OrientationFormDetail({ itemLabel, formStatuses, onUploa
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-3">
+
+          <div className="mt-2 space-y-2">
+            {/* Download / View actions */}
+            <FormActions form={form} />
+
+            {/* Upload completed form back (for student-facing forms) */}
             {form.audience !== "instructor" && (
               <FormUploadButton
                 formId={form.id}
@@ -78,14 +156,6 @@ export default function OrientationFormDetail({ itemLabel, formStatuses, onUploa
                 onUploadComplete={onUploadComplete}
               />
             )}
-            <span className="text-[10px] text-[var(--muted)]">Ask your instructor for this form</span>
-            <Link
-              href={`/chat?topic=form&name=${encodeURIComponent(form.title)}`}
-              prefetch={false}
-              className="text-[10px] font-semibold text-[var(--accent-secondary)] hover:underline"
-            >
-              Ask Sage →
-            </Link>
           </div>
         </div>
       ))}

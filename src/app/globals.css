@@ -1,19 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5ecdc;
-  --foreground: #12263f;
-  --ink-strong: #10253e;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-strong: rgba(255, 255, 255, 0.84);
-  --surface-dark: rgba(7, 23, 43, 0.88);
-  --border: rgba(18, 38, 63, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --accent: #ff9a4d;
-  --accent-strong: #f97316;
-  --accent-secondary: #0f9a92;
-  --accent-tertiary: #ffd27d;
-  --muted: #5f6f84;
+  /* Brand Colors */
+  --primary: #007baf;
+  --accent: #37b550;
+  --dark: #004071;
+  --light: #FFFFFF;
+  --muted: #EDF3F7;
+  --gray: #60636b;
+  --gold: #d3b257;
+  --royal: #00133f;
+  --mauve: #a7253f;
+  --offwhite: #d1d3d4;
+  --muted-gold: #ad8806;
+
+  /* Structural mappings */
+  --background: var(--muted);
+  --foreground: var(--royal);
+  --ink-strong: var(--dark);
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-strong: #ffffff;
+  --surface-dark: rgba(0, 64, 113, 0.88);
+  --border: rgba(96, 99, 107, 0.15);
+  --border-strong: rgba(0, 64, 113, 0.15);
+  --accent-strong: #2a8a3c;
+  --accent-secondary: var(--primary);
+  --accent-tertiary: var(--gold);
 }
 
 @theme inline {
@@ -21,12 +33,24 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
+  
+  --color-brand-primary: var(--primary);
+  --color-brand-accent: var(--accent);
+  --color-brand-dark: var(--dark);
+  --color-brand-light: var(--light);
+  --color-brand-muted: var(--muted);
+  --color-brand-gray: var(--gray);
+  --color-brand-gold: var(--gold);
+  --color-brand-royal: var(--royal);
+  --color-brand-mauve: var(--mauve);
+  --color-brand-offwhite: var(--offwhite);
+  --color-brand-mutedgold: var(--muted-gold);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #f5ecdc;
-    --foreground: #12263f;
+    --background: var(--muted);
+    --foreground: var(--royal);
   }
 }
 
@@ -37,9 +61,9 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 12% 12%, rgba(255, 195, 113, 0.42), transparent 24%),
-    radial-gradient(circle at 82% 8%, rgba(15, 154, 146, 0.2), transparent 22%),
-    linear-gradient(180deg, #0d1f35 0%, #17314a 18%, #f7f0e2 48%, #f2e4ca 100%);
+    radial-gradient(circle at 12% 12%, rgba(211, 178, 87, 0.15), transparent 24%),
+    radial-gradient(circle at 82% 8%, rgba(0, 123, 175, 0.15), transparent 22%),
+    linear-gradient(180deg, var(--muted) 0%, var(--light) 25%, var(--light) 100%);
   color: var(--foreground);
   font-family: var(--font-body), sans-serif;
   position: relative;
@@ -69,13 +93,13 @@ body::after {
   height: 26rem;
   pointer-events: none;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 210, 125, 0.55), transparent 68%);
+  background: radial-gradient(circle, rgba(211, 178, 87, 0.4), transparent 68%);
   filter: blur(90px);
   opacity: 0.85;
 }
 
 ::selection {
-  background: rgba(255, 154, 77, 0.28);
+  background: rgba(0, 123, 175, 0.25);
 }
 
 .font-display {
@@ -119,9 +143,9 @@ body::after {
   border-radius: 1.75rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
-    linear-gradient(135deg, rgba(7, 23, 43, 0.94), rgba(15, 154, 146, 0.76) 58%, rgba(255, 154, 77, 0.64));
+    linear-gradient(135deg, rgba(0, 64, 113, 0.94), rgba(0, 123, 175, 0.8) 58%, rgba(55, 181, 80, 0.64));
   color: white;
-  box-shadow: 0 28px 90px rgba(7, 23, 43, 0.2);
+  box-shadow: 0 28px 90px rgba(0, 64, 113, 0.2);
 }
 
 .page-hero::after {
@@ -133,7 +157,7 @@ body::after {
   height: 24rem;
   pointer-events: none;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 223, 159, 0.45), transparent 68%);
+  background: radial-gradient(circle, rgba(211, 178, 87, 0.45), transparent 68%);
 }
 
 .page-eyebrow {
@@ -184,14 +208,14 @@ body::after {
   background: linear-gradient(135deg, var(--accent-strong), var(--accent));
   color: white;
   font-weight: 700;
-  box-shadow: 0 18px 36px rgba(249, 115, 22, 0.22);
+  box-shadow: 0 18px 36px rgba(55, 181, 80, 0.25);
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
 .primary-button:hover {
   transform: translateY(-1px);
   filter: saturate(1.05);
-  box-shadow: 0 22px 42px rgba(249, 115, 22, 0.28);
+  box-shadow: 0 22px 42px rgba(55, 181, 80, 0.35);
 }
 
 .secondary-button {

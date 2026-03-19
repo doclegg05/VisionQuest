@@ -22,33 +22,33 @@ model Student {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  conversations        Conversation[]
-  goals                Goal[]
-  progression          Progression?
-  files                FileUpload[]
-  orientationProgress  OrientationProgress[]
-  certifications       Certification[]
-  portfolioItems       PortfolioItem[]
-  resumeData           ResumeData?
-  passwordResetTokens  PasswordResetToken[]
+  conversations           Conversation[]
+  goals                   Goal[]
+  progression             Progression?
+  files                   FileUpload[]
+  orientationProgress     OrientationProgress[]
+  certifications          Certification[]
+  portfolioItems          PortfolioItem[]
+  resumeData              ResumeData?
+  passwordResetTokens     PasswordResetToken[]
   securityQuestionAnswers SecurityQuestionAnswer[]
-  appointments         Appointment[]         @relation("StudentAppointments")
-  advisorAppointments  Appointment[]         @relation("AdvisorAppointments")
-  assignedTasks        StudentTask[]         @relation("AssignedTasks")
-  createdTasks         StudentTask[]         @relation("CreatedTasks")
-  caseNotes            CaseNote[]            @relation("StudentCaseNotes")
-  authoredNotes        CaseNote[]            @relation("AuthoredCaseNotes")
-  alerts               StudentAlert[]
-  availabilityBlocks   AdvisorAvailability[] @relation("AdvisorAvailability")
-  createdOpportunities Opportunity[]         @relation("CreatedOpportunities")
-  applications         Application[]
-  createdEvents        CareerEvent[]         @relation("CreatedEvents")
-  eventRegistrations   EventRegistration[]
-  publicCredentialPage PublicCredentialPage?
-  spokesRecord         SpokesRecord?
-  notifications        Notification[]
-  formSubmissions      FormSubmission[]
-  visionBoardItems     VisionBoardItem[]
+  appointments            Appointment[]            @relation("StudentAppointments")
+  advisorAppointments     Appointment[]            @relation("AdvisorAppointments")
+  assignedTasks           StudentTask[]            @relation("AssignedTasks")
+  createdTasks            StudentTask[]            @relation("CreatedTasks")
+  caseNotes               CaseNote[]               @relation("StudentCaseNotes")
+  authoredNotes           CaseNote[]               @relation("AuthoredCaseNotes")
+  alerts                  StudentAlert[]
+  availabilityBlocks      AdvisorAvailability[]    @relation("AdvisorAvailability")
+  createdOpportunities    Opportunity[]            @relation("CreatedOpportunities")
+  applications            Application[]
+  createdEvents           CareerEvent[]            @relation("CreatedEvents")
+  eventRegistrations      EventRegistration[]
+  publicCredentialPage    PublicCredentialPage?
+  spokesRecord            SpokesRecord?
+  notifications           Notification[]
+  formSubmissions         FormSubmission[]
+  visionBoardItems        VisionBoardItem[]
 
   @@schema("visionquest")
 }
@@ -610,14 +610,14 @@ model SecurityQuestionAnswer {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   studentId String
   type      String
   title     String
-  body      String?  @db.Text
-  read      Boolean  @default(false)
+  body      String?   @db.Text
+  read      Boolean   @default(false)
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -668,6 +668,93 @@ model FormSubmission {
 
   @@unique([studentId, formId])
   @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// Program Documents
+// Stores program-level PDFs, forms, and reference materials in Supabase Storage.
+// These are NOT student-specific — they belong to the program itself.
+// =============================================================================
+
+model ProgramDocument {
+  id String @id @default(cuid())
+
+  // --- Display Info ---
+  title       String // Human-readable name, e.g. "IC3 Study Guide"
+  description String? @db.Text // Optional summary for Sage and UI tooltips
+
+  // --- Storage ---
+  storageKey String @unique // Supabase Storage path, e.g. "documents/lms/ic3-study-guide.pdf"
+  mimeType   String @default("application/pdf")
+  sizeBytes  Int?
+
+  // --- Classification ---
+  // Document category determines folder and display context
+  category ProgramDocCategory
+  // Who can see/access this document
+  audience ProgramDocAudience @default(BOTH)
+
+  // --- Linking to Certifications & Platforms ---
+  // Optional: link this document to a specific certification ID (from certifications.ts)
+  certificationId String? // e.g. "ic3", "mos-word", "workkeys-ncrc"
+  // Optional: link this document to a specific platform ID (from platforms.ts)
+  platformId      String? // e.g. "gmetrix-and-learnkey", "edgenuity"
+
+  // --- Sage AI Context ---
+  // If true, this document's description is injected into Sage's knowledge base
+  usedBySage      Boolean @default(false)
+  // Short text summary Sage can read (avoids loading full PDF into prompt)
+  sageContextNote String? @db.Text
+
+  // --- Metadata ---
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  uploadedBy String? // studentId of teacher who uploaded
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([category, audience, isActive])
+  @@index([certificationId])
+  @@index([platformId])
+  @@index([usedBySage, isActive])
+  @@schema("visionquest")
+}
+
+enum ProgramDocCategory {
+  // Student-facing
+  ORIENTATION // New student onboarding forms and guides
+  STUDENT_REFERRAL // DOHS / WV Works referral forms
+  STUDENT_RESOURCE // General student handouts and resources
+
+  // Teacher-facing
+  TEACHER_GUIDE // Instructor guides and admin resources
+  TEACHER_LMS_SUPPORT // Helps teachers understand platforms they aren't familiar with
+
+  // LMS & Certifications
+  LMS_PLATFORM_GUIDE // Platform-specific setup and how-to guides
+  CERTIFICATION_INFO // Exam objectives, study guides, prerequisites
+  CERTIFICATION_PREREQ // Prerequisite chains for complex certifications
+
+  // Program Admin
+  DOHS_FORM // DFA-TS-12, DFA-WVW-70, etc.
+  PROGRAM_POLICY // Dress code, AUP, confidentiality, non-discrimination
+  READY_TO_WORK // Module records, attendance verification, benchmarks
+
+  // Sage Knowledge Base
+  SAGE_CONTEXT // Raw context documents loaded into Sage's AI grounding
+
+  // Presentations
+  PRESENTATION // PowerPoints converted to PDF for display
+
+  @@schema("visionquest")
+}
+
+enum ProgramDocAudience {
+  STUDENT // Visible only to students
+  TEACHER // Visible only to teachers/admins
+  BOTH // Visible to everyone
+
   @@schema("visionquest")
 }
 

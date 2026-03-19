@@ -14,6 +14,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "users:promote-teacher": "node scripts/promote-teacher.mjs",
     "db:seed": "node scripts/seed-data.mjs",
+    "db:seed-documents": "node scripts/seed-documents.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

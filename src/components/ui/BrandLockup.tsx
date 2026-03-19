@@ -58,17 +58,29 @@ export default function BrandLockup({
 
   const content = (
     <div className={wrapperClassName}>
-      <div className="relative shrink-0 overflow-hidden rounded-[1rem] bg-white/85 p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
-        <Image
-          src="/spokes-logo.png"
-          alt="SPOKES logo"
-          width={sizeConfig.imageWidth}
-          height={sizeConfig.imageHeight}
-          priority={priority}
-          className="h-auto w-auto max-w-full"
-        />
+      <div className="flex items-stretch gap-1.5 shrink-0">
+        <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-white p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
+          <Image
+            src="/wvae-logo.png"
+            alt="WVAE logo"
+            width={Math.round(sizeConfig.imageWidth * 0.9)}
+            height={Math.round(sizeConfig.imageHeight * 0.9)}
+            priority={priority}
+            className="h-auto w-auto max-h-full object-contain"
+          />
+        </div>
+        <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-white p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
+          <Image
+            src="/spokes-logo.png"
+            alt="SPOKES logo"
+            width={sizeConfig.imageWidth}
+            height={sizeConfig.imageHeight}
+            priority={priority}
+            className="h-auto w-auto max-h-full object-contain"
+          />
+        </div>
       </div>
-      <div>
+      <div className="ml-1">
         <p className={titleClassName}>{title}</p>
         <p className={subtitleClassName}>{subtitle}</p>
       </div>

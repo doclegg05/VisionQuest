@@ -10,8 +10,9 @@ import CareerManager from "./CareerManager";
 import OutcomesReport from "./OutcomesReport";
 import SpokesManager from "./SpokesManager";
 import SpokesReport from "./SpokesReport";
+import DocumentBrowser from "@/components/documents/DocumentBrowser";
 
-type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "reports" | "audit";
+type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "reports" | "audit" | "documents";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "orientation", label: "Orientation" },
@@ -22,6 +23,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "career", label: "Career" },
   { key: "reports", label: "Reports" },
   { key: "audit", label: "Audit Trail" },
+  { key: "documents", label: "Documents" },
 ];
 
 export default function ManageDashboard() {
@@ -59,6 +61,7 @@ export default function ManageDashboard() {
         </div>
       )}
       {tab === "audit" && <AuditTrail />}
+      {tab === "documents" && <DocumentBrowser />}
     </div>
   );
 }
