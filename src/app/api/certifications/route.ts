@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { getCertificationProgress, validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
 import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
-import { parseState, createInitialState, recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
+import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
+import { updateProgression } from "@/lib/progression/service";
 import { logger } from "@/lib/logger";
 
 // GET — get student's certification with requirements
@@ -41,13 +42,8 @@ export const GET = withErrorHandler(async () => {
 
     // Record certification started for progression
     try {
-      const progExisting = await prisma.progression.findUnique({ where: { studentId: session.id } });
-      const progState = progExisting ? parseState(progExisting.state) : createInitialState();
-      recordCertificationStarted(progState);
-      await prisma.progression.upsert({
-        where: { studentId: session.id },
-        update: { state: JSON.stringify(progState) },
-        create: { studentId: session.id, state: JSON.stringify(progState) },
+      await updateProgression(session.id, (state) => {
+        recordCertificationStarted(state);
       });
     } catch (err) {
       logger.error("Failed to record certification started", { error: String(err) });
@@ -170,13 +166,8 @@ export const POST = withErrorHandler(async (req: Request) => {
   // Record certification earned if just completed
   if (updatedCert.status === "completed") {
     try {
-      const progExisting = await prisma.progression.findUnique({ where: { studentId: session.id } });
-      const progState = progExisting ? parseState(progExisting.state) : createInitialState();
-      recordCertificationEarned(progState);
-      await prisma.progression.upsert({
-        where: { studentId: session.id },
-        update: { state: JSON.stringify(progState) },
-        create: { studentId: session.id, state: JSON.stringify(progState) },
+      await updateProgression(session.id, (state) => {
+        recordCertificationEarned(state);
       });
     } catch (err) {
       logger.error("Failed to record certification earned", { error: String(err) });

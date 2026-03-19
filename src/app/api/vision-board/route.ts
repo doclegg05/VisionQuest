@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { parseState, createInitialState, recordVisionBoardItem } from "@/lib/progression/engine";
+import { recordVisionBoardItem } from "@/lib/progression/engine";
+import { updateProgression } from "@/lib/progression/service";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
 
@@ -66,13 +67,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
   // Record progression
   try {
-    const progExisting = await prisma.progression.findUnique({ where: { studentId: session.id } });
-    const progState = progExisting ? parseState(progExisting.state) : createInitialState();
-    recordVisionBoardItem(progState, type === "goal" ? "goal_link" : "pin");
-    await prisma.progression.upsert({
-      where: { studentId: session.id },
-      update: { state: JSON.stringify(progState) },
-      create: { studentId: session.id, state: JSON.stringify(progState) },
+    await updateProgression(session.id, (state) => {
+      recordVisionBoardItem(state, type === "goal" ? "goal_link" : "pin");
     });
   } catch (err) {
     logger.error("Failed to record vision board progression", { error: String(err) });

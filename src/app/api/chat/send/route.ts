@@ -3,34 +3,15 @@ import { prisma } from "@/lib/db";
 import { streamResponse } from "@/lib/gemini";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
-import { parseState, createInitialState, recordChatSession } from "@/lib/progression/engine";
+import { recordChatSession } from "@/lib/progression/engine";
+import { updateProgression } from "@/lib/progression/service";
 import { logger } from "@/lib/logger";
-import { invalidatePrefix } from "@/lib/cache";
 import { withAuth } from "@/lib/api-error";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { getOrCreateConversation, saveMessage } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-
-// ─── Progression helpers (used during stream) ───────────────────────────────
-
-async function getOrCreateProgression(studentId: string) {
-  const existing = await prisma.progression.findUnique({ where: { studentId } });
-  if (existing) return parseState(existing.state);
-  const initial = createInitialState();
-  await prisma.progression.create({ data: { studentId, state: JSON.stringify(initial) } });
-  return initial;
-}
-
-async function saveProgression(studentId: string, state: ReturnType<typeof createInitialState>) {
-  await prisma.progression.upsert({
-    where: { studentId },
-    update: { state: JSON.stringify(state) },
-    create: { studentId, state: JSON.stringify(state) },
-  });
-  invalidatePrefix(`progression:${studentId}`);
-}
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -100,9 +81,9 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         await saveMessage(conversation.id, "assistant", fullResponse);
 
         // Award chat session XP (synchronous — happens before stream closes)
-        const progState = await getOrCreateProgression(session.id);
-        recordChatSession(progState);
-        await saveProgression(session.id, progState);
+        await updateProgression(session.id, (state) => {
+          recordChatSession(state);
+        });
 
         // Fire-and-forget: goal extraction, XP awards, stage updates, title generation
         handlePostResponse({

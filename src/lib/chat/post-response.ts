@@ -4,35 +4,13 @@ import { GOAL_PLANNING_STATUSES, isGoalLevel, type GoalLevel } from "@/lib/goals
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
 import {
-  parseState,
-  createInitialState,
   recordWeeklyReview,
   recordMonthlyReview,
 } from "@/lib/progression/engine";
+import { updateProgression } from "@/lib/progression/service";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { generateConversationTitle } from "./conversation";
-
-// ─── Progression helpers (private) ──────────────────────────────────────────
-
-async function getOrCreateProgression(studentId: string) {
-  const existing = await prisma.progression.findUnique({ where: { studentId } });
-  if (existing) return parseState(existing.state);
-  const initial = createInitialState();
-  await prisma.progression.create({
-    data: { studentId, state: JSON.stringify(initial) },
-  });
-  return initial;
-}
-
-async function saveProgression(studentId: string, state: ReturnType<typeof createInitialState>) {
-  await prisma.progression.upsert({
-    where: { studentId },
-    update: { state: JSON.stringify(state) },
-    create: { studentId, state: JSON.stringify(state) },
-  });
-  invalidatePrefix(`progression:${studentId}`);
-}
 
 // ─── Main post-response handler ─────────────────────────────────────────────
 
@@ -134,17 +112,19 @@ export async function handlePostResponse({
   // 5. Award review XP
   if (conversationStage === "review") {
     try {
-      const reviewState = await getOrCreateProgression(studentId);
       const reviewMsgCount = await prisma.message.count({ where: { conversationId } });
       if (reviewMsgCount >= 4) {
         const hasMonthly = existingLevels.has("monthly");
         const hasWeekly = existingLevels.has("weekly");
-        if (hasMonthly && hasWeekly) {
-          recordWeeklyReview(reviewState);
-        } else if (hasMonthly) {
-          recordMonthlyReview(reviewState);
+        if (hasMonthly || hasWeekly) {
+          await updateProgression(studentId, (state) => {
+            if (hasMonthly && hasWeekly) {
+              recordWeeklyReview(state);
+            } else if (hasMonthly) {
+              recordMonthlyReview(state);
+            }
+          });
         }
-        await saveProgression(studentId, reviewState);
       }
     } catch (err) {
       logger.error("Failed to record review XP", { error: String(err) });

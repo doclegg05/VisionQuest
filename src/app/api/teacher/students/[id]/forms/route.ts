@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
-import { parseState, createInitialState } from "@/lib/progression/engine";
+import { updateProgression } from "@/lib/progression/service";
 import { withTeacherAuth } from "@/lib/api-error";
 
 export const GET = withTeacherAuth(async (
@@ -77,13 +77,8 @@ export const PATCH = withTeacherAuth(async (
   // Award XP for approved form submissions
   if (status === "approved") {
     try {
-      const progExisting = await prisma.progression.findUnique({ where: { studentId: id } });
-      const progState = progExisting ? parseState(progExisting.state) : createInitialState();
-      progState.xp += 20;
-      await prisma.progression.upsert({
-        where: { studentId: id },
-        update: { state: JSON.stringify(progState) },
-        create: { studentId: id, state: JSON.stringify(progState) },
+      await updateProgression(id, (state) => {
+        state.xp += 20;
       });
     } catch (err) {
       logger.error("Failed to award form approval XP", { error: String(err) });

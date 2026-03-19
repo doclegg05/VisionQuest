@@ -49,6 +49,8 @@ model Student {
   notifications           Notification[]
   formSubmissions         FormSubmission[]
   visionBoardItems        VisionBoardItem[]
+  goalResourceLinks       GoalResourceLink[]         @relation("StudentGoalResourceLinks")
+  assignedGoalLinks       GoalResourceLink[]         @relation("AssignedGoalResourceLinks")
 
   @@schema("visionquest")
 }
@@ -96,6 +98,7 @@ model Goal {
   student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
   parent   Goal?   @relation("GoalHierarchy", fields: [parentId], references: [id])
   children Goal[]  @relation("GoalHierarchy")
+  resourceLinks GoalResourceLink[]
 
   @@schema("visionquest")
 }
@@ -104,6 +107,7 @@ model Progression {
   id        String @id @default(cuid())
   studentId String @unique
   state     String
+  version   Int    @default(0)
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -778,5 +782,32 @@ model VisionBoardItem {
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
+  @@schema("visionquest")
+}
+
+model GoalResourceLink {
+  id           String    @id @default(cuid())
+  goalId        String
+  studentId     String
+  resourceType  String
+  resourceId    String
+  title         String
+  description   String?   @db.Text
+  url           String?
+  linkType      String    @default("assigned")
+  status        String    @default("assigned")
+  dueAt         DateTime?
+  assignedById  String?
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  student    Student  @relation("StudentGoalResourceLinks", fields: [studentId], references: [id], onDelete: Cascade)
+  assignedBy Student? @relation("AssignedGoalResourceLinks", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([goalId, resourceType, resourceId, linkType])
+  @@index([goalId, linkType, status])
+  @@index([studentId, status])
   @@schema("visionquest")
 }
