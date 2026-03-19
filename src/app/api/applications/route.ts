@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
 const VALID_APPLICATION_STATUSES = [
   "saved",
@@ -11,10 +11,7 @@ const VALID_APPLICATION_STATUSES = [
   "withdrawn",
 ] as const;
 
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const POST = withAuth(async (session, req: Request) => {
   const body = await req.json();
   const opportunityId = typeof body.opportunityId === "string" ? body.opportunityId : "";
   const status = typeof body.status === "string" ? body.status.trim() : "saved";
@@ -86,4 +83,4 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ application });
-}
+});

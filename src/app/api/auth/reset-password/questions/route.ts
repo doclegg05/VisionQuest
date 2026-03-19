@@ -9,11 +9,12 @@ import {
 import { verifySecurityAnswer } from "@/lib/security-question-auth";
 import { isValidEmail, MAX_LENGTHS } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
+import { withErrorHandler } from "@/lib/api-error";
 
 const RESET_ERROR =
   "We could not verify those classroom recovery answers. Try again or ask your instructor for help.";
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const rl = await rateLimit(`reset-password-questions:${ip}`, 5, 60 * 60 * 1000);
 
@@ -117,4 +118,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

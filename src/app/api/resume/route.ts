@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { withAuth } from "@/lib/api-error";
 
 export interface ResumeContent {
   objective: string;
@@ -20,10 +20,7 @@ const EMPTY_RESUME: ResumeContent = {
 };
 
 // GET — get student's resume data
-export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = withAuth(async (session) => {
   const resume = await prisma.resumeData.findUnique({
     where: { studentId: session.id },
   });
@@ -37,13 +34,10 @@ export async function GET() {
     }
   }
   return NextResponse.json({ resume: data, displayName: session.displayName });
-}
+});
 
 // POST — save resume data
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const POST = withAuth(async (session, req: Request) => {
   const body = await req.json();
   const data = JSON.stringify(body.resume || EMPTY_RESUME);
 
@@ -54,4 +48,4 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

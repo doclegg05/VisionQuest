@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseState, createInitialState, getXpProgress, getAchievementsWithDefs, recordDailyCheckin, checkReadinessAchievements } from "@/lib/progression/engine";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
-import { cached } from "@/lib/cache";
+import { cached, invalidate } from "@/lib/cache";
 import { withErrorHandler, unauthorized } from "@/lib/api-error";
 
 export const GET = withErrorHandler(async () => {
@@ -15,6 +15,7 @@ export const GET = withErrorHandler(async () => {
   );
 
   const state = progression ? parseState(progression.state) : createInitialState();
+  let mutated = false;
 
   // Daily check-in: award XP if the student hasn't checked in today
   const today = new Date().toISOString().slice(0, 10);
@@ -26,6 +27,7 @@ export const GET = withErrorHandler(async () => {
       update: { state: JSON.stringify(state) },
       create: { studentId: session.id, state: JSON.stringify(state) },
     });
+    mutated = true;
   }
 
   const xpProgress = getXpProgress(state);
@@ -40,6 +42,11 @@ export const GET = withErrorHandler(async () => {
       update: { state: JSON.stringify(state) },
       create: { studentId: session.id, state: JSON.stringify(state) },
     });
+    mutated = true;
+  }
+
+  if (mutated) {
+    invalidate(`progression:${session.id}`);
   }
 
   const achievements = getAchievementsWithDefs(state);

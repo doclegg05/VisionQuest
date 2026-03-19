@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import {
@@ -9,18 +8,9 @@ import {
 } from "@/lib/security-questions";
 import { hashSecurityAnswers } from "@/lib/security-question-auth";
 import { logAuditEvent } from "@/lib/audit";
+import { withAuth } from "@/lib/api-error";
 
-async function requireSession() {
-  const session = await getSession();
-  return session ?? null;
-}
-
-export async function GET() {
-  const session = await requireSession();
-  if (!session) {
-    return Response.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
+export const GET = withAuth(async (session) => {
   const student = await prisma.student.findUnique({
     where: { id: session.id },
     select: {
@@ -39,14 +29,9 @@ export async function GET() {
     configured,
     questions: SECURITY_QUESTIONS,
   });
-}
+});
 
-export async function POST(req: NextRequest) {
-  const session = await requireSession();
-  if (!session) {
-    return Response.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
+export const POST = withAuth(async (session, req: NextRequest) => {
   const rl = await rateLimit(`security-questions:${session.id}`, 5, 15 * 60 * 1000);
   if (!rl.success) {
     return Response.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
@@ -83,4 +68,4 @@ export async function POST(req: NextRequest) {
   });
 
   return Response.json({ success: true });
-}
+});

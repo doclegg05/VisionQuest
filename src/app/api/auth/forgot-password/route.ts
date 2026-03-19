@@ -5,6 +5,7 @@ import { generatePasswordResetToken } from "@/lib/password-reset";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail } from "@/lib/validation";
+import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 
 function getAppBaseUrl(req: NextRequest): string {
@@ -14,7 +15,7 @@ function getAppBaseUrl(req: NextRequest): string {
 const GENERIC_MESSAGE =
   "If that account has an email on file, you will receive a reset link shortly. If not, contact your program staff.";
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const rl = await rateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000);
 
@@ -107,4 +108,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
-}
+});

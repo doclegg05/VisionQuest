@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
+import { withAuth } from "@/lib/api-error";
 
-export async function GET(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -28,4 +25,4 @@ export async function GET(req: Request) {
       "Content-Disposition": `inline; filename="${file.filename}"`,
     },
   });
-}
+});

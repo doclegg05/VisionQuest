@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
-import { syncAlertsForStudents } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress } from "@/lib/certifications";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
@@ -21,8 +20,6 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     select: { id: true },
     orderBy: { displayName: "asc" },
   });
-
-  await syncAlertsForStudents(allStudentIds.map((student) => student.id));
 
   const students = await prisma.student.findMany({
     where: studentWhere,

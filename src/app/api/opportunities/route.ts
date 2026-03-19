@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = withAuth(async (session) => {
   const opportunities = await prisma.opportunity.findMany({
     where: { status: { not: "archived" } },
     include: {
@@ -30,4 +27,4 @@ export async function GET() {
       application: opportunity.applications[0] || null,
     })),
   });
-}
+});

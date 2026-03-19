@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
+export const GET = withAuth(async (session) => {
   const conversations = await prisma.conversation.findMany({
     where: { studentId: session.id },
     orderBy: { updatedAt: "desc" },
@@ -23,4 +18,4 @@ export async function GET() {
   });
 
   return NextResponse.json({ conversations });
-}
+});

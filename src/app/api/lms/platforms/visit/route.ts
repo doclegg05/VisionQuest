@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   parseState,
   createInitialState,
   recordPlatformVisit,
 } from "@/lib/progression/engine";
+import { withAuth } from "@/lib/api-error";
 
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
+export const POST = withAuth(async (session, req: NextRequest) => {
   const body = await req.json();
   const platformId = body.platformId as string | undefined;
 
@@ -43,4 +38,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

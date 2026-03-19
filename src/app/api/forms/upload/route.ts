@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey, validateFile } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
 import { logger } from "@/lib/logger";
+import { withAuth } from "@/lib/api-error";
 
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
+export const POST = withAuth(async (session, req: NextRequest) => {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -75,4 +70,4 @@ export async function POST(req: NextRequest) {
     logger.error("Form upload error", { error: String(error) });
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
-}
+});

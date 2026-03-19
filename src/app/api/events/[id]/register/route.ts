@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
-export async function POST(
+export const POST = withAuth(async (
+  session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+) => {
   const { id } = await params;
 
   const event = await prisma.careerEvent.findUnique({
@@ -60,15 +58,13 @@ export async function POST(
   });
 
   return NextResponse.json({ registration });
-}
+});
 
-export async function DELETE(
+export const DELETE = withAuth(async (
+  session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+) => {
   const { id } = await params;
 
   const registration = await prisma.eventRegistration.findFirst({
@@ -104,4 +100,4 @@ export async function DELETE(
   });
 
   return NextResponse.json({ ok: true });
-}
+});

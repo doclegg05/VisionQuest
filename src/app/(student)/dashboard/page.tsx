@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
-import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import {
   createInitialState,
@@ -33,8 +32,6 @@ const MODULES = [
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
-
-  await syncStudentAlerts(session.id);
 
   const now = new Date();
   const [goalCount, progression, nextAppointment, tasks, alertCount] = await Promise.all([

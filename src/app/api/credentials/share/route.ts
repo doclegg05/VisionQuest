@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
 function slugify(value: string) {
   return value
@@ -25,10 +25,7 @@ async function ensureUniqueSlug(base: string) {
   }
 }
 
-export async function GET(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = withAuth(async (session, req: Request) => {
   const [page, certification] = await Promise.all([
     prisma.publicCredentialPage.findUnique({
       where: { studentId: session.id },
@@ -56,12 +53,9 @@ export async function GET(req: Request) {
     page,
     publicUrl: page ? `${baseUrl}/credentials/${page.slug}` : null,
   });
-}
+});
 
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const POST = withAuth(async (session, req: Request) => {
   const body = await req.json();
   const isPublic = Boolean(body.isPublic);
   const headline = typeof body.headline === "string" ? body.headline.trim() : "";
@@ -114,4 +108,4 @@ export async function POST(req: Request) {
     page,
     publicUrl: `${baseUrl}/credentials/${page.slug}`,
   });
-}
+});

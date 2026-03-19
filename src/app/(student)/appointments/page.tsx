@@ -1,14 +1,12 @@
 import PageIntro from "@/components/ui/PageIntro";
 import StudentAdvisingHub from "@/components/advising/StudentAdvisingHub";
 import { getSession } from "@/lib/auth";
-import { listBookableAdvisors, syncStudentAlerts } from "@/lib/advising";
+import { listBookableAdvisors } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 
 export default async function AppointmentsPage() {
   const session = await getSession();
   if (!session) return null;
-
-  await syncStudentAlerts(session.id);
 
   const [appointments, tasks, alerts, bookableAdvisors] = await Promise.all([
     prisma.appointment.findMany({

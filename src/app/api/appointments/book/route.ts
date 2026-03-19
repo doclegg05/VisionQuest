@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { withAuth } from "@/lib/api-error";
 
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const POST = withAuth(async (session, req: Request) => {
   if (session.role !== "student") {
     return NextResponse.json({ error: "Only students can self-book appointments." }, { status: 403 });
   }
@@ -85,4 +83,4 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ appointment });
-}
+});

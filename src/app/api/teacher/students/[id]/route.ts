@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
-import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
@@ -11,8 +10,6 @@ export const GET = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-
-  await syncStudentAlerts(id);
 
   const student = await prisma.student.findUnique({
     where: { id },

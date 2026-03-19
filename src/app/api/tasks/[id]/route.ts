@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { isTaskStatus, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
-export async function PATCH(
+export const PATCH = withAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+) => {
   const { id } = await params;
   const body = await req.json();
   const nextStatus = typeof body.status === "string" ? body.status.trim() : "";
@@ -70,4 +68,4 @@ export async function PATCH(
   });
 
   return NextResponse.json({ task });
-}
+});

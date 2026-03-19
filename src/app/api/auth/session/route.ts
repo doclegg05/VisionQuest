@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSession, clearSession } from "@/lib/auth";
+import { clearSession } from "@/lib/auth";
+import { withAuth, withErrorHandler } from "@/lib/api-error";
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
+export const GET = withAuth(async (session) => {
   return NextResponse.json({ student: session });
-}
+});
 
-export async function DELETE() {
+export const DELETE = withErrorHandler(async () => {
   await clearSession();
   return NextResponse.json({ ok: true });
-}
+});

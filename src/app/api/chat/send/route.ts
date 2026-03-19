@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { streamResponse } from "@/lib/gemini";
 import { decrypt } from "@/lib/crypto";
@@ -9,6 +8,7 @@ import { extractGoals } from "@/lib/sage/goal-extractor";
 import { parseState, createInitialState, recordGoalSet, recordChatSession, recordWeeklyReview, recordMonthlyReview } from "@/lib/progression/engine";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
+import { withAuth } from "@/lib/api-error";
 
 const PLATFORM_GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -31,12 +31,7 @@ async function saveProgression(studentId: string, state: ReturnType<typeof creat
   invalidatePrefix(`progression:${studentId}`);
 }
 
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Not authenticated." }), { status: 401 });
-  }
-
+export const POST = withAuth(async (session, req: NextRequest) => {
   const body = await req.json();
   const userMessage = (body.message || "").trim();
   const conversationId = body.conversationId || null;
@@ -311,4 +306,4 @@ export async function POST(req: NextRequest) {
       Connection: "keep-alive",
     },
   });
-}
+});

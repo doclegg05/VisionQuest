@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
-export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
+export const GET = withAuth(async (session, req: NextRequest) => {
   const conversationId = req.nextUrl.searchParams.get("conversationId");
   if (!conversationId) {
     return NextResponse.json({ error: "conversationId is required." }, { status: 400 });
@@ -34,4 +29,4 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json({ conversation, messages: messages.reverse() });
-}
+});

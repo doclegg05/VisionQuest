@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
 // GET — list LMS links grouped by category
-export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = withAuth(async () => {
   const links = await prisma.lmsLink.findMany({
     orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
   });
@@ -19,4 +16,4 @@ export async function GET() {
   }
 
   return NextResponse.json({ links, grouped });
-}
+});

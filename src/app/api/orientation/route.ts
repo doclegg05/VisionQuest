@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api-error";
 
 // GET — list orientation items with student's progress
-export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = withAuth(async (session) => {
   const items = await prisma.orientationItem.findMany({
     orderBy: { sortOrder: "asc" },
     include: {
@@ -30,13 +27,10 @@ export async function GET() {
   const done = formatted.filter((i) => i.completed).length;
 
   return NextResponse.json({ items: formatted, total, done });
-}
+});
 
 // POST — toggle an orientation item's completion
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const POST = withAuth(async (session, req: Request) => {
   const { itemId, completed } = await req.json();
   if (!itemId || typeof completed !== "boolean") {
     return NextResponse.json({ error: "itemId and completed required" }, { status: 400 });
@@ -49,4 +43,4 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

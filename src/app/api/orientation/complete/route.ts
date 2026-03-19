@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseState, createInitialState, recordOrientationComplete } from "@/lib/progression/engine";
+import { withAuth } from "@/lib/api-error";
 
-export async function POST() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
+export const POST = withAuth(async (session) => {
   const existing = await prisma.progression.findUnique({
     where: { studentId: session.id },
   });
@@ -25,4 +20,4 @@ export async function POST() {
   }
 
   return NextResponse.json({ ok: true });
-}
+});

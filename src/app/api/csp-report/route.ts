@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { withErrorHandler } from "@/lib/api-error";
 
 /**
  * CSP violation reporting endpoint.
  * Browsers POST violation reports here when Content-Security-Policy is violated.
  */
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   try {
     const body = await req.json();
 
@@ -24,4 +25,4 @@ export async function POST(req: NextRequest) {
   }
 
   return new NextResponse(null, { status: 204 });
-}
+});

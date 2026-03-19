@@ -1,16 +1,11 @@
 import { NextRequest } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
+import { withAuth } from "@/lib/api-error";
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Not authenticated." }), { status: 401 });
-  }
-
+export const GET = withAuth(async (session) => {
   const student = await prisma.student.findUnique({
     where: { id: session.id },
     select: { geminiApiKey: true },
@@ -37,14 +32,9 @@ export async function GET() {
     keyHint,
     platformKeyConfigured,
   });
-}
+});
 
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Not authenticated." }), { status: 401 });
-  }
-
+export const POST = withAuth(async (session, req: NextRequest) => {
   const rl = await rateLimit(`api-key:${session.id}`, 5, 15 * 60 * 1000);
   if (!rl.success) {
     return Response.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
@@ -93,14 +83,9 @@ export async function POST(req: NextRequest) {
   });
 
   return Response.json({ success: true });
-}
+});
 
-export async function DELETE() {
-  const session = await getSession();
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Not authenticated." }), { status: 401 });
-  }
-
+export const DELETE = withAuth(async (session) => {
   await prisma.student.update({
     where: { id: session.id },
     data: { geminiApiKey: null },
@@ -116,4 +101,4 @@ export async function DELETE() {
   });
 
   return Response.json({ success: true });
-}
+});

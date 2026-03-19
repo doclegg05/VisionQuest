@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db";
 import { hashPasswordResetToken } from "@/lib/password-reset";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
+import { withErrorHandler } from "@/lib/api-error";
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const rl = await rateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000);
 
@@ -96,4 +97,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

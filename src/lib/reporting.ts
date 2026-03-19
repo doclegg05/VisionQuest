@@ -1,4 +1,3 @@
-import { syncAlertsForStudents } from "./advising";
 import { prisma } from "./db";
 
 function latestDate(...values: Array<Date | null | undefined>) {
@@ -23,8 +22,6 @@ export async function getTeacherOutcomeReport() {
     select: { id: true },
     orderBy: { displayName: "asc" },
   });
-
-  await syncAlertsForStudents(studentIds.map((student) => student.id));
 
   const [orientationTotal, students, recentApplications, activeOpportunityCount, closingSoonOpportunityCount, upcomingEvents] =
     await Promise.all([
