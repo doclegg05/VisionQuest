@@ -107,7 +107,7 @@ export default function CoursesHub() {
     return (
       <div className="surface-section p-8 text-center">
         <p className="text-4xl mb-3">📚</p>
-        <p className="text-sm text-[var(--muted)]">
+        <p className="text-sm text-[var(--ink-muted)]">
           No learning platforms available yet.
         </p>
       </div>
@@ -133,7 +133,7 @@ export default function CoursesHub() {
 
       {grouped.length === 0 ? (
         <div className="surface-section p-8 text-center">
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-[var(--ink-muted)]">
             No platforms match your current filter.
           </p>
         </div>

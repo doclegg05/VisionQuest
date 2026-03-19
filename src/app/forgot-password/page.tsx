@@ -96,9 +96,9 @@ export default function ForgotPasswordPage() {
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-2xl items-center">
         <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
           <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
-          <p className="page-eyebrow text-[var(--muted)]">Account recovery</p>
+          <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
           <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Reset your password</h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+          <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
             Use an email link or answer the classroom recovery questions tied to your account.
           </p>
 
@@ -113,7 +113,7 @@ export default function ForgotPasswordPage() {
               className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "questions"
                   ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                  : "text-[var(--muted)] hover:text-[var(--ink-strong)]"
+                  : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
               Classroom questions
@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
               className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "email"
                   ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                  : "text-[var(--muted)] hover:text-[var(--ink-strong)]"
+                  : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
               Email link

@@ -63,39 +63,39 @@ export default async function PublicCredentialPage({
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="surface-section p-5">
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Learner</p>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Learner</p>
             <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{page.student.displayName}</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">Student ID {page.student.studentId}</p>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">Student ID {page.student.studentId}</p>
           </div>
           <div className="surface-section p-5">
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Verified on</p>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Verified on</p>
             <p className="mt-2 text-2xl font-bold text-[var(--accent-secondary)]">
               {certification.completedAt ? new Date(certification.completedAt).toLocaleDateString() : "Verified"}
             </p>
-            <p className="mt-1 text-sm text-[var(--muted)]">Certification completion date</p>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">Certification completion date</p>
           </div>
           <div className="surface-section p-5">
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Evidence</p>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Evidence</p>
             <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{page.student.portfolioItems.length}</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">Portfolio items on file</p>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">Portfolio items on file</p>
           </div>
         </div>
 
         <section className="surface-section mt-6 p-6">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Credential Summary</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Credential Summary</p>
           <h2 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">SPOKES Ready to Work Certification</h2>
-          <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
+          <p className="mt-4 text-sm leading-7 text-[var(--ink-muted)]">
             This public page confirms that the learner completed the program&apos;s readiness credential and met the required verification checkpoints.
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/80 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Requirements complete</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Requirements complete</p>
               <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">
                 {completedRequirements}/{certification.requirements.length}
               </p>
             </div>
             <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/80 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Verification status</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Verification status</p>
               <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">Completed</p>
             </div>
           </div>

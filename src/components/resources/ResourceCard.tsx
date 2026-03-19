@@ -22,7 +22,7 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
     <div className="surface-section flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 flex-1">
         <p className="font-medium text-[var(--ink-strong)]">{form.title}</p>
-        <p className="mt-1 text-xs text-[var(--muted)]">{form.description}</p>
+        <p className="mt-1 text-xs text-[var(--ink-muted)]">{form.description}</p>
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -36,7 +36,7 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
             Required
           </span>
         )}
-        <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-0.5 text-xs font-semibold text-[var(--muted)]">
+        <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
           {audienceLabel}
         </span>
       </div>
@@ -52,7 +52,7 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
       )}
 
       <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 sm:hidden">
-        <p className="text-xs text-[var(--muted)]">
+        <p className="text-xs text-[var(--ink-muted)]">
           Ask your instructor for this form
         </p>
         <Link
@@ -66,7 +66,7 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
 
       {/* Desktop bottom row — rendered inside flex-row context */}
       <div className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
-        <p className="text-xs text-[var(--muted)]">
+        <p className="text-xs text-[var(--ink-muted)]">
           Ask your instructor for this form
         </p>
         <Link

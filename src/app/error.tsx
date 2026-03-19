@@ -21,7 +21,7 @@ export default function GlobalError({
       <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-[var(--ink-strong)]">
         Something went wrong
       </h1>
-      <p className="mt-3 text-lg text-[var(--muted)]">
+      <p className="mt-3 text-lg text-[var(--ink-muted)]">
         An unexpected error occurred. Please try again.
       </p>
       <button

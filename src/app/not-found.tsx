@@ -9,7 +9,7 @@ export default function NotFound() {
       <h1 className="font-[family-name:var(--font-display)] text-6xl font-bold text-[var(--ink-strong)]">
         404
       </h1>
-      <p className="mt-3 text-lg text-[var(--muted)]">
+      <p className="mt-3 text-lg text-[var(--ink-muted)]">
         Page not found. It may have been moved or doesn&apos;t exist.
       </p>
       <Link

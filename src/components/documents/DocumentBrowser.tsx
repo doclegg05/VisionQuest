@@ -146,7 +146,7 @@ export default function DocumentBrowser({
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
                 ? "bg-[var(--ink-strong)] text-white"
-                : "border border-[var(--border)] text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
             }`}
           >
             All ({documents.length})
@@ -163,7 +163,7 @@ export default function DocumentBrowser({
                 className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   selectedCategory === cat
                     ? "bg-[var(--ink-strong)] text-white"
-                    : "border border-[var(--border)] text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                    : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
                 }`}
               >
                 {meta.icon} {meta.label} ({count})
@@ -177,7 +177,7 @@ export default function DocumentBrowser({
       {loading && (
         <div className="py-12 text-center">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--accent-secondary)]" />
-          <p className="mt-3 text-sm text-[var(--muted)]">Loading documents...</p>
+          <p className="mt-3 text-sm text-[var(--ink-muted)]">Loading documents...</p>
         </div>
       )}
 
@@ -197,7 +197,7 @@ export default function DocumentBrowser({
 
       {/* Empty state */}
       {!loading && !error && filtered.length === 0 && (
-        <p className="py-12 text-center text-sm text-[var(--muted)]">
+        <p className="py-12 text-center text-sm text-[var(--ink-muted)]">
           No documents match your search.
         </p>
       )}
@@ -263,7 +263,7 @@ function CategorySection({
           </div>
         </div>
         <span
-          className="text-[var(--muted)] transition-transform duration-200"
+          className="text-[var(--ink-muted)] transition-transform duration-200"
           style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
         >
           ▾

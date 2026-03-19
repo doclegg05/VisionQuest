@@ -265,7 +265,7 @@ export default function CertTracker() {
                   )}
                 </div>
                 {req.needsFile && !req.fileId && !req.completed && (
-                  <p className="mt-2 text-xs text-[var(--muted)]">
+                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
                     Attach the required file before marking this item complete.
                   </p>
                 )}

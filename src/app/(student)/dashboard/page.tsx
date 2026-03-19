@@ -165,10 +165,10 @@ export default async function DashboardPage() {
 
       <div className="mb-4 mt-8 flex items-end justify-between gap-4">
         <div>
-          <p className="page-eyebrow text-[var(--muted)]">Modules</p>
+          <p className="page-eyebrow text-[var(--ink-muted)]">Modules</p>
           <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Choose your next step</h2>
         </div>
-        <p className="hidden max-w-sm text-sm leading-6 text-[var(--muted)] md:block">
+        <p className="hidden max-w-sm text-sm leading-6 text-[var(--ink-muted)] md:block">
           Each area supports a different part of your progress, from planning to proof of readiness.
         </p>
       </div>
@@ -187,7 +187,7 @@ export default async function DashboardPage() {
                 {mod.icon}
               </div>
               <h2 className="font-display text-xl text-[var(--ink-strong)]">{mod.label}</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{mod.description}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{mod.description}</p>
               <div className="mt-5 text-sm font-semibold text-[var(--accent-strong)] transition-transform group-hover:translate-x-1">
                 Open module →
               </div>

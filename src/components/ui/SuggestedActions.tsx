@@ -128,9 +128,9 @@ export default function SuggestedActions({
           <span className="text-xl">{action.emoji}</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--ink-strong)] group-hover:text-[var(--accent-secondary)]">{action.title}</p>
-            <p className="text-xs text-[var(--muted)] mt-0.5">{action.desc}</p>
+            <p className="text-xs text-[var(--ink-muted)] mt-0.5">{action.desc}</p>
           </div>
-          <span className="text-[var(--muted)] text-xs group-hover:text-[var(--accent-secondary)] transition-colors">{"\u2192"}</span>
+          <span className="text-[var(--ink-muted)] text-xs group-hover:text-[var(--accent-secondary)] transition-colors">{"\u2192"}</span>
         </Link>
       ))}
     </div>

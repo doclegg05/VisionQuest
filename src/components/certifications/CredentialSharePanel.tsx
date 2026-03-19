@@ -98,9 +98,9 @@ export default function CredentialSharePanel() {
     <div className="surface-section p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Shareable proof</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Shareable proof</p>
           <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Public Credential Page</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
             Create a simple public page that verifies your completed Ready to Work certification for employers and partners.
           </p>
         </div>
@@ -116,7 +116,7 @@ export default function CredentialSharePanel() {
       </div>
 
       {!data?.eligible ? (
-        <div className="mt-4 rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+        <div className="mt-4 rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
           Finish certification first. Once your Ready to Work certification is completed and verified, you can publish a public credential page here.
         </div>
       ) : (
@@ -137,7 +137,7 @@ export default function CredentialSharePanel() {
                 placeholder="What should visitors know about this credential and what it represents?"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
                 <input
                   type="checkbox"
                   checked={form.isPublic}
@@ -160,7 +160,7 @@ export default function CredentialSharePanel() {
               <p className="mt-3 font-display text-2xl text-[var(--ink-strong)]">
                 {form.headline || "Ready to Work Certified"}
               </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 {form.summary || "This learner completed the SPOKES Ready to Work certification."}
               </p>
               {data.publicUrl ? (
@@ -174,7 +174,7 @@ export default function CredentialSharePanel() {
       )}
 
       {message ? (
-        <p className="mt-4 text-sm text-[var(--muted)]">{message}</p>
+        <p className="mt-4 text-sm text-[var(--ink-muted)]">{message}</p>
       ) : null}
     </div>
   );

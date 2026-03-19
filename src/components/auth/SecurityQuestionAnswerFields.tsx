@@ -31,7 +31,7 @@ export default function SecurityQuestionAnswerFields({
     <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.03)] p-4">
       <div className="mb-4">
         <p className="text-sm font-semibold text-[var(--ink-strong)]">{title}</p>
-        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{description}</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">{description}</p>
       </div>
 
       <div className="space-y-4">

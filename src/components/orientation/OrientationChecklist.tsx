@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import OrientationFormDetail from "./OrientationFormDetail";
+import OrientationFormDetail, { findRelatedForms } from "./OrientationFormDetail";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 
 interface OrientationItem {
@@ -135,13 +135,16 @@ export default function OrientationChecklist() {
 
       {/* Checklist */}
       <div className="space-y-2">
-        {items.map((item) => (
+        {items.map((item) => {
+          const relatedForms = findRelatedForms(item.label);
+          const hasForms = relatedForms.length > 0;
+          return (
           <div key={item.id}>
             <label
-              className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                 item.completed
                   ? "bg-green-50 border-green-200"
-                  : "bg-white border-gray-200 hover:bg-gray-50"
+                  : "bg-white border-gray-200 hover:bg-gray-50 bg-opacity-[86%]"
               }`}
             >
               <input
@@ -149,33 +152,62 @@ export default function OrientationChecklist() {
                 checked={item.completed}
                 disabled={toggling === item.id}
                 onChange={() => toggleItem(item.id, !item.completed)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
               />
               <div
-                className="flex-1 min-w-0 cursor-pointer"
+                className="flex-1 min-w-0"
                 onClick={(e) => {
                   e.preventDefault();
-                  setExpandedItem(expandedItem === item.id ? null : item.id);
+                  if (hasForms) {
+                    setExpandedItem(expandedItem === item.id ? null : item.id);
+                  }
                 }}
               >
-                <p className={`text-sm font-medium ${item.completed ? "text-green-800 line-through" : "text-gray-900"}`}>
+                <p className={`text-[15px] font-medium ${item.completed ? "text-green-800 line-through opacity-80" : "text-[var(--ink-strong)]"}`}>
                   {item.label}
                   {item.required && (
                     <span className="ml-1 text-xs text-red-400 font-normal">*</span>
                   )}
                 </p>
                 {item.description && (
-                  <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                  <p className="text-sm text-[var(--ink-muted)] mt-0.5">{item.description}</p>
                 )}
               </div>
-              <span className={`text-[var(--muted)] text-xs transition-transform ${expandedItem === item.id ? "rotate-90" : ""}`}>
-                ▶
-              </span>
-              {item.completed && (
-                <span className="text-green-500 text-sm">✓</span>
+
+              {hasForms && (
+                <div className="flex gap-2 items-center flex-wrap justify-end shrink-0 pl-2">
+                  {relatedForms.map(form => {
+                    const viewUrl = `/api/forms/download?file=${encodeURIComponent(form.fileName)}&name=${encodeURIComponent(form.fileName)}`;
+                    return (
+                      <a
+                        key={form.id}
+                        href={viewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()} // Prevent row click
+                        className="inline-flex items-center gap-1.5 rounded-[0.5rem] bg-[var(--primary)] text-white px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-[var(--dark)] transition-colors"
+                        title={`Open ${form.title}`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Open PDF
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+
+              {hasForms && (
+                <span className={`text-[var(--ink-muted)] shrink-0 ml-1 text-xs transition-transform ${expandedItem === item.id ? "rotate-90" : ""}`}>
+                  ▶
+                </span>
+              )}
+              {item.completed && !hasForms && (
+                <span className="text-green-500 shrink-0 text-sm ml-1">✓</span>
               )}
             </label>
-            {expandedItem === item.id && (
+            {expandedItem === item.id && hasForms && (
               <OrientationFormDetail
                 itemLabel={item.label}
                 formStatuses={formStatuses}
@@ -183,7 +215,8 @@ export default function OrientationChecklist() {
               />
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {done === total && total > 0 && (

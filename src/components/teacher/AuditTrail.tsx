@@ -59,7 +59,7 @@ export default function AuditTrail() {
 
   if (logs.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-white/70 p-6 text-sm text-[var(--muted)]">
+      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-white/70 p-6 text-sm text-[var(--ink-muted)]">
         No tracked teacher actions yet.
       </div>
     );
@@ -71,18 +71,18 @@ export default function AuditTrail() {
         <div key={log.id} className="surface-section p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
                 {formatAction(log.action)}
               </p>
               <p className="mt-1 text-sm font-medium text-[var(--ink-strong)]">
                 {log.summary || `${formatAction(log.action)} on ${log.targetType}`}
               </p>
             </div>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="text-xs text-[var(--ink-muted)]">
               {new Date(log.createdAt).toLocaleString()}
             </p>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--muted)]">
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--ink-muted)]">
             {log.actorRole && (
               <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-1">
                 Actor: {log.actorRole}

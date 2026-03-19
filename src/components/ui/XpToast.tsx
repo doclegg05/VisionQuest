@@ -30,7 +30,7 @@ export default function XpToast({ amount, label, onDone }: XpToastProps) {
         <span className="text-lg">⚡</span>
         <div>
           <p className="text-sm font-bold text-[var(--accent-strong)]">+{amount} XP</p>
-          {label && <p className="text-[10px] text-[var(--muted)]">{label}</p>}
+          {label && <p className="text-[10px] text-[var(--ink-muted)]">{label}</p>}
         </div>
       </div>
     </div>

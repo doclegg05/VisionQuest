@@ -56,19 +56,19 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <div className="surface-section p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Upcoming</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Upcoming</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">{upcomingCount}</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">Career fairs, workshops, and hiring events ahead.</p>
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">Career fairs, workshops, and hiring events ahead.</p>
         </div>
         <div className="surface-section p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Registered</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Registered</p>
           <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">{registeredCount}</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">Events you&apos;ve committed to attending.</p>
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">Events you&apos;ve committed to attending.</p>
         </div>
         <div className="surface-section p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Momentum</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Momentum</p>
           <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Show up where opportunity gathers</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">
             Register early so teachers can help you prepare for each event.
           </p>
         </div>
@@ -81,7 +81,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
       ) : null}
 
       {events.length === 0 ? (
-        <div className="surface-section p-8 text-center text-[var(--muted)]">
+        <div className="surface-section p-8 text-center text-[var(--ink-muted)]">
           No events are scheduled yet.
         </div>
       ) : (
@@ -103,10 +103,10 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         {event.status}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-[var(--muted)]">
+                    <p className="mt-2 text-sm text-[var(--ink-muted)]">
                       {new Date(event.startsAt).toLocaleString()} to {new Date(event.endsAt).toLocaleString()}
                     </p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
+                    <p className="mt-1 text-sm text-[var(--ink-muted)]">
                       {event.location || "Location to be announced"}
                       {event.capacity ? ` • ${event.registrationCount}/${event.capacity} registered` : ` • ${event.registrationCount} registered`}
                     </p>
@@ -144,11 +144,11 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                 </div>
 
                 {event.description ? (
-                  <p className="mt-4 text-sm leading-7 text-[var(--muted)]">{event.description}</p>
+                  <p className="mt-4 text-sm leading-7 text-[var(--ink-muted)]">{event.description}</p>
                 ) : null}
 
                 {event.registration?.registeredAt ? (
-                  <p className="mt-3 text-xs text-[var(--muted)]">
+                  <p className="mt-3 text-xs text-[var(--ink-muted)]">
                     Registered {new Date(event.registration.registeredAt).toLocaleString()}
                   </p>
                 ) : null}

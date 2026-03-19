@@ -209,7 +209,7 @@ export default function SpokesManager() {
           Handbook-aligned setup
         </p>
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">SPOKES checklists and modules</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
           Use this space to load the official orientation paperwork, program files, and required modules from the
           SPOKES handbook. Orientation and program files are tracked separately so teachers can see exactly what is
           holding a learner up.
@@ -220,7 +220,7 @@ export default function SpokesManager() {
         <section className="surface-section p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Checklists</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Checklists</p>
               <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Orientation & program files</h3>
             </div>
             <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
@@ -234,11 +234,11 @@ export default function SpokesManager() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+                    <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                       {template.category === "program_file" ? "Program file" : "Orientation"} • order {template.sortOrder}
                     </p>
                     {template.description ? (
-                      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{template.description}</p>
+                      <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{template.description}</p>
                     ) : null}
                   </div>
                   <div className="flex gap-2">
@@ -272,7 +272,7 @@ export default function SpokesManager() {
             ))}
 
             {checklistTemplates.length === 0 ? (
-              <p className="rounded-[1rem] border border-dashed border-[var(--border-soft)] p-4 text-sm text-[var(--muted)]">
+              <p className="rounded-[1rem] border border-dashed border-[var(--border-soft)] p-4 text-sm text-[var(--ink-muted)]">
                 No SPOKES checklist items have been configured yet.
               </p>
             ) : null}
@@ -312,7 +312,7 @@ export default function SpokesManager() {
                   className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
-              <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)]">
+              <div className="flex flex-wrap gap-4 text-sm text-[var(--ink-muted)]">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -342,7 +342,7 @@ export default function SpokesManager() {
                   <button
                     type="button"
                     onClick={resetChecklistForm}
-                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-[var(--muted)] transition hover:border-gray-300 hover:text-[var(--ink-strong)]"
+                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-gray-300 hover:text-[var(--ink-strong)]"
                   >
                     Cancel
                   </button>
@@ -355,7 +355,7 @@ export default function SpokesManager() {
         <section className="surface-section p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Modules</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Modules</p>
               <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Required SPOKES modules</h3>
             </div>
             <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
@@ -369,11 +369,11 @@ export default function SpokesManager() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+                    <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                       order {template.sortOrder}
                     </p>
                     {template.description ? (
-                      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{template.description}</p>
+                      <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{template.description}</p>
                     ) : null}
                   </div>
                   <div className="flex gap-2">
@@ -406,7 +406,7 @@ export default function SpokesManager() {
             ))}
 
             {moduleTemplates.length === 0 ? (
-              <p className="rounded-[1rem] border border-dashed border-[var(--border-soft)] p-4 text-sm text-[var(--muted)]">
+              <p className="rounded-[1rem] border border-dashed border-[var(--border-soft)] p-4 text-sm text-[var(--ink-muted)]">
                 No SPOKES modules have been configured yet.
               </p>
             ) : null}
@@ -436,7 +436,7 @@ export default function SpokesManager() {
                 placeholder="Sort order (optional)"
                 className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
-              <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)]">
+              <div className="flex flex-wrap gap-4 text-sm text-[var(--ink-muted)]">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -466,7 +466,7 @@ export default function SpokesManager() {
                   <button
                     type="button"
                     onClick={resetModuleForm}
-                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-[var(--muted)] transition hover:border-gray-300 hover:text-[var(--ink-strong)]"
+                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-gray-300 hover:text-[var(--ink-strong)]"
                   >
                     Cancel
                   </button>

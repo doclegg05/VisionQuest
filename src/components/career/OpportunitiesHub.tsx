@@ -89,19 +89,19 @@ export default function OpportunitiesHub({
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <div className="surface-section p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Open now</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Open now</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">{activeCount}</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">Live roles, internships, and other opportunities.</p>
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">Live roles, internships, and other opportunities.</p>
         </div>
         <div className="surface-section p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Applied</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Applied</p>
           <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">{appliedCount}</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">Opportunities you&apos;ve already moved forward on.</p>
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">Opportunities you&apos;ve already moved forward on.</p>
         </div>
         <div className="surface-section p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Tracking</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Tracking</p>
           <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Keep your pipeline visible</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">
             Save roles you&apos;re considering, then update them as you apply and interview.
           </p>
         </div>
@@ -114,7 +114,7 @@ export default function OpportunitiesHub({
       ) : null}
 
       {opportunities.length === 0 ? (
-        <div className="surface-section p-8 text-center text-[var(--muted)]">
+        <div className="surface-section p-8 text-center text-[var(--ink-muted)]">
           No opportunities are posted yet.
         </div>
       ) : (
@@ -135,7 +135,7 @@ export default function OpportunitiesHub({
                         {opportunity.status}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-[var(--muted)]">
+                    <p className="mt-2 text-sm text-[var(--ink-muted)]">
                       {opportunity.company} • {opportunity.type}
                       {opportunity.location ? ` • ${opportunity.location}` : ""}
                     </p>
@@ -158,7 +158,7 @@ export default function OpportunitiesHub({
                 </div>
 
                 {opportunity.description ? (
-                  <p className="mt-4 text-sm leading-7 text-[var(--muted)]">{opportunity.description}</p>
+                  <p className="mt-4 text-sm leading-7 text-[var(--ink-muted)]">{opportunity.description}</p>
                 ) : null}
 
                 <div className="mt-5 grid gap-3 lg:grid-cols-[14rem_1fr_auto]">
@@ -207,7 +207,7 @@ export default function OpportunitiesHub({
                 </div>
 
                 {opportunity.application?.appliedAt ? (
-                  <p className="mt-3 text-xs text-[var(--muted)]">
+                  <p className="mt-3 text-xs text-[var(--ink-muted)]">
                     Marked as applied {new Date(opportunity.application.appliedAt).toLocaleString()}
                   </p>
                 ) : null}

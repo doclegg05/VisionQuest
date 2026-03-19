@@ -78,7 +78,7 @@ export default function ResourceLibrary() {
           className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
             selectedCategory === "all"
               ? "bg-[var(--ink-strong)] text-white"
-              : "border border-[var(--border)] text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+              : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
           }`}
         >
           All
@@ -91,7 +91,7 @@ export default function ResourceLibrary() {
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === key
                 ? "bg-[var(--ink-strong)] text-white"
-                : "border border-[var(--border)] text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
             }`}
           >
             {FORM_CATEGORIES[key].icon} {FORM_CATEGORIES[key].label}
@@ -101,7 +101,7 @@ export default function ResourceLibrary() {
 
       {/* Category sections */}
       {filteredForms.length === 0 && (
-        <p className="py-12 text-center text-sm text-[var(--muted)]">
+        <p className="py-12 text-center text-sm text-[var(--ink-muted)]">
           No forms match your search.
         </p>
       )}
@@ -168,9 +168,9 @@ function CategorySection({
               {count}
             </span>
           </div>
-          <p className="text-xs text-[var(--muted)]">{description}</p>
+          <p className="text-xs text-[var(--ink-muted)]">{description}</p>
         </div>
-        <span className="text-[var(--muted)] transition-transform duration-200" style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>
+        <span className="text-[var(--ink-muted)] transition-transform duration-200" style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>
           ▾
         </span>
       </button>

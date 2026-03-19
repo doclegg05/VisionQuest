@@ -13,7 +13,7 @@ export default function RecentActivity({ achievements, lastLevelUp, currentStrea
   if (recentItems.length === 0 && !lastLevelUp) {
     return (
       <div className="text-center py-4">
-        <p className="text-sm text-[var(--muted)]">Start earning achievements by talking to Sage, completing orientation, or exploring learning platforms!</p>
+        <p className="text-sm text-[var(--ink-muted)]">Start earning achievements by talking to Sage, completing orientation, or exploring learning platforms!</p>
       </div>
     );
   }
@@ -25,7 +25,7 @@ export default function RecentActivity({ achievements, lastLevelUp, currentStrea
           <span className="text-lg">🚀</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Reached Level {lastLevelUp.level}</p>
-            <p className="text-[10px] text-[var(--muted)]">{formatRelativeDate(lastLevelUp.at)}</p>
+            <p className="text-[10px] text-[var(--ink-muted)]">{formatRelativeDate(lastLevelUp.at)}</p>
           </div>
         </div>
       )}
@@ -34,7 +34,7 @@ export default function RecentActivity({ achievements, lastLevelUp, currentStrea
           <span className="text-lg">🏅</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[var(--ink-strong)]">{a.label}</p>
-            <p className="text-[10px] text-[var(--muted)]">{a.desc}</p>
+            <p className="text-[10px] text-[var(--ink-muted)]">{a.desc}</p>
           </div>
         </div>
       ))}

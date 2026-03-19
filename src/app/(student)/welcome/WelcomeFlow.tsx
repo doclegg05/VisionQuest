@@ -19,7 +19,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
             <h1 className="font-display text-3xl text-[var(--ink-strong)]">
               Welcome, {studentName}!
             </h1>
-            <p className="mt-4 text-base leading-7 text-[var(--muted)]">
+            <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               VisionQuest is your personal guide through the SPOKES program —
               from setting goals to earning certifications and building your
               career.
@@ -65,7 +65,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
             <h1 className="font-display text-3xl text-[var(--ink-strong)]">
               Meet Sage
             </h1>
-            <p className="mt-4 text-base leading-7 text-[var(--muted)]">
+            <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               Sage is your AI mentor — like a supportive friend who helps you
               plan, stay motivated, and make progress toward your goals.
             </p>
@@ -107,7 +107,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
             </button>
             <button
               onClick={() => setStep(0)}
-              className="mx-auto mt-3 block text-sm text-[var(--muted)] hover:text-[var(--ink-strong)]"
+              className="mx-auto mt-3 block text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               ← Back
             </button>
@@ -120,7 +120,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
             <h1 className="font-display text-3xl text-[var(--ink-strong)]">
               Your first step
             </h1>
-            <p className="mt-4 text-base leading-7 text-[var(--muted)]">
+            <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               Choose where you&apos;d like to start. You can always find
               everything on your dashboard.
             </p>
@@ -136,7 +136,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
                   <p className="font-display text-lg text-[var(--ink-strong)]">
                     Talk to Sage
                   </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
                     Start a conversation about your dreams and goals. Sage will
                     help you turn them into a plan.
                   </p>
@@ -153,7 +153,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
                   <p className="font-display text-lg text-[var(--ink-strong)]">
                     Complete Orientation
                   </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
                     Review program forms and get oriented with what to expect.
                   </p>
                 </div>
@@ -169,7 +169,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
                   <p className="font-display text-lg text-[var(--ink-strong)]">
                     Explore the Dashboard
                   </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
                     See all the modules available and find your own path.
                   </p>
                 </div>
@@ -177,7 +177,7 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
             </div>
             <button
               onClick={() => setStep(1)}
-              className="mt-4 text-sm text-[var(--muted)] hover:text-[var(--ink-strong)]"
+              className="mt-4 text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               ← Back
             </button>

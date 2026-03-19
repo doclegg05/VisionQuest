@@ -87,7 +87,7 @@ export default function NotificationBell() {
 
           <div className="max-h-72 overflow-y-auto">
             {notifications.length === 0 ? (
-              <p className="py-8 text-center text-sm text-[var(--muted)]">No notifications yet</p>
+              <p className="py-8 text-center text-sm text-[var(--ink-muted)]">No notifications yet</p>
             ) : (
               notifications.map((n) => (
                 <div
@@ -100,8 +100,8 @@ export default function NotificationBell() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--ink-strong)]">{n.title}</p>
-                      {n.body && <p className="mt-0.5 text-xs text-[var(--muted)] line-clamp-2">{n.body}</p>}
-                      <p className="mt-1 text-[10px] text-[var(--muted)]">{timeAgo(n.createdAt)}</p>
+                      {n.body && <p className="mt-0.5 text-xs text-[var(--ink-muted)] line-clamp-2">{n.body}</p>}
+                      <p className="mt-1 text-[10px] text-[var(--ink-muted)]">{timeAgo(n.createdAt)}</p>
                     </div>
                   </div>
                 </div>

@@ -69,7 +69,7 @@ export default function PlatformCard({
             <h3 className="font-display text-base font-semibold text-[var(--ink-strong)]">
               {platform.name}
             </h3>
-            <p className="text-sm text-[var(--muted)] mt-1 leading-relaxed">
+            <p className="text-sm text-[var(--ink-muted)] mt-1 leading-relaxed">
               {platform.description}
             </p>
           </div>
@@ -99,7 +99,7 @@ export default function PlatformCard({
               Open Platform &rarr;
             </button>
           ) : (
-            <span className="text-xs text-[var(--muted)] italic">
+            <span className="text-xs text-[var(--ink-muted)] italic">
               Classroom-based platform
             </span>
           )}
@@ -107,7 +107,7 @@ export default function PlatformCard({
           {studentLinks.length > 0 && (
             <button
               onClick={() => setLinksOpen(!linksOpen)}
-              className="text-xs text-[var(--muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
+              className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
             >
               {linksOpen ? "Less resources \u25B4" : "More resources \u25BE"}
             </button>

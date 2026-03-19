@@ -25,7 +25,7 @@ export default function PlatformCategorySection({
           <h2 className="font-display text-lg font-semibold text-[var(--ink-strong)]">
             {meta.label}
           </h2>
-          <p className="text-xs text-[var(--muted)]">{meta.description}</p>
+          <p className="text-xs text-[var(--ink-muted)]">{meta.description}</p>
         </div>
       </div>
 

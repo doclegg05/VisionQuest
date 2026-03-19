@@ -130,7 +130,7 @@ export default function FileManager() {
         <h3 className="mb-3 text-sm font-semibold text-[var(--ink-strong)]">Upload a File</h3>
         <div className="flex items-end gap-3">
           <div className="flex-1">
-            <label className="mb-1 block text-xs text-[var(--muted)]">Category</label>
+            <label className="mb-1 block text-xs text-[var(--ink-muted)]">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -159,7 +159,7 @@ export default function FileManager() {
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-[var(--muted)]">PDF, JPG, PNG, or GIF. Max 10MB.</p>
+        <p className="mt-2 text-xs text-[var(--ink-muted)]">PDF, JPG, PNG, or GIF. Max 10MB.</p>
       </div>
 
       {/* File list */}

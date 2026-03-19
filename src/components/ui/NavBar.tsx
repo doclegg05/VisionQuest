@@ -71,14 +71,14 @@ export default function NavBar({ studentName, role }: NavBarProps) {
           subtitle="SPOKES Portal"
         />
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[var(--muted)]">{studentName}</span>
+          <span className="text-sm font-medium text-[var(--ink-muted)]">{studentName}</span>
           <div className="text-[var(--ink-strong)]">
             <NotificationBell />
           </div>
           <button
             onClick={handleLogout}
             type="button"
-            className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1 text-xs font-semibold text-[var(--muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+            className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
             aria-label="Log out"
           >
             Log out
@@ -98,7 +98,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
               href={item.href}
               prefetch={false}
               className={`flex flex-1 flex-col items-center py-3 text-xs transition-colors
-                ${pathname === item.href ? "text-[var(--ink-strong)]" : "text-[var(--muted)]"}`}
+                ${pathname === item.href ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
               aria-current={pathname === item.href ? "page" : undefined}
             >
               <span className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
@@ -113,7 +113,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             onClick={() => setMoreOpen(!moreOpen)}
             type="button"
             className={`flex flex-1 flex-col items-center py-3 text-xs transition-colors
-              ${isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--muted)]"}`}
+              ${isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
             aria-expanded={moreOpen}
             aria-label="More navigation options"
           >
@@ -149,7 +149,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
                   className={`flex flex-col items-center rounded-[1.1rem] py-3 text-xs transition-colors
                     ${pathname === item.href
                       ? "bg-[rgba(16,37,62,0.08)] text-[var(--ink-strong)]"
-                      : "text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                      : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
                     }`}
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
@@ -169,7 +169,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
                     className={`flex items-center gap-2 rounded-[1rem] px-4 py-3 text-sm transition-colors
                       ${pathname === item.href || pathname.startsWith(item.href + "/")
                         ? "bg-[rgba(16,37,62,0.08)] text-[var(--ink-strong)]"
-                        : "text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"}`}
+                        : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"}`}
                     aria-current={pathname === item.href ? "page" : undefined}
                   >
                     <span>{item.icon}</span>

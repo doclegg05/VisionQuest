@@ -63,9 +63,9 @@ function ResetPasswordForm() {
   return (
     <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
       <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
-      <p className="page-eyebrow text-[var(--muted)]">Account recovery</p>
+      <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
       <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Choose a new password</h1>
-      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+      <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
         Create a new password for your VisionQuest account. You will be signed in right after the reset succeeds.
       </p>
 

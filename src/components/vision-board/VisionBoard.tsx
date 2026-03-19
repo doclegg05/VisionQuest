@@ -82,7 +82,7 @@ export default function VisionBoard() {
     setTimeout(() => checkProgression(), 1000);
   }, [fetchItems, checkProgression]);
 
-  if (loading) return <p className="text-sm text-[var(--muted)]">Loading your vision board...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading your vision board...</p>;
   if (error) return (
     <div className="text-center py-12">
       <p className="text-red-600 mb-4">{error}</p>

@@ -66,7 +66,7 @@ export default async function GoalsPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm italic text-[var(--muted)]">
+                <p className="text-sm italic text-[var(--ink-muted)]">
                   Not set yet — talk to Sage to define this goal
                 </p>
               )}

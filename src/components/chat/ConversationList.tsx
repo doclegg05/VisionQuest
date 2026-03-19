@@ -98,7 +98,7 @@ export default function ConversationList({
               <p className={`mt-2 text-sm font-medium ${activeId === conv.id ? "text-[var(--ink-strong)]" : "text-white"}`}>
                 {conv.title || "New conversation"}
               </p>
-              <p className={`mt-1 text-xs ${activeId === conv.id ? "text-[var(--muted)]" : "text-white/45"}`}>
+              <p className={`mt-1 text-xs ${activeId === conv.id ? "text-[var(--ink-muted)]" : "text-white/45"}`}>
                 {new Date(conv.updatedAt).toLocaleDateString()}
               </p>
             </button>

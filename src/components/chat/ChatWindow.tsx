@@ -307,7 +307,7 @@ function ChatWindowInner() {
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             type="button"
-            className="rounded-2xl border border-[rgba(18,38,63,0.1)] px-3 py-2 text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+            className="rounded-2xl border border-[rgba(18,38,63,0.1)] px-3 py-2 text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
           >
             ☰
           </button>
@@ -317,7 +317,7 @@ function ChatWindowInner() {
         <div className="flex-1 overflow-y-auto px-4 py-6" role="log" aria-label="Conversation with Sage" aria-live="polite">
           <div className="mx-auto max-w-4xl space-y-4">
             {messages.length === 0 && !isLoading && (
-              <div className="mt-20 text-center text-[var(--muted)]">
+              <div className="mt-20 text-center text-[var(--ink-muted)]">
                 <div className="mx-auto mb-5 flex justify-center">
                   <BrandLockup
                     size="md"

@@ -103,7 +103,7 @@ export default function StudentSpokesHub({
                       {template.required ? <span className="ml-1 text-xs text-rose-500">*</span> : null}
                     </p>
                     {template.description ? (
-                      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{template.description}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">{template.description}</p>
                     ) : null}
                   </div>
                   <span
@@ -120,7 +120,7 @@ export default function StudentSpokesHub({
             );
           })}
           {templates.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">Your teachers have not published items here yet.</p>
+            <p className="text-sm text-[var(--ink-muted)]">Your teachers have not published items here yet.</p>
           ) : null}
         </div>
       </div>
@@ -131,25 +131,25 @@ export default function StudentSpokesHub({
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Official status</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Official status</p>
           <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
             {record ? record.status.replaceAll("_", " ") : "Awaiting setup"}
           </p>
         </div>
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Orientation</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Orientation</p>
           <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
             {summary.orientation.done}/{summary.orientation.total}
           </p>
         </div>
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Program files</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Program files</p>
           <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
             {summary.programFiles.done}/{summary.programFiles.total}
           </p>
         </div>
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Required modules</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Required modules</p>
           <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
             {summary.modules.done}/{summary.modules.total}
           </p>
@@ -158,7 +158,7 @@ export default function StudentSpokesHub({
 
       {!record ? (
         <div className="surface-section p-6">
-          <p className="text-sm leading-6 text-[var(--muted)]">
+          <p className="text-sm leading-6 text-[var(--ink-muted)]">
             Your official SPOKES record has not been set up in VisionQuest yet. Your instructor can publish it here
             once referral and program paperwork are ready.
           </p>
@@ -171,19 +171,19 @@ export default function StudentSpokesHub({
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Where you are in the SPOKES process</h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-[var(--border-soft)] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)]">Referral logged</p>
+                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Referral logged</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{formatDate(record.referralDate)}</p>
                 </div>
                 <div className="rounded-xl border border-[var(--border-soft)] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)]">Enrollment</p>
+                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Enrollment</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{formatDate(record.enrolledAt)}</p>
                 </div>
                 <div className="rounded-xl border border-[var(--border-soft)] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)]">WV Family Survey</p>
+                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">WV Family Survey</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{formatDate(record.familySurveyOfferedAt)}</p>
                 </div>
                 <div className="rounded-xl border border-[var(--border-soft)] bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)]">Post-secondary</p>
+                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Post-secondary</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">
                     {record.postSecondaryEnteredAt
                       ? `${formatDate(record.postSecondaryEnteredAt)}${record.postSecondaryProgram ? ` • ${record.postSecondaryProgram}` : ""}`
@@ -191,7 +191,7 @@ export default function StudentSpokesHub({
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--border-soft)] bg-white/70 p-4 sm:col-span-2">
-                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)]">Employment follow-up</p>
+                  <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Employment follow-up</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">
                     {record.unsubsidizedEmploymentAt
                       ? `${formatDate(record.unsubsidizedEmploymentAt)}${record.employerName ? ` • ${record.employerName}` : ""}`
@@ -214,7 +214,7 @@ export default function StudentSpokesHub({
                         <div>
                           <p className="text-sm font-medium text-[var(--ink-strong)]">{template.label}</p>
                           {template.description ? (
-                            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{template.description}</p>
+                            <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">{template.description}</p>
                           ) : null}
                         </div>
                         <span
@@ -231,7 +231,7 @@ export default function StudentSpokesHub({
                   );
                 })}
                 {moduleTemplates.length === 0 ? (
-                  <p className="text-sm text-[var(--muted)]">No SPOKES modules are published yet.</p>
+                  <p className="text-sm text-[var(--ink-muted)]">No SPOKES modules are published yet.</p>
                 ) : null}
               </div>
             </section>
@@ -250,7 +250,7 @@ export default function StudentSpokesHub({
             <section className="surface-section p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Follow-up</p>
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment checkpoints</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 Your teachers will log the 1-, 3-, and 6-month check-ins here after unsubsidized employment.
                 {summary.employmentFollowUpsDue > 0 ? ` ${summary.employmentFollowUpsDue} check-in(s) are due.` : ""}
               </p>
@@ -260,7 +260,7 @@ export default function StudentSpokesHub({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-[var(--ink-strong)]">{item.checkpointMonths}-month follow-up</p>
-                        <p className="mt-1 text-xs text-[var(--muted)]">
+                        <p className="mt-1 text-xs text-[var(--ink-muted)]">
                           {item.dueAt ? `Due ${formatDate(item.dueAt)}` : "Will appear after employment is recorded"}
                         </p>
                       </div>
@@ -277,7 +277,7 @@ export default function StudentSpokesHub({
                       </span>
                     </div>
                     {item.followUp ? (
-                      <p className="mt-3 text-sm text-[var(--muted)]">
+                      <p className="mt-3 text-sm text-[var(--ink-muted)]">
                         {formatDate(item.followUp.checkedAt)} • {item.followUp.status}
                       </p>
                     ) : null}

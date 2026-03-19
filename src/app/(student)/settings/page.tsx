@@ -108,11 +108,11 @@ export default function SettingsPage() {
       <div className="surface-section mb-6 p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="page-eyebrow text-[var(--muted)]">Classroom recovery</p>
+            <p className="page-eyebrow text-[var(--ink-muted)]">Classroom recovery</p>
             <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
               Recovery questions
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               This lower-security reset option is meant only for your classroom deployment. If you forget your password, you can answer these questions and choose a new one without email.
             </p>
           </div>
@@ -128,7 +128,7 @@ export default function SettingsPage() {
         </div>
 
         {recoveryConfigured && (
-          <p className="mt-4 text-sm text-[var(--muted)]">
+          <p className="mt-4 text-sm text-[var(--ink-muted)]">
             Updating the questions here replaces your previous classroom recovery answers. You will need to enter all three answers again to save changes.
           </p>
         )}
@@ -173,7 +173,7 @@ export default function SettingsPage() {
             <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">
               {hasKey ? "Personal API key connected" : "Platform API key connected"}
             </p>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {hasKey
                 ? `Stored key ending in ${keyHint}`
                 : "Students can chat with Sage without adding their own API key."}
@@ -202,7 +202,7 @@ export default function SettingsPage() {
               ▶
             </span>
             <div>
-              <p className="page-eyebrow text-[var(--muted)]">Quick guide</p>
+              <p className="page-eyebrow text-[var(--ink-muted)]">Quick guide</p>
               <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">How to get your API key</h2>
             </div>
           </button>
@@ -241,7 +241,7 @@ export default function SettingsPage() {
                   </span>
                   <h3 className="font-semibold text-[var(--ink-strong)]">{item.title}</h3>
                 </div>
-                <p className="text-sm leading-6 text-[var(--muted)]">{item.body}</p>
+                <p className="text-sm leading-6 text-[var(--ink-muted)]">{item.body}</p>
               </div>
             ))}
           </div>
@@ -249,7 +249,7 @@ export default function SettingsPage() {
 
         <div className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-white/70 p-5">
           {platformKeyConfigured && (
-            <p className="mb-3 text-sm text-[var(--muted)]">
+            <p className="mb-3 text-sm text-[var(--ink-muted)]">
               A program-managed Gemini key is already active. Adding a personal key here is optional and will override the shared setup for your account.
             </p>
           )}

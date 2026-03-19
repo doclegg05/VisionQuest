@@ -464,7 +464,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                     {template.required ? <span className="ml-1 text-xs text-rose-500">*</span> : null}
                   </p>
                   {template.description ? (
-                    <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{template.description}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">{template.description}</p>
                   ) : null}
                 </div>
                 {progress?.completedAt ? (
@@ -476,7 +476,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             );
           })}
           {templates.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No items configured yet.</p>
+            <p className="text-sm text-[var(--ink-muted)]">No items configured yet.</p>
           ) : null}
         </div>
       </div>
@@ -491,12 +491,12 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             ← Back to student detail
           </Link>
           <h1 className="mt-2 font-display text-3xl text-[var(--ink-strong)]">{payload.student.displayName}</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
             Official SPOKES record for {payload.student.studentId}
             {payload.student.email ? ` • ${payload.student.email}` : ""}
           </p>
         </div>
-        <div className="rounded-[1rem] border border-[var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--muted)]">
+        <div className="rounded-[1rem] border border-[var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--ink-muted)]">
           Status: <span className="font-semibold text-[var(--ink-strong)]">{payload.summary.status.replaceAll("_", " ")}</span>
         </div>
       </div>
@@ -509,29 +509,29 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Orientation</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Orientation</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">
             {payload.summary.orientation.done}/{payload.summary.orientation.total}
           </p>
         </div>
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Program files</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Program files</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">
             {payload.summary.programFiles.done}/{payload.summary.programFiles.total}
           </p>
         </div>
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Required modules</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Required modules</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">
             {payload.summary.modules.done}/{payload.summary.modules.total}
           </p>
         </div>
         <div className="surface-section p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Employment follow-up</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Employment follow-up</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">
             {payload.summary.employmentFollowUpsCompleted}
           </p>
-          <p className="mt-1 text-xs text-[var(--muted)]">{payload.summary.employmentFollowUpsDue} due now</p>
+          <p className="mt-1 text-xs text-[var(--ink-muted)]">{payload.summary.employmentFollowUpsDue} due now</p>
         </div>
       </div>
 
@@ -581,7 +581,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             <input value={profileForm.race} onChange={(event) => setProfileForm((current) => ({ ...current, race: event.target.value }))} placeholder="Race" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.ethnicity} onChange={(event) => setProfileForm((current) => ({ ...current, ethnicity: event.target.value }))} placeholder="Ethnicity" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <textarea value={profileForm.barriersOnEntry} onChange={(event) => setProfileForm((current) => ({ ...current, barriersOnEntry: event.target.value }))} placeholder="Barriers on entry (comma separated)" rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+            <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input type="checkbox" checked={profileForm.jobRetentionStudent} onChange={(event) => setProfileForm((current) => ({ ...current, jobRetentionStudent: event.target.checked }))} />
               Job retention student
             </label>
@@ -630,7 +630,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                     <div>
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
                       {template.description ? (
-                        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{template.description}</p>
+                        <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">{template.description}</p>
                       ) : null}
                     </div>
                     {progress ? (
@@ -677,7 +677,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             })}
 
             {payload.moduleTemplates.length === 0 ? (
-              <p className="text-sm text-[var(--muted)]">No SPOKES modules configured yet.</p>
+              <p className="text-sm text-[var(--ink-muted)]">No SPOKES modules configured yet.</p>
             ) : null}
           </div>
         </section>
@@ -688,7 +688,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Exit follow-through</p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment follow-up</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Record the 1-, 3-, and 6-month check-ins required after unsubsidized employment.
             </p>
           </div>
@@ -703,7 +703,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{item.checkpointMonths}-month follow-up</p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         {item.dueAt ? `Due ${formatDateInput(item.dueAt)}` : "Available after employment is recorded"}
                       </p>
                     </div>
@@ -720,7 +720,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                     </span>
                   </div>
                   {item.followUp ? (
-                    <div className="mt-3 flex items-center gap-3 flex-wrap text-sm text-[var(--muted)]">
+                    <div className="mt-3 flex items-center gap-3 flex-wrap text-sm text-[var(--ink-muted)]">
                       <span>{formatDateInput(item.followUp.checkedAt)}</span>
                       <span className="font-medium text-[var(--ink-strong)]">{item.followUp.status}</span>
                       <button

@@ -35,7 +35,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
 
   if (goals.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-6 text-center text-sm text-[var(--muted)]">
+      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-6 text-center text-sm text-[var(--ink-muted)]">
         <p className="text-2xl mb-2">🎯</p>
         <p>No goals set yet. Goals appear here after the student talks to Sage.</p>
       </div>
@@ -72,7 +72,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
             {/* Level header */}
             <button
               onClick={() => toggleCollapse(level)}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs font-semibold text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)] transition-colors"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs font-semibold text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)] transition-colors"
             >
               <span className={`transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▶</span>
               <span>{config.icon}</span>

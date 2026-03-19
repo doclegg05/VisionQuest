@@ -25,7 +25,7 @@ export default function PlatformFilter({
   const chipActive =
     "bg-[var(--ink-strong)] text-white shadow-sm";
   const chipInactive =
-    "border border-[var(--muted)]/30 text-[var(--muted)] hover:border-[var(--ink-strong)]/50 hover:text-[var(--ink-strong)]";
+    "border border-[var(--muted)]/30 text-[var(--ink-muted)] hover:border-[var(--ink-strong)]/50 hover:text-[var(--ink-strong)]";
   const chipGoalActive =
     "bg-[var(--accent-strong)] text-white shadow-sm";
 

@@ -173,7 +173,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
       {/* Note form popover */}
       {showNoteForm && (
         <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-white/95 p-4 shadow-xl backdrop-blur-lg z-50">
-          <p className="text-xs font-semibold text-[var(--muted)] mb-2">New Note</p>
+          <p className="text-xs font-semibold text-[var(--ink-muted)] mb-2">New Note</p>
           <textarea
             value={noteText}
             onChange={(e) => setNoteText(e.target.value.slice(0, 200))}
@@ -182,11 +182,11 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             className="textarea-field w-full resize-none text-sm"
             autoFocus
           />
-          <p className="mt-1 text-right text-[10px] text-[var(--muted)]">{noteText.length}/200</p>
+          <p className="mt-1 text-right text-[10px] text-[var(--ink-muted)]">{noteText.length}/200</p>
 
           {/* Color picker */}
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] text-[var(--muted)]">Color:</span>
+            <span className="text-[10px] text-[var(--ink-muted)]">Color:</span>
             {NOTE_COLOR_OPTIONS.map((c) => (
               <button
                 key={c.id}
@@ -209,7 +209,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             </button>
             <button
               onClick={() => setShowNoteForm(false)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--muted)] hover:bg-gray-50"
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -220,11 +220,11 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
       {/* Goal picker popover */}
       {showGoalPicker && (
         <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-white/95 p-4 shadow-xl backdrop-blur-lg z-50">
-          <p className="text-xs font-semibold text-[var(--muted)] mb-2">Link a Goal</p>
+          <p className="text-xs font-semibold text-[var(--ink-muted)] mb-2">Link a Goal</p>
           {loadingGoals ? (
-            <p className="text-xs text-[var(--muted)]">Loading goals...</p>
+            <p className="text-xs text-[var(--ink-muted)]">Loading goals...</p>
           ) : goals.length === 0 ? (
-            <p className="text-xs text-[var(--muted)]">No goals set yet. Talk to Sage to create your first goal!</p>
+            <p className="text-xs text-[var(--ink-muted)]">No goals set yet. Talk to Sage to create your first goal!</p>
           ) : (
             <div className="max-h-48 space-y-1.5 overflow-y-auto">
               {goals.map((goal) => (
@@ -243,7 +243,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
           )}
           <button
             onClick={() => setShowGoalPicker(false)}
-            className="mt-3 rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--muted)] hover:bg-gray-50 w-full"
+            className="mt-3 rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-gray-50 w-full"
           >
             Cancel
           </button>

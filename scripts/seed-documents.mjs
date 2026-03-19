@@ -64,6 +64,94 @@ const MIME_MAP = {
 // Extensions to skip entirely
 const SKIP_EXTENSIONS = new Set([".url", ".ai"]);
 
+// ─── TITLE OVERRIDES (storageKey → human-readable display title) ────────────
+const TITLE_OVERRIDES = {
+  // DoHS Forms
+  "forms/DFA-PRC-1_Rev-1-24.pdf": "Personal Responsibility Contract (DFA-PRC-1)",
+  "forms/DFA_-_SSP-1_1-9-24.pdf": "Self-Sufficiency Plan (DFA-SSP-1)",
+  "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf": "Transitional Support Form — Fillable (DFA-TS-12)",
+  "forms/DFA-TS-12_Rev_-2-24.pdf": "Transitional Support Form (DFA-TS-12)",
+  "forms/DFA-WVW-25_Rev_6-24.pdf": "WV Works Activity Assignment (DFA-WVW-25)",
+  "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf": "WV Works Participation Report — Sample (DFA-WVW-70)",
+  "forms/LNS_with_Referral_4.24.pdf": "Learner Notification of Services with Referral",
+  "forms/Prospective_Employer_Letter_ESP_EIP.docx.pdf": "Prospective Employer Letter — ESP/EIP",
+  "forms/PY_24_Student_Profile_Fillable_11.15.23.pdf": "Student Profile — Program Year 2024 (Fillable)",
+  "forms/Support_Services_Fact_Sheet_Rev_6-22.pdf": "Support Services Fact Sheet",
+  "forms/WVAdultEd_ESOL_RegistrationBackground_Interview-fillable_updated_July_2022.pdf": "ESOL Registration & Background Interview (Fillable)",
+  "forms/WVAdultEd_Sign_in_sheet_5_2023 (1).pdf": "WV Adult Education Sign-In Sheet",
+
+  // Orientation
+  "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf": "Technology Acceptable Use Policy (Fillable)",
+  "orientation/SPOKES_Rights_and_Responsibilites_FY26_Fillable.pdf": "SPOKES Rights and Responsibilities (Fillable)",
+  "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf": "DoHS Release of Information (Fillable)",
+
+  // LMS Platform Guides
+  "lms/Burlington English/02_Accessing_BE_1.pdf": "Accessing Burlington English — Getting Started",
+  "lms/Bring Your A Game to Work/BYAG_PPT_by_Kara_Richards.pptx": "Bring Your A Game — Presentation by Kara Richards",
+  "lms/Bring Your A Game to Work/BYAGTW_T3_-_2015_Webinar.pdf": "Bring Your A Game — Tier 3 Webinar",
+  "lms/Burlington English/IH-012-921_Guide_for_IEL-CE.pdf": "Burlington English Guide for IEL-CE",
+  "lms/Burlington English/IH-013-089_Certificate_of_Achievement__fillable.pdf": "Burlington English Certificate of Achievement (Fillable)",
+  "lms/Burlington English/IH-015-816_BE_certificate_of_achivement_West_Coast_fillable.pdf": "Burlington English Certificate of Achievement — West Coast (Fillable)",
+  "lms/Aztec/MSESC_-_PLUS_Quick_Start_Teacher_Guide_-_Version_9.0.pdf": "Aztec PLUS Quick Start Teacher Guide",
+  "lms/Burlington English/QG_for_Teachers_Aug2017.pdf": "Burlington English Quick Guide for Teachers",
+  "lms/Through the Customer's Eyes-Customer Service Training/TTCE_LEVEL_2_CERTIFICATE_2.pdf": "Through the Customer's Eyes — Level 2 Certificate",
+  "lms/Burlington English/UPDATED_BE_Placement_Chart_USA__BB_2-2017.pdf": "Burlington English Placement Chart",
+  "lms/Burlington English/WVAE_Certificate.pdf": "WV Adult Ed Certificate — Burlington English",
+  "lms/Burlington English/WVAE_Certificate_hours.pdf": "WV Adult Ed Certificate Hours — Burlington English",
+  "lms/Through the Customer's Eyes-Customer Service Training/facilitatorsGuide1.pdf": "Through the Customer's Eyes — Facilitator's Guide",
+  "lms/Bring Your A Game to Work/Pyscho_Metrics_of_Personality.pdf": "Psychometrics of Personality",
+  "lms/GMetrix and LearnKey/Intuit/Instuit Quickbooks Certificate.pdf": "Intuit QuickBooks Certificate",
+  "lms/Ready to Work/Matching-WKs2Jobs-Exercise.pdf": "Matching Workplace Skills to Jobs — Exercise",
+  "lms/Ready to Work/Ready to Work Certficate.pdf": "Ready to Work Certificate",
+
+  // Certification / Program Info
+  "lms/certifications/program-info/SPOKES Life and Employabilitly Skills Curriculum Module Descriptor.pdf": "SPOKES Life & Employability Skills — Module Descriptor",
+  "lms/certifications/program-info/MOS Module Descriptor.pdf": "Microsoft Office Specialist (MOS) — Module Descriptor",
+  "lms/certifications/program-info/Sample_TABE_13_Result_to_DoHS.pdf": "Sample TABE 13/14 Result Report for DoHS",
+
+  // Teacher Guides
+  "teachers/guides/34_CFR_463.20d_13_Considerations.pdf": "WIOA 34 CFR 463.20(d) — 13 Considerations for IET Programs",
+  "teachers/guides/ABEEducatorEvaluationProcedures.abe_final.pdf": "ABE Educator Evaluation Procedures",
+  "teachers/guides/esea_edeval_timeline_000.pdf": "ESEA Educator Evaluation Timeline",
+  "teachers/guides/Administrative_Guide_Revised_10.4.2024.pdf": "SPOKES Administrative Guide",
+  "teachers/guides/Americas-Talent-Strategy-Building-the-Workforce-for-the-Golden-Age.pdf": "America's Talent Strategy — Building the Workforce",
+  "teachers/guides/Hanbook Appendix/Section 10/NWD_WV_user_flyer.pdf": "No Wrong Door WV — User Flyer",
+  "teachers/guides/Hanbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf": "Post-Secondary Verification Form",
+  "teachers/guides/Hanbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf": "Workforce Development Flyer",
+  "teachers/guides/Hanbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf": "Desktop Monitoring Reflection Tool (Fillable)",
+  "teachers/guides/Hanbook Appendix/Section 14/ESL_WIOA_2015.pptx": "ESOL & WIOA Requirements Presentation",
+  "teachers/guides/Hanbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf": "WV Standardized Data Tool — Education & Career Plan",
+  "teachers/guides/Hanbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf": "Burnout & Self-Care — WV Adult Ed Association",
+  "teachers/guides/Hanbook Appendix/Section 10/Logos/class.png": "Adult Education Classroom Image",
+  "teachers/guides/Hanbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG": "Weekly Orientation Flyer (B&W)",
+  "teachers/guides/Hanbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf": "Adult Education Fact Sheet",
+  "teachers/guides/Hanbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf": "Triple AI Datasheet — K-12 Interactive",
+  "teachers/guides/Hanbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf": "Measurable Skills Gain & Outcomes Reference",
+  "teachers/guides/Hanbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf": "Average Contact Hours Per Student",
+
+  // WV Adult Ed Handbook Sections
+  "teachers/guides/WV Adult Ed Handbook/Section_1_2025.2026.pdf": "Handbook Section 1 — Acronyms & Definitions",
+  "teachers/guides/WV Adult Ed Handbook/Section_2_2025.2026.pdf": "Handbook Section 2 — Professional Development",
+  "teachers/guides/WV Adult Ed Handbook/Section_3_2025.2026.pdf": "Handbook Section 3 — Learning Disabilities",
+  "teachers/guides/WV Adult Ed Handbook/Section_4_2025.2026.pdf": "Handbook Section 4 — Student Intake & Orientation",
+  "teachers/guides/WV Adult Ed Handbook/Section_5_2025.2026.pdf": "Handbook Section 5 — Barrier Reduction",
+  "teachers/guides/WV Adult Ed Handbook/Section_6_2025.2026.pdf": "Handbook Section 6 — Assessment (TABE/CASAS)",
+  "teachers/guides/WV Adult Ed Handbook/Section_7_2025.2026.pdf": "Handbook Section 7 — Career Pathways & Certificates",
+  "teachers/guides/WV Adult Ed Handbook/Section_8_2025.2026.pdf": "Handbook Section 8 — Curriculum Standards (CCR)",
+  "teachers/guides/WV Adult Ed Handbook/Section_9_2025.2026.pdf": "Handbook Section 9 — Instructional Strategies",
+  "teachers/guides/WV Adult Ed Handbook/Section_10_2025.2026.pdf": "Handbook Section 10 — Marketing & Outreach",
+  "teachers/guides/WV Adult Ed Handbook/Section_11_2025.2026_2.pdf": "Handbook Section 11 — Data & Monitoring (NRS)",
+  "teachers/guides/WV Adult Ed Handbook/Section_12_2025.2026.pdf": "Handbook Section 12 — HSE Diplomas",
+  "teachers/guides/WV Adult Ed Handbook/Section_13_2025.2026_updated_2.18.26.pdf": "Handbook Section 13 — Proxy Hours & Distance Education",
+  "teachers/guides/WV Adult Ed Handbook/Section_14_2025.2026.pdf": "Handbook Section 14 — ESOL",
+  "teachers/guides/WV Adult Ed Handbook/Section_15_2025_2026.pdf": "Handbook Section 15 — Corrections Education",
+  "teachers/guides/WV Adult Ed Handbook/Section_16_2025.2026.pdf": "Handbook Section 16 — SPOKES Modules",
+
+  // Presentations / Marketing
+  "presentations/wvadulted.com_1.png": "WV Adult Education Website Screenshot",
+  "presentations/WVAE-color-contacts.png": "WV Adult Education Contact Information (Color)",
+};
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 /** Parse an inventory line into a relative path from docs-upload/ */
@@ -209,7 +297,7 @@ async function main() {
     const category = getCategory(relPath);
     const audience = getAudience(relPath);
     const platformId = getPlatformId(relPath);
-    const title = deriveTitle(filename);
+    const title = TITLE_OVERRIDES[storageKey] || deriveTitle(filename);
     const mimeType = getMimeType(filename);
 
     // For Section 16 mapped to lms/, override audience to BOTH

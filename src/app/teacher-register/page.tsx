@@ -53,11 +53,11 @@ export default function TeacherRegisterPage() {
         <div className="panel panel-strong w-full rounded-[2rem] p-6 md:p-10">
           <div className="mb-8">
             <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
-            <p className="page-eyebrow text-[var(--muted)]">Teacher access</p>
+            <p className="page-eyebrow text-[var(--ink-muted)]">Teacher access</p>
             <h1 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
               Teacher Registration
             </h1>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Create a teacher account for the SPOKES Program Portal.
               You will need the teacher registration key provided by your administrator.
             </p>
@@ -77,7 +77,7 @@ export default function TeacherRegisterPage() {
                 required
                 className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="mt-1 text-xs text-[var(--ink-muted)]">
                 Contact your program administrator if you don&apos;t have this key.
               </p>
             </div>

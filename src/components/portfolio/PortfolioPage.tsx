@@ -18,7 +18,7 @@ export default function PortfolioPage() {
           className={`rounded-[1rem] py-3 text-sm font-semibold transition-colors ${
             tab === "portfolio"
               ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-              : "text-[var(--muted)] hover:text-[var(--ink-strong)]"
+              : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
           }`}
         >
           Portfolio Items
@@ -29,7 +29,7 @@ export default function PortfolioPage() {
           className={`rounded-[1rem] py-3 text-sm font-semibold transition-colors ${
             tab === "resume"
               ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-              : "text-[var(--muted)] hover:text-[var(--ink-strong)]"
+              : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
           }`}
         >
           Resume Builder

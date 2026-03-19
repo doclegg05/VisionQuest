@@ -622,11 +622,11 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               }`}>
                 {student.isActive ? "Active" : "Inactive"}
               </span>
-              <span className="text-xs text-[var(--muted)]">
+              <span className="text-xs text-[var(--ink-muted)]">
                 Registered {new Date(student.createdAt).toLocaleDateString()}
               </span>
               {student.email && (
-                <span className="text-xs text-[var(--muted)]">{student.email}</span>
+                <span className="text-xs text-[var(--ink-muted)]">{student.email}</span>
               )}
             </div>
 
@@ -1391,15 +1391,15 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                       <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-secondary)]">
                         {conv.stage}
                       </span>
-                      <span className="text-[10px] text-[var(--muted)]">
+                      <span className="text-[10px] text-[var(--ink-muted)]">
                         {conv.messageCount} messages ({conv.userMessageCount} from student)
                       </span>
                     </div>
                     {conv.lastMessagePreview && (
-                      <p className="mt-2 text-xs text-[var(--muted)] line-clamp-2">&ldquo;{conv.lastMessagePreview}&rdquo;</p>
+                      <p className="mt-2 text-xs text-[var(--ink-muted)] line-clamp-2">&ldquo;{conv.lastMessagePreview}&rdquo;</p>
                     )}
                   </div>
-                  <span className="shrink-0 text-[10px] text-[var(--muted)]">
+                  <span className="shrink-0 text-[10px] text-[var(--ink-muted)]">
                     {new Date(conv.updatedAt).toLocaleDateString()}
                   </span>
                 </div>

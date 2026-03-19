@@ -208,7 +208,7 @@ export default function ClassOverview() {
           </div>
 
           {alerts.length === 0 ? (
-            <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+            <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
               No active advising alerts right now.
             </p>
           ) : (
@@ -222,7 +222,7 @@ export default function ClassOverview() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {alert.student.displayName} • {alert.student.studentId}
                       </p>
                     </div>
@@ -230,8 +230,8 @@ export default function ClassOverview() {
                       {alert.severity}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{alert.summary}</p>
-                  <p className="mt-2 text-xs text-[var(--muted)]">
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
                     Detected {relativeTime(alert.detectedAt)}
                   </p>
                 </Link>
@@ -254,7 +254,7 @@ export default function ClassOverview() {
           </div>
 
           {upcomingAppointments.length === 0 ? (
-            <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+            <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
               No appointments are scheduled in the next 7 days.
             </p>
           ) : (
@@ -268,7 +268,7 @@ export default function ClassOverview() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {appointment.student.displayName} • {appointment.student.studentId}
                       </p>
                     </div>
@@ -276,7 +276,7 @@ export default function ClassOverview() {
                       {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-[var(--muted)]">
+                  <p className="mt-2 text-sm text-[var(--ink-muted)]">
                     {formatAppointment(appointment.startsAt)}
                   </p>
                 </Link>
@@ -330,7 +330,7 @@ export default function ClassOverview() {
           <button
             onClick={() => setViewMode("table")}
             className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-              viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+              viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
             }`}
           >
             Table
@@ -338,7 +338,7 @@ export default function ClassOverview() {
           <button
             onClick={() => setViewMode("cards")}
             className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-              viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--muted)] hover:bg-[rgba(16,37,62,0.04)]"
+              viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
             }`}
           >
             Cards
@@ -346,7 +346,7 @@ export default function ClassOverview() {
         </div>
 
         {/* Inactive toggle */}
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)] cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-[var(--ink-muted)] cursor-pointer">
           <input
             type="checkbox"
             checked={showInactive}
@@ -390,7 +390,7 @@ export default function ClassOverview() {
                 <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
                   Lvl {s.level}
                 </span>
-                <span className="text-xs text-[var(--muted)]">{s.xp} XP</span>
+                <span className="text-xs text-[var(--ink-muted)]">{s.xp} XP</span>
                 {s.streak > 0 && <span className="text-xs">🔥 {s.streak}</span>}
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                   s.readinessScore >= 75
@@ -406,7 +406,7 @@ export default function ClassOverview() {
               {/* Progress bars */}
               <div className="space-y-2">
                 <div>
-                  <div className="flex justify-between text-[10px] text-[var(--muted)] mb-0.5">
+                  <div className="flex justify-between text-[10px] text-[var(--ink-muted)] mb-0.5">
                     <span>Orientation</span>
                     <span>{s.orientationDone}/{s.orientationTotal}</span>
                   </div>
@@ -415,7 +415,7 @@ export default function ClassOverview() {
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-[10px] text-[var(--muted)] mb-0.5">
+                  <div className="flex justify-between text-[10px] text-[var(--ink-muted)] mb-0.5">
                     <span>Certifications</span>
                     <span>{s.certDone}/{s.certTotal}</span>
                   </div>
@@ -426,7 +426,7 @@ export default function ClassOverview() {
               </div>
 
               {/* Bottom row */}
-              <div className="mt-3 flex items-center justify-between text-[10px] text-[var(--muted)]">
+              <div className="mt-3 flex items-center justify-between text-[10px] text-[var(--ink-muted)]">
                 <span>{s.goalsCount} goals {s.hasBhag && "• BHAG ✓"}</span>
                 {s.certPendingVerify > 0 && (
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 font-semibold">{s.certPendingVerify} pending</span>

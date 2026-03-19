@@ -162,11 +162,11 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
         <section className="panel panel-strong flex items-center rounded-[2rem] p-5 md:p-8">
           <div className="w-full">
             <div className="mb-8">
-              <p className="page-eyebrow text-[var(--muted)]">Portal access</p>
+              <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
               <h2 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
                 {mode === "login" ? "Welcome back" : "Create your account"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 Use the form below to register or sign in. Google sign-in is optional, not required, and new accounts use email-based recovery.
               </p>
             </div>
@@ -187,7 +187,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors
                   ${mode === "login"
                     ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                    : "text-[var(--muted)] hover:text-[var(--ink-strong)]"
+                    : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
                   }`}
               >
                 Sign In
@@ -198,7 +198,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors
                   ${mode === "register"
                     ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                    : "text-[var(--muted)] hover:text-[var(--ink-strong)]"
+                    : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
                   }`}
               >
                 Register
@@ -299,7 +299,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               <>
                 <div className="my-5 flex items-center gap-3">
                   <div className="h-px flex-1 bg-[rgba(18,38,63,0.12)]" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">or</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">or</span>
                   <div className="h-px flex-1 bg-[rgba(18,38,63,0.12)]" />
                 </div>
 
@@ -319,7 +319,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 </a>
               </>
             ) : (
-              <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--muted)]">
+              <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                 Google sign-in is not enabled in this environment. Use the register or sign-in form above.
               </div>
             )}
@@ -335,7 +335,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
                 <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
               </div>
-              <p className="text-[10px] uppercase font-semibold tracking-widest text-[var(--muted)]">
+              <p className="text-[10px] uppercase font-semibold tracking-widest text-[var(--ink-muted)]">
                 SPOKES Workforce Development Program
               </p>
             </div>

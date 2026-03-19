@@ -144,7 +144,7 @@ export default function StudentAdvisingHub({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl text-[var(--ink-strong)]">Book Advising Time</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               Reserve an open slot with a teacher without waiting for someone else to schedule it.
             </p>
           </div>
@@ -154,14 +154,14 @@ export default function StudentAdvisingHub({
         </div>
 
         {bookableAdvisors.length === 0 ? (
-          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
             Your teachers haven&apos;t published bookable office hours yet. Check back soon or message staff directly.
           </div>
         ) : (
           <div className="mt-4 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-4 space-y-3">
-              <label className="text-sm text-[var(--muted)]">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              <label className="text-sm text-[var(--ink-muted)]">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
                 </span>
                 <select
@@ -184,8 +184,8 @@ export default function StudentAdvisingHub({
                 </select>
               </label>
 
-              <label className="text-sm text-[var(--muted)]">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              <label className="text-sm text-[var(--ink-muted)]">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Time slot
                 </span>
                 <select
@@ -227,7 +227,7 @@ export default function StudentAdvisingHub({
               </button>
 
               {bookingStatus ? (
-                <p className="text-sm text-[var(--muted)]">{bookingStatus}</p>
+                <p className="text-sm text-[var(--ink-muted)]">{bookingStatus}</p>
               ) : null}
             </div>
 
@@ -240,10 +240,10 @@ export default function StudentAdvisingHub({
                   <p className="mt-3 font-display text-2xl text-[var(--ink-strong)]">
                     {selectedAdvisor.advisorName}
                   </p>
-                  <p className="mt-2 text-sm text-[var(--muted)]">
+                  <p className="mt-2 text-sm text-[var(--ink-muted)]">
                     {dateFormatter.format(new Date(selectedSlot.startsAt))}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
                     {selectedSlot.locationLabel || selectedSlot.locationType.replace("_", " ")}
                   </p>
                   {selectedSlot.meetingUrl ? (
@@ -251,7 +251,7 @@ export default function StudentAdvisingHub({
                   ) : null}
                 </>
               ) : (
-                <p className="mt-3 text-sm text-[var(--muted)]">
+                <p className="mt-3 text-sm text-[var(--ink-muted)]">
                   Choose an advisor and time slot to review the appointment details here.
                 </p>
               )}
@@ -271,7 +271,7 @@ export default function StudentAdvisingHub({
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-2xl text-[var(--ink-strong)]">Upcoming Appointments</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
                 Meetings your advisors have scheduled with you.
               </p>
             </div>
@@ -281,7 +281,7 @@ export default function StudentAdvisingHub({
           </div>
 
           {upcomingAppointments.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
               No upcoming advising appointments are on your calendar right now.
             </div>
           ) : (
@@ -294,10 +294,10 @@ export default function StudentAdvisingHub({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
-                      <p className="mt-1 text-sm text-[var(--muted)]">
+                      <p className="mt-1 text-sm text-[var(--ink-muted)]">
                         {dateFormatter.format(new Date(appointment.startsAt))}
                       </p>
-                      <p className="mt-1 text-sm text-[var(--muted)]">
+                      <p className="mt-1 text-sm text-[var(--ink-muted)]">
                         With {appointment.advisorName}
                       </p>
                     </div>
@@ -306,7 +306,7 @@ export default function StudentAdvisingHub({
                     </span>
                   </div>
                   {appointment.description ? (
-                    <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{appointment.description}</p>
+                    <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">{appointment.description}</p>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-3 text-sm">
                     {appointment.meetingUrl ? (
@@ -320,7 +320,7 @@ export default function StudentAdvisingHub({
                       </a>
                     ) : null}
                     {appointment.notes ? (
-                      <span className="text-[var(--muted)]">Note: {appointment.notes}</span>
+                      <span className="text-[var(--ink-muted)]">Note: {appointment.notes}</span>
                     ) : null}
                   </div>
                 </div>
@@ -333,7 +333,7 @@ export default function StudentAdvisingHub({
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-2xl text-[var(--ink-strong)]">Attention Queue</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
                 Items that need a response so nothing slips.
               </p>
             </div>
@@ -343,7 +343,7 @@ export default function StudentAdvisingHub({
           </div>
 
           {alerts.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
               You&apos;re caught up. New alerts will show up here when a follow-up becomes overdue.
             </div>
           ) : (
@@ -356,8 +356,8 @@ export default function StudentAdvisingHub({
                       {alert.severity}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{alert.summary}</p>
-                  <p className="mt-2 text-xs text-[var(--muted)]">
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
                     Detected {dateFormatter.format(new Date(alert.detectedAt))}
                   </p>
                 </div>
@@ -372,7 +372,7 @@ export default function StudentAdvisingHub({
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-2xl text-[var(--ink-strong)]">Follow-Up Tasks</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
                 Complete these actions to stay on track with your advisor.
               </p>
             </div>
@@ -382,7 +382,7 @@ export default function StudentAdvisingHub({
           </div>
 
           {tasks.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
               No follow-up tasks have been assigned yet.
             </div>
           ) : (
@@ -405,8 +405,8 @@ export default function StudentAdvisingHub({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-[var(--ink-strong)]">{task.title}</p>
-                        <p className="mt-1 text-sm text-[var(--muted)]">{dueLabel}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                        <p className="mt-1 text-sm text-[var(--ink-muted)]">{dueLabel}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                           Added by {task.createdByName}
                         </p>
                       </div>
@@ -422,7 +422,7 @@ export default function StudentAdvisingHub({
                     </div>
 
                     {task.description ? (
-                      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{task.description}</p>
+                      <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">{task.description}</p>
                     ) : null}
 
                     <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -443,7 +443,7 @@ export default function StudentAdvisingHub({
                             : "Mark complete"}
                       </button>
                       {task.completedAt ? (
-                        <span className="text-xs text-[var(--muted)]">
+                        <span className="text-xs text-[var(--ink-muted)]">
                           Completed {dateFormatter.format(new Date(task.completedAt))}
                         </span>
                       ) : null}
@@ -458,7 +458,7 @@ export default function StudentAdvisingHub({
         <section className="surface-section p-5">
           <div className="mb-4">
             <h2 className="font-display text-2xl text-[var(--ink-strong)]">Recent History</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               Past advising activity and recently completed items.
             </p>
           </div>
@@ -467,18 +467,18 @@ export default function StudentAdvisingHub({
             <div>
               <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Past Appointments</h3>
               {pastAppointments.length === 0 ? (
-                <p className="mt-2 text-sm text-[var(--muted)]">No past appointments yet.</p>
+                <p className="mt-2 text-sm text-[var(--ink-muted)]">No past appointments yet.</p>
               ) : (
                 <div className="mt-2 space-y-2">
                   {pastAppointments.slice(0, 5).map((appointment) => (
                     <div key={appointment.id} className="rounded-[1rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
-                        <span className="text-xs text-[var(--muted)]">
+                        <span className="text-xs text-[var(--ink-muted)]">
                           {dateFormatter.format(new Date(appointment.startsAt))}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--muted)]">
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {appointment.status}
                       </p>
                     </div>
@@ -490,13 +490,13 @@ export default function StudentAdvisingHub({
             <div>
               <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Completed Tasks</h3>
               {completedTasks.length === 0 ? (
-                <p className="mt-2 text-sm text-[var(--muted)]">You haven&apos;t completed any advising tasks yet.</p>
+                <p className="mt-2 text-sm text-[var(--ink-muted)]">You haven&apos;t completed any advising tasks yet.</p>
               ) : (
                 <div className="mt-2 space-y-2">
                   {completedTasks.slice(0, 5).map((task) => (
                     <div key={task.id} className="rounded-[1rem] border border-emerald-200 bg-emerald-50/70 p-3">
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         Completed {task.completedAt ? dateFormatter.format(new Date(task.completedAt)) : "recently"}
                       </p>
                     </div>

@@ -45,7 +45,7 @@ export default function AchievementUnlock({ label, desc, onDone }: AchievementUn
           <p className="text-4xl mb-3">🏅</p>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600/70">Achievement Unlocked</p>
           <p className="mt-2 font-display text-2xl text-[var(--ink-strong)]">{label}</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">{desc}</p>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">{desc}</p>
         </div>
       </div>
     </div>

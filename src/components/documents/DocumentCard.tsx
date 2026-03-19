@@ -82,7 +82,7 @@ export default function DocumentCard({
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)]"
+            className="rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)]"
             title="View"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -94,7 +94,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] disabled:opacity-40"
+            className="rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] disabled:opacity-40"
             title="Download"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -113,16 +113,16 @@ export default function DocumentCard({
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{doc.title}</h3>
           {doc.description && (
-            <p className="mt-1 text-xs text-[var(--muted)] line-clamp-2">{doc.description}</p>
+            <p className="mt-1 text-xs text-[var(--ink-muted)] line-clamp-2">{doc.description}</p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {doc.sizeBytes ? (
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--muted)]">
+              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
                 {formatSize(doc.sizeBytes)}
               </span>
             ) : null}
             {doc.mimeType !== "application/pdf" && (
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--muted)]">
+              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
                 {doc.mimeType.split("/").pop()?.toUpperCase()}
               </span>
             )}

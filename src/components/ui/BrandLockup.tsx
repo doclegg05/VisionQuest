@@ -53,7 +53,7 @@ export default function BrandLockup({
     isDark ? "text-white" : "text-[var(--ink-strong)]"
   }`;
   const subtitleClassName = `mt-1 uppercase ${sizeConfig.subtitleClassName} ${
-    isDark ? "text-white/60" : "text-[var(--muted)]"
+    isDark ? "text-white/60" : "text-[var(--ink-muted)]"
   }`;
 
   const content = (

@@ -11,7 +11,7 @@ export default function Loading() {
           role="status"
           aria-label="Loading"
         />
-        <p className="text-sm text-[var(--muted)]">Loading&hellip;</p>
+        <p className="text-sm text-[var(--ink-muted)]">Loading&hellip;</p>
       </div>
     </main>
   );

@@ -79,13 +79,13 @@ export default function DashboardClient({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {/* Job Readiness Score */}
       <div className="surface-section p-5 flex flex-col items-center md:col-span-2">
-        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Job Readiness Score</h3>
+        <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Job Readiness Score</h3>
         <ReadinessScore score={readinessScore} breakdown={readinessBreakdown} />
       </div>
 
       {/* XP & Level */}
       <div className="surface-section p-5">
-        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Your Progress</h3>
+        <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Your Progress</h3>
         <XpBar
           current={xpProgress.current}
           nextTarget={xpProgress.nextTarget}
@@ -100,7 +100,7 @@ export default function DashboardClient({
 
       {/* Achievements */}
       <div className="surface-section p-5">
-        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">
+        <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">
           Achievements ({achievements.length})
         </h3>
         <AchievementList achievements={achievements} />
@@ -108,7 +108,7 @@ export default function DashboardClient({
 
       {/* Suggested Next Steps */}
       <div className="surface-section p-5">
-        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Suggested Next Steps</h3>
+        <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Suggested Next Steps</h3>
         <SuggestedActions
           hasGoals={hasGoals}
           orientationComplete={orientationComplete}
@@ -122,7 +122,7 @@ export default function DashboardClient({
 
       {/* Recent Activity */}
       <div className="surface-section p-5">
-        <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">Recent Wins</h3>
+        <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Recent Wins</h3>
         <RecentActivity
           achievements={achievements}
           lastLevelUp={lastLevelUp}
@@ -134,8 +134,8 @@ export default function DashboardClient({
       <div className="surface-section p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-medium text-[var(--muted)]">Advising</h3>
-            <p className="mt-1 text-xs text-[var(--muted)]">
+            <h3 className="text-sm font-medium text-[var(--ink-muted)]">Advising</h3>
+            <p className="mt-1 text-xs text-[var(--ink-muted)]">
               Keep up with appointments, follow-ups, and outreach.
             </p>
           </div>
@@ -150,15 +150,15 @@ export default function DashboardClient({
               Next Appointment
             </p>
             <p className="mt-2 font-display text-xl text-[var(--ink-strong)]">{nextAppointment.title}</p>
-            <p className="mt-2 text-sm text-[var(--muted)]">
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">
               {dateFormatter.format(new Date(nextAppointment.startsAt))}
             </p>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {nextAppointment.locationLabel || nextAppointment.locationType.replace("_", " ")}
             </p>
           </div>
         ) : (
-          <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--muted)]">
+          <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
             No appointment is scheduled yet. Your advising appointments will show up here.
           </div>
         )}
@@ -173,7 +173,7 @@ export default function DashboardClient({
         </div>
 
         {tasks.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--muted)]">No open follow-up tasks right now.</p>
+          <p className="mt-3 text-sm text-[var(--ink-muted)]">No open follow-up tasks right now.</p>
         ) : (
           <div className="mt-3 space-y-2">
             {tasks.map((task) => (
@@ -190,7 +190,7 @@ export default function DashboardClient({
                     {task.priority}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-[var(--muted)]">
+                <p className="mt-1 text-xs text-[var(--ink-muted)]">
                   {task.dueAt ? `Due ${dateFormatter.format(new Date(task.dueAt))}` : "No due date"}
                 </p>
               </div>

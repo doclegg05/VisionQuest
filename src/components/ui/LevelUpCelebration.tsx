@@ -51,7 +51,7 @@ export default function LevelUpCelebration({ newLevel, onDone }: LevelUpCelebrat
             <p className="text-5xl mb-4">🚀</p>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">Level Up!</p>
             <p className="mt-3 font-display text-5xl text-[var(--ink-strong)]">{newLevel}</p>
-            <p className="mt-2 text-sm text-[var(--muted)]">
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">
               {newLevel === 2 && "Horizon Set — you're finding your direction"}
               {newLevel === 3 && "Strategist — you're building real plans"}
               {newLevel === 4 && "Executor — you're making it happen"}

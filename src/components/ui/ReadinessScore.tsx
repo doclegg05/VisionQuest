@@ -44,7 +44,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`font-display font-bold text-[var(--ink-strong)] ${dims.text}`}>{score}%</span>
-          {size === "md" && <span className="text-[9px] text-[var(--muted)] uppercase tracking-wider">Ready</span>}
+          {size === "md" && <span className="text-[9px] text-[var(--ink-muted)] uppercase tracking-wider">Ready</span>}
         </div>
       </div>
 
@@ -53,7 +53,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
         <div className="w-full space-y-1.5">
           {Object.values(breakdown).map((item) => (
             <div key={item.label} className="flex items-center gap-2">
-              <span className="w-20 text-[10px] text-[var(--muted)] text-right">{item.label}</span>
+              <span className="w-20 text-[10px] text-[var(--ink-muted)] text-right">{item.label}</span>
               <div className="flex-1 h-1.5 rounded-full bg-[rgba(18,38,63,0.06)] overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
@@ -63,7 +63,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
                   }}
                 />
               </div>
-              <span className="w-8 text-[10px] text-[var(--muted)]">{item.score}/{item.max}</span>
+              <span className="w-8 text-[10px] text-[var(--ink-muted)]">{item.score}/{item.max}</span>
             </div>
           ))}
         </div>
