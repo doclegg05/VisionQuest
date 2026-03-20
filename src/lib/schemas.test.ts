@@ -81,9 +81,24 @@ test("registerSchema allows optional securityQuestions", () => {
     displayName: "Jane",
     email: "j@e.com",
     password: "secure123",
-    securityQuestions: [{ questionId: "q1", answer: "blue" }],
+    securityQuestions: {
+      birth_city: "Morgantown",
+      elementary_school: "Lincoln",
+      favorite_teacher: "Jones",
+    },
   });
   assert.ok(result.success);
+});
+
+test("registerSchema rejects the legacy securityQuestions array shape", () => {
+  const result = registerSchema.safeParse({
+    studentId: "jdoe",
+    displayName: "Jane",
+    email: "j@e.com",
+    password: "secure123",
+    securityQuestions: [{ questionId: "q1", answer: "blue" }],
+  });
+  assert.ok(!result.success);
 });
 
 // ---------------------------------------------------------------------------

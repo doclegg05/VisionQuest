@@ -40,10 +40,11 @@ export const registerSchema = z.object({
   displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
   password: z.string().min(6, "Password must be at least 6 characters.").max(200, "Password must be 200 characters or fewer."),
-  securityQuestions: z.array(z.object({
-    questionId: z.string(),
-    answer: z.string(),
-  })).optional(),
+  securityQuestions: z.object({
+    birth_city: z.string().optional(),
+    elementary_school: z.string().optional(),
+    favorite_teacher: z.string().optional(),
+  }).optional(),
 });
 
 // ─── Chat Schemas ───────────────────────────────────────────────────────────
