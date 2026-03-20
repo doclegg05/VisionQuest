@@ -134,6 +134,23 @@ model ProgressionEvent {
   @@schema("visionquest")
 }
 
+model BackgroundJob {
+  id          String    @id @default(cuid())
+  type        String
+  payload     String    @db.Text
+  status      String    @default("pending") // pending, processing, completed, failed
+  dedupeKey   String?
+  attempts    Int       @default(0)
+  error       String?   @db.Text
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([dedupeKey, status])
+  @@schema("visionquest")
+}
+
 model OrientationItem {
   id          String   @id @default(cuid())
   label       String
