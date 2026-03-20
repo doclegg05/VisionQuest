@@ -4,7 +4,7 @@ import { streamResponse } from "@/lib/gemini";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { recordChatSession } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
@@ -81,8 +81,13 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         await saveMessage(conversation.id, "assistant", fullResponse);
 
         // Award chat session XP (synchronous — happens before stream closes)
-        await updateProgression(session.id, (state) => {
-          recordChatSession(state);
+        await awardEvent({
+          studentId: session.id,
+          eventType: "chat_session",
+          sourceType: "conversation",
+          sourceId: conversation.id,
+          xp: 10,
+          mutate: (state) => recordChatSession(state),
         });
 
         // Fire-and-forget: goal extraction, XP awards, stage updates, title generation

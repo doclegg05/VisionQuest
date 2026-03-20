@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
 import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
 import { recordPortfolioItem } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
+import { syncStudentAlerts } from "@/lib/advising";
 
 // GET — list student's portfolio items
 export const GET = withErrorHandler(async () => {
@@ -58,12 +59,19 @@ export const POST = withErrorHandler(async (req: Request) => {
   // Record portfolio progression
   try {
     const portfolioType = (type === "resume") ? "resume" : "item";
-    await updateProgression(session.id, (state) => {
-      recordPortfolioItem(state, portfolioType);
+    await awardEvent({
+      studentId: session.id,
+      eventType: "portfolio_item",
+      sourceType: "portfolio",
+      sourceId: item.id,
+      xp: portfolioType === "resume" ? 50 : 15,
+      mutate: (state) => recordPortfolioItem(state, portfolioType),
     });
   } catch (err) {
     logger.error("Failed to record portfolio progression", { error: String(err) });
   }
+
+  await syncStudentAlerts(session.id);
 
   return NextResponse.json({ item });
 });
@@ -99,6 +107,7 @@ export const PUT = withErrorHandler(async (req: Request) => {
   if (url !== undefined) data.url = url;
 
   const item = await prisma.portfolioItem.update({ where: { id }, data });
+  await syncStudentAlerts(session.id);
   return NextResponse.json({ item });
 });
 
@@ -116,5 +125,6 @@ export const DELETE = withErrorHandler(async (req: Request) => {
   if (!existing) throw notFound("Not found");
 
   await prisma.portfolioItem.delete({ where: { id } });
+  await syncStudentAlerts(session.id);
   return NextResponse.json({ ok: true });
 });

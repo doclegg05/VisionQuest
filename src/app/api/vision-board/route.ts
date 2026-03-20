@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { recordVisionBoardItem } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
 
@@ -67,8 +67,13 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
   // Record progression
   try {
-    await updateProgression(session.id, (state) => {
-      recordVisionBoardItem(state, type === "goal" ? "goal_link" : "pin");
+    await awardEvent({
+      studentId: session.id,
+      eventType: type === "goal" ? "visionboard_goal_link" : "visionboard_pin",
+      sourceType: "vision_board",
+      sourceId: item.id,
+      xp: type === "goal" ? 15 : 10,
+      mutate: (state) => recordVisionBoardItem(state, type === "goal" ? "goal_link" : "pin"),
     });
   } catch (err) {
     logger.error("Failed to record vision board progression", { error: String(err) });

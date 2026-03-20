@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { syncStudentAlerts } from "@/lib/advising";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress, validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
 import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
 import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 
 // GET — get student's certification with requirements
@@ -42,8 +43,13 @@ export const GET = withErrorHandler(async () => {
 
     // Record certification started for progression
     try {
-      await updateProgression(session.id, (state) => {
-        recordCertificationStarted(state);
+      await awardEvent({
+        studentId: session.id,
+        eventType: "cert_started",
+        sourceType: "certification",
+        sourceId: cert.id,
+        xp: 25,
+        mutate: (state) => recordCertificationStarted(state),
       });
     } catch (err) {
       logger.error("Failed to record certification started", { error: String(err) });
@@ -166,13 +172,20 @@ export const POST = withErrorHandler(async (req: Request) => {
   // Record certification earned if just completed
   if (updatedCert.status === "completed") {
     try {
-      await updateProgression(session.id, (state) => {
-        recordCertificationEarned(state);
+      await awardEvent({
+        studentId: session.id,
+        eventType: "cert_earned",
+        sourceType: "certification",
+        sourceId: requirement.certificationId,
+        xp: 100,
+        mutate: (state) => recordCertificationEarned(state),
       });
     } catch (err) {
       logger.error("Failed to record certification earned", { error: String(err) });
     }
   }
+
+  await syncStudentAlerts(session.id);
 
   return NextResponse.json({ ok: true });
 });

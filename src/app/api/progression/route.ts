@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getXpProgress, getAchievementsWithDefs, recordDailyCheckin, checkReadinessAchievements } from "@/lib/progression/engine";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
-import { getProgression, updateProgression } from "@/lib/progression/service";
+import { getProgression } from "@/lib/progression/service";
+import { awardEvent, getRecentEvents } from "@/lib/progression/events";
 import { withErrorHandler, unauthorized } from "@/lib/api-error";
 
 export const GET = withErrorHandler(async () => {
@@ -10,14 +11,15 @@ export const GET = withErrorHandler(async () => {
   if (!session) throw unauthorized();
 
   // Daily check-in: award XP if the student hasn't checked in today
-  const { state: currentState } = await getProgression(session.id);
   const today = new Date().toISOString().slice(0, 10);
-  const lastCheckin = currentState.streakDays.length > 0 ? currentState.streakDays[currentState.streakDays.length - 1] : null;
-  if (lastCheckin !== today) {
-    await updateProgression(session.id, (state) => {
-      recordDailyCheckin(state);
-    });
-  }
+  await awardEvent({
+    studentId: session.id,
+    eventType: "daily_checkin",
+    sourceType: "checkin",
+    sourceId: today,
+    xp: 15,
+    mutate: (state) => recordDailyCheckin(state),
+  });
 
   // Re-read after potential daily checkin write, then check readiness achievements
   const { state: freshState } = await getProgression(session.id);
@@ -26,8 +28,13 @@ export const GET = withErrorHandler(async () => {
   const prevAchievementCount = freshState.achievements.length;
   checkReadinessAchievements(freshState, readiness.score);
   if (freshState.achievements.length > prevAchievementCount) {
-    await updateProgression(session.id, (state) => {
-      checkReadinessAchievements(state, readiness.score);
+    await awardEvent({
+      studentId: session.id,
+      eventType: "readiness_check",
+      sourceType: "readiness",
+      sourceId: today,
+      xp: 0,
+      mutate: (state) => checkReadinessAchievements(state, readiness.score),
     });
   }
 
@@ -44,6 +51,8 @@ export const GET = withErrorHandler(async () => {
     ? state.levelUpHistory[state.levelUpHistory.length - 1]
     : null;
 
+  const recentEvents = await getRecentEvents(session.id, 20);
+
   return NextResponse.json({
     ...state,
     xpProgress,
@@ -52,5 +61,6 @@ export const GET = withErrorHandler(async () => {
     lastLevelUp,
     readinessScore: finalReadiness.score,
     readinessBreakdown: finalReadiness.breakdown,
+    recentEvents,
   });
 });

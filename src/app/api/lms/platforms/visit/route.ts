@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordPlatformVisit } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { withAuth } from "@/lib/api-error";
 
 export const POST = withAuth(async (session, req: NextRequest) => {
@@ -15,8 +15,13 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   }
 
   // Record the visit
-  await updateProgression(session.id, (state) => {
-    recordPlatformVisit(state, platformId);
+  await awardEvent({
+    studentId: session.id,
+    eventType: "platform_visit",
+    sourceType: "platform",
+    sourceId: platformId,
+    xp: 5,
+    mutate: (state) => recordPlatformVisit(state, platformId),
   });
 
   return NextResponse.json({ ok: true });

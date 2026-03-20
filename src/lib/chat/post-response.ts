@@ -7,7 +7,7 @@ import {
   recordWeeklyReview,
   recordMonthlyReview,
 } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { generateConversationTitle } from "./conversation";
@@ -117,12 +117,16 @@ export async function handlePostResponse({
         const hasMonthly = existingLevels.has("monthly");
         const hasWeekly = existingLevels.has("weekly");
         if (hasMonthly || hasWeekly) {
-          await updateProgression(studentId, (state) => {
-            if (hasMonthly && hasWeekly) {
-              recordWeeklyReview(state);
-            } else if (hasMonthly) {
-              recordMonthlyReview(state);
-            }
+          await awardEvent({
+            studentId,
+            eventType: hasMonthly && hasWeekly ? "weekly_review" : "monthly_review",
+            sourceType: "conversation",
+            sourceId: conversationId,
+            xp: hasMonthly && hasWeekly ? 40 : 60,
+            mutate: (state) => {
+              if (hasMonthly && hasWeekly) recordWeeklyReview(state);
+              else if (hasMonthly) recordMonthlyReview(state);
+            },
           });
         }
       }

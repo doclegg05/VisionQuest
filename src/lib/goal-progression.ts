@@ -1,5 +1,5 @@
 import { recordGoalSet } from "@/lib/progression/engine";
-import { getProgression, updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import type { GoalLevel } from "@/lib/goals";
 
 export async function ensureGoalLevelProgression(
@@ -9,16 +9,18 @@ export async function ensureGoalLevelProgression(
   const uniqueLevels = [...new Set(levels)];
   if (uniqueLevels.length === 0) return 0;
 
-  // Read current state to check which levels are already recorded
-  const { state: currentState } = await getProgression(studentId);
-  const levelsToAdd = uniqueLevels.filter((level) => !currentState.completedGoalLevels.includes(level));
-  if (levelsToAdd.length === 0) return 0;
+  let awarded = 0;
+  for (const level of uniqueLevels) {
+    const ok = await awardEvent({
+      studentId,
+      eventType: `${level}_set`,
+      sourceType: "goal",
+      sourceId: `${studentId}:${level}`,
+      xp: 50,
+      mutate: (state) => recordGoalSet(state, level),
+    });
+    if (ok) awarded++;
+  }
 
-  await updateProgression(studentId, (state) => {
-    for (const level of levelsToAdd) {
-      recordGoalSet(state, level);
-    }
-  });
-
-  return levelsToAdd.length;
+  return awarded;
 }

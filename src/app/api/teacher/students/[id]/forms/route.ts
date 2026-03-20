@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { syncStudentAlerts } from "@/lib/advising";
 import { logger } from "@/lib/logger";
-import { updateProgression } from "@/lib/progression/service";
+import { awardEvent } from "@/lib/progression/events";
 import { withTeacherAuth } from "@/lib/api-error";
 
 export const GET = withTeacherAuth(async (
@@ -77,13 +78,20 @@ export const PATCH = withTeacherAuth(async (
   // Award XP for approved form submissions
   if (status === "approved") {
     try {
-      await updateProgression(id, (state) => {
-        state.xp += 20;
+      await awardEvent({
+        studentId: id,
+        eventType: "form_approved",
+        sourceType: "form",
+        sourceId: submission.id,
+        xp: 20,
+        mutate: (state) => { state.xp += 20; },
       });
     } catch (err) {
       logger.error("Failed to award form approval XP", { error: String(err) });
     }
   }
+
+  await syncStudentAlerts(id);
 
   return NextResponse.json({ submission: updated });
 });
