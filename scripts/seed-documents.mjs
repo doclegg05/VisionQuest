@@ -147,6 +147,16 @@ const TITLE_OVERRIDES = {
   "teachers/guides/WV Adult Ed Handbook/Section_15_2025_2026.pdf": "Handbook Section 15 — Corrections Education",
   "teachers/guides/WV Adult Ed Handbook/Section_16_2025.2026.pdf": "Handbook Section 16 — SPOKES Modules",
 
+  // Teacher docs with raw-looking titles
+  "teachers/guides/professional-growth-development-plan-form.pdf": "Professional Growth & Development Plan Form",
+  "teachers/guides/Hanbook Appendix/Section 10/Logos/free_customer_service_training.png": "Free Customer Service Training Promo",
+  "teachers/guides/Hanbook Appendix/Section 10/Logos/wvadulted.com_1.png": "WV Adult Education Website Banner",
+  "teachers/guides/Hanbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf": "Corrections Education Sign-In Sheet",
+  "teachers/guides/Hanbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf": "GED Program Tools & Resources for Student Success",
+  "teachers/guides/Hanbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf": "Preparing Students for the GED RLA Extended Response",
+  "teachers/guides/Hanbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf": "Program Files Checklist",
+  "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf": "WV Adult Education Enrollment Verification",
+
   // Presentations / Marketing
   "presentations/wvadulted.com_1.png": "WV Adult Education Website Screenshot",
   "presentations/WVAE-color-contacts.png": "WV Adult Education Contact Information (Color)",
@@ -199,6 +209,8 @@ function getCategory(relPath) {
       return "READY_TO_WORK";
     if (/portfolio|employment.?portfolio/i.test(lower))
       return "READY_TO_WORK";
+    if (/referral|lns.?with.?referral|prospective.?employer/i.test(lower))
+      return "STUDENT_REFERRAL";
     return "DOHS_FORM";
   }
 
