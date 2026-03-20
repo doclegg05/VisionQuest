@@ -509,7 +509,7 @@ export const PLATFORMS: SpokesPlatform[] = [
       "West Virginia tourism and hospitality career skills training.",
     category: "career-skills",
     icon: "💼",
-    loginUrl: null,
+    loginUrl: "https://wvtourism.com/tourismworks/free-trainings/",
     certifications: [],
     links: [],
     tags: ["tourism", "hospitality", "west-virginia"],
