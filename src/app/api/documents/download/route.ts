@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
-import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { rateLimit } from "@/lib/rate-limit";
+import { withErrorHandler, unauthorized, badRequest, notFound, rateLimited } from "@/lib/api-error";
 
 /**
  * GET /api/documents/download?id=<docId>&mode=view|download
@@ -16,6 +17,10 @@ import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-
 export const GET = withErrorHandler(async (req: Request) => {
   const session = await getSession();
   if (!session) throw unauthorized();
+
+  // 30 downloads per minute per user
+  const rl = await rateLimit(`docs-dl:${session.id}`, 30, 60 * 1000);
+  if (!rl.success) throw rateLimited();
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");

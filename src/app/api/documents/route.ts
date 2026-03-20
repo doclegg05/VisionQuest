@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
-import { withErrorHandler, unauthorized, badRequest } from "@/lib/api-error";
+import { rateLimit } from "@/lib/rate-limit";
+import { withErrorHandler, unauthorized, badRequest, rateLimited } from "@/lib/api-error";
 import type { Prisma } from "@prisma/client";
 
 const VALID_CATEGORIES = new Set([
@@ -22,6 +23,10 @@ const VALID_CATEGORIES = new Set([
 export const GET = withErrorHandler(async (req: Request) => {
   const session = await getSession();
   if (!session) throw unauthorized();
+
+  // 120 requests per minute per user
+  const rl = await rateLimit(`docs:${session.id}`, 120, 60 * 1000);
+  if (!rl.success) throw rateLimited();
 
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");

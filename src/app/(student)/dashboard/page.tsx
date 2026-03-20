@@ -15,19 +15,19 @@ import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import DashboardClient from "./DashboardClient";
 
 const MODULES = [
-  { href: "/chat", label: "Talk to Sage", icon: "💬", description: "Chat with your AI coach about goals and next steps.", glow: "from-amber-300/40 via-orange-300/10 to-transparent" },
-  { href: "/appointments", label: "Advising", icon: "🗓️", description: "See advising appointments, follow-up tasks, and anything that needs attention.", glow: "from-teal-300/40 via-cyan-200/10 to-transparent" },
-  { href: "/goals", label: "My Goals", icon: "🎯", description: "See the full path from big vision to today’s actions.", glow: "from-sky-300/40 via-cyan-300/10 to-transparent" },
-  { href: "/orientation", label: "Orientation", icon: "📋", description: "Handle onboarding steps and know what’s left.", glow: "from-emerald-300/40 via-green-200/10 to-transparent" },
-  { href: "/spokes", label: "My SPOKES Record", icon: "🧭", description: "See the official referral, paperwork, modules, and follow-up milestones your teacher tracks.", glow: "from-lime-300/40 via-emerald-200/10 to-transparent" },
-  { href: "/courses", label: "Courses", icon: "📚", description: "Browse learning resources curated for the program.", glow: "from-violet-300/40 via-fuchsia-200/10 to-transparent" },
-  { href: "/resources", label: "Resources", icon: "📄", description: "Reference guide for program forms, certification documents, and compliance paperwork.", glow: "from-slate-300/40 via-zinc-200/10 to-transparent" },
-  { href: "/opportunities", label: "Opportunities", icon: "🚀", description: "Track jobs, internships, and other openings worth acting on.", glow: "from-cyan-300/40 via-sky-200/10 to-transparent" },
-  { href: "/events", label: "Events", icon: "🎟️", description: "Register for workshops, hiring events, and networking opportunities.", glow: "from-pink-300/40 via-rose-200/10 to-transparent" },
-  { href: "/certifications", label: "Certifications", icon: "🏆", description: "Track progress toward your Ready to Work credential.", glow: "from-yellow-300/45 via-amber-200/10 to-transparent" },
-  { href: "/portfolio", label: "Portfolio", icon: "💼", description: "Collect evidence of your skills and achievements.", glow: "from-rose-300/40 via-orange-200/10 to-transparent" },
-  { href: "/vision-board", label: "Vision Board", icon: "📌", description: "Pin your dreams, goals, and inspirations to a personal corkboard.", glow: "from-amber-300/40 via-yellow-200/10 to-transparent" },
-  { href: "/files", label: "My Files", icon: "📁", description: "Keep documents and uploads organized in one place.", glow: "from-indigo-300/40 via-sky-200/10 to-transparent" },
+  { href: "/chat", label: "Sage", icon: "💬", description: "Get guidance from your AI coach on goals, career plans, and next steps.", glow: "from-amber-300/40 via-orange-300/10 to-transparent" },
+  { href: "/goals", label: "My Goals", icon: "🎯", description: "Track your path from big-picture vision down to today’s action items.", glow: "from-sky-300/40 via-cyan-300/10 to-transparent" },
+  { href: "/appointments", label: "Advising", icon: "🗓️", description: "View advising appointments, follow-up tasks, and alerts.", glow: "from-teal-300/40 via-cyan-200/10 to-transparent" },
+  { href: "/orientation", label: "Orientation", icon: "📋", description: "Complete onboarding steps and download required forms.", glow: "from-emerald-300/40 via-green-200/10 to-transparent" },
+  { href: "/courses", label: "Courses", icon: "📚", description: "Access learning platforms and training materials for the program.", glow: "from-violet-300/40 via-fuchsia-200/10 to-transparent" },
+  { href: "/certifications", label: "Certifications", icon: "🏆", description: "Earn industry credentials and track Ready to Work progress.", glow: "from-yellow-300/45 via-amber-200/10 to-transparent" },
+  { href: "/opportunities", label: "Jobs & Opportunities", icon: "🚀", description: "Browse and track job openings, internships, and career leads.", glow: "from-cyan-300/40 via-sky-200/10 to-transparent" },
+  { href: "/events", label: "Events", icon: "🎟️", description: "Register for workshops, hiring fairs, and networking events.", glow: "from-pink-300/40 via-rose-200/10 to-transparent" },
+  { href: "/portfolio", label: "Portfolio", icon: "💼", description: "Build a collection of your skills, work samples, and achievements.", glow: "from-rose-300/40 via-orange-200/10 to-transparent" },
+  { href: "/resources", label: "Forms & Documents", icon: "📄", description: "View, download, and print program forms and reference documents.", glow: "from-slate-300/40 via-zinc-200/10 to-transparent" },
+  { href: "/spokes", label: "My SPOKES Record", icon: "🧭", description: "View your official program record, modules, and follow-up milestones.", glow: "from-lime-300/40 via-emerald-200/10 to-transparent" },
+  { href: "/vision-board", label: "Vision Board", icon: "📌", description: "Pin your dreams, goals, and inspirations to a personal board.", glow: "from-amber-300/40 via-yellow-200/10 to-transparent" },
+  { href: "/files", label: "My Files", icon: "📁", description: "Upload and organize your personal documents.", glow: "from-indigo-300/40 via-sky-200/10 to-transparent" },
 ];
 
 export default async function DashboardPage() {
