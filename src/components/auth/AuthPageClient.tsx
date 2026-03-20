@@ -84,7 +84,8 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
         return;
       }
 
-      router.push("/chat");
+      // New registrations go to welcome flow; logins go to dashboard
+      router.push(mode === "register" ? "/welcome" : "/dashboard");
       router.refresh();
     } catch {
       setError("Could not connect to server.");

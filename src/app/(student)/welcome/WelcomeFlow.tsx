@@ -27,16 +27,16 @@ export default function WelcomeFlow({ studentName }: WelcomeFlowProps) {
             <div className="mt-8 space-y-3 text-left">
               {[
                 {
-                  icon: "💬",
-                  text: "Chat with Sage, your AI coach, to set goals and get guidance",
+                  icon: "📋",
+                  text: "Complete orientation forms and get set up for the program",
+                },
+                {
+                  icon: "🎯",
+                  text: "Set career goals and track your progress with AI coaching",
                 },
                 {
                   icon: "🏆",
-                  text: "Earn certifications in digital literacy, office skills, customer service, and more",
-                },
-                {
-                  icon: "💼",
-                  text: "Build a portfolio that proves you're ready to work",
+                  text: "Earn industry certifications and build your professional portfolio",
                 },
               ].map((item) => (
                 <div
