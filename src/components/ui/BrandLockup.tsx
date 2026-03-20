@@ -48,7 +48,7 @@ export default function BrandLockup({
   const isDark = theme === "dark";
   const stackOnMobile = size !== "sm";
   const wrapperClassName = `inline-flex max-w-full items-center ${
-    stackOnMobile ? "flex-wrap sm:flex-nowrap" : "flex-nowrap"
+    stackOnMobile ? "flex-wrap" : "flex-nowrap"
   } ${sizeConfig.gapClassName} ${
     align === "center" ? "justify-center text-center" : ""
   }`;
@@ -83,9 +83,9 @@ export default function BrandLockup({
           />
         </div>
       </div>
-      <div className={`min-w-0 ${stackOnMobile ? "basis-full pt-1.5 sm:basis-auto sm:pt-0" : ""}`}>
-        <p className={`${titleClassName} break-words`}>{title}</p>
-        <p className={`${subtitleClassName} break-words`}>{subtitle}</p>
+      <div className={`min-w-0 ${stackOnMobile ? "basis-full pt-1" : ""}`}>
+        <p className={titleClassName}>{title}</p>
+        <p className={subtitleClassName}>{subtitle}</p>
       </div>
     </div>
   );
