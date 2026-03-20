@@ -11,7 +11,7 @@ const MAX_CONNECTS_PER_MINUTE = 10;
  * SSE endpoint for real-time notifications.
  * Clients connect and receive push events when notifications are sent.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
@@ -47,11 +47,17 @@ export async function GET() {
     });
   }, HEARTBEAT_INTERVAL);
 
-  // Secondary cleanup on stream close
-  readable.pipeTo(new WritableStream()).catch(() => {}).finally(() => {
+  const finalize = () => {
     clearInterval(heartbeat);
     cleanup();
-  });
+  };
+
+  req.signal.addEventListener("abort", () => {
+    writer.close().catch(() => {});
+    finalize();
+  }, { once: true });
+
+  writer.closed.catch(() => {}).finally(finalize);
 
   return new Response(readable, {
     headers: {
