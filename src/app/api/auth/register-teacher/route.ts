@@ -7,7 +7,15 @@ import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 
-const TEACHER_KEY = process.env.TEACHER_KEY || "";
+function normalizeTeacherKey(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim().replace(/^['"]+|['"]+$/g, "");
+}
+
+const TEACHER_KEY = normalizeTeacherKey(process.env.TEACHER_KEY || "");
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -17,7 +25,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const body = await req.json();
-  const teacherKey = (body.teacherKey || "").trim();
+  const teacherKey = normalizeTeacherKey(body.teacherKey);
   const displayName = (body.displayName || "").trim();
   const email = normalizeEmail(body.email || "");
   const password = (body.password || "").trim();
@@ -27,7 +35,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "Teacher registration is not configured." }, { status: 503 });
   }
   if (!teacherKey || teacherKey !== TEACHER_KEY) {
-    logger.warn("Invalid teacher key attempt", { ip });
+    logger.warn("Invalid teacher key attempt", {
+      ip,
+      providedLength: teacherKey.length,
+      configuredLength: TEACHER_KEY.length,
+    });
     return NextResponse.json({ error: "Invalid teacher key." }, { status: 403 });
   }
 
