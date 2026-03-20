@@ -1,4 +1,18 @@
+import { createHash } from "node:crypto";
 import { prisma } from "./db";
+import { buildGoalEvidenceEntries, buildGoalReviewQueue } from "./goal-evidence";
+import {
+  buildStudentInterventionNotifications,
+  buildTeacherInterventionNotifications,
+  studentInterventionHref,
+  teacherInterventionHref,
+} from "./intervention-notifications";
+import { enqueueJobWithCooldown } from "./jobs";
+import { logger } from "./logger";
+import { sendNotificationWithCooldown } from "./notifications";
+import { parseState } from "./progression/engine";
+import { toGoalResourceLinkView } from "./goal-resource-links";
+import { buildStudentStatusSignals, type StudentStatusSignals } from "./student-status";
 
 export const APPOINTMENT_STATUSES = ["scheduled", "completed", "cancelled", "missed"] as const;
 export const TASK_STATUSES = ["open", "in_progress", "completed"] as const;
@@ -87,6 +101,7 @@ interface AlertInputs {
     lastActivityAt?: Date | null;
     applicationCount?: number;
     eventRegistrationCount?: number;
+    orientationStatus?: StudentStatusSignals | null;
     certification?: {
       status: string | null;
       startedAt: Date | null;
@@ -234,6 +249,101 @@ export function buildStudentAlertDescriptors({
           sourceId: signals?.studentId || studentKey,
         });
       }
+    }
+  }
+
+  const orientationStatus = signals?.orientationStatus;
+  const daysSinceEnrollment = signals?.studentCreatedAt
+    ? (now.getTime() - signals.studentCreatedAt.getTime()) / (1000 * 60 * 60 * 24)
+    : 0;
+  if (orientationStatus && signals?.studentId) {
+    const orientationStarted =
+      orientationStatus.requiredForms.approved.length > 0 ||
+      orientationStatus.requiredForms.pendingReview.length > 0 ||
+      orientationStatus.requiredForms.needsRevision.length > 0 ||
+      orientationStatus.orientationChecklist.completedRequired > 0;
+
+    if (
+      orientationStatus.requiredForms.missing.length > 0 &&
+      (orientationStarted || daysSinceEnrollment >= 2)
+    ) {
+      const missingForms = orientationStatus.requiredForms.missing.map((item) => item.title);
+      alerts.push({
+        alertKey: `orientation_form_missing:${signals.studentId}`,
+        type: "orientation_form_missing",
+        severity: daysSinceEnrollment >= 7 ? "high" : "medium",
+        title: "Required onboarding forms are still missing",
+        summary:
+          missingForms.length > 3
+            ? `${missingForms.slice(0, 3).join(", ")}, and ${missingForms.length - 3} more required onboarding forms are still missing.`
+            : `${missingForms.join(", ")} still need to be submitted.`,
+        sourceType: "student",
+        sourceId: signals.studentId,
+      });
+    }
+
+    if (orientationStatus.requiredForms.pendingReview.length > 0) {
+      const oldestPendingAt = orientationStatus.requiredForms.pendingReview.reduce<Date | null>(
+        (oldest, item) => {
+          const updatedAt = item.updatedAt instanceof Date ? item.updatedAt : item.updatedAt ? new Date(item.updatedAt) : null;
+          if (!updatedAt || Number.isNaN(updatedAt.getTime())) return oldest;
+          if (!oldest || updatedAt.getTime() < oldest.getTime()) return updatedAt;
+          return oldest;
+        },
+        null,
+      );
+      const pendingAgeDays = oldestPendingAt
+        ? (now.getTime() - oldestPendingAt.getTime()) / (1000 * 60 * 60 * 24)
+        : 0;
+      const pendingForms = orientationStatus.requiredForms.pendingReview.map((item) => item.title);
+      alerts.push({
+        alertKey: `orientation_form_pending_review:${signals.studentId}`,
+        type: "orientation_form_pending_review",
+        severity: pendingAgeDays >= 3 ? "high" : "medium",
+        title: "Submitted onboarding forms need review",
+        summary:
+          pendingForms.length > 3
+            ? `${pendingForms.slice(0, 3).join(", ")}, and ${pendingForms.length - 3} more forms are waiting for instructor review.`
+            : `${pendingForms.join(", ")} ${pendingForms.length === 1 ? "is" : "are"} waiting for instructor review.`,
+        sourceType: "student",
+        sourceId: signals.studentId,
+      });
+    }
+
+    if (orientationStatus.requiredForms.needsRevision.length > 0) {
+      const revisionForms = orientationStatus.requiredForms.needsRevision.map((item) => item.title);
+      alerts.push({
+        alertKey: `orientation_form_revision_needed:${signals.studentId}`,
+        type: "orientation_form_revision_needed",
+        severity: "medium",
+        title: "Onboarding forms were returned for revision",
+        summary:
+          revisionForms.length > 3
+            ? `${revisionForms.slice(0, 3).join(", ")}, and ${revisionForms.length - 3} more forms were returned and still need student follow-up.`
+            : `${revisionForms.join(", ")} ${revisionForms.length === 1 ? "was" : "were"} returned and still need student follow-up.`,
+        sourceType: "student",
+        sourceId: signals.studentId,
+      });
+    }
+
+    if (
+      orientationStatus.orientationChecklist.incompleteRequired.length > 0 &&
+      orientationStatus.orientationChecklist.totalRequired > 0 &&
+      daysSinceEnrollment >= 7
+    ) {
+      const incompleteItems = orientationStatus.orientationChecklist.incompleteRequired.map((item) => item.label);
+      alerts.push({
+        alertKey: `orientation_item_incomplete:${signals.studentId}`,
+        type: "orientation_item_incomplete",
+        severity: daysSinceEnrollment >= 14 ? "high" : "medium",
+        title: "Required orientation steps are still incomplete",
+        summary:
+          incompleteItems.length > 3
+            ? `${incompleteItems.slice(0, 3).join(", ")}, and ${incompleteItems.length - 3} more required orientation steps are still incomplete.`
+            : `${incompleteItems.join(", ")} ${incompleteItems.length === 1 ? "is" : "are"} still incomplete.`,
+        sourceType: "student",
+        sourceId: signals.studentId,
+      });
     }
   }
 
@@ -664,10 +774,144 @@ export async function sendPendingAppointmentReminders({
   return { sent, skipped };
 }
 
+async function syncInterventionNotifications({
+  studentId,
+  studentName,
+  studentLabel,
+  studentEmail,
+  alerts,
+  evidenceEntries,
+  reviewQueue,
+  now = new Date(),
+}: {
+  studentId: string;
+  studentName: string;
+  studentLabel: string;
+  studentEmail: string | null;
+  alerts: AlertDescriptor[];
+  evidenceEntries: ReturnType<typeof buildGoalEvidenceEntries>;
+  reviewQueue: ReturnType<typeof buildGoalReviewQueue>;
+  now?: Date;
+}) {
+  const studentSpecs = buildStudentInterventionNotifications({
+    alerts,
+    evidenceEntries,
+    now,
+  });
+
+  await Promise.allSettled(
+    studentSpecs.map((spec) =>
+      sendNotificationWithCooldown(
+        studentId,
+        {
+          type: spec.type,
+          title: spec.title,
+          body: spec.body,
+        },
+        spec.cooldownHours,
+      ),
+    ),
+  );
+
+  const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || "";
+  if (studentEmail) {
+    await Promise.allSettled(
+      studentSpecs.map((spec) => {
+        const href = `${baseUrl}${studentInterventionHref(spec.type)}`;
+        const dedupeHash = createHash("sha1")
+          .update(`${studentId}:${spec.type}:${spec.title}:${spec.body}`)
+          .digest("hex");
+
+        return enqueueJobWithCooldown({
+          type: "send_email",
+          dedupeKey: `student-nudge:${dedupeHash}`,
+          cooldownHours: spec.cooldownHours,
+          payload: {
+            to: studentEmail,
+            subject: `VisionQuest reminder: ${spec.title}`,
+            text:
+              `Hi ${studentName},\n\n` +
+              `${spec.body}\n\n` +
+              `${baseUrl ? `Open VisionQuest: ${href}\n\n` : ""}` +
+              "This reminder was sent automatically from VisionQuest.",
+          },
+        });
+      }),
+    );
+  }
+
+  const teacherSpecs = buildTeacherInterventionNotifications({
+    studentName,
+    studentId: studentLabel,
+    alerts,
+    reviewQueue,
+  });
+
+  if (teacherSpecs.length === 0) {
+    return;
+  }
+
+  const teachers = await prisma.student.findMany({
+    where: {
+      role: "teacher",
+      isActive: true,
+    },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+    },
+  });
+
+  await Promise.allSettled(
+    teachers.flatMap((teacher) =>
+      teacherSpecs.map((spec) =>
+        sendNotificationWithCooldown(
+          teacher.id,
+          {
+            type: spec.type,
+            title: spec.title,
+            body: spec.body,
+          },
+          spec.cooldownHours,
+        ),
+      ),
+    ),
+  );
+
+  await Promise.allSettled(
+    teachers.flatMap((teacher) => {
+      if (!teacher.email) return [];
+
+      return teacherSpecs.map((spec) => {
+        const href = `${baseUrl}${teacherInterventionHref(spec.type, studentId)}`;
+        const dedupeHash = createHash("sha1")
+          .update(`${teacher.id}:${studentId}:${spec.type}:${spec.title}:${spec.body}`)
+          .digest("hex");
+
+        return enqueueJobWithCooldown({
+          type: "send_email",
+          dedupeKey: `teacher-nudge:${dedupeHash}`,
+          cooldownHours: spec.cooldownHours,
+          payload: {
+            to: teacher.email,
+            subject: `VisionQuest teacher alert: ${spec.title}`,
+            text:
+              `Hi ${teacher.displayName},\n\n` +
+              `${spec.body}\n\n` +
+              `${baseUrl ? `Open student workspace: ${href}\n\n` : ""}` +
+              "This reminder was sent automatically from VisionQuest.",
+          },
+        });
+      });
+    }),
+  );
+}
+
 export async function syncStudentAlerts(studentId: string) {
   const now = new Date();
 
-  const [tasks, appointments, studentSignals, existing] = await prisma.$transaction([
+  const [tasks, appointments, studentSignals, orientationItems, existing] = await prisma.$transaction([
     prisma.studentTask.findMany({
       where: {
         studentId,
@@ -695,21 +939,84 @@ export async function syncStudentAlerts(studentId: string) {
       where: { id: studentId },
       select: {
         id: true,
+        studentId: true,
+        displayName: true,
+        email: true,
         createdAt: true,
+        progression: {
+          select: { state: true },
+        },
         conversations: {
           select: { updatedAt: true },
           orderBy: { updatedAt: "desc" },
           take: 1,
         },
         goals: {
-          select: { updatedAt: true },
+          select: {
+            id: true,
+            content: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
           orderBy: { updatedAt: "desc" },
-          take: 1,
+        },
+        goalResourceLinks: {
+          select: {
+            id: true,
+            goalId: true,
+            resourceType: true,
+            resourceId: true,
+            title: true,
+            description: true,
+            url: true,
+            linkType: true,
+            status: true,
+            dueAt: true,
+            notes: true,
+            assignedById: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        formSubmissions: {
+          select: {
+            id: true,
+            formId: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            reviewedAt: true,
+            notes: true,
+          },
+          orderBy: { updatedAt: "desc" },
+        },
+        orientationProgress: {
+          select: {
+            itemId: true,
+            completed: true,
+            completedAt: true,
+          },
         },
         portfolioItems: {
-          select: { updatedAt: true },
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            createdAt: true,
+            updatedAt: true,
+          },
           orderBy: { updatedAt: "desc" },
-          take: 1,
+        },
+        resumeData: {
+          select: { id: true },
+        },
+        publicCredentialPage: {
+          select: {
+            isPublic: true,
+            updatedAt: true,
+          },
         },
         files: {
           select: { uploadedAt: true },
@@ -726,15 +1033,25 @@ export async function syncStudentAlerts(studentId: string) {
           orderBy: { updatedAt: "desc" },
           take: 1,
         },
-        applications: {
-          select: { updatedAt: true },
-          orderBy: { updatedAt: "desc" },
-          take: 1,
-        },
         eventRegistrations: {
-          select: { updatedAt: true },
+          select: {
+            id: true,
+            eventId: true,
+            status: true,
+            updatedAt: true,
+            registeredAt: true,
+          },
           orderBy: { updatedAt: "desc" },
-          take: 1,
+        },
+        applications: {
+          select: {
+            id: true,
+            opportunityId: true,
+            status: true,
+            updatedAt: true,
+            appliedAt: true,
+          },
+          orderBy: { updatedAt: "desc" },
         },
         certifications: {
           where: { certType: "ready-to-work" },
@@ -744,9 +1061,11 @@ export async function syncStudentAlerts(studentId: string) {
             completedAt: true,
             requirements: {
               select: {
+                templateId: true,
                 completed: true,
                 completedAt: true,
                 verifiedAt: true,
+                verifiedBy: true,
                 template: {
                   select: {
                     required: true,
@@ -765,6 +1084,14 @@ export async function syncStudentAlerts(studentId: string) {
         },
       },
     }),
+    prisma.orientationItem.findMany({
+      select: {
+        id: true,
+        label: true,
+        required: true,
+      },
+      orderBy: { sortOrder: "asc" },
+    }),
     prisma.studentAlert.findMany({
       where: {
         studentId,
@@ -776,6 +1103,13 @@ export async function syncStudentAlerts(studentId: string) {
             "inactive_student",
             "career_inactive",
             "certification_stalled",
+            "goal_needs_resource",
+            "goal_resource_stale",
+            "goal_review_pending",
+            "orientation_form_missing",
+            "orientation_form_pending_review",
+            "orientation_form_revision_needed",
+            "orientation_item_incomplete",
           ],
         },
       },
@@ -795,18 +1129,74 @@ export async function syncStudentAlerts(studentId: string) {
       requirement.verifiedAt,
     ])
   );
+  const progressionState = studentSignals?.progression?.state
+    ? parseState(studentSignals.progression.state)
+    : null;
+  const studentStatusSignals = studentSignals
+    ? buildStudentStatusSignals({
+        formSubmissions: studentSignals.formSubmissions,
+        orientationItems,
+        orientationProgress: studentSignals.orientationProgress,
+      })
+    : null;
+  const goalLinks = (studentSignals?.goalResourceLinks || [])
+    .map((link) => toGoalResourceLinkView(link))
+    .filter((link): link is NonNullable<typeof link> => !!link);
+  const goalEvidenceEntries = studentSignals
+    ? buildGoalEvidenceEntries({
+        links: goalLinks,
+        progressionState,
+        formSubmissions: studentSignals.formSubmissions,
+        orientationProgress: studentSignals.orientationProgress,
+        certification: certification
+          ? {
+              status: certification.status,
+              startedAt: certification.startedAt,
+              completedAt: certification.completedAt,
+              requirements: certification.requirements.map((requirement) => ({
+                templateId: requirement.templateId,
+                completed: requirement.completed,
+                completedAt: requirement.completedAt,
+                verifiedBy: requirement.verifiedBy,
+                verifiedAt: requirement.verifiedAt,
+              })),
+            }
+          : null,
+        portfolioItems: studentSignals.portfolioItems,
+        resumeData: studentSignals.resumeData,
+        publicCredentialPage: studentSignals.publicCredentialPage,
+        applications: studentSignals.applications,
+        eventRegistrations: studentSignals.eventRegistrations,
+      })
+    : [];
+  const goalReviewItems = studentSignals
+    ? buildGoalReviewQueue({
+        goals: studentSignals.goals.map((goal) => ({
+          id: goal.id,
+          content: goal.content,
+          status: goal.status,
+          createdAt: goal.createdAt,
+        })),
+        links: goalLinks,
+        evidenceEntries: goalEvidenceEntries,
+        now,
+      })
+    : [];
   const lastActivityAt = latestDate(
     studentSignals?.createdAt || null,
     studentSignals?.conversations[0]?.updatedAt || null,
     studentSignals?.goals[0]?.updatedAt || null,
+    studentSignals?.formSubmissions[0]?.updatedAt || null,
+    ...((studentSignals?.orientationProgress || []).map((progress) => progress.completedAt)),
     studentSignals?.portfolioItems[0]?.updatedAt || null,
     studentSignals?.files[0]?.uploadedAt || null,
     studentSignals?.appointments[0]?.updatedAt || null,
     studentSignals?.assignedTasks[0]?.updatedAt || null,
     studentSignals?.applications[0]?.updatedAt || null,
-    studentSignals?.eventRegistrations[0]?.updatedAt || null
+    studentSignals?.eventRegistrations[0]?.updatedAt || null,
+    studentSignals?.publicCredentialPage?.updatedAt || null
   );
-  const desiredAlerts = buildStudentAlertDescriptors({
+  const baselineAlerts = buildStudentAlertDescriptors({
     tasks,
     appointments,
     signals: studentSignals
@@ -816,6 +1206,7 @@ export async function syncStudentAlerts(studentId: string) {
           lastActivityAt,
           applicationCount: studentSignals._count.applications,
           eventRegistrationCount: studentSignals._count.eventRegistrations,
+          orientationStatus: studentStatusSignals,
           certification: certification
             ? {
                 status: certification.status,
@@ -831,6 +1222,24 @@ export async function syncStudentAlerts(studentId: string) {
       : undefined,
     now,
   });
+  const goalAlerts = goalReviewItems.map<AlertDescriptor>((item) => ({
+    alertKey: item.key,
+    type: item.kind,
+    severity: item.severity,
+    title: item.kind === "goal_needs_resource"
+      ? "Goal needs a support plan"
+      : item.kind === "goal_review_pending"
+        ? "Student work is waiting for review"
+        : "Assigned goal resource is stalled",
+    summary: item.kind === "goal_needs_resource"
+      ? `${item.goalTitle} does not have an assigned resource or next step yet.`
+      : item.kind === "goal_review_pending"
+        ? `${item.resourceTitle || "Assigned work"} has student evidence waiting for teacher review.`
+        : `${item.resourceTitle || "Assigned work"} has no observed student activity after assignment.`,
+    sourceType: item.linkId ? "goal_resource_link" : "goal",
+    sourceId: item.linkId || item.goalId,
+  }));
+  const desiredAlerts = [...baselineAlerts, ...goalAlerts];
   const desiredKeys = new Set(desiredAlerts.map((alert) => alert.alertKey));
   const staleAlertIds = existing
     .filter((alert) => !desiredKeys.has(alert.alertKey))
@@ -875,6 +1284,26 @@ export async function syncStudentAlerts(studentId: string) {
       });
     }
   });
+
+  if (studentSignals) {
+    try {
+      await syncInterventionNotifications({
+        studentId,
+        studentName: studentSignals.displayName,
+        studentLabel: studentSignals.studentId,
+        studentEmail: studentSignals.email,
+        alerts: desiredAlerts,
+        evidenceEntries: goalEvidenceEntries,
+        reviewQueue: goalReviewItems,
+        now,
+      });
+    } catch (error) {
+      logger.error("Failed to sync intervention notifications", {
+        studentId,
+        error: String(error),
+      });
+    }
+  }
 }
 
 export async function syncAlertsForStudents(studentIds: string[], batchSize: number = 4) {

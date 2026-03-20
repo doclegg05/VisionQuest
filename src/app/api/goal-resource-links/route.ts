@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { badRequest, conflict, notFound, withTeacherAuth } from "@/lib/api-error";
+import { syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import {
@@ -128,6 +129,8 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
         : `"${title}" was added to your current goal plan.`,
     }).catch((error) => logger.error("Failed to send goal plan notification", { error: String(error) }));
   }
+
+  await syncStudentAlerts(goal.studentId);
 
   const link = toGoalResourceLinkView(created);
   return NextResponse.json({ link });

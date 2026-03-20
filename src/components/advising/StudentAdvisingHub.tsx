@@ -158,8 +158,8 @@ export default function StudentAdvisingHub({
             Your teachers haven&apos;t published bookable office hours yet. Check back soon or message staff directly.
           </div>
         ) : (
-          <div className="mt-4 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-4 space-y-3">
+          <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-3 rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-4">
               <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
@@ -266,7 +266,7 @@ export default function StudentAdvisingHub({
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-4 2xl:grid-cols-[1.1fr_0.9fr]">
         <section className="surface-section p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -292,8 +292,8 @@ export default function StudentAdvisingHub({
                   className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
                       <p className="mt-1 text-sm text-[var(--ink-muted)]">
                         {dateFormatter.format(new Date(appointment.startsAt))}
                       </p>
@@ -301,7 +301,7 @@ export default function StudentAdvisingHub({
                         With {appointment.advisorName}
                       </p>
                     </div>
-                    <span className="rounded-full bg-[rgba(16,37,62,0.08)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+                    <span className="max-w-full whitespace-normal rounded-full bg-[rgba(16,37,62,0.08)] px-3 py-1 text-center text-xs leading-4 font-semibold text-[var(--ink-strong)]">
                       {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                     </span>
                   </div>
@@ -350,8 +350,8 @@ export default function StudentAdvisingHub({
             <div className="space-y-3">
               {alerts.map((alert) => (
                 <div key={alert.id} className="rounded-[1.2rem] border border-amber-200 bg-amber-50/80 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-[var(--ink-strong)]">{alert.title}</p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
                     <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
                       {alert.severity}
                     </span>
@@ -367,7 +367,7 @@ export default function StudentAdvisingHub({
         </section>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-4 2xl:grid-cols-[1.1fr_0.9fr]">
         <section className="surface-section p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -403,8 +403,8 @@ export default function StudentAdvisingHub({
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-[var(--ink-strong)]">{task.title}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-semibold text-[var(--ink-strong)]">{task.title}</p>
                         <p className="mt-1 text-sm text-[var(--ink-muted)]">{dueLabel}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                           Added by {task.createdByName}
@@ -472,8 +472,8 @@ export default function StudentAdvisingHub({
                 <div className="mt-2 space-y-2">
                   {pastAppointments.slice(0, 5).map((appointment) => (
                     <div key={appointment.id} className="rounded-[1rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
                         <span className="text-xs text-[var(--ink-muted)]">
                           {dateFormatter.format(new Date(appointment.startsAt))}
                         </span>
@@ -495,7 +495,7 @@ export default function StudentAdvisingHub({
                 <div className="mt-2 space-y-2">
                   {completedTasks.slice(0, 5).map((task) => (
                     <div key={task.id} className="rounded-[1rem] border border-emerald-200 bg-emerald-50/70 p-3">
-                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
+                      <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
                       <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         Completed {task.completedAt ? dateFormatter.format(new Date(task.completedAt)) : "recently"}
                       </p>

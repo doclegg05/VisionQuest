@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncStudentAlerts } from "@/lib/advising";
 import { badRequest, forbidden, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -96,6 +97,8 @@ export const PATCH = withErrorHandler(async (
     where: { id: link.id },
     data: updates,
   });
+
+  await syncStudentAlerts(link.studentId);
 
   return NextResponse.json({ link: toGoalResourceLinkView(updated) });
 });

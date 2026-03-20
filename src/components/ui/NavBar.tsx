@@ -82,7 +82,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
           />
         </div>
         <div className="flex shrink-0 items-center gap-1.5 min-[430px]:gap-2">
-          <span className="hidden max-w-[8rem] truncate text-right text-sm font-medium text-[var(--ink-muted)] min-[430px]:block">
+          <span className="hidden max-w-[9.75rem] break-words text-right text-sm font-medium leading-4 text-[var(--ink-muted)] min-[430px]:block min-[470px]:max-w-[11rem]">
             {studentName}
           </span>
           <div className="text-[var(--ink-strong)]">

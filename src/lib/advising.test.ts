@@ -4,6 +4,7 @@ import {
   buildBookableAdvisorSlots,
   buildStudentAlertDescriptors,
 } from "./advising";
+import { buildStudentStatusSignals } from "./student-status";
 
 test("buildStudentAlertDescriptors creates overdue task alerts with escalating severity", () => {
   const now = new Date("2026-03-13T17:00:00.000Z");
@@ -99,6 +100,51 @@ test("buildStudentAlertDescriptors flags certifications that have stalled", () =
   assert.equal(alerts.length, 1);
   assert.equal(alerts[0]?.type, "certification_stalled");
   assert.equal(alerts[0]?.severity, "high");
+});
+
+test("buildStudentAlertDescriptors adds orientation follow-up alerts from shared student status", () => {
+  const now = new Date("2026-03-13T17:00:00.000Z");
+  const alerts = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-3",
+      studentCreatedAt: new Date("2026-03-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-03-12T12:00:00.000Z"),
+      applicationCount: 0,
+      eventRegistrationCount: 0,
+      orientationStatus: buildStudentStatusSignals({
+        formSubmissions: [
+          {
+            formId: "student-profile",
+            status: "pending",
+            updatedAt: "2026-03-09T12:00:00.000Z",
+            reviewedAt: null,
+            notes: null,
+          },
+          {
+            formId: "rights-responsibilities",
+            status: "rejected",
+            updatedAt: "2026-03-10T12:00:00.000Z",
+            reviewedAt: "2026-03-11T12:00:00.000Z",
+            notes: "Please add initials",
+          },
+        ],
+        orientationItems: [
+          { id: "orientation-1", label: "Meet your instructor", required: true },
+          { id: "orientation-2", label: "Review class expectations", required: true },
+        ],
+        orientationProgress: [],
+      }),
+      certification: null,
+    },
+  });
+
+  assert.ok(alerts.some((alert) => alert.type === "orientation_form_missing"));
+  assert.ok(alerts.some((alert) => alert.type === "orientation_form_pending_review"));
+  assert.ok(alerts.some((alert) => alert.type === "orientation_form_revision_needed"));
+  assert.ok(alerts.some((alert) => alert.type === "orientation_item_incomplete"));
 });
 
 test("buildBookableAdvisorSlots excludes booked slots and sorts the remainder", () => {

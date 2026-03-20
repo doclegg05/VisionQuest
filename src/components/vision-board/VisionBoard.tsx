@@ -25,7 +25,7 @@ export default function VisionBoard() {
   const [items, setItems] = useState<VisionBoardItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const fetchItems = useCallback(async () => {
     try {
@@ -44,27 +44,65 @@ export default function VisionBoard() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const savePosition = useCallback((id: string, posX: number, posY: number, zIndex: number) => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
+  useEffect(() => {
+    const timers = saveTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+      timers.clear();
+    };
+  }, []);
+
+  const saveItemLayout = useCallback((id: string, payload: Partial<Pick<VisionBoardItemData, "posX" | "posY" | "width" | "zIndex">>) => {
+    const existingTimer = saveTimersRef.current.get(id);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const nextTimer = setTimeout(() => {
       fetch("/api/vision-board", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, posX, posY, zIndex }),
+        body: JSON.stringify({ id, ...payload }),
       }).catch(() => {});
-    }, 500);
+      saveTimersRef.current.delete(id);
+    }, 350);
+
+    saveTimersRef.current.set(id, nextTimer);
   }, []);
 
   const handleMove = useCallback((id: string, posX: number, posY: number) => {
+    let nextZ = 1;
     setItems(prev => {
       const maxZ = Math.max(...prev.map(i => i.zIndex), 0);
+      nextZ = maxZ + 1;
       return prev.map(item =>
-        item.id === id ? { ...item, posX, posY, zIndex: maxZ + 1 } : item
+        item.id === id ? { ...item, posX, posY, zIndex: nextZ } : item
       );
     });
-    const maxZ = Math.max(...items.map(i => i.zIndex), 0);
-    savePosition(id, posX, posY, maxZ + 1);
-  }, [items, savePosition]);
+    saveItemLayout(id, { posX, posY, zIndex: nextZ });
+  }, [saveItemLayout]);
+
+  const handleResize = useCallback((id: string, width: number) => {
+    let nextZ = 1;
+    let nextPosX = 0;
+    setItems((prev) => {
+      const maxZ = Math.max(...prev.map((entry) => entry.zIndex), 0);
+      nextZ = maxZ + 1;
+
+      return prev.map((item) => {
+        if (item.id !== id) return item;
+        nextPosX = Math.max(0, Math.min(100 - width, item.posX));
+        return {
+          ...item,
+          width,
+          posX: nextPosX,
+          zIndex: nextZ,
+        };
+      });
+    });
+
+    saveItemLayout(id, { width, posX: nextPosX, zIndex: nextZ });
+  }, [saveItemLayout]);
 
   const handleDelete = useCallback(async (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
@@ -92,7 +130,17 @@ export default function VisionBoard() {
 
   return (
     <div className="space-y-4">
-      <CorkboardCanvas items={items} onMove={handleMove} onDelete={handleDelete} />
+      <div className="surface-section overflow-hidden p-3 sm:p-4">
+        <div className="mb-3 flex flex-col gap-2 rounded-[1.25rem] border border-[rgba(18,38,63,0.08)] bg-white/55 px-4 py-3 text-sm text-[var(--ink-muted)] sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl">
+            Drag pins anywhere on the board. Use the corner grip to resize notes, images, and linked goals.
+          </p>
+          <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+            {items.length} pinned
+          </span>
+        </div>
+        <CorkboardCanvas items={items} onMove={handleMove} onResize={handleResize} onDelete={handleDelete} />
+      </div>
       <VisionBoardToolbar onItemAdded={handleItemAdded} />
     </div>
   );

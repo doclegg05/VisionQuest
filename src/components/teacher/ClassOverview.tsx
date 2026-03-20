@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import { apiFetch } from "@/lib/api";
+import {
+  teacherDashboardAlertAction,
+  teacherDashboardAlertQuickAction,
+  teacherDashboardReviewAction,
+  teacherDashboardReviewQuickAction,
+} from "@/lib/intervention-notifications";
 
 interface StudentOverview {
   id: string;
@@ -36,6 +43,24 @@ interface DashboardAlert {
   severity: string;
   title: string;
   summary: string;
+  sourceType: string | null;
+  sourceId: string | null;
+  detectedAt: string;
+  student: {
+    id: string;
+    studentId: string;
+    displayName: string;
+  };
+}
+
+interface ReviewQueueItem {
+  id: string;
+  type: string;
+  severity: string;
+  title: string;
+  summary: string;
+  sourceType: string | null;
+  sourceId: string | null;
   detectedAt: string;
   student: {
     id: string;
@@ -63,6 +88,7 @@ type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDo
 export default function ClassOverview() {
   const [students, setStudents] = useState<StudentOverview[]>([]);
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,16 +99,19 @@ export default function ClassOverview() {
   const [totalPages, setTotalPages] = useState(1);
   const [showInactive, setShowInactive] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [actionIntent, setActionIntent] = useState<DashboardActionIntent | null>(null);
 
   const applyStudentPage = useCallback((data: {
     students?: StudentOverview[];
     alerts?: DashboardAlert[];
+    reviewQueue?: ReviewQueueItem[];
     upcomingAppointments?: UpcomingAppointment[];
     totalPages?: number;
     page?: number;
   }) => {
     setStudents(data.students || []);
     setAlerts(data.alerts || []);
+    setReviewQueue(data.reviewQueue || []);
     setUpcomingAppointments(data.upcomingAppointments || []);
     setTotalPages(data.totalPages || 1);
     setPage(data.page || 1);
@@ -180,6 +209,38 @@ export default function ClassOverview() {
     }).format(new Date(dateStr));
   }
 
+  function buildAlertQuickIntent(alert: DashboardAlert): DashboardActionIntent | null {
+    const quickAction = teacherDashboardAlertQuickAction(alert.type);
+    if (!quickAction) return null;
+    if (quickAction.kind === "assign_support" && alert.sourceType !== "goal") return null;
+
+    return {
+      kind: quickAction.kind,
+      title: alert.title,
+      summary: alert.summary,
+      severity: alert.severity,
+      student: alert.student,
+      goalId: alert.sourceType === "goal" ? alert.sourceId : null,
+      linkId: alert.sourceType === "goal_resource_link" ? alert.sourceId : null,
+    };
+  }
+
+  function buildReviewQuickIntent(item: ReviewQueueItem): DashboardActionIntent | null {
+    const quickAction = teacherDashboardReviewQuickAction(item.type);
+    if (!quickAction) return null;
+    if (quickAction.kind === "assign_support" && item.sourceType !== "goal") return null;
+
+    return {
+      kind: quickAction.kind,
+      title: item.title,
+      summary: item.summary,
+      severity: item.severity,
+      student: item.student,
+      goalId: item.sourceType === "goal" ? item.sourceId : null,
+      linkId: item.sourceType === "goal_resource_link" ? item.sourceId : null,
+    };
+  }
+
   if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading class data...</p>;
 
   if (error) return (
@@ -193,7 +254,15 @@ export default function ClassOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      {actionIntent ? (
+        <DashboardActionPanel
+          intent={actionIntent}
+          onClose={() => setActionIntent(null)}
+          onChanged={() => fetchStudents(page)}
+        />
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-3">
         <div className="surface-section p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -214,15 +283,14 @@ export default function ClassOverview() {
           ) : (
             <div className="space-y-3">
               {alerts.map((alert) => (
-                <Link
+                <div
                   key={alert.id}
-                  href={`/teacher/students/${alert.student.id}`}
                   className="block rounded-[1rem] border border-amber-200 bg-amber-50/80 p-4 transition-colors hover:border-amber-300"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                      <p className="mt-1 break-all text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                      <p className="mt-1 break-words text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {alert.student.displayName} • {alert.student.studentId}
                       </p>
                     </div>
@@ -231,10 +299,103 @@ export default function ClassOverview() {
                     </span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
-                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
-                    Detected {relativeTime(alert.detectedAt)}
-                  </p>
-                </Link>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      Detected {relativeTime(alert.detectedAt)}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const quickIntent = buildAlertQuickIntent(alert);
+                        return quickIntent ? (
+                          <button
+                            type="button"
+                            onClick={() => setActionIntent(quickIntent)}
+                            className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-white"
+                          >
+                            {teacherDashboardAlertQuickAction(alert.type)?.label}
+                          </button>
+                        ) : null;
+                      })()}
+                      <Link
+                        href={teacherDashboardAlertAction(alert.type, alert.student.id).href}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                      >
+                        {teacherDashboardAlertAction(alert.type, alert.student.id).label}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="surface-section p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+                Goal review
+              </p>
+              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Review queue</h2>
+            </div>
+            <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+              {reviewQueue.length} open
+            </span>
+          </div>
+
+          {reviewQueue.length === 0 ? (
+            <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+              No goal-linked review items are waiting right now.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {reviewQueue.map((item) => (
+                <div
+                  key={item.id}
+                  className={`block rounded-[1rem] border p-4 transition-colors ${
+                    item.severity === "high"
+                      ? "border-rose-200 bg-rose-50/80 hover:border-rose-300"
+                      : "border-amber-200 bg-amber-50/80 hover:border-amber-300"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{item.title}</p>
+                      <p className="mt-1 break-words text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                        {item.student.displayName} • {item.student.studentId}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-700">
+                      {item.severity}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{item.summary}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      Detected {relativeTime(item.detectedAt)}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const quickIntent = buildReviewQuickIntent(item);
+                        return quickIntent ? (
+                          <button
+                            type="button"
+                            onClick={() => setActionIntent(quickIntent)}
+                            className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-white"
+                          >
+                            {teacherDashboardReviewQuickAction(item.type)?.label}
+                          </button>
+                        ) : null;
+                      })()}
+                      <Link
+                        href={teacherDashboardReviewAction(item.type, item.student.id).href}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                      >
+                        {teacherDashboardReviewAction(item.type, item.student.id).label}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -265,14 +426,14 @@ export default function ClassOverview() {
                   href={`/teacher/students/${appointment.student.id}`}
                   className="block rounded-[1rem] border border-[rgba(15,154,146,0.14)] bg-[rgba(15,154,146,0.08)] p-4 transition-colors hover:border-[rgba(15,154,146,0.28)]"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
-                      <p className="mt-1 break-all text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                      <p className="mt-1 break-words text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {appointment.student.displayName} • {appointment.student.studentId}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-secondary)]">
+                    <span className="max-w-full rounded-full bg-white px-2.5 py-1 text-center text-[11px] leading-4 font-semibold text-[var(--accent-secondary)] whitespace-normal">
                       {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                     </span>
                   </div>
@@ -390,7 +551,7 @@ export default function ClassOverview() {
                     })()}
                     <p className="break-words font-display text-base leading-5 text-[var(--ink-strong)]">{s.displayName}</p>
                   </div>
-                  <p className="ml-4 mt-1 break-all text-xs text-[var(--ink-muted)]">{s.studentId}</p>
+                  <p className="ml-4 mt-1 break-words text-xs text-[var(--ink-muted)]">{s.studentId}</p>
                 </div>
                 {!s.isActive && (
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">Inactive</span>
@@ -457,7 +618,7 @@ export default function ClassOverview() {
       /* Student Table */
       <div className="surface-section overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[52rem] w-full text-sm">
+          <table className="min-w-[58rem] w-full text-sm lg:min-w-[62rem]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th
@@ -524,7 +685,7 @@ export default function ClassOverview() {
                           })()}
                           <p className="break-words font-medium text-gray-900">{s.displayName}</p>
                         </div>
-                        <p className="ml-4 text-xs break-all text-gray-400">{s.studentId}</p>
+                        <p className="ml-4 text-xs break-words text-gray-400">{s.studentId}</p>
                         {s.openAlertCount > 0 && (
                           <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                             {s.openAlertCount} alert{s.openAlertCount === 1 ? "" : "s"}

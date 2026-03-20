@@ -22,6 +22,11 @@ interface EnqueueOptions {
   dedupeKey?: string;
 }
 
+interface EnqueueWithCooldownOptions extends EnqueueOptions {
+  /** Suppress duplicate jobs with the same dedupe key during this window */
+  cooldownHours: number;
+}
+
 /**
  * Enqueue a background job. If a dedupeKey is provided and a pending/processing
  * job with that key already exists, the job is skipped.
@@ -46,6 +51,33 @@ export async function enqueueJob({ type, payload, dedupeKey }: EnqueueOptions): 
   });
 
   return job.id;
+}
+
+export async function enqueueJobWithCooldown({
+  type,
+  payload,
+  dedupeKey,
+  cooldownHours,
+}: EnqueueWithCooldownOptions): Promise<string | null> {
+  if (!dedupeKey) {
+    return enqueueJob({ type, payload });
+  }
+
+  const cutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
+  const existing = await prisma.backgroundJob.findFirst({
+    where: {
+      dedupeKey,
+      createdAt: { gte: cutoff },
+      status: { in: ["pending", "processing", "completed"] },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return null;
+  }
+
+  return enqueueJob({ type, payload, dedupeKey });
 }
 
 /**

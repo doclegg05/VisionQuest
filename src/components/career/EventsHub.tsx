@@ -90,7 +90,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
             const isRegistered = Boolean(event.registration);
             const eventIsPast = new Date(event.endsAt).getTime() < Date.now();
             return (
-              <div key={event.id} className="surface-section p-5">
+              <div id={`event-${event.id}`} key={event.id} className="surface-section p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">

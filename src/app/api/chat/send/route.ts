@@ -12,6 +12,7 @@ import { resolveApiKey } from "@/lib/chat/api-key";
 import { getOrCreateConversation, saveMessage } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { buildStudentStatusSignals, buildStudentStatusSummary } from "@/lib/student-status";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -36,11 +37,47 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   await saveMessage(conversation.id, "user", userMessage);
 
   // Build system prompt context
-  const goals = await prisma.goal.findMany({
-    where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
-  });
+  const [goals, orientationItems, formSubmissions, orientationProgress] = await Promise.all([
+    prisma.goal.findMany({
+      where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
+    }),
+    prisma.orientationItem.findMany({
+      select: {
+        id: true,
+        label: true,
+        required: true,
+      },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.formSubmission.findMany({
+      where: { studentId: session.id },
+      select: {
+        formId: true,
+        status: true,
+        updatedAt: true,
+        reviewedAt: true,
+        notes: true,
+      },
+    }),
+    prisma.orientationProgress.findMany({
+      where: { studentId: session.id },
+      select: {
+        itemId: true,
+        completed: true,
+        completedAt: true,
+      },
+    }),
+  ]);
   const goalsByLevel: Record<string, string> = {};
   for (const g of goals) goalsByLevel[g.level] = g.content;
+  const studentStatusSummary = buildStudentStatusSummary(
+    buildStudentStatusSignals({
+      formSubmissions,
+      orientationItems,
+      orientationProgress,
+    }),
+    { includePositiveSummary: conversation.stage === "orientation" || conversation.stage === "onboarding" },
+  );
 
   const systemPrompt = buildSystemPrompt(conversation.stage as ConversationStage, {
     studentName: session.displayName,
@@ -51,6 +88,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     goals_summary: goals.length > 0
       ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
       : "No planning goals set yet.",
+    student_status_summary: studentStatusSummary || undefined,
     userMessage,
   });
 

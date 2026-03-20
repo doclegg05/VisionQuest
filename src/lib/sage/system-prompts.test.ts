@@ -51,6 +51,16 @@ describe("buildSystemPrompt", () => {
     assert.match(prompt, /CURRENT TASK: Help the student set weekly goals/);
   });
 
+  it("includes verified platform status when live student state is provided", () => {
+    const prompt = buildSystemPrompt("orientation", {
+      student_status_summary: "Required onboarding forms still missing: SPOKES Student Profile.",
+    });
+
+    assert.match(prompt, /VERIFIED STUDENT PLATFORM STATUS:/);
+    assert.match(prompt, /Required onboarding forms still missing: SPOKES Student Profile\./);
+    assert.match(prompt, /Treat this status as factual website state\./);
+  });
+
   it("leaves placeholder-free prompts when optional context is omitted", () => {
     const prompt = buildSystemPrompt("general");
 

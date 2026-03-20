@@ -122,11 +122,11 @@ export default function OpportunitiesHub({
           {opportunities.map((opportunity) => {
             const draft = drafts[opportunity.id] || { status: "saved", notes: "" };
             return (
-              <div key={opportunity.id} className="surface-section p-5">
+              <div id={`opportunity-${opportunity.id}`} key={opportunity.id} className="surface-section p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-display text-2xl text-[var(--ink-strong)]">{opportunity.title}</h2>
+                      <h2 className="break-words font-display text-2xl text-[var(--ink-strong)]">{opportunity.title}</h2>
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                         opportunity.status === "open"
                           ? "bg-emerald-100 text-emerald-700"
@@ -135,7 +135,7 @@ export default function OpportunitiesHub({
                         {opportunity.status}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-[var(--ink-muted)]">
+                    <p className="mt-2 break-words text-sm text-[var(--ink-muted)]">
                       {opportunity.company} • {opportunity.type}
                       {opportunity.location ? ` • ${opportunity.location}` : ""}
                     </p>
@@ -150,7 +150,7 @@ export default function OpportunitiesHub({
                       href={opportunity.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-white"
+                      className="shrink-0 rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-white"
                     >
                       Open listing
                     </a>
@@ -158,10 +158,10 @@ export default function OpportunitiesHub({
                 </div>
 
                 {opportunity.description ? (
-                  <p className="mt-4 text-sm leading-7 text-[var(--ink-muted)]">{opportunity.description}</p>
+                  <p className="mt-4 break-words text-sm leading-7 text-[var(--ink-muted)]">{opportunity.description}</p>
                 ) : null}
 
-                <div className="mt-5 grid gap-3 lg:grid-cols-[14rem_1fr_auto]">
+                <div className="mt-5 grid gap-3 md:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_auto]">
                   <select
                     value={draft.status}
                     onChange={(event) =>
@@ -200,7 +200,7 @@ export default function OpportunitiesHub({
                     type="button"
                     onClick={() => void saveApplication(opportunity.id)}
                     disabled={savingId === opportunity.id}
-                    className="primary-button px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="primary-button px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-start"
                   >
                     {savingId === opportunity.id ? "Saving..." : "Update"}
                   </button>

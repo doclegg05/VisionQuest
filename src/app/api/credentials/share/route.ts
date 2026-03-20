@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
 
@@ -100,6 +101,8 @@ export const POST = withAuth(async (session, req: Request) => {
       isPublic: eligible ? isPublic : false,
     },
   });
+
+  await syncStudentAlerts(session.id);
 
   const baseUrl = process.env.APP_BASE_URL || new URL(req.url).origin;
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncStudentAlerts } from "@/lib/advising";
 import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
@@ -160,6 +161,8 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
         templateId: requirement.template.id,
       },
     });
+
+    await syncStudentAlerts(requirement.certification.studentId);
 
     return NextResponse.json({ ok: true });
   }

@@ -88,6 +88,31 @@ export async function sendNotification(
   if (set.size === 0) connections.delete(userId);
 }
 
+export async function sendNotificationWithCooldown(
+  userId: string,
+  payload: { type: string; title: string; body?: string },
+  cooldownHours: number,
+): Promise<boolean> {
+  const cutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
+  const existing = await prisma.notification.findFirst({
+    where: {
+      studentId: userId,
+      type: payload.type,
+      title: payload.title,
+      body: payload.body || null,
+      createdAt: { gte: cutoff },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return false;
+  }
+
+  await sendNotification(userId, payload);
+  return true;
+}
+
 /**
  * Get unread notification count for a user.
  */

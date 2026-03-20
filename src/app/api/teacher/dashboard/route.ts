@@ -166,7 +166,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     };
   });
 
-  const [alerts, upcomingAppointments] = await Promise.all([
+  const [alerts, reviewQueue, upcomingAppointments] = await Promise.all([
     prisma.studentAlert.findMany({
       where: { status: "open" },
       select: {
@@ -175,6 +175,8 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
         severity: true,
         title: true,
         summary: true,
+        sourceType: true,
+        sourceId: true,
         detectedAt: true,
         student: {
           select: {
@@ -185,6 +187,33 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
         },
       },
       orderBy: { detectedAt: "desc" },
+      take: 8,
+    }),
+    prisma.studentAlert.findMany({
+      where: {
+        status: "open",
+        type: {
+          in: ["goal_needs_resource", "goal_resource_stale", "goal_review_pending"],
+        },
+      },
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        title: true,
+        summary: true,
+        sourceType: true,
+        sourceId: true,
+        detectedAt: true,
+        student: {
+          select: {
+            id: true,
+            studentId: true,
+            displayName: true,
+          },
+        },
+      },
+      orderBy: [{ severity: "asc" }, { detectedAt: "desc" }],
       take: 8,
     }),
     prisma.appointment.findMany({
@@ -218,6 +247,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
   return NextResponse.json({
     students: overview,
     alerts,
+    reviewQueue,
     upcomingAppointments,
     total,
     page,

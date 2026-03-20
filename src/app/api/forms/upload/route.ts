@@ -4,6 +4,7 @@ import { uploadFile, generateStorageKey, validateFile } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
+import { syncStudentAlerts } from "@/lib/advising";
 
 export const POST = withAuth(async (session, req: NextRequest) => {
   try {
@@ -64,6 +65,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         notes: null,
       },
     });
+
+    await syncStudentAlerts(session.id);
 
     return NextResponse.json({ submission, fileId: fileRecord.id });
   } catch (error) {

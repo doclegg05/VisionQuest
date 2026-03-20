@@ -58,7 +58,7 @@ export default function ResourceLibrary() {
   }, [filteredForms]);
 
   return (
-    <div className="mt-8 space-y-8">
+    <div className="space-y-8">
       {/* Search */}
       <div>
         <input

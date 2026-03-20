@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GOAL_LEVEL_META, goalStatusLabel, goalCountsTowardPlan } from "@/lib/goals";
 import {
   GOAL_RESOURCE_LINK_STATUS_LABELS,
@@ -29,9 +29,37 @@ const GOAL_STATUS_STYLES: Record<string, string> = {
   abandoned: "bg-slate-100 text-slate-600",
 };
 
+function formatDueDate(value: string | Date | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function toDueAtPayload(value: string): string | null {
+  if (!value) return null;
+  return new Date(`${value}T12:00:00.000Z`).toISOString();
+}
+
+function createLinkDrafts(goalPlans: GoalPlanEntry[]) {
+  return Object.fromEntries(
+    goalPlans.flatMap((plan) => plan.links.map((link) => [link.id, {
+      dueAt: formatDueDate(link.dueAt),
+      notes: link.notes || "",
+    }])),
+  ) as Record<string, { dueAt: string; notes: string }>;
+}
+
 export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: GoalSupportPlannerProps) {
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
+  const [savingLinkId, setSavingLinkId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { dueAt: string; notes: string }>>({});
+  const [linkDrafts, setLinkDrafts] = useState(() => createLinkDrafts(goalPlans));
+
+  useEffect(() => {
+    setLinkDrafts(createLinkDrafts(goalPlans));
+  }, [goalPlans]);
 
   const planningGoals = goals.filter((goal) => goalCountsTowardPlan(goal.status));
   if (planningGoals.length === 0) {
@@ -44,6 +72,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
 
   async function handleAssign(goalId: string, recommendation: GoalPlanEntry["recommendations"][number]) {
     const assignKey = `${goalId}:${recommendation.resourceType}:${recommendation.resourceId}`;
+    const draft = assignmentDrafts[assignKey] || { dueAt: "", notes: "" };
     setAssigningKey(assignKey);
     setMessage(null);
 
@@ -59,6 +88,8 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
           description: recommendation.description,
           url: recommendation.url,
           linkType: "assigned",
+          dueAt: toDueAtPayload(draft.dueAt),
+          notes: draft.notes.trim(),
         }),
       });
 
@@ -67,6 +98,11 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
         throw new Error(payload?.error || "Could not assign the resource.");
       }
 
+      setAssignmentDrafts((current) => {
+        const next = { ...current };
+        delete next[assignKey];
+        return next;
+      });
       setMessage({ tone: "success", text: `"${recommendation.title}" assigned to the goal plan.` });
       await onChanged();
     } catch (error) {
@@ -76,6 +112,40 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
       });
     } finally {
       setAssigningKey(null);
+    }
+  }
+
+  async function handleSaveLink(linkId: string) {
+    const draft = linkDrafts[linkId];
+    if (!draft) return;
+
+    setSavingLinkId(linkId);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/goal-resource-links/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dueAt: toDueAtPayload(draft.dueAt),
+          notes: draft.notes.trim(),
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Could not update the plan details.");
+      }
+
+      setMessage({ tone: "success", text: "Plan details updated." });
+      await onChanged();
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Could not update the plan details.",
+      });
+    } finally {
+      setSavingLinkId(null);
     }
   }
 
@@ -127,38 +197,89 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
                   Assigned Resources
                 </p>
-                {plan.links.map((link) => (
-                  <div key={link.id} className="rounded-lg border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-                            {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
-                          </span>
-                          <p className="text-sm font-semibold text-gray-900">{link.title}</p>
+                {plan.links.map((link) => {
+                  const draft = linkDrafts[link.id] || { dueAt: "", notes: "" };
+                  return (
+                    <div key={link.id} className="rounded-lg border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                              {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
+                            </span>
+                            <p className="text-sm font-semibold text-gray-900">{link.title}</p>
+                          </div>
+                          {link.description ? (
+                            <p className="mt-1 text-sm text-gray-600">{link.description}</p>
+                          ) : null}
                         </div>
-                        {link.description ? (
-                          <p className="mt-1 text-sm text-gray-600">{link.description}</p>
-                        ) : null}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                            {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
+                          </span>
+                          {link.url ? (
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                            >
+                              Open
+                            </a>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                          {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
-                        </span>
-                        {link.url ? (
-                          <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
-                          >
-                            Open
-                          </a>
-                        ) : null}
+
+                      <div className="mt-3 grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_auto] md:items-end">
+                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                          Due date
+                          <input
+                            type="date"
+                            value={draft.dueAt}
+                            onChange={(event) =>
+                              setLinkDrafts((current) => ({
+                                ...current,
+                                [link.id]: {
+                                  ...draft,
+                                  dueAt: event.target.value,
+                                },
+                              }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal uppercase tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                          />
+                        </label>
+
+                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                          Instructor note
+                          <textarea
+                            value={draft.notes}
+                            onChange={(event) =>
+                              setLinkDrafts((current) => ({
+                                ...current,
+                                [link.id]: {
+                                  ...draft,
+                                  notes: event.target.value.slice(0, 1000),
+                                },
+                              }))
+                            }
+                            rows={2}
+                            placeholder="Add context, a checkpoint, or the next expected move."
+                            className="mt-1 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLink(link.id)}
+                          disabled={savingLinkId === link.id}
+                          className="rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {savingLinkId === link.id ? "Saving..." : "Save details"}
+                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : null}
 
@@ -171,6 +292,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                   const linkKey = `${recommendation.resourceType}:${recommendation.resourceId}`;
                   const alreadyLinked = plan.links.some((link) => `${link.resourceType}:${link.resourceId}` === linkKey);
                   const assignKey = `${goal.id}:${linkKey}`;
+                  const draft = assignmentDrafts[assignKey] || { dueAt: "", notes: "" };
 
                   return (
                     <div key={linkKey} className="rounded-lg border border-dashed border-[rgba(18,38,63,0.12)] bg-white p-3">
@@ -209,6 +331,47 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                           </button>
                         </div>
                       </div>
+
+                      {!alreadyLinked ? (
+                        <div className="mt-3 grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)]">
+                          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                            Due date
+                            <input
+                              type="date"
+                              value={draft.dueAt}
+                              onChange={(event) =>
+                                setAssignmentDrafts((current) => ({
+                                  ...current,
+                                  [assignKey]: {
+                                    ...draft,
+                                    dueAt: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal uppercase tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                            />
+                          </label>
+
+                          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                            Instructor note
+                            <textarea
+                              value={draft.notes}
+                              onChange={(event) =>
+                                setAssignmentDrafts((current) => ({
+                                  ...current,
+                                  [assignKey]: {
+                                    ...draft,
+                                    notes: event.target.value.slice(0, 1000),
+                                  },
+                                }))
+                              }
+                              rows={2}
+                              placeholder="Optional context or next-step instruction."
+                              className="mt-1 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                            />
+                          </label>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}

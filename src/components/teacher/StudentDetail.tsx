@@ -6,7 +6,10 @@ import GoalTree from "./GoalTree";
 import GoalSupportPlanner from "./GoalSupportPlanner";
 import ReadinessScore from "@/components/ui/ReadinessScore";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
-import type { GoalPlanEntry } from "@/lib/goal-resource-links";
+import {
+  GOAL_RESOURCE_TYPE_LABELS,
+  type GoalPlanEntry,
+} from "@/lib/goal-resource-links";
 
 interface GoalData {
   id: string;
@@ -124,10 +127,59 @@ interface AlertData {
   detectedAt: string;
 }
 
+interface GoalEvidenceData {
+  goalId: string;
+  linkId: string;
+  resourceType: keyof typeof GOAL_RESOURCE_TYPE_LABELS;
+  resourceId: string;
+  title: string;
+  linkStatus: string;
+  evidenceStatus: "not_started" | "in_progress" | "submitted" | "completed" | "approved" | "blocked";
+  evidenceSource: "none" | "student_update" | "system" | "teacher_review";
+  reviewNeeded: boolean;
+  evidenceLabel: string;
+  summary: string;
+  lastObservedAt: string | null;
+  dueAt: string | null;
+  notes: string | null;
+}
+
+interface ReviewQueueItemData {
+  key: string;
+  kind: "goal_needs_resource" | "goal_resource_stale" | "goal_review_pending";
+  severity: "medium" | "high";
+  goalId: string;
+  goalTitle: string;
+  linkId: string | null;
+  resourceTitle: string | null;
+  summary: string;
+  dueAt: string | null;
+  detectedAt: string | null;
+}
+
+interface FormSubmissionData {
+  id: string;
+  formId: string;
+  title: string;
+  description: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
+  notes: string | null;
+  file: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    uploadedAt: string;
+  } | null;
+}
+
 interface PublicCredentialPageData {
   isPublic: boolean;
   slug: string;
   headline: string | null;
+  updatedAt?: string;
 }
 
 interface ApplicationData {
@@ -176,6 +228,9 @@ interface StudentData {
   readinessBreakdown: ReadinessBreakdown;
   goals: GoalData[];
   goalPlans: GoalPlanEntry[];
+  goalEvidence: GoalEvidenceData[];
+  reviewQueue: ReviewQueueItemData[];
+  formSubmissions: FormSubmissionData[];
   orientation: {
     items: OrientationItemData[];
     progress: OrientationProgressData[];
@@ -200,6 +255,21 @@ interface StudentData {
   alerts: AlertData[];
   conversations: ConversationSummary[];
 }
+
+const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
+  not_started: "bg-slate-100 text-slate-600",
+  in_progress: "bg-sky-100 text-sky-700",
+  submitted: "bg-amber-100 text-amber-700",
+  completed: "bg-emerald-100 text-emerald-700",
+  approved: "bg-emerald-100 text-emerald-700",
+  blocked: "bg-rose-100 text-rose-700",
+};
+
+const REVIEW_KIND_LABELS: Record<ReviewQueueItemData["kind"], string> = {
+  goal_needs_resource: "Needs assignment",
+  goal_resource_stale: "Needs follow-up",
+  goal_review_pending: "Needs review",
+};
 
 const NOTE_CATEGORIES = [
   { value: "general", label: "General" },
@@ -246,6 +316,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+  const [reviewingFormId, setReviewingFormId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
   const [appointmentForm, setAppointmentForm] = useState({
@@ -504,6 +575,41 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   }
 
+  async function handleReviewForm(submissionId: string, status: "approved" | "rejected") {
+    const notes = status === "rejected"
+      ? window.prompt("Optional note for the student:", "") 
+      : "";
+    if (status === "rejected" && notes === null) {
+      return;
+    }
+
+    setReviewingFormId(submissionId);
+    setPanelMessage(null);
+
+    try {
+      const response = await fetch(`/api/teacher/students/${studentId}/forms`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionId,
+          status,
+          notes: notes || "",
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getErrorMessage(payload, "Could not update the form review."));
+      }
+
+      setPanelMessage(status === "approved" ? "Form approved." : "Form returned for revision.");
+      await loadData();
+    } catch (err) {
+      setPanelMessage(err instanceof Error ? err.message : "Could not update the form review.");
+    } finally {
+      setReviewingFormId(null);
+    }
+  }
+
   if (loading) return <p className="text-sm text-gray-400">Loading student data...</p>;
 
   if (error) {
@@ -526,6 +632,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     readinessBreakdown,
     goals,
     goalPlans,
+    goalEvidence,
+    reviewQueue,
+    formSubmissions,
     orientation,
     certification,
     publicCredentialPage,
@@ -553,6 +662,24 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const activeEventRegistrations = eventRegistrations.filter(
     (registration) => registration.status === "registered"
   );
+  const evidenceByLinkId = new Map(goalEvidence.map((entry) => [entry.linkId, entry]));
+  const goalById = new Map(goals.map((goal) => [goal.id, goal]));
+  const reviewActionForItem = (item: ReviewQueueItemData) => {
+    const evidence = item.linkId ? evidenceByLinkId.get(item.linkId) : null;
+    if (item.kind === "goal_needs_resource") {
+      return { href: "#goal-plans", label: "Assign support" };
+    }
+    if (evidence?.resourceType === "form") {
+      return { href: "#submitted-forms", label: "Review form" };
+    }
+    if (evidence?.resourceType === "certification") {
+      return { href: "#certification-review", label: "Review certification" };
+    }
+    if (evidence?.resourceType === "career_step") {
+      return { href: "#career-progress", label: "Open career progress" };
+    }
+    return { href: "#goal-evidence", label: "Open evidence" };
+  };
 
   return (
     <div className="space-y-6">
@@ -566,7 +693,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         </div>
       ) : null}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="goal-evidence" className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">{student.displayName}</h2>
@@ -736,6 +863,232 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           </div>
         </div>
       )}
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">Goal Evidence & Review</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Track which assigned resources have real student activity and what still needs instructor follow-up.
+            </p>
+          </div>
+          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+            {reviewQueue.length} open review item{reviewQueue.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Review queue</p>
+            {reviewQueue.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-gray-500">
+                No goal-linked review items are open right now.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {reviewQueue.map((item) => (
+                  <div
+                    key={item.key}
+                    className={`rounded-lg border p-4 ${
+                      item.severity === "high"
+                        ? "border-rose-200 bg-rose-50/70"
+                        : "border-amber-200 bg-amber-50/70"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-600">
+                            {REVIEW_KIND_LABELS[item.kind]}
+                          </span>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {item.resourceTitle || item.goalTitle}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-gray-600">{item.summary}</p>
+                        <p className="mt-2 text-xs text-gray-400">
+                          Goal: {item.goalTitle}
+                          {item.detectedAt ? ` • ${dateFormatter.format(new Date(item.detectedAt))}` : ""}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-700">
+                        {item.severity}
+                      </span>
+                    </div>
+                    {item.dueAt ? (
+                      <p className="mt-2 text-xs font-medium text-rose-600">
+                        Due {dateFormatter.format(new Date(item.dueAt))}
+                      </p>
+                    ) : null}
+                    <a
+                      href={reviewActionForItem(item).href}
+                      className="mt-3 inline-flex text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                    >
+                      {reviewActionForItem(item).label} →
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Assigned resource evidence</p>
+            {goalPlans.every((plan) => plan.links.length === 0) ? (
+              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-gray-500">
+                No assigned goal resources yet.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-4">
+                {goalPlans
+                  .filter((plan) => plan.links.length > 0)
+                  .map((plan) => {
+                    const goal = goalById.get(plan.goalId);
+                    if (!goal) return null;
+
+                    return (
+                      <div key={plan.goalId} className="rounded-lg border border-gray-100 p-4">
+                        <p className="text-sm font-semibold text-gray-900">{goal.content}</p>
+                        <div className="mt-3 space-y-3">
+                          {plan.links.map((link) => {
+                            const evidence = evidenceByLinkId.get(link.id);
+                            return (
+                              <div key={link.id} className="rounded-lg border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] p-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                                        {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
+                                      </span>
+                                      <p className="text-sm font-semibold text-gray-900">{link.title}</p>
+                                    </div>
+                                    <p className="mt-2 text-sm text-gray-600">
+                                      {evidence?.summary || "No evidence summary available."}
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                      {evidence?.lastObservedAt ? (
+                                        <span>
+                                          Last update {dateFormatter.format(new Date(evidence.lastObservedAt))}
+                                        </span>
+                                      ) : null}
+                                      {evidence?.dueAt ? (
+                                        <span>Due {dateFormatter.format(new Date(evidence.dueAt))}</span>
+                                      ) : null}
+                                      {link.url ? (
+                                        <a
+                                          href={link.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                                        >
+                                          Open resource
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${EVIDENCE_STATUS_STYLES[evidence?.evidenceStatus || "not_started"]}`}>
+                                      {evidence?.evidenceLabel || "Waiting for activity"}
+                                    </span>
+                                    {evidence?.reviewNeeded ? (
+                                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                                        Teacher review
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div id="submitted-forms" className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">Submitted Forms</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Review uploaded paperwork and clear pending review items from the advising queue.
+            </p>
+          </div>
+          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+            {formSubmissions.length} submission{formSubmissions.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {formSubmissions.length === 0 ? (
+          <p className="mt-4 text-sm text-gray-400">No form submissions yet.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {formSubmissions.map((submission) => (
+              <div key={submission.id} className="rounded-lg border border-gray-100 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900">{submission.title}</p>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        submission.status === "approved"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : submission.status === "rejected"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {submission.status}
+                      </span>
+                    </div>
+                    {submission.description ? (
+                      <p className="mt-2 text-sm text-gray-600">{submission.description}</p>
+                    ) : null}
+                    <p className="mt-2 text-xs text-gray-400">
+                      Updated {dateFormatter.format(new Date(submission.updatedAt))}
+                      {submission.reviewedAt ? ` • Reviewed ${dateFormatter.format(new Date(submission.reviewedAt))}` : ""}
+                    </p>
+                    {submission.notes ? (
+                      <p className="mt-2 text-sm text-gray-600">Note: {submission.notes}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {submission.file ? (
+                      <a
+                        href={`/api/files/download?id=${submission.file.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-white"
+                      >
+                        Open file
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => handleReviewForm(submission.id, "approved")}
+                      disabled={reviewingFormId === submission.id}
+                      className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
+                    >
+                      {reviewingFormId === submission.id ? "Saving..." : "Approve"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReviewForm(submission.id, "rejected")}
+                      disabled={reviewingFormId === submission.id}
+                      className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-60"
+                    >
+                      Return
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -1134,7 +1487,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="goal-plans" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Goals ({goals.length})</h3>
         <div className="mb-5">
           <GoalSupportPlanner goals={goals} goalPlans={goalPlans} onChanged={loadData} />
@@ -1142,7 +1495,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         <GoalTree goals={goals} />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="orientation-review" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Orientation ({orientDone}/{orientTotal})
         </h3>
@@ -1170,7 +1523,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="certification-review" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Ready to Work Certification ({certDone}/{certification.templates.length})
           {certification.cert?.status === "completed" && (
@@ -1261,7 +1614,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="career-progress" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Career Progress ({activeApplications.length} active apps • {activeEventRegistrations.length} event registrations)
         </h3>

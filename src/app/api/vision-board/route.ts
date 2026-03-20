@@ -5,6 +5,22 @@ import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
 
+function clampPercent(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampOptionalPercent(value: unknown, min: number, max: number) {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  return clampPercent(numeric, min, max);
+}
+
+function defaultWidthForType(type: "image" | "note" | "goal") {
+  if (type === "image") return 26;
+  if (type === "goal") return 22;
+  return 20;
+}
+
 // GET — list all vision board items for student
 export const GET = withAuth(async (session) => {
   const items = await prisma.visionBoardItem.findMany({
@@ -58,6 +74,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       goalId: goalId || null,
       posX: posX ?? 30 + Math.random() * 40, // Random center-ish position
       posY: posY ?? 20 + Math.random() * 40,
+      width: defaultWidthForType(type),
       color: color || (type === "note" ? "yellow" : null),
       pinColor: pinColor || "red",
       rotation,
@@ -98,9 +115,9 @@ export const PUT = withAuth(async (session, req: NextRequest) => {
   const updated = await prisma.visionBoardItem.update({
     where: { id },
     data: {
-      ...(posX !== undefined ? { posX } : {}),
-      ...(posY !== undefined ? { posY } : {}),
-      ...(width !== undefined ? { width } : {}),
+      ...(posX !== undefined ? { posX: clampOptionalPercent(posX, 0, 100) } : {}),
+      ...(posY !== undefined ? { posY: clampOptionalPercent(posY, 0, 90) } : {}),
+      ...(width !== undefined ? { width: clampOptionalPercent(width, 14, 42) } : {}),
       ...(rotation !== undefined ? { rotation } : {}),
       ...(zIndex !== undefined ? { zIndex } : {}),
       ...(content !== undefined ? { content } : {}),

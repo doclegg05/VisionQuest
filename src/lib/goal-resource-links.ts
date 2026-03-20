@@ -1,4 +1,12 @@
-export const GOAL_RESOURCE_TYPES = ["platform", "document"] as const;
+export const GOAL_RESOURCE_TYPES = [
+  "platform",
+  "document",
+  "form",
+  "certification",
+  "orientation",
+  "portfolio_task",
+  "career_step",
+] as const;
 export type GoalResourceType = (typeof GOAL_RESOURCE_TYPES)[number];
 
 export const GOAL_RESOURCE_LINK_TYPES = ["recommended", "assigned"] as const;
@@ -17,6 +25,11 @@ export type GoalResourceLinkStatus = (typeof GOAL_RESOURCE_LINK_STATUSES)[number
 export const GOAL_RESOURCE_TYPE_LABELS: Record<GoalResourceType, string> = {
   platform: "Platform",
   document: "Document",
+  form: "Form",
+  certification: "Certification",
+  orientation: "Orientation Step",
+  portfolio_task: "Portfolio Task",
+  career_step: "Career Step",
 };
 
 export const GOAL_RESOURCE_LINK_STATUS_LABELS: Record<GoalResourceLinkStatus, string> = {

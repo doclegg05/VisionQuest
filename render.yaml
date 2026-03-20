@@ -72,3 +72,20 @@ services:
           type: web
           name: visionquest
           envVarKey: CRON_SECRET
+  - type: cron
+    name: visionquest-job-processor
+    runtime: node
+    schedule: "*/10 * * * *"
+    buildCommand: "true"
+    startCommand: node scripts/run-job-processor.mjs
+    envVars:
+      - key: APP_BASE_URL
+        fromService:
+          type: web
+          name: visionquest
+          envVarKey: APP_BASE_URL
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: visionquest
+          envVarKey: CRON_SECRET

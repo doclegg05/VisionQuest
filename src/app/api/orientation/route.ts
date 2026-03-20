@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { syncStudentAlerts } from "@/lib/advising";
 import { withAuth } from "@/lib/api-error";
 
 // GET — list orientation items with student's progress
@@ -41,6 +42,8 @@ export const POST = withAuth(async (session, req: Request) => {
     update: { completed, completedAt: completed ? new Date() : null },
     create: { studentId: session.id, itemId, completed, completedAt: completed ? new Date() : null },
   });
+
+  await syncStudentAlerts(session.id);
 
   return NextResponse.json({ ok: true });
 });

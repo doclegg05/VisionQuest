@@ -17,12 +17,24 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
       : form.audience === "student"
         ? "Student"
         : "Instructor";
+  const downloadHref = `/api/forms/download?file=${encodeURIComponent(form.fileName)}&name=${encodeURIComponent(form.fileName)}`;
 
   return (
     <div className="surface-section flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 flex-1">
         <p className="font-medium text-[var(--ink-strong)]">{form.title}</p>
         <p className="mt-1 text-xs text-[var(--ink-muted)]">{form.description}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <a
+            href={downloadHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+          >
+            Open form
+          </a>
+          <span className="text-xs text-[var(--ink-muted)]">{form.fileName}</span>
+        </div>
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2">

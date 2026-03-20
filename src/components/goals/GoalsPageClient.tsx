@@ -508,6 +508,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                       {link.description ? (
                                         <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">{link.description}</p>
                                       ) : null}
+                                      {link.notes ? (
+                                        <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">{link.notes}</p>
+                                      ) : null}
                                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                                         <span className={`rounded-full px-2.5 py-1 font-semibold ${RESOURCE_STATUS_STYLES[link.status]}`}>
                                           {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}

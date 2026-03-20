@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import {
+  buildGoalEvidenceEntries,
+  buildGoalReviewQueue,
+  serializeGoalEvidenceEntries,
+  serializeGoalReviewQueue,
+} from "@/lib/goal-evidence";
 import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
+import { parseState } from "@/lib/progression/engine";
+import { FORMS } from "@/lib/spokes/forms";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
 // GET — individual student detail for teacher view
@@ -85,7 +93,21 @@ export const GET = withTeacherAuth(async (
           isPublic: true,
           slug: true,
           headline: true,
+          updatedAt: true,
         },
+      },
+      formSubmissions: {
+        select: {
+          id: true,
+          formId: true,
+          fileId: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          reviewedAt: true,
+          notes: true,
+        },
+        orderBy: { updatedAt: "desc" },
       },
       portfolioItems: {
         select: {
@@ -93,12 +115,14 @@ export const GET = withTeacherAuth(async (
           title: true,
           type: true,
           createdAt: true,
+          updatedAt: true,
         },
         orderBy: { createdAt: "desc" },
       },
       applications: {
         select: {
           id: true,
+          opportunityId: true,
           status: true,
           updatedAt: true,
           appliedAt: true,
@@ -117,6 +141,7 @@ export const GET = withTeacherAuth(async (
       eventRegistrations: {
         select: {
           id: true,
+          eventId: true,
           status: true,
           registeredAt: true,
           updatedAt: true,
@@ -234,24 +259,40 @@ export const GET = withTeacherAuth(async (
   }
 
   // Get orientation items for context
-  const orientationItems = await prisma.orientationItem.findMany({
-    orderBy: { sortOrder: "asc" },
-  });
-
-  // Get cert templates for context
-  const certTemplates = await prisma.certTemplate.findMany({
-    where: { certType: "ready-to-work" },
-    orderBy: { sortOrder: "asc" },
-  });
+  const formFileIds = student.formSubmissions.map((submission) => submission.fileId).filter(Boolean);
+  const [orientationItems, certTemplates, formFiles] = await Promise.all([
+    prisma.orientationItem.findMany({
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.certTemplate.findMany({
+      where: { certType: "ready-to-work" },
+      orderBy: { sortOrder: "asc" },
+    }),
+    formFileIds.length > 0
+      ? prisma.fileUpload.findMany({
+          where: { id: { in: formFileIds } },
+          select: {
+            id: true,
+            filename: true,
+            mimeType: true,
+            uploadedAt: true,
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+  const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
+  const formFileById = new Map(formFiles.map((file) => [file.id, file]));
 
   // Parse progression
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rawProgression: any = null;
+  let parsedProgression = parseState(null);
   let progression = { xp: 0, level: 1, streaks: { daily: { current: 0, longest: 0 } }, achievements: [] as string[] };
   if (student.progression?.state) {
     try {
       rawProgression = JSON.parse(student.progression.state);
       progression = rawProgression;
+      parsedProgression = parseState(student.progression.state);
     } catch { /* ignore */ }
   }
 
@@ -303,6 +344,36 @@ export const GET = withTeacherAuth(async (
       .map((link) => toGoalResourceLinkView(link))
       .filter((link): link is NonNullable<typeof link> => !!link),
   }));
+  const goalEvidence = serializeGoalEvidenceEntries(buildGoalEvidenceEntries({
+    links: goalPlans.flatMap((plan) => plan.links),
+    progressionState: parsedProgression,
+    formSubmissions: student.formSubmissions,
+    orientationProgress: student.orientationProgress,
+    certification: student.certifications[0]
+      ? {
+          status: student.certifications[0].status,
+          startedAt: student.certifications[0].startedAt,
+          completedAt: student.certifications[0].completedAt,
+          requirements: student.certifications[0].requirements.map((requirement) => ({
+            templateId: requirement.templateId,
+            completed: requirement.completed,
+            completedAt: requirement.completedAt,
+            verifiedBy: requirement.verifiedBy,
+            verifiedAt: requirement.verifiedAt,
+          })),
+        }
+      : null,
+    portfolioItems: student.portfolioItems,
+    resumeData: student.resumeData,
+    publicCredentialPage: student.publicCredentialPage,
+    applications: student.applications,
+    eventRegistrations: student.eventRegistrations,
+  }));
+  const reviewQueue = serializeGoalReviewQueue(buildGoalReviewQueue({
+    goals: student.goals,
+    links: goalPlans.flatMap((plan) => plan.links),
+    evidenceEntries: goalEvidence,
+  }));
 
   return NextResponse.json({
     student: {
@@ -318,6 +389,31 @@ export const GET = withTeacherAuth(async (
     readinessBreakdown: readinessResult.breakdown,
     goals: student.goals,
     goalPlans,
+    goalEvidence,
+    reviewQueue,
+    formSubmissions: student.formSubmissions.map((submission) => {
+      const form = formDefinitionById.get(submission.formId);
+      const file = formFileById.get(submission.fileId);
+      return {
+        id: submission.id,
+        formId: submission.formId,
+        title: form?.title || submission.formId,
+        description: form?.description || null,
+        status: submission.status,
+        createdAt: submission.createdAt,
+        updatedAt: submission.updatedAt,
+        reviewedAt: submission.reviewedAt,
+        notes: submission.notes,
+        file: file
+          ? {
+              id: file.id,
+              filename: file.filename,
+              mimeType: file.mimeType,
+              uploadedAt: file.uploadedAt,
+            }
+          : null,
+      };
+    }),
     orientation: {
       items: orientationItems,
       progress: student.orientationProgress,

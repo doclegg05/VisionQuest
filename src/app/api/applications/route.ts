@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
@@ -81,6 +82,8 @@ export const POST = withAuth(async (session, req: Request) => {
       status,
     },
   });
+
+  await syncStudentAlerts(session.id);
 
   return NextResponse.json({ application });
 });

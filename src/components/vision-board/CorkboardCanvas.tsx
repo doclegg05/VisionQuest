@@ -7,10 +7,11 @@ import type { VisionBoardItemData } from "./VisionBoard";
 interface CorkboardCanvasProps {
   items: VisionBoardItemData[];
   onMove: (id: string, posX: number, posY: number) => void;
+  onResize: (id: string, width: number) => void;
   onDelete: (id: string) => void;
 }
 
-export default function CorkboardCanvas({ items, onMove, onDelete }: CorkboardCanvasProps) {
+export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: CorkboardCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -27,13 +28,15 @@ export default function CorkboardCanvas({ items, onMove, onDelete }: CorkboardCa
     const offsetX = parseFloat(e.dataTransfer.getData("offsetX") || "0");
     const offsetY = parseFloat(e.dataTransfer.getData("offsetY") || "0");
     if (!itemId) return;
+    const item = items.find((entry) => entry.id === itemId);
+    const maxX = item ? Math.max(0, 100 - item.width) : 90;
 
     const rect = canvas.getBoundingClientRect();
-    const posX = Math.max(0, Math.min(90, ((e.clientX - rect.left - offsetX) / rect.width) * 100));
+    const posX = Math.max(0, Math.min(maxX, ((e.clientX - rect.left - offsetX) / rect.width) * 100));
     const posY = Math.max(0, Math.min(90, ((e.clientY - rect.top - offsetY) / rect.height) * 100));
 
     onMove(itemId, posX, posY);
-  }, [onMove]);
+  }, [items, onMove]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,52 +46,55 @@ export default function CorkboardCanvas({ items, onMove, onDelete }: CorkboardCa
       if (detail?.id && detail?.posX !== undefined) {
         onMove(detail.id, detail.posX, detail.posY);
       }
+      if (detail?.id && detail?.width !== undefined) {
+        onResize(detail.id, detail.width);
+      }
     };
     canvas.addEventListener("pinmove", handler);
     return () => canvas.removeEventListener("pinmove", handler);
-  }, [onMove]);
+  }, [onMove, onResize]);
 
   return (
-    <div
-      ref={canvasRef}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      className="relative min-h-[60vh] md:min-h-[65vh] overflow-hidden rounded-[1rem]"
-      style={{
-        background: `
-          radial-gradient(ellipse at 20% 50%, rgba(210,180,140,0.3) 0%, transparent 50%),
-          radial-gradient(ellipse at 80% 20%, rgba(210,180,140,0.2) 0%, transparent 40%),
-          radial-gradient(ellipse at 50% 80%, rgba(195,160,120,0.25) 0%, transparent 45%),
-          linear-gradient(135deg, #c4a87c 0%, #b8956a 25%, #c9a97a 50%, #a88656 75%, #c4a87c 100%)
-        `,
-        boxShadow: `
-          inset 0 2px 8px rgba(0,0,0,0.15),
-          inset 0 -2px 8px rgba(0,0,0,0.1),
-          0 4px 20px rgba(0,0,0,0.12)
-        `,
-        border: "8px solid",
-        borderImage: "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 30%, #8B6F47 50%, #5A3E20 70%, #8B6F47 100%) 1",
-      }}
-    >
-      {/* Empty state */}
-      {items.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center text-center">
-          <div className="rounded-xl bg-white/80 p-8 shadow-lg backdrop-blur">
-            <p className="text-3xl mb-3">📌</p>
-            <p className="font-display text-lg text-[#5A3E20]">Your vision board is empty</p>
-            <p className="mt-2 text-sm text-[#8B6F47]">Use the buttons below to pin images, notes, and goals.</p>
-          </div>
-        </div>
-      )}
+    <div className="overflow-x-auto pb-2">
+      <div
+        ref={canvasRef}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className="relative h-[72vh] min-h-[42rem] min-w-[68rem] overflow-hidden rounded-[1.35rem] border-[10px] border-transparent bg-[linear-gradient(145deg,#c4a87c_0%,#b8956a_24%,#c9a97a_49%,#a88656_74%,#c4a87c_100%)] shadow-[0_24px_80px_rgba(52,34,15,0.2)] [border-image:linear-gradient(135deg,#8B6F47_0%,#6B4F2F_30%,#8B6F47_52%,#5A3E20_72%,#8B6F47_100%)_1]"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_24%,rgba(255,246,228,0.18)_0%,transparent_42%),radial-gradient(ellipse_at_78%_18%,rgba(255,246,228,0.14)_0%,transparent_36%),radial-gradient(ellipse_at_50%_84%,rgba(102,69,29,0.12)_0%,transparent_44%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(rgba(92,58,20,0.18)_0.7px,transparent_0.7px)] [background-size:14px_14px]" />
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.15),inset_0_-2px_10px_rgba(0,0,0,0.12)]" />
 
-      {/* Pins */}
-      {items.map((item) => (
-        <VisionBoardPin
-          key={item.id}
-          item={item}
-          onDelete={onDelete}
-        />
-      ))}
+        {/* Empty state */}
+        {items.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
+            <div className="rounded-[1.4rem] border border-white/55 bg-white/82 p-8 shadow-[0_18px_45px_rgba(68,43,18,0.18)] backdrop-blur">
+              <p className="mb-3 text-3xl">📌</p>
+              <p className="font-display text-lg text-[#5A3E20]">Your vision board is empty</p>
+              <p className="mt-2 text-sm text-[#8B6F47]">
+                Start by pinning a note, image, or goal. You can drag cards anywhere and resize them from the lower corner.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-white/24 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/80 shadow-[0_8px_16px_rgba(70,42,10,0.14)]">
+          Creative workspace
+        </div>
+
+        {/* Pins */}
+        {items.map((item) => (
+          <VisionBoardPin
+            key={item.id}
+            item={item}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+      <p className="mt-2 px-1 text-xs text-[var(--ink-muted)]">
+        Tip: if the board feels larger than your screen, scroll sideways inside the workspace to reach the full corkboard.
+      </p>
     </div>
   );
 }
