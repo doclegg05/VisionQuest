@@ -130,15 +130,27 @@ export default function DocumentBrowser({
 
   return (
     <div className="space-y-6">
+      {/* Screen reader announcement for search results */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {!loading && !error && filtered.length === 0 && "No documents match your search."}
+        {!loading && !error && filtered.length > 0 && `${filtered.length} document${filtered.length === 1 ? "" : "s"} found.`}
+        {loading && "Loading documents."}
+      </div>
+
       {/* Search bar */}
       {showSearch && (
-        <input
-          type="text"
-          placeholder="Search documents by title or description..."
-          value={searchInput}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="w-full rounded-2xl border border-[var(--border)] bg-white/70 px-5 py-3 text-sm text-[var(--ink-strong)] placeholder:text-[var(--muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
-        />
+        <>
+          <label htmlFor="doc-search" className="sr-only">Search documents</label>
+          <input
+            id="doc-search"
+            type="text"
+            placeholder="Search documents by title or description..."
+            value={searchInput}
+            onChange={(e) => handleSearch(e.target.value)}
+            aria-label="Search documents by title or description"
+            className="w-full rounded-2xl border border-[var(--border)] bg-white/70 px-5 py-3 text-sm text-[var(--ink-strong)] placeholder:text-[var(--muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
+          />
+        </>
       )}
 
       {/* Category filter tabs */}
@@ -255,9 +267,10 @@ function CategorySection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="flex w-full items-center gap-3 text-left"
       >
-        <span className="text-2xl">{icon}</span>
+        <span aria-hidden="true" className="text-2xl">{icon}</span>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-lg text-[var(--ink-strong)]">{label}</h2>

@@ -85,9 +85,9 @@ export default function DocumentCard({
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] sm:flex-none"
-            title="View"
+            aria-label={`View ${doc.title}`}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
               <circle cx="8" cy="8" r="2" />
             </svg>
@@ -97,9 +97,9 @@ export default function DocumentCard({
             onClick={handleDownload}
             disabled={downloading}
             className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] disabled:opacity-40 sm:flex-none"
-            title="Download"
+            aria-label={`Download ${doc.title}`}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 2v9m0 0-3-3m3 3 3-3M3 13h10" />
             </svg>
           </button>
@@ -140,7 +140,7 @@ export default function DocumentCard({
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] sm:flex-none"
-            title="View / Print"
+            aria-label={`View ${doc.title}`}
           >
             View
           </a>
@@ -149,14 +149,14 @@ export default function DocumentCard({
             onClick={handleDownload}
             disabled={downloading}
             className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] disabled:opacity-40 sm:flex-none"
-            title="Download"
+            aria-label={`Download ${doc.title}`}
           >
             {downloading ? "..." : downloadError ? "Failed" : "Download"}
           </button>
         </div>
       </div>
       {downloadError && (
-        <p className="mt-2 text-xs text-red-600">Download failed. Try again or use View.</p>
+        <p role="alert" className="mt-2 text-xs text-red-600">Download failed. Try again or use View.</p>
       )}
     </div>
   );

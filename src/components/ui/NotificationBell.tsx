@@ -21,13 +21,18 @@ export default function NotificationBell() {
   const { notifications, unreadCount, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Close panel on Escape or outside click
+  // Close panel on Escape or outside click; return focus to trigger
   useEffect(() => {
     if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     const handleClick = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
@@ -43,6 +48,15 @@ export default function NotificationBell() {
     };
   }, [open]);
 
+  // Move focus into the dialog when it opens
+  useEffect(() => {
+    if (open) {
+      // Focus the first focusable element inside the dropdown
+      const first = dialogRef.current?.querySelector<HTMLElement>("button, a, [tabindex]");
+      if (first) first.focus();
+    }
+  }, [open]);
+
   // Tick counter that increments each minute to refresh relative timestamps
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -53,13 +67,15 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={panelRef}>
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         type="button"
         className="relative grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-white/10"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         aria-expanded={open}
+        aria-haspopup="dialog"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
@@ -71,7 +87,12 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[rgba(255,255,255,0.96)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] backdrop-blur">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-label="Notifications"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[rgba(255,255,255,0.96)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] backdrop-blur"
+        >
           <div className="flex items-center justify-between border-b border-[rgba(18,38,63,0.08)] px-4 py-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Notifications</h3>
             {unreadCount > 0 && (
@@ -96,7 +117,7 @@ export default function NotificationBell() {
                 >
                   <div className="flex items-start gap-2">
                     {!n.read && (
-                      <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--accent-strong)]" />
+                      <span aria-hidden="true" className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--accent-strong)]" />
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--ink-strong)]">{n.title}</p>

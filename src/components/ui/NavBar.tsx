@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import BrandLockup from "./BrandLockup";
@@ -41,6 +41,8 @@ export default function NavBar({ studentName, role }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const moreDialogRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await fetch("/api/auth/session", { method: "DELETE" });
@@ -48,10 +50,17 @@ export default function NavBar({ studentName, role }: NavBarProps) {
     router.refresh();
   };
 
+  // Focus first link in "More" dialog on open; return focus on Escape
   useEffect(() => {
     if (!moreOpen) return;
+    const first = moreDialogRef.current?.querySelector<HTMLElement>("a, button");
+    if (first) first.focus();
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false);
+      if (e.key === "Escape") {
+        setMoreOpen(false);
+        moreButtonRef.current?.focus();
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -114,11 +123,13 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             </Link>
           ))}
           <button
+            ref={moreButtonRef}
             onClick={() => setMoreOpen(!moreOpen)}
             type="button"
             className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors
               ${isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
             aria-expanded={moreOpen}
+            aria-haspopup="dialog"
             aria-label="More navigation options"
           >
             <span className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
@@ -138,6 +149,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             onClick={() => setMoreOpen(false)}
           />
           <div
+            ref={moreDialogRef}
             role="dialog"
             aria-modal="true"
             aria-label="More navigation options"
@@ -199,7 +211,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             subtitle="SPOKES Program Portal"
             theme="dark"
           />
-          <p className="mt-4 text-sm leading-6 text-white/68">
+          <p className="mt-4 text-sm leading-6 text-white/90">
             A guided path from big vision to daily wins.
           </p>
         </div>
@@ -213,11 +225,11 @@ export default function NavBar({ studentName, role }: NavBarProps) {
               className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors
                 ${pathname === item.href
                   ? "bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
-                  : "text-white/72 hover:bg-white/10 hover:text-white"
+                  : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
               aria-current={pathname === item.href ? "page" : undefined}
             >
-              <span className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
+              <span aria-hidden="true" className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
                 pathname === item.href ? "bg-[var(--ink-strong)] text-white" : "bg-white/10 text-white"
               }`}>
                 {item.icon}
@@ -236,7 +248,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
                   className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors
                     ${pathname === item.href || pathname.startsWith(item.href + "/")
                       ? "bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
-                      : "text-white/72 hover:bg-white/10 hover:text-white"
+                      : "text-white/90 hover:bg-white/10 hover:text-white"
                     }`}
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
@@ -258,14 +270,14 @@ export default function NavBar({ studentName, role }: NavBarProps) {
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="break-words text-sm font-semibold leading-5">{studentName}</p>
-              <p className="text-xs uppercase tracking-[0.18em] text-white/45">{role}</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-white/75">{role}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <NotificationBell />
               <button
                 onClick={handleLogout}
                 type="button"
-                className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+                className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label="Log out"
               >
                 Log out
