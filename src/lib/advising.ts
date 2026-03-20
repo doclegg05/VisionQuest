@@ -1095,7 +1095,7 @@ export async function syncStudentAlerts(studentId: string) {
     prisma.studentAlert.findMany({
       where: {
         studentId,
-        status: "open",
+        status: { in: ["open", "snoozed", "dismissed"] },
         type: {
           in: [
             "overdue_task",
@@ -1113,7 +1113,7 @@ export async function syncStudentAlerts(studentId: string) {
           ],
         },
       },
-      select: { id: true, alertKey: true },
+      select: { id: true, alertKey: true, status: true, snoozedUntil: true },
     }),
   ]);
 
@@ -1241,42 +1241,71 @@ export async function syncStudentAlerts(studentId: string) {
   }));
   const desiredAlerts = [...baselineAlerts, ...goalAlerts];
   const desiredKeys = new Set(desiredAlerts.map((alert) => alert.alertKey));
-  const staleAlertIds = existing
-    .filter((alert) => !desiredKeys.has(alert.alertKey))
-    .map((alert) => alert.id);
+
+  // Build a map of existing alerts by key for snooze/dismiss checks
+  const existingByKey = new Map(existing.map((a) => [a.alertKey, a]));
 
   await prisma.$transaction(async (tx) => {
     for (const alert of desiredAlerts) {
-      await tx.studentAlert.upsert({
-        where: { alertKey: alert.alertKey },
-        update: {
-          severity: alert.severity,
-          status: "open",
-          title: alert.title,
-          summary: alert.summary,
-          sourceType: alert.sourceType,
-          sourceId: alert.sourceId,
-          detectedAt: now,
-          resolvedAt: null,
-        },
-        create: {
-          studentId,
-          alertKey: alert.alertKey,
-          type: alert.type,
-          severity: alert.severity,
-          status: "open",
-          title: alert.title,
-          summary: alert.summary,
-          sourceType: alert.sourceType,
-          sourceId: alert.sourceId,
-          detectedAt: now,
-        },
-      });
+      const prev = existingByKey.get(alert.alertKey);
+
+      // Respect manual snooze: don't force "open" if snoozed and window is still active
+      const isSnoozed = prev?.status === "snoozed" && prev.snoozedUntil && prev.snoozedUntil > now;
+      // Respect manual dismiss: don't reopen dismissed alerts
+      const isDismissed = prev?.status === "dismissed";
+
+      if (isSnoozed || isDismissed) {
+        // Update metadata (severity, title, summary) but preserve manual status
+        await tx.studentAlert.update({
+          where: { alertKey: alert.alertKey },
+          data: {
+            severity: alert.severity,
+            title: alert.title,
+            summary: alert.summary,
+            sourceType: alert.sourceType,
+            sourceId: alert.sourceId,
+          },
+        });
+      } else {
+        // Expired snooze → revert to open; new or existing open → set open
+        await tx.studentAlert.upsert({
+          where: { alertKey: alert.alertKey },
+          update: {
+            severity: alert.severity,
+            status: "open",
+            title: alert.title,
+            summary: alert.summary,
+            sourceType: alert.sourceType,
+            sourceId: alert.sourceId,
+            detectedAt: now,
+            resolvedAt: null,
+            snoozedUntil: null,
+            snoozedBy: null,
+          },
+          create: {
+            studentId,
+            alertKey: alert.alertKey,
+            type: alert.type,
+            severity: alert.severity,
+            status: "open",
+            title: alert.title,
+            summary: alert.summary,
+            sourceType: alert.sourceType,
+            sourceId: alert.sourceId,
+            detectedAt: now,
+          },
+        });
+      }
     }
 
-    if (staleAlertIds.length > 0) {
+    // Only resolve stale alerts that aren't manually dismissed
+    const staleNonDismissedIds = existing
+      .filter((a) => !desiredKeys.has(a.alertKey) && a.status !== "dismissed")
+      .map((a) => a.id);
+
+    if (staleNonDismissedIds.length > 0) {
       await tx.studentAlert.updateMany({
-        where: { id: { in: staleAlertIds } },
+        where: { id: { in: staleNonDismissedIds } },
         data: {
           status: "resolved",
           resolvedAt: now,

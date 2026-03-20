@@ -505,20 +505,23 @@ model CaseNote {
 }
 
 model StudentAlert {
-  id         String    @id @default(cuid())
-  studentId  String
-  alertKey   String    @unique
-  type       String
-  severity   String    @default("medium")
-  status     String    @default("open")
-  title      String
-  summary    String    @db.Text
-  sourceType String?
-  sourceId   String?
-  detectedAt DateTime  @default(now())
-  resolvedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  studentId    String
+  alertKey     String    @unique
+  type         String
+  severity     String    @default("medium")
+  status       String    @default("open") // open, snoozed, resolved, dismissed
+  title        String
+  summary      String    @db.Text
+  sourceType   String?
+  sourceId     String?
+  detectedAt   DateTime  @default(now())
+  resolvedAt   DateTime?
+  snoozedUntil DateTime? // Manual snooze: alert hidden until this time
+  snoozedBy    String?   // Teacher ID who snoozed
+  dismissedAt  DateTime? // Manual dismiss: soft delete by teacher
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
