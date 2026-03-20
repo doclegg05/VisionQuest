@@ -44,6 +44,7 @@ See [.env.example](./.env.example) for the full list.
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `JWT_SECRET`
+- `TEACHER_KEY`
 - `API_KEY_ENCRYPTION_KEY`
 - `APP_BASE_URL`
 
@@ -72,13 +73,16 @@ See [.env.example](./.env.example) for the full list.
 1. Provision PostgreSQL and run `npm run prisma:migrate:deploy`.
 2. If you deploy on Render with Supabase, use the Supabase **Session pooler** connection string for `DATABASE_URL`.
 3. If Render cannot reach the Supabase direct host, set `DIRECT_URL` to the same Session pooler string until you have an IPv4-compatible direct connection.
-4. Set `JWT_SECRET`, `API_KEY_ENCRYPTION_KEY`, and `APP_BASE_URL` with production values.
+4. Set `JWT_SECRET`, `TEACHER_KEY`, `API_KEY_ENCRYPTION_KEY`, and `APP_BASE_URL` with production values.
 5. Configure `GEMINI_API_KEY` if Sage should work without personal student keys.
 6. Configure `SMTP_*` values if students should be able to reset passwords by email.
 7. Configure storage credentials if file uploads are enabled in production.
 8. If you deploy on Render with [render.yaml](./render.yaml), the reminder cron service is provisioned automatically. Otherwise, schedule `node scripts/run-appointment-reminders.mjs` hourly with `APP_BASE_URL` and `CRON_SECRET`.
 9. Whitelist the deployed Google OAuth callback URL in Google Cloud if Google sign-in is enabled.
-10. Promote the first teacher account after that user registers:
+10. Either:
+
+    - set `TEACHER_KEY` and have teachers register at `/teacher-register`, or
+    - promote the first teacher account after that user registers:
 
    ```bash
    npm run users:promote-teacher -- <student-id-or-email>

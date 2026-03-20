@@ -53,6 +53,9 @@ Run locally:
 # JWT signing secret
 openssl rand -hex 32
 
+# Teacher registration key
+openssl rand -base64 32 | tr -d '\n'
+
 # API key encryption key (base64-encoded 32 bytes)
 openssl rand -base64 32 | tr -d '\n'
 ```
@@ -98,6 +101,7 @@ Render input rules:
 | `DATABASE_URL` | Supabase Session pooler connection string |
 | `DIRECT_URL` | Same Session pooler string on Render unless you have an IPv4-compatible direct connection |
 | `JWT_SECRET` | Output of `openssl rand -hex 32` |
+| `TEACHER_KEY` | Output of `openssl rand -base64 32` for `/teacher-register` access |
 | `API_KEY_ENCRYPTION_KEY` | Output of `openssl rand -base64 32` |
 | `APP_BASE_URL` | `https://your-app.onrender.com` |
 | `GEMINI_API_KEY` | From Google AI Studio |
@@ -144,7 +148,13 @@ DATABASE_URL="..." node scripts/seed-data.mjs
 
 ## Step 7: Create First Teacher Account
 
-1. Have the teacher register as a normal student at `/`
+Preferred path:
+1. Set `TEACHER_KEY` in Render.
+2. Give that key only to authorized staff.
+3. Have the teacher register at `/teacher-register`.
+
+Fallback path:
+1. Have the teacher register as a normal student at `/`.
 2. Promote them to teacher:
 
 ```bash
