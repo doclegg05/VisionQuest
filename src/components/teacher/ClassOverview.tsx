@@ -322,6 +322,36 @@ export default function ClassOverview() {
                       >
                         {teacherDashboardAlertAction(alert.type, alert.student.id).label}
                       </Link>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetch(`/api/teacher/alerts/${alert.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "snooze", hours: 24 }),
+                          });
+                          setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
+                        }}
+                        className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                        title="Snooze for 24 hours"
+                      >
+                        Snooze
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetch(`/api/teacher/alerts/${alert.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "dismiss" }),
+                          });
+                          setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
+                        }}
+                        className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                        title="Dismiss this alert"
+                      >
+                        Dismiss
+                      </button>
                     </div>
                   </div>
                 </div>
