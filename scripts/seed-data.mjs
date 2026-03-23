@@ -14,17 +14,42 @@ const prisma = new PrismaClient();
 
 // ---------- Orientation Items ----------
 
+// Matches the official "SPOKES Checklist for Student Orientation and Intake" (Reviewed 6/13/2025)
 const ORIENTATION_ITEMS = [
-  { label: "Complete student registration", description: "Create your Visionquest account and set up your profile.", sortOrder: 0, required: true },
-  { label: "Meet with your advisor", description: "Schedule and attend your first advising session.", sortOrder: 1, required: true },
-  { label: "Review program handbook", description: "Read through the SPOKES program handbook and policies.", sortOrder: 2, required: true },
-  { label: "Complete learning needs screening", description: "Take the learning needs assessment to help identify your starting point.", sortOrder: 3, required: true },
-  { label: "Set up your Sage profile", description: "Introduce yourself to Sage and set your initial goals.", sortOrder: 4, required: true },
-  { label: "Tour the facility", description: "Take a tour of the program facility and meet the staff.", sortOrder: 5, required: true },
-  { label: "Review dress code policy", description: "Read and acknowledge the program dress code requirements.", sortOrder: 6, required: true },
+  // Section 1: Welcome Activity & Program Overview
+  { label: "Welcome activity and program overview", description: "Learn about the program purpose, available services, classroom layout, building rules, and class schedule.", sortOrder: 0, required: true },
+  { label: "Review rights and responsibilities", description: "Read and sign the SPOKES Rights and Responsibilities form.", sortOrder: 1, required: true },
+  { label: "Review code of conduct and dress code", description: "Read and acknowledge the program dress code and conduct expectations.", sortOrder: 2, required: true },
+  { label: "Review attendance and closing policy", description: "Understand the attendance requirements and class closing policy.", sortOrder: 3, required: true },
+
+  // Section 2: Registration Forms
+  { label: "Complete SPOKES Student Profile", description: "Fill out the Student Profile form (key information completed by student, remainder by instructor).", sortOrder: 4, required: true },
+  { label: "Sign personal attendance contract", description: "Read and sign the SPOKES Personal Attendance Contract.", sortOrder: 5, required: true },
+  { label: "Sign release of information", description: "Complete the WVAdultEd/SPOKES Authorization for Release of Information to the Department of Health Services.", sortOrder: 6, required: true },
   { label: "Complete media release form", description: "Review and sign the media release form.", sortOrder: 7, required: false },
-  { label: "Set up WorkKeys account", description: "Create your ACT WorkKeys account for career readiness assessments.", sortOrder: 8, required: true },
-  { label: "Review four-week schedule", description: "Review and understand your program schedule for the first four weeks.", sortOrder: 9, required: true },
+  { label: "Sign technology acceptable use policy", description: "Read and sign the WVAdultEd Student Technology Acceptable Use Policy.", sortOrder: 8, required: true },
+  { label: "Complete DoHS participant time sheet", description: "Fill out the WVDoHS Participant Time Sheet (DFA-TS-12) for activity tracking.", sortOrder: 9, required: true },
+
+  // Section 3: Learning Needs / Barriers Screening
+  { label: "Complete learning needs screening", description: "Take the WV Learning Needs Screening (13 questions + follow-up on barriers). Results may come from the Assessment Specialist or WVDoHS referral.", sortOrder: 10, required: true },
+  { label: "Document any disability accommodations", description: "If applicable, document disabilities and arrange accommodations with your WVDoHS Case Manager.", sortOrder: 11, required: false },
+
+  // Section 4: Strengths Identification (TABE)
+  { label: "Complete TABE Locator assessment", description: "Take the TABE Locator to determine the correct pre-test level for reading and math.", sortOrder: 12, required: true },
+
+  // Section 5: Standardized Entry Assessment
+  { label: "Complete TABE entry assessment", description: "Take the TABE assessment in reading and math. Results will be recorded on your Student Profile.", sortOrder: 13, required: true },
+
+  // Section 6: Goal and Career Exploration
+  { label: "Complete education and career plan", description: "Work with your instructor to create your SPOKES Education and Career Plan, including short-term and long-term goals.", sortOrder: 14, required: true },
+  { label: "Complete career interest assessment", description: "Take a career interest and aptitude assessment to help identify career pathways.", sortOrder: 15, required: true },
+
+  // Section 7: Private Student Interview
+  { label: "Private student interview", description: "Meet one-on-one with your instructor to discuss assessment results, barriers, support services, career interests, and certificate programs.", sortOrder: 16, required: true },
+  { label: "Confirm attendance schedule", description: "Confirm your attendance schedule and commitment status using the SPOKES Personal Attendance Contract.", sortOrder: 17, required: true },
+
+  // VisionQuest-specific
+  { label: "Set up your Sage profile", description: "Introduce yourself to Sage, your AI career coach, and set your initial goals.", sortOrder: 18, required: true },
 ];
 
 // ---------- Ready-to-Work Certification Templates ----------
