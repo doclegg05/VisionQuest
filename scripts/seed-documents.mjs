@@ -69,9 +69,9 @@ const TITLE_OVERRIDES = {
   // DoHS Forms
   "forms/DFA-PRC-1_Rev-1-24.pdf": "Personal Responsibility Contract (DFA-PRC-1)",
   "forms/DFA_-_SSP-1_1-9-24.pdf": "Self-Sufficiency Plan (DFA-SSP-1)",
-  "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf": "Transitional Support Form — Fillable (DFA-TS-12)",
-  "forms/DFA-TS-12_Rev_-2-24.pdf": "Transitional Support Form (DFA-TS-12)",
-  "forms/DFA-WVW-25_Rev_6-24.pdf": "WV Works Activity Assignment (DFA-WVW-25)",
+  "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf": "Student Timesheet — Fillable (DFA-TS-12)",
+  "forms/DFA-TS-12_Rev_-2-24.pdf": "Student Timesheet (DFA-TS-12)",
+  "forms/DFA-WVW-25_Rev_6-24.pdf": "WV Works Employer Contact Activity Assignment (DFA-WVW-25)",
   "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf": "WV Works Participation Report — Sample (DFA-WVW-70)",
   "forms/LNS_with_Referral_4.24.pdf": "Learner Notification of Services with Referral",
   "forms/Prospective_Employer_Letter_ESP_EIP.docx.pdf": "Prospective Employer Letter — ESP/EIP",
