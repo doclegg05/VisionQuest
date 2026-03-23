@@ -16,6 +16,7 @@ model Student {
   passwordHash   String
   email          String?  @unique
   geminiApiKey   String?
+  credlyUsername String?
   role           String   @default("student")
   isActive       Boolean  @default(true)
   sessionVersion Int      @default(0)
@@ -52,6 +53,7 @@ model Student {
   goalResourceLinks       GoalResourceLink[]         @relation("StudentGoalResourceLinks")
   assignedGoalLinks       GoalResourceLink[]         @relation("AssignedGoalResourceLinks")
   progressionEvents       ProgressionEvent[]
+  careerDiscovery         CareerDiscovery?
 
   @@schema("visionquest")
 }
