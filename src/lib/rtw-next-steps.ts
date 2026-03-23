@@ -95,7 +95,7 @@ export function computeNextRtwSteps(
           label: req.label,
           action: "upload_file",
           description: "Upload the required file, then mark this complete.",
-          href: "/certifications",
+          href: "/learning",
           priority: 4 + clusterBoost,
           clusterMatch: isClusterMatch,
         });
@@ -106,7 +106,7 @@ export function computeNextRtwSteps(
           label: req.label,
           action: "complete",
           description: req.url ? "Complete this lesson, then check it off." : "Mark this requirement when you've finished it.",
-          href: "/certifications",
+          href: "/learning",
           priority: 3 + clusterBoost,
           clusterMatch: isClusterMatch,
         });
@@ -118,7 +118,7 @@ export function computeNextRtwSteps(
         label: req.label,
         action: "waiting_verification",
         description: "Done! Waiting for your instructor to verify.",
-        href: "/certifications",
+        href: "/learning",
         priority: 8 + clusterBoost,
         clusterMatch: isClusterMatch,
       });
@@ -145,7 +145,7 @@ export function computeNextRtwSteps(
       label: "Visit a learning platform",
       action: "visit_platform",
       description: "Explore the training platforms available to you.",
-      href: "/courses",
+      href: "/learning",
       priority: 6,
       clusterMatch: false,
     });

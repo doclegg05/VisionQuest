@@ -54,9 +54,9 @@ export default function SuggestedActions({
   if (certificationsStarted === 0) {
     actions.push({
       emoji: "\u{1F3C6}",
-      title: "Explore certifications",
-      desc: "See what industry certifications you can earn through SPOKES.",
-      href: "/certifications",
+      title: "Open learning",
+      desc: "See the training and certifications that best fit your path through SPOKES.",
+      href: "/learning",
       priority: 3,
     });
   }
@@ -66,7 +66,7 @@ export default function SuggestedActions({
       emoji: "\u{1F4DA}",
       title: "Visit a learning platform",
       desc: "Check out the training platforms available to you.",
-      href: "/courses",
+      href: "/learning",
       priority: 4,
     });
   }
@@ -97,7 +97,7 @@ export default function SuggestedActions({
       emoji: "\u{1F3AF}",
       title: "Goal match found",
       desc: suggestion,
-      href: "/courses",
+      href: "/learning",
       priority: 3.5,
     });
   }

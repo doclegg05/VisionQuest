@@ -86,14 +86,14 @@ const CAREER_STEPS: CareerStepDefinition[] = [
     id: "application-submit",
     title: "Submit an application",
     description: "Track a real job or internship application in your opportunities dashboard.",
-    url: "/opportunities",
+    url: "/career",
     keywords: ["job", "employment", "work", "career", "application", "interview", "resume"],
   },
   {
     id: "event-register",
     title: "Register for a career event",
     description: "Sign up for a hiring event, workshop, or employer visit tied to this goal.",
-    url: "/events",
+    url: "/career",
     keywords: ["event", "career fair", "workshop", "network", "employer", "recruiter", "hiring"],
   },
 ];
@@ -243,7 +243,7 @@ function collectCertificationRecommendations(certificationIds: string[]) {
 
     const url = certification.platforms
       .map((platformId) => getPlatformUrl(platformId))
-      .find((value): value is string => !!value) || "/courses";
+      .find((value): value is string => !!value) || "/learning";
 
     return [{
       resourceType: "certification" as const,
@@ -339,7 +339,7 @@ function collectOpportunityRecommendations(
       resourceId: `opportunity:${opportunity.id}`,
       title: `Apply: ${opportunity.title}`,
       description: `${opportunity.company} • ${opportunity.type}${opportunity.deadline ? ` • deadline ${opportunity.deadline.toLocaleDateString()}` : ""}`,
-      url: `/opportunities#opportunity-${opportunity.id}`,
+      url: `/career#opportunity-${opportunity.id}`,
       reason: "Live opportunity matched to this goal",
     }));
 }
@@ -367,7 +367,7 @@ function collectEventRecommendations(
       resourceId: `event:${event.id}`,
       title: `Attend: ${event.title}`,
       description: `${event.startsAt.toLocaleString()}${event.location ? ` • ${event.location}` : ""}`,
-      url: `/events#event-${event.id}`,
+      url: `/career#event-${event.id}`,
       reason: "Upcoming event matched to this goal",
     }));
 }
