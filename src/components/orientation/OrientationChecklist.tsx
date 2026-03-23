@@ -57,36 +57,48 @@ export default function OrientationChecklist() {
   }
 
   async function toggleItem(itemId: string, completed: boolean) {
-    setToggling(itemId);
+    // Optimistic update — show the change immediately
+    setItems((prev) => prev.map((item) =>
+      item.id === itemId
+        ? { ...item, completed, completedAt: completed ? new Date().toISOString() : null }
+        : item
+    ));
+
     try {
       const res = await fetch("/api/orientation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId, completed }),
       });
-      if (res.ok) {
-        setItems((prev) => {
-          const updated = prev.map((item) =>
-            item.id === itemId
-              ? { ...item, completed, completedAt: completed ? new Date().toISOString() : null }
-              : item
-          );
 
-          // Check if orientation is now complete (using updated array, not stale state)
-          const allDone = completed && updated.every(i => i.completed);
-          if (allDone) {
-            fetch("/api/orientation/complete", { method: "POST" })
-              .then(() => setTimeout(() => checkProgression(), 500))
-              .catch(() => {});
-          }
-
-          return updated;
-        });
+      if (!res.ok) {
+        // Revert on failure
+        setItems((prev) => prev.map((item) =>
+          item.id === itemId
+            ? { ...item, completed: !completed, completedAt: null }
+            : item
+        ));
+        return;
       }
+
+      // Check if orientation is now complete
+      setItems((prev) => {
+        const allDone = completed && prev.every((i) => i.completed);
+        if (allDone) {
+          fetch("/api/orientation/complete", { method: "POST" })
+            .then(() => setTimeout(() => checkProgression(), 500))
+            .catch(() => {});
+        }
+        return prev;
+      });
     } catch (err) {
+      // Revert on network error
       console.error("Failed to toggle item:", err);
-    } finally {
-      setToggling(null);
+      setItems((prev) => prev.map((item) =>
+        item.id === itemId
+          ? { ...item, completed: !completed, completedAt: null }
+          : item
+      ));
     }
   }
 
