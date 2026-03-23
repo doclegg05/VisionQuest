@@ -34,19 +34,62 @@ export default function CredlyBadges() {
   if (!username) {
     return (
       <div className="surface-section p-5">
-        <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <span className="text-3xl">🏅</span>
-          <h3 className="font-display text-lg text-[var(--ink-strong)]">Display Your Earned Badges</h3>
-          <p className="max-w-md text-sm text-[var(--ink-muted)]">
-            Connect your Credly profile to automatically display certification badges you&apos;ve earned
-            from Certiport exams (IC3, MOS, QuickBooks, IT Specialist, and more).
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Digital credentials</p>
+          <h3 className="mt-1 font-display text-lg text-[var(--ink-strong)]">Connect Your Credly Badges</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+            When you pass a Certiport certification exam (IC3, MOS, QuickBooks, IT Specialist), you earn a
+            digital badge through Credly. Connect your profile to display them here automatically.
           </p>
-          <Link
-            href="/settings"
-            className="primary-button mt-2 px-5 py-2.5 text-sm"
-          >
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              step: "1",
+              title: "Pass a certification exam",
+              desc: "Complete any Certiport exam through GMetrix or your testing center.",
+            },
+            {
+              step: "2",
+              title: "Check your email",
+              desc: "Credly sends an email to accept your badge. Look for \"You've earned a badge\" from Credly.",
+            },
+            {
+              step: "3",
+              title: "Accept & create your profile",
+              desc: "Click the link in the email to accept the badge. This creates your Credly profile at credly.com.",
+            },
+            {
+              step: "4",
+              title: "Connect to VisionQuest",
+              desc: "Go to Settings, paste your Credly profile URL or username, and click Connect.",
+            },
+          ].map((item) => (
+            <div key={item.step} className="rounded-xl border border-[var(--border)] bg-white/60 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-strong)] text-xs font-bold text-white">
+                  {item.step}
+                </span>
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">{item.title}</p>
+              </div>
+              <p className="text-xs leading-5 text-[var(--ink-muted)]">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link href="/settings" className="primary-button px-5 py-2.5 text-sm">
             Connect Credly in Settings
           </Link>
+          <a
+            href="https://www.credly.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-[var(--accent-secondary)] hover:underline"
+          >
+            Visit credly.com to find your profile
+          </a>
         </div>
       </div>
     );
