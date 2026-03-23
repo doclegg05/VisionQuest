@@ -18,6 +18,20 @@ describe("getOrientationStepDetail", () => {
     assert.equal(detail.forms[0]?.id, "education-career-plan");
   });
 
+  it("matches attendance-policy wording variants to the attendance contract", () => {
+    const detail = getOrientationStepDetail("Review Attendance Policy");
+
+    assert.equal(detail.forms.length, 1);
+    assert.equal(detail.forms[0]?.id, "attendance-contract");
+  });
+
+  it("matches release-information wording variants to the release forms", () => {
+    const detail = getOrientationStepDetail("Sign release information");
+    const formIds = detail.forms.map((form) => form.id);
+
+    assert.deepEqual(formIds, ["auth-release", "dohs-release"]);
+  });
+
   it("returns guidance for instructor-led steps with no PDF", () => {
     const detail = getOrientationStepDetail("Complete TABE Locator assessment");
 
