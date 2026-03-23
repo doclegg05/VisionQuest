@@ -18,6 +18,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
     setMessage("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
+      textareaRef.current.focus();
     }
   }, [message, disabled, onSend]);
 
