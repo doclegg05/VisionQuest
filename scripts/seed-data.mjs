@@ -15,41 +15,49 @@ const prisma = new PrismaClient();
 // ---------- Orientation Items ----------
 
 // Matches the official "SPOKES Checklist for Student Orientation and Intake" (Reviewed 6/13/2025)
+// plus Required Forms for SPOKES Student Files
 const ORIENTATION_ITEMS = [
   // Section 1: Welcome Activity & Program Overview
-  { label: "Welcome activity and program overview", description: "Learn about the program purpose, available services, classroom layout, building rules, and class schedule.", sortOrder: 0, required: true },
-  { label: "Review rights and responsibilities", description: "Read and sign the SPOKES Rights and Responsibilities form.", sortOrder: 1, required: true },
-  { label: "Review code of conduct and dress code", description: "Read and acknowledge the program dress code and conduct expectations.", sortOrder: 2, required: true },
-  { label: "Review attendance and closing policy", description: "Understand the attendance requirements and class closing policy.", sortOrder: 3, required: true },
+  { label: "Program overview and facility tour", description: "Learn about the program purpose, available services, program components, physical layout, class and building rules.", section: "Welcome Activity & Program Overview", sortOrder: 0, required: true },
+  { label: "Review Rights and Responsibilities", description: "Read and sign the SPOKES Rights and Responsibilities form.", section: "Welcome Activity & Program Overview", sortOrder: 1, required: true },
+  { label: "Review Code of Conduct and Dress Code", description: "Read and acknowledge the program dress code and conduct expectations.", section: "Welcome Activity & Program Overview", sortOrder: 2, required: true },
+  { label: "Review Attendance/Class Closing Policy", description: "Understand the attendance requirements and class closing policy.", section: "Welcome Activity & Program Overview", sortOrder: 3, required: true },
+  { label: "Review Daily Sign-in Sheet", description: "Review the daily attendance sign-in sheet process.", section: "Welcome Activity & Program Overview", sortOrder: 4, required: true },
+  { label: "Review Class Schedule/Holidays Observed", description: "Review the class schedule and holidays observed.", section: "Welcome Activity & Program Overview", sortOrder: 5, required: true },
 
   // Section 2: Registration Forms
-  { label: "Complete SPOKES Student Profile", description: "Fill out the Student Profile form (key information completed by student, remainder by instructor).", sortOrder: 4, required: true },
-  { label: "Sign personal attendance contract", description: "Read and sign the SPOKES Personal Attendance Contract.", sortOrder: 5, required: true },
-  { label: "Sign release of information", description: "Complete the WVAdultEd/SPOKES Authorization for Release of Information to the Department of Health Services.", sortOrder: 6, required: true },
-  { label: "Complete media release form", description: "Review and sign the media release form.", sortOrder: 7, required: false },
-  { label: "Sign technology acceptable use policy", description: "Read and sign the WVAdultEd Student Technology Acceptable Use Policy.", sortOrder: 8, required: true },
-  { label: "Complete DoHS participant time sheet", description: "Fill out the WVDoHS Participant Time Sheet (DFA-TS-12) for activity tracking.", sortOrder: 9, required: true },
+  { label: "Complete SPOKES Student Profile", description: "Fill out the Student Profile form (key information completed by student, remainder by instructor).", section: "Registration Forms", sortOrder: 6, required: true },
+  { label: "Sign Personal Attendance Contract", description: "Read and sign the SPOKES Personal Attendance Contract.", section: "Registration Forms", sortOrder: 7, required: true },
+  { label: "Sign Authorization for Release of Information", description: "Complete the WVAdultEd/SPOKES Authorization for Release of Information to the Department of Health Services.", section: "Registration Forms", sortOrder: 8, required: true },
+  { label: "Complete Media Release Form", description: "Review and sign the media release form.", section: "Registration Forms", sortOrder: 9, required: false },
+  { label: "Sign Technology Acceptable Use Policy", description: "Read and sign the WVAdultEd Student Technology Acceptable Use Policy.", section: "Registration Forms", sortOrder: 10, required: true },
+  { label: "Complete DoHS Participant Time Sheet", description: "Fill out the WVDoHS Participant Time Sheet (DFA-TS-12) for activity tracking.", section: "Registration Forms", sortOrder: 11, required: true },
 
   // Section 3: Learning Needs / Barriers Screening
-  { label: "Complete learning needs screening", description: "Take the WV Learning Needs Screening (13 questions + follow-up on barriers). Results may come from the Assessment Specialist or WVDoHS referral.", sortOrder: 10, required: true },
-  { label: "Document any disability accommodations", description: "If applicable, document disabilities and arrange accommodations with your WVDoHS Case Manager.", sortOrder: 11, required: false },
+  { label: "Complete Learning Needs Screening", description: "Take the WV Learning Needs Screening (13 questions + follow-up on barriers). Results may come from the Assessment Specialist or WVDoHS referral.", section: "Learning Needs / Barriers Screening", sortOrder: 12, required: true },
+  { label: "Document disability accommodations", description: "If applicable, document disabilities and arrange accommodations with your WVDoHS Case Manager.", section: "Learning Needs / Barriers Screening", sortOrder: 13, required: false },
 
-  // Section 4: Strengths Identification (TABE)
-  { label: "Complete TABE Locator assessment", description: "Take the TABE Locator to determine the correct pre-test level for reading and math.", sortOrder: 12, required: true },
+  // Section 4: Strengths Identification
+  { label: "Complete TABE Locator assessment", description: "Take the TABE Locator to determine the correct pre-test level for reading and math.", section: "Strengths Identification", sortOrder: 14, required: true },
 
   // Section 5: Standardized Entry Assessment
-  { label: "Complete TABE entry assessment", description: "Take the TABE assessment in reading and math. Results will be recorded on your Student Profile.", sortOrder: 13, required: true },
+  { label: "Complete TABE entry assessment", description: "Take the TABE assessment in reading and math. Results will be recorded on your Student Profile.", section: "Standardized Entry Assessment", sortOrder: 15, required: true },
 
   // Section 6: Goal and Career Exploration
-  { label: "Complete education and career plan", description: "Work with your instructor to create your SPOKES Education and Career Plan, including short-term and long-term goals.", sortOrder: 14, required: true },
-  { label: "Complete career interest assessment", description: "Take a career interest and aptitude assessment to help identify career pathways.", sortOrder: 15, required: true },
+  { label: "Complete Education and Career Plan", description: "Work with your instructor to create your SPOKES Education and Career Plan, including short-term and long-term goals.", section: "Goal and Career Exploration", sortOrder: 16, required: true },
+  { label: "Complete career interest assessment", description: "Take a career interest and aptitude assessment to help identify career pathways.", section: "Goal and Career Exploration", sortOrder: 17, required: true },
 
   // Section 7: Private Student Interview
-  { label: "Private student interview", description: "Meet one-on-one with your instructor to discuss assessment results, barriers, support services, career interests, and certificate programs.", sortOrder: 16, required: true },
-  { label: "Confirm attendance schedule", description: "Confirm your attendance schedule and commitment status using the SPOKES Personal Attendance Contract.", sortOrder: 17, required: true },
+  { label: "Private student interview", description: "Meet one-on-one with your instructor to discuss assessment results, barriers, support services, career interests, and certificate programs.", section: "Private Student Interview", sortOrder: 18, required: true },
+  { label: "Confirm attendance schedule", description: "Confirm your attendance schedule and commitment status using the SPOKES Personal Attendance Contract.", section: "Private Student Interview", sortOrder: 19, required: true },
 
-  // VisionQuest-specific
-  { label: "Set up your Sage profile", description: "Introduce yourself to Sage, your AI career coach, and set your initial goals.", sortOrder: 18, required: true },
+  // Section 8: Required Program Forms
+  { label: "Review Employment Portfolio Checklist", description: "Review the Employment Portfolio Checklist and understand portfolio requirements.", section: "Required Program Forms", sortOrder: 20, required: true },
+  { label: "Review SPOKES Module Record", description: "Review the SPOKES Module Record for tracking program module completion.", section: "Required Program Forms", sortOrder: 21, required: true },
+  { label: "Review Ready to Work Attendance Verification", description: "Review the Ready to Work Attendance Verification form for certification tracking.", section: "Required Program Forms", sortOrder: 22, required: true },
+
+  // Section 9: Get Started with VisionQuest
+  { label: "Set up your Sage profile", description: "Introduce yourself to Sage, your AI career coach, and set your initial goals.", section: "Get Started with VisionQuest", sortOrder: 23, required: true },
 ];
 
 // ---------- Ready-to-Work Certification Templates ----------
@@ -112,7 +120,7 @@ async function seed() {
   for (const item of ORIENTATION_ITEMS) {
     await prisma.orientationItem.upsert({
       where: { id: `seed-orient-${item.sortOrder}` },
-      update: { label: item.label, description: item.description, sortOrder: item.sortOrder, required: item.required },
+      update: { label: item.label, description: item.description, section: item.section ?? null, sortOrder: item.sortOrder, required: item.required },
       create: { id: `seed-orient-${item.sortOrder}`, ...item },
     });
   }

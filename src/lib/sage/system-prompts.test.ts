@@ -3,15 +3,27 @@ import { describe, it } from "node:test";
 import { buildSystemPrompt, determineStage } from "./system-prompts";
 
 describe("determineStage", () => {
-  it("returns onboarding until a BHAG exists", () => {
-    assert.equal(determineStage([]), "onboarding");
+  it("returns discovery when no goals and no completed discovery", () => {
+    assert.equal(determineStage([], false), "discovery");
+  });
+
+  it("returns discovery when hasCompletedDiscovery is undefined and no goals", () => {
+    assert.equal(determineStage([]), "discovery");
+  });
+
+  it("returns onboarding when discovery is complete but no BHAG", () => {
+    assert.equal(determineStage([], true), "onboarding");
+  });
+
+  it("skips discovery when BHAG exists even without completed discovery", () => {
+    assert.equal(determineStage([{ level: "bhag" }], false), "monthly");
   });
 
   it("advances through the staged goal hierarchy", () => {
-    assert.equal(determineStage([{ level: "bhag" }]), "monthly");
-    assert.equal(determineStage([{ level: "bhag" }, { level: "monthly" }]), "weekly");
+    assert.equal(determineStage([{ level: "bhag" }], true), "monthly");
+    assert.equal(determineStage([{ level: "bhag" }, { level: "monthly" }], true), "weekly");
     assert.equal(
-      determineStage([{ level: "bhag" }, { level: "monthly" }, { level: "weekly" }]),
+      determineStage([{ level: "bhag" }, { level: "monthly" }, { level: "weekly" }], true),
       "daily"
     );
     assert.equal(
@@ -20,7 +32,7 @@ describe("determineStage", () => {
         { level: "monthly" },
         { level: "weekly" },
         { level: "daily" },
-      ]),
+      ], true),
       "tasks"
     );
     assert.equal(
@@ -30,7 +42,7 @@ describe("determineStage", () => {
         { level: "weekly" },
         { level: "daily" },
         { level: "task" },
-      ]),
+      ], true),
       "checkin"
     );
   });
@@ -67,5 +79,35 @@ describe("buildSystemPrompt", () => {
     assert.ok(!prompt.includes("{bhag}"));
     assert.ok(!prompt.includes("{monthly}"));
     assert.match(prompt, /CURRENT TASK: Answer the student's question/);
+  });
+
+  it("injects career clusters into discovery stage prompt", () => {
+    const prompt = buildSystemPrompt("discovery", {
+      studentName: "Jordan",
+      career_clusters: "SPOKES CAREER PATHWAYS:\nOffice & Admin\nFinance & Bookkeeping",
+    });
+
+    assert.match(prompt, /Career Discovery conversation/);
+    assert.match(prompt, /SPOKES CAREER PATHWAYS:/);
+    assert.match(prompt, /Office & Admin/);
+    assert.match(prompt, /The student's name is Jordan/);
+  });
+
+  it("injects discovery summary into non-discovery stages", () => {
+    const prompt = buildSystemPrompt("onboarding", {
+      discovery_summary: "Student is interested in office work and bookkeeping. (Top pathways: office-admin, finance-bookkeeping)",
+    });
+
+    assert.match(prompt, /CAREER DISCOVERY CONTEXT/);
+    assert.match(prompt, /interested in office work/);
+  });
+
+  it("does not inject discovery summary into discovery stage itself", () => {
+    const prompt = buildSystemPrompt("discovery", {
+      career_clusters: "test clusters",
+      discovery_summary: "This should not appear",
+    });
+
+    assert.ok(!prompt.includes("CAREER DISCOVERY CONTEXT"));
   });
 });

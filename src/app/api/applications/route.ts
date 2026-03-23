@@ -3,6 +3,8 @@ import { syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
+import { logger } from "@/lib/logger";
+import { deleteFile } from "@/lib/storage";
 
 const VALID_APPLICATION_STATUSES = [
   "saved",
@@ -11,6 +13,61 @@ const VALID_APPLICATION_STATUSES = [
   "offer",
   "withdrawn",
 ] as const;
+
+async function cleanupDetachedGeneratedResumeFile(
+  studentId: string,
+  previousResumeFileId: string | null | undefined,
+  nextResumeFileId: string | null,
+  currentApplicationId: string,
+) {
+  if (!previousResumeFileId || previousResumeFileId === nextResumeFileId) {
+    return;
+  }
+
+  const generatedFile = await prisma.fileUpload.findFirst({
+    where: {
+      id: previousResumeFileId,
+      studentId,
+      category: "resume-generated",
+    },
+    select: {
+      id: true,
+      storageKey: true,
+    },
+  });
+  if (!generatedFile) {
+    return;
+  }
+
+  const otherReferences = await prisma.application.count({
+    where: {
+      resumeFileId: previousResumeFileId,
+      NOT: { id: currentApplicationId },
+    },
+  });
+  if (otherReferences > 0) {
+    return;
+  }
+
+  try {
+    await deleteFile(generatedFile.storageKey);
+  } catch (error) {
+    logger.warn("Failed to delete detached generated resume from storage", {
+      studentId,
+      fileId: generatedFile.id,
+      storageKey: generatedFile.storageKey,
+      error: String(error),
+    });
+  }
+
+  await prisma.fileUpload.deleteMany({
+    where: {
+      id: generatedFile.id,
+      studentId,
+      category: "resume-generated",
+    },
+  });
+}
 
 export const POST = withAuth(async (session, req: Request) => {
   const body = await req.json();
@@ -47,6 +104,19 @@ export const POST = withAuth(async (session, req: Request) => {
     }
   }
 
+  const existingApplication = await prisma.application.findUnique({
+    where: {
+      studentId_opportunityId: {
+        studentId: session.id,
+        opportunityId,
+      },
+    },
+    select: {
+      id: true,
+      resumeFileId: true,
+    },
+  });
+
   const application = await prisma.application.upsert({
     where: {
       studentId_opportunityId: {
@@ -69,6 +139,13 @@ export const POST = withAuth(async (session, req: Request) => {
       appliedAt: status === "applied" ? new Date() : null,
     },
   });
+
+  await cleanupDetachedGeneratedResumeFile(
+    session.id,
+    existingApplication?.resumeFileId,
+    resumeFileId || null,
+    application.id,
+  );
 
   await logAuditEvent({
     actorId: session.id,

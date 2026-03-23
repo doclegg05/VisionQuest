@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth, badRequest, notFound } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
 /**
@@ -20,8 +21,15 @@ export const PATCH = withTeacherAuth(async (
   const body = await _req.json();
   const action = body.action as string;
 
-  const alert = await prisma.studentAlert.findUnique({ where: { id } });
+  const alert = await prisma.studentAlert.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      studentId: true,
+    },
+  });
   if (!alert) throw notFound("Alert not found");
+  await assertStaffCanManageStudent(session, alert.studentId);
 
   const now = new Date();
 

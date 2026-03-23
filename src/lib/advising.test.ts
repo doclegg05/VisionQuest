@@ -60,7 +60,7 @@ test("buildStudentAlertDescriptors adds inactivity and career momentum alerts", 
     signals: {
       studentId: "student-1",
       studentCreatedAt: new Date("2026-02-01T12:00:00.000Z"),
-      lastActivityAt: new Date("2026-03-01T15:00:00.000Z"),
+      lastActivityAt: new Date("2026-02-26T15:00:00.000Z"),
       applicationCount: 0,
       eventRegistrationCount: 0,
       certification: null,
@@ -69,10 +69,61 @@ test("buildStudentAlertDescriptors adds inactivity and career momentum alerts", 
 
   assert.deepEqual(
     alerts.map((alert) => alert.type),
-    ["inactive_student", "career_inactive"]
+    ["inactive_student_14", "career_inactive"]
   );
   assert.equal(alerts[0]?.alertKey, "inactive_student:student-1");
   assert.equal(alerts[1]?.severity, "medium");
+});
+
+test("buildStudentAlertDescriptors escalates inactivity stages at 30, 60, and 90 days", () => {
+  const now = new Date("2026-04-15T17:00:00.000Z");
+
+  const thirtyDayAlert = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-30",
+      studentCreatedAt: new Date("2026-01-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-03-15T12:00:00.000Z"),
+      applicationCount: 1,
+      eventRegistrationCount: 0,
+      certification: null,
+    },
+  })[0];
+
+  const sixtyDayAlert = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-60",
+      studentCreatedAt: new Date("2026-01-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-02-14T12:00:00.000Z"),
+      applicationCount: 1,
+      eventRegistrationCount: 0,
+      certification: null,
+    },
+  })[0];
+
+  const ninetyDayAlert = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-90",
+      studentCreatedAt: new Date("2025-12-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-01-01T12:00:00.000Z"),
+      applicationCount: 1,
+      eventRegistrationCount: 0,
+      certification: null,
+    },
+  })[0];
+
+  assert.equal(thirtyDayAlert?.type, "inactive_student_30");
+  assert.equal(sixtyDayAlert?.type, "inactive_student_60");
+  assert.equal(ninetyDayAlert?.type, "inactive_student_90");
+  assert.match(ninetyDayAlert?.summary || "", /archive/i);
 });
 
 test("buildStudentAlertDescriptors flags certifications that have stalled", () => {

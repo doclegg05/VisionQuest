@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getRoleHomePath } from "@/lib/role-home";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
@@ -13,6 +14,10 @@ export default async function StudentLayout({
 
   if (!session) {
     redirect("/");
+  }
+
+  if (session.role !== "student") {
+    redirect(getRoleHomePath(session.role));
   }
 
   return (

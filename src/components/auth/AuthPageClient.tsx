@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BrandLockup from "@/components/ui/BrandLockup";
@@ -36,6 +36,16 @@ interface AuthPageClientProps {
   googleAuthEnabled: boolean;
 }
 
+interface InvitePreview {
+  classId: string;
+  className: string;
+  classCode: string;
+  email: string;
+  displayName: string;
+  suggestedStudentId: string;
+  expiresAt: string;
+}
+
 function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const [mode, setMode] = useState<Mode>("login");
   const [studentId, setStudentId] = useState("");
@@ -45,11 +55,60 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const [securityQuestions, setSecurityQuestions] = useState(createEmptySecurityQuestionAnswers());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [invite, setInvite] = useState<InvitePreview | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const oauthError = searchParams.get("error");
   const oauthErrorMessage = oauthError ? (ERROR_MESSAGES[oauthError] || "An error occurred. Please try again.") : null;
+  const inviteToken = searchParams.get("invite") || "";
+
+  useEffect(() => {
+    if (!inviteToken) {
+      setInvite(null);
+      setMode("login");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadInvite() {
+      setInviteLoading(true);
+      try {
+        const response = await fetch(`/api/auth/class-invite?token=${encodeURIComponent(inviteToken)}`);
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.error || "This class invite is no longer available.");
+        }
+
+        if (cancelled) return;
+
+        const nextInvite = payload?.invite as InvitePreview;
+        setInvite(nextInvite);
+        setMode("register");
+        setStudentId((current) => current || nextInvite.suggestedStudentId || "");
+        setDisplayName((current) => current || nextInvite.displayName || "");
+        setEmail((current) => current || nextInvite.email || "");
+        setError("");
+      } catch (err) {
+        if (cancelled) return;
+        setInvite(null);
+        setMode("login");
+        setError(err instanceof Error ? err.message : "This class invite is no longer available.");
+      } finally {
+        if (!cancelled) {
+          setInviteLoading(false);
+        }
+      }
+    }
+
+    void loadInvite();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +124,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               password,
               displayName,
               email,
+              inviteToken,
               securityQuestions,
             }
           : {
@@ -84,8 +144,17 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
         return;
       }
 
-      // New registrations go to welcome flow; logins go to dashboard
-      router.push(mode === "register" ? "/welcome" : "/dashboard");
+      const nextRole = data?.student?.role;
+      const nextPath =
+        nextRole === "admin"
+          ? "/admin"
+          : nextRole === "teacher"
+            ? "/teacher"
+            : mode === "register"
+              ? "/welcome"
+              : "/dashboard";
+
+      router.push(nextPath);
       router.refresh();
     } catch {
       setError("Could not connect to server.");
@@ -168,7 +237,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 {mode === "login" ? "Welcome back" : "Create your account"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-                Use the form below to register or sign in. Google sign-in is optional, not required, and new accounts use email-based recovery.
+                {invite
+                  ? `Complete your invited signup to join ${invite.className}.`
+                  : "Use the form below to sign in. Students now create accounts from instructor-issued class invites."}
               </p>
             </div>
 
@@ -181,7 +252,22 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
             )}
 
-            <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-[rgba(16,37,62,0.06)] p-1.5">
+            {inviteLoading ? (
+              <div className="mb-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+                Loading your class invite...
+              </div>
+            ) : null}
+
+            {invite ? (
+              <div className="mb-5 rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+                <p className="font-semibold">{invite.className}</p>
+                <p className="mt-1 text-[var(--ink-muted)]">
+                  Invited for {invite.email} • Expires {new Date(invite.expiresAt).toLocaleString()}
+                </p>
+              </div>
+            ) : null}
+
+            <div className={`mb-6 grid gap-2 rounded-2xl bg-[rgba(16,37,62,0.06)] p-1.5 ${invite ? "grid-cols-2" : "grid-cols-1"}`}>
               <button
                 type="button"
                 onClick={() => { setMode("login"); setError(""); }}
@@ -193,17 +279,19 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               >
                 Sign In
               </button>
-              <button
-                type="button"
-                onClick={() => { setMode("register"); setError(""); }}
-                className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors
-                  ${mode === "register"
-                    ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                    : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                  }`}
-              >
-                Register
-              </button>
+              {invite ? (
+                <button
+                  type="button"
+                  onClick={() => { setMode("register"); setError(""); }}
+                  className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors
+                    ${mode === "register"
+                      ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
+                      : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                    }`}
+                >
+                  Register
+                </button>
+              ) : null}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" aria-label={mode === "login" ? "Sign in" : "Create account"}>
@@ -217,6 +305,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   placeholder="e.g., john.doe"
                   autoComplete="username"
                   required
+                  disabled={mode === "register" && inviteLoading}
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
@@ -231,6 +320,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="What should we call you?"
                     required
+                    disabled={inviteLoading}
                     className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                   />
                 </div>
@@ -247,6 +337,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                     placeholder="you@example.com"
                     autoComplete="email"
                     required
+                    disabled={mode === "register" && Boolean(invite?.email)}
                     className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                   />
                 </div>
@@ -280,7 +371,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (mode === "register" && (!invite || !inviteToken || inviteLoading))}
                 className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
@@ -324,6 +415,12 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 Google sign-in is not enabled in this environment. Use the register or sign-in form above.
               </div>
             )}
+
+            {!invite ? (
+              <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+                New student accounts are created during orientation from instructor-issued class invites.
+              </div>
+            ) : null}
 
             <div className="mt-8 flex flex-col items-center gap-3 sm:gap-4">
               <a

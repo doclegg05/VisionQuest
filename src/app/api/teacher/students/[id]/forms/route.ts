@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { syncStudentAlerts } from "@/lib/advising";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { logger } from "@/lib/logger";
 import { awardEvent } from "@/lib/progression/events";
 import { withTeacherAuth } from "@/lib/api-error";
@@ -12,6 +13,7 @@ export const GET = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
+  await assertStaffCanManageStudent(session, id);
 
   const submissions = await prisma.formSubmission.findMany({
     where: { studentId: id },
@@ -40,6 +42,7 @@ export const PATCH = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
+  await assertStaffCanManageStudent(session, id);
 
   const body = await req.json();
   const { submissionId, status, notes } = body;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
   buildGoalEvidenceEntries,
@@ -15,11 +16,12 @@ import { computeReadinessScore } from "@/lib/progression/readiness-score";
 
 // GET — individual student detail for teacher view
 export const GET = withTeacherAuth(async (
-  _session,
+  session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
+  await assertStaffCanManageStudent(session, id);
 
   const student = await prisma.student.findUnique({
     where: { id },
@@ -251,6 +253,21 @@ export const GET = withTeacherAuth(async (
         },
         orderBy: { updatedAt: "desc" },
       },
+      careerDiscovery: {
+        select: {
+          status: true,
+          interests: true,
+          strengths: true,
+          subjects: true,
+          problems: true,
+          values: true,
+          circumstances: true,
+          topClusters: true,
+          clusterScores: true,
+          sageSummary: true,
+          completedAt: true,
+        },
+      },
     },
   });
 
@@ -442,5 +459,29 @@ export const GET = withTeacherAuth(async (
     })),
     alerts: student.alerts,
     conversations: conversationSummaries,
+    careerDiscovery: student.careerDiscovery
+      ? {
+          status: student.careerDiscovery.status,
+          topClusters: student.careerDiscovery.topClusters,
+          sageSummary: student.careerDiscovery.sageSummary,
+          interests: safeJsonParse(student.careerDiscovery.interests),
+          strengths: safeJsonParse(student.careerDiscovery.strengths),
+          subjects: safeJsonParse(student.careerDiscovery.subjects),
+          problems: safeJsonParse(student.careerDiscovery.problems),
+          values: safeJsonParse(student.careerDiscovery.values),
+          circumstances: safeJsonParse(student.careerDiscovery.circumstances),
+          completedAt: student.careerDiscovery.completedAt,
+        }
+      : null,
   });
 });
+
+function safeJsonParse(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}

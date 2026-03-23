@@ -38,6 +38,7 @@ test("registerSchema accepts valid input", () => {
     displayName: "Jane Doe",
     email: "jane@example.com",
     password: "secure123",
+    inviteToken: "valid-invite-token",
   });
   assert.ok(result.success);
 });
@@ -48,6 +49,7 @@ test("registerSchema requires studentId min 3 chars", () => {
     displayName: "Jane",
     email: "j@e.com",
     password: "secure123",
+    inviteToken: "valid-invite-token",
   });
   assert.ok(!result.success);
   assert.ok(result.error.issues[0].message.includes("3 characters"));
@@ -59,6 +61,7 @@ test("registerSchema requires valid email", () => {
     displayName: "Jane",
     email: "notanemail",
     password: "secure123",
+    inviteToken: "valid-invite-token",
   });
   assert.ok(!result.success);
   assert.ok(result.error.issues[0].message.includes("email"));
@@ -70,9 +73,21 @@ test("registerSchema requires password min 6 chars", () => {
     displayName: "Jane",
     email: "j@e.com",
     password: "12345",
+    inviteToken: "valid-invite-token",
   });
   assert.ok(!result.success);
   assert.ok(result.error.issues[0].message.includes("6 characters"));
+});
+
+test("registerSchema requires an invite token", () => {
+  const result = registerSchema.safeParse({
+    studentId: "jdoe",
+    displayName: "Jane Doe",
+    email: "jane@example.com",
+    password: "secure123",
+  });
+  assert.ok(!result.success);
+  assert.equal(result.error.issues[0]?.path[0], "inviteToken");
 });
 
 test("registerSchema allows optional securityQuestions", () => {
@@ -81,6 +96,7 @@ test("registerSchema allows optional securityQuestions", () => {
     displayName: "Jane",
     email: "j@e.com",
     password: "secure123",
+    inviteToken: "valid-invite-token",
     securityQuestions: {
       birth_city: "Morgantown",
       elementary_school: "Lincoln",
@@ -96,6 +112,7 @@ test("registerSchema rejects the legacy securityQuestions array shape", () => {
     displayName: "Jane",
     email: "j@e.com",
     password: "secure123",
+    inviteToken: "valid-invite-token",
     securityQuestions: [{ questionId: "q1", answer: "blue" }],
   });
   assert.ok(!result.success);

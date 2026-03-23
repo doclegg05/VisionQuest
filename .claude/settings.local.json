@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma:*)",
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" DIRECT_URL=\"postgresql://x:x@localhost:5432/x\" npx prisma validate)",
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" DIRECT_URL=\"postgresql://x:x@localhost:5432/x\" npx prisma generate)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(npx next:*)",
+      "WebSearch",
+      "WebFetch(domain:www.cfwvconnect.com)",
+      "WebFetch(domain:careertech.org)",
+      "WebFetch(domain:secure.cfwv.com)",
+      "WebFetch(domain:www.cves.org)",
+      "WebFetch(domain:careerexplorer.hawaii.edu)"
+    ]
+  }
+}

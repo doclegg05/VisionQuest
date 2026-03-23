@@ -20,12 +20,18 @@ export async function getOrCreateConversation(
     return conversation;
   }
 
-  // New conversation — determine stage from existing goals
-  const goals = await prisma.goal.findMany({
-    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
-    select: { level: true },
-  });
-  const stage = determineStage(goals);
+  // New conversation — determine stage from existing goals + discovery status
+  const [goals, discovery] = await Promise.all([
+    prisma.goal.findMany({
+      where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
+      select: { level: true },
+    }),
+    prisma.careerDiscovery.findUnique({
+      where: { studentId },
+      select: { status: true },
+    }),
+  ]);
+  const stage = determineStage(goals, discovery?.status === "complete");
 
   // Deactivate previous goal conversations
   await prisma.conversation.updateMany({

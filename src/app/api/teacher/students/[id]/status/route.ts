@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
@@ -17,10 +18,7 @@ export const PATCH = withTeacherAuth(async (
     return NextResponse.json({ error: "isActive must be a boolean" }, { status: 400 });
   }
 
-  const student = await prisma.student.findUnique({
-    where: { id },
-    select: { id: true, studentId: true, role: true, isActive: true },
-  });
+  const student = await assertStaffCanManageStudent(session, id);
   if (!student) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }

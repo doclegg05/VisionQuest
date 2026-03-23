@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getRoleHomePath } from "@/lib/role-home";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 
@@ -14,8 +15,8 @@ export default async function TeacherLayout({
     redirect("/");
   }
 
-  if (session.role !== "teacher") {
-    redirect("/dashboard");
+  if (session.role !== "teacher" && session.role !== "admin") {
+    redirect(getRoleHomePath(session.role));
   }
 
   return (

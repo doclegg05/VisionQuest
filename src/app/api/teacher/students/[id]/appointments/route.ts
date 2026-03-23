@@ -7,6 +7,7 @@ import {
   syncStudentAlerts,
 } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
@@ -55,13 +56,7 @@ export const POST = withTeacherAuth(async (
     return NextResponse.json({ error: "Meeting URL must be valid." }, { status: 400 });
   }
 
-  const student = await prisma.student.findFirst({
-    where: {
-      id: studentId,
-      role: "student",
-    },
-    select: { id: true },
-  });
+  const student = await assertStaffCanManageStudent(session, studentId);
 
   if (!student) {
     return NextResponse.json({ error: "Student not found." }, { status: 404 });

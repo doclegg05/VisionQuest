@@ -311,6 +311,10 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
     case "orientation_form_revision_needed":
     case "orientation_item_incomplete":
     case "inactive_student":
+    case "inactive_student_14":
+    case "inactive_student_30":
+    case "inactive_student_60":
+    case "inactive_student_90":
     case "career_inactive":
     case "certification_stalled":
     case "overdue_task":

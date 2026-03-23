@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { buildSpokesSummary } from "@/lib/spokes";
 
-export const GET = withTeacherAuth(async (_session) => {
+export const GET = withTeacherAuth(async (session) => {
+  const managedStudentIds = await listManagedStudentIds(session, {
+    includeInactiveAccounts: true,
+  });
+
   const [checklistTemplates, moduleTemplates, records] = await Promise.all([
     prisma.spokesChecklistTemplate.findMany(),
     prisma.spokesModuleTemplate.findMany(),
     prisma.spokesRecord.findMany({
+      where: {
+        studentId: { in: managedStudentIds },
+      },
       include: {
         student: {
           select: {

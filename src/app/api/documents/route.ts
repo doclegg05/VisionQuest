@@ -3,7 +3,13 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { rateLimit } from "@/lib/rate-limit";
-import { withErrorHandler, unauthorized, badRequest, rateLimited } from "@/lib/api-error";
+import {
+  withErrorHandler,
+  unauthorized,
+  badRequest,
+  rateLimited,
+  isStaffRole,
+} from "@/lib/api-error";
 import type { Prisma } from "@prisma/client";
 
 const VALID_CATEGORIES = new Set([
@@ -36,12 +42,12 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   if (category && !VALID_CATEGORIES.has(category)) throw badRequest("Invalid category");
 
-  const isTeacher = session.role === "teacher";
+  const isStaff = isStaffRole(session.role);
 
   const where: Prisma.ProgramDocumentWhereInput = {
     isActive: true,
     // Students only see STUDENT + BOTH
-    ...(!isTeacher && { audience: { in: ["STUDENT", "BOTH"] } }),
+    ...(!isStaff && { audience: { in: ["STUDENT", "BOTH"] } }),
     ...(category && { category: category as Prisma.EnumProgramDocCategoryFilter }),
     ...(platformId && { platformId }),
     ...(certificationId && { certificationId }),
@@ -55,7 +61,7 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // Normalize search for cache key to prevent cache fragmentation
   const normalizedSearch = search?.toLowerCase() || "";
-  const cacheKey = `docs:${isTeacher ? "t" : "s"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${normalizedSearch}`;
+  const cacheKey = `docs:${isStaff ? "staff" : "student"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${normalizedSearch}`;
 
   const documents = await cached(cacheKey, 120, () =>
     prisma.programDocument.findMany({

@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "users:promote-teacher": "node scripts/promote-teacher.mjs",
+    "users:promote-admin": "node scripts/promote-admin.mjs",
     "db:seed": "node scripts/seed-data.mjs",
     "db:seed-documents": "node scripts/seed-documents.mjs",
     "postinstall": "prisma generate"

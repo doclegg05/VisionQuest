@@ -1,20 +1,64 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import {
+  assertStaffCanManageClass,
+  buildManagedStudentWhere,
+  listManagedClasses,
+  listManagedStudentIds,
+} from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { goalCountsTowardPlan } from "@/lib/goals";
 import { getCertificationProgress } from "@/lib/certifications";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import {
+  ALL_INACTIVITY_ALERT_TYPES,
+  getInactivityStageByType,
+  getInactivityStageRank,
+  normalizeInactivityAlertType,
+} from "@/lib/inactivity";
+
+function sortInactivityAlerts<T extends { type: string; detectedAt: Date }>(alerts: T[]) {
+  return alerts.sort((left, right) => {
+    const stageGap = getInactivityStageRank(right.type) - getInactivityStageRank(left.type);
+    if (stageGap !== 0) return stageGap;
+    return right.detectedAt.getTime() - left.detectedAt.getTime();
+  });
+}
+
+function latestDate(...values: Array<Date | null | undefined>) {
+  return values.reduce<Date | null>((latest, value) => {
+    if (!value) return latest;
+    if (!latest || value.getTime() > latest.getTime()) return value;
+    return latest;
+  }, null);
+}
 
 // GET — class overview: all students with cross-module progress
-export const GET = withTeacherAuth(async (_session, req: Request) => {
+export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
   const showInactive = url.searchParams.get("showInactive") === "true";
+  const requestedClassId = url.searchParams.get("classId")?.trim() || "";
   const now = new Date();
   const upcomingWindow = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7);
 
-  const studentWhere = { role: "student" as const, ...(showInactive ? {} : { isActive: true }) };
+  if (requestedClassId) {
+    await assertStaffCanManageClass(session, requestedClassId);
+  }
+
+  const [classes, managedStudentIds] = await Promise.all([
+    listManagedClasses(session),
+    listManagedStudentIds(session, {
+      classId: requestedClassId || undefined,
+      includeInactiveAccounts: true,
+    }),
+  ]);
+
+  const studentWhere = buildManagedStudentWhere(session, {
+    classId: requestedClassId || undefined,
+    includeInactiveAccounts: showInactive,
+  });
   const total = await prisma.student.count({ where: studentWhere });
 
   const students = await prisma.student.findMany({
@@ -27,11 +71,11 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
       isActive: true,
       progression: { select: { state: true } },
       goals: {
-        select: { level: true, status: true },
+        select: { level: true, status: true, updatedAt: true },
       },
       orientationProgress: {
         where: { completed: true },
-        select: { id: true },
+        select: { id: true, completedAt: true },
       },
       certifications: {
         select: {
@@ -41,9 +85,24 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
           },
         },
       },
-      portfolioItems: { select: { id: true } },
+      portfolioItems: { select: { id: true, updatedAt: true } },
       resumeData: { select: { id: true } },
-      files: { select: { id: true } },
+      files: { select: { id: true, uploadedAt: true } },
+      formSubmissions: {
+        select: { id: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      applications: {
+        select: { id: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      eventRegistrations: {
+        select: { id: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
       alerts: {
         where: { status: "open" },
         select: { id: true, severity: true, title: true, detectedAt: true },
@@ -138,6 +197,17 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
       },
       certTemplates.filter((t) => t.required).length
     );
+    const lastActiveAt = latestDate(
+      s.createdAt,
+      s.conversations[0]?.updatedAt,
+      ...s.goals.map((goal) => goal.updatedAt),
+      ...s.orientationProgress.map((progress) => progress.completedAt || null),
+      ...s.portfolioItems.map((item) => item.updatedAt),
+      ...s.files.map((file) => file.uploadedAt),
+      s.formSubmissions[0]?.updatedAt,
+      s.applications[0]?.updatedAt,
+      s.eventRegistrations[0]?.updatedAt,
+    ) || s.createdAt;
 
     return {
       id: s.id,
@@ -145,7 +215,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
       displayName: s.displayName,
       createdAt: s.createdAt,
       isActive: s.isActive,
-      lastActive: s.conversations[0]?.updatedAt || s.createdAt,
+      lastActive: lastActiveAt,
       xp,
       level,
       streak,
@@ -166,9 +236,13 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     };
   });
 
-  const [alerts, reviewQueue, upcomingAppointments] = await Promise.all([
+  const [alerts, reviewQueue, upcomingAppointments, inactivityAlerts] = await Promise.all([
     prisma.studentAlert.findMany({
-      where: { status: "open" },
+      where: {
+        status: "open",
+        studentId: { in: managedStudentIds },
+        type: { notIn: [...ALL_INACTIVITY_ALERT_TYPES] },
+      },
       select: {
         id: true,
         type: true,
@@ -192,6 +266,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     prisma.studentAlert.findMany({
       where: {
         status: "open",
+        studentId: { in: managedStudentIds },
         type: {
           in: ["goal_needs_resource", "goal_resource_stale", "goal_review_pending"],
         },
@@ -218,6 +293,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     }),
     prisma.appointment.findMany({
       where: {
+        studentId: { in: managedStudentIds },
         status: "scheduled",
         startsAt: {
           gte: now,
@@ -242,11 +318,69 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
       orderBy: { startsAt: "asc" },
       take: 6,
     }),
+    prisma.studentAlert.findMany({
+      where: {
+        status: "open",
+        studentId: { in: managedStudentIds },
+        type: { in: [...ALL_INACTIVITY_ALERT_TYPES] },
+      },
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        title: true,
+        summary: true,
+        sourceType: true,
+        sourceId: true,
+        detectedAt: true,
+        student: {
+          select: {
+            id: true,
+            studentId: true,
+            displayName: true,
+          },
+        },
+      },
+      take: 12,
+    }),
   ]);
 
+  const inactivityQueue = sortInactivityAlerts(inactivityAlerts).map((alert) => {
+    const stage = getInactivityStageByType(alert.type);
+    const normalizedType = normalizeInactivityAlertType(alert.type) || alert.type;
+
+    return {
+      ...alert,
+      type: normalizedType,
+      stageLabel: stage?.label || "Follow-up",
+      nextStep: stage?.nextStep || alert.summary,
+    };
+  });
+
+  const inactivitySummary = inactivityQueue.reduce(
+    (summary, item) => {
+      const normalizedType = normalizeInactivityAlertType(item.type);
+      if (normalizedType === "inactive_student_14") summary.followUp14 += 1;
+      if (normalizedType === "inactive_student_30") summary.inactive30 += 1;
+      if (normalizedType === "inactive_student_60") summary.reengage60 += 1;
+      if (normalizedType === "inactive_student_90") summary.archiveReview90 += 1;
+      return summary;
+    },
+    {
+      followUp14: 0,
+      inactive30: 0,
+      reengage60: 0,
+      archiveReview90: 0,
+    },
+  );
+
   return NextResponse.json({
+    classes,
+    currentClassId: requestedClassId || null,
     students: overview,
     alerts,
+    inactivityQueue,
+    inactivitySummary,
     reviewQueue,
     upcomingAppointments,
     total,

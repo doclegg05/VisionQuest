@@ -90,6 +90,10 @@ export interface Session {
   role: string;
 }
 
+export function isStaffRole(role: string) {
+  return role === "teacher" || role === "admin";
+}
+
 /**
  * Wraps a route handler with auth + error handling.
  * The handler receives the validated session as first arg.
@@ -112,8 +116,8 @@ export function withAuth<
 }
 
 /**
- * Wraps a route handler with teacher auth + error handling.
- * Rejects non-teacher sessions with 403.
+ * Wraps a route handler with staff auth + error handling.
+ * Rejects non-teacher/admin sessions with 403.
  *
  * Usage:
  *   export const GET = withTeacherAuth(async (session, req) => {
@@ -129,7 +133,20 @@ export function withTeacherAuth<
   return withErrorHandler(async (...args: Args) => {
     const session = await getSession();
     if (!session) throw unauthorized();
-    if (session.role !== "teacher") throw forbidden();
+    if (!isStaffRole(session.role)) throw forbidden();
+    return handler(session as Session, ...args);
+  });
+}
+
+export function withAdminAuth<
+  Args extends unknown[],
+>(
+  handler: (session: Session, ...args: Args) => Promise<Response>,
+): (...args: Args) => Promise<Response> {
+  return withErrorHandler(async (...args: Args) => {
+    const session = await getSession();
+    if (!session) throw unauthorized();
+    if (session.role !== "admin") throw forbidden();
     return handler(session as Session, ...args);
   });
 }

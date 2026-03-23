@@ -1,35 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import {
+  EMPTY_RESUME,
+  buildResumePlainText,
+  buildResumePrintHtml,
+  type ResumeCertification,
+  type ResumeContent,
+  type ResumeEducation,
+  type ResumeExperience,
+} from "@/lib/resume";
+import { generateResumePdf } from "@/lib/resume-pdf";
 
-interface Experience {
-  title: string;
-  company: string;
-  dates: string;
-  description: string;
+interface ResumeAssistResponse {
+  resume: ResumeContent;
+  missingInformation: string[];
+  notes: string;
 }
 
-interface Education {
-  school: string;
-  degree: string;
-  dates: string;
-}
+const INPUT_CLASS =
+  "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const SECONDARY_BUTTON_CLASS =
+  "rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60";
 
-interface ResumeContent {
-  objective: string;
-  skills: string[];
-  experience: Experience[];
-  education: Education[];
-  references: string;
+function sanitizeFileName(value: string) {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "resume";
 }
-
-const EMPTY_RESUME: ResumeContent = {
-  objective: "",
-  skills: [],
-  experience: [],
-  education: [],
-  references: "",
-};
 
 export default function ResumeBuilder() {
   const [resume, setResume] = useState<ResumeContent>(EMPTY_RESUME);
@@ -39,16 +38,25 @@ export default function ResumeBuilder() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skillInput, setSkillInput] = useState("");
+  const [assistantPrompt, setAssistantPrompt] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantMessage, setAssistantMessage] = useState<string | null>(null);
+  const [missingInformation, setMissingInformation] = useState<string[]>([]);
+  const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   async function fetchResume() {
     try {
       const res = await fetch("/api/resume");
-      if (res.ok) {
-        const data = await res.json();
-        setResume(data.resume || EMPTY_RESUME);
-        setDisplayName(data.displayName || "");
-        setError(null);
+      if (!res.ok) {
+        throw new Error("Failed to load resume.");
       }
+
+      const data = await res.json();
+      setResume(data.resume || EMPTY_RESUME);
+      setDisplayName(data.displayName || "");
+      setError(null);
     } catch (err) {
       console.error("Failed to load resume:", err);
       setError("Failed to load. Please try again.");
@@ -58,219 +66,639 @@ export default function ResumeBuilder() {
   }
 
   useEffect(() => {
-    fetchResume();
+    void fetchResume();
   }, []);
 
   async function handleSave() {
     setSaving(true);
     setSaved(false);
+    setAssistantMessage(null);
+
     try {
       const res = await fetch("/api/resume", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resume }),
       });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.error || "Could not save your resume.");
       }
+
+      setSaved(true);
+      setError(null);
+      setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error("Failed to save resume:", err);
+      setError(err instanceof Error ? err.message : "Could not save your resume.");
     } finally {
       setSaving(false);
     }
   }
 
+  function updateContact(field: keyof ResumeContent["contact"], value: string) {
+    setResume((current) => ({
+      ...current,
+      contact: {
+        ...current.contact,
+        [field]: value,
+      },
+    }));
+  }
+
   function addSkill() {
-    if (!skillInput.trim()) return;
-    setResume({ ...resume, skills: [...resume.skills, skillInput.trim()] });
+    const nextSkill = skillInput.trim();
+    if (!nextSkill) return;
+
+    setResume((current) => ({
+      ...current,
+      skills: Array.from(new Set([...current.skills, nextSkill])),
+    }));
     setSkillInput("");
   }
 
   function removeSkill(index: number) {
-    setResume({ ...resume, skills: resume.skills.filter((_, i) => i !== index) });
+    setResume((current) => ({
+      ...current,
+      skills: current.skills.filter((_, itemIndex) => itemIndex !== index),
+    }));
   }
 
   function addExperience() {
-    setResume({
-      ...resume,
-      experience: [...resume.experience, { title: "", company: "", dates: "", description: "" }],
-    });
+    setResume((current) => ({
+      ...current,
+      experience: [
+        ...current.experience,
+        { title: "", company: "", location: "", dates: "", description: "" },
+      ],
+    }));
   }
 
-  function updateExperience(index: number, field: keyof Experience, value: string) {
-    const updated = [...resume.experience];
-    updated[index] = { ...updated[index], [field]: value };
-    setResume({ ...resume, experience: updated });
+  function updateExperience(index: number, field: keyof ResumeExperience, value: string) {
+    setResume((current) => ({
+      ...current,
+      experience: current.experience.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
   }
 
   function removeExperience(index: number) {
-    setResume({ ...resume, experience: resume.experience.filter((_, i) => i !== index) });
+    setResume((current) => ({
+      ...current,
+      experience: current.experience.filter((_, itemIndex) => itemIndex !== index),
+    }));
   }
 
   function addEducation() {
-    setResume({
-      ...resume,
-      education: [...resume.education, { school: "", degree: "", dates: "" }],
-    });
+    setResume((current) => ({
+      ...current,
+      education: [
+        ...current.education,
+        { school: "", degree: "", location: "", dates: "" },
+      ],
+    }));
   }
 
-  function updateEducation(index: number, field: keyof Education, value: string) {
-    const updated = [...resume.education];
-    updated[index] = { ...updated[index], [field]: value };
-    setResume({ ...resume, education: updated });
+  function updateEducation(index: number, field: keyof ResumeEducation, value: string) {
+    setResume((current) => ({
+      ...current,
+      education: current.education.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
   }
 
   function removeEducation(index: number) {
-    setResume({ ...resume, education: resume.education.filter((_, i) => i !== index) });
+    setResume((current) => ({
+      ...current,
+      education: current.education.filter((_, itemIndex) => itemIndex !== index),
+    }));
+  }
+
+  function addCertification() {
+    setResume((current) => ({
+      ...current,
+      certifications: [
+        ...current.certifications,
+        { name: "", issuer: "", dates: "" },
+      ],
+    }));
+  }
+
+  function updateCertification(index: number, field: keyof ResumeCertification, value: string) {
+    setResume((current) => ({
+      ...current,
+      certifications: current.certifications.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item
+      ),
+    }));
+  }
+
+  function removeCertification(index: number) {
+    setResume((current) => ({
+      ...current,
+      certifications: current.certifications.filter((_, itemIndex) => itemIndex !== index),
+    }));
+  }
+
+  async function handleAssist() {
+    setAssistantLoading(true);
+    setAssistantMessage(null);
+    setMissingInformation([]);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/resume/assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: assistantPrompt }),
+      });
+
+      const payload = (await res.json().catch(() => null)) as ResumeAssistResponse | { error?: string } | null;
+      if (!res.ok) {
+        throw new Error(payload && "error" in payload ? payload.error || "Could not draft the resume." : "Could not draft the resume.");
+      }
+
+      if (payload && "resume" in payload) {
+        setResume(payload.resume || EMPTY_RESUME);
+        setMissingInformation(payload.missingInformation || []);
+        setAssistantMessage(
+          payload.notes ||
+            ((payload.missingInformation || []).length > 0
+              ? "Sage drafted what it could and flagged the details it still needs."
+              : "Sage drafted the resume using the facts currently on file.")
+        );
+      }
+    } catch (err) {
+      console.error("Resume assist failed:", err);
+      setError(err instanceof Error ? err.message : "Could not draft the resume.");
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
+  async function handleCopyAtsText() {
+    try {
+      await navigator.clipboard.writeText(buildResumePlainText(displayName, resume));
+      setCopyState("done");
+      setTimeout(() => setCopyState("idle"), 1800);
+    } catch (err) {
+      console.error("Failed to copy resume text:", err);
+      setCopyState("error");
+      setTimeout(() => setCopyState("idle"), 1800);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    setExportingPdf(true);
+
+    try {
+      const blob = await generateResumePdf(displayName || "Resume", resume);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${sanitizeFileName(displayName || "resume")}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      setError("Could not generate the PDF export.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handlePrint() {
+    setPrinting(true);
+
+    try {
+      const printWindow = window.open("", "_blank", "noopener,noreferrer");
+      if (!printWindow) {
+        throw new Error("Pop-up blocked.");
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(buildResumePrintHtml(displayName || "Resume", resume));
+      printWindow.document.close();
+      printWindow.focus();
+
+      setTimeout(() => {
+        printWindow.print();
+      }, 200);
+    } catch (err) {
+      console.error("Failed to print resume:", err);
+      setError("Could not open the print view. Check whether pop-ups are blocked.");
+    } finally {
+      setPrinting(false);
+    }
   }
 
   if (loading) return <p className="text-sm text-gray-400">Loading resume...</p>;
 
-  if (error) return (
-    <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchResume} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-        Try Again
-      </button>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="surface-section p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-700">Resume Builder</h3>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`text-sm px-4 py-1.5 rounded-lg transition-colors ${
-              saved
-                ? "bg-green-100 text-green-700"
-                : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
-          >
-            {saved ? "Saved!" : saving ? "Saving..." : "Save Resume"}
-          </button>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Resume Builder</p>
+            <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">{displayName || "Your resume"}</h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+              Keep this resume plain, readable, and ATS-friendly. The same content should work for online applications,
+              PDF downloads, and printed handouts.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCopyAtsText()}
+              className={SECONDARY_BUTTON_CLASS}
+            >
+              {copyState === "done" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy ATS Text"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDownloadPdf()}
+              disabled={exportingPdf}
+              className={SECONDARY_BUTTON_CLASS}
+            >
+              {exportingPdf ? "Building PDF..." : "Download PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handlePrint()}
+              disabled={printing}
+              className={SECONDARY_BUTTON_CLASS}
+            >
+              {printing ? "Opening..." : "Print"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                saved
+                  ? "bg-green-100 text-green-700"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {saved ? "Saved" : saving ? "Saving..." : "Save Resume"}
+            </button>
+          </div>
         </div>
-        <p className="text-lg font-bold text-gray-900">{displayName}</p>
+
+        {error ? (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
       </div>
 
-      {/* Objective */}
       <div className="surface-section p-5">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">Career Objective</h4>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700">Write with Sage</h4>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+              Give Sage a target role, job posting summary, or tone request. It will rewrite the resume using only
+              information already stored in VisionQuest and the facts already on this page.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleAssist()}
+            disabled={assistantLoading}
+            className="rounded-lg bg-[var(--ink-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {assistantLoading ? "Sage is drafting..." : "Draft with Sage"}
+          </button>
+        </div>
+
+        <textarea
+          value={assistantPrompt}
+          onChange={(event) => setAssistantPrompt(event.target.value)}
+          placeholder="Example: Tailor this for entry-level office administrator roles. Highlight customer service, Microsoft Office, reliability, and any training or certifications."
+          rows={4}
+          className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+
+        {assistantMessage ? (
+          <div className="mt-4 rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+            {assistantMessage}
+          </div>
+        ) : null}
+
+        {missingInformation.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">Sage still needs:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+              {missingInformation.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="surface-section p-5">
+        <h4 className="mb-3 text-sm font-semibold text-gray-700">Header</h4>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              Display name
+            </label>
+            <input value={displayName} readOnly className={`${INPUT_CLASS} bg-gray-50 text-gray-500`} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              Headline
+            </label>
+            <input
+              value={resume.headline}
+              onChange={(event) => setResume((current) => ({ ...current, headline: event.target.value }))}
+              placeholder="Example: Job-ready office support candidate with customer service experience"
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              Email
+            </label>
+            <input
+              type="email"
+              value={resume.contact.email}
+              onChange={(event) => updateContact("email", event.target.value)}
+              placeholder="name@example.com"
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              Phone
+            </label>
+            <input
+              value={resume.contact.phone}
+              onChange={(event) => updateContact("phone", event.target.value)}
+              placeholder="(555) 555-5555"
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              Location
+            </label>
+            <input
+              value={resume.contact.location}
+              onChange={(event) => updateContact("location", event.target.value)}
+              placeholder="City, State"
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              Website or portfolio
+            </label>
+            <input
+              value={resume.contact.website}
+              onChange={(event) => updateContact("website", event.target.value)}
+              placeholder="https://example.com"
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              LinkedIn
+            </label>
+            <input
+              value={resume.contact.linkedin}
+              onChange={(event) => updateContact("linkedin", event.target.value)}
+              placeholder="https://linkedin.com/in/your-name"
+              className={INPUT_CLASS}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="surface-section p-5">
+        <h4 className="mb-2 text-sm font-semibold text-gray-700">Professional Summary</h4>
         <textarea
           value={resume.objective}
-          onChange={(e) => setResume({ ...resume, objective: e.target.value })}
-          placeholder="Describe your career goals and what you bring to an employer..."
-          rows={3}
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          onChange={(event) => setResume((current) => ({ ...current, objective: event.target.value }))}
+          placeholder="Write 2-4 lines summarizing the kind of work you want, the strengths you bring, and the training or experience that supports you."
+          rows={5}
+          className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      {/* Skills */}
       <div className="surface-section p-5">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">Skills</h4>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {resume.skills.map((skill, i) => (
-            <span key={i} className="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full flex items-center gap-1">
+        <h4 className="mb-2 text-sm font-semibold text-gray-700">Skills</h4>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {resume.skills.map((skill, index) => (
+            <span
+              key={`${skill}-${index}`}
+              className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+            >
               {skill}
-              <button onClick={() => removeSkill(i)} className="text-blue-400 hover:text-blue-600 ml-0.5">&times;</button>
+              <button type="button" onClick={() => removeSkill(index)} className="text-blue-500 hover:text-blue-700">
+                Remove
+              </button>
             </span>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
             type="text"
             value={skillInput}
-            onChange={(e) => setSkillInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())}
-            placeholder="Add a skill (e.g., Microsoft Office, Customer Service)"
-            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(event) => setSkillInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addSkill();
+              }
+            }}
+            placeholder="Add a skill such as Microsoft Excel, customer service, scheduling, or inventory tracking"
+            className={`${INPUT_CLASS} flex-1`}
           />
-          <button onClick={addSkill} className="text-sm bg-gray-100 px-3 py-2 rounded-lg hover:bg-gray-200 text-gray-600">Add</button>
+          <button type="button" onClick={addSkill} className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200">
+            Add Skill
+          </button>
         </div>
       </div>
 
-      {/* Experience */}
       <div className="surface-section p-5">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Work Experience</h4>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="text-sm font-semibold text-gray-700">Work Experience</h4>
+          <button type="button" onClick={addExperience} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+            Add Experience
+          </button>
+        </div>
         <div className="space-y-4">
-          {resume.experience.map((exp, i) => (
-            <div key={i} className="border border-gray-100 rounded-lg p-3 space-y-2">
-              <div className="flex gap-2">
-                <input type="text" placeholder="Job Title" value={exp.title}
-                  onChange={(e) => updateExperience(i, "title", e.target.value)}
-                  className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <button onClick={() => removeExperience(i)} className="text-xs text-red-500 px-2">Remove</button>
+          {resume.experience.length === 0 ? (
+            <p className="text-sm text-[var(--ink-muted)]">Add jobs, volunteer roles, internships, or program work that shows readiness.</p>
+          ) : null}
+          {resume.experience.map((item, index) => (
+            <div key={`experience-${index}`} className="rounded-xl border border-gray-100 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">Experience {index + 1}</p>
+                <button type="button" onClick={() => removeExperience(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                  Remove
+                </button>
               </div>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Company/Organization" value={exp.company}
-                  onChange={(e) => updateExperience(i, "company", e.target.value)}
-                  className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input type="text" placeholder="Dates (e.g., Jan 2024 - Present)" value={exp.dates}
-                  onChange={(e) => updateExperience(i, "dates", e.target.value)}
-                  className="w-48 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  value={item.title}
+                  onChange={(event) => updateExperience(index, "title", event.target.value)}
+                  placeholder="Job title"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.company}
+                  onChange={(event) => updateExperience(index, "company", event.target.value)}
+                  placeholder="Employer or organization"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.location}
+                  onChange={(event) => updateExperience(index, "location", event.target.value)}
+                  placeholder="Location"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.dates}
+                  onChange={(event) => updateExperience(index, "dates", event.target.value)}
+                  placeholder="Dates, for example Jan 2024 - Present"
+                  className={INPUT_CLASS}
+                />
               </div>
-              <textarea placeholder="Describe your responsibilities and achievements..." value={exp.description}
-                onChange={(e) => updateExperience(i, "description", e.target.value)} rows={2}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+              <textarea
+                value={item.description}
+                onChange={(event) => updateExperience(index, "description", event.target.value)}
+                rows={4}
+                placeholder={"Use short bullet lines, for example:\n- Helped customers with questions and scheduling\n- Organized records and completed data entry accurately"}
+                className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           ))}
         </div>
-        <button onClick={addExperience}
-          className="mt-3 text-sm text-blue-600 hover:text-blue-800">+ Add Experience</button>
       </div>
 
-      {/* Education */}
       <div className="surface-section p-5">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Education</h4>
-        <div className="space-y-3">
-          {resume.education.map((edu, i) => (
-            <div key={i} className="border border-gray-100 rounded-lg p-3 flex gap-2 items-start">
-              <div className="flex-1 space-y-2">
-                <input type="text" placeholder="School/Institution" value={edu.school}
-                  onChange={(e) => updateEducation(i, "school", e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <div className="flex gap-2">
-                  <input type="text" placeholder="Degree/Program" value={edu.degree}
-                    onChange={(e) => updateEducation(i, "degree", e.target.value)}
-                    className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  <input type="text" placeholder="Dates" value={edu.dates}
-                    onChange={(e) => updateEducation(i, "dates", e.target.value)}
-                    className="w-40 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="text-sm font-semibold text-gray-700">Education</h4>
+          <button type="button" onClick={addEducation} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+            Add Education
+          </button>
+        </div>
+        <div className="space-y-4">
+          {resume.education.length === 0 ? (
+            <p className="text-sm text-[var(--ink-muted)]">Add schools, training programs, GED/HSE work, or structured coursework.</p>
+          ) : null}
+          {resume.education.map((item, index) => (
+            <div key={`education-${index}`} className="rounded-xl border border-gray-100 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">Education {index + 1}</p>
+                <button type="button" onClick={() => removeEducation(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                  Remove
+                </button>
               </div>
-              <button onClick={() => removeEducation(i)} className="text-xs text-red-500 px-2 mt-1">Remove</button>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  value={item.school}
+                  onChange={(event) => updateEducation(index, "school", event.target.value)}
+                  placeholder="School or program"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.degree}
+                  onChange={(event) => updateEducation(index, "degree", event.target.value)}
+                  placeholder="Diploma, GED, certificate, or program name"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.location}
+                  onChange={(event) => updateEducation(index, "location", event.target.value)}
+                  placeholder="Location"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.dates}
+                  onChange={(event) => updateEducation(index, "dates", event.target.value)}
+                  placeholder="Dates"
+                  className={INPUT_CLASS}
+                />
+              </div>
             </div>
           ))}
         </div>
-        <button onClick={addEducation}
-          className="mt-3 text-sm text-blue-600 hover:text-blue-800">+ Add Education</button>
       </div>
 
-      {/* References */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">References</h4>
+      <div className="surface-section p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="text-sm font-semibold text-gray-700">Certifications</h4>
+          <button type="button" onClick={addCertification} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+            Add Certification
+          </button>
+        </div>
+        <div className="space-y-4">
+          {resume.certifications.length === 0 ? (
+            <p className="text-sm text-[var(--ink-muted)]">List completed certifications or credentials that should appear on the resume.</p>
+          ) : null}
+          {resume.certifications.map((item, index) => (
+            <div key={`certification-${index}`} className="rounded-xl border border-gray-100 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">Certification {index + 1}</p>
+                <button type="button" onClick={() => removeCertification(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                  Remove
+                </button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <input
+                  value={item.name}
+                  onChange={(event) => updateCertification(index, "name", event.target.value)}
+                  placeholder="Certification name"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.issuer}
+                  onChange={(event) => updateCertification(index, "issuer", event.target.value)}
+                  placeholder="Issuer"
+                  className={INPUT_CLASS}
+                />
+                <input
+                  value={item.dates}
+                  onChange={(event) => updateCertification(index, "dates", event.target.value)}
+                  placeholder="Date earned"
+                  className={INPUT_CLASS}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="surface-section p-5">
+        <h4 className="mb-2 text-sm font-semibold text-gray-700">References</h4>
         <textarea
           value={resume.references}
-          onChange={(e) => setResume({ ...resume, references: e.target.value })}
-          placeholder="List your references or write 'Available upon request'"
+          onChange={(event) => setResume((current) => ({ ...current, references: event.target.value }))}
+          placeholder="Usually this should be: Available upon request"
           rows={3}
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      {/* Save */}
       <button
-        onClick={handleSave}
+        type="button"
+        onClick={() => void handleSave()}
         disabled={saving}
-        className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
+        className={`w-full rounded-xl py-3 text-sm font-semibold transition-colors ${
           saved ? "bg-green-100 text-green-700" : "bg-blue-600 text-white hover:bg-blue-700"
         }`}
       >
-        {saved ? "Resume Saved!" : saving ? "Saving..." : "Save Resume"}
+        {saved ? "Resume Saved" : saving ? "Saving..." : "Save Resume"}
       </button>
     </div>
   );

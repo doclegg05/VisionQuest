@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import { apiFetch } from "@/lib/api";
+import { getInactivityStageByType } from "@/lib/inactivity";
 import {
   teacherDashboardAlertAction,
   teacherDashboardAlertQuickAction,
@@ -35,6 +36,13 @@ interface StudentOverview {
   filesCount: number;
   isActive: boolean;
   readinessScore: number;
+}
+
+interface ManagedClassOption {
+  id: string;
+  name: string;
+  code: string;
+  status: string;
 }
 
 interface DashboardAlert {
@@ -83,11 +91,45 @@ interface UpcomingAppointment {
   };
 }
 
+interface InactivityQueueItem {
+  id: string;
+  type: string;
+  severity: string;
+  title: string;
+  summary: string;
+  sourceType: string | null;
+  sourceId: string | null;
+  detectedAt: string;
+  stageLabel: string;
+  nextStep: string;
+  student: {
+    id: string;
+    studentId: string;
+    displayName: string;
+  };
+}
+
+interface InactivitySummary {
+  followUp14: number;
+  inactive30: number;
+  reengage60: number;
+  archiveReview90: number;
+}
+
 type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDone" | "readinessScore";
 
 export default function ClassOverview() {
+  const [classes, setClasses] = useState<ManagedClassOption[]>([]);
+  const [currentClassId, setCurrentClassId] = useState("");
   const [students, setStudents] = useState<StudentOverview[]>([]);
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [inactivityQueue, setInactivityQueue] = useState<InactivityQueueItem[]>([]);
+  const [inactivitySummary, setInactivitySummary] = useState<InactivitySummary>({
+    followUp14: 0,
+    inactive30: 0,
+    reengage60: 0,
+    archiveReview90: 0,
+  });
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,15 +144,28 @@ export default function ClassOverview() {
   const [actionIntent, setActionIntent] = useState<DashboardActionIntent | null>(null);
 
   const applyStudentPage = useCallback((data: {
+    classes?: ManagedClassOption[];
+    currentClassId?: string | null;
     students?: StudentOverview[];
     alerts?: DashboardAlert[];
+    inactivityQueue?: InactivityQueueItem[];
+    inactivitySummary?: InactivitySummary;
     reviewQueue?: ReviewQueueItem[];
     upcomingAppointments?: UpcomingAppointment[];
     totalPages?: number;
     page?: number;
   }) => {
+    setClasses(data.classes || []);
+    setCurrentClassId(data.currentClassId || "");
     setStudents(data.students || []);
     setAlerts(data.alerts || []);
+    setInactivityQueue(data.inactivityQueue || []);
+    setInactivitySummary(data.inactivitySummary || {
+      followUp14: 0,
+      inactive30: 0,
+      reengage60: 0,
+      archiveReview90: 0,
+    });
     setReviewQueue(data.reviewQueue || []);
     setUpcomingAppointments(data.upcomingAppointments || []);
     setTotalPages(data.totalPages || 1);
@@ -122,7 +177,7 @@ export default function ClassOverview() {
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/teacher/dashboard?page=${p}&limit=50${showInactive ? "&showInactive=true" : ""}`;
+      const url = `/api/teacher/dashboard?page=${p}&limit=50${showInactive ? "&showInactive=true" : ""}${currentClassId ? `&classId=${encodeURIComponent(currentClassId)}` : ""}`;
       const response = await apiFetch(url);
       const data = await response.json();
       applyStudentPage(data);
@@ -131,12 +186,12 @@ export default function ClassOverview() {
     } finally {
       setLoading(false);
     }
-  }, [applyStudentPage, showInactive]);
+  }, [applyStudentPage, currentClassId, showInactive]);
 
   useEffect(() => {
     async function loadStudents() {
       try {
-        const url = `/api/teacher/dashboard?page=1&limit=50${showInactive ? "&showInactive=true" : ""}`;
+        const url = `/api/teacher/dashboard?page=1&limit=50${showInactive ? "&showInactive=true" : ""}${currentClassId ? `&classId=${encodeURIComponent(currentClassId)}` : ""}`;
         const response = await apiFetch(url);
         const data = await response.json();
         applyStudentPage(data);
@@ -148,7 +203,7 @@ export default function ClassOverview() {
     }
 
     void loadStudents();
-  }, [applyStudentPage, showInactive]);
+  }, [applyStudentPage, currentClassId, showInactive]);
 
   function handleSort(key: SortKey) {
     if (sortBy === key) {
@@ -477,6 +532,118 @@ export default function ClassOverview() {
         </div>
       </div>
 
+      <div className="surface-section p-5">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+              Re-engagement
+            </p>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Inactivity follow-up queue</h2>
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">
+              Use 14-day follow-up, 30-day inactive, 60-day re-engagement, and 90-day archive review as staff checkpoints instead of automatic archiving.
+            </p>
+          </div>
+          <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+            {inactivityQueue.length} queued
+          </span>
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-2">
+          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+            14-day {inactivitySummary.followUp14}
+          </span>
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+            30-day {inactivitySummary.inactive30}
+          </span>
+          <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+            60-day {inactivitySummary.reengage60}
+          </span>
+          <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+            90-day {inactivitySummary.archiveReview90}
+          </span>
+        </div>
+
+        {inactivityQueue.length === 0 ? (
+          <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+            No students are currently in the inactivity follow-up queue.
+          </p>
+        ) : (
+          <div className="grid gap-3 xl:grid-cols-2">
+            {inactivityQueue.map((item) => {
+              const stage = getInactivityStageByType(item.type);
+              const quickAction = teacherDashboardAlertQuickAction(item.type);
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.68)] p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{item.student.displayName}</p>
+                      <p className="mt-1 break-words text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                        {item.student.studentId}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                        item.type === "inactive_student_90"
+                          ? "bg-rose-100 text-rose-700"
+                          : item.type === "inactive_student_60"
+                            ? "bg-orange-100 text-orange-700"
+                            : item.type === "inactive_student_30"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-[rgba(16,37,62,0.06)] text-[var(--ink-muted)]"
+                      }`}
+                    >
+                      {item.stageLabel}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">{item.summary}</p>
+                  <p className="mt-2 text-xs text-[var(--ink-muted)]">{stage?.nextStep || item.nextStep}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--ink-muted)]">Detected {relativeTime(item.detectedAt)}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {quickAction ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActionIntent({
+                              kind: quickAction.kind,
+                              title: item.title,
+                              summary: item.summary,
+                              severity: item.severity,
+                              student: item.student,
+                              goalId: null,
+                              linkId: null,
+                            })
+                          }
+                          className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-white"
+                        >
+                          {quickAction.label}
+                        </button>
+                      ) : null}
+                      <Link
+                        href={`/teacher/students/${item.student.id}`}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                      >
+                        Open student
+                      </Link>
+                      <Link
+                        href={`/teacher/classes${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                      >
+                        Manage roster
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="surface-section p-4 sm:p-5">
@@ -499,20 +666,39 @@ export default function ClassOverview() {
 
       {/* Search + Export */}
       <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
-        <label className="min-w-0 flex-1">
-          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-            Search students
-          </span>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or student ID..."
-            className="field px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
-          />
-        </label>
+        <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <label>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+              Class scope
+            </span>
+            <select
+              value={currentClassId}
+              onChange={(event) => setCurrentClassId(event.target.value)}
+              className="field w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+            >
+              <option value="">All assigned classes</option>
+              {classes.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} ({item.code})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-0">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+              Search students
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or student ID..."
+              className="field w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+            />
+          </label>
+        </div>
         <a
-          href="/api/teacher/export"
+          href={`/api/teacher/export${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
           className="inline-flex items-center justify-center rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
         >
           Export CSV

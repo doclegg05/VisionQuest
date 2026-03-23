@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
@@ -20,7 +21,7 @@ export const POST = withTeacherAuth(async (
     );
   }
 
-  const student = await prisma.student.findUnique({ where: { id } });
+  const student = await assertStaffCanManageStudent(session, id);
   if (!student || student.role === "teacher") {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }

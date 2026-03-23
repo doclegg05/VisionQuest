@@ -254,6 +254,18 @@ interface StudentData {
   notes: NoteData[];
   alerts: AlertData[];
   conversations: ConversationSummary[];
+  careerDiscovery: {
+    status: string;
+    topClusters: string[];
+    sageSummary: string | null;
+    interests: string[];
+    strengths: string[];
+    subjects: string[];
+    problems: string[];
+    values: string[];
+    circumstances: string[];
+    completedAt: string | null;
+  } | null;
 }
 
 const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
@@ -1493,6 +1505,107 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           <GoalSupportPlanner goals={goals} goalPlans={goalPlans} onChanged={loadData} />
         </div>
         <GoalTree goals={goals} />
+      </div>
+
+      {/* Career Discovery */}
+      <div id="career-discovery" className="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          Career Discovery
+          {data.careerDiscovery?.status === "complete" && (
+            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Complete</span>
+          )}
+          {data.careerDiscovery?.status === "in_progress" && (
+            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">In Progress</span>
+          )}
+        </h3>
+        {!data.careerDiscovery ? (
+          <p className="text-sm text-gray-400">Student has not started career discovery yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {data.careerDiscovery.sageSummary && (
+              <p className="text-sm text-gray-700">{data.careerDiscovery.sageSummary}</p>
+            )}
+            {data.careerDiscovery.topClusters.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Top Pathways</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {data.careerDiscovery.topClusters.map((cluster) => (
+                    <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
+                      {cluster.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(data.careerDiscovery.interests.length > 0 || data.careerDiscovery.strengths.length > 0 || data.careerDiscovery.subjects.length > 0 || data.careerDiscovery.problems.length > 0 || data.careerDiscovery.values.length > 0) && (
+              <details className="text-sm">
+                <summary className="text-xs font-medium text-gray-500 uppercase cursor-pointer">Signals</summary>
+                <div className="mt-2 space-y-2">
+                  {data.careerDiscovery.interests.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Interests:</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {data.careerDiscovery.interests.map((item, i) => (
+                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.careerDiscovery.strengths.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Strengths:</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {data.careerDiscovery.strengths.map((item, i) => (
+                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.careerDiscovery.subjects.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Preferred Subjects:</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {data.careerDiscovery.subjects.map((item, i) => (
+                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.careerDiscovery.problems.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Problems They Care About:</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {data.careerDiscovery.problems.map((item, i) => (
+                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.careerDiscovery.values.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Values:</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {data.careerDiscovery.values.map((item, i) => (
+                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.careerDiscovery.circumstances.length > 0 && (
+                    <div>
+                      <span className="text-xs text-gray-400">Circumstances:</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {data.careerDiscovery.circumstances.map((item, i) => (
+                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
       <div id="orientation-review" className="bg-white rounded-xl border border-gray-200 p-5">

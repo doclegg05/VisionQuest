@@ -4,6 +4,7 @@ import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } fr
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
+import { findValidClassInviteByToken } from "@/lib/classroom";
 import { validateSecurityQuestionAnswers } from "@/lib/security-questions";
 import { hashSecurityAnswers } from "@/lib/security-question-auth";
 import { parseBody, registerSchema } from "@/lib/schemas";
@@ -20,6 +21,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const displayName = body.displayName.trim();
   const password = body.password.trim();
   const email = normalizeEmail(body.email);
+  const invite = await findValidClassInviteByToken(body.inviteToken);
+
+  if (!invite) {
+    return NextResponse.json({ error: "This class invite is missing, expired, or has already been used." }, { status: 403 });
+  }
+
+  if (invite.email !== email) {
+    return NextResponse.json({ error: "Use the email address that your instructor invited." }, { status: 400 });
+  }
 
   // Security questions validated separately (custom logic beyond Zod)
   const securityQuestionsResult = validateSecurityQuestionAnswers(body.securityQuestions);
@@ -48,17 +58,37 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const { hash } = hashPassword(password);
-  const student = await prisma.student.create({
-    data: {
-      studentId,
-      displayName,
-      passwordHash: hash,
-      email,
-      role: "student",
-      securityQuestionAnswers: {
-        create: hashSecurityAnswers(securityQuestionsResult.answers),
+  const student = await prisma.$transaction(async (tx) => {
+    const created = await tx.student.create({
+      data: {
+        studentId,
+        displayName,
+        passwordHash: hash,
+        email,
+        role: "student",
+        securityQuestionAnswers: {
+          create: hashSecurityAnswers(securityQuestionsResult.answers),
+        },
       },
-    },
+    });
+
+    await tx.studentClassEnrollment.create({
+      data: {
+        classId: invite.classId,
+        studentId: created.id,
+        status: "active",
+      },
+    });
+
+    await tx.classEnrollmentInvite.update({
+      where: { id: invite.id },
+      data: {
+        claimedAt: new Date(),
+        claimedById: created.id,
+      },
+    });
+
+    return created;
   });
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);
@@ -69,8 +99,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     action: "auth.register",
     targetType: "student",
     targetId: student.id,
-    summary: `New student registered: ${student.studentId}.`,
-    metadata: { ip },
+    summary: `New student registered from class invite: ${student.studentId}.`,
+    metadata: {
+      ip,
+      classId: invite.classId,
+      inviteId: invite.id,
+    },
   });
 
   return NextResponse.json({

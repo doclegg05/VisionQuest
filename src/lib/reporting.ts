@@ -12,22 +12,20 @@ function countDaysSince(value: Date, now: Date) {
   return Math.floor((now.getTime() - value.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export async function getTeacherOutcomeReport() {
+export async function getTeacherOutcomeReport(studentIds?: string[]) {
   const now = new Date();
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  const studentIds = await prisma.student.findMany({
-    where: { role: "student" },
-    select: { id: true },
-    orderBy: { displayName: "asc" },
-  });
+  const scopedStudentIds = studentIds && studentIds.length > 0 ? studentIds : null;
 
   const [orientationTotal, students, recentApplications, activeOpportunityCount, closingSoonOpportunityCount, upcomingEvents] =
     await Promise.all([
       prisma.orientationItem.count(),
       prisma.student.findMany({
-        where: { role: "student" },
+        where: {
+          role: "student",
+          ...(scopedStudentIds ? { id: { in: scopedStudentIds } } : {}),
+        },
         select: {
           id: true,
           studentId: true,
@@ -115,6 +113,7 @@ export async function getTeacherOutcomeReport() {
       }),
       prisma.application.findMany({
         where: {
+          ...(scopedStudentIds ? { studentId: { in: scopedStudentIds } } : {}),
           status: {
             in: ["applied", "interviewing", "offer"],
           },

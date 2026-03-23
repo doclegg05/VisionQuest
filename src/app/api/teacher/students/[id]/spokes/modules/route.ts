@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { ensureSpokesRecordForStudent } from "@/lib/spokes";
 
@@ -16,6 +17,7 @@ export const POST = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
+  await assertStaffCanManageStudent(session, id);
   const body = await req.json();
 
   if (typeof body.templateId !== "string" || !body.templateId) {
@@ -78,6 +80,7 @@ export const DELETE = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
+  await assertStaffCanManageStudent(session, id);
   const body = await req.json();
 
   if (typeof body.templateId !== "string" || !body.templateId) {

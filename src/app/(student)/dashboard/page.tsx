@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   if (!session) return null;
 
   const now = new Date();
-  const [goalCount, progression, nextAppointment, tasks, alertCount] = await Promise.all([
+  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id } }),
     prisma.appointment.findFirst({
@@ -75,6 +75,10 @@ export default async function DashboardPage() {
         status: "open",
       },
     }),
+    prisma.resumeData.findUnique({
+      where: { studentId: session.id },
+      select: { id: true },
+    }),
   ]);
 
   // Redirect brand-new students to the welcome flow
@@ -86,6 +90,9 @@ export default async function DashboardPage() {
   }
 
   const state = progression ? parseState(progression.state) : createInitialState();
+  if (!state.resumeCreated && resumeData) {
+    state.resumeCreated = true;
+  }
   const readiness = computeReadinessScore(state);
   const xpProgress = getXpProgress(state);
   const achievements = getAchievementsWithDefs(state);

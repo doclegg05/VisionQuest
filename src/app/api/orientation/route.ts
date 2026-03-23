@@ -19,6 +19,7 @@ export const GET = withAuth(async (session) => {
     id: item.id,
     label: item.label,
     description: item.description,
+    section: item.section ?? null,
     required: item.required,
     completed: item.progress[0]?.completed ?? false,
     completedAt: item.progress[0]?.completedAt ?? null,

@@ -13,6 +13,7 @@ import { sendNotificationWithCooldown } from "./notifications";
 import { parseState } from "./progression/engine";
 import { toGoalResourceLinkView } from "./goal-resource-links";
 import { buildStudentStatusSignals, type StudentStatusSignals } from "./student-status";
+import { ALL_INACTIVITY_ALERT_TYPES, getDaysSinceActivity, getInactivityStage } from "./inactivity";
 
 export const APPOINTMENT_STATUSES = ["scheduled", "completed", "cancelled", "missed"] as const;
 export const TASK_STATUSES = ["open", "in_progress", "completed"] as const;
@@ -194,14 +195,14 @@ export function buildStudentAlertDescriptors({
   const studentKey = signals?.studentId || "student";
   const lastActivityAt = latestDate(signals?.lastActivityAt, signals?.studentCreatedAt);
   if (lastActivityAt) {
-    const inactiveDays = (now.getTime() - lastActivityAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (inactiveDays >= 7) {
+    const inactivityStage = getInactivityStage(getDaysSinceActivity(lastActivityAt, now));
+    if (inactivityStage) {
       alerts.push({
         alertKey: `inactive_student:${studentKey}`,
-        type: "inactive_student",
-        severity: inactiveDays >= 14 ? "high" : "medium",
-        title: "Low recent activity",
-        summary: `No recorded student activity since ${formatAlertDate(lastActivityAt)}.`,
+        type: inactivityStage.type,
+        severity: inactivityStage.severity,
+        title: inactivityStage.title,
+        summary: `No recorded student activity since ${formatAlertDate(lastActivityAt)}. ${inactivityStage.nextStep}`,
         sourceType: "student",
         sourceId: signals?.studentId || studentKey,
       });
@@ -1100,7 +1101,6 @@ export async function syncStudentAlerts(studentId: string) {
           in: [
             "overdue_task",
             "missed_appointment",
-            "inactive_student",
             "career_inactive",
             "certification_stalled",
             "goal_needs_resource",
@@ -1110,6 +1110,7 @@ export async function syncStudentAlerts(studentId: string) {
             "orientation_form_pending_review",
             "orientation_form_revision_needed",
             "orientation_item_incomplete",
+            ...ALL_INACTIVITY_ALERT_TYPES,
           ],
         },
       },

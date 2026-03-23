@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageClass, buildManagedStudentWhere } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getCertificationProgress } from "@/lib/certifications";
@@ -14,11 +15,20 @@ function latestDate(...values: Array<Date | null | undefined>) {
 }
 
 // GET — export class data as CSV
-export const GET = withTeacherAuth(async (session) => {
+export const GET = withTeacherAuth(async (session, req: Request) => {
   const now = new Date();
+  const { searchParams } = new URL(req.url);
+  const classId = searchParams.get("classId")?.trim() || "";
+
+  if (classId) {
+    await assertStaffCanManageClass(session, classId);
+  }
 
   const students = await prisma.student.findMany({
-    where: { role: "student" },
+    where: buildManagedStudentWhere(session, {
+      classId: classId || undefined,
+      includeInactiveAccounts: true,
+    }),
     select: {
       id: true,
       studentId: true,
@@ -217,6 +227,7 @@ export const GET = withTeacherAuth(async (session) => {
     targetType: "class",
     summary: "Teacher exported the student progress CSV.",
     metadata: {
+      classId: classId || null,
       studentCount: students.length,
     },
   });

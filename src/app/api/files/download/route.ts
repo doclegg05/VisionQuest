@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
-import { withAuth } from "@/lib/api-error";
+import { isStaffRole, withAuth } from "@/lib/api-error";
 
 export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  // Students can download their own files; teachers can download any file
-  const where = session.role === "teacher"
+  // Students can download their own files; staff can download any file
+  const where = isStaffRole(session.role)
     ? { id }
     : { id, studentId: session.id };
 

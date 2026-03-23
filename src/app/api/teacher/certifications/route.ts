@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent, listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
 import { getCertificationProgress } from "@/lib/certifications";
@@ -8,13 +9,20 @@ import { logAuditEvent } from "@/lib/audit";
 import { recomputeCertificationStatus, recomputeCertificationStatusesForType } from "@/lib/certification-service";
 
 // GET — list cert templates or all student cert progress
-export const GET = withTeacherAuth(async (_session, req: Request) => {
+export const GET = withTeacherAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const view = searchParams.get("view"); // "templates" or "students"
 
   if (view === "students") {
+    const managedStudentIds = await listManagedStudentIds(session, {
+      includeInactiveAccounts: true,
+    });
+
     // Get all certifications with student info
     const certs = await prisma.certification.findMany({
+      where: {
+        studentId: { in: managedStudentIds },
+      },
       include: {
         student: { select: { id: true, displayName: true, studentId: true } },
         requirements: true,
@@ -120,7 +128,13 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
     const requirement = await prisma.certRequirement.findUnique({
       where: { id: requirementId },
       include: {
-        certification: true,
+        certification: {
+          select: {
+            id: true,
+            studentId: true,
+            certType: true,
+          },
+        },
         template: {
           select: {
             id: true,
@@ -136,6 +150,7 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
     if (!requirement) {
       return NextResponse.json({ error: "Requirement not found." }, { status: 404 });
     }
+    await assertStaffCanManageStudent(session, requirement.certification.studentId);
     if (!requirement.completed) {
       return NextResponse.json({ error: "Only completed requirements can be verified." }, { status: 400 });
     }

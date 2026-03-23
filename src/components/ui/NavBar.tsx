@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { getRoleHomePath } from "@/lib/role-home";
 import BrandLockup from "./BrandLockup";
 import NotificationBell from "./NotificationBell";
 
-const NAV_ITEMS = [
+const STUDENT_ITEMS = [
   { href: "/chat", label: "Sage", icon: "💬" },
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/appointments", label: "Advising", icon: "🗓️" },
@@ -24,13 +25,15 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
-const TEACHER_ITEMS = [
+const STAFF_ITEMS = [
   { href: "/teacher", label: "Class Dashboard", icon: "👥" },
+  { href: "/teacher/classes", label: "Classes", icon: "🏫" },
   { href: "/teacher/manage", label: "Manage Content", icon: "⚙️" },
 ];
 
-const MOBILE_MAIN = NAV_ITEMS.slice(0, 4);
-const MOBILE_MORE = NAV_ITEMS.slice(4);
+const ADMIN_ITEMS = [
+  { href: "/admin", label: "Admin", icon: "🛠️" },
+];
 
 interface NavBarProps {
   studentName: string;
@@ -44,13 +47,22 @@ export default function NavBar({ studentName, role }: NavBarProps) {
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreDialogRef = useRef<HTMLDivElement>(null);
 
+  const homeHref = getRoleHomePath(role);
+  const primaryItems =
+    role === "student"
+      ? STUDENT_ITEMS
+      : role === "admin"
+        ? [...ADMIN_ITEMS, ...STAFF_ITEMS]
+        : STAFF_ITEMS;
+  const mobileMain = primaryItems.slice(0, 4);
+  const mobileMore = primaryItems.slice(4);
+
   const handleLogout = async () => {
     await fetch("/api/auth/session", { method: "DELETE" });
     router.push("/");
     router.refresh();
   };
 
-  // Focus first link in "More" dialog on open; return focus on Escape
   useEffect(() => {
     if (!moreOpen) return;
     const first = moreDialogRef.current?.querySelector<HTMLElement>("a, button");
@@ -62,20 +74,21 @@ export default function NavBar({ studentName, role }: NavBarProps) {
         moreButtonRef.current?.focus();
       }
     };
+
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [moreOpen]);
 
-  const isMoreActive = [...MOBILE_MORE, ...(role === "teacher" ? TEACHER_ITEMS : [])].some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+  const isMoreActive = mobileMore.some(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
   );
 
   return (
     <>
-      <div className="md:hidden fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-white/50 bg-[rgba(255,255,255,0.84)] px-3.5 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur">
+      <div className="fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-white/50 bg-[rgba(255,255,255,0.84)] px-3.5 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur md:hidden">
         <div className="min-w-0 flex-1">
           <BrandLockup
-            href="/dashboard"
+            href={homeHref}
             size="sm"
             title="VisionQuest"
             subtitle="Portal"
@@ -100,52 +113,64 @@ export default function NavBar({ studentName, role }: NavBarProps) {
       </div>
 
       <nav
-        className="md:hidden fixed bottom-3 left-3 right-3 z-50 rounded-[1.8rem] border border-white/55 bg-[rgba(255,255,255,0.84)] shadow-[0_18px_50px_rgba(16,37,62,0.16)] backdrop-blur"
+        className="fixed bottom-3 left-3 right-3 z-50 rounded-[1.8rem] border border-white/55 bg-[rgba(255,255,255,0.84)] shadow-[0_18px_50px_rgba(16,37,62,0.16)] backdrop-blur md:hidden"
         role="navigation"
         aria-label="Main navigation"
       >
         <div className="flex">
-          {MOBILE_MAIN.map((item) => (
+          {mobileMain.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               prefetch={false}
-              className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors
-                ${pathname === item.href ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
+              className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors ${
+                pathname === item.href || pathname.startsWith(item.href + "/")
+                  ? "text-[var(--ink-strong)]"
+                  : "text-[var(--ink-muted)]"
+              }`}
               aria-current={pathname === item.href ? "page" : undefined}
             >
-              <span className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
-                pathname === item.href ? "bg-[rgba(16,37,62,0.1)]" : "bg-transparent"
-              }`}>
+              <span
+                className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
+                  pathname === item.href || pathname.startsWith(item.href + "/")
+                    ? "bg-[rgba(16,37,62,0.1)]"
+                    : "bg-transparent"
+                }`}
+              >
                 {item.icon}
               </span>
               <span className="text-center">{item.label}</span>
             </Link>
           ))}
-          <button
-            ref={moreButtonRef}
-            onClick={() => setMoreOpen(!moreOpen)}
-            type="button"
-            className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors
-              ${isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}`}
-            aria-expanded={moreOpen}
-            aria-haspopup="dialog"
-            aria-label="More navigation options"
-          >
-            <span className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
-              isMoreActive ? "bg-[rgba(16,37,62,0.1)]" : "bg-transparent"
-            }`}>
-              •••
-            </span>
-            <span className="text-center">More</span>
-          </button>
+          {mobileMore.length > 0 ? (
+            <button
+              ref={moreButtonRef}
+              onClick={() => setMoreOpen(!moreOpen)}
+              type="button"
+              className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors ${
+                isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"
+              }`}
+              aria-expanded={moreOpen}
+              aria-haspopup="dialog"
+              aria-label="More navigation options"
+            >
+              <span
+                className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
+                  isMoreActive ? "bg-[rgba(16,37,62,0.1)]" : "bg-transparent"
+                }`}
+              >
+                •••
+              </span>
+              <span className="text-center">More</span>
+            </button>
+          ) : null}
         </div>
       </nav>
 
-      {moreOpen && (
+      {moreOpen && mobileMore.length > 0 ? (
         <>
           <div
-            className="md:hidden fixed inset-0 z-40 bg-black/30"
+            className="fixed inset-0 z-40 bg-black/30 md:hidden"
             onClick={() => setMoreOpen(false)}
           />
           <div
@@ -153,20 +178,20 @@ export default function NavBar({ studentName, role }: NavBarProps) {
             role="dialog"
             aria-modal="true"
             aria-label="More navigation options"
-            className="panel panel-strong md:hidden fixed bottom-24 left-3 right-3 z-50 rounded-[1.75rem] p-4"
+            className="panel panel-strong fixed bottom-24 left-3 right-3 z-50 rounded-[1.75rem] p-4 md:hidden"
           >
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {MOBILE_MORE.map((item) => (
+              {mobileMore.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   prefetch={false}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors
-                    ${pathname === item.href
+                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                    pathname === item.href || pathname.startsWith(item.href + "/")
                       ? "bg-[rgba(16,37,62,0.08)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
-                    }`}
+                  }`}
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
                   <span className="mb-1 text-2xl">{item.icon}</span>
@@ -174,38 +199,18 @@ export default function NavBar({ studentName, role }: NavBarProps) {
                 </Link>
               ))}
             </div>
-            {role === "teacher" && (
-              <div className="mt-3 grid grid-cols-1 gap-2 border-t border-[rgba(18,38,63,0.08)] pt-3 sm:grid-cols-2">
-                {TEACHER_ITEMS.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    prefetch={false}
-                    onClick={() => setMoreOpen(false)}
-                    className={`flex items-center gap-2 rounded-[1rem] px-4 py-3 text-sm transition-colors
-                      ${pathname === item.href || pathname.startsWith(item.href + "/")
-                        ? "bg-[rgba(16,37,62,0.08)] text-[var(--ink-strong)]"
-                        : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"}`}
-                    aria-current={pathname === item.href ? "page" : undefined}
-                  >
-                    <span>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
         </>
-      )}
+      ) : null}
 
       <aside
-        className="hidden md:flex fixed inset-y-4 left-4 z-40 w-[17rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(7,23,43,0.96),rgba(16,37,62,0.94)_34%,rgba(8,68,80,0.92))] text-white shadow-[0_30px_90px_rgba(7,23,43,0.28)]"
+        className="fixed inset-y-4 left-4 z-40 hidden w-[17rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(7,23,43,0.96),rgba(16,37,62,0.94)_34%,rgba(8,68,80,0.92))] text-white shadow-[0_30px_90px_rgba(7,23,43,0.28)] md:flex"
         role="navigation"
         aria-label="Main navigation"
       >
         <div className="border-b border-white/10 p-6">
           <BrandLockup
-            href="/dashboard"
+            href={homeHref}
             size="md"
             title="VisionQuest"
             subtitle="SPOKES Program Portal"
@@ -217,53 +222,32 @@ export default function NavBar({ studentName, role }: NavBarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={false}
-              className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors
-                ${pathname === item.href
-                  ? "bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
-                  : "text-white/90 hover:bg-white/10 hover:text-white"
+          {primaryItems.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                prefetch={false}
+                className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
+                    : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
-              aria-current={pathname === item.href ? "page" : undefined}
-            >
-              <span aria-hidden="true" className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
-                pathname === item.href ? "bg-[var(--ink-strong)] text-white" : "bg-white/10 text-white"
-              }`}>
-                {item.icon}
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
-
-          {role === "teacher" && (
-            <div className="mt-4 border-t border-white/10 pt-4">
-              {TEACHER_ITEMS.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={false}
-                  className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors
-                    ${pathname === item.href || pathname.startsWith(item.href + "/")
-                      ? "bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
-                      : "text-white/90 hover:bg-white/10 hover:text-white"
-                    }`}
-                  aria-current={pathname === item.href ? "page" : undefined}
+                aria-current={pathname === item.href ? "page" : undefined}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
+                    active ? "bg-[var(--ink-strong)] text-white" : "bg-white/10 text-white"
+                  }`}
                 >
-                  <span className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
-                    pathname === item.href || pathname.startsWith(item.href + "/")
-                      ? "bg-[var(--ink-strong)] text-white"
-                      : "bg-white/10 text-white"
-                  }`}>
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          )}
+                  {item.icon}
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="border-t border-white/10 p-4">

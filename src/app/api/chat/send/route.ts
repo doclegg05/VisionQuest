@@ -13,6 +13,7 @@ import { getOrCreateConversation, saveMessage } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { buildStudentStatusSignals, buildStudentStatusSummary } from "@/lib/student-status";
+import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   await saveMessage(conversation.id, "user", userMessage);
 
   // Build system prompt context
-  const [goals, orientationItems, formSubmissions, orientationProgress] = await Promise.all([
+  const [goals, orientationItems, formSubmissions, orientationProgress, careerDiscovery] = await Promise.all([
     prisma.goal.findMany({
       where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
     }),
@@ -67,6 +68,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         completedAt: true,
       },
     }),
+    prisma.careerDiscovery.findUnique({
+      where: { studentId: session.id },
+      select: { status: true, sageSummary: true, topClusters: true },
+    }),
   ]);
   const goalsByLevel: Record<string, string> = {};
   for (const g of goals) goalsByLevel[g.level] = g.content;
@@ -79,6 +84,12 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     { includePositiveSummary: conversation.stage === "orientation" || conversation.stage === "onboarding" },
   );
 
+  // Build discovery context for the prompt
+  const isDiscoveryStage = conversation.stage === "discovery";
+  const discoverySummary = careerDiscovery?.sageSummary && careerDiscovery.topClusters.length > 0
+    ? `${careerDiscovery.sageSummary} (Top pathways: ${careerDiscovery.topClusters.join(", ")})`
+    : undefined;
+
   const systemPrompt = buildSystemPrompt(conversation.stage as ConversationStage, {
     studentName: session.displayName,
     bhag: goalsByLevel["bhag"],
@@ -90,6 +101,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       : "No planning goals set yet.",
     student_status_summary: studentStatusSummary || undefined,
     userMessage,
+    career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
+    discovery_summary: discoverySummary,
   });
 
   // Format message history for Gemini

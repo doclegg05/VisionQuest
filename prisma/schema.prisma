@@ -35,6 +35,11 @@ model Student {
   securityQuestionAnswers SecurityQuestionAnswer[]
   appointments            Appointment[]            @relation("StudentAppointments")
   advisorAppointments     Appointment[]            @relation("AdvisorAppointments")
+  createdClasses          SpokesClass[]            @relation("CreatedClasses")
+  instructedClasses       SpokesClassInstructor[]  @relation("ClassInstructors")
+  classEnrollments        StudentClassEnrollment[] @relation("ClassEnrollments")
+  createdClassInvites     ClassEnrollmentInvite[]  @relation("CreatedClassInvites")
+  claimedClassInvites     ClassEnrollmentInvite[]  @relation("ClaimedClassInvites")
   assignedTasks           StudentTask[]            @relation("AssignedTasks")
   createdTasks            StudentTask[]            @relation("CreatedTasks")
   caseNotes               CaseNote[]               @relation("StudentCaseNotes")
@@ -414,6 +419,83 @@ model FileUpload {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@schema("visionquest")
+}
+
+model SpokesClass {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  status      String    @default("active")
+  description String?   @db.Text
+  startDate   DateTime? @db.Date
+  endDate     DateTime? @db.Date
+  archivedAt  DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy   Student?                 @relation("CreatedClasses", fields: [createdById], references: [id], onDelete: SetNull)
+  instructors SpokesClassInstructor[]
+  enrollments StudentClassEnrollment[]
+  invites     ClassEnrollmentInvite[]
+
+  @@index([status, name])
+  @@schema("visionquest")
+}
+
+model SpokesClassInstructor {
+  classId      String
+  instructorId String
+  assignedAt   DateTime @default(now())
+
+  class      SpokesClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  instructor Student     @relation("ClassInstructors", fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@id([classId, instructorId])
+  @@index([instructorId])
+  @@schema("visionquest")
+}
+
+model StudentClassEnrollment {
+  id            String    @id @default(cuid())
+  classId       String
+  studentId     String
+  status        String    @default("active")
+  enrolledAt    DateTime  @default(now())
+  archivedAt    DateTime?
+  archiveReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  class   SpokesClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student Student     @relation("ClassEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([studentId, status])
+  @@index([classId, status])
+  @@schema("visionquest")
+}
+
+model ClassEnrollmentInvite {
+  id                 String    @id @default(cuid())
+  classId            String
+  email              String
+  displayName        String?
+  suggestedStudentId String?
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  claimedAt          DateTime?
+  claimedById        String?
+  createdById        String
+  createdAt          DateTime  @default(now())
+
+  class     SpokesClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdBy Student     @relation("CreatedClassInvites", fields: [createdById], references: [id], onDelete: Cascade)
+  claimedBy Student?    @relation("ClaimedClassInvites", fields: [claimedById], references: [id], onDelete: SetNull)
+
+  @@index([classId, claimedAt, expiresAt])
+  @@index([email, claimedAt])
   @@schema("visionquest")
 }
 
@@ -860,8 +942,10 @@ model CareerDiscovery {
   studentId      String    @unique
   status         String    @default("in_progress") // in_progress | complete
   interests      String?   @db.Text
-  values         String?   @db.Text
   strengths      String?   @db.Text
+  subjects       String?   @db.Text
+  problems       String?   @db.Text
+  values         String?   @db.Text
   circumstances  String?   @db.Text
   clusterScores  String?   @db.Text
   topClusters    String[]  @default([])

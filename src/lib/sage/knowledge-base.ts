@@ -90,7 +90,6 @@ Required forms for new students:
 - Non-Discrimination Notice
 - Sign-in Sheet (daily attendance)
 - Password Log Template
-- Career Exploration Worksheet (CFWV)
 - WorkKeys Account Creation instructions
 
 DOHS / WV WORKS FORMS:
@@ -269,10 +268,9 @@ REQUIRED FORMS (FY26):
 
 ADDITIONAL ORIENTATION:
 - 4-week schedule orientation (two example schedules available)
-- Career Exploration Worksheet (CFWV)
+- Career discovery conversation with Sage (replaces the former CFWV Career Exploration Worksheet)
 - WorkKeys account creation instructions
-- Sign-in sheet for daily attendance tracking
-- CFWV Replacement Resources guide`,
+- Sign-in sheet for daily attendance tracking`,
 
   dohs_forms: `DOHS / WV WORKS FORMS (detailed):
 Forms related to the WV Department of Health and Human Services and WV Works program.

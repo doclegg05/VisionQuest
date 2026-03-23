@@ -3,7 +3,14 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
 import { rateLimit } from "@/lib/rate-limit";
-import { withErrorHandler, unauthorized, badRequest, notFound, rateLimited } from "@/lib/api-error";
+import {
+  withErrorHandler,
+  unauthorized,
+  badRequest,
+  notFound,
+  rateLimited,
+  isStaffRole,
+} from "@/lib/api-error";
 
 /**
  * GET /api/documents/download?id=<docId>&mode=view|download
@@ -41,7 +48,7 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // Uniform 404 for missing, inactive, or unauthorized docs (no IDOR oracle)
   if (!doc || !doc.isActive) throw notFound("Document not found");
-  if (session.role !== "teacher" && doc.audience === "TEACHER") {
+  if (!isStaffRole(session.role) && doc.audience === "TEACHER") {
     throw notFound("Document not found");
   }
 

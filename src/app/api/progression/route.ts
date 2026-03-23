@@ -5,6 +5,7 @@ import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { getProgression } from "@/lib/progression/service";
 import { awardEvent, getRecentEvents } from "@/lib/progression/events";
 import { withErrorHandler, unauthorized } from "@/lib/api-error";
+import { prisma } from "@/lib/db";
 
 export const GET = withErrorHandler(async () => {
   const session = await getSession();
@@ -40,6 +41,13 @@ export const GET = withErrorHandler(async () => {
 
   // Final read for display
   const { state } = await getProgression(session.id);
+  const resumeData = await prisma.resumeData.findUnique({
+    where: { studentId: session.id },
+    select: { id: true },
+  });
+  if (!state.resumeCreated && resumeData) {
+    state.resumeCreated = true;
+  }
   const xpProgress = getXpProgress(state);
   const finalReadiness = computeReadinessScore(state);
   const achievements = getAchievementsWithDefs(state);
