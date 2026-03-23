@@ -122,11 +122,14 @@ export default function DocumentBrowser({
     return map;
   }, [filtered]);
 
-  // Available categories from the current result set
+  // Available categories — use only categories that actually have documents after filtering
   const availableCategories = useMemo(() => {
-    const cats = new Set(documents.map((d) => d.category));
+    const source = Array.isArray(category)
+      ? documents.filter((d) => category.includes(d.category))
+      : documents;
+    const cats = new Set(source.map((d) => d.category));
     return [...cats].sort();
-  }, [documents]);
+  }, [documents, category]);
 
   return (
     <div className="space-y-6">
@@ -165,7 +168,7 @@ export default function DocumentBrowser({
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
             }`}
           >
-            All ({documents.length})
+            All ({Array.isArray(category) ? documents.filter((d) => category.includes(d.category)).length : documents.length})
           </button>
           {availableCategories.map((cat) => {
             const meta = DOC_CATEGORIES[cat];
