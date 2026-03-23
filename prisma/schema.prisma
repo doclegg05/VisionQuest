@@ -157,6 +157,7 @@ model OrientationItem {
   id          String   @id @default(cuid())
   label       String
   description String?  @db.Text
+  section     String?
   sortOrder   Int      @default(0)
   required    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -851,5 +852,26 @@ model GoalResourceLink {
   @@unique([goalId, resourceType, resourceId, linkType])
   @@index([goalId, linkType, status])
   @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+model CareerDiscovery {
+  id             String    @id @default(cuid())
+  studentId      String    @unique
+  status         String    @default("in_progress") // in_progress | complete
+  interests      String?   @db.Text
+  values         String?   @db.Text
+  strengths      String?   @db.Text
+  circumstances  String?   @db.Text
+  clusterScores  String?   @db.Text
+  topClusters    String[]  @default([])
+  sageSummary    String?   @db.Text
+  conversationId String?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
   @@schema("visionquest")
 }
