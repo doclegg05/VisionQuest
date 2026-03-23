@@ -13,7 +13,6 @@ const STUDENT_ITEMS = [
   { href: "/appointments", label: "Advising", icon: "🗓️" },
   { href: "/goals", label: "Goals", icon: "🎯" },
   { href: "/orientation", label: "Orientation", icon: "📋" },
-  { href: "/spokes", label: "SPOKES", icon: "🧭" },
   { href: "/courses", label: "Courses", icon: "📚" },
   { href: "/resources", label: "Resources", icon: "📄" },
   { href: "/opportunities", label: "Jobs", icon: "🚀" },

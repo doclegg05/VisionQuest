@@ -25,7 +25,6 @@ const MODULES = [
   { href: "/events", label: "Events", icon: "🎟️", description: "Register for workshops, hiring fairs, and networking events.", glow: "from-pink-300/40 via-rose-200/10 to-transparent" },
   { href: "/portfolio", label: "Portfolio", icon: "💼", description: "Build a collection of your skills, work samples, and achievements.", glow: "from-rose-300/40 via-orange-200/10 to-transparent" },
   { href: "/resources", label: "Forms & Documents", icon: "📄", description: "View, download, and print program forms and reference documents.", glow: "from-slate-300/40 via-zinc-200/10 to-transparent" },
-  { href: "/spokes", label: "My SPOKES Record", icon: "🧭", description: "View your official program record, modules, and follow-up milestones.", glow: "from-lime-300/40 via-emerald-200/10 to-transparent" },
   { href: "/vision-board", label: "Vision Board", icon: "📌", description: "Pin your dreams, goals, and inspirations to a personal board.", glow: "from-amber-300/40 via-yellow-200/10 to-transparent" },
   { href: "/files", label: "My Files", icon: "📁", description: "Upload and organize your personal documents.", glow: "from-indigo-300/40 via-sky-200/10 to-transparent" },
 ];
