@@ -1,5 +1,5 @@
 import OrientationChecklist from "@/components/orientation/OrientationChecklist";
-import DocumentBrowser from "@/components/documents/DocumentBrowser";
+import ResourceLibrary from "@/components/resources/ResourceLibrary";
 import PageIntro from "@/components/ui/PageIntro";
 
 export default function OrientationPage() {
@@ -14,15 +14,19 @@ export default function OrientationPage() {
         <OrientationChecklist />
       </div>
 
-      <div className="mt-8">
-        <h2 className="font-display text-lg text-[var(--ink-strong)] mb-4">
-          Orientation Forms & Documents
-        </h2>
-        <DocumentBrowser
-          category={["ORIENTATION", "DOHS_FORM", "PROGRAM_POLICY"]}
-          showSearch={false}
-          compact
-        />
+      <div className="surface-section mt-8 p-5">
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Action forms
+          </p>
+          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">
+            Orientation Forms
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
+            Open the form you need, fill it out, and upload completed versions. Your instructor will review and approve submissions.
+          </p>
+        </div>
+        <ResourceLibrary />
       </div>
     </div>
   );
