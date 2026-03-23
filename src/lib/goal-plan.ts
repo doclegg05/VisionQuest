@@ -6,7 +6,7 @@ import type {
   GoalResourceRecommendation,
 } from "@/lib/goal-resource-links";
 import { CERTIFICATIONS } from "@/lib/spokes/certifications";
-import { FORMS } from "@/lib/spokes/forms";
+import { buildFormDownloadUrl, FORMS } from "@/lib/spokes/forms";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { PLATFORMS } from "@/lib/spokes/platforms";
 
@@ -178,8 +178,8 @@ function getPlatformUrl(platformId: string): string | null {
     || null;
 }
 
-function makeFormUrl(fileName: string): string {
-  return `/api/forms/download?file=${encodeURIComponent(fileName)}&name=${encodeURIComponent(fileName)}`;
+function makeFormUrl(formId: string): string {
+  return buildFormDownloadUrl(formId, "view");
 }
 
 function includesKeyword(text: string, keywords: string[]): boolean {
@@ -227,7 +227,7 @@ function collectFormRecommendations(goalText: string, matchedCertificationIds: s
         resourceId: form.id,
         title: form.title,
         description: form.description,
-        url: makeFormUrl(form.fileName),
+        url: makeFormUrl(form.id),
         reason: matcher.reason,
       });
     }

@@ -53,6 +53,7 @@ const REQUIRED_ONBOARDING_FORMS = FORMS
     (form) =>
       form.category === "onboarding" &&
       form.required &&
+      form.acceptsSubmission &&
       (form.audience === "student" || form.audience === "both"),
   )
   .sort((left, right) => left.sortOrder - right.sortOrder);

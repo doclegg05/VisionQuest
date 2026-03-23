@@ -23,10 +23,10 @@ export default function OrientationPage() {
             Orientation Forms
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Open the form you need, fill it out, and upload completed versions. Your instructor will review and approve submissions.
+            Open the fillable PDFs for each step when available, print them if you need signatures, and upload completed copies back here for instructor review. Some orientation steps are instructor-led and do not require a PDF.
           </p>
         </div>
-        <ResourceLibrary />
+        <ResourceLibrary categories={["onboarding"]} />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface OrientationItem {
   id: string;
@@ -8,6 +8,102 @@ interface OrientationItem {
   description: string | null;
   required: boolean;
   sortOrder: number;
+}
+
+// ─── Welcome Letter Upload Widget ────────────────────────────────────────────
+
+function WelcomeLetterSlot() {
+  const [exists, setExists] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/teacher/welcome-letter")
+      .then((r) => r.ok ? r.json() : { exists: false })
+      .then((d) => setExists(d.exists))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/teacher/welcome-letter", { method: "POST", body: fd });
+      if (res.ok) setExists(true);
+      else alert((await res.json()).error || "Upload failed");
+    } catch {
+      alert("Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Delete the current welcome letter?")) return;
+    try {
+      const res = await fetch("/api/teacher/welcome-letter", { method: "DELETE" });
+      if (res.ok) setExists(false);
+    } catch {
+      alert("Delete failed");
+    }
+  }
+
+  if (loading) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-gray-700">Welcome Letter</h3>
+      <p className="text-xs text-gray-500">
+        Upload a welcome letter PDF that students can view from the orientation checklist.
+      </p>
+      {exists ? (
+        <div className="flex items-center gap-3">
+          <a
+            href="/api/forms/download?formId=welcome-letter&mode=view"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+          >
+            View current letter
+          </a>
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          >
+            {uploading ? "Uploading..." : "Replace"}
+          </button>
+          <button
+            onClick={handleDelete}
+            className="text-xs font-semibold text-red-500 hover:text-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+        >
+          {uploading ? "Uploading..." : "Upload Welcome Letter (PDF)"}
+        </button>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleUpload}
+        className="hidden"
+      />
+    </div>
+  );
 }
 
 export default function OrientationManager() {
@@ -102,6 +198,8 @@ export default function OrientationManager() {
 
   return (
     <div className="space-y-4">
+      <WelcomeLetterSlot />
+
       {/* Item list */}
       {items.length === 0 ? (
         <div className="text-center text-gray-400 py-8 text-sm">

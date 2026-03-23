@@ -1,23 +1,44 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import OrientationFormDetail, { findRelatedForms } from "./OrientationFormDetail";
+import OrientationFormDetail from "./OrientationFormDetail";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import { getOrientationStepDetail } from "@/lib/orientation-step-resources";
 
 interface OrientationItem {
   id: string;
   label: string;
   description: string | null;
+  section: string | null;
   required: boolean;
   completed: boolean;
   completedAt: string | null;
+}
+
+interface SectionGroup {
+  section: string;
+  items: OrientationItem[];
+}
+
+function groupBySection(items: OrientationItem[]): SectionGroup[] {
+  const groups: SectionGroup[] = [];
+  let current: SectionGroup | null = null;
+
+  for (const item of items) {
+    const section = item.section || "General";
+    if (!current || current.section !== section) {
+      current = { section, items: [] };
+      groups.push(current);
+    }
+    current.items.push(item);
+  }
+  return groups;
 }
 
 export default function OrientationChecklist() {
   const { checkProgression } = useProgression();
   const [items, setItems] = useState<OrientationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toggling, setToggling] = useState<string | null>(null);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
@@ -57,7 +78,6 @@ export default function OrientationChecklist() {
   }
 
   async function toggleItem(itemId: string, completed: boolean) {
-    // Optimistic update — show the change immediately
     setItems((prev) => prev.map((item) =>
       item.id === itemId
         ? { ...item, completed, completedAt: completed ? new Date().toISOString() : null }
@@ -72,7 +92,6 @@ export default function OrientationChecklist() {
       });
 
       if (!res.ok) {
-        // Revert on failure
         setItems((prev) => prev.map((item) =>
           item.id === itemId
             ? { ...item, completed: !completed, completedAt: null }
@@ -81,7 +100,6 @@ export default function OrientationChecklist() {
         return;
       }
 
-      // Check if orientation is now complete
       setItems((prev) => {
         const allDone = completed && prev.every((i) => i.completed);
         if (allDone) {
@@ -92,7 +110,6 @@ export default function OrientationChecklist() {
         return prev;
       });
     } catch (err) {
-      // Revert on network error
       console.error("Failed to toggle item:", err);
       setItems((prev) => prev.map((item) =>
         item.id === itemId
@@ -128,9 +145,10 @@ export default function OrientationChecklist() {
   const done = items.filter((i) => i.completed).length;
   const total = items.length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const sections = groupBySection(items);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Progress bar */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs text-gray-500">
@@ -145,67 +163,87 @@ export default function OrientationChecklist() {
         </div>
       </div>
 
-      {/* Checklist */}
-      <div className="space-y-2">
-        {items.map((item) => {
-          const relatedForms = findRelatedForms(item.label);
-          const hasForms = relatedForms.length > 0;
-          return (
-          <div key={item.id}>
-            <label
-              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                item.completed
-                  ? "bg-green-50 border-green-200"
-                  : "bg-white border-gray-200 hover:bg-gray-50 bg-opacity-[86%]"
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={item.completed}
-                disabled={toggling === item.id}
-                onChange={() => toggleItem(item.id, !item.completed)}
-                className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
-              />
-              <div
-                className="flex-1 min-w-0"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (hasForms) {
-                    setExpandedItem(expandedItem === item.id ? null : item.id);
-                  }
-                }}
-              >
-                <p className={`text-[15px] font-medium ${item.completed ? "text-green-800 line-through opacity-80" : "text-[var(--ink-strong)]"}`}>
-                  {item.label}
-                  {item.required && (
-                    <span className="ml-1 text-xs text-red-400 font-normal">*</span>
-                  )}
-                </p>
-                {item.description && (
-                  <p className="text-sm text-[var(--ink-muted)] mt-0.5">{item.description}</p>
-                )}
-              </div>
+      {/* Sections */}
+      {sections.map((group) => {
+        const sectionDone = group.items.filter((i) => i.completed).length;
+        const sectionTotal = group.items.length;
 
-              {hasForms && (
-                <span className={`text-[var(--ink-muted)] shrink-0 ml-1 text-xs transition-transform ${expandedItem === item.id ? "rotate-90" : ""}`}>
-                  ▶
-                </span>
-              )}
-              {item.completed && !hasForms && (
-                <span className="text-green-500 shrink-0 text-sm ml-1">✓</span>
-              )}
-            </label>
-            {expandedItem === item.id && hasForms && (
-              <OrientationFormDetail
-                itemLabel={item.label}
-                formStatuses={formStatuses}
-                onUploadComplete={fetchFormStatuses}
-              />
-            )}
+        return (
+          <div key={group.section}>
+            {/* Section header */}
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-[var(--ink-strong)]">
+                {group.section}
+              </h3>
+              <span className="text-xs text-[var(--ink-muted)]">
+                {sectionDone}/{sectionTotal}
+              </span>
+            </div>
+
+            {/* Section items */}
+            <div className="space-y-2">
+              {group.items.map((item) => {
+                const detail = getOrientationStepDetail(item.label);
+                const hasDetails = detail.forms.length > 0 || !!detail.note;
+
+                return (
+                  <div key={item.id}>
+                    <label
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        item.completed
+                          ? "bg-green-50 border-green-200"
+                          : "bg-white border-gray-200 hover:bg-gray-50 bg-opacity-[86%]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={() => toggleItem(item.id, !item.completed)}
+                        className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
+                      />
+                      <div
+                        className="flex-1 min-w-0"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (hasDetails) {
+                            setExpandedItem(expandedItem === item.id ? null : item.id);
+                          }
+                        }}
+                      >
+                        <p className={`text-[15px] font-medium ${item.completed ? "text-green-800 line-through opacity-80" : "text-[var(--ink-strong)]"}`}>
+                          {item.label}
+                          {item.required && (
+                            <span className="ml-1 text-xs text-red-400 font-normal">*</span>
+                          )}
+                        </p>
+                        {item.description && (
+                          <p className="text-sm text-[var(--ink-muted)] mt-0.5">{item.description}</p>
+                        )}
+                      </div>
+
+                      {hasDetails && (
+                        <span className={`text-[var(--ink-muted)] shrink-0 ml-1 text-xs transition-transform ${expandedItem === item.id ? "rotate-90" : ""}`}>
+                          ▶
+                        </span>
+                      )}
+                      {item.completed && !hasDetails && (
+                        <span className="text-green-500 shrink-0 text-sm ml-1">✓</span>
+                      )}
+                    </label>
+                    {expandedItem === item.id && hasDetails && (
+                      <OrientationFormDetail
+                        itemLabel={item.label}
+                        formStatuses={formStatuses}
+                        onUploadComplete={fetchFormStatuses}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          );
-        })}
-      </div>
+        );
+      })}
 
       {done === total && total > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">

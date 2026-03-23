@@ -21,6 +21,12 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     if (!formDef) {
       return NextResponse.json({ error: "Invalid form ID." }, { status: 400 });
     }
+    if (!formDef.acceptsSubmission) {
+      return NextResponse.json(
+        { error: "This form does not accept student uploads." },
+        { status: 400 },
+      );
+    }
 
     // Validate file
     const validationError = validateFile({ size: file.size, type: file.type });

@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import type { SpokesForm } from "@/lib/spokes/forms";
+import {
+  buildFormDownloadUrl,
+  hasDownloadableFormDocument,
+  type SpokesForm,
+} from "@/lib/spokes/forms";
 import FormUploadButton from "@/components/ui/FormUploadButton";
 
 interface ResourceCardProps {
@@ -17,7 +21,7 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
       : form.audience === "student"
         ? "Student"
         : "Instructor";
-  const downloadHref = `/api/forms/download?file=${encodeURIComponent(form.fileName)}&name=${encodeURIComponent(form.fileName)}`;
+  const hasDocument = hasDownloadableFormDocument(form);
 
   return (
     <div className="surface-section flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -25,15 +29,28 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
         <p className="font-medium text-[var(--ink-strong)]">{form.title}</p>
         <p className="mt-1 text-xs text-[var(--ink-muted)]">{form.description}</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <a
-            href={downloadHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
-          >
-            Open form
-          </a>
-          <span className="text-xs text-[var(--ink-muted)]">{form.fileName}</span>
+          {hasDocument ? (
+            <>
+              <a
+                href={buildFormDownloadUrl(form, "view")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+              >
+                Open PDF
+              </a>
+              <a
+                href={buildFormDownloadUrl(form, "download")}
+                className="text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+              >
+                Download
+              </a>
+            </>
+          ) : (
+            <span className="text-xs text-[var(--accent-strong)]">
+              PDF not connected yet
+            </span>
+          )}
         </div>
       </div>
 
@@ -53,7 +70,7 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
         </span>
       </div>
 
-      {form.audience !== "instructor" && (
+      {form.acceptsSubmission && (
         <div className="flex shrink-0 items-center">
           <FormUploadButton
             formId={form.id}
