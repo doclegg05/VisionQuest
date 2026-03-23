@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: npm run prisma:migrate:deploy && node .next/standalone/server.js
+    startCommand: npm run prisma:migrate:deploy; node .next/standalone/server.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
