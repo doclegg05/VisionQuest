@@ -199,50 +199,161 @@ export default function PortfolioGrid() {
         ))
       )}
 
-      {/* Add/Edit form */}
+      {/* Add/Edit wizard */}
       {showForm ? (
-        <div className="surface-section space-y-3 p-4">
-          <h3 className="text-sm font-semibold text-gray-700">
-            {editingId ? "Edit Item" : "Add Portfolio Item"}
+        <div className="surface-section overflow-hidden p-5">
+          <h3 className="font-display text-lg text-[var(--ink-strong)]">
+            {editingId ? "Edit Portfolio Item" : "Add to Your Portfolio"}
           </h3>
-          <input type="text" placeholder="Title" value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <input type="text" placeholder="Description (optional)" value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <div className="flex gap-3">
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="project">Project</option>
-              <option value="cert">Certification</option>
-              <option value="award">Award</option>
-            </select>
-            <input type="url" placeholder="Link URL (optional)" value={form.url}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            {editingId ? "Update the details below." : "Choose what you'd like to add, then fill in the details."}
+          </p>
+
+          {/* Step 1: Type selector (visual cards) */}
+          {!editingId && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { value: "cert", icon: "📜", label: "Certification", desc: "Industry credential or certificate" },
+                { value: "project", icon: "🛠️", label: "Project", desc: "Work sample or class project" },
+                { value: "award", icon: "🏅", label: "Award", desc: "Recognition or achievement" },
+                { value: "resume", icon: "📝", label: "Document", desc: "Resume, letter, or reference" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, type: opt.value })}
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
+                    form.type === opt.value
+                      ? "border-[var(--accent-strong)] bg-[rgba(42,138,60,0.06)] shadow-sm"
+                      : "border-[var(--border)] hover:border-[var(--accent-secondary)]"
+                  }`}
+                >
+                  <span className="text-2xl">{opt.icon}</span>
+                  <span className="text-sm font-semibold text-[var(--ink-strong)]">{opt.label}</span>
+                  <span className="text-[11px] leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Step 2: Details */}
+          <div className="mt-5 space-y-4">
+            <div>
+              <label htmlFor="portfolio-title" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+                Title <span className="text-red-400">*</span>
+              </label>
+              <input
+                id="portfolio-title"
+                type="text"
+                placeholder={form.type === "cert" ? "e.g., IC3 Digital Literacy Level 1" : "e.g., Customer Service Training Project"}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="field px-4 py-3 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="portfolio-desc" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+                Description <span className="text-[var(--ink-muted)]">(optional)</span>
+              </label>
+              <textarea
+                id="portfolio-desc"
+                placeholder="What did you learn or accomplish?"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={2}
+                className="field px-4 py-3 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="portfolio-url" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+                Link <span className="text-[var(--ink-muted)]">(optional)</span>
+              </label>
+              <input
+                id="portfolio-url"
+                type="url"
+                placeholder="https://..."
+                value={form.url}
+                onChange={(e) => setForm({ ...form, url: e.target.value })}
+                className="field px-4 py-3 text-sm"
+              />
+            </div>
+
+            {/* File upload area */}
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-[var(--ink-strong)]">
+                Attach file <span className="text-[var(--ink-muted)]">(PDF, JPG, or PNG — max 10MB)</span>
+              </p>
+              {form.fileId ? (
+                <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                  <span className="text-green-600 text-lg">✓</span>
+                  <span className="flex-1 text-sm font-medium text-green-800">File attached</span>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, fileId: "" })}
+                    className="text-xs font-medium text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] px-4 py-6 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)] disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--accent-secondary)]" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      Click to upload a file
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-              className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-200">
-              {uploading ? "Uploading..." : form.fileId ? "File attached ✓" : "Attach file"}
+
+          {/* Actions */}
+          <div className="mt-6 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!form.title.trim()}
+              className="primary-button px-6 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {editingId ? "Save Changes" : "Add to Portfolio"}
             </button>
-            {form.fileId && (
-              <button onClick={() => setForm({ ...form, fileId: "" })} className="text-xs text-red-500">Remove file</button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleSave}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-              {editingId ? "Save" : "Add Item"}
+            <button
+              type="button"
+              onClick={resetForm}
+              className="text-sm font-medium text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+            >
+              Cancel
             </button>
-            <button onClick={resetForm} className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700">Cancel</button>
           </div>
+
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>
+          )}
         </div>
       ) : (
-        <button onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
-          + Add Portfolio Item
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] p-5 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]"
+        >
+          <span className="text-lg">+</span> Add Portfolio Item
         </button>
       )}
     </div>
