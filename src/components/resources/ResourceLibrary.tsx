@@ -4,9 +4,17 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { FORMS, FORM_CATEGORIES, FormCategory } from "@/lib/spokes/forms";
 import ResourceCard from "./ResourceCard";
 
-const categoryKeys = Object.keys(FORM_CATEGORIES) as FormCategory[];
+const allCategoryKeys = Object.keys(FORM_CATEGORIES) as FormCategory[];
 
-export default function ResourceLibrary() {
+interface ResourceLibraryProps {
+  categories?: FormCategory[];
+}
+
+export default function ResourceLibrary({ categories }: ResourceLibraryProps = {}) {
+  const categoryKeys = categories ?? allCategoryKeys;
+  const filteredByCategory = categories
+    ? FORMS.filter((f) => categories.includes(f.category))
+    : FORMS;
   const [selectedCategory, setSelectedCategory] = useState<FormCategory | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
@@ -29,7 +37,7 @@ export default function ResourceLibrary() {
   }, [fetchFormStatuses]);
 
   const filteredForms = useMemo(() => {
-    let result = FORMS;
+    let result = filteredByCategory;
 
     if (selectedCategory !== "all") {
       result = result.filter((f) => f.category === selectedCategory);
@@ -45,7 +53,7 @@ export default function ResourceLibrary() {
     }
 
     return result;
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, filteredByCategory]);
 
   const grouped = useMemo(() => {
     const map = new Map<FormCategory, typeof filteredForms>();
@@ -70,34 +78,36 @@ export default function ResourceLibrary() {
         />
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        <button
-          type="button"
-          onClick={() => setSelectedCategory("all")}
-          className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-            selectedCategory === "all"
-              ? "bg-[var(--ink-strong)] text-white"
-              : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
-          }`}
-        >
-          All
-        </button>
-        {categoryKeys.map((key) => (
+      {/* Filter tabs — hidden when only one category */}
+      {categoryKeys.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           <button
-            key={key}
             type="button"
-            onClick={() => setSelectedCategory(key)}
+            onClick={() => setSelectedCategory("all")}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              selectedCategory === key
+              selectedCategory === "all"
                 ? "bg-[var(--ink-strong)] text-white"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
             }`}
           >
-            {FORM_CATEGORIES[key].icon} {FORM_CATEGORIES[key].label}
+            All
           </button>
-        ))}
-      </div>
+          {categoryKeys.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSelectedCategory(key)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                selectedCategory === key
+                  ? "bg-[var(--ink-strong)] text-white"
+                  : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+              }`}
+            >
+              {FORM_CATEGORIES[key].icon} {FORM_CATEGORIES[key].label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Category sections */}
       {filteredForms.length === 0 && (
