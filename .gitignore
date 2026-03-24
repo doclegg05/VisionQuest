@@ -55,3 +55,18 @@ next-env.d.ts
 /SPOKES Handbook/
 /content/
 /docs-upload/
+
+# Claude Code — personal overrides (gitignored per best practices)
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Generated artifacts (screenshots, audit reports)
+/artifacts/
+
+# Temp files
+tmp_*.txt
+
+# Old backup dirs (safe to delete)
+_old_CLAUDE.md/
+_old_CLAUDE.local.md/
+_old_MEMORY.md
