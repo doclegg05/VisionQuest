@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withAdminAuth, withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
+import { withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
 import { assertStaffCanManageClass, normalizeClassCode } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
@@ -91,7 +91,7 @@ export const GET = withTeacherAuth(async (
   });
 });
 
-export const PATCH = withAdminAuth(async (
+export const PATCH = withTeacherAuth(async (
   session,
   req: Request,
   { params }: { params: Promise<{ id: string }> },

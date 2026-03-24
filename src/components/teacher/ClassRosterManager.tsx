@@ -75,7 +75,8 @@ function formatWhen(value: string | null) {
   return new Date(value).toLocaleDateString();
 }
 
-export default function ClassRosterManager({ adminMode = false }: { adminMode?: boolean }) {
+export default function ClassRosterManager() {
+  const adminMode = true; // Teachers and admins have the same access level
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId")?.trim() || "";
   const [classes, setClasses] = useState<ClassSummary[]>([]);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withAdminAuth, withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
+import { withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
 import { listManagedClasses, normalizeClassCode } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
@@ -60,22 +60,20 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     orderBy: [{ status: "asc" }, { name: "asc" }],
   });
 
-  const availableInstructors =
-    session.role === "admin"
-      ? await prisma.student.findMany({
-          where: {
-            role: "teacher",
-            isActive: true,
-          },
-          select: {
-            id: true,
-            studentId: true,
-            displayName: true,
-            email: true,
-          },
-          orderBy: { displayName: "asc" },
-        })
-      : [];
+  // Teachers and admins both get the full instructor list
+  const availableInstructors = await prisma.student.findMany({
+    where: {
+      role: "teacher",
+      isActive: true,
+    },
+    select: {
+      id: true,
+      studentId: true,
+      displayName: true,
+      email: true,
+    },
+    orderBy: { displayName: "asc" },
+  });
 
   return NextResponse.json({
     classes: classes.map((item) => ({
@@ -89,7 +87,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   });
 });
 
-export const POST = withAdminAuth(async (session, req: Request) => {
+export const POST = withTeacherAuth(async (session, req: Request) => {
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = normalizeClassCode(typeof body.code === "string" && body.code.trim() ? body.code : name);

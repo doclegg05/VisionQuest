@@ -9,7 +9,7 @@ export default function AdminSettingsPage() {
         title="Program Classes"
         description="Create SPOKES classes, assign instructors, manage orientation invites, and archive class enrollments without deleting student history."
       />
-      <ClassRosterManager adminMode />
+      <ClassRosterManager />
     </div>
   );
 }
