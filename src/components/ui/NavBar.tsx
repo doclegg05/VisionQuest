@@ -4,20 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath } from "@/lib/role-home";
+import { getVisibleNavItems, type NavPhase } from "@/lib/nav-progression";
 import BrandLockup from "./BrandLockup";
 import NotificationBell from "./NotificationBell";
-
-const STUDENT_ITEMS = [
-  { href: "/chat", label: "Sage", icon: "💬" },
-  { href: "/dashboard", label: "Dashboard", icon: "📊" },
-  { href: "/goals", label: "Goals", icon: "🎯" },
-  { href: "/orientation", label: "Orientation", icon: "📋" },
-  { href: "/learning", label: "Learning", icon: "📚" },
-  { href: "/career", label: "Career", icon: "🚀" },
-  { href: "/appointments", label: "Advising", icon: "🗓️" },
-  { href: "/portfolio", label: "Portfolio", icon: "💼" },
-  { href: "/settings", label: "Settings", icon: "⚙️" },
-];
 
 const STAFF_ITEMS = [
   { href: "/teacher", label: "Class Dashboard", icon: "👥" },
@@ -32,9 +21,10 @@ const ADMIN_ITEMS = [
 interface NavBarProps {
   studentName: string;
   role: string;
+  navPhase?: NavPhase;
 }
 
-export default function NavBar({ studentName, role }: NavBarProps) {
+export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -44,7 +34,7 @@ export default function NavBar({ studentName, role }: NavBarProps) {
   const homeHref = getRoleHomePath(role);
   const primaryItems =
     role === "student"
-      ? STUDENT_ITEMS
+      ? getVisibleNavItems(navPhase ?? 3)
       : role === "admin"
         ? [...ADMIN_ITEMS, ...STAFF_ITEMS]
         : STAFF_ITEMS;

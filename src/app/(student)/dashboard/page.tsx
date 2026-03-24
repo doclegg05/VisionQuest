@@ -12,6 +12,7 @@ import {
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { getClassProgress } from "@/lib/class-progress";
 import DashboardClient from "./DashboardClient";
 
 const MODULES = [
@@ -83,11 +84,34 @@ export default async function DashboardPage() {
     }
   }
 
+  // Fetch orientation progress and activity data for readiness + streak calendar
+  const since28d = new Date();
+  since28d.setDate(since28d.getDate() - 27);
+  since28d.setHours(0, 0, 0, 0);
+
+  const [orientationDoneCount, orientationTotalCount, activityEvents] = await Promise.all([
+    prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
+    prisma.orientationItem.count(),
+    prisma.progressionEvent.findMany({
+      where: { studentId: session.id, occurredAt: { gte: since28d } },
+      select: { occurredAt: true },
+    }),
+  ]);
+
+  const activityDays: Record<string, number> = {};
+  for (const event of activityEvents) {
+    const day = event.occurredAt.toISOString().slice(0, 10);
+    activityDays[day] = (activityDays[day] || 0) + 1;
+  }
+
   const state = progression ? parseState(progression.state) : createInitialState();
   if (!state.resumeCreated && resumeData) {
     state.resumeCreated = true;
   }
-  const readiness = computeReadinessScore(state);
+  const readiness = computeReadinessScore({
+    ...state,
+    orientationProgress: { completed: orientationDoneCount, total: orientationTotalCount },
+  });
   const xpProgress = getXpProgress(state);
   const achievements = getAchievementsWithDefs(state);
 
@@ -102,6 +126,9 @@ export default async function DashboardPage() {
   });
   const goalTexts = planningGoals.map((goal) => goal.content);
   const goalMatchResult = matchGoalsToPlatforms(goalTexts);
+
+  // Fetch class progress for cohort card
+  const classProgress = await getClassProgress(session.id);
 
   return (
     <div className="page-shell">
@@ -160,6 +187,8 @@ export default async function DashboardPage() {
         goalSuggestions={goalMatchResult.suggestions}
         readinessScore={readiness.score}
         readinessBreakdown={readiness.breakdown}
+        activityDays={activityDays}
+        classProgress={classProgress}
       />
 
       <div className="mb-4 mt-8 flex items-end justify-between gap-4">

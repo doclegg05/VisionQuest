@@ -16,6 +16,7 @@ export interface ReadinessResult {
 export function computeReadinessScore(
   state: {
     orientationComplete: boolean;
+    orientationProgress?: { completed: number; total: number };
     completedGoalLevels: string[];
     certificationsEarned: number;
     portfolioItemCount: number;
@@ -28,8 +29,17 @@ export function computeReadinessScore(
   totalCerts: number = 19,
   totalPlatforms: number = 13
 ): ReadinessResult {
-  // Orientation (15 pts): all or nothing
-  const orientationScore = state.orientationComplete ? 15 : 0;
+  // Orientation (15 pts): proportional, capped at 15 if fully complete
+  let orientationScore: number;
+  if (state.orientationComplete) {
+    orientationScore = 15;
+  } else if (state.orientationProgress && state.orientationProgress.total > 0) {
+    orientationScore = Math.round(
+      (state.orientationProgress.completed / state.orientationProgress.total) * 15
+    );
+  } else {
+    orientationScore = 0;
+  }
 
   // Goals (15 pts): 3 per level (bhag, monthly, weekly, daily, task)
   const goalLevels = ["bhag", "monthly", "weekly", "daily", "task"];

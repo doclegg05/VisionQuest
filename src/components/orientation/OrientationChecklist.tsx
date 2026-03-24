@@ -149,7 +149,31 @@ export default function OrientationChecklist() {
 
   return (
     <div className="space-y-6">
-      {/* Progress bar */}
+      {/* Section summary strip */}
+      <div className="flex flex-wrap items-center gap-2">
+        {sections.map((group) => {
+          const sDone = group.items.filter((i) => i.completed).length;
+          const sTotal = group.items.length;
+          const isComplete = sDone === sTotal;
+          return (
+            <span
+              key={group.section}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                isComplete
+                  ? "bg-green-100 text-green-700"
+                  : sDone > 0
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-gray-100 text-[var(--ink-muted)]"
+              }`}
+            >
+              {isComplete ? "✓" : `${sDone}/${sTotal}`}
+              <span className="max-w-24 truncate">{group.section}</span>
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Overall progress bar */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs text-gray-500">
           <span>{done} of {total} completed</span>
@@ -167,17 +191,32 @@ export default function OrientationChecklist() {
       {sections.map((group) => {
         const sectionDone = group.items.filter((i) => i.completed).length;
         const sectionTotal = group.items.length;
+        const sectionComplete = sectionDone === sectionTotal;
+        const sectionPct = sectionTotal > 0 ? Math.round((sectionDone / sectionTotal) * 100) : 0;
 
         return (
           <div key={group.section}>
             {/* Section header */}
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm font-bold text-[var(--ink-strong)]">
                 {group.section}
+                {sectionComplete && (
+                  <span className="ml-2 text-green-500">✓</span>
+                )}
               </h3>
               <span className="text-xs text-[var(--ink-muted)]">
                 {sectionDone}/{sectionTotal}
               </span>
+            </div>
+
+            {/* Section progress bar */}
+            <div className="mb-3 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  sectionComplete ? "bg-green-500" : "bg-amber-400"
+                }`}
+                style={{ width: `${sectionPct}%` }}
+              />
             </div>
 
             {/* Section items */}

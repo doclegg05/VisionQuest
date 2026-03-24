@@ -7,6 +7,8 @@ import AchievementList from "@/components/ui/AchievementList";
 import RecentActivity from "@/components/ui/RecentActivity";
 import SuggestedActions from "@/components/ui/SuggestedActions";
 import ReadinessScore from "@/components/ui/ReadinessScore";
+import StreakCalendar from "@/components/ui/StreakCalendar";
+import CohortCard from "@/components/ui/CohortCard";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 
 interface DashboardClientProps {
@@ -46,6 +48,14 @@ interface DashboardClientProps {
   goalSuggestions: string[];
   readinessScore: number;
   readinessBreakdown: ReadinessBreakdown;
+  activityDays: Record<string, number>;
+  classProgress?: {
+    className: string;
+    classmateCount: number;
+    avgOrientationPct: number;
+    orientationCompletedThisWeek: number;
+    avgReadinessScore: number;
+  } | null;
 }
 
 export default function DashboardClient({
@@ -67,6 +77,8 @@ export default function DashboardClient({
   goalSuggestions,
   readinessScore,
   readinessBreakdown,
+  activityDays,
+  classProgress,
 }: DashboardClientProps) {
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -83,6 +95,17 @@ export default function DashboardClient({
         <ReadinessScore score={readinessScore} breakdown={readinessBreakdown} />
       </div>
 
+      {/* Cohort card (only if enrolled in a class) */}
+      {classProgress && (
+        <CohortCard
+          className={classProgress.className}
+          classmateCount={classProgress.classmateCount}
+          avgOrientationPct={classProgress.avgOrientationPct}
+          orientationCompletedThisWeek={classProgress.orientationCompletedThisWeek}
+          avgReadinessScore={classProgress.avgReadinessScore}
+        />
+      )}
+
       {/* XP & Level */}
       <div className="surface-section p-5">
         <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Your Progress</h3>
@@ -95,6 +118,7 @@ export default function DashboardClient({
         />
         <div className="mt-4">
           <StreakBadge currentStreak={currentStreak} longestStreak={longestStreak} />
+          <StreakCalendar days={activityDays} />
         </div>
       </div>
 

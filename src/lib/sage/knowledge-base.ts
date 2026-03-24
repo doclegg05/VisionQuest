@@ -52,11 +52,12 @@ CERTIFICATIONS AVAILABLE (students can earn these):
     - Exam and certificate request via Wufoo forms
 
 SPOKES CERTIFICATES (program milestones, not industry certifications):
-- Certificate of Attendance — based on attendance hours
+The Ready to Work Certificate is the standard goal for all students. Lesser certificates exist as fallbacks for students who exit early or don't quite reach all RTW benchmarks.
+- Ready to Work Certificate — the target for every student; requires meeting attendance benchmarks, earning core certifications, building an employment portfolio, and demonstrating job readiness skills
+- Certificate of Achievement — strong participation with documented benchmarks
+- Certificate of Completion — completing core program requirements
 - Certificate of Participation — benchmarks documented by instructor
-- Certificate of Completion — completing program requirements
-- Certificate of Achievement — highest level, requires documented benchmarks
-- Ready to Work Certificate — comprehensive readiness certification with specific benchmarks
+- Certificate of Attendance — based on attendance hours only
 
 LEARNING PLATFORMS (where students do coursework):
 1. GMetrix & LearnKey — Certification practice tests and training (IC3, MOS, QuickBooks). Login: gmetrix.net. Register at certiport.pearsonvue.com.
@@ -102,13 +103,17 @@ DOHS / WV WORKS FORMS:
 - Prospective Employer Letter — template for ESP/EIP employer outreach
 - Dental Services through WV Works (2025) — dental benefit information
 
-PROGRAM STRUCTURE:
-- 4-week rotating schedule (see Sample SPOKES Four-Week Schedule)
+PROGRAM STRUCTURE & TIMELINE:
+- SPOKES is a 4-to-10-week program (20-35 hours/week, minimum 87% attendance, rolling weekly enrollment)
+- The program follows a 4-week rotating SPOKES Cycle where students work on multiple tracks simultaneously: digital literacy, employability skills, certifications, and career preparation
+- Phases: Weeks 1-4 SPOKES Cycle (academic skills, job readiness, employability, certifications) → Week 5+ Vocational Training (Customer Service Parts 1 & 2) → 2-4 weeks Intense Job Search → up to 2 weeks Job Retention
+- Optimal class size: 8-15 participants
+- The Ready to Work Certificate is the standard goal for ALL students — most students who attend consistently meet the requirements
+- Students who don't quite reach RTW benchmarks can earn a Certificate of Achievement or Participation instead
 - Tracks student progress via SPOKES Student Tracker spreadsheet
 - Reports through SPOKES Database (see Database Handbook)
 - Curriculum based on SPOKES Life and Employability Skills Curriculum
-- Students build an Employment Portfolio documenting their achievements
-- Ready to Work certification is the comprehensive goal
+- Students build an Employment Portfolio documenting their achievements throughout the program
 
 ADMINISTRATOR RESOURCES:
 - Educator Evaluation Procedures & Timeline (on Schoology)
@@ -285,12 +290,26 @@ Forms related to the WV Department of Health and Human Services and WV Works pro
 - Dental Services 2025: Information about dental benefits available through WV Works`,
 
   ready_to_work: `READY TO WORK CERTIFICATION (detailed):
-The Ready to Work Certificate is the comprehensive goal of the SPOKES program.
-- Tracks multiple benchmarks across program participation
-- Attendance Verification Form — documents required attendance hours
-- SPOKES Module Record (FY26) — tracks completion of required modules
-- Checklist for Documentation of Benchmarks available
-- Represents readiness for employment`,
+The Ready to Work Certificate is the standard goal for every SPOKES student. Instructors aim for all students to earn it. The certificate tiers (Attendance, Participation, Completion, Achievement) exist as fallbacks for students who exit early or don't reach all benchmarks — they are not separate tracks.
+
+WHAT'S REQUIRED:
+- Attendance benchmarks: meet the required hours documented on the Ready to Work Attendance Verification Form
+- Core certifications: complete required SPOKES modules (IC3 Digital Literacy, ACT WorkKeys, Life & Employability Skills at minimum)
+- Employment portfolio: resume, cover letter, professional references, work samples, certifications
+- Job readiness demonstrations: mock interview, workplace skills assessment, job search portfolio (applications)
+- Financial literacy and digital literacy modules
+- SPOKES Module Record (FY26) — tracks completion of all required modules
+
+TIMELINE CONTEXT:
+- The program runs 4-to-10 weeks at 20-35 hours/week
+- Even at minimum attendance (20 hrs/week), most students accumulate enough hours for RTW
+- Students work on multiple tracks simultaneously during the 4-week SPOKES Cycle — not sequentially
+- If a student doesn't quite reach all RTW benchmarks, their instructor may award a Certificate of Achievement or Participation instead
+
+TRACKING FORMS:
+- Ready to Work Attendance Verification Form — documents attendance hours
+- SPOKES Module Record — tracks module completion
+- Checklist for Documentation of Benchmarks — instructor verification of all requirements`,
 
   portfolio: `EMPLOYMENT PORTFOLIO (detailed):
 Students build an Employment Portfolio throughout the program to demonstrate job readiness.
