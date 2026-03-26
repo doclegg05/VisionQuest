@@ -24,7 +24,7 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
   { href: "/goals", label: "Goals", icon: "🎯", phase: 1 },
   { href: "/orientation", label: "Orientation", icon: "📋", phase: 1 },
   { href: "/vision-board", label: "Vision Board", icon: "🌟", phase: 1 },
-  { href: "/learning", label: "Learning", icon: "📚", phase: 2 },
+  { href: "/learning", label: "Learning", icon: "📚", phase: 1 },
   { href: "/portfolio", label: "Portfolio", icon: "💼", phase: 2 },
   { href: "/files", label: "Files", icon: "📁", phase: 2 },
   { href: "/resources", label: "Resources", icon: "📖", phase: 2 },
