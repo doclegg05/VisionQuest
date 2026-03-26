@@ -21,8 +21,18 @@ export const POST = withAuth(async (session, req: Request) => {
   let username = (typeof body.credlyUsername === "string" ? body.credlyUsername : "").trim();
 
   // Extract username from full URL if pasted
-  const urlMatch = username.match(/credly\.com\/users\/([^/\s]+)/);
-  if (urlMatch) username = urlMatch[1];
+  const usersMatch = username.match(/credly\.com\/users\/([^/\s?#]+)/);
+  if (usersMatch) {
+    username = usersMatch[1];
+  } else if (username.includes("credly.com/")) {
+    // Reject non-profile Credly URLs (e.g., /earner/dashboard)
+    throw badRequest(
+      "That looks like a Credly link but not a profile URL. Go to your Credly profile page — the URL should look like credly.com/users/your-name.",
+    );
+  }
+
+  // Strip any remaining URL parts — username should be alphanumeric + hyphens
+  username = username.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9._-]/g, "");
 
   if (!username) throw badRequest("Credly username is required.");
   if (username.length > 100) throw badRequest("Username is too long.");

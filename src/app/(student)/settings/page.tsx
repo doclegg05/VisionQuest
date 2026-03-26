@@ -342,7 +342,7 @@ export default function SettingsPage() {
               className="field px-4 py-3 text-sm"
             />
             <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
-              Find your username at credly.com — click your profile and copy the URL or username.
+              Go to credly.com, click your name in the top-right, then &quot;View Profile.&quot; Copy the URL — it should look like credly.com/users/your-name.
             </p>
           </div>
 

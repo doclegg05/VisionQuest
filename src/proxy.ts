@@ -45,7 +45,7 @@ export function proxy(request: NextRequest) {
     `script-src 'self' 'nonce-${nonce}'${isProduction ? "" : " 'unsafe-eval'"}`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: https://images.credly.com",
     "connect-src 'self' https://*.ingest.sentry.io",
     "object-src 'none'",
     "frame-ancestors 'none'",

@@ -38,14 +38,15 @@ export const GET = withAuth(async (session) => {
 
       if (!data?.data || !Array.isArray(data.data)) return [];
 
-      return data.data.map((badge: Record<string, unknown>) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return data.data.map((badge: any) => ({
         id: badge.id,
-        name: (badge as { badge_template?: { name?: string } }).badge_template?.name || "Unknown Badge",
-        description: (badge as { badge_template?: { description?: string } }).badge_template?.description || "",
-        imageUrl: (badge as { badge_template?: { image_url?: string } }).badge_template?.image_url || "",
-        issuedAt: badge.issued_at || badge.created_at,
-        issuerName: (badge as { issuer?: { name?: string } }).issuer?.name || "",
-        badgeUrl: badge.badge_url || `https://www.credly.com/badges/${badge.id}`,
+        name: badge.badge_template?.name || "Unknown Badge",
+        description: badge.badge_template?.description || "",
+        imageUrl: badge.badge_template?.image?.url || badge.badge_template?.image_url || "",
+        issuedAt: badge.issued_at_date || badge.issued_at || badge.created_at,
+        issuerName: badge.issuer?.entities?.[0]?.entity?.name || "",
+        badgeUrl: `https://www.credly.com/badges/${badge.id}`,
       }));
     } catch {
       return [];
