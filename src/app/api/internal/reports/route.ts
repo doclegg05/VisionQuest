@@ -129,14 +129,6 @@ export async function POST(req: Request) {
           type: "monthly_readiness_report",
           title: `Monthly Report: ${cls.name}`,
           body: `${monthKey} readiness summary — ${students.length} students, ${avgReadiness}% avg readiness. Breakdown: ${buckets["76-100"]} high (76-100%), ${buckets["51-75"]} mid (51-75%), ${buckets["26-50"]} emerging (26-50%), ${buckets["0-25"]} starting (0-25%).`,
-          metadata: JSON.stringify({
-            monthKey,
-            classId: cls.id,
-            className: cls.name,
-            studentCount: students.length,
-            avgReadiness,
-            readinessBuckets: buckets,
-          }),
         },
       });
     }
