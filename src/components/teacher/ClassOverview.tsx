@@ -325,9 +325,14 @@ export default function ClassOverview() {
         reviewQueue={reviewQueue}
         onAction={(intent) => setActionIntent({
           kind: "create_task",
-          studentRecordId: intent.studentId,
-          alertId: intent.alertId,
-          studentDisplayName: intent.studentName,
+          title: intent.type,
+          summary: "",
+          severity: "medium",
+          student: {
+            id: intent.studentId,
+            studentId: "",
+            displayName: intent.studentName,
+          },
         })}
       />
 
