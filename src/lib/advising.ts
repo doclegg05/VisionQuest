@@ -272,7 +272,7 @@ export function buildStudentAlertDescriptors({
           type: "goal_stale",
           severity: daysSinceUpdate >= 14 ? "high" : "medium",
           title: `${goal.level.charAt(0).toUpperCase() + goal.level.slice(1)} goal needs review`,
-          summary: `"${goal.content.slice(0, 60)}${goal.content.length > 60 ? "..." : ""}" has not been updated in ${Math.round(daysSinceUpdate)} days.`,
+          summary: `${goal.level.charAt(0).toUpperCase() + goal.level.slice(1)} goal has not been updated in ${Math.round(daysSinceUpdate)} days.`,
           sourceType: "goal",
           sourceId: goal.id,
         });
