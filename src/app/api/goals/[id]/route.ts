@@ -4,6 +4,8 @@ import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
 import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
+import { recordBhagCompleted } from "@/lib/progression/engine";
+import { updateProgression } from "@/lib/progression/service";
 
 async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {
@@ -78,6 +80,11 @@ export const PATCH = withAuth(async (
 
   if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
     await ensureGoalLevelProgression(session.id, [updatedGoal.level]);
+  }
+
+  // When a BHAG is marked completed, award XP and check tier unlocks
+  if (updatedGoal.level === "bhag" && updatedGoal.status === "completed") {
+    await updateProgression(session.id, recordBhagCompleted);
   }
 
   return NextResponse.json({ goal: updatedGoal });

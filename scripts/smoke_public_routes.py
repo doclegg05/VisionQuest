@@ -68,15 +68,6 @@ def run() -> None:
                 "Sign-in tab is missing on the landing page.",
             )
 
-            page.get_by_role("button", name="Register").click()
-            page.wait_for_load_state("networkidle")
-            expect(
-                page.get_by_label("Email").is_visible(),
-                "Register mode did not reveal the email field.",
-            )
-
-            page.get_by_role("button", name="Sign In").first.click()
-            page.wait_for_load_state("networkidle")
             page.get_by_role("link", name="Forgot your password?").click()
             page.wait_for_url(f"{BASE_URL}/forgot-password")
             page.wait_for_load_state("networkidle")

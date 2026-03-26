@@ -48,7 +48,7 @@ CERTIFICATIONS AVAILABLE (students can earn these):
 13. Burlington English Certificate/Certification (for ESL students)
 14. Bring Your A Game Certificate
     - Work ethic curriculum covering the 7 A's: Attitude, Attendance, Appearance, Ambition, Accountability, Appreciation, Acceptance
-    - Includes video lessons, Quizizz review quizzes, and SMART Board games
+    - Includes video lessons and classroom activities
     - Exam and certificate request via Wufoo forms
 
 SPOKES CERTIFICATES (program milestones, not industry certifications):
@@ -66,13 +66,11 @@ LEARNING PLATFORMS (where students do coursework):
 4. Essential Education — Computer Essentials digital literacy. Access: essentialed.com/start/wvde. Use Firefox browser.
 5. Burlington English — ESL/English language learning. Login: burlingtonenglish.com
 6. USA Learns — Free online English courses for ESL students. Homepage: usalearns.org
-7. Crossroads Cafe — ESL video-based learning series. Videos at ket.org.
-8. Aztec — GED/HSE prep software with guides and student handouts
-9. CSMlearn — Career skills and soft skills training. Login: csmlearn.com. Account request via Wufoo form.
-10. Bring Your A Game Anywhere — Work ethic curriculum (7 A's). Includes Quizizz quizzes and SMART Board games.
-11. Through the Customer's Eyes — Customer service training (2 parts). Login: learn.skillpath.com.
-12. Learning Express Library — Free library-based career and test prep resources (see PDF guide for registration)
-13. WV Tourism Works — WV tourism industry training (external program)
+7. Aztec — GED/HSE prep software with guides and student handouts
+8. CSMlearn — Career skills and soft skills training. Login: csmlearn.com. Account request via Wufoo form.
+9. Bring Your A Game Anywhere — Work ethic curriculum (7 A's). Classroom-based with video lessons.
+10. Through the Customer's Eyes — Customer service training (2 parts). Login: learn.skillpath.com.
+11. WV Tourism Works — WV tourism industry training (external program)
 
 STUDENT ONBOARDING FORMS (FY26, current year):
 Required forms for new students:
@@ -200,8 +198,6 @@ Work ethic and employability curriculum teaching the 7 A's:
 7. Acceptance — diversity and adaptability
 
 - Video lessons for each module (classroom viewing)
-- Quizizz review quizzes for each A (online, interactive)
-- SMART Board review games: Connect 4, Horse Derby, Jeopardy, Tic-Tac-Toe, Vortex
 - Exam: online practice test available, then proctored exam
 - Certificate: request via Wufoo form after passing exam
 - Exam account request: Wufoo form`,

@@ -1,14 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import BrandLockup from "@/components/ui/BrandLockup";
-import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
-import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  oauth_not_configured: "Google sign-in is not set up here. Use the form below to register or sign in.",
+  oauth_not_configured: "Google sign-in is not set up here. Use the form below to sign in.",
   oauth_denied: "Google sign-in was cancelled. You can still use the form below.",
   oauth_invalid: "Google sign-in returned an invalid response. Please try again or use the form below.",
   oauth_state_mismatch: "Google sign-in session expired. Please try again or use the form below.",
@@ -25,90 +23,25 @@ const HIGHLIGHTS = [
 ];
 
 const MODULE_SPOTLIGHT = [
-  { icon: "🎯", label: "Goal mapping", copy: "From BHAG to today’s next step." },
+  { icon: "🎯", label: "Goal mapping", copy: "From BHAG to today's next step." },
   { icon: "📚", label: "Learning hub", copy: "Courses and certifications in one place." },
   { icon: "💼", label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
 ];
-
-type Mode = "login" | "register";
 
 interface AuthPageClientProps {
   googleAuthEnabled: boolean;
 }
 
-interface InvitePreview {
-  classId: string;
-  className: string;
-  classCode: string;
-  email: string;
-  displayName: string;
-  suggestedStudentId: string;
-  expiresAt: string;
-}
-
 function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
-  const [mode, setMode] = useState<Mode>("login");
   const [studentId, setStudentId] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [securityQuestions, setSecurityQuestions] = useState(createEmptySecurityQuestionAnswers());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [invite, setInvite] = useState<InvitePreview | null>(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
+  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const oauthError = searchParams.get("error");
   const oauthErrorMessage = oauthError ? (ERROR_MESSAGES[oauthError] || "An error occurred. Please try again.") : null;
-  const inviteToken = searchParams.get("invite") || "";
-
-  useEffect(() => {
-    if (!inviteToken) {
-      setInvite(null);
-      setMode("login");
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadInvite() {
-      setInviteLoading(true);
-      try {
-        const response = await fetch(`/api/auth/class-invite?token=${encodeURIComponent(inviteToken)}`);
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(payload?.error || "This class invite is no longer available.");
-        }
-
-        if (cancelled) return;
-
-        const nextInvite = payload?.invite as InvitePreview;
-        setInvite(nextInvite);
-        setMode("register");
-        setStudentId((current) => current || nextInvite.suggestedStudentId || "");
-        setDisplayName((current) => current || nextInvite.displayName || "");
-        setEmail((current) => current || nextInvite.email || "");
-        setError("");
-      } catch (err) {
-        if (cancelled) return;
-        setInvite(null);
-        setMode("login");
-        setError(err instanceof Error ? err.message : "This class invite is no longer available.");
-      } finally {
-        if (!cancelled) {
-          setInviteLoading(false);
-        }
-      }
-    }
-
-    void loadInvite();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [inviteToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,26 +49,10 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
     setLoading(true);
 
     try {
-      const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const body =
-        mode === "register"
-          ? {
-              studentId,
-              password,
-              displayName,
-              email,
-              inviteToken,
-              securityQuestions,
-            }
-          : {
-              studentId,
-              password,
-            };
-
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ studentId, password }),
       });
 
       const data = await res.json();
@@ -150,9 +67,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
           ? "/admin"
           : nextRole === "teacher"
             ? "/teacher"
-            : mode === "register"
-              ? "/welcome"
-              : "/dashboard";
+            : "/dashboard";
 
       router.push(nextPath);
       router.refresh();
@@ -234,12 +149,10 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             <div className="mb-7 sm:mb-8">
               <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
               <h2 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
-                {mode === "login" ? "Welcome back" : "Create your account"}
+                Welcome back
               </h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-                {invite
-                  ? `Complete your invited signup to join ${invite.className}.`
-                  : "Use the form below to sign in. Students now create accounts from instructor-issued class invites."}
+                Sign in with your username or email and password.
               </p>
             </div>
 
@@ -252,104 +165,20 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
             )}
 
-            {inviteLoading ? (
-              <div className="mb-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-                Loading your class invite...
-              </div>
-            ) : null}
-
-            {invite ? (
-              <div className="mb-5 rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
-                <p className="font-semibold">{invite.className}</p>
-                <p className="mt-1 text-[var(--ink-muted)]">
-                  Invited for {invite.email} • Expires {new Date(invite.expiresAt).toLocaleString()}
-                </p>
-              </div>
-            ) : null}
-
-            <div className={`mb-6 grid gap-2 rounded-2xl bg-[rgba(16,37,62,0.06)] p-1.5 ${invite ? "grid-cols-2" : "grid-cols-1"}`}>
-              <button
-                type="button"
-                onClick={() => { setMode("login"); setError(""); }}
-                className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors
-                  ${mode === "login"
-                    ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                    : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                  }`}
-              >
-                Sign In
-              </button>
-              {invite ? (
-                <button
-                  type="button"
-                  onClick={() => { setMode("register"); setError(""); }}
-                  className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors
-                    ${mode === "register"
-                      ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
-                      : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                    }`}
-                >
-                  Register
-                </button>
-              ) : null}
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4" aria-label={mode === "login" ? "Sign in" : "Create account"}>
+            <form onSubmit={handleSubmit} className="space-y-4" aria-label="Sign in">
               <div>
-                <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Student ID</label>
+                <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Username or Email</label>
                 <input
                   id="studentId"
                   type="text"
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g., john.doe"
+                  placeholder="e.g., john.doe or john@example.com"
                   autoComplete="username"
                   required
-                  disabled={mode === "register" && inviteLoading}
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
-
-              {mode === "register" && (
-                <div>
-                  <label htmlFor="displayName" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Your Name</label>
-                  <input
-                    id="displayName"
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="What should we call you?"
-                    required
-                    disabled={inviteLoading}
-                    className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  />
-                </div>
-              )}
-
-              {mode === "register" && (
-                <div>
-                  <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Email</label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                    disabled={mode === "register" && Boolean(invite?.email)}
-                    className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  />
-                </div>
-              )}
-
-              {mode === "register" && (
-                <SecurityQuestionAnswerFields
-                  answers={securityQuestions}
-                  onChange={setSecurityQuestions}
-                  idPrefix="register-security-question"
-                />
-              )}
 
               <div>
                 <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Password</label>
@@ -358,9 +187,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="Enter your password"
                   required
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  autoComplete="current-password"
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
@@ -371,20 +200,18 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
               <button
                 type="submit"
-                disabled={loading || (mode === "register" && (!invite || !inviteToken || inviteLoading))}
+                disabled={loading}
                 className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+                {loading ? "Please wait..." : "Sign In"}
               </button>
 
-              {mode === "login" && (
-                <a
-                  href="/forgot-password"
-                  className="block text-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
-                >
-                  Forgot your password?
-                </a>
-              )}
+              <a
+                href="/forgot-password"
+                className="block text-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+              >
+                Forgot your password?
+              </a>
             </form>
 
             {googleAuthEnabled ? (
@@ -412,15 +239,13 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </>
             ) : (
               <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-                Google sign-in is not enabled in this environment. Use the register or sign-in form above.
+                Google sign-in is not enabled in this environment. Use the sign-in form above.
               </div>
             )}
 
-            {!invite ? (
-              <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-                New student accounts are created during orientation from instructor-issued class invites.
-              </div>
-            ) : null}
+            <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+              Your instructor will provide your username and password.
+            </div>
 
             <div className="mt-8 flex flex-col items-center gap-3 sm:gap-4">
               <a

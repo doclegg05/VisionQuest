@@ -1,11 +1,10 @@
 export interface ReadinessBreakdown {
   orientation: { score: number; max: number; label: string };
-  goals: { score: number; max: number; label: string };
+  goalPlanning: { score: number; max: number; label: string };
+  bhagAchieved: { score: number; max: number; label: string };
   certifications: { score: number; max: number; label: string };
   portfolio: { score: number; max: number; label: string };
-  platforms: { score: number; max: number; label: string };
   consistency: { score: number; max: number; label: string };
-  progress: { score: number; max: number; label: string };
 }
 
 export interface ReadinessResult {
@@ -18,83 +17,73 @@ export function computeReadinessScore(
     orientationComplete: boolean;
     orientationProgress?: { completed: number; total: number };
     completedGoalLevels: string[];
+    bhagCompleted: boolean;
     certificationsEarned: number;
     portfolioItemCount: number;
     resumeCreated: boolean;
     portfolioShared: boolean;
-    platformsVisited: string[];
     longestStreak: number;
-    level: number;
   },
   totalCerts: number = 19,
-  totalPlatforms: number = 13
 ): ReadinessResult {
-  // Orientation (15 pts): proportional, capped at 15 if fully complete
+  // Orientation (10 pts): program forms and checklist
   let orientationScore: number;
   if (state.orientationComplete) {
-    orientationScore = 15;
+    orientationScore = 10;
   } else if (state.orientationProgress && state.orientationProgress.total > 0) {
     orientationScore = Math.round(
-      (state.orientationProgress.completed / state.orientationProgress.total) * 15
+      (state.orientationProgress.completed / state.orientationProgress.total) * 10,
     );
   } else {
     orientationScore = 0;
   }
 
-  // Goals (15 pts): 3 per level (bhag, monthly, weekly, daily, task)
+  // Goal Planning (15 pts): 3 per level (bhag, monthly, weekly, daily, task)
   const goalLevels = ["bhag", "monthly", "weekly", "daily", "task"];
-  const goalsScore = Math.min(
+  const goalPlanningScore = Math.min(
     15,
-    state.completedGoalLevels.filter((l) => goalLevels.includes(l)).length * 3
+    state.completedGoalLevels.filter((l) => goalLevels.includes(l)).length * 3,
   );
 
-  // Certifications (25 pts): proportional to total
+  // BHAG Achieved (20 pts): student's big goal marked complete
+  const bhagScore = state.bhagCompleted ? 20 : 0;
+
+  // Certifications (25 pts): industry credentials earned
   const certsScore = Math.min(
     25,
-    Math.round((state.certificationsEarned / totalCerts) * 25)
+    Math.round((state.certificationsEarned / totalCerts) * 25),
   );
 
-  // Portfolio (15 pts): resume=5, items=2 each up to 4 items (8), shared=2
+  // Resume & Portfolio (20 pts): resume=8, items=2 each up to 4 (8), shared=4
   let portfolioScore = 0;
-  if (state.resumeCreated) portfolioScore += 5;
+  if (state.resumeCreated) portfolioScore += 8;
   portfolioScore += Math.min(8, state.portfolioItemCount * 2);
-  if (state.portfolioShared) portfolioScore += 2;
-  portfolioScore = Math.min(15, portfolioScore);
+  if (state.portfolioShared) portfolioScore += 4;
+  portfolioScore = Math.min(20, portfolioScore);
 
-  // Platforms (10 pts): proportional
-  const platformsScore = Math.min(
-    10,
-    Math.round((state.platformsVisited.length / totalPlatforms) * 10)
-  );
-
-  // Consistency (10 pts): streak milestones
+  // Consistency (10 pts): streak milestones (shows discipline)
   let consistencyScore = 0;
   if (state.longestStreak >= 30) consistencyScore = 10;
   else if (state.longestStreak >= 14) consistencyScore = 6;
   else if (state.longestStreak >= 7) consistencyScore = 3;
 
-  // Progress (10 pts): level-based
-  const progressScore = Math.round(((state.level - 1) / 4) * 10);
-
   const score =
     orientationScore +
-    goalsScore +
+    goalPlanningScore +
+    bhagScore +
     certsScore +
     portfolioScore +
-    platformsScore +
-    consistencyScore +
-    progressScore;
+    consistencyScore;
 
   return {
     score: Math.min(100, score),
     breakdown: {
-      orientation: { score: orientationScore, max: 15, label: "Orientation" },
-      goals: { score: goalsScore, max: 15, label: "Goals" },
+      orientation: { score: orientationScore, max: 10, label: "Orientation" },
+      goalPlanning: { score: goalPlanningScore, max: 15, label: "Goal Planning" },
+      bhagAchieved: { score: bhagScore, max: 20, label: "Big Goal Achieved" },
       certifications: { score: certsScore, max: 25, label: "Certifications" },
-      portfolio: { score: portfolioScore, max: 15, label: "Portfolio" },
-      platforms: { score: platformsScore, max: 10, label: "Platforms" },
+      portfolio: { score: portfolioScore, max: 20, label: "Resume & Portfolio" },
       consistency: { score: consistencyScore, max: 10, label: "Consistency" },
-      progress: { score: progressScore, max: 10, label: "Progress" },
     },
   };
 }

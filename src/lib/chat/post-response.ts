@@ -64,6 +64,12 @@ export async function handlePostResponse({
         circumstances: JSON.stringify(discoveryResult.circumstances),
         clusterScores: JSON.stringify(discoveryResult.cluster_scores),
         sageSummary: discoveryResult.summary || null,
+        riasecScores: JSON.stringify(discoveryResult.riasec_scores),
+        hollandCode: discoveryResult.holland_code || null,
+        nationalClusters: JSON.stringify(discoveryResult.national_career_clusters),
+        transferableSkills: JSON.stringify(discoveryResult.transferable_skills),
+        workValues: JSON.stringify(discoveryResult.work_values),
+        assessmentSummary: discoveryResult.assessment_summary || null,
         conversationId,
       };
 

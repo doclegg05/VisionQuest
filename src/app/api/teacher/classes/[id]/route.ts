@@ -62,20 +62,6 @@ export const GET = withTeacherAuth(async (
         },
         orderBy: [{ status: "asc" }, { student: { displayName: "asc" } }],
       },
-      invites: {
-        where: {
-          claimedAt: null,
-        },
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          suggestedStudentId: true,
-          expiresAt: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-      },
     },
   });
 

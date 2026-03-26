@@ -17,6 +17,7 @@ const STREAK_BONUS: Record<number, number> = {
 
 export const ACHIEVEMENT_DEFS: Record<string, { label: string; desc: string }> = {
   "xp:bhag_set":         { label: "Dream Defined",       desc: "Set your Big Hairy Audacious Goal" },
+  "xp:bhag_complete":    { label: "Dream Achieved",      desc: "Completed your Big Hairy Audacious Goal" },
   "xp:monthly_set":      { label: "Monthly Mapper",      desc: "Set a monthly goal" },
   "xp:weekly_set":       { label: "Weekly Warrior",       desc: "Set a weekly goal" },
   "xp:daily_set":        { label: "Daily Driver",         desc: "Set a daily goal" },
@@ -56,17 +57,20 @@ export const ACHIEVEMENT_DEFS: Record<string, { label: string; desc: string }> =
   "visionboard:ten_pins":    { label: "Dream Weaver", desc: "Pinned 10 items to your vision board" },
   "visionboard:goal_linked": { label: "Goal Mapper",  desc: "Linked a goal to your vision board" },
 
+  // Documents
+  "document:first_view":    { label: "Studious",             desc: "Viewed your first assigned document" },
+
   // Portfolio
   "portfolio:first_item":   { label: "Portfolio Starter",    desc: "Added your first portfolio item" },
   "portfolio:resume":       { label: "Resume Ready",         desc: "Created your resume" },
   "portfolio:shared":       { label: "Portfolio Published",  desc: "Shared your portfolio publicly" },
 
   // SPOKES Program Certificate tiers
-  "tier:attendance":        { label: "Consistent",           desc: "Earned Certificate of Attendance" },
-  "tier:participation":     { label: "Engaged",              desc: "Earned Certificate of Participation" },
-  "tier:completion":        { label: "Committed",            desc: "Earned Certificate of Completion" },
-  "tier:achievement":       { label: "Accomplished",         desc: "Earned Certificate of Achievement" },
-  "tier:ready_to_work":     { label: "Ready to Work",        desc: "Earned the Ready to Work Certificate" },
+  "tier:attendance":        { label: "Consistent",           desc: "7-day streak — Certificate of Attendance" },
+  "tier:participation":     { label: "Engaged",              desc: "Orientation done + all goal levels set — Certificate of Participation" },
+  "tier:completion":        { label: "Committed",            desc: "First cert earned + resume built — Certificate of Completion" },
+  "tier:achievement":       { label: "Accomplished",         desc: "5+ certs + portfolio shared — Certificate of Achievement" },
+  "tier:ready_to_work":     { label: "Ready to Work",        desc: "All tiers + big goal achieved — Ready to Work Certificate" },
 
   // Readiness score milestones
   "readiness:50":           { label: "Halfway There",        desc: "Reached 50% job readiness" },
@@ -89,11 +93,13 @@ export interface ProgressionState {
   certificationsStarted: number;
   certificationsEarned: number;
   platformsVisited: string[];
+  documentsViewed: string[];
   orientationComplete: boolean;
   portfolioItemCount: number;
   resumeCreated: boolean;
   portfolioShared: boolean;
   visionBoardItemCount: number;
+  bhagCompleted: boolean;
 }
 
 function isoNow(): string {
@@ -152,11 +158,13 @@ export function createInitialState(): ProgressionState {
     certificationsStarted: 0,
     certificationsEarned: 0,
     platformsVisited: [],
+    documentsViewed: [],
     orientationComplete: false,
     portfolioItemCount: 0,
     resumeCreated: false,
     portfolioShared: false,
     visionBoardItemCount: 0,
+    bhagCompleted: false,
   };
 }
 
@@ -179,11 +187,13 @@ export function parseState(raw: string | null): ProgressionState {
       certificationsStarted: Math.max(0, parsed.certificationsStarted || 0),
       certificationsEarned: Math.max(0, parsed.certificationsEarned || 0),
       platformsVisited: Array.isArray(parsed.platformsVisited) ? parsed.platformsVisited : [],
+      documentsViewed: Array.isArray(parsed.documentsViewed) ? parsed.documentsViewed : [],
       orientationComplete: !!parsed.orientationComplete,
       portfolioItemCount: Math.max(0, parsed.portfolioItemCount || 0),
       resumeCreated: !!parsed.resumeCreated,
       portfolioShared: !!parsed.portfolioShared,
       visionBoardItemCount: Math.max(0, parsed.visionBoardItemCount || 0),
+      bhagCompleted: !!parsed.bhagCompleted,
     };
   } catch {
     return createInitialState();
@@ -313,41 +323,49 @@ export function getAchievementsWithDefs(state: ProgressionState) {
 }
 
 function checkTierUnlocks(state: ProgressionState): void {
-  // Attendance tier: 7-day streak
+  // Attendance tier: 7-day streak — shows reliability
   if (!state.achievements.includes("tier:attendance") && state.longestStreak >= 7) {
     addAchievement(state, "tier:attendance");
   }
 
-  // Participation tier: chat session + daily checkin + platform visit
+  // Participation tier: orientation done + goals set at all levels
   if (!state.achievements.includes("tier:participation") &&
-      state.achievements.includes("xp:chat_session") &&
-      state.achievements.includes("xp:daily_checkin") &&
-      state.achievements.includes("platform:first_visit")) {
+      state.orientationComplete &&
+      state.completedGoalLevels.length >= 5) {
     addAchievement(state, "tier:participation");
   }
 
-  // Completion tier: orientation done + first cert earned
+  // Completion tier: 1+ certifications earned + resume created
   if (!state.achievements.includes("tier:completion") &&
-      state.orientationComplete &&
-      state.certificationsEarned >= 1) {
+      state.certificationsEarned >= 1 &&
+      state.resumeCreated) {
     addAchievement(state, "tier:completion");
   }
 
-  // Achievement tier: 5 certs + resume + level 3
+  // Achievement tier: 5+ certs + portfolio shared
   if (!state.achievements.includes("tier:achievement") &&
       state.certificationsEarned >= 5 &&
-      state.resumeCreated &&
-      state.level >= 3) {
+      state.portfolioShared) {
     addAchievement(state, "tier:achievement");
   }
 
-  // Ready to Work: all previous tiers
+  // Ready to Work: all previous tiers + BHAG achieved
   if (!state.achievements.includes("tier:ready_to_work") &&
       state.achievements.includes("tier:attendance") &&
       state.achievements.includes("tier:participation") &&
       state.achievements.includes("tier:completion") &&
-      state.achievements.includes("tier:achievement")) {
+      state.achievements.includes("tier:achievement") &&
+      state.bhagCompleted) {
     addAchievement(state, "tier:ready_to_work");
+  }
+}
+
+export function recordBhagCompleted(state: ProgressionState): void {
+  if (!state.bhagCompleted) {
+    state.bhagCompleted = true;
+    state.xp += 100;
+    addAchievement(state, "xp:bhag_complete");
+    checkTierUnlocks(state);
   }
 }
 
@@ -374,7 +392,16 @@ export function recordPlatformVisit(state: ProgressionState, platformId: string)
     state.xp += 5;
     if (state.platformsVisited.length === 1) addAchievement(state, "platform:first_visit");
     if (state.platformsVisited.length >= 5) addAchievement(state, "platform:five_used");
-    if (state.platformsVisited.length >= 13) addAchievement(state, "platform:all_explored");
+    if (state.platformsVisited.length >= 11) addAchievement(state, "platform:all_explored");
+    checkTierUnlocks(state);
+  }
+}
+
+export function recordDocumentView(state: ProgressionState, documentId: string): void {
+  if (!state.documentsViewed.includes(documentId)) {
+    state.documentsViewed.push(documentId);
+    state.xp += 3;
+    if (state.documentsViewed.length === 1) addAchievement(state, "document:first_view");
     checkTierUnlocks(state);
   }
 }

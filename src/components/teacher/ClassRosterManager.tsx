@@ -21,16 +21,6 @@ interface ClassSummary {
   instructors: InstructorOption[];
   activeEnrollmentCount: number;
   archivedEnrollmentCount: number;
-  pendingInviteCount: number;
-}
-
-interface PendingInvite {
-  id: string;
-  email: string;
-  displayName: string | null;
-  suggestedStudentId: string | null;
-  expiresAt: string;
-  createdAt: string;
 }
 
 interface ClassEnrollment {
@@ -58,7 +48,6 @@ interface ClassDetail {
   endDate: string | null;
   instructors: InstructorOption[];
   enrollments: ClassEnrollment[];
-  invites: PendingInvite[];
 }
 
 interface ClassesResponse {
@@ -87,10 +76,6 @@ export default function ClassRosterManager() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteDisplayName, setInviteDisplayName] = useState("");
-  const [inviteStudentId, setInviteStudentId] = useState("");
-  const [inviteUrl, setInviteUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [creatingClass, setCreatingClass] = useState(false);
   const [newClassName, setNewClassName] = useState("");
@@ -105,6 +90,13 @@ export default function ClassRosterManager() {
   const [classStartDate, setClassStartDate] = useState("");
   const [classEndDate, setClassEndDate] = useState("");
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+
+  // Create student form state
+  const [newStudentUsername, setNewStudentUsername] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
+  const [newStudentEmail, setNewStudentEmail] = useState("");
+  const [newStudentPassword, setNewStudentPassword] = useState("");
+  const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
 
   async function loadClasses(preferredClassId?: string) {
     setLoading(true);
@@ -176,38 +168,40 @@ export default function ClassRosterManager() {
     void loadClassDetail(selectedClassId);
   }, [selectedClassId]);
 
-  async function createInvite() {
+  async function createStudent() {
     if (!selectedClassId) return;
 
     setSaving(true);
     setError("");
     setMessage("");
-    setInviteUrl("");
+    setCreatedCredentials(null);
 
     try {
-      const response = await fetch(`/api/teacher/classes/${selectedClassId}/invites`, {
+      const response = await fetch(`/api/teacher/classes/${selectedClassId}/students`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: inviteEmail,
-          displayName: inviteDisplayName,
-          suggestedStudentId: inviteStudentId,
+          studentId: newStudentUsername,
+          displayName: newStudentName,
+          email: newStudentEmail || undefined,
+          password: newStudentPassword,
         }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Could not create the class invite.");
+        throw new Error(payload?.error || "Could not create the student account.");
       }
 
-      setInviteEmail("");
-      setInviteDisplayName("");
-      setInviteStudentId("");
-      setInviteUrl(payload?.invite?.inviteUrl || "");
-      setMessage("Student invite created.");
+      setCreatedCredentials({ username: newStudentUsername, password: newStudentPassword });
+      setMessage(`Account created for ${newStudentName}.`);
+      setNewStudentUsername("");
+      setNewStudentName("");
+      setNewStudentEmail("");
+      setNewStudentPassword("");
       await loadClassDetail(selectedClassId);
       await loadClasses(selectedClassId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the class invite.");
+      setError(err instanceof Error ? err.message : "Could not create the student account.");
     } finally {
       setSaving(false);
     }
@@ -399,7 +393,7 @@ export default function ClassRosterManager() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a class</h2>
             <p className="mt-2 text-sm text-[var(--ink-muted)]">
-              Classes hold the instructor roster and the students enrolled through orientation invites.
+              Classes organize students and instructors. Create student accounts from the class roster below.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -582,145 +576,122 @@ export default function ClassRosterManager() {
               </div>
 
               <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Invite student</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Add student</p>
+                <p className="mt-1 text-sm text-[var(--ink-muted)]">Create an account and enroll in this class.</p>
                 <div className="mt-3 space-y-3">
                   <input
-                    value={inviteEmail}
-                    onChange={(event) => setInviteEmail(event.target.value)}
-                    placeholder="Student email"
+                    value={newStudentName}
+                    onChange={(event) => setNewStudentName(event.target.value)}
+                    placeholder="Name"
                     className="field px-4 py-3 text-sm"
                   />
                   <input
-                    value={inviteDisplayName}
-                    onChange={(event) => setInviteDisplayName(event.target.value)}
-                    placeholder="Student name"
+                    value={newStudentUsername}
+                    onChange={(event) => setNewStudentUsername(event.target.value)}
+                    placeholder="Username"
                     className="field px-4 py-3 text-sm"
                   />
                   <input
-                    value={inviteStudentId}
-                    onChange={(event) => setInviteStudentId(event.target.value)}
-                    placeholder="Suggested student ID"
+                    value={newStudentEmail}
+                    onChange={(event) => setNewStudentEmail(event.target.value)}
+                    placeholder="Email (optional)"
+                    type="email"
+                    className="field px-4 py-3 text-sm"
+                  />
+                  <input
+                    value={newStudentPassword}
+                    onChange={(event) => setNewStudentPassword(event.target.value)}
+                    placeholder="Password"
+                    type="text"
+                    autoComplete="off"
                     className="field px-4 py-3 text-sm"
                   />
                   <button
                     type="button"
-                    onClick={() => void createInvite()}
+                    onClick={() => void createStudent()}
                     disabled={saving || classDetail.status === "archived"}
                     className="primary-button w-full px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Create Invite
+                    Create Account
                   </button>
-                  {inviteUrl ? (
+                  {createdCredentials ? (
                     <div className="rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-3 text-sm text-[var(--ink-strong)]">
-                      <p className="font-semibold">Invite link ready</p>
-                      <p className="mt-2 break-all text-[var(--ink-muted)]">{inviteUrl}</p>
-                      <button
-                        type="button"
-                        onClick={() => void navigator.clipboard.writeText(inviteUrl)}
-                        className="mt-3 rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)]"
-                      >
-                        Copy Link
-                      </button>
+                      <p className="font-semibold">Account created — share these credentials:</p>
+                      <div className="mt-2 space-y-1 font-mono text-sm">
+                        <p>Username: <span className="font-semibold">{createdCredentials.username}</span></p>
+                        <p>Password: <span className="font-semibold">{createdCredentials.password}</span></p>
+                      </div>
                     </div>
                   ) : null}
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Roster</p>
-                    <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in this class</h3>
-                  </div>
-                  <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
-                    {classDetail.enrollments.length} total
-                  </span>
+            <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Roster</p>
+                  <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in this class</h3>
                 </div>
-                <div className="mt-4 space-y-3">
-                  {classDetail.enrollments.length === 0 ? (
-                    <p className="text-sm text-[var(--ink-muted)]">No students have claimed invites for this class yet.</p>
-                  ) : (
-                    classDetail.enrollments.map((enrollment) => (
-                      <div key={enrollment.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] px-4 py-3">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-[var(--ink-strong)]">{enrollment.student.displayName}</p>
-                            <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                              {enrollment.student.studentId} • {enrollment.student.email || "No email"}
-                            </p>
-                            <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                              Enrolled {new Date(enrollment.enrolledAt).toLocaleDateString()}
-                              {enrollment.archivedAt ? ` • Archived ${new Date(enrollment.archivedAt).toLocaleDateString()}` : ""}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
-                              {enrollment.status}
-                            </span>
-                            {enrollment.status === "archived" ? (
+                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                  {classDetail.enrollments.length} total
+                </span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {classDetail.enrollments.length === 0 ? (
+                  <p className="text-sm text-[var(--ink-muted)]">No students enrolled in this class yet. Use the form above to create student accounts.</p>
+                ) : (
+                  classDetail.enrollments.map((enrollment) => (
+                    <div key={enrollment.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] px-4 py-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-[var(--ink-strong)]">{enrollment.student.displayName}</p>
+                          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                            {enrollment.student.studentId} {enrollment.student.email ? `• ${enrollment.student.email}` : ""}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                            Enrolled {new Date(enrollment.enrolledAt).toLocaleDateString()}
+                            {enrollment.archivedAt ? ` • Archived ${new Date(enrollment.archivedAt).toLocaleDateString()}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                            {enrollment.status}
+                          </span>
+                          {enrollment.status === "archived" ? (
+                            <button
+                              type="button"
+                              onClick={() => void updateEnrollmentStatus(enrollment.id, "active")}
+                              disabled={saving}
+                              className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Restore
+                            </button>
+                          ) : (
+                            <>
                               <button
                                 type="button"
-                                onClick={() => void updateEnrollmentStatus(enrollment.id, "active")}
+                                onClick={() => void updateEnrollmentStatus(enrollment.id, enrollment.status === "inactive" ? "active" : "inactive")}
                                 disabled={saving}
                                 className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                Restore
+                                {enrollment.status === "inactive" ? "Mark Active" : "Mark Inactive"}
                               </button>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => void updateEnrollmentStatus(enrollment.id, enrollment.status === "inactive" ? "active" : "inactive")}
-                                  disabled={saving}
-                                  className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  {enrollment.status === "inactive" ? "Mark Active" : "Mark Inactive"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void updateEnrollmentStatus(enrollment.id, "archived")}
-                                  disabled={saving}
-                                  className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  Archive
-                                </button>
-                              </>
-                            )}
-                          </div>
+                              <button
+                                type="button"
+                                onClick={() => void updateEnrollmentStatus(enrollment.id, "archived")}
+                                disabled={saving}
+                                className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Archive
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Pending invites</p>
-                    <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Orientation invites</h3>
-                  </div>
-                  <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
-                    {classDetail.invites.length} open
-                  </span>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {classDetail.invites.length === 0 ? (
-                    <p className="text-sm text-[var(--ink-muted)]">No pending invites for this class.</p>
-                  ) : (
-                    classDetail.invites.map((invite) => (
-                      <div key={invite.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] px-4 py-3">
-                        <p className="font-semibold text-[var(--ink-strong)]">{invite.displayName || invite.email}</p>
-                        <p className="mt-1 text-sm text-[var(--ink-muted)]">{invite.email}</p>
-                        <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                          Suggested ID {invite.suggestedStudentId || "Not set"} • Expires {new Date(invite.expiresAt).toLocaleString()}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -728,7 +699,7 @@ export default function ClassRosterManager() {
           <p className="text-sm text-[var(--ink-muted)]">
             {classes.length === 0
               ? adminMode
-                ? "Create your first class to start assigning instructors and orientation invites."
+                ? "Create your first class to start adding students."
                 : "No classes are assigned to your account yet."
               : "Select a class to load the roster."}
           </p>

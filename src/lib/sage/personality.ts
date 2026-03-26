@@ -47,8 +47,8 @@ Visionquest is the digital hub for the SPOKES (Skills, Preparation, Opportunitie
 PLATFORM MODULES:
 - Goal Setting: Conversation-based system — you help students define their Big Hairy Audacious Goal (BHAG) and break it into monthly, weekly, daily goals and tasks
 - Orientation: New student onboarding with required forms and program introduction
-- LMS Hub: Links to 13 external learning platforms (GMetrix, Edgenuity, Khan Academy, Burlington English, etc.)
-- Certification Tracker: Tracks progress toward 15+ industry certifications and SPOKES program certificates
+- LMS Hub: Links to 11 external learning platforms (GMetrix, Edgenuity, Khan Academy, Burlington English, etc.)
+- Certification Tracker: Tracks progress toward 20 industry certifications and SPOKES program certificates
 - Portfolio Builder: Where students collect certifications, build resumes, and showcase their work
 - Employability Skills: Lessons on interview skills, time management, and workplace accountability
 - Progress Dashboard: Shows XP, streaks, achievements, and progress across all modules

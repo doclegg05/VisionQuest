@@ -324,6 +324,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [deactivating, setDeactivating] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [showAllConversations, setShowAllConversations] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "goals" | "progress" | "operations">("overview");
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
@@ -641,7 +642,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     student,
     progression,
     readinessScore,
-    readinessBreakdown,
+    readinessBreakdown: _readinessBreakdown,
     goals,
     goalPlans,
     goalEvidence,
@@ -721,6 +722,12 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 className="text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
               >
                 Open SPOKES record
+              </Link>
+              <Link
+                href={`/teacher/students/${student.id}/dashboard`}
+                className="text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+              >
+                Preview Dashboard
               </Link>
               <button
                 onClick={() => setShowResetPw(!showResetPw)}
@@ -1022,6 +1029,33 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         </div>
       </div>
 
+      {/* Tab Bar */}
+      <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+        {([
+          { key: "overview", label: "Overview" },
+          { key: "goals", label: "Goals & Plan" },
+          { key: "progress", label: "Progress" },
+          { key: "operations", label: "Operations" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.key
+                ? "bg-white text-[var(--ink-strong)] shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview Tab — readiness, alerts, quick stats (the header card above serves as overview) */}
+
+      {/* Operations Tab */}
+      {activeTab === "operations" && <>
       <div id="submitted-forms" className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -1499,6 +1533,10 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         </div>
       </div>
 
+      </>}
+
+      {/* Goals & Plan Tab */}
+      {activeTab === "goals" && <>
       <div id="goal-plans" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Goals ({goals.length})</h3>
         <div className="mb-5">
@@ -1608,6 +1646,10 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         )}
       </div>
 
+      </>}
+
+      {/* Progress Tab */}
+      {activeTab === "progress" && <>
       <div id="orientation-review" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Orientation ({orientDone}/{orientTotal})
@@ -1889,6 +1931,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }

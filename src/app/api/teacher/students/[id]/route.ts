@@ -265,6 +265,12 @@ export const GET = withTeacherAuth(async (
           topClusters: true,
           clusterScores: true,
           sageSummary: true,
+          riasecScores: true,
+          hollandCode: true,
+          nationalClusters: true,
+          transferableSkills: true,
+          workValues: true,
+          assessmentSummary: true,
           completedAt: true,
         },
       },
@@ -317,17 +323,17 @@ export const GET = withTeacherAuth(async (
   const certDoneCount = student.certifications[0]
     ? student.certifications[0].requirements.filter((r) => r.completed).length
     : 0;
+  const bhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
   const readinessResult = computeReadinessScore(
     {
       orientationComplete: rawProgression?.orientationComplete ?? false,
       completedGoalLevels: rawProgression?.completedGoalLevels ?? [],
+      bhagCompleted,
       certificationsEarned: certDoneCount,
       portfolioItemCount: rawProgression?.portfolioItemCount ?? student.portfolioItems.length,
       resumeCreated: rawProgression?.resumeCreated ?? !!student.resumeData,
       portfolioShared: rawProgression?.portfolioShared ?? false,
-      platformsVisited: rawProgression?.platformsVisited ?? [],
       longestStreak: rawProgression?.streaks?.daily?.longest ?? rawProgression?.longestStreak ?? 0,
-      level: rawProgression?.level ?? 1,
     },
     certTemplates.filter((t) => t.required).length || 19,
   );
@@ -470,6 +476,12 @@ export const GET = withTeacherAuth(async (
           problems: safeJsonParse(student.careerDiscovery.problems),
           values: safeJsonParse(student.careerDiscovery.values),
           circumstances: safeJsonParse(student.careerDiscovery.circumstances),
+          riasecScores: safeJsonParse(student.careerDiscovery.riasecScores),
+          hollandCode: student.careerDiscovery.hollandCode,
+          nationalClusters: safeJsonParse(student.careerDiscovery.nationalClusters),
+          transferableSkills: safeJsonParse(student.careerDiscovery.transferableSkills),
+          workValues: safeJsonParse(student.careerDiscovery.workValues),
+          assessmentSummary: student.careerDiscovery.assessmentSummary,
           completedAt: student.careerDiscovery.completedAt,
         }
       : null,

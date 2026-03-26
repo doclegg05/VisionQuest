@@ -4,6 +4,7 @@ import { useState } from "react";
 import PortfolioGrid from "./PortfolioGrid";
 import ResumeBuilder from "./ResumeBuilder";
 import CredentialSharePanel from "@/components/certifications/CredentialSharePanel";
+import CredlyBadges from "@/components/certifications/CredlyBadges";
 
 type Tab = "portfolio" | "resume" | "sharing";
 
@@ -52,7 +53,12 @@ export default function PortfolioPage() {
         ? <PortfolioGrid />
         : tab === "resume"
           ? <ResumeBuilder />
-          : <CredentialSharePanel />}
+          : (
+            <div className="space-y-6">
+              <CredentialSharePanel />
+              <CredlyBadges />
+            </div>
+          )}
     </div>
   );
 }

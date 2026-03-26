@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, normalizeStudentId, setSessionCookie } from "@/lib/auth";
+import { verifyPassword, normalizeStudentId, normalizeEmail, setSessionCookie } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -14,10 +14,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const body = await parseBody(req, loginSchema);
-  const studentId = normalizeStudentId(body.studentId);
+  const login = body.studentId.trim();
   const password = body.password.trim();
 
-  const student = await prisma.student.findUnique({ where: { studentId } });
+  const isEmail = login.includes("@");
+  const student = isEmail
+    ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
+    : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
   if (!student || !verifyPassword(password, student.passwordHash)) {
     const resp = NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
     logAuditEvent({
@@ -25,7 +28,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       actorRole: null,
       action: "auth.login_failed",
       targetType: "student",
-      summary: `Failed login attempt for student ID "${studentId}".`,
+      summary: `Failed login attempt for "${login}".`,
       metadata: { ip },
     });
     return resp;

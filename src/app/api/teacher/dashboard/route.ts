@@ -147,7 +147,6 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     let level = 1;
     let streak = 0;
     let longestStreak = 0;
-    let platformsVisited: string[] = [];
     let portfolioShared = false;
     if (s.progression?.state) {
       try {
@@ -156,7 +155,6 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         level = state.level || 1;
         streak = state.streaks?.daily?.current || 0;
         longestStreak = state.streaks?.daily?.longest || 0;
-        platformsVisited = state.platformsVisited || [];
         portfolioShared = !!state.portfolioShared;
       } catch { /* ignore */ }
     }
@@ -183,17 +181,17 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       : 0;
 
     // Readiness score
+    const bhagCompleted = s.goals.some((g) => g.level === "bhag" && g.status === "completed");
     const readiness = computeReadinessScore(
       {
         orientationComplete: s.orientationProgress.length >= orientationTotal && orientationTotal > 0,
         completedGoalLevels,
+        bhagCompleted,
         certificationsEarned: certDone,
         portfolioItemCount: s.portfolioItems.length,
         resumeCreated: !!s.resumeData,
         portfolioShared,
-        platformsVisited,
         longestStreak,
-        level,
       },
       certTemplates.filter((t) => t.required).length
     );
@@ -268,7 +266,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         status: "open",
         studentId: { in: managedStudentIds },
         type: {
-          in: ["goal_needs_resource", "goal_resource_stale", "goal_review_pending"],
+          in: ["goal_needs_resource", "goal_resource_stale", "goal_review_pending", "goal_platform_stale"],
         },
       },
       select: {

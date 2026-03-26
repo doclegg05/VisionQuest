@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
+import InterventionQueue from "./InterventionQueue";
 import { apiFetch } from "@/lib/api";
 import { getInactivityStageByType } from "@/lib/inactivity";
 import {
@@ -316,6 +317,19 @@ export default function ClassOverview() {
           onChanged={() => fetchStudents(page)}
         />
       ) : null}
+
+      {/* Unified Intervention Queue */}
+      <InterventionQueue
+        alerts={alerts}
+        inactivityQueue={inactivityQueue}
+        reviewQueue={reviewQueue}
+        onAction={(intent) => setActionIntent({
+          kind: "create_task",
+          studentRecordId: intent.studentId,
+          alertId: intent.alertId,
+          studentDisplayName: intent.studentName,
+        })}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="surface-section p-5">

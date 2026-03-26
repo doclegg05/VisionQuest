@@ -157,3 +157,99 @@ test("buildGoalEvidenceEntries recognizes application and event career steps fro
   assert.equal(evidence[0]?.evidenceStatus, "completed");
   assert.equal(evidence[1]?.evidenceStatus, "completed");
 });
+
+test("buildGoalEvidenceEntries marks viewed documents as in_progress", () => {
+  const state = createInitialState();
+  state.documentsViewed.push("doc-study-guide");
+
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "document",
+        resourceId: "doc-study-guide",
+        title: "IC3 Study Guide",
+      }),
+    ],
+    progressionState: state,
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "in_progress");
+  assert.equal(evidence.evidenceSource, "system");
+  assert.match(evidence.summary, /opened this assigned document/i);
+});
+
+test("buildGoalEvidenceEntries marks unviewed documents as not_started", () => {
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "document",
+        resourceId: "doc-study-guide",
+        title: "IC3 Study Guide",
+      }),
+    ],
+    progressionState: createInitialState(),
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "not_started");
+});
+
+test("buildGoalReviewQueue flags visited platforms with no follow-through after ten days", () => {
+  const state = createInitialState();
+  state.platformsVisited.push("gmetrix-and-learnkey");
+
+  const link = makeLink({
+    resourceType: "platform",
+    resourceId: "gmetrix-and-learnkey",
+    title: "GMetrix and LearnKey",
+    createdAt: "2026-03-01T12:00:00.000Z",
+  });
+
+  const queue = buildGoalReviewQueue({
+    goals: [{
+      id: "goal-1",
+      content: "Practice for IC3 certification.",
+      status: "active",
+      createdAt: "2026-03-01T12:00:00.000Z",
+    }],
+    links: [link],
+    evidenceEntries: buildGoalEvidenceEntries({
+      links: [link],
+      progressionState: state,
+    }),
+    now: new Date("2026-03-15T12:00:00.000Z"),
+  });
+
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0]?.kind, "goal_platform_stale");
+});
+
+test("buildGoalReviewQueue does not flag visited platforms before ten days", () => {
+  const state = createInitialState();
+  state.platformsVisited.push("gmetrix-and-learnkey");
+
+  const link = makeLink({
+    resourceType: "platform",
+    resourceId: "gmetrix-and-learnkey",
+    title: "GMetrix and LearnKey",
+    createdAt: "2026-03-01T12:00:00.000Z",
+  });
+
+  const queue = buildGoalReviewQueue({
+    goals: [{
+      id: "goal-1",
+      content: "Practice for IC3 certification.",
+      status: "active",
+      createdAt: "2026-03-01T12:00:00.000Z",
+    }],
+    links: [link],
+    evidenceEntries: buildGoalEvidenceEntries({
+      links: [link],
+      progressionState: state,
+    }),
+    now: new Date("2026-03-08T12:00:00.000Z"),
+  });
+
+  assert.equal(queue.length, 0);
+});

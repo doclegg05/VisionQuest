@@ -5,6 +5,7 @@ import Link from "next/link";
 interface SuggestedActionsProps {
   hasGoals: boolean;
   orientationComplete: boolean;
+  orientationProgress?: { completed: number; total: number };
   certificationsStarted: number;
   platformsVisited: number;
   resumeCreated: boolean;
@@ -24,6 +25,7 @@ export default function SuggestedActions({
   hasGoals,
   orientationComplete,
   certificationsStarted,
+  orientationProgress,
   platformsVisited,
   resumeCreated,
   currentStreak,
@@ -42,10 +44,15 @@ export default function SuggestedActions({
   }
 
   if (!orientationComplete) {
+    const remaining = orientationProgress
+      ? orientationProgress.total - orientationProgress.completed
+      : 0;
     actions.push({
       emoji: "\u{1F4CB}",
       title: "Complete orientation",
-      desc: "Review program forms and finish your onboarding checklist.",
+      desc: remaining > 0
+        ? `${remaining} checklist item${remaining === 1 ? "" : "s"} remaining. Finish your onboarding to move forward.`
+        : "Review program forms and finish your onboarding checklist.",
       href: "/orientation",
       priority: 2,
     });

@@ -49,7 +49,7 @@ const KEYWORD_GROUPS: {
   },
   {
     keywords: ["english", "esl", "language", "speaking", "reading", "writing english"],
-    platforms: ["burlington-english", "usa-learns", "crossroads-cafe"],
+    platforms: ["burlington-english", "usa-learns"],
     certifications: ["burlington-english"],
     suggestion: "Burlington English and USA Learns will strengthen your English skills",
   },
@@ -61,7 +61,7 @@ const KEYWORD_GROUPS: {
   },
   {
     keywords: ["career", "job", "work", "employment", "professional", "workplace", "interview"],
-    platforms: ["bring-your-a-game", "csmlearn", "learning-express-library"],
+    platforms: ["bring-your-a-game", "csmlearn"],
     certifications: ["byag", "workkeys-ncrc", "professional-communications"],
     suggestion: "Bring Your A Game and WorkKeys NCRC build core employability skills",
   },

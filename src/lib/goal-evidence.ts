@@ -29,6 +29,7 @@ export const GOAL_REVIEW_ITEM_KINDS = [
   "goal_needs_resource",
   "goal_resource_stale",
   "goal_review_pending",
+  "goal_platform_stale",
 ] as const;
 export type GoalReviewItemKind = (typeof GOAL_REVIEW_ITEM_KINDS)[number];
 
@@ -280,6 +281,21 @@ function evidenceFromPlatform(link: GoalResourceLinkView, progressionState: Prog
   return manualEvidence(link);
 }
 
+function evidenceFromDocument(link: GoalResourceLinkView, progressionState: ProgressionState | null) {
+  if (progressionState?.documentsViewed.includes(link.resourceId)) {
+    return {
+      evidenceStatus: "in_progress" as const,
+      evidenceSource: "system" as const,
+      reviewNeeded: false,
+      evidenceLabel: "Document viewed",
+      summary: "Student has opened this assigned document.",
+      lastObservedAt: null,
+    };
+  }
+
+  return manualEvidence(link);
+}
+
 function evidenceFromPortfolioTask(
   link: GoalResourceLinkView,
   portfolioItems: GoalEvidencePortfolioItem[],
@@ -522,6 +538,8 @@ export function buildGoalEvidenceEntries({
           return evidenceFromCertification(link, certification);
         case "career_step":
           return evidenceFromCareerStep(link, applications, eventRegistrations);
+        case "document":
+          return evidenceFromDocument(link, progressionState);
         default:
           return manualEvidence(link);
       }
@@ -622,6 +640,32 @@ export function buildGoalReviewQueue({
         dueAt: evidence.dueAt,
         detectedAt: evidence.lastObservedAt,
       });
+      continue;
+    }
+
+    // Platform visited but no follow-through after 10 days
+    if (
+      evidence.resourceType === "platform" &&
+      evidence.evidenceStatus === "in_progress"
+    ) {
+      const platformAssignedAt = toDate(links.find((link) => link.id === evidence.linkId)?.createdAt);
+      if (platformAssignedAt) {
+        const platformAgeDays = (now.getTime() - platformAssignedAt.getTime()) / 86400000;
+        if (platformAgeDays >= 10) {
+          queue.push({
+            key: `goal_platform_stale:${evidence.linkId}`,
+            kind: "goal_platform_stale",
+            severity: platformAgeDays >= 20 ? "high" : "medium",
+            goalId: goal.id,
+            goalTitle: buildGoalTitle(goal),
+            linkId: evidence.linkId,
+            resourceTitle: evidence.title,
+            summary: `${evidence.title} was visited but no follow-through evidence has appeared.`,
+            dueAt: evidence.dueAt,
+            detectedAt: platformAssignedAt,
+          });
+        }
+      }
       continue;
     }
 

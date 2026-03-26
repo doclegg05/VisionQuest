@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loginSchema, registerSchema, chatSendSchema, apiKeySchema } from "./schemas";
+import { loginSchema, createStudentSchema, chatSendSchema, apiKeySchema } from "./schemas";
 
 // ---------------------------------------------------------------------------
 // loginSchema
@@ -29,93 +29,56 @@ test("loginSchema rejects studentId over 50 chars", () => {
 });
 
 // ---------------------------------------------------------------------------
-// registerSchema
+// createStudentSchema
 // ---------------------------------------------------------------------------
 
-test("registerSchema accepts valid input", () => {
-  const result = registerSchema.safeParse({
+test("createStudentSchema accepts valid input", () => {
+  const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane Doe",
-    email: "jane@example.com",
     password: "secure123",
-    inviteToken: "valid-invite-token",
   });
   assert.ok(result.success);
 });
 
-test("registerSchema requires studentId min 3 chars", () => {
-  const result = registerSchema.safeParse({
+test("createStudentSchema accepts optional email", () => {
+  const result = createStudentSchema.safeParse({
+    studentId: "jdoe",
+    displayName: "Jane Doe",
+    email: "jane@example.com",
+    password: "secure123",
+  });
+  assert.ok(result.success);
+});
+
+test("createStudentSchema requires username min 3 chars", () => {
+  const result = createStudentSchema.safeParse({
     studentId: "ab",
     displayName: "Jane",
-    email: "j@e.com",
     password: "secure123",
-    inviteToken: "valid-invite-token",
   });
   assert.ok(!result.success);
   assert.ok(result.error.issues[0].message.includes("3 characters"));
 });
 
-test("registerSchema requires valid email", () => {
-  const result = registerSchema.safeParse({
+test("createStudentSchema requires password min 6 chars", () => {
+  const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane",
-    email: "notanemail",
-    password: "secure123",
-    inviteToken: "valid-invite-token",
-  });
-  assert.ok(!result.success);
-  assert.ok(result.error.issues[0].message.includes("email"));
-});
-
-test("registerSchema requires password min 6 chars", () => {
-  const result = registerSchema.safeParse({
-    studentId: "jdoe",
-    displayName: "Jane",
-    email: "j@e.com",
     password: "12345",
-    inviteToken: "valid-invite-token",
   });
   assert.ok(!result.success);
   assert.ok(result.error.issues[0].message.includes("6 characters"));
 });
 
-test("registerSchema requires an invite token", () => {
-  const result = registerSchema.safeParse({
-    studentId: "jdoe",
-    displayName: "Jane Doe",
-    email: "jane@example.com",
-    password: "secure123",
-  });
-  assert.ok(!result.success);
-  assert.equal(result.error.issues[0]?.path[0], "inviteToken");
-});
-
-test("registerSchema allows optional securityQuestions", () => {
-  const result = registerSchema.safeParse({
+test("createStudentSchema allows empty string for email", () => {
+  const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane",
-    email: "j@e.com",
     password: "secure123",
-    inviteToken: "valid-invite-token",
-    securityQuestions: {
-      birth_city: "Morgantown",
-      elementary_school: "Lincoln",
-      favorite_teacher: "Jones",
-    },
+    email: "",
   });
   assert.ok(result.success);
-});
-
-test("registerSchema rejects the legacy securityQuestions array shape", () => {
-  const result = registerSchema.safeParse({
-    studentId: "jdoe",
-    displayName: "Jane",
-    email: "j@e.com",
-    password: "secure123",
-    inviteToken: "valid-invite-token",
-    securityQuestions: [{ questionId: "q1", answer: "blue" }],
-  });
-  assert.ok(!result.success);
 });
 
 // ---------------------------------------------------------------------------

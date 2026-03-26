@@ -117,8 +117,8 @@ export const FORMS: SpokesForm[] = [
     description:
       "Student rights within the program and expected responsibilities",
     category: "onboarding",
-    fileName: "SPOKES_Rights_and_Responsibilites_FY26_Fillable.pdf",
-    storageKey: "orientation/SPOKES_Rights_and_Responsibilites_FY26_Fillable.pdf",
+    fileName: "SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+    storageKey: "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
     fillable: true,
     required: true,
     audience: "student",

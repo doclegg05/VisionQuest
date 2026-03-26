@@ -87,7 +87,7 @@ describe("buildSystemPrompt", () => {
       career_clusters: "SPOKES CAREER PATHWAYS:\nOffice & Admin\nFinance & Bookkeeping",
     });
 
-    assert.match(prompt, /Career Discovery conversation/);
+    assert.match(prompt, /Career Discovery/);
     assert.match(prompt, /SPOKES CAREER PATHWAYS:/);
     assert.match(prompt, /Office & Admin/);
     assert.match(prompt, /The student's name is Jordan/);

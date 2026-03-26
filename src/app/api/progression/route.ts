@@ -24,7 +24,11 @@ export const GET = withErrorHandler(async () => {
 
   // Re-read after potential daily checkin write, then check readiness achievements
   const { state: freshState } = await getProgression(session.id);
-  const readiness = computeReadinessScore(freshState);
+  const bhagGoal = await prisma.goal.findFirst({
+    where: { studentId: session.id, level: "bhag", status: "completed" },
+    select: { id: true },
+  });
+  const readiness = computeReadinessScore({ ...freshState, bhagCompleted: !!bhagGoal });
 
   const prevAchievementCount = freshState.achievements.length;
   checkReadinessAchievements(freshState, readiness.score);
@@ -49,7 +53,7 @@ export const GET = withErrorHandler(async () => {
     state.resumeCreated = true;
   }
   const xpProgress = getXpProgress(state);
-  const finalReadiness = computeReadinessScore(state);
+  const finalReadiness = computeReadinessScore({ ...state, bhagCompleted: !!bhagGoal });
   const achievements = getAchievementsWithDefs(state);
 
   // Recent activity: last 5 achievements with timestamps (from achievements array order)

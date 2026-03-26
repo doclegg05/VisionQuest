@@ -110,6 +110,14 @@ interface AlertInputs {
       completedRequiredCount: number;
       requiredCount: number;
     } | null;
+    goals?: {
+      id: string;
+      level: string;
+      status: string;
+      updatedAt: Date;
+    }[];
+    lastConversationAt?: Date | null;
+    orientationComplete?: boolean;
   };
   now?: Date;
 }
@@ -248,6 +256,54 @@ export function buildStudentAlertDescriptors({
           summary: `Certification progress has not advanced since ${formatAlertDate(referenceDate)}.`,
           sourceType: "certification",
           sourceId: signals?.studentId || studentKey,
+        });
+      }
+    }
+  }
+
+  // Goal stale detection: goals not updated in 7+ days
+  if (signals?.goals && signals.goals.length > 0) {
+    const activeGoals = signals.goals.filter((g) => g.status === "active" || g.status === "in_progress");
+    for (const goal of activeGoals) {
+      const daysSinceUpdate = (now.getTime() - goal.updatedAt.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceUpdate >= 7) {
+        alerts.push({
+          alertKey: `goal_stale:${goal.id}`,
+          type: "goal_stale",
+          severity: daysSinceUpdate >= 14 ? "high" : "medium",
+          title: `${goal.level.charAt(0).toUpperCase() + goal.level.slice(1)} goal needs review`,
+          summary: `"${goal.content.slice(0, 60)}${goal.content.length > 60 ? "..." : ""}" has not been updated in ${Math.round(daysSinceUpdate)} days.`,
+          sourceType: "goal",
+          sourceId: goal.id,
+        });
+      }
+    }
+  }
+
+  // Orientation follow-up: escalating reminders for students who haven't started or finished
+  if (signals?.studentCreatedAt && signals.orientationComplete !== true) {
+    const enrollDays = (now.getTime() - signals.studentCreatedAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (enrollDays >= 3) {
+      const hasStarted = signals.goals && signals.goals.length > 0;
+      if (!hasStarted && enrollDays >= 3 && enrollDays < 7) {
+        alerts.push({
+          alertKey: `orientation_not_started:${studentKey}`,
+          type: "orientation_not_started",
+          severity: "medium",
+          title: "Student has not started orientation",
+          summary: `Enrolled ${Math.round(enrollDays)} days ago but has not begun the orientation checklist. Reach out to help them get started.`,
+          sourceType: "student",
+          sourceId: signals.studentId || studentKey,
+        });
+      } else if (enrollDays >= 7) {
+        alerts.push({
+          alertKey: `orientation_overdue:${studentKey}`,
+          type: "orientation_overdue",
+          severity: enrollDays >= 14 ? "high" : "medium",
+          title: "Orientation is overdue",
+          summary: `Enrolled ${Math.round(enrollDays)} days ago with orientation still incomplete. Follow up to prevent the student from falling behind.`,
+          sourceType: "student",
+          sourceId: signals.studentId || studentKey,
         });
       }
     }
@@ -955,6 +1011,7 @@ export async function syncStudentAlerts(studentId: string) {
         goals: {
           select: {
             id: true,
+            level: true,
             content: true,
             status: true,
             createdAt: true,
@@ -1110,6 +1167,9 @@ export async function syncStudentAlerts(studentId: string) {
             "orientation_form_pending_review",
             "orientation_form_revision_needed",
             "orientation_item_incomplete",
+            "goal_stale",
+            "orientation_not_started",
+            "orientation_overdue",
             ...ALL_INACTIVITY_ALERT_TYPES,
           ],
         },
@@ -1208,6 +1268,14 @@ export async function syncStudentAlerts(studentId: string) {
           applicationCount: studentSignals._count.applications,
           eventRegistrationCount: studentSignals._count.eventRegistrations,
           orientationStatus: studentStatusSignals,
+          goals: studentSignals.goals.map((g) => ({
+            id: g.id,
+            level: g.level,
+            status: g.status,
+            updatedAt: g.updatedAt,
+          })),
+          lastConversationAt: studentSignals.conversations[0]?.updatedAt || null,
+          orientationComplete: progressionState?.orientationComplete || false,
           certification: certification
             ? {
                 status: certification.status,
@@ -1231,12 +1299,16 @@ export async function syncStudentAlerts(studentId: string) {
       ? "Goal needs a support plan"
       : item.kind === "goal_review_pending"
         ? "Student work is waiting for review"
-        : "Assigned goal resource is stalled",
+        : item.kind === "goal_platform_stale"
+          ? "Platform visited but no follow-through"
+          : "Assigned goal resource is stalled",
     summary: item.kind === "goal_needs_resource"
       ? `${item.goalTitle} does not have an assigned resource or next step yet.`
       : item.kind === "goal_review_pending"
         ? `${item.resourceTitle || "Assigned work"} has student evidence waiting for teacher review.`
-        : `${item.resourceTitle || "Assigned work"} has no observed student activity after assignment.`,
+        : item.kind === "goal_platform_stale"
+          ? `${item.resourceTitle || "Learning platform"} was visited but no follow-through evidence has appeared.`
+          : `${item.resourceTitle || "Assigned work"} has no observed student activity after assignment.`,
     sourceType: item.linkId ? "goal_resource_link" : "goal",
     sourceId: item.linkId || item.goalId,
   }));

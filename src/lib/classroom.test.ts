@@ -3,10 +3,7 @@ import test from "node:test";
 import {
   NON_ARCHIVED_ENROLLMENT_STATUSES,
   buildManagedStudentWhere,
-  createClassInviteToken,
-  hashInviteToken,
   normalizeClassCode,
-  normalizeInviteInput,
 } from "./classroom";
 import { getRoleHomePath } from "./role-home";
 
@@ -14,26 +11,6 @@ test("normalizeClassCode creates a stable class slug", () => {
   assert.equal(normalizeClassCode("  SPOKES Class 2026 / AM  "), "spokes-class-2026-am");
 });
 
-test("createClassInviteToken returns a token and matching hash", () => {
-  const invite = createClassInviteToken();
-
-  assert.ok(invite.token.length >= 30);
-  assert.equal(invite.tokenHash, hashInviteToken(invite.token));
-});
-
-test("normalizeInviteInput normalizes email and suggested student id", () => {
-  const normalized = normalizeInviteInput({
-    email: " Student@Example.com ",
-    displayName: "  Jane Doe ",
-    suggestedStudentId: " JD 123 ",
-  });
-
-  assert.deepEqual(normalized, {
-    email: "student@example.com",
-    displayName: "Jane Doe",
-    suggestedStudentId: "jd123",
-  });
-});
 
 test("buildManagedStudentWhere returns unrestricted admin access when no class is selected", () => {
   const where = buildManagedStudentWhere(

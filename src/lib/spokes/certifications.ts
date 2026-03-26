@@ -182,7 +182,7 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     shortName: "Design for Delight",
     description:
       "Innovation and design thinking certification through Intuit and Certiport.",
-    category: "finance",
+    category: "creative",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
   },

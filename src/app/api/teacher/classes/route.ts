@@ -49,13 +49,6 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
           status: true,
         },
       },
-      invites: {
-        where: {
-          claimedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-        select: { id: true },
-      },
     },
     orderBy: [{ status: "asc" }, { name: "asc" }],
   });
@@ -81,7 +74,6 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       instructors: item.instructors.map((entry) => entry.instructor),
       activeEnrollmentCount: item.enrollments.filter((enrollment) => enrollment.status !== "archived").length,
       archivedEnrollmentCount: item.enrollments.filter((enrollment) => enrollment.status === "archived").length,
-      pendingInviteCount: item.invites.length,
     })),
     availableInstructors,
   });

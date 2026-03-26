@@ -85,6 +85,16 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           <div className="text-[var(--ink-strong)]">
             <NotificationBell />
           </div>
+          {role === "student" && (
+            <Link
+              href="/settings"
+              prefetch={false}
+              className="rounded-full border border-[rgba(18,38,63,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+              aria-label="Settings"
+            >
+              ⚙️
+            </Link>
+          )}
           <button
             onClick={handleLogout}
             type="button"
@@ -242,6 +252,16 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <NotificationBell />
+              {role === "student" && (
+                <Link
+                  href="/settings"
+                  prefetch={false}
+                  className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Settings"
+                >
+                  ⚙️
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 type="button"
@@ -254,6 +274,18 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           </div>
         </div>
       </aside>
+
+      {/* Floating Sage button for students */}
+      {role === "student" && pathname !== "/chat" && (
+        <Link
+          href="/chat"
+          prefetch={false}
+          className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--ink-strong)] text-2xl text-white shadow-[0_8px_30px_rgba(7,23,43,0.35)] transition-transform hover:scale-110 md:bottom-6 md:right-6"
+          aria-label="Open Sage AI Coach"
+        >
+          💬
+        </Link>
+      )}
     </>
   );
 }

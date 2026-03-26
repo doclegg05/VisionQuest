@@ -53,10 +53,18 @@ export async function getClassProgress(studentId: string): Promise<ClassProgress
       : 0;
 
   // Readiness scores from progression state
-  const progressions = await prisma.progression.findMany({
-    where: { studentId: { in: classmateIds } },
-    select: { studentId: true, state: true },
-  });
+  const [progressions, bhagCompletions] = await Promise.all([
+    prisma.progression.findMany({
+      where: { studentId: { in: classmateIds } },
+      select: { studentId: true, state: true },
+    }),
+    prisma.goal.findMany({
+      where: { studentId: { in: classmateIds }, level: "bhag", status: "completed" },
+      select: { studentId: true },
+    }),
+  ]);
+
+  const bhagCompletedSet = new Set(bhagCompletions.map((g) => g.studentId));
 
   let readinessSum = 0;
   for (const prog of progressions) {
@@ -64,6 +72,7 @@ export async function getClassProgress(studentId: string): Promise<ClassProgress
     const completed = orientationMap.get(prog.studentId) || 0;
     const readiness = computeReadinessScore({
       ...state,
+      bhagCompleted: bhagCompletedSet.has(prog.studentId),
       orientationProgress: { completed, total: totalOrientation },
     });
     readinessSum += readiness.score;

@@ -64,6 +64,7 @@ test("buildStudentAlertDescriptors adds inactivity and career momentum alerts", 
       applicationCount: 0,
       eventRegistrationCount: 0,
       certification: null,
+      orientationComplete: true,
     },
   });
 
@@ -138,6 +139,7 @@ test("buildStudentAlertDescriptors flags certifications that have stalled", () =
       lastActivityAt: new Date("2026-03-10T12:00:00.000Z"),
       applicationCount: 2,
       eventRegistrationCount: 1,
+      orientationComplete: true,
       certification: {
         status: "in_progress",
         startedAt: new Date("2026-02-01T12:00:00.000Z"),

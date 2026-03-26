@@ -1,6 +1,6 @@
 // =============================================================================
 // SPOKES Learning Platforms
-// Static metadata for all 13 SPOKES program learning platforms
+// Static metadata for all 11 SPOKES program learning platforms
 // =============================================================================
 
 export type PlatformCategory =
@@ -321,29 +321,7 @@ export const PLATFORMS: SpokesPlatform[] = [
   },
 
   // ---------------------------------------------------------------------------
-  // 8. Crossroads Cafe
-  // ---------------------------------------------------------------------------
-  {
-    id: "crossroads-cafe",
-    name: "Crossroads Cafe",
-    description:
-      "Video-based ESL learning series following characters in everyday situations to build English skills.",
-    category: "esl-language",
-    icon: "🌍",
-    loginUrl: null,
-    certifications: [],
-    links: [
-      {
-        label: "Watch Episodes",
-        url: "https://www.ket.org/series/XRDC/all/",
-        audience: "both",
-      },
-    ],
-    tags: ["esl", "video", "conversational-english"],
-  },
-
-  // ---------------------------------------------------------------------------
-  // 9. CSM Learn
+  // 8. CSM Learn
   // ---------------------------------------------------------------------------
   {
     id: "csmlearn",
@@ -352,7 +330,7 @@ export const PLATFORMS: SpokesPlatform[] = [
       "Customer service training platform with interactive modules and certification preparation.",
     category: "career-skills",
     icon: "💼",
-    loginUrl: "https://csmlearn.com/home?logout=true",
+    loginUrl: "https://csmlearn.com",
     certifications: ["customer-service-csm"],
     links: [
       {
@@ -403,104 +381,12 @@ export const PLATFORMS: SpokesPlatform[] = [
     icon: "💪",
     loginUrl: null,
     certifications: ["byag"],
-    links: [
-      {
-        label: "Quizizz — Attitude",
-        url: "https://quizizz.com/admin/quiz/byag-attitude",
-        audience: "student",
-      },
-      {
-        label: "Quizizz — Attendance",
-        url: "https://quizizz.com/admin/quiz/byag-attendance",
-        audience: "student",
-      },
-      {
-        label: "Quizizz — Appearance",
-        url: "https://quizizz.com/admin/quiz/byag-appearance",
-        audience: "student",
-      },
-      {
-        label: "Quizizz — Ambition",
-        url: "https://quizizz.com/admin/quiz/byag-ambition",
-        audience: "student",
-      },
-      {
-        label: "Quizizz — Accountability",
-        url: "https://quizizz.com/admin/quiz/byag-accountability",
-        audience: "student",
-      },
-      {
-        label: "Quizizz — Appreciation",
-        url: "https://quizizz.com/admin/quiz/byag-appreciation",
-        audience: "student",
-      },
-      {
-        label: "Quizizz — Acceptance",
-        url: "https://quizizz.com/admin/quiz/byag-acceptance",
-        audience: "student",
-      },
-      {
-        label: "SMART Board — Connect 4",
-        url: "https://exchange.smarttech.com/byag-connect4",
-        audience: "teacher",
-      },
-      {
-        label: "SMART Board — Horse Derby",
-        url: "https://exchange.smarttech.com/byag-horsederby",
-        audience: "teacher",
-      },
-      {
-        label: "SMART Board — Jeopardy",
-        url: "https://exchange.smarttech.com/byag-jeopardy",
-        audience: "teacher",
-      },
-      {
-        label: "SMART Board — Tic Tac Toe",
-        url: "https://exchange.smarttech.com/byag-tictactoe",
-        audience: "teacher",
-      },
-      {
-        label: "SMART Board — Vortex",
-        url: "https://exchange.smarttech.com/byag-vortex",
-        audience: "teacher",
-      },
-      {
-        label: "Exam Account Request",
-        url: "https://bringyouragame.org/exam-request",
-        audience: "teacher",
-      },
-      {
-        label: "Certificate Request",
-        url: "https://bringyouragame.org/certificate-request",
-        audience: "teacher",
-      },
-      {
-        label: "Online Practice Test",
-        url: "https://bringyouragame.org/practice-test",
-        audience: "student",
-      },
-    ],
+    links: [],
     tags: ["work-ethic", "7-as", "classroom", "employability"],
   },
 
   // ---------------------------------------------------------------------------
-  // 12. Learning Express Library
-  // ---------------------------------------------------------------------------
-  {
-    id: "learning-express-library",
-    name: "Learning Express Library",
-    description:
-      "Career readiness resources including job search skills, practice tests, and career exploration tools.",
-    category: "career-readiness",
-    icon: "🎯",
-    loginUrl: null,
-    certifications: [],
-    links: [],
-    tags: ["career-readiness", "job-search", "practice-tests", "library"],
-  },
-
-  // ---------------------------------------------------------------------------
-  // 13. WV Tourism Works
+  // 12. WV Tourism Works
   // ---------------------------------------------------------------------------
   {
     id: "wv-tourism-works",

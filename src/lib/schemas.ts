@@ -35,17 +35,11 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required.").max(200, "Password is too long."),
 });
 
-export const registerSchema = z.object({
-  studentId: z.string().min(3, "Student ID must be at least 3 characters.").max(50, "Student ID must be 50 characters or fewer."),
-  displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
-  email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
+export const createStudentSchema = z.object({
+  studentId: z.string().min(3, "Username must be at least 3 characters.").max(50, "Username must be 50 characters or fewer."),
+  displayName: z.string().min(1, "Name is required.").max(100, "Name must be 100 characters or fewer."),
+  email: z.string().email("A valid email address is required.").max(200, "Email is too long.").optional().or(z.literal("")),
   password: z.string().min(6, "Password must be at least 6 characters.").max(200, "Password must be 200 characters or fewer."),
-  inviteToken: z.string().min(10, "A valid class invite is required.").max(200, "Invite token is invalid."),
-  securityQuestions: z.object({
-    birth_city: z.string().optional(),
-    elementary_school: z.string().optional(),
-    favorite_teacher: z.string().optional(),
-  }).optional(),
 });
 
 // ─── Chat Schemas ───────────────────────────────────────────────────────────

@@ -38,8 +38,6 @@ model Student {
   createdClasses          SpokesClass[]            @relation("CreatedClasses")
   instructedClasses       SpokesClassInstructor[]  @relation("ClassInstructors")
   classEnrollments        StudentClassEnrollment[] @relation("ClassEnrollments")
-  createdClassInvites     ClassEnrollmentInvite[]  @relation("CreatedClassInvites")
-  claimedClassInvites     ClassEnrollmentInvite[]  @relation("ClaimedClassInvites")
   assignedTasks           StudentTask[]            @relation("AssignedTasks")
   createdTasks            StudentTask[]            @relation("CreatedTasks")
   caseNotes               CaseNote[]               @relation("StudentCaseNotes")
@@ -55,8 +53,8 @@ model Student {
   notifications           Notification[]
   formSubmissions         FormSubmission[]
   visionBoardItems        VisionBoardItem[]
-  goalResourceLinks       GoalResourceLink[]         @relation("StudentGoalResourceLinks")
-  assignedGoalLinks       GoalResourceLink[]         @relation("AssignedGoalResourceLinks")
+  goalResourceLinks       GoalResourceLink[]       @relation("StudentGoalResourceLinks")
+  assignedGoalLinks       GoalResourceLink[]       @relation("AssignedGoalResourceLinks")
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
 
@@ -103,9 +101,9 @@ model Goal {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  parent   Goal?   @relation("GoalHierarchy", fields: [parentId], references: [id])
-  children Goal[]  @relation("GoalHierarchy")
+  student       Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parent        Goal?              @relation("GoalHierarchy", fields: [parentId], references: [id])
+  children      Goal[]             @relation("GoalHierarchy")
   resourceLinks GoalResourceLink[]
 
   @@schema("visionquest")
@@ -438,7 +436,6 @@ model SpokesClass {
   createdBy   Student?                 @relation("CreatedClasses", fields: [createdById], references: [id], onDelete: SetNull)
   instructors SpokesClassInstructor[]
   enrollments StudentClassEnrollment[]
-  invites     ClassEnrollmentInvite[]
 
   @@index([status, name])
   @@schema("visionquest")
@@ -474,28 +471,6 @@ model StudentClassEnrollment {
   @@unique([classId, studentId])
   @@index([studentId, status])
   @@index([classId, status])
-  @@schema("visionquest")
-}
-
-model ClassEnrollmentInvite {
-  id                 String    @id @default(cuid())
-  classId            String
-  email              String
-  displayName        String?
-  suggestedStudentId String?
-  tokenHash          String    @unique
-  expiresAt          DateTime
-  claimedAt          DateTime?
-  claimedById        String?
-  createdById        String
-  createdAt          DateTime  @default(now())
-
-  class     SpokesClass @relation(fields: [classId], references: [id], onDelete: Cascade)
-  createdBy Student     @relation("CreatedClassInvites", fields: [createdById], references: [id], onDelete: Cascade)
-  claimedBy Student?    @relation("ClaimedClassInvites", fields: [claimedById], references: [id], onDelete: SetNull)
-
-  @@index([classId, claimedAt, expiresAt])
-  @@index([email, claimedAt])
   @@schema("visionquest")
 }
 
@@ -603,7 +578,7 @@ model StudentAlert {
   detectedAt   DateTime  @default(now())
   resolvedAt   DateTime?
   snoozedUntil DateTime? // Manual snooze: alert hidden until this time
-  snoozedBy    String?   // Teacher ID who snoozed
+  snoozedBy    String? // Teacher ID who snoozed
   dismissedAt  DateTime? // Manual dismiss: soft delete by teacher
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -912,20 +887,20 @@ model VisionBoardItem {
 
 model GoalResourceLink {
   id           String    @id @default(cuid())
-  goalId        String
-  studentId     String
-  resourceType  String
-  resourceId    String
-  title         String
-  description   String?   @db.Text
-  url           String?
-  linkType      String    @default("assigned")
-  status        String    @default("assigned")
-  dueAt         DateTime?
-  assignedById  String?
-  notes         String?   @db.Text
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  goalId       String
+  studentId    String
+  resourceType String
+  resourceId   String
+  title        String
+  description  String?   @db.Text
+  url          String?
+  linkType     String    @default("assigned")
+  status       String    @default("assigned")
+  dueAt        DateTime?
+  assignedById String?
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
   student    Student  @relation("StudentGoalResourceLinks", fields: [studentId], references: [id], onDelete: Cascade)
@@ -938,22 +913,28 @@ model GoalResourceLink {
 }
 
 model CareerDiscovery {
-  id             String    @id @default(cuid())
-  studentId      String    @unique
-  status         String    @default("in_progress") // in_progress | complete
-  interests      String?   @db.Text
-  strengths      String?   @db.Text
-  subjects       String?   @db.Text
-  problems       String?   @db.Text
-  values         String?   @db.Text
-  circumstances  String?   @db.Text
-  clusterScores  String?   @db.Text
-  topClusters    String[]  @default([])
-  sageSummary    String?   @db.Text
-  conversationId String?
-  completedAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  studentId          String    @unique
+  status             String    @default("in_progress") // in_progress | complete
+  interests          String?   @db.Text
+  strengths          String?   @db.Text
+  subjects           String?   @db.Text
+  problems           String?   @db.Text
+  values             String?   @db.Text
+  circumstances      String?   @db.Text
+  clusterScores      String?   @db.Text
+  topClusters        String[]  @default([])
+  sageSummary        String?   @db.Text
+  riasecScores       String?   @db.Text // JSON: {realistic, investigative, artistic, social, enterprising, conventional}
+  hollandCode        String? // e.g., "SEC"
+  nationalClusters   String?   @db.Text // JSON: [{cluster_name, score, spokes_mapping}]
+  transferableSkills String?   @db.Text // JSON: [{skill, category, evidence}]
+  workValues         String?   @db.Text // JSON: [{value, importance}]
+  assessmentSummary  String?   @db.Text // 3-5 sentence instructor-facing summary
+  conversationId     String?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 

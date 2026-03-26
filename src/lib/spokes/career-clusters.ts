@@ -206,7 +206,6 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "byag",
     ],
     platformIds: [
-      "learning-express-library",
       "csmlearn",
       "bring-your-a-game",
     ],
@@ -239,7 +238,7 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
     description:
       "English language learning for non-native speakers to build workplace communication skills.",
     certificationIds: ["burlington-english"],
-    platformIds: ["burlington-english", "usa-learns", "crossroads-cafe"],
+    platformIds: ["burlington-english", "usa-learns"],
     sampleJobs: [
       "Bilingual Customer Service Representative",
       "Interpreter Assistant",

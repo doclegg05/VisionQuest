@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
+import { isStaffRole } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
   createInitialState,
@@ -13,82 +14,51 @@ import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { getClassProgress } from "@/lib/class-progress";
-import DashboardClient from "./DashboardClient";
+import DashboardClient from "@/app/(student)/dashboard/DashboardClient";
 
-
-export default async function DashboardPage() {
+export default async function StudentDashboardPreview({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const session = await getSession();
-  if (!session) return null;
+  if (!session || !isStaffRole(session.role)) redirect("/");
+
+  const { id: studentId } = await params;
+  const managedStudent = await assertStaffCanManageStudent(session, studentId);
 
   const now = new Date();
   const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData] = await Promise.all([
-    prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
-    prisma.progression.findUnique({ where: { studentId: session.id } }),
+    prisma.goal.count({ where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
+    prisma.progression.findUnique({ where: { studentId } }),
     prisma.appointment.findFirst({
-      where: {
-        studentId: session.id,
-        status: "scheduled",
-        startsAt: { gte: now },
-      },
-      select: {
-        id: true,
-        title: true,
-        startsAt: true,
-        endsAt: true,
-        locationType: true,
-        locationLabel: true,
-      },
+      where: { studentId, status: "scheduled", startsAt: { gte: now } },
+      select: { id: true, title: true, startsAt: true, endsAt: true, locationType: true, locationLabel: true },
       orderBy: { startsAt: "asc" },
     }),
     prisma.studentTask.findMany({
-      where: {
-        studentId: session.id,
-        status: { in: ["open", "in_progress"] },
-      },
-      select: {
-        id: true,
-        title: true,
-        dueAt: true,
-        priority: true,
-        status: true,
-      },
+      where: { studentId, status: { in: ["open", "in_progress"] } },
+      select: { id: true, title: true, dueAt: true, priority: true, status: true },
       orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
       take: 4,
     }),
-    prisma.studentAlert.count({
-      where: {
-        studentId: session.id,
-        status: "open",
-      },
-    }),
-    prisma.resumeData.findUnique({
-      where: { studentId: session.id },
-      select: { id: true },
-    }),
+    prisma.studentAlert.count({ where: { studentId, status: "open" } }),
+    prisma.resumeData.findUnique({ where: { studentId }, select: { id: true } }),
   ]);
 
-  // Redirect brand-new students to the welcome flow
-  if (goalCount === 0 && !progression) {
-    const convCount = await prisma.conversation.count({ where: { studentId: session.id } });
-    if (convCount === 0) {
-      redirect("/welcome");
-    }
-  }
-
-  // Fetch orientation progress and activity data for readiness + streak calendar
   const since28d = new Date();
   since28d.setDate(since28d.getDate() - 27);
   since28d.setHours(0, 0, 0, 0);
 
   const [orientationDoneCount, orientationTotalCount, activityEvents, bhagGoal] = await Promise.all([
-    prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
+    prisma.orientationProgress.count({ where: { studentId, completed: true } }),
     prisma.orientationItem.count(),
     prisma.progressionEvent.findMany({
-      where: { studentId: session.id, occurredAt: { gte: since28d } },
+      where: { studentId, occurredAt: { gte: since28d } },
       select: { occurredAt: true },
     }),
     prisma.goal.findFirst({
-      where: { studentId: session.id, level: "bhag", status: "completed" },
+      where: { studentId, level: "bhag", status: "completed" },
       select: { id: true },
     }),
   ]);
@@ -115,45 +85,43 @@ export default async function DashboardPage() {
     ? { ...state.levelUpHistory[state.levelUpHistory.length - 1] }
     : null;
 
-  // Get goal suggestions from BHAG
   const planningGoals = await prisma.goal.findMany({
-    where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
+    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
     select: { content: true },
   });
-  const goalTexts = planningGoals.map((goal) => goal.content);
-  const goalMatchResult = matchGoalsToPlatforms(goalTexts);
-
-  // Fetch class progress for cohort card
-  const classProgress = await getClassProgress(session.id);
+  const goalMatchResult = matchGoalsToPlatforms(planningGoals.map((g) => g.content));
+  const classProgress = await getClassProgress(studentId);
 
   return (
     <div className="page-shell">
-      <PageIntro
-        eyebrow="Student workspace"
-        title={`Welcome back, ${session.displayName}`}
-        description={
-          goalCount > 0
-            ? `You have ${goalCount} goal${goalCount === 1 ? "" : "s"} in your plan. Keep building steady momentum.`
-            : "Start with Sage or add your first goal in My Goals to turn your vision into a plan."
-        }
-        actions={(
-          <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
-            Open Sage
-          </Link>
-        )}
-      >
-        <div className="mt-6 flex flex-wrap gap-3 text-sm text-white/82">
-          <span className="rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-            Level {state.level}
-          </span>
-          <span className="rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-            {state.currentStreak} day streak
-          </span>
-          <span className="rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-            {achievements.length} achievements
-          </span>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-600">Dashboard Preview</p>
+          <p className="mt-1 text-sm text-amber-800">
+            Viewing <span className="font-semibold">{managedStudent.displayName}</span>&apos;s dashboard as the student sees it. Read-only.
+          </p>
         </div>
-      </PageIntro>
+        <Link
+          href={`/teacher/students/${studentId}`}
+          className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+        >
+          Back to Student Detail
+        </Link>
+      </div>
+
+      <div className="mb-6">
+        <div className="page-hero rounded-[2rem] p-5 sm:p-7 md:p-10">
+          <p className="page-eyebrow text-white/60">Student workspace</p>
+          <h1 className="mt-2 font-display text-3xl text-white">
+            Welcome back, {managedStudent.displayName}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-white/75">
+            {goalCount > 0
+              ? `${goalCount} goal${goalCount === 1 ? "" : "s"} in plan. Level ${state.level}, ${state.currentStreak} day streak, ${achievements.length} achievements.`
+              : "No goals set yet."}
+          </p>
+        </div>
+      </div>
 
       <DashboardClient
         level={state.level}

@@ -106,6 +106,16 @@ export function buildStudentInterventionNotifications({
         body: alert.summary,
         cooldownHours: 24,
       });
+      continue;
+    }
+
+    if (alert.type === "goal_platform_stale") {
+      specs.push({
+        type: "nudge.goal_platform_stale",
+        title: "A learning platform needs your follow-through",
+        body: alert.summary,
+        cooldownHours: 48,
+      });
     }
   }
 
@@ -202,6 +212,16 @@ export function buildTeacherInterventionNotifications({
         body: `${studentName} (${studentId}): ${item.summary}`,
         cooldownHours: 24,
       });
+      continue;
+    }
+
+    if (item.kind === "goal_platform_stale") {
+      specs.push({
+        type: "teacher_nudge.goal_platform_stale",
+        title: "Platform visited but no follow-through",
+        body: `${studentName} (${studentId}): ${item.summary}`,
+        cooldownHours: 48,
+      });
     }
   }
 
@@ -226,6 +246,7 @@ export function studentInterventionHref(type: string) {
     case "nudge.orientation_checklist":
       return "/orientation";
     case "nudge.goal_stale":
+    case "nudge.goal_platform_stale":
     case "nudge.goal_due_soon":
       return "/goals";
     default:
@@ -244,6 +265,7 @@ export function teacherInterventionHref(type: string, studentRecordId: string) {
     case "teacher_nudge.goal_review":
       return `/teacher/students/${studentRecordId}#goal-evidence`;
     case "teacher_nudge.goal_stale":
+    case "teacher_nudge.goal_platform_stale":
       return `/teacher/students/${studentRecordId}#goal-plans`;
     default:
       return `/teacher/students/${studentRecordId}`;
@@ -278,6 +300,7 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         label: "Assign support",
       };
     case "goal_resource_stale":
+    case "goal_platform_stale":
       return {
         href: `/teacher/students/${studentRecordId}#goal-plans`,
         label: "Follow up",
@@ -291,6 +314,17 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
       return {
         href: `/teacher/students/${studentRecordId}#certification-review`,
         label: "Open certification",
+      };
+    case "goal_stale":
+      return {
+        href: `/teacher/students/${studentRecordId}#goal-plans`,
+        label: "Review goals",
+      };
+    case "orientation_not_started":
+    case "orientation_overdue":
+      return {
+        href: `/teacher/students/${studentRecordId}#orientation-review`,
+        label: "Open orientation",
       };
     default:
       return {
@@ -320,6 +354,10 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
     case "overdue_task":
     case "missed_appointment":
     case "goal_resource_stale":
+    case "goal_platform_stale":
+    case "goal_stale":
+    case "orientation_not_started":
+    case "orientation_overdue":
       return {
         kind: "create_task",
         label: "Add task",
@@ -342,6 +380,7 @@ export function teacherDashboardReviewAction(reviewType: string, studentRecordId
         label: "Assign support",
       };
     case "goal_resource_stale":
+    case "goal_platform_stale":
       return {
         href: `/teacher/students/${studentRecordId}#goal-plans`,
         label: "Follow up",
@@ -367,6 +406,7 @@ export function teacherDashboardReviewQuickAction(reviewType: string): Dashboard
         label: "Quick assign",
       };
     case "goal_resource_stale":
+    case "goal_platform_stale":
       return {
         kind: "create_task",
         label: "Add task",
