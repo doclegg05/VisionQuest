@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface OrientationItem {
   id: string;
@@ -106,19 +106,81 @@ function WelcomeLetterSlot() {
   );
 }
 
+// ─── Inline Edit Form ────────────────────────────────────────────────────────
+
+function InlineEditForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: { label: string; description: string; required: boolean };
+  onSave: (data: { label: string; description: string; required: boolean }) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState(initial);
+  const labelRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    labelRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 space-y-3">
+      <input
+        ref={labelRef}
+        type="text"
+        placeholder="Item label"
+        value={form.label}
+        onChange={(e) => setForm({ ...form, label: e.target.value })}
+        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <input
+        type="text"
+        placeholder="Description (optional)"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <label className="flex items-center gap-2 text-sm text-gray-600">
+        <input
+          type="checkbox"
+          checked={form.required}
+          onChange={(e) => setForm({ ...form, required: e.target.checked })}
+          className="rounded border-gray-300 text-blue-600"
+        />
+        Required for orientation completion
+      </label>
+      <div className="flex gap-2">
+        <button
+          onClick={() => form.label.trim() && onSave(form)}
+          disabled={!form.label.trim()}
+          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
 export default function OrientationManager() {
   const [items, setItems] = useState<OrientationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "", description: "", required: true });
+  const [addingNew, setAddingNew] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  async function fetchItems() {
+  const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/teacher/orientation");
@@ -127,21 +189,18 @@ export default function OrientationManager() {
         setItems(data.items || []);
         setError(null);
       }
-    } catch (err) {
-      console.error("Failed to load items:", err);
+    } catch {
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function handleSave() {
-    if (!form.label.trim()) return;
+  useEffect(() => { fetchItems(); }, [fetchItems]);
 
-    const method = editingId ? "PUT" : "POST";
-    const body = editingId
-      ? { id: editingId, ...form }
-      : form;
+  async function handleSave(id: string | null, data: { label: string; description: string; required: boolean }) {
+    const method = id ? "PUT" : "POST";
+    const body = id ? { id, ...data } : data;
 
     try {
       const res = await fetch("/api/teacher/orientation", {
@@ -150,17 +209,17 @@ export default function OrientationManager() {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        resetForm();
+        setEditingId(null);
+        setAddingNew(false);
         fetchItems();
       }
-    } catch (err) {
-      console.error("Failed to save item:", err);
+    } catch {
+      // Error handling
     }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this orientation item? Student progress for it will also be removed.")) return;
-
     try {
       const res = await fetch("/api/teacher/orientation", {
         method: "DELETE",
@@ -168,21 +227,62 @@ export default function OrientationManager() {
         body: JSON.stringify({ id }),
       });
       if (res.ok) fetchItems();
-    } catch (err) {
-      console.error("Failed to delete item:", err);
+    } catch {
+      // Error handling
     }
   }
 
-  function startEdit(item: OrientationItem) {
-    setEditingId(item.id);
-    setForm({ label: item.label, description: item.description || "", required: item.required });
-    setShowForm(true);
+  // ─── Drag and Drop ──────────────────────────────────────────────────────
+
+  function handleDragStart(id: string) {
+    setDragId(id);
   }
 
-  function resetForm() {
-    setShowForm(false);
-    setEditingId(null);
-    setForm({ label: "", description: "", required: true });
+  function handleDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    if (id !== dragId) setDragOverId(id);
+  }
+
+  function handleDragLeave() {
+    setDragOverId(null);
+  }
+
+  async function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    const oldIndex = items.findIndex((i) => i.id === dragId);
+    const newIndex = items.findIndex((i) => i.id === targetId);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder locally
+    const reordered = [...items];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    setItems(reordered);
+    setDragId(null);
+    setDragOverId(null);
+
+    // Save new sort orders to server
+    for (let i = 0; i < reordered.length; i++) {
+      if (reordered[i].sortOrder !== i) {
+        await fetch("/api/teacher/orientation", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: reordered[i].id, sortOrder: i }),
+        });
+      }
+    }
+
+    fetchItems();
+  }
+
+  function handleDragEnd() {
+    setDragId(null);
+    setDragOverId(null);
   }
 
   if (loading) return <p className="text-sm text-gray-400">Loading...</p>;
@@ -200,6 +300,8 @@ export default function OrientationManager() {
     <div className="space-y-4">
       <WelcomeLetterSlot />
 
+      <p className="text-xs text-gray-500">Drag items to reorder. Click Edit to modify.</p>
+
       {/* Item list */}
       {items.length === 0 ? (
         <div className="text-center text-gray-400 py-8 text-sm">
@@ -207,88 +309,79 @@ export default function OrientationManager() {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">
-                  {item.label}
-                  {item.required && (
-                    <span className="ml-1.5 text-xs bg-red-50 text-red-500 px-1.5 py-0.5 rounded">Required</span>
-                  )}
-                </p>
-                {item.description && (
-                  <p className="text-xs text-gray-500 mt-1">{item.description}</p>
-                )}
+          {items.map((item) => {
+            if (editingId === item.id) {
+              return (
+                <InlineEditForm
+                  key={item.id}
+                  initial={{ label: item.label, description: item.description || "", required: item.required }}
+                  onSave={(data) => handleSave(item.id, data)}
+                  onCancel={() => setEditingId(null)}
+                />
+              );
+            }
+
+            return (
+              <div
+                key={item.id}
+                draggable
+                onDragStart={() => handleDragStart(item.id)}
+                onDragOver={(e) => handleDragOver(e, item.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={() => handleDrop(item.id)}
+                onDragEnd={handleDragEnd}
+                className={`bg-white rounded-xl border p-4 flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition-all ${
+                  dragOverId === item.id
+                    ? "border-blue-400 bg-blue-50 scale-[1.01]"
+                    : dragId === item.id
+                      ? "opacity-50 border-gray-200"
+                      : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <span className="mt-1 text-gray-300 text-sm select-none" aria-hidden="true">&#x2630;</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      {item.label}
+                      {item.required && (
+                        <span className="ml-1.5 text-xs bg-red-50 text-red-500 px-1.5 py-0.5 rounded">Required</span>
+                      )}
+                    </p>
+                    {item.description && (
+                      <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setEditingId(item.id)}
+                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => startEdit(item)}
-                  className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Add/Edit form */}
-      {showForm ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">
-            {editingId ? "Edit Item" : "New Orientation Item"}
-          </h3>
-          <input
-            type="text"
-            placeholder="Item label (e.g., 'Sign program agreement')"
-            value={form.label}
-            onChange={(e) => setForm({ ...form, label: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={form.required}
-              onChange={(e) => setForm({ ...form, required: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600"
-            />
-            Required for orientation completion
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {editingId ? "Save Changes" : "Add Item"}
-            </button>
-            <button
-              onClick={resetForm}
-              className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {/* Add new form */}
+      {addingNew ? (
+        <InlineEditForm
+          initial={{ label: "", description: "", required: true }}
+          onSave={(data) => handleSave(null, data)}
+          onCancel={() => setAddingNew(false)}
+        />
       ) : (
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => { setEditingId(null); setAddingNew(true); }}
           className="w-full border-2 border-dashed border-gray-300 rounded-xl p-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
           + Add Orientation Item
