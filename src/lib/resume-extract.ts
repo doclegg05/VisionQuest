@@ -2,7 +2,8 @@ import { generateStructuredResponse } from "@/lib/gemini";
 import { normalizeResumeContent, type ResumeContent } from "@/lib/resume";
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const pdfParse = (await import("pdf-parse")).default;
+  const mod = await import("pdf-parse");
+  const pdfParse = typeof mod.default === "function" ? mod.default : (mod as unknown as (buf: Buffer) => Promise<{ text: string }>);
   const result = await pdfParse(buffer);
   return result.text;
 }
