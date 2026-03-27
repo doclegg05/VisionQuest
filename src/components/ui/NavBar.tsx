@@ -7,6 +7,7 @@ import { getRoleHomePath } from "@/lib/role-home";
 import { getVisibleNavItems, type NavPhase } from "@/lib/nav-progression";
 import BrandLockup from "./BrandLockup";
 import NotificationBell from "./NotificationBell";
+import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 const STAFF_ITEMS = [
   { href: "/teacher", label: "Class Dashboard", icon: "👥" },
@@ -28,6 +29,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [sageMiniOpen, setSageMiniOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreDialogRef = useRef<HTMLDivElement>(null);
 
@@ -275,16 +277,20 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
         </div>
       </aside>
 
-      {/* Floating Sage button for students */}
+      {/* Floating Sage button + mini chat for students */}
       {role === "student" && pathname !== "/chat" && (
-        <Link
-          href="/chat"
-          prefetch={false}
-          className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--ink-strong)] text-2xl text-white shadow-[0_8px_30px_rgba(7,23,43,0.35)] transition-transform hover:scale-110 md:bottom-6 md:right-6"
-          aria-label="Open Sage AI Coach"
-        >
-          💬
-        </Link>
+        <>
+          <button
+            onClick={() => setSageMiniOpen((v) => !v)}
+            type="button"
+            className={`fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_30px_rgba(7,23,43,0.35)] transition-all hover:scale-110 md:bottom-6 md:right-6 ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] rotate-0" : "bg-[var(--ink-strong)]"}`}
+            aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
+            aria-expanded={sageMiniOpen}
+          >
+            {sageMiniOpen ? "✕" : "💬"}
+          </button>
+          <SageMiniChat open={sageMiniOpen} onClose={() => setSageMiniOpen(false)} />
+        </>
       )}
     </>
   );

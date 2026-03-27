@@ -1,15 +1,24 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, compact }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevDisabledRef = useRef(disabled);
+
+  useEffect(() => {
+    if (prevDisabledRef.current && !disabled) {
+      textareaRef.current?.focus();
+    }
+    prevDisabledRef.current = disabled;
+  }, [disabled]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = message.trim();
@@ -38,8 +47,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
-    <div className="border-t border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.72)] p-4 backdrop-blur">
-      <div className="mx-auto flex max-w-4xl items-end gap-3">
+    <div className={`border-t border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.72)] backdrop-blur ${compact ? "p-2" : "p-4"}`}>
+      <div className={`flex items-end gap-2 ${compact ? "" : "mx-auto max-w-4xl gap-3"}`}>
         <textarea
           ref={textareaRef}
           value={message}
@@ -50,14 +59,14 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           disabled={disabled}
           rows={1}
           aria-label="Message to Sage"
-          className="textarea-field min-h-[54px] flex-1 resize-none px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:bg-[rgba(16,37,62,0.05)] overflow-y-auto"
+          className={`textarea-field flex-1 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:bg-[rgba(16,37,62,0.05)] overflow-y-auto ${compact ? "min-h-[42px] px-3 py-2 text-sm" : "min-h-[54px] px-4 py-3 text-base"}`}
         />
         <button
           onClick={handleSubmit}
           disabled={disabled || !message.trim()}
           aria-label="Send message"
           type="button"
-          className="primary-button px-5 py-3.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          className={`primary-button text-sm disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "px-3 py-2.5" : "px-5 py-3.5"}`}
         >
           Send
         </button>
