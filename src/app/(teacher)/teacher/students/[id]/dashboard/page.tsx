@@ -13,7 +13,6 @@ import {
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
-import { getClassProgress } from "@/lib/class-progress";
 import DashboardClient from "@/app/(student)/dashboard/DashboardClient";
 
 export default async function StudentDashboardPreview({
@@ -90,7 +89,7 @@ export default async function StudentDashboardPreview({
     select: { content: true },
   });
   const goalMatchResult = matchGoalsToPlatforms(planningGoals.map((g) => g.content));
-  const classProgress = await getClassProgress(studentId);
+
 
   return (
     <div className="page-shell">
@@ -103,7 +102,7 @@ export default async function StudentDashboardPreview({
         </div>
         <Link
           href={`/teacher/students/${studentId}`}
-          className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+          className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
         >
           Back to Student Detail
         </Link>
@@ -153,7 +152,6 @@ export default async function StudentDashboardPreview({
         readinessScore={readiness.score}
         readinessBreakdown={readiness.breakdown}
         activityDays={activityDays}
-        classProgress={classProgress}
       />
     </div>
   );
