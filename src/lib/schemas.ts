@@ -69,7 +69,7 @@ export const forgotPasswordSchema = z.object({
 export const resetPasswordQuestionsSchema = z.object({
   login: z.string().min(1, "Enter the email address or student ID for your account.").max(200, "Login is too long."),
   password: z.string().min(6, "Password must be at least 6 characters.").max(200, "Password must be 200 characters or fewer."),
-  securityQuestions: z.record(z.string()),
+  securityQuestions: z.record(z.string(), z.string()),
 });
 
 // ─── Chat Schemas ───────────────────────────────────────────────────────────
