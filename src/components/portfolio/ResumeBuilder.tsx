@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   EMPTY_RESUME,
   buildResumePlainText,
@@ -45,6 +45,10 @@ export default function ResumeBuilder() {
   const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
   const [exportingPdf, setExportingPdf] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadImprovements, setUploadImprovements] = useState<string[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchResume() {
     try {
@@ -297,6 +301,56 @@ export default function ResumeBuilder() {
     }
   }
 
+  async function handleUpload(file: File) {
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const ALLOWED = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+    ];
+    if (file.size > MAX_SIZE) { setError("File too large (max 5 MB)."); return; }
+    if (!ALLOWED.includes(file.type)) { setError("Only PDF and Word documents are supported."); return; }
+
+    setUploading(true);
+    setError(null);
+    setUploadImprovements([]);
+    setAssistantMessage(null);
+    setMissingInformation([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/resume/upload", { method: "POST", body: formData });
+      const payload = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(payload?.error || "Could not process the resume.");
+      }
+
+      if (payload?.resume) {
+        setResume(payload.resume);
+        setUploadImprovements(payload.improvements || []);
+        setAssistantMessage(
+          payload.notes || "Sage extracted and rebuilt your resume. Review the sections below and save when ready."
+        );
+      }
+    } catch (err) {
+      console.error("Resume upload failed:", err);
+      setError(err instanceof Error ? err.message : "Could not process the resume.");
+    } finally {
+      setUploading(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void handleUpload(file);
+  }
+
   if (loading) return <p className="text-sm text-gray-400">Loading resume...</p>;
 
   return (
@@ -356,6 +410,64 @@ export default function ResumeBuilder() {
             {error}
           </div>
         ) : null}
+      </div>
+
+      <div
+        className={`surface-section p-5 ${dragOver ? "ring-2 ring-[var(--accent-strong)] ring-inset" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700">Upload Existing Resume</h4>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+              Have a resume already? Upload it and Sage will extract the content, rewrite it with ATS-friendly language,
+              and populate the builder below. Supports PDF and Word documents.
+            </p>
+          </div>
+          <div>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); }}
+            />
+            <button
+              type="button"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={uploading}
+              className="rounded-lg bg-[var(--ink-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {uploading ? "Sage is reading..." : "Upload Resume"}
+            </button>
+          </div>
+        </div>
+
+        {uploading && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent-strong)] border-t-transparent" />
+            <p className="text-sm text-[var(--ink-strong)]">Sage is extracting and rebuilding your resume with ATS-optimized language...</p>
+          </div>
+        )}
+
+        {!uploading && dragOver && (
+          <div className="mt-4 rounded-xl border-2 border-dashed border-[var(--accent-strong)] bg-[rgba(15,154,146,0.04)] px-4 py-8 text-center">
+            <p className="text-sm font-medium text-[var(--accent-strong)]">Drop your resume here</p>
+          </div>
+        )}
+
+        {uploadImprovements.length > 0 && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">Suggestions to strengthen your resume:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+              {uploadImprovements.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="surface-section p-5">
