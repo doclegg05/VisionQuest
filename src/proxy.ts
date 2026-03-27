@@ -9,7 +9,7 @@ const isProduction = process.env.NODE_ENV === "production";
  * 2. Per-request CSP nonce generation (replaces static unsafe-inline)
  * 3. API version header
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // --- CSRF protection (state-changing API requests only) ---
   const method = request.method.toUpperCase();
   const isApi = request.nextUrl.pathname.startsWith("/api/");

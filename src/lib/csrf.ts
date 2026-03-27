@@ -1,5 +1,3 @@
-import crypto from "crypto";
-
 export function isUrlHostMatch(value: string | null, host: string | null): boolean {
   if (!value || !host) return false;
 
@@ -9,6 +7,15 @@ export function isUrlHostMatch(value: string | null, host: string | null): boole
   } catch {
     return false;
   }
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 export function isAuthorizedInternalRequest(
@@ -24,9 +31,5 @@ export function isAuthorizedInternalRequest(
     return false;
   }
 
-  const expected = `Bearer ${cronSecret}`;
-  const a = Buffer.from(authorizationHeader);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  return constantTimeEqual(authorizationHeader, `Bearer ${cronSecret}`);
 }
