@@ -14,8 +14,7 @@ Return valid JSON in this exact format:
       "confidence": 0.0 to 1.0
     }
   ],
-  "stage_complete": true | false,
-  "xp_events": []
+  "stage_complete": true | false
 }
 
 Rules:
@@ -26,8 +25,7 @@ Rules:
 - "task" = specific action steps
 - confidence must be above 0.7 for the goal to be real — if the student is still brainstorming, confidence should be low
 - stage_complete = true only if the student has clearly committed to a goal at the current level
-- xp_events can include: "bhag_set", "monthly_set", "weekly_set", "daily_set", "tasks_set", "daily_checkin", "task_complete"
-- If no goals are found, return empty arrays`;
+- If no goals are found, return an empty array`;
 
 export interface ExtractedGoal {
   level: string;
@@ -38,7 +36,6 @@ export interface ExtractedGoal {
 export interface ExtractionResult {
   goals_found: ExtractedGoal[];
   stage_complete: boolean;
-  xp_events: string[];
 }
 
 export async function extractGoals(
@@ -57,15 +54,25 @@ export async function extractGoals(
     ];
 
     const result = await generateStructuredResponse(apiKey, EXTRACTION_PROMPT, messagesWithContext);
-    const parsed = JSON.parse(result) as ExtractionResult;
+    const parsed = JSON.parse(result);
+
+    // Validate structure before using — Gemini may return malformed JSON
+    const goalsFound = Array.isArray(parsed?.goals_found) ? parsed.goals_found : [];
+    const validGoals = goalsFound.filter(
+      (g: unknown): g is ExtractedGoal =>
+        typeof g === "object" && g !== null &&
+        typeof (g as ExtractedGoal).level === "string" &&
+        typeof (g as ExtractedGoal).content === "string" &&
+        typeof (g as ExtractedGoal).confidence === "number" &&
+        (g as ExtractedGoal).confidence > 0.7,
+    );
 
     return {
-      goals_found: (parsed.goals_found || []).filter((g) => g.confidence > 0.7),
-      stage_complete: parsed.stage_complete || false,
-      xp_events: parsed.xp_events || [],
+      goals_found: validGoals,
+      stage_complete: parsed?.stage_complete === true,
     };
   } catch (error) {
     logger.error("Goal extraction failed", { error: String(error) });
-    return { goals_found: [], stage_complete: false, xp_events: [] };
+    return { goals_found: [], stage_complete: false };
   }
 }

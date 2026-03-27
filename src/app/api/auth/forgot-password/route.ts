@@ -6,6 +6,7 @@ import { isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail } from "@/lib/validation";
 import { withErrorHandler } from "@/lib/api-error";
+import { parseBody, forgotPasswordSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 
 function getAppBaseUrl(req: NextRequest): string {
@@ -23,12 +24,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
   }
 
-  const body = await req.json();
-  const login = String(body.login || "").trim();
-
-  if (!login) {
-    return NextResponse.json({ error: "Enter the email address or student ID for your account." }, { status: 400 });
-  }
+  const body = await parseBody(req, forgotPasswordSchema);
+  const login = body.login.trim();
 
   if (!isEmailDeliveryConfigured()) {
     return NextResponse.json({

@@ -7,9 +7,10 @@ import {
   validateSecurityQuestionAnswers,
 } from "@/lib/security-questions";
 import { verifySecurityAnswer } from "@/lib/security-question-auth";
-import { isValidEmail, MAX_LENGTHS } from "@/lib/validation";
+import { isValidEmail } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
+import { parseBody, resetPasswordQuestionsSchema } from "@/lib/schemas";
 
 const RESET_ERROR =
   "We could not verify those classroom recovery answers. Try again or ask your instructor for help.";
@@ -22,20 +23,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
   }
 
-  const body = await req.json();
-  const login = String(body.login || "").trim();
-  const password = String(body.password || "").trim();
+  const body = await parseBody(req, resetPasswordQuestionsSchema);
+  const login = body.login.trim();
+  const password = body.password.trim();
   const securityQuestionsResult = validateSecurityQuestionAnswers(body.securityQuestions);
 
-  if (!login) {
-    return NextResponse.json({ error: "Enter the email address or student ID for your account." }, { status: 400 });
-  }
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
-  }
-  if (password.length > MAX_LENGTHS.password) {
-    return NextResponse.json({ error: `Password must be ${MAX_LENGTHS.password} characters or fewer.` }, { status: 400 });
-  }
   if (securityQuestionsResult.error) {
     return NextResponse.json({ error: securityQuestionsResult.error }, { status: 400 });
   }

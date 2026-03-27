@@ -5,6 +5,7 @@ import { hashPasswordResetToken } from "@/lib/password-reset";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
+import { parseBody, resetPasswordSchema } from "@/lib/schemas";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -14,17 +15,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
   }
 
-  const body = await req.json();
-  const token = String(body.token || "").trim();
-  const password = String(body.password || "").trim();
-
-  if (!token) {
-    return NextResponse.json({ error: "This reset link is invalid." }, { status: 400 });
-  }
-
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
-  }
+  const body = await parseBody(req, resetPasswordSchema);
+  const token = body.token.trim();
+  const password = body.password.trim();
 
   const tokenHash = hashPasswordResetToken(token);
   const now = new Date();

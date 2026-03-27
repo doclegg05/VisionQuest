@@ -4,6 +4,7 @@ import { getRoleHomePath } from "@/lib/role-home";
 import { prisma } from "@/lib/db";
 import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
+import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
@@ -25,7 +26,7 @@ export default async function StudentLayout({
 
   // Lightweight fetch for nav phase (cached by Next.js request dedup)
   const [goalCount, progression, orientationDone] = await Promise.all([
-    prisma.goal.count({ where: { studentId: session.id, status: { in: ["active", "planning"] } } }),
+    prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id }, select: { state: true } }),
     prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
   ]);

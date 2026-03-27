@@ -326,11 +326,11 @@ export default function ClassOverview() {
         onAction={(intent) => setActionIntent({
           kind: "create_task",
           title: intent.type,
-          summary: "",
+          summary: intent.studentName,
           severity: "medium",
           student: {
             id: intent.studentId,
-            studentId: "",
+            studentId: intent.studentId,
             displayName: intent.studentName,
           },
         })}
@@ -368,7 +368,7 @@ export default function ClassOverview() {
                         {alert.student.displayName} • {alert.student.studentId}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
                       {alert.severity}
                     </span>
                   </div>
@@ -399,11 +399,12 @@ export default function ClassOverview() {
                       <button
                         type="button"
                         onClick={async () => {
-                          await fetch(`/api/teacher/alerts/${alert.id}`, {
+                          const res = await fetch(`/api/teacher/alerts/${alert.id}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ action: "snooze", hours: 24 }),
                           });
+                          if (!res.ok) return;
                           setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
                         }}
                         className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
@@ -414,11 +415,12 @@ export default function ClassOverview() {
                       <button
                         type="button"
                         onClick={async () => {
-                          await fetch(`/api/teacher/alerts/${alert.id}`, {
+                          const res = await fetch(`/api/teacher/alerts/${alert.id}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ action: "dismiss" }),
                           });
+                          if (!res.ok) return;
                           setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
                         }}
                         className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
@@ -571,13 +573,13 @@ export default function ClassOverview() {
           <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
             14-day {inactivitySummary.followUp14}
           </span>
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
             30-day {inactivitySummary.inactive30}
           </span>
           <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
             60-day {inactivitySummary.reengage60}
           </span>
-          <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+          <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
             90-day {inactivitySummary.archiveReview90}
           </span>
         </div>
@@ -607,11 +609,11 @@ export default function ClassOverview() {
                     <span
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
                         item.type === "inactive_student_90"
-                          ? "bg-rose-100 text-rose-700"
+                          ? "bg-rose-100 text-rose-800"
                           : item.type === "inactive_student_60"
                             ? "bg-orange-100 text-orange-700"
                             : item.type === "inactive_student_30"
-                              ? "bg-amber-100 text-amber-700"
+                              ? "bg-amber-100 text-amber-800"
                               : "bg-[rgba(16,37,62,0.06)] text-[var(--ink-muted)]"
                       }`}
                     >
@@ -804,7 +806,7 @@ export default function ClassOverview() {
                   s.readinessScore >= 75
                     ? "bg-emerald-100 text-emerald-700"
                     : s.readinessScore >= 50
-                      ? "bg-amber-100 text-amber-700"
+                      ? "bg-amber-100 text-amber-800"
                       : "bg-orange-100 text-orange-700"
                 }`}>
                   {s.readinessScore}% Ready
@@ -839,7 +841,7 @@ export default function ClassOverview() {
                   {s.goalsCount} goals {s.hasBhag && "• BHAG ✓"}
                 </span>
                 {s.certPendingVerify > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">{s.certPendingVerify} pending</span>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">{s.certPendingVerify} pending</span>
                 )}
                 {s.openAlertCount > 0 && (
                   <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
@@ -922,7 +924,7 @@ export default function ClassOverview() {
                         </div>
                         <p className="ml-4 text-xs break-words text-gray-400">{s.studentId}</p>
                         {s.openAlertCount > 0 && (
-                          <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                          <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                             {s.openAlertCount} alert{s.openAlertCount === 1 ? "" : "s"}
                           </span>
                         )}
@@ -963,7 +965,7 @@ export default function ClassOverview() {
                         s.readinessScore >= 75
                           ? "bg-emerald-100 text-emerald-700"
                           : s.readinessScore >= 50
-                            ? "bg-amber-100 text-amber-700"
+                            ? "bg-amber-100 text-amber-800"
                             : "bg-orange-100 text-orange-700"
                       }`}>
                         {s.readinessScore}%

@@ -21,6 +21,17 @@ export default function FormUploadButton({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const MAX_SIZE = 10 * 1024 * 1024;
+    const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+    if (file.size > MAX_SIZE) {
+      setError("File too large (max 10 MB).");
+      return;
+    }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError("Only PDF, JPG, and PNG files are accepted.");
+      return;
+    }
+
     setUploading(true);
     setError(null);
 
@@ -60,7 +71,7 @@ export default function FormUploadButton({
   if (currentStatus === "pending") {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700">
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-800">
           ⏳ Pending Review
         </span>
         <button

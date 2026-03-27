@@ -131,15 +131,18 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         // Save assistant message
         await saveMessage(conversation.id, "assistant", fullResponse);
 
-        // Award chat session XP (synchronous — happens before stream closes)
-        await awardEvent({
-          studentId: session.id,
-          eventType: "chat_session",
-          sourceType: "conversation",
-          sourceId: conversation.id,
-          xp: 10,
-          mutate: (state) => recordChatSession(state),
-        });
+        try {
+          await awardEvent({
+            studentId: session.id,
+            eventType: "chat_session",
+            sourceType: "conversation",
+            sourceId: conversation.id,
+            xp: 10,
+            mutate: (state) => recordChatSession(state),
+          });
+        } catch (err) {
+          logger.error("Failed to award chat XP", { error: String(err) });
+        }
 
         // Fire-and-forget: goal extraction, XP awards, stage updates, title generation
         handlePostResponse({
@@ -155,9 +158,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversation.id })}\n\n`));
         controller.close();
       } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        logger.error("Stream error", { error: String(error) });
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `Failed to generate response: ${errMsg}` })}\n\n`));
+        logger.error("Stream error", { error: error instanceof Error ? error.message : String(error) });
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Something went wrong generating a response. Please try again." })}\n\n`));
         controller.close();
       }
     },

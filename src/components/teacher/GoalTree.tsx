@@ -45,76 +45,79 @@ export default function GoalTree({ goals }: GoalTreeProps) {
     );
   }
 
-  // Build tree: group by level, then render in hierarchy order
-  const byLevel: Record<string, GoalData[]> = {};
+  const goalMap = new Map<string, GoalData & { children: GoalData[] }>();
   for (const g of goals) {
-    if (!byLevel[g.level]) byLevel[g.level] = [];
-    byLevel[g.level].push(g);
+    goalMap.set(g.id, { ...g, children: [] });
   }
 
+  const roots: (GoalData & { children: GoalData[] })[] = [];
   const levelOrder = ["bhag", "monthly", "weekly", "daily", "task"];
-  const toggleCollapse = (level: string) => {
+
+  for (const g of Array.from(goalMap.values())) {
+    if (g.parentId && goalMap.has(g.parentId)) {
+      goalMap.get(g.parentId)!.children.push(g);
+    } else {
+      roots.push(g);
+    }
+  }
+
+  roots.sort((a, b) => levelOrder.indexOf(a.level) - levelOrder.indexOf(b.level));
+
+  const toggleCollapse = (id: string) => {
     setCollapsed(prev => {
       const next = new Set(prev);
-      if (next.has(level)) next.delete(level);
-      else next.add(level);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
+  function renderGoalNode(goal: GoalData & { children: GoalData[] }, depth: number) {
+    const config = LEVEL_CONFIG[goal.level] || { label: goal.level, icon: "📌", color: "from-gray-50 to-white border-gray-200", indent: 0 };
+    const status = STATUS_BADGE[goal.status] || {
+      label: goalStatusLabel(goal.status),
+      className: "bg-slate-100 text-slate-700",
+    };
+    const isCollapsed = collapsed.has(goal.id);
+    const hasChildren = goal.children.length > 0;
+
+    return (
+      <div key={goal.id} style={{ marginLeft: `${depth * 1.5}rem` }}>
+        <div className={`rounded-xl border bg-gradient-to-r ${config.color} p-3`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {hasChildren && (
+                <button
+                  onClick={() => toggleCollapse(goal.id)}
+                  className="shrink-0 text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors"
+                >
+                  <span className={`inline-block transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▶</span>
+                </button>
+              )}
+              <span className="shrink-0">{config.icon}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">{config.label}</span>
+              <p className="text-sm text-[var(--ink-strong)]">{goal.content}</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.className}`}>
+              {status.label}
+            </span>
+          </div>
+        </div>
+
+        {hasChildren && !isCollapsed && (
+          <div className="ml-4 mt-1 space-y-1.5 border-l-2 border-[rgba(18,38,63,0.08)] pl-3">
+            {goal.children
+              .sort((a, b) => levelOrder.indexOf(a.level) - levelOrder.indexOf(b.level))
+              .map(child => renderGoalNode(child as GoalData & { children: GoalData[] }, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
-      {levelOrder.map((level) => {
-        const levelGoals = byLevel[level];
-        if (!levelGoals || levelGoals.length === 0) return null;
-        const config = LEVEL_CONFIG[level] || { label: level, icon: "📌", color: "from-gray-50 to-white border-gray-200", indent: 0 };
-        const isCollapsed = collapsed.has(level);
-
-        return (
-          <div key={level} style={{ marginLeft: `${config.indent * 1.5}rem` }}>
-            {/* Level header */}
-            <button
-              onClick={() => toggleCollapse(level)}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-xs font-semibold text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)] transition-colors"
-            >
-              <span className={`transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▶</span>
-              <span>{config.icon}</span>
-              <span className="uppercase tracking-wider">{config.label}</span>
-              <span className="rounded-full bg-[rgba(18,38,63,0.08)] px-2 py-0.5 text-[10px]">{levelGoals.length}</span>
-            </button>
-
-            {/* Goal cards */}
-            {!isCollapsed && (
-              <div className="ml-4 mt-1 space-y-1.5 border-l-2 border-[rgba(18,38,63,0.08)] pl-3">
-                {levelGoals.map((goal) => {
-                  const status = STATUS_BADGE[goal.status] || {
-                    label: goalStatusLabel(goal.status),
-                    className: "bg-slate-100 text-slate-600",
-                  };
-                  return (
-                    <div
-                      key={goal.id}
-                      className={`rounded-xl border bg-gradient-to-r ${config.color} p-3`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm text-[var(--ink-strong)]">{goal.content}</p>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.className}`}>
-                          {status.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Connecting line indicator for hierarchy */}
-            {!isCollapsed && config.indent < 4 && byLevel[levelOrder[levelOrder.indexOf(level) + 1]] && (
-              <div className="ml-6 h-2 border-l-2 border-[rgba(18,38,63,0.08)]" />
-            )}
-          </div>
-        );
-      })}
+      {roots.map(root => renderGoalNode(root, 0))}
     </div>
   );
 }

@@ -206,20 +206,22 @@ export function buildSystemPrompt(
   if (context.studentName) {
     stagePrompt = `The student's name is ${context.studentName}.\n\n${stagePrompt}`;
   }
+  // Bracket student-supplied content to mitigate prompt injection.
+  // Career clusters are system-defined, so they don't need bracketing.
   if (context.bhag) {
-    stagePrompt = stagePrompt.replace("{bhag}", context.bhag);
+    stagePrompt = stagePrompt.replace("{bhag}", `[STUDENT_GOAL_START]${context.bhag}[STUDENT_GOAL_END]`);
   }
   if (context.monthly) {
-    stagePrompt = stagePrompt.replace("{monthly}", context.monthly);
+    stagePrompt = stagePrompt.replace("{monthly}", `[STUDENT_GOAL_START]${context.monthly}[STUDENT_GOAL_END]`);
   }
   if (context.weekly) {
-    stagePrompt = stagePrompt.replace("{weekly}", context.weekly);
+    stagePrompt = stagePrompt.replace("{weekly}", `[STUDENT_GOAL_START]${context.weekly}[STUDENT_GOAL_END]`);
   }
   if (context.daily) {
-    stagePrompt = stagePrompt.replace("{daily}", context.daily);
+    stagePrompt = stagePrompt.replace("{daily}", `[STUDENT_GOAL_START]${context.daily}[STUDENT_GOAL_END]`);
   }
   if (context.goals_summary) {
-    stagePrompt = stagePrompt.replace("{goals_summary}", context.goals_summary);
+    stagePrompt = stagePrompt.replace("{goals_summary}", `[STUDENT_GOALS_START]\n${context.goals_summary}\n[STUDENT_GOALS_END]`);
   }
   if (context.career_clusters) {
     stagePrompt = stagePrompt.replace("{career_clusters}", context.career_clusters);
@@ -253,7 +255,9 @@ export function buildSystemPrompt(
     }
   }
 
-  return parts.join("\n\n---\n\n");
+  let result = parts.join("\n\n---\n\n");
+  result = result.replace(/\{[a-z_]+\}/g, "");
+  return result;
 }
 
 export function determineStage(

@@ -9,7 +9,7 @@ const isProduction = process.env.NODE_ENV === "production";
  * 2. Per-request CSP nonce generation (replaces static unsafe-inline)
  * 3. API version header
  */
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   // --- CSRF protection (state-changing API requests only) ---
   const method = request.method.toUpperCase();
   const isApi = request.nextUrl.pathname.startsWith("/api/");
@@ -21,19 +21,17 @@ export function proxy(request: NextRequest) {
     const host = request.headers.get("host");
     const authorization = request.headers.get("authorization");
 
-    if (isProduction) {
-      const isInternal = isAuthorizedInternalRequest(
-        request.nextUrl.pathname,
-        authorization,
-        process.env.CRON_SECRET,
-      );
+    const isInternal = isAuthorizedInternalRequest(
+      request.nextUrl.pathname,
+      authorization,
+      process.env.CRON_SECRET,
+    );
 
-      if (!isInternal && !isUrlHostMatch(origin, host) && !isUrlHostMatch(referer, host)) {
-        return NextResponse.json(
-          { error: "Forbidden: origin mismatch." },
-          { status: 403 },
-        );
-      }
+    if (!isInternal && !isUrlHostMatch(origin, host) && !isUrlHostMatch(referer, host)) {
+      return NextResponse.json(
+        { error: "Forbidden: origin mismatch." },
+        { status: 403 },
+      );
     }
   }
 

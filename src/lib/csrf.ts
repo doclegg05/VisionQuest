@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 export function isUrlHostMatch(value: string | null, host: string | null): boolean {
   if (!value || !host) return false;
 
@@ -18,9 +20,13 @@ export function isAuthorizedInternalRequest(
     return false;
   }
 
-  if (!cronSecret) {
+  if (!cronSecret || !authorizationHeader) {
     return false;
   }
 
-  return authorizationHeader === `Bearer ${cronSecret}`;
+  const expected = `Bearer ${cronSecret}`;
+  const a = Buffer.from(authorizationHeader);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }

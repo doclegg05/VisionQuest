@@ -57,13 +57,6 @@ interface DashboardClientProps {
   readinessScore: number;
   readinessBreakdown: ReadinessBreakdown;
   activityDays: Record<string, number>;
-  classProgress?: {
-    className: string;
-    classmateCount: number;
-    avgOrientationPct: number;
-    orientationCompletedThisWeek: number;
-    avgReadinessScore: number;
-  } | null;
 }
 
 export default function DashboardClient({
@@ -235,10 +228,10 @@ export default function DashboardClient({
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                           task.priority === "high"
-                            ? "bg-rose-100 text-rose-700"
+                            ? "bg-rose-100 text-rose-800"
                             : task.priority === "low"
-                              ? "bg-slate-100 text-slate-600"
-                              : "bg-amber-100 text-amber-700"
+                              ? "bg-slate-100 text-slate-700"
+                              : "bg-amber-100 text-amber-800"
                         }`}>
                           {task.priority}
                         </span>

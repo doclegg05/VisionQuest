@@ -210,7 +210,7 @@ export async function handlePostResponse({
             eventType: hasMonthly && hasWeekly ? "weekly_review" : "monthly_review",
             sourceType: "conversation",
             sourceId: conversationId,
-            xp: hasMonthly && hasWeekly ? 40 : 60,
+            xp: hasMonthly && hasWeekly ? 60 : 40,
             mutate: (state) => {
               if (hasMonthly && hasWeekly) recordWeeklyReview(state);
               else if (hasMonthly) recordMonthlyReview(state);

@@ -14,9 +14,12 @@ export async function getOrCreateConversation(
   if (conversationId) {
     const conversation = await prisma.conversation.findFirst({
       where: { id: conversationId, studentId },
-      include: { messages: { orderBy: { createdAt: "asc" } } },
+      include: { messages: { orderBy: { createdAt: "desc" as const }, take: 50 } },
     });
     if (!conversation) throw notFound("Conversation not found.");
+    if (conversation.messages) {
+      conversation.messages.reverse();
+    }
     return conversation;
   }
 

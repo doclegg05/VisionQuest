@@ -226,8 +226,8 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         birthDate: formatDateInput(payload.record.birthDate),
         race: payload.record.race || "",
         ethnicity: payload.record.ethnicity || "",
-        barriersOnEntry: payload.record.barriersOnEntry.join(", "),
-        barriersRemaining: payload.record.barriersRemaining.join(", "),
+        barriersOnEntry: payload.record.barriersOnEntry?.join("\n") ?? "",
+        barriersRemaining: payload.record.barriersRemaining?.join("\n") ?? "",
         jobRetentionStudent: Boolean(payload.record.jobRetentionStudent),
         tabeDate: formatDateInput(payload.record.tabeDate),
         educationalLevel: payload.record.educationalLevel || "",
@@ -271,7 +271,11 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
       const response = await fetch(`/api/teacher/students/${studentId}/spokes`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profileForm),
+        body: JSON.stringify({
+          ...profileForm,
+          barriersOnEntry: profileForm.barriersOnEntry.split("\n").map(s => s.trim()).filter(Boolean),
+          barriersRemaining: profileForm.barriersRemaining.split("\n").map(s => s.trim()).filter(Boolean),
+        }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -580,14 +584,14 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             <input type="date" value={profileForm.birthDate} onChange={(event) => setProfileForm((current) => ({ ...current, birthDate: event.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.race} onChange={(event) => setProfileForm((current) => ({ ...current, race: event.target.value }))} placeholder="Race" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.ethnicity} onChange={(event) => setProfileForm((current) => ({ ...current, ethnicity: event.target.value }))} placeholder="Ethnicity" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <textarea value={profileForm.barriersOnEntry} onChange={(event) => setProfileForm((current) => ({ ...current, barriersOnEntry: event.target.value }))} placeholder="Barriers on entry (comma separated)" rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <textarea value={profileForm.barriersOnEntry} onChange={(event) => setProfileForm((current) => ({ ...current, barriersOnEntry: event.target.value }))} placeholder="Barriers on entry (one per line)" rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input type="checkbox" checked={profileForm.jobRetentionStudent} onChange={(event) => setProfileForm((current) => ({ ...current, jobRetentionStudent: event.target.checked }))} />
               Job retention student
             </label>
             <input type="date" value={profileForm.tabeDate} onChange={(event) => setProfileForm((current) => ({ ...current, tabeDate: event.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.educationalLevel} onChange={(event) => setProfileForm((current) => ({ ...current, educationalLevel: event.target.value }))} placeholder="Educational level / TABE level" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <textarea value={profileForm.barriersRemaining} onChange={(event) => setProfileForm((current) => ({ ...current, barriersRemaining: event.target.value }))} placeholder="Barriers remaining on exit (comma separated)" rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <textarea value={profileForm.barriersRemaining} onChange={(event) => setProfileForm((current) => ({ ...current, barriersRemaining: event.target.value }))} placeholder="Barriers remaining on exit (one per line)" rows={3} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
           </div>
 
           <div className="space-y-3">
@@ -638,7 +642,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                         Completed {formatDateInput(progress.completedAt)}
                       </span>
                     ) : (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                         Not completed
                       </span>
                     )}
@@ -666,7 +670,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                         type="button"
                         onClick={() => void removeModule(template.id)}
                         disabled={savingModuleId === template.id}
-                        className="rounded-xl border border-rose-200 px-4 py-2 text-sm text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+                        className="rounded-xl border border-rose-200 px-4 py-2 text-sm text-rose-800 transition hover:bg-rose-50 disabled:opacity-60"
                       >
                         Remove
                       </button>
@@ -712,8 +716,8 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                         item.status === "completed"
                           ? "bg-emerald-100 text-emerald-700"
                           : item.status === "due"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-slate-100 text-slate-600"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-700"
                       }`}
                     >
                       {item.status.replaceAll("_", " ")}
@@ -740,7 +744,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                       <button
                         type="button"
                         onClick={() => void removeFollowUp(item.checkpointMonths)}
-                        className="text-xs text-rose-600 hover:text-rose-700"
+                        className="text-xs text-rose-600 hover:text-rose-800"
                       >
                         Remove
                       </button>

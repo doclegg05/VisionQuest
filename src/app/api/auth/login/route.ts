@@ -21,7 +21,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const student = isEmail
     ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
     : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
-  if (!student || !verifyPassword(password, student.passwordHash)) {
+  if (!student || !verifyPassword(password, student.passwordHash) || !student.isActive) {
     const resp = NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
     logAuditEvent({
       actorId: null,
@@ -32,10 +32,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       metadata: { ip },
     });
     return resp;
-  }
-
-  if (!student.isActive) {
-    return NextResponse.json({ error: "This account has been deactivated. Please contact your instructor." }, { status: 403 });
   }
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);

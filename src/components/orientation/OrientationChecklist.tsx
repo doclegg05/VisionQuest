@@ -105,7 +105,10 @@ export default function OrientationChecklist() {
         if (allDone) {
           fetch("/api/orientation/complete", { method: "POST" })
             .then(() => setTimeout(() => checkProgression(), 500))
-            .catch(() => {});
+            .catch((err) => {
+              console.error("Failed to record orientation completion", err);
+              setError("All items checked, but we couldn't save your progress. Please refresh and try again.");
+            });
         }
         return prev;
       });
@@ -162,7 +165,7 @@ export default function OrientationChecklist() {
                 isComplete
                   ? "bg-green-100 text-green-700"
                   : sDone > 0
-                    ? "bg-amber-50 text-amber-700"
+                    ? "bg-amber-50 text-amber-800"
                     : "bg-gray-100 text-[var(--ink-muted)]"
               }`}
             >

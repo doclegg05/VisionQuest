@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { isValidEmail, MAX_LENGTHS } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
+import { parseBody, registerTeacherSchema } from "@/lib/schemas";
 
 function normalizeTeacherKey(value: unknown): string {
   if (typeof value !== "string") {
@@ -24,39 +25,25 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
   }
 
-  const body = await req.json();
+  const body = await parseBody(req, registerTeacherSchema);
   const teacherKey = normalizeTeacherKey(body.teacherKey);
-  const displayName = (body.displayName || "").trim();
-  const email = normalizeEmail(body.email || "");
-  const password = (body.password || "").trim();
+  const displayName = body.displayName.trim();
+  const email = normalizeEmail(body.email);
+  const password = body.password.trim();
 
-  // Validate teacher key first
+  // Validate teacher key
   if (!TEACHER_KEY) {
     return NextResponse.json({ error: "Teacher registration is not configured." }, { status: 503 });
   }
-  if (!teacherKey || teacherKey !== TEACHER_KEY) {
+  const a = Buffer.from(teacherKey);
+  const b = Buffer.from(TEACHER_KEY);
+  if (!teacherKey || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     logger.warn("Invalid teacher key attempt", {
       ip,
       providedLength: teacherKey.length,
       configuredLength: TEACHER_KEY.length,
     });
     return NextResponse.json({ error: "Invalid teacher key." }, { status: 403 });
-  }
-
-  if (!displayName) {
-    return NextResponse.json({ error: "Display name is required." }, { status: 400 });
-  }
-  if (displayName.length > MAX_LENGTHS.displayName) {
-    return NextResponse.json({ error: `Display name must be ${MAX_LENGTHS.displayName} characters or fewer.` }, { status: 400 });
-  }
-  if (!email || !isValidEmail(email)) {
-    return NextResponse.json({ error: "A valid email address is required." }, { status: 400 });
-  }
-  if (!password || password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
-  }
-  if (password.length > MAX_LENGTHS.password) {
-    return NextResponse.json({ error: `Password must be ${MAX_LENGTHS.password} characters or fewer.` }, { status: 400 });
   }
 
   // Generate a teacher ID from email prefix

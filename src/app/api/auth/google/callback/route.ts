@@ -80,16 +80,22 @@ export async function GET(req: NextRequest) {
 
     const tokenData: GoogleTokenResponse = await tokenRes.json();
 
-    // Get user info
-    const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-
-    if (!userRes.ok) {
-      return NextResponse.redirect(new URL("/?error=oauth_userinfo_failed", req.url));
+    // Decode user info from the signed id_token (received directly from
+    // Google's token endpoint over TLS with our client_secret, so the payload
+    // is trustworthy without additional signature verification per Google's
+    // server-side auth docs).
+    let userInfo: GoogleUserInfo;
+    try {
+      const payload = tokenData.id_token.split(".")[1];
+      if (!payload) throw new Error("Missing id_token payload");
+      const decoded = JSON.parse(Buffer.from(payload, "base64url").toString());
+      if (!decoded.sub || !decoded.email) throw new Error("id_token missing required claims");
+      if (decoded.aud !== GOOGLE_CLIENT_ID) throw new Error("id_token aud mismatch");
+      if (decoded.iss !== "accounts.google.com" && decoded.iss !== "https://accounts.google.com") throw new Error("id_token iss mismatch");
+      userInfo = { sub: decoded.sub, email: decoded.email, name: decoded.name || "", picture: decoded.picture };
+    } catch {
+      return NextResponse.redirect(new URL("/?error=oauth_token_invalid", req.url));
     }
-
-    const userInfo: GoogleUserInfo = await userRes.json();
     const normalizedEmail = normalizeEmail(userInfo.email);
 
     // Find or create user
@@ -101,25 +107,38 @@ export async function GET(req: NextRequest) {
       // Create new student from Google info
       // Use email prefix as studentId, ensure unique
       const baseId = userInfo.email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
-      let studentId = baseId;
-      let suffix = 1;
-      while (await prisma.student.findUnique({ where: { studentId } })) {
-        studentId = `${baseId}${suffix}`;
-        suffix++;
-      }
-
       // Generate a random password hash (user won't need it with OAuth)
       const { hash } = hashPassword(crypto.randomBytes(32).toString("hex"));
 
-      student = await prisma.student.create({
-        data: {
-          studentId,
-          displayName: userInfo.name || userInfo.email.split("@")[0],
-          email: normalizedEmail,
-          passwordHash: hash,
-          role: "student", // OAuth users start as students
-        },
-      });
+      // Retry with random suffix to avoid TOCTOU race on studentId uniqueness
+      let studentId = baseId;
+      const maxAttempts = 5;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          student = await prisma.student.create({
+            data: {
+              studentId,
+              displayName: userInfo.name || userInfo.email.split("@")[0],
+              email: normalizedEmail,
+              passwordHash: hash,
+              role: "student",
+            },
+          });
+          break;
+        } catch (err: unknown) {
+          const isPrismaUniqueViolation =
+            err && typeof err === "object" && "code" in err && err.code === "P2002";
+          if (!isPrismaUniqueViolation || attempt === maxAttempts - 1) throw err;
+          studentId = `${baseId}${crypto.randomInt(1000, 9999)}`;
+        }
+      }
+      if (!student) {
+        return NextResponse.redirect(new URL("/?error=oauth_failed", req.url));
+      }
+    }
+
+    if (!student.isActive) {
+      return NextResponse.redirect(new URL("/?error=account_deactivated", req.url));
     }
 
     // Set session cookie

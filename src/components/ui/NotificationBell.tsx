@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useNotifications } from "./NotificationProvider";
+import { studentInterventionHref } from "@/lib/intervention-notifications";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -19,6 +21,7 @@ function timeAgo(iso: string): string {
  */
 export default function NotificationBell() {
   const { notifications, unreadCount, markAllRead } = useNotifications();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -91,7 +94,8 @@ export default function NotificationBell() {
           ref={dialogRef}
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[rgba(255,255,255,0.96)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] backdrop-blur"
+          className="fixed right-3 top-[4.5rem] z-[60] w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[rgba(255,255,255,0.96)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] backdrop-blur md:left-[18rem] md:right-auto md:top-4"
+          style={{ maxHeight: "calc(100vh - 6rem)" }}
         >
           <div className="flex items-center justify-between border-b border-[rgba(18,38,63,0.08)] px-4 py-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Notifications</h3>
@@ -110,11 +114,16 @@ export default function NotificationBell() {
             {notifications.length === 0 ? (
               <p className="py-8 text-center text-sm text-[var(--ink-muted)]">No notifications yet</p>
             ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`border-b border-[rgba(18,38,63,0.05)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""}`}
-                >
+              notifications.map((n) => {
+                const href = n.type.startsWith("nudge.")
+                  ? studentInterventionHref(n.type)
+                  : n.type.startsWith("teacher_nudge.")
+                    ? "/teacher-dashboard"
+                    : null;
+                const handleClick = href
+                  ? () => { setOpen(false); router.push(href); }
+                  : undefined;
+                const inner = (
                   <div className="flex items-start gap-2">
                     {!n.read && (
                       <span aria-hidden="true" className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--accent-strong)]" />
@@ -125,8 +134,25 @@ export default function NotificationBell() {
                       <p className="mt-1 text-[10px] text-[var(--ink-muted)]">{timeAgo(n.createdAt)}</p>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+                return href ? (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={handleClick}
+                    className={`w-full text-left border-b border-[rgba(18,38,63,0.05)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""} cursor-pointer hover:bg-[rgba(0,123,175,0.04)]`}
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div
+                    key={n.id}
+                    className={`border-b border-[rgba(18,38,63,0.05)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""}`}
+                  >
+                    {inner}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

@@ -12,7 +12,6 @@ import {
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
-import { getClassProgress } from "@/lib/class-progress";
 import DashboardClient from "./DashboardClient";
 
 
@@ -123,9 +122,6 @@ export default async function DashboardPage() {
   const goalTexts = planningGoals.map((goal) => goal.content);
   const goalMatchResult = matchGoalsToPlatforms(goalTexts);
 
-  // Fetch class progress for cohort card
-  const classProgress = await getClassProgress(session.id);
-
   return (
     <div className="page-shell">
       <PageIntro
@@ -185,7 +181,6 @@ export default async function DashboardPage() {
         readinessScore={readiness.score}
         readinessBreakdown={readiness.breakdown}
         activityDays={activityDays}
-        classProgress={classProgress}
       />
     </div>
   );

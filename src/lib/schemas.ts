@@ -42,11 +42,41 @@ export const createStudentSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters.").max(200, "Password must be 200 characters or fewer."),
 });
 
+// ─── Teacher Registration Schema ────────────────────────────────────────────
+
+export const registerTeacherSchema = z.object({
+  teacherKey: z.string().min(1, "Teacher key is required."),
+  displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
+  email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
+});
+
+// ─── Password Reset Schema ─────────────────────────────────────────────────
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required."),
+  password: z.string().min(6, "Password must be at least 6 characters.").max(128, "Password must be 128 characters or fewer."),
+});
+
+// ─── Forgot Password Schema ───────────────────────────────────────────────
+
+export const forgotPasswordSchema = z.object({
+  login: z.string().min(1, "Enter the email address or student ID for your account.").max(200, "Login is too long."),
+});
+
+// ─── Reset Password (Security Questions) Schema ──────────────────────────
+
+export const resetPasswordQuestionsSchema = z.object({
+  login: z.string().min(1, "Enter the email address or student ID for your account.").max(200, "Login is too long."),
+  password: z.string().min(6, "Password must be at least 6 characters.").max(200, "Password must be 200 characters or fewer."),
+  securityQuestions: z.record(z.string()),
+});
+
 // ─── Chat Schemas ───────────────────────────────────────────────────────────
 
 export const chatSendSchema = z.object({
   message: z.string().min(1, "Message is required.").max(10000, "Message too long. Maximum 10,000 characters."),
-  conversationId: z.string().nullish(),
+  conversationId: z.string().cuid("Invalid conversation ID.").nullish(),
 });
 
 // ─── Settings Schemas ───────────────────────────────────────────────────────

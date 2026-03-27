@@ -111,6 +111,10 @@ export async function uploadFile(
 ): Promise<void> {
   if (shouldUseLocalDisk()) {
     const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR) + path.sep)) {
+      throw new Error("Invalid storage path");
+    }
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, buffer);
     return;
@@ -132,6 +136,10 @@ export async function uploadFile(
 export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
   if (shouldUseLocalDisk()) {
     const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR) + path.sep)) {
+      throw new Error("Invalid storage path");
+    }
     try {
       const buffer = await fs.readFile(filePath);
       const ext = path.extname(storageKey).toLowerCase();
@@ -181,6 +189,10 @@ export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer
 export async function deleteFile(storageKey: string): Promise<void> {
   if (shouldUseLocalDisk()) {
     const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR) + path.sep)) {
+      throw new Error("Invalid storage path");
+    }
     try {
       await fs.unlink(filePath);
     } catch {
