@@ -58,8 +58,8 @@ describe("buildSystemPrompt", () => {
     });
 
     assert.match(prompt, /The student's name is Avery\./);
-    assert.match(prompt, /Their BHAG is: "Become a nurse"/);
-    assert.match(prompt, /Their monthly goal is: "Apply to CNA programs"/);
+    assert.match(prompt, /\[STUDENT_GOAL_START\]Become a nurse\[STUDENT_GOAL_END\]/);
+    assert.match(prompt, /\[STUDENT_GOAL_START\]Apply to CNA programs\[STUDENT_GOAL_END\]/);
     assert.match(prompt, /CURRENT TASK: Help the student set weekly goals/);
   });
 
@@ -109,5 +109,49 @@ describe("buildSystemPrompt", () => {
     });
 
     assert.ok(!prompt.includes("CAREER DISCOVERY CONTEXT"));
+  });
+
+  it("builds a teacher assistant prompt with all three roles", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", {
+      studentName: "Ms. Carter",
+      userMessage: "How do I set up GMetrix accounts?",
+    });
+
+    // Should include teacher-specific content
+    assert.match(prompt, /ROLE 1 — PROGRAM KNOWLEDGE ASSISTANT/);
+    assert.match(prompt, /ROLE 2 — STUDENT ADVISOR/);
+    assert.match(prompt, /ROLE 3 — GENERAL ASSISTANT/);
+    assert.match(prompt, /Professional and collegial/);
+  });
+
+  it("teacher assistant prompt excludes student personality and guardrails", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", {
+      userMessage: "Tell me about IC3",
+    });
+
+    // Should NOT include student-focused personality or guardrails
+    assert.ok(!prompt.includes("You believe every one of them has unrealized potential"));
+    assert.ok(!prompt.includes("MOTIVATIONAL INTERVIEWING PRINCIPLES"));
+    assert.ok(!prompt.includes("call 988"));
+
+    // Should include platform and program knowledge
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+    assert.match(prompt, /PLATFORM MODULES/);
+  });
+
+  it("teacher assistant prompt injects relevant topic content based on userMessage", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", {
+      userMessage: "How do I set up GMetrix for a new student?",
+    });
+
+    assert.match(prompt, /DETAILED REFERENCE/);
+    assert.match(prompt, /GMETRIX/i);
+  });
+
+  it("teacher assistant prompt works without userMessage", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", {});
+
+    assert.match(prompt, /ROLE 1 — PROGRAM KNOWLEDGE ASSISTANT/);
+    assert.ok(!prompt.includes("DETAILED REFERENCE"));
   });
 });

@@ -93,9 +93,10 @@ test("chatSendSchema accepts valid message", () => {
 });
 
 test("chatSendSchema accepts message with conversationId", () => {
-  const result = chatSendSchema.safeParse({ message: "Hi", conversationId: "abc123" });
+  const cuid = "cm1234567890abcdefghijklm";
+  const result = chatSendSchema.safeParse({ message: "Hi", conversationId: cuid });
   assert.ok(result.success);
-  assert.equal(result.data.conversationId, "abc123");
+  assert.equal(result.data.conversationId, cuid);
 });
 
 test("chatSendSchema rejects empty message", () => {

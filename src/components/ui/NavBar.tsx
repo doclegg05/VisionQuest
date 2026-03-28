@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath } from "@/lib/role-home";
@@ -30,6 +30,21 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
   const [sageMiniOpen, setSageMiniOpen] = useState(false);
+  const [sagePendingMessage, setSagePendingMessage] = useState<string | null>(null);
+
+  // Listen for sage:open events from anywhere in the app
+  const handleSageOpen = useCallback((e: Event) => {
+    const detail = (e as CustomEvent<{ message: string }>).detail;
+    if (detail?.message) {
+      setSagePendingMessage(detail.message);
+      setSageMiniOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("sage:open", handleSageOpen);
+    return () => window.removeEventListener("sage:open", handleSageOpen);
+  }, [handleSageOpen]);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreDialogRef = useRef<HTMLDivElement>(null);
 
@@ -277,8 +292,8 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
         </div>
       </aside>
 
-      {/* Floating Sage button + mini chat for students */}
-      {role === "student" && pathname !== "/chat" && (
+      {/* Floating Sage button + mini chat */}
+      {pathname !== "/chat" && (
         <>
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
@@ -289,7 +304,13 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           >
             {sageMiniOpen ? "✕" : "💬"}
           </button>
-          <SageMiniChat open={sageMiniOpen} onClose={() => setSageMiniOpen(false)} />
+          <SageMiniChat
+            open={sageMiniOpen}
+            onClose={() => setSageMiniOpen(false)}
+            role={role}
+            initialMessage={sagePendingMessage}
+            onInitialMessageConsumed={() => setSagePendingMessage(null)}
+          />
         </>
       )}
     </>

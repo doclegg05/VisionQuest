@@ -16,14 +16,29 @@ interface Message {
 interface SageMiniChatProps {
   open: boolean;
   onClose: () => void;
+  role?: string;
+  initialMessage?: string | null;
+  onInitialMessageConsumed?: () => void;
 }
 
-export function SageMiniChat({ open, onClose }: SageMiniChatProps) {
+/**
+ * Dispatch a custom event to open the Sage mini chat with a pre-composed message.
+ * Can be called from anywhere in the app (e.g., InterventionQueue).
+ */
+export function openSageWithMessage(message: string) {
+  window.dispatchEvent(
+    new CustomEvent("sage:open", { detail: { message } }),
+  );
+}
+
+export function SageMiniChat({ open, onClose, role = "student", initialMessage, onInitialMessageConsumed }: SageMiniChatProps) {
+  const isStaff = role === "teacher" || role === "admin";
   const { checkProgression } = useProgression();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const initialMessageSentRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -137,7 +152,9 @@ export function SageMiniChat({ open, onClose }: SageMiniChatProps) {
           },
         ]);
         setStreamingContent("");
-        setTimeout(() => checkProgression(), 2000);
+        if (!isStaff) {
+          setTimeout(() => checkProgression(), 2000);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Something went wrong.";
         setMessages((prev) => [
@@ -148,8 +165,20 @@ export function SageMiniChat({ open, onClose }: SageMiniChatProps) {
         setIsLoading(false);
       }
     },
-    [conversationId, checkProgression]
+    [conversationId, checkProgression, isStaff]
   );
+
+  // Auto-send initial message when provided via prop
+  useEffect(() => {
+    if (open && initialMessage && !isLoading && initialMessageSentRef.current !== initialMessage) {
+      initialMessageSentRef.current = initialMessage;
+      // Start a fresh conversation for contextual asks
+      setConversationId(null);
+      setMessages([]);
+      onInitialMessageConsumed?.();
+      void handleSend(initialMessage);
+    }
+  }, [open, initialMessage, isLoading, handleSend, onInitialMessageConsumed]);
 
   if (!open) return null;
 
@@ -170,13 +199,15 @@ export function SageMiniChat({ open, onClose }: SageMiniChatProps) {
           <span className="text-sm font-semibold text-white">Sage</span>
         </div>
         <div className="flex items-center gap-2">
-          <a
-            href="/chat"
-            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Open full chat"
-          >
-            Expand
-          </a>
+          {!isStaff && (
+            <a
+              href="/chat"
+              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Open full chat"
+            >
+              Expand
+            </a>
+          )}
           <button
             onClick={onClose}
             type="button"
@@ -195,9 +226,13 @@ export function SageMiniChat({ open, onClose }: SageMiniChatProps) {
         <div className="space-y-3">
           {messages.length === 0 && !isLoading && (
             <div className="py-8 text-center">
-              <p className="text-sm font-medium text-[var(--ink-strong)]">Ask Sage anything</p>
+              <p className="text-sm font-medium text-[var(--ink-strong)]">
+                {isStaff ? "Ask Sage for help" : "Ask Sage anything"}
+              </p>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                Goals, next steps, or what feels stuck.
+                {isStaff
+                  ? "Program info, student advising, or drafting communications."
+                  : "Goals, next steps, or what feels stuck."}
               </p>
             </div>
           )}

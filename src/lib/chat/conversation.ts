@@ -49,6 +49,38 @@ export async function getOrCreateConversation(
 }
 
 /**
+ * Load or create a teacher assistant conversation.
+ * Teacher conversations use a fixed "teacher_assistant" stage and module.
+ */
+export async function getOrCreateTeacherConversation(
+  teacherId: string,
+  conversationId: string | null,
+) {
+  if (conversationId) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, studentId: teacherId },
+      include: { messages: { orderBy: { createdAt: "desc" as const }, take: 50 } },
+    });
+    if (!conversation) throw notFound("Conversation not found.");
+    if (conversation.messages) {
+      conversation.messages.reverse();
+    }
+    return conversation;
+  }
+
+  // Deactivate previous teacher assistant conversations
+  await prisma.conversation.updateMany({
+    where: { studentId: teacherId, module: "teacher_assistant", active: true },
+    data: { active: false },
+  });
+
+  return prisma.conversation.create({
+    data: { studentId: teacherId, module: "teacher_assistant", stage: "teacher_assistant", active: true },
+    include: { messages: true },
+  });
+}
+
+/**
  * Save a message (user or assistant) to a conversation.
  */
 export async function saveMessage(

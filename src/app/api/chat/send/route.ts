@@ -6,10 +6,10 @@ import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts"
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
-import { withAuth } from "@/lib/api-error";
+import { withAuth, isStaffRole } from "@/lib/api-error";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { resolveApiKey } from "@/lib/chat/api-key";
-import { getOrCreateConversation, saveMessage } from "@/lib/chat/conversation";
+import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { buildStudentStatusSignals, buildStudentStatusSummary } from "@/lib/student-status";
@@ -21,6 +21,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;
+  const isTeacher = isStaffRole(session.role);
 
   // Rate limit
   const rl = await rateLimit(`chat:${session.id}`, 60, 60 * 60 * 1000);
@@ -31,79 +32,90 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   // Resolve API key
   const apiKey = await resolveApiKey(session.id);
 
-  // Get or create conversation
-  const conversation = await getOrCreateConversation(session.id, conversationId);
+  // Get or create conversation (teacher vs student path)
+  const conversation = isTeacher
+    ? await getOrCreateTeacherConversation(session.id, conversationId)
+    : await getOrCreateConversation(session.id, conversationId);
 
   // Save user message
   await saveMessage(conversation.id, "user", userMessage);
 
-  // Build system prompt context
-  const [goals, orientationItems, formSubmissions, orientationProgress, careerDiscovery] = await Promise.all([
-    prisma.goal.findMany({
-      where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
-    }),
-    prisma.orientationItem.findMany({
-      select: {
-        id: true,
-        label: true,
-        required: true,
-      },
-      orderBy: { sortOrder: "asc" },
-    }),
-    prisma.formSubmission.findMany({
-      where: { studentId: session.id },
-      select: {
-        formId: true,
-        status: true,
-        updatedAt: true,
-        reviewedAt: true,
-        notes: true,
-      },
-    }),
-    prisma.orientationProgress.findMany({
-      where: { studentId: session.id },
-      select: {
-        itemId: true,
-        completed: true,
-        completedAt: true,
-      },
-    }),
-    prisma.careerDiscovery.findUnique({
-      where: { studentId: session.id },
-      select: { status: true, sageSummary: true, topClusters: true },
-    }),
-  ]);
-  const goalsByLevel: Record<string, string> = {};
-  for (const g of goals) goalsByLevel[g.level] = g.content;
-  const studentStatusSummary = buildStudentStatusSummary(
-    buildStudentStatusSignals({
-      formSubmissions,
-      orientationItems,
-      orientationProgress,
-    }),
-    { includePositiveSummary: conversation.stage === "orientation" || conversation.stage === "onboarding" },
-  );
+  // Build system prompt — teacher gets a streamlined path
+  let systemPrompt: string;
 
-  // Build discovery context for the prompt
-  const isDiscoveryStage = conversation.stage === "discovery";
-  const discoverySummary = careerDiscovery?.sageSummary && careerDiscovery.topClusters.length > 0
-    ? `${careerDiscovery.sageSummary} (Top pathways: ${careerDiscovery.topClusters.join(", ")})`
-    : undefined;
+  if (isTeacher) {
+    systemPrompt = buildSystemPrompt("teacher_assistant", {
+      studentName: session.displayName,
+      userMessage,
+    });
+  } else {
+    const [goals, orientationItems, formSubmissions, orientationProgress, careerDiscovery] = await Promise.all([
+      prisma.goal.findMany({
+        where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
+      }),
+      prisma.orientationItem.findMany({
+        select: {
+          id: true,
+          label: true,
+          required: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      }),
+      prisma.formSubmission.findMany({
+        where: { studentId: session.id },
+        select: {
+          formId: true,
+          status: true,
+          updatedAt: true,
+          reviewedAt: true,
+          notes: true,
+        },
+      }),
+      prisma.orientationProgress.findMany({
+        where: { studentId: session.id },
+        select: {
+          itemId: true,
+          completed: true,
+          completedAt: true,
+        },
+      }),
+      prisma.careerDiscovery.findUnique({
+        where: { studentId: session.id },
+        select: { status: true, sageSummary: true, topClusters: true },
+      }),
+    ]);
+    const goalsByLevel: Record<string, string> = {};
+    for (const g of goals) goalsByLevel[g.level] = g.content;
+    const studentStatusSummary = buildStudentStatusSummary(
+      buildStudentStatusSignals({
+        formSubmissions,
+        orientationItems,
+        orientationProgress,
+      }),
+      { includePositiveSummary: conversation.stage === "orientation" || conversation.stage === "onboarding" },
+    );
 
-  const systemPrompt = buildSystemPrompt(conversation.stage as ConversationStage, {
-    studentName: session.displayName,
-    bhag: goalsByLevel["bhag"],
-    monthly: goalsByLevel["monthly"],
-    weekly: goalsByLevel["weekly"],
-    daily: goalsByLevel["daily"],
-    goals_summary: goals.length > 0
-      ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
-      : "No planning goals set yet.",
-    student_status_summary: studentStatusSummary || undefined,
-    userMessage,
-    career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
-    discovery_summary: discoverySummary,
-  });
+    // Build discovery context for the prompt
+    const isDiscoveryStage = conversation.stage === "discovery";
+    const discoverySummary = careerDiscovery?.sageSummary && careerDiscovery.topClusters.length > 0
+      ? `${careerDiscovery.sageSummary} (Top pathways: ${careerDiscovery.topClusters.join(", ")})`
+      : undefined;
+
+    systemPrompt = buildSystemPrompt(conversation.stage as ConversationStage, {
+      studentName: session.displayName,
+      bhag: goalsByLevel["bhag"],
+      monthly: goalsByLevel["monthly"],
+      weekly: goalsByLevel["weekly"],
+      daily: goalsByLevel["daily"],
+      goals_summary: goals.length > 0
+        ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
+        : "No planning goals set yet.",
+      student_status_summary: studentStatusSummary || undefined,
+      userMessage,
+      career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
+      discovery_summary: discoverySummary,
+    });
+  }
 
   // Format message history for Gemini
   const allMessages = [
@@ -131,29 +143,31 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         // Save assistant message
         await saveMessage(conversation.id, "assistant", fullResponse);
 
-        try {
-          await awardEvent({
-            studentId: session.id,
-            eventType: "chat_session",
-            sourceType: "conversation",
-            sourceId: conversation.id,
-            xp: 10,
-            mutate: (state) => recordChatSession(state),
-          });
-        } catch (err) {
-          logger.error("Failed to award chat XP", { error: String(err) });
-        }
+        // Student-only post-processing: XP, goal extraction, stage updates
+        if (!isTeacher) {
+          try {
+            await awardEvent({
+              studentId: session.id,
+              eventType: "chat_session",
+              sourceType: "conversation",
+              sourceId: conversation.id,
+              xp: 10,
+              mutate: (state) => recordChatSession(state),
+            });
+          } catch (err) {
+            logger.error("Failed to award chat XP", { error: String(err) });
+          }
 
-        // Fire-and-forget: goal extraction, XP awards, stage updates, title generation
-        handlePostResponse({
-          conversationId: conversation.id,
-          conversationTitle: conversation.title,
-          conversationStage: conversation.stage,
-          fullResponse,
-          studentId: session.id,
-          apiKey,
-          allMessages,
-        }).catch((err) => logger.error("Post-response error", { error: String(err) }));
+          handlePostResponse({
+            conversationId: conversation.id,
+            conversationTitle: conversation.title,
+            conversationStage: conversation.stage,
+            fullResponse,
+            studentId: session.id,
+            apiKey,
+            allMessages,
+          }).catch((err) => logger.error("Post-response error", { error: String(err) }));
+        }
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversation.id })}\n\n`));
         controller.close();
