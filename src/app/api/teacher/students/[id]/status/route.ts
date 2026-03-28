@@ -3,6 +3,8 @@ import { withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { generateStudentArchive } from "@/lib/student-archive";
+import { logger } from "@/lib/logger";
 
 // PATCH — toggle a student's active status
 export const PATCH = withTeacherAuth(async (
@@ -43,6 +45,13 @@ export const PATCH = withTeacherAuth(async (
     targetId: id,
     summary: `${isActive ? "Reactivated" : "Deactivated"} student ${student.studentId}.`,
   });
+
+  // Auto-archive on deactivation (fire-and-forget)
+  if (!isActive) {
+    generateStudentArchive(id, session.id).catch((err) =>
+      logger.error("Auto-archive on deactivation failed", { studentId: id, error: String(err) }),
+    );
+  }
 
   return NextResponse.json({ ok: true, isActive });
 });

@@ -173,6 +173,10 @@ interface FormSubmissionData {
     mimeType: string;
     uploadedAt: string;
   } | null;
+  signatureFile: {
+    id: string;
+    filename: string;
+  } | null;
 }
 
 interface PublicCredentialPageData {
@@ -323,6 +327,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [resetStatus, setResetStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [deactivating, setDeactivating] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveResult, setArchiveResult] = useState<{ storageKey: string; fileCount: number } | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
   const [showAllConversations, setShowAllConversations] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "goals" | "progress" | "operations">("overview");
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
@@ -781,7 +788,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
             </div>
 
             {/* Deactivate/Reactivate */}
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
               {!confirmDeactivate ? (
                 <button
                   onClick={() => setConfirmDeactivate(true)}
@@ -794,10 +801,10 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                   {student.isActive ? "Deactivate Account" : "Reactivate Account"}
                 </button>
               ) : (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <div className="w-full rounded-xl border border-red-200 bg-red-50 p-3">
                   <p className="text-sm text-red-800">
                     {student.isActive
-                      ? "This will log the student out and prevent future login. Their data is preserved."
+                      ? "This will log the student out and prevent future login. Their data is preserved and an archive will be created."
                       : "This will allow the student to log in again."}
                   </p>
                   <div className="mt-2 flex gap-2">
@@ -819,7 +826,51 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                   </div>
                 </div>
               )}
+
+              {/* Archive Records */}
+              <button
+                onClick={async () => {
+                  setArchiving(true);
+                  setArchiveError(null);
+                  try {
+                    const res = await apiFetch(`/api/teacher/students/${studentId}/archive`, { method: "POST" });
+                    if (!res.ok) {
+                      const data = await res.json().catch(() => ({}));
+                      setArchiveError(data.error || "Archive failed.");
+                      return;
+                    }
+                    const data = await res.json();
+                    setArchiveResult(data);
+                  } catch {
+                    setArchiveError("Archive failed. Please try again.");
+                  } finally {
+                    setArchiving(false);
+                  }
+                }}
+                disabled={archiving}
+                className="rounded-lg border border-indigo-200 px-4 py-2 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50"
+              >
+                {archiving ? "Archiving..." : "Archive Student Records"}
+              </button>
             </div>
+
+            {archiveResult && (
+              <div className="mt-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+                <p className="text-sm text-indigo-800">
+                  Archive created with {archiveResult.fileCount} files.
+                </p>
+                <a
+                  href={`/api/teacher/students/${studentId}/archive?key=${encodeURIComponent(archiveResult.storageKey)}`}
+                  download
+                  className="mt-1 inline-block text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                >
+                  Download ZIP archive
+                </a>
+              </div>
+            )}
+            {archiveError && (
+              <p className="mt-2 text-xs text-red-500">{archiveError}</p>
+            )}
           </div>
 
           <div className="flex gap-4 text-center flex-wrap items-start">
@@ -1110,6 +1161,16 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                         className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-white"
                       >
                         Open file
+                      </a>
+                    ) : null}
+                    {submission.signatureFile ? (
+                      <a
+                        href={`/api/files/download?id=${submission.signatureFile.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        View signature
                       </a>
                     ) : null}
                     <button

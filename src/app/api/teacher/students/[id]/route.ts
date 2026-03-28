@@ -103,6 +103,7 @@ export const GET = withTeacherAuth(async (
           id: true,
           formId: true,
           fileId: true,
+          signatureFileId: true,
           status: true,
           createdAt: true,
           updatedAt: true,
@@ -282,7 +283,10 @@ export const GET = withTeacherAuth(async (
   }
 
   // Get orientation items for context
-  const formFileIds = student.formSubmissions.map((submission) => submission.fileId).filter(Boolean);
+  const formFileIds = [
+    ...student.formSubmissions.map((s) => s.fileId),
+    ...student.formSubmissions.map((s) => s.signatureFileId).filter(Boolean),
+  ].filter(Boolean) as string[];
   const [orientationItems, certTemplates, formFiles] = await Promise.all([
     prisma.orientationItem.findMany({
       orderBy: { sortOrder: "asc" },
@@ -417,6 +421,7 @@ export const GET = withTeacherAuth(async (
     formSubmissions: student.formSubmissions.map((submission) => {
       const form = formDefinitionById.get(submission.formId);
       const file = formFileById.get(submission.fileId);
+      const sigFile = submission.signatureFileId ? formFileById.get(submission.signatureFileId) : null;
       return {
         id: submission.id,
         formId: submission.formId,
@@ -434,6 +439,9 @@ export const GET = withTeacherAuth(async (
               mimeType: file.mimeType,
               uploadedAt: file.uploadedAt,
             }
+          : null,
+        signatureFile: sigFile
+          ? { id: sigFile.id, filename: sigFile.filename }
           : null,
       };
     }),

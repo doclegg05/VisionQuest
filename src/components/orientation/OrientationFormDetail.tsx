@@ -1,12 +1,109 @@
 "use client";
 
+import { useState } from "react";
 import FormUploadButton from "@/components/ui/FormUploadButton";
+import SignaturePad from "@/components/ui/SignaturePad";
 import { getOrientationStepDetail } from "@/lib/orientation-step-resources";
 import {
   buildFormDownloadUrl,
   hasDownloadableFormDocument,
   type SpokesForm,
 } from "@/lib/spokes/forms";
+
+function SignAndSubmitButton({
+  formId,
+  currentStatus,
+  onComplete,
+}: {
+  formId: string;
+  currentStatus: "pending" | "approved" | "rejected" | null;
+  onComplete?: () => void;
+}) {
+  const [showPad, setShowPad] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSign(dataUrl: string) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/forms/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formId, signature: dataUrl }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Signature submission failed.");
+        return;
+      }
+      setShowPad(false);
+      onComplete?.();
+    } catch {
+      setError("Signature submission failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (currentStatus === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+        Signed & Approved
+      </span>
+    );
+  }
+
+  if (currentStatus === "pending") {
+    return (
+      <div className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-800">
+          Signed — Pending Review
+        </span>
+        <button
+          onClick={() => setShowPad(true)}
+          type="button"
+          className="text-[10px] font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+        >
+          Re-sign
+        </button>
+      </div>
+    );
+  }
+
+  if (showPad) {
+    return (
+      <div className="mt-2">
+        {submitting && (
+          <p className="mb-2 text-xs text-[var(--ink-muted)]">Submitting signature...</p>
+        )}
+        <SignaturePad
+          onSign={handleSign}
+          onCancel={() => setShowPad(false)}
+        />
+        {error && <p className="mt-1 text-[10px] text-red-500">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowPad(true)}
+        type="button"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-[10px] font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)]"
+      >
+        {currentStatus === "rejected" ? "Re-sign" : "Sign & Submit"}
+      </button>
+      {currentStatus === "rejected" && (
+        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-600">
+          Returned — please re-sign
+        </span>
+      )}
+      {error && <p className="mt-1 text-[10px] text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 function OrientationFormCard({
   form,
@@ -30,6 +127,11 @@ function OrientationFormCard({
           {form.fillable && (
             <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-secondary)]">
               Fillable
+            </span>
+          )}
+          {form.requiresSignature && (
+            <span className="rounded-full bg-[rgba(99,102,241,0.1)] px-2 py-0.5 text-[10px] font-semibold text-indigo-600">
+              Signature
             </span>
           )}
           {form.required && (
@@ -63,14 +165,23 @@ function OrientationFormCard({
             PDF not connected yet. You can still upload a completed copy if your class uses paper forms.
           </p>
         )}
+      </div>
 
-        {form.acceptsSubmission && (
+      {/* Submission actions */}
+      <div className="mt-2">
+        {form.requiresSignature ? (
+          <SignAndSubmitButton
+            formId={form.id}
+            currentStatus={currentStatus}
+            onComplete={onUploadComplete}
+          />
+        ) : form.acceptsSubmission ? (
           <FormUploadButton
             formId={form.id}
             currentStatus={currentStatus}
             onUploadComplete={onUploadComplete}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );

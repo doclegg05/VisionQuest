@@ -757,16 +757,17 @@ model AuditLog {
 }
 
 model FormSubmission {
-  id         String    @id @default(cuid())
-  studentId  String
-  formId     String
-  fileId     String
-  status     String    @default("pending")
-  reviewedBy String?
-  reviewedAt DateTime?
-  notes      String?   @db.Text
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  studentId       String
+  formId          String
+  fileId          String
+  signatureFileId String?
+  status          String    @default("pending")
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 

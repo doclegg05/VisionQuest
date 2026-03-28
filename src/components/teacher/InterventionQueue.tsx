@@ -11,6 +11,8 @@ import {
 } from "@/lib/intervention-notifications";
 import { openSageWithMessage } from "@/components/chat/SageMiniChat";
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
 interface AlertItem {
   id: string;
   type: string;
@@ -20,11 +22,7 @@ interface AlertItem {
   sourceType: string | null;
   sourceId: string | null;
   detectedAt: string;
-  student: {
-    id: string;
-    studentId: string;
-    displayName: string;
-  };
+  student: { id: string; studentId: string; displayName: string };
 }
 
 interface InactivityItem {
@@ -34,11 +32,7 @@ interface InactivityItem {
   title: string;
   summary: string;
   detectedAt: string;
-  student: {
-    id: string;
-    studentId: string;
-    displayName: string;
-  };
+  student: { id: string; studentId: string; displayName: string };
 }
 
 interface ReviewItem {
@@ -48,11 +42,7 @@ interface ReviewItem {
   title: string;
   summary: string;
   detectedAt: string;
-  student: {
-    id: string;
-    studentId: string;
-    displayName: string;
-  };
+  student: { id: string; studentId: string; displayName: string };
   goalId?: string;
   goalContent?: string;
 }
@@ -77,192 +67,356 @@ interface UnifiedItem {
   nextStep?: string;
 }
 
-function unifyAndSort(
+// ─── Unify raw inputs ───────────────────────────────────────────────────────
+
+function unifyItems(
   alerts: AlertItem[],
   inactivity: InactivityItem[],
   review: ReviewItem[],
 ): UnifiedItem[] {
   const items: UnifiedItem[] = [];
-
-  for (const a of alerts) {
-    items.push({ ...a, category: "alert" });
-  }
-
+  for (const a of alerts) items.push({ ...a, category: "alert" });
   for (const i of inactivity) {
     const stage = getInactivityStageByType(i.type);
-    items.push({
-      ...i,
-      category: "inactivity",
-      stageLabel: stage?.label || i.type,
-      nextStep: stage?.nextStep || "",
-    });
+    items.push({ ...i, category: "inactivity", stageLabel: stage?.label || i.type, nextStep: stage?.nextStep || "" });
+  }
+  for (const r of review) items.push({ ...r, category: "review" });
+  return items;
+}
+
+// ─── Consolidation ──────────────────────────────────────────────────────────
+// Merges related alerts into single lines. E.g. 3 "orientation_form_missing"
+// become one "3 orientation forms missing" with a single action link.
+
+const CONSOLIDATION_GROUPS: Record<string, { label: string; groupCategory: string }> = {
+  orientation_form_missing:        { label: "orientation forms missing",         groupCategory: "Orientation" },
+  orientation_form_pending_review: { label: "forms awaiting review",             groupCategory: "Orientation" },
+  orientation_form_revision_needed:{ label: "forms needing revision",            groupCategory: "Orientation" },
+  orientation_item_incomplete:     { label: "orientation steps incomplete",      groupCategory: "Orientation" },
+  orientation_not_started:         { label: "orientation not started",           groupCategory: "Orientation" },
+  orientation_overdue:             { label: "orientation overdue",               groupCategory: "Orientation" },
+  goal_needs_resource:             { label: "goals without assigned resources",  groupCategory: "Goals" },
+  goal_resource_stale:             { label: "stale goal resources",              groupCategory: "Goals" },
+  goal_platform_stale:             { label: "platforms visited, no follow-through", groupCategory: "Goals" },
+  goal_review_pending:             { label: "goal evidence awaiting review",     groupCategory: "Goals" },
+  goal_stale:                      { label: "stale goals",                       groupCategory: "Goals" },
+  overdue_task:                    { label: "overdue tasks",                     groupCategory: "Tasks" },
+  missed_appointment:              { label: "missed appointments",               groupCategory: "Advising" },
+  certification_stalled:           { label: "certifications stalled",            groupCategory: "Certifications" },
+};
+
+interface ConsolidatedItem {
+  key: string;
+  groupCategory: string;
+  label: string;
+  count: number;
+  severity: "high" | "medium";
+  items: UnifiedItem[];
+  primaryAction: { label: string; href: string } | null;
+}
+
+function consolidateItems(items: UnifiedItem[]): ConsolidatedItem[] {
+  const buckets = new Map<string, ConsolidatedItem>();
+
+  for (const item of items) {
+    const group = CONSOLIDATION_GROUPS[item.type];
+    const bucketKey = group ? item.type : `_ungrouped_${item.id}`;
+
+    let bucket = buckets.get(bucketKey);
+    if (!bucket) {
+      // Pick the primary action from the first item in the group
+      let primaryAction: { label: string; href: string } | null = null;
+      if (item.category === "review") {
+        const qa = teacherDashboardReviewQuickAction(item.type);
+        const action = teacherDashboardReviewAction(item.type, item.student.id);
+        if (qa && action) primaryAction = { label: qa.label, href: action.href };
+      } else {
+        const qa = teacherDashboardAlertQuickAction(item.type);
+        const action = teacherDashboardAlertAction(item.type, item.student.id);
+        if (qa && action) primaryAction = { label: qa.label, href: action.href };
+      }
+
+      bucket = {
+        key: bucketKey,
+        groupCategory: group?.groupCategory || categoryLabel(item.category),
+        label: group?.label || item.title,
+        count: 0,
+        severity: "medium",
+        items: [],
+        primaryAction,
+      };
+      buckets.set(bucketKey, bucket);
+    }
+
+    bucket.items.push(item);
+    bucket.count++;
+    if (item.severity === "high") bucket.severity = "high";
   }
 
-  for (const r of review) {
-    items.push({ ...r, category: "review" });
-  }
-
-  // Sort: high severity first, then by date (newest first)
-  return items.sort((a, b) => {
-    const sevOrder = a.severity === "high" ? 0 : 1;
-    const sevOrderB = b.severity === "high" ? 0 : 1;
-    if (sevOrder !== sevOrderB) return sevOrder - sevOrderB;
-    return new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime();
+  // Sort: high severity first, then by count desc
+  return Array.from(buckets.values()).sort((a, b) => {
+    if (a.severity !== b.severity) return a.severity === "high" ? -1 : 1;
+    return b.count - a.count;
   });
 }
 
-// ─── Sage Summary ───────────────────────────────────────────────────────────
-
-interface StudentSummary {
-  student: { id: string; studentId: string; displayName: string };
-  highCount: number;
-  mediumCount: number;
-  items: UnifiedItem[];
+function categoryLabel(cat: string) {
+  switch (cat) {
+    case "inactivity": return "Inactivity";
+    case "review": return "Review";
+    default: return "Alert";
+  }
 }
 
-function groupByStudent(items: UnifiedItem[]): StudentSummary[] {
-  const map = new Map<string, StudentSummary>();
+// ─── Student grouping ───────────────────────────────────────────────────────
+
+interface StudentGroup {
+  student: { id: string; studentId: string; displayName: string };
+  highCount: number;
+  totalCount: number;
+  items: UnifiedItem[];
+  consolidated: ConsolidatedItem[];
+  topCategory: string;
+}
+
+function groupByStudent(items: UnifiedItem[]): StudentGroup[] {
+  const map = new Map<string, StudentGroup>();
   for (const item of items) {
     let entry = map.get(item.student.id);
     if (!entry) {
-      entry = { student: item.student, highCount: 0, mediumCount: 0, items: [] };
+      entry = {
+        student: item.student,
+        highCount: 0,
+        totalCount: 0,
+        items: [],
+        consolidated: [],
+        topCategory: "",
+      };
       map.set(item.student.id, entry);
     }
     entry.items.push(item);
+    entry.totalCount++;
     if (item.severity === "high") entry.highCount++;
-    else entry.mediumCount++;
   }
-  // Sort by high-severity count desc, then total count desc
+
+  for (const entry of map.values()) {
+    entry.consolidated = consolidateItems(entry.items);
+    // The top category is the first consolidated item's group
+    entry.topCategory = entry.consolidated[0]?.groupCategory || "";
+  }
+
   return Array.from(map.values()).sort(
-    (a, b) => b.highCount - a.highCount || b.items.length - a.items.length,
+    (a, b) => b.highCount - a.highCount || b.totalCount - a.totalCount,
   );
 }
 
-function buildSageMessage(group: StudentSummary): string {
+// ─── Sage message builder ───────────────────────────────────────────────────
+
+function buildSageMessage(group: StudentGroup): string {
   const lines = [
-    `I need help with interventions for ${group.student.displayName}. Here are their current alerts:\n`,
+    `I need help with interventions for ${group.student.displayName}. Here are their current issues:\n`,
   ];
-  for (const item of group.items) {
-    lines.push(`- [${item.severity.toUpperCase()}] ${item.title}: ${item.summary}`);
+  for (const c of group.consolidated) {
+    const sevTag = c.severity === "high" ? " [HIGH]" : "";
+    lines.push(`- ${c.count > 1 ? `${c.count} ` : ""}${c.label}${sevTag}`);
   }
   lines.push(
-    `\nPlease help me prioritize these, suggest what to address first, and recommend specific actions I can take for each one.`,
+    `\nPlease help me prioritize these, suggest what to address first, and recommend specific actions I can take.`,
   );
   return lines.join("\n");
 }
 
-function SageSummaryPanel({ groups, totalCount }: { groups: StudentSummary[]; totalCount: number }) {
-  const studentCount = groups.length;
-  const highTotal = groups.reduce((sum, g) => sum + g.highCount, 0);
-
-  function handleAskSageAll() {
-    const lines = [`I have ${totalCount} interventions across ${studentCount} students. Here's a summary:\n`];
-    for (const g of groups) {
-      lines.push(`${g.student.displayName}: ${g.highCount} high, ${g.mediumCount} other (${g.items.length} total)`);
-      for (const item of g.items.slice(0, 3)) {
-        lines.push(`  - [${item.severity.toUpperCase()}] ${item.title}`);
-      }
-      if (g.items.length > 3) lines.push(`  - ...and ${g.items.length - 3} more`);
+function buildSageAllMessage(groups: StudentGroup[], totalCount: number): string {
+  const lines = [`I have ${totalCount} interventions across ${groups.length} students. Here's a summary:\n`];
+  for (const g of groups) {
+    lines.push(`${g.student.displayName}: ${g.highCount} high priority, ${g.totalCount} total`);
+    for (const c of g.consolidated.slice(0, 3)) {
+      lines.push(`  - ${c.count > 1 ? `${c.count} ` : ""}${c.label}`);
     }
-    lines.push(`\nHelp me prioritize which students to address first and suggest an action plan for the most urgent issues.`);
-    openSageWithMessage(lines.join("\n"));
+    if (g.consolidated.length > 3) lines.push(`  - ...and ${g.consolidated.length - 3} more categories`);
   }
+  lines.push(`\nHelp me prioritize which students to address first and suggest an action plan for the most urgent issues.`);
+  return lines.join("\n");
+}
+
+// ─── Student Accordion Row ──────────────────────────────────────────────────
+
+function StudentAccordion({
+  group,
+  isOpen,
+  onToggle,
+  onAction,
+}: {
+  group: StudentGroup;
+  isOpen: boolean;
+  onToggle: () => void;
+  onAction: InterventionQueueProps["onAction"];
+}) {
+  const borderColor = group.highCount > 0
+    ? "border-red-200"
+    : "border-amber-200";
+  const bgColor = group.highCount > 0
+    ? "bg-red-50/40"
+    : "bg-amber-50/40";
+
+  // Build a compact preview of consolidated categories
+  const preview = group.consolidated
+    .slice(0, 3)
+    .map((c) => (c.count > 1 ? `${c.count} ${c.label}` : c.label))
+    .join(", ");
 
   return (
-    <div className="rounded-[1.15rem] border border-[rgba(8,68,80,0.15)] bg-[linear-gradient(135deg,rgba(8,68,80,0.04),rgba(8,68,80,0.08))] p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-xl bg-[rgba(8,68,80,0.12)] text-sm font-bold text-[rgba(8,68,80,0.85)]">
-              S
-            </span>
-            <p className="text-sm font-semibold text-[var(--ink-strong)]">Sage Summary</p>
-          </div>
-          <p className="mt-2 text-sm text-[var(--ink-muted)]">
-            {studentCount} student{studentCount !== 1 ? "s" : ""} need{studentCount === 1 ? "s" : ""} attention with {totalCount} total intervention{totalCount !== 1 ? "s" : ""}
-            {highTotal > 0 ? `. ${highTotal} are high priority.` : "."}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleAskSageAll}
-          className="rounded-full bg-[var(--ink-strong)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-105 hover:shadow-md"
+    <div className={`overflow-hidden rounded-[1.15rem] border ${borderColor} ${bgColor} transition-colors`}>
+      {/* Collapsed header — always visible */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-black/[0.02]"
+        aria-expanded={isOpen}
+      >
+        {/* Chevron */}
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`shrink-0 text-[var(--ink-muted)] transition-transform ${isOpen ? "rotate-90" : ""}`}
         >
-          Ask Sage to prioritize all
-        </button>
-      </div>
+          <path d="m9 18 6-6-6-6" />
+        </svg>
 
-      <div className="mt-3 space-y-2">
-        {groups.map((group) => (
-          <div
-            key={group.student.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-[0.85rem] bg-white/70 px-3 py-2.5"
-          >
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/teacher/students/${group.student.id}`}
-                className="text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
-              >
-                {group.student.displayName}
-              </Link>
-              <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                {group.items.length} issue{group.items.length !== 1 ? "s" : ""}
-                {group.highCount > 0 ? ` (${group.highCount} high)` : ""}
-                {" \u2014 "}
-                {group.items.slice(0, 2).map((i) => i.title).join(", ")}
-                {group.items.length > 2 ? `, +${group.items.length - 2} more` : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openSageWithMessage(buildSageMessage(group))}
-              className="shrink-0 rounded-full border border-[rgba(8,68,80,0.2)] px-3 py-1.5 text-xs font-semibold text-[rgba(8,68,80,0.85)] transition-colors hover:bg-[rgba(8,68,80,0.08)]"
-            >
-              Ask Sage
-            </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-[var(--ink-strong)]">
+              {group.student.displayName}
+            </span>
+            {group.highCount > 0 && (
+              <span className="rounded-full bg-red-200 px-2 py-0.5 text-[10px] font-semibold text-red-800">
+                {group.highCount} urgent
+              </span>
+            )}
+            <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+              {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
+            </span>
           </div>
-        ))}
-      </div>
+          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{preview}</p>
+        </div>
+
+        {/* Quick actions on the collapsed row */}
+        <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => openSageWithMessage(buildSageMessage(group))}
+            className="rounded-full border border-[rgba(8,68,80,0.2)] px-3 py-1.5 text-xs font-semibold text-[rgba(8,68,80,0.85)] transition-colors hover:bg-[rgba(8,68,80,0.08)]"
+          >
+            Ask Sage
+          </button>
+          <Link
+            href={`/teacher/students/${group.student.id}`}
+            className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+          >
+            View student
+          </Link>
+        </div>
+      </button>
+
+      {/* Expanded — consolidated items grouped by category */}
+      {isOpen && (
+        <div className="border-t border-inherit px-4 pb-4 pt-3">
+          {group.consolidated.map((c) => {
+            const isHigh = c.severity === "high";
+            return (
+              <div
+                key={c.key}
+                className={`mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[0.85rem] border px-3 py-2.5 ${
+                  isHigh ? "border-red-200 bg-red-50/80" : "border-gray-200 bg-white"
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      {c.groupCategory}
+                    </span>
+                    {isHigh && (
+                      <span className="rounded-full bg-red-200 px-1.5 py-0.5 text-[9px] font-bold text-red-800">
+                        HIGH
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm font-medium text-[var(--ink-strong)]">
+                    {c.count > 1 ? `${c.count} ${c.label}` : c.label}
+                  </p>
+                  {/* Show individual summaries if few enough */}
+                  {c.count <= 3 && c.items.map((item) => (
+                    <p key={item.id} className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                      {item.summary}
+                    </p>
+                  ))}
+                  {c.count > 3 && (
+                    <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                      {c.items[0].summary} and {c.count - 1} more
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {c.primaryAction && (
+                    <Link
+                      href={c.primaryAction.href}
+                      className="rounded-full border border-[rgba(18,38,63,0.12)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-gray-50"
+                    >
+                      {c.primaryAction.label}
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const first = c.items[0];
+                      onAction({ type: first.type, studentId: first.student.id, alertId: first.id, studentName: first.student.displayName });
+                    }}
+                    className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+                  >
+                    Actions
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Main Queue ─────────────────────────────────────────────────────────────
-
-function getCategoryBadge(category: string) {
-  switch (category) {
-    case "inactivity":
-      return { label: "Inactive", className: "bg-red-100 text-red-700" };
-    case "review":
-      return { label: "Review", className: "bg-blue-100 text-blue-700" };
-    default:
-      return { label: "Alert", className: "bg-amber-100 text-amber-700" };
-  }
-}
-
-function getQuickAction(item: UnifiedItem): { label: string; href: string } | null {
-  if (item.category === "review") {
-    const qa = teacherDashboardReviewQuickAction(item.type);
-    const action = teacherDashboardReviewAction(item.type, item.student.id);
-    if (qa && action) return { label: qa.label, href: action.href };
-  } else {
-    const qa = teacherDashboardAlertQuickAction(item.type);
-    const action = teacherDashboardAlertAction(item.type, item.student.id);
-    if (qa && action) return { label: qa.label, href: action.href };
-  }
-  return null;
-}
+// ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue, onAction }: InterventionQueueProps) {
-  const [filter, setFilter] = useState<"all" | "alert" | "inactivity" | "review">("all");
-  const [showDetails, setShowDetails] = useState(false);
-
-  const allItems = unifyAndSort(alerts, inactivityQueue, reviewQueue);
-  const filtered = filter === "all" ? allItems : allItems.filter((i) => i.category === filter);
+  const allItems = unifyItems(alerts, inactivityQueue, reviewQueue);
   const studentGroups = groupByStudent(allItems);
+  const [openStudents, setOpenStudents] = useState<Set<string>>(new Set());
 
   const highCount = allItems.filter((i) => i.severity === "high").length;
   const totalCount = allItems.length;
+
+  function toggleStudent(id: string) {
+    setOpenStudents((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function expandAll() {
+    setOpenStudents(new Set(studentGroups.map((g) => g.student.id)));
+  }
+
+  function collapseAll() {
+    setOpenStudents(new Set());
+  }
 
   if (totalCount === 0) {
     return (
@@ -277,6 +431,7 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
 
   return (
     <div className="surface-section p-5">
+      {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
@@ -284,116 +439,40 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
           </p>
           <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
-            {totalCount} intervention{totalCount === 1 ? "" : "s"} across {studentGroups.length} student{studentGroups.length === 1 ? "" : "s"}
+            {totalCount} intervention{totalCount !== 1 ? "s" : ""} across {studentGroups.length} student{studentGroups.length !== 1 ? "s" : ""}
             {highCount > 0 ? ` \u2022 ${highCount} high priority` : ""}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowDetails((v) => !v)}
-          className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
-        >
-          {showDetails ? "Hide details" : "Show all details"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openSageWithMessage(buildSageAllMessage(studentGroups, totalCount))}
+            className="rounded-full bg-[var(--ink-strong)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-105 hover:shadow-md"
+          >
+            Ask Sage to prioritize
+          </button>
+          <button
+            type="button"
+            onClick={openStudents.size === studentGroups.length ? collapseAll : expandAll}
+            className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+          >
+            {openStudents.size === studentGroups.length ? "Collapse all" : "Expand all"}
+          </button>
+        </div>
       </div>
 
-      {/* Sage Summary — grouped by student */}
-      <SageSummaryPanel groups={studentGroups} totalCount={totalCount} />
-
-      {/* Detailed list — collapsed by default */}
-      {showDetails && (
-        <div className="mt-4">
-          <div className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-0.5">
-            {([
-              { key: "all", label: `All (${totalCount})` },
-              { key: "alert", label: "Alerts" },
-              { key: "inactivity", label: "Inactive" },
-              { key: "review", label: "Review" },
-            ] as const).map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setFilter(f.key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  filter === f.key
-                    ? "bg-white text-[var(--ink-strong)] shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="space-y-2">
-            {filtered.slice(0, 20).map((item) => {
-              const badge = getCategoryBadge(item.category);
-              const qa = getQuickAction(item);
-
-              return (
-                <div
-                  key={item.id}
-                  className={`rounded-[1rem] border p-4 transition-colors ${
-                    item.severity === "high"
-                      ? "border-red-200 bg-red-50/60"
-                      : "border-amber-200 bg-amber-50/60"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}>
-                          {badge.label}
-                        </span>
-                        {item.severity === "high" && (
-                          <span className="rounded-full bg-red-200 px-2 py-0.5 text-[10px] font-semibold text-red-800">
-                            High
-                          </span>
-                        )}
-                        {item.stageLabel && (
-                          <span className="text-[10px] font-semibold text-gray-500">{item.stageLabel}</span>
-                        )}
-                      </div>
-                      <p className="mt-1.5 text-sm font-semibold text-[var(--ink-strong)]">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                        <Link href={`/teacher/students/${item.student.id}`} className="font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]">
-                          {item.student.displayName}
-                        </Link>
-                        {" \u2022 "}{item.summary}
-                      </p>
-                      {item.nextStep && (
-                        <p className="mt-1 text-xs text-gray-500">Next: {item.nextStep}</p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {qa && (
-                        <Link
-                          href={qa.href}
-                          className="rounded-full border border-[rgba(18,38,63,0.12)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-gray-50"
-                        >
-                          {qa.label}
-                        </Link>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onAction({ type: item.type, studentId: item.student.id, alertId: item.id, studentName: item.student.displayName })}
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
-                      >
-                        Actions
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {filtered.length > 20 && (
-              <p className="py-2 text-center text-xs text-[var(--ink-muted)]">
-                Showing 20 of {filtered.length} items
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Student accordion list */}
+      <div className="space-y-2">
+        {studentGroups.map((group) => (
+          <StudentAccordion
+            key={group.student.id}
+            group={group}
+            isOpen={openStudents.has(group.student.id)}
+            onToggle={() => toggleStudent(group.student.id)}
+            onAction={onAction}
+          />
+        ))}
+      </div>
     </div>
   );
 }

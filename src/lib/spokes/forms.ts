@@ -21,6 +21,7 @@ export interface SpokesForm {
   required: boolean;
   audience: "student" | "instructor" | "both";
   acceptsSubmission: boolean;
+  requiresSignature: boolean;
   sortOrder: number;
 }
 
@@ -70,6 +71,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "student",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 1,
   },
   {
@@ -83,6 +85,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 2,
   },
   {
@@ -96,6 +99,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: false,
     sortOrder: 3,
   },
   {
@@ -109,6 +113,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 4,
   },
   {
@@ -123,6 +128,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 5,
   },
   {
@@ -137,6 +143,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 6,
   },
   {
@@ -151,6 +158,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 7,
   },
   {
@@ -164,6 +172,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 8,
   },
   {
@@ -178,6 +187,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 9,
   },
   {
@@ -192,6 +202,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 10,
   },
   {
@@ -205,6 +216,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: false,
     sortOrder: 11,
   },
   {
@@ -219,6 +231,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: false,
     sortOrder: 12,
   },
   {
@@ -233,6 +246,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: false,
     sortOrder: 13,
   },
   {
@@ -247,6 +261,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 14,
   },
   {
@@ -261,6 +276,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 15,
   },
 
@@ -279,6 +295,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 1,
   },
 
@@ -297,6 +314,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "both",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 1,
   },
   {
@@ -310,6 +328,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 2,
   },
   {
@@ -323,6 +342,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 3,
   },
   {
@@ -336,6 +356,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 4,
   },
   {
@@ -349,6 +370,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: true,
+    requiresSignature: true,
     sortOrder: 5,
   },
   {
@@ -363,6 +385,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 6,
   },
   {
@@ -376,6 +399,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 7,
   },
   {
@@ -390,6 +414,7 @@ export const FORMS: SpokesForm[] = [
     required: false,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 8,
   },
 
@@ -408,6 +433,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
+    requiresSignature: false,
     sortOrder: 1,
   },
 
@@ -426,6 +452,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "both",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 1,
   },
   {
@@ -439,6 +466,7 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: false,
+    requiresSignature: false,
     sortOrder: 2,
   },
 ];
