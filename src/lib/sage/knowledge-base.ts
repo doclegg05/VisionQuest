@@ -356,6 +356,103 @@ export const TOPIC_KEYWORDS: Record<string, string[]> = {
   admin_resources: ["administrator", "instructor resource", "evaluation", "professional development", "confidentiality", "aup", "acceptable use", "schoology handbook"],
 };
 
+// ---------------------------------------------------------------------------
+// Document-based context from ProgramDocument (dynamic RAG layer)
+// ---------------------------------------------------------------------------
+
+import { prisma } from "@/lib/db";
+import { cached } from "@/lib/cache";
+
+interface SageDocument {
+  title: string;
+  sageContextNote: string | null;
+  certificationId: string | null;
+  platformId: string | null;
+}
+
+async function loadSageDocuments(): Promise<SageDocument[]> {
+  return cached("sage:documents", 300, () =>
+    prisma.programDocument.findMany({
+      where: { usedBySage: true, isActive: true },
+      select: {
+        title: true,
+        sageContextNote: true,
+        certificationId: true,
+        platformId: true,
+      },
+    }),
+  );
+}
+
+/**
+ * Score a document against the user message using keyword matching
+ * on title, certificationId, platformId, and sageContextNote.
+ */
+function scoreDocument(doc: SageDocument, messageLower: string): number {
+  let score = 0;
+
+  // Match title words (each word matched adds its length)
+  const titleWords = doc.title.toLowerCase().split(/\s+/);
+  for (const word of titleWords) {
+    if (word.length >= 3 && messageLower.includes(word)) {
+      score += word.length;
+    }
+  }
+
+  // Match certificationId and platformId directly
+  if (doc.certificationId && messageLower.includes(doc.certificationId.toLowerCase())) {
+    score += doc.certificationId.length * 2; // higher weight for exact ID match
+  }
+  if (doc.platformId && messageLower.includes(doc.platformId.toLowerCase())) {
+    score += doc.platformId.length * 2;
+  }
+
+  // Match keywords in sageContextNote (first 200 chars for efficiency)
+  if (doc.sageContextNote) {
+    const noteWords = doc.sageContextNote.toLowerCase().slice(0, 200).split(/\s+/);
+    for (const word of noteWords) {
+      if (word.length >= 4 && messageLower.includes(word)) {
+        score += 1; // lower weight for note matches
+      }
+    }
+  }
+
+  return score;
+}
+
+/**
+ * Retrieve relevant program documents based on the user's message.
+ * Returns formatted context string to inject into Sage's system prompt.
+ *
+ * Uses keyword matching on document titles, certification/platform IDs,
+ * and sageContextNote content. Returns top 3 matches.
+ *
+ * Upgrade path: replace keyword matching with pgvector cosine similarity
+ * if corpus grows beyond 200 documents. The function signature stays the same.
+ */
+export async function getDocumentContext(userMessage: string): Promise<string> {
+  const docs = await loadSageDocuments();
+  if (docs.length === 0) return "";
+
+  const messageLower = userMessage.toLowerCase();
+  const scored = docs
+    .map((doc) => ({ doc, score: scoreDocument(doc, messageLower) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  if (scored.length === 0) return "";
+
+  const content = scored
+    .map((entry) => {
+      const note = entry.doc.sageContextNote || entry.doc.title;
+      return `[${entry.doc.title}]: ${note}`;
+    })
+    .join("\n\n");
+
+  return `\n\nPROGRAM DOCUMENT REFERENCE (use this for specific, accurate answers about program materials):\n${content}`;
+}
+
 /**
  * Given a user message, find matching topics and return additional context to inject.
  * Returns empty string if no topics match (Sage uses base knowledge).

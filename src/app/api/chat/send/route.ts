@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { streamResponse } from "@/lib/gemini";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
+import { getDocumentContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
@@ -115,6 +116,12 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
       discovery_summary: discoverySummary,
     });
+  }
+
+  // Inject document-based context from ProgramDocument (RAG layer)
+  const documentContext = await getDocumentContext(userMessage);
+  if (documentContext) {
+    systemPrompt += documentContext;
   }
 
   // Format message history for Gemini
