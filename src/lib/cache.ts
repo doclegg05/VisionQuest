@@ -1,17 +1,82 @@
 import NodeCache from "node-cache";
 
-/**
- * In-memory TTL cache for hot paths.
- *
- * Good for single-instance deployments (Render starter plan).
- * Replace with Redis if you scale to multiple instances.
- */
-const appCache = new NodeCache({
-  stdTTL: 60, // default 60s
-  checkperiod: 120, // eviction check every 120s
-  useClones: true, // safe: callers get copies, preventing cross-request mutation
-  maxKeys: 10_000, // hard cap to prevent memory exhaustion
-});
+// ---------------------------------------------------------------------------
+// Cache adapter interface
+//
+// The app uses InMemoryCacheAdapter by default (single-instance Render).
+// When REDIS_URL is set, swap to RedisCacheAdapter for multi-instance support.
+// ---------------------------------------------------------------------------
+
+interface CacheAdapter {
+  get<T>(key: string): T | undefined;
+  set(key: string, value: unknown, ttlSeconds: number): void;
+  del(key: string): void;
+  delPrefix(prefix: string): void;
+}
+
+// ---------------------------------------------------------------------------
+// In-memory adapter (default) — uses node-cache
+// ---------------------------------------------------------------------------
+
+class InMemoryCacheAdapter implements CacheAdapter {
+  private cache: NodeCache;
+
+  constructor() {
+    this.cache = new NodeCache({
+      stdTTL: 60,
+      checkperiod: 120,
+      useClones: true,
+      maxKeys: 10_000,
+    });
+  }
+
+  get<T>(key: string): T | undefined {
+    return this.cache.get<T>(key);
+  }
+
+  set(key: string, value: unknown, ttlSeconds: number): void {
+    this.cache.set(key, value, ttlSeconds);
+  }
+
+  del(key: string): void {
+    this.cache.del(key);
+  }
+
+  delPrefix(prefix: string): void {
+    const keys = this.cache.keys().filter((k) => k.startsWith(prefix));
+    if (keys.length > 0) this.cache.del(keys);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Redis adapter stub — activate by setting REDIS_URL environment variable
+//
+// To implement: npm install ioredis, replace the stub methods below.
+// The function signatures are identical to InMemoryCacheAdapter.
+// ---------------------------------------------------------------------------
+
+// Uncomment and implement when scaling to multiple instances:
+//
+// import Redis from "ioredis";
+//
+// class RedisCacheAdapter implements CacheAdapter {
+//   private client: Redis;
+//   constructor(url: string) { this.client = new Redis(url); }
+//   get<T>(key: string): T | undefined { /* redis GET + JSON.parse */ }
+//   set(key: string, value: unknown, ttlSeconds: number): void { /* redis SET EX */ }
+//   del(key: string): void { /* redis DEL */ }
+//   delPrefix(prefix: string): void { /* redis SCAN + DEL */ }
+// }
+
+// ---------------------------------------------------------------------------
+// Singleton adapter
+// ---------------------------------------------------------------------------
+
+const adapter: CacheAdapter = new InMemoryCacheAdapter();
+
+// ---------------------------------------------------------------------------
+// Public API — unchanged signatures, backed by adapter
+// ---------------------------------------------------------------------------
 
 /**
  * Get a cached value, or compute + store it on miss.
@@ -24,11 +89,11 @@ export async function cached<T>(
   ttlSeconds: number,
   fetcher: () => Promise<T>,
 ): Promise<T> {
-  const hit = appCache.get<T>(key);
+  const hit = adapter.get<T>(key);
   if (hit !== undefined) return hit;
 
   const value = await fetcher();
-  appCache.set(key, value, ttlSeconds);
+  adapter.set(key, value, ttlSeconds);
   return value;
 }
 
@@ -36,7 +101,7 @@ export async function cached<T>(
  * Invalidate a single cache key.
  */
 export function invalidate(key: string): void {
-  appCache.del(key);
+  adapter.del(key);
 }
 
 /**
@@ -44,6 +109,5 @@ export function invalidate(key: string): void {
  * Useful for busting all of a user's cached data on writes.
  */
 export function invalidatePrefix(prefix: string): void {
-  const keys = appCache.keys().filter((k) => k.startsWith(prefix));
-  if (keys.length > 0) appCache.del(keys);
+  adapter.delPrefix(prefix);
 }

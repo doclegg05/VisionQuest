@@ -57,6 +57,7 @@ model Student {
   assignedGoalLinks       GoalResourceLink[]       @relation("AssignedGoalResourceLinks")
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
+  moodEntries             MoodEntry[]
 
   @@schema("visionquest")
 }
@@ -943,6 +944,21 @@ model CareerDiscovery {
   @@schema("visionquest")
 }
 
+model MoodEntry {
+  id             String   @id @default(cuid())
+  studentId      String
+  score          Int
+  context        String?  @db.Text
+  source         String
+  conversationId String?
+  extractedAt    DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, extractedAt])
+  @@schema("visionquest")
+}
+
 model GrantKpiSnapshot {
   id           String   @id @default(cuid())
   programYear  String
@@ -954,5 +970,18 @@ model GrantKpiSnapshot {
 
   @@unique([programYear, snapshotDate, classId])
   @@index([programYear, snapshotDate])
+  @@schema("visionquest")
+}
+
+model WebhookSubscription {
+  id         String   @id @default(cuid())
+  url        String
+  secret     String
+  eventTypes String[] @default([])
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive])
   @@schema("visionquest")
 }
