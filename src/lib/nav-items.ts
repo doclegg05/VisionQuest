@@ -1,0 +1,24 @@
+import {
+  House,
+  Target,
+  ClipboardText,
+  BookOpen,
+  Briefcase,
+  Rocket,
+  CalendarDots,
+} from "@phosphor-icons/react";
+import type { NavItem, NavPhase } from "./nav-progression";
+
+export const STUDENT_NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Home", icon: House, phase: 1 },
+  { href: "/goals", label: "Goals", icon: Target, phase: 1 },
+  { href: "/orientation", label: "Orientation", icon: ClipboardText, phase: 1 },
+  { href: "/learning", label: "Learning", icon: BookOpen, phase: 1 },
+  { href: "/portfolio", label: "Portfolio", icon: Briefcase, phase: 2 },
+  { href: "/career", label: "Career", icon: Rocket, phase: 3 },
+  { href: "/appointments", label: "Advising", icon: CalendarDots, phase: 3 },
+];
+
+export function getVisibleNavItems(phase: NavPhase): NavItem[] {
+  return STUDENT_NAV_ITEMS.filter((item) => item.phase <= phase);
+}

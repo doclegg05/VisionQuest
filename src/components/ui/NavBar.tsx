@@ -4,19 +4,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath } from "@/lib/role-home";
-import { getVisibleNavItems, type NavPhase } from "@/lib/nav-progression";
+import { type NavPhase, type NavItem } from "@/lib/nav-progression";
+import { getVisibleNavItems } from "@/lib/nav-items";
+import {
+  Users,
+  Buildings,
+  Gear,
+  Wrench,
+  ChatCircle,
+  DotsThreeOutline,
+} from "@phosphor-icons/react";
+import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
 import NotificationBell from "./NotificationBell";
 import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
-const STAFF_ITEMS = [
-  { href: "/teacher", label: "Class Dashboard", icon: "👥" },
-  { href: "/teacher/classes", label: "Classes", icon: "🏫" },
-  { href: "/teacher/manage", label: "Manage Content", icon: "⚙️" },
+const STAFF_ITEMS: NavItem[] = [
+  { href: "/teacher", label: "Class Dashboard", icon: Users, phase: 1 },
+  { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
+  { href: "/teacher/manage", label: "Manage Content", icon: Gear, phase: 1 },
 ];
 
-const ADMIN_ITEMS = [
-  { href: "/admin", label: "Admin", icon: "🛠️" },
+const ADMIN_ITEMS: NavItem[] = [
+  { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
 ];
 
 interface NavBarProps {
@@ -99,6 +109,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           <span className="hidden max-w-[9.75rem] break-words text-right text-sm font-medium leading-4 text-[var(--ink-muted)] min-[430px]:block min-[470px]:max-w-[11rem]">
             {studentName}
           </span>
+          <ThemeToggle className="hidden min-[390px]:block" />
           <div className="text-[var(--ink-strong)]">
             <NotificationBell />
           </div>
@@ -109,7 +120,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
               className="rounded-full border border-[rgba(18,38,63,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
               aria-label="Settings"
             >
-              ⚙️
+              <Gear size={16} weight="bold" />
             </Link>
           )}
           <button
@@ -148,7 +159,10 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                     : "bg-transparent"
                 }`}
               >
-                {item.icon}
+                <item.icon
+                  size={20}
+                  weight={pathname === item.href || pathname.startsWith(item.href + "/") ? "fill" : "regular"}
+                />
               </span>
               <span className="text-center">{item.label}</span>
             </Link>
@@ -170,7 +184,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   isMoreActive ? "bg-[rgba(16,37,62,0.1)]" : "bg-transparent"
                 }`}
               >
-                •••
+                <DotsThreeOutline size={20} weight={isMoreActive ? "fill" : "regular"} />
               </span>
               <span className="text-center">More</span>
             </button>
@@ -205,7 +219,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   }`}
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
-                  <span className="mb-1 text-2xl">{item.icon}</span>
+                  <item.icon size={24} weight="regular" className="mb-1" />
                   <span className="text-center leading-4">{item.label}</span>
                 </Link>
               ))}
@@ -253,7 +267,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                     active ? "bg-[var(--ink-strong)] text-white" : "bg-white/10 text-white"
                   }`}
                 >
-                  {item.icon}
+                  <item.icon size={20} weight={active ? "fill" : "regular"} />
                 </span>
                 <span>{item.label}</span>
               </Link>
@@ -268,6 +282,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
               <p className="text-xs uppercase tracking-[0.18em] text-white/75">{role}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggle />
               <NotificationBell />
               {role === "student" && (
                 <Link
@@ -276,7 +291,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
                   aria-label="Settings"
                 >
-                  ⚙️
+                  <Gear size={16} weight="bold" />
                 </Link>
               )}
               <button
@@ -302,7 +317,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
             aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
             aria-expanded={sageMiniOpen}
           >
-            {sageMiniOpen ? "✕" : "💬"}
+            {sageMiniOpen ? "✕" : <ChatCircle size={24} weight="fill" />}
           </button>
           <SageMiniChat
             open={sageMiniOpen}
