@@ -145,6 +145,40 @@ function ProgramOfTheYearBadge({
 }
 
 // ---------------------------------------------------------------------------
+// Sparkline — tiny inline SVG trend chart
+// ---------------------------------------------------------------------------
+
+function Sparkline({ values, color = "#0ea5e9" }: { values: number[]; color?: string }) {
+  if (values.length < 2) return null;
+
+  const width = 120;
+  const height = 32;
+  const pad = 2;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+
+  const points = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+    return `${x},${y}`;
+  });
+
+  return (
+    <svg width={width} height={height} className="inline-block" aria-hidden="true">
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points.join(" ")}
+      />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Counts summary
 // ---------------------------------------------------------------------------
 
@@ -194,9 +228,14 @@ export default function GrantKpiReport() {
     students: DrillDownStudent[];
   } | null>(null);
   const [drillLoading, setDrillLoading] = useState(false);
+  const [trendData, setTrendData] = useState<Array<{
+    date: string;
+    metrics: GrantKpiPayload["metrics"];
+  }>>([]);
 
   useEffect(() => {
     void loadData();
+    void loadTrends();
   }, []);
 
   async function loadData() {
@@ -234,6 +273,23 @@ export default function GrantKpiReport() {
     }
   }
 
+  async function loadTrends() {
+    try {
+      const res = await fetch("/api/teacher/reports/grant-kpi/history");
+      if (!res.ok) return;
+      const payload = await res.json();
+      if (Array.isArray(payload.snapshots)) {
+        setTrendData(payload.snapshots);
+      }
+    } catch {
+      // Trends are optional — don't block the dashboard
+    }
+  }
+
+  function getTrendValues(metricKey: keyof GrantKpiPayload["metrics"]): number[] {
+    return trendData.map((s) => s.metrics[metricKey]?.value ?? 0);
+  }
+
   function handleExportCsv() {
     const a = document.createElement("a");
     a.href = "/api/teacher/reports/grant-kpi?format=csv";
@@ -257,13 +313,13 @@ export default function GrantKpiReport() {
     );
   }
 
-  const metricList = [
-    data.metrics.enrollmentRate,
-    data.metrics.jobPlacementRate,
-    data.metrics.highWagePlacementRate,
-    data.metrics.postSecondaryTransition,
-    data.metrics.threeMonthRetention,
-    data.metrics.sixMonthRetention,
+  const metricEntries: Array<{ key: keyof GrantKpiPayload["metrics"]; metric: GrantMetric }> = [
+    { key: "enrollmentRate", metric: data.metrics.enrollmentRate },
+    { key: "jobPlacementRate", metric: data.metrics.jobPlacementRate },
+    { key: "highWagePlacementRate", metric: data.metrics.highWagePlacementRate },
+    { key: "postSecondaryTransition", metric: data.metrics.postSecondaryTransition },
+    { key: "threeMonthRetention", metric: data.metrics.threeMonthRetention },
+    { key: "sixMonthRetention", metric: data.metrics.sixMonthRetention },
   ];
 
   return (
@@ -283,8 +339,21 @@ export default function GrantKpiReport() {
         <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Performance metrics</p>
         <h3 className="mt-2 text-lg font-semibold text-gray-900">Grant outcomes</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {metricList.map((m) => (
-            <MetricCard key={m.label} m={m} onDrillDown={handleDrillDown} />
+          {metricEntries.map(({ key, metric: m }) => (
+            <div key={m.label}>
+              <MetricCard m={m} onDrillDown={handleDrillDown} />
+              {trendData.length >= 2 && (
+                <div className="mt-1 flex items-center gap-2 px-1">
+                  <Sparkline
+                    values={getTrendValues(key)}
+                    color={m.meetsTarget === true ? "#059669" : m.meetsTarget === false ? "#d97706" : "#6b7280"}
+                  />
+                  <span className="text-xs text-gray-400">
+                    {trendData.length} snapshots
+                  </span>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

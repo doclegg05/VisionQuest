@@ -39,3 +39,8 @@ registerJobHandler("sync_student_alerts", async (payload) => {
   const { syncStudentAlerts } = await import("./advising");
   await syncStudentAlerts(payload.studentId as string);
 });
+
+registerJobHandler("snapshot_grant_kpis", async (payload) => {
+  const { takeGrantKpiSnapshot } = await import("./grant-kpi-history");
+  await takeGrantKpiSnapshot(payload.classId as string | undefined);
+});

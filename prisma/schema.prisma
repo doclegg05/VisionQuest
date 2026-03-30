@@ -67,6 +67,7 @@ model Conversation {
   module    String
   stage     String
   title     String?
+  summary   String?  @db.Text
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -939,5 +940,19 @@ model CareerDiscovery {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@schema("visionquest")
+}
+
+model GrantKpiSnapshot {
+  id           String   @id @default(cuid())
+  programYear  String
+  snapshotDate DateTime @db.Date
+  classId      String?
+  metrics      String   @db.Text // JSON: { enrollmentRate, jobPlacementRate, ... }
+  counts       String   @db.Text // JSON: { referred, enrolled, placed, ... }
+  createdAt    DateTime @default(now())
+
+  @@unique([programYear, snapshotDate, classId])
+  @@index([programYear, snapshotDate])
   @@schema("visionquest")
 }
