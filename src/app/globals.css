@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-:root {
-  /* Brand Colors */
+:root,
+[data-theme="light"] {
+  /* Brand Colors (unchanged) */
   --primary: #007baf;
   --accent: #37b550;
   --dark: #004071;
@@ -14,27 +15,75 @@
   --offwhite: #d1d3d4;
   --muted-gold: #ad8806;
 
-  /* Structural mappings */
-  --background: var(--muted);
-  --foreground: var(--royal);
-  --ink-strong: var(--dark);
-  --surface: rgba(255, 255, 255, 0.85);
+  /* Theme tokens — Light */
+  --surface-base: #f4f6f9;
+  --surface-raised: rgba(255, 255, 255, 0.86);
+  --surface-overlay: rgba(0, 0, 0, 0.04);
+  --ink-strong: #00133f;
+  --ink-muted: #4a4d54;
+  --ink-faint: rgba(0, 0, 0, 0.25);
+  --border: rgba(18, 38, 63, 0.12);
+  --border-strong: rgba(0, 64, 113, 0.15);
+  --accent-green: #2a8a3c;
+  --accent-blue: #005d8a;
+  --accent-gold: #ad8806;
+  --accent-red: #c43c3c;
+  --glow-green: rgba(55, 181, 80, 0.15);
+  --glow-gold: rgba(211, 178, 87, 0.1);
+
+  /* Legacy aliases */
+  --background: var(--surface-base);
+  --foreground: var(--ink-strong);
+  --surface: var(--surface-raised);
   --surface-strong: #ffffff;
   --surface-dark: rgba(0, 64, 113, 0.88);
-  --ink-muted: var(--gray);
-  --border: rgba(74, 77, 84, 0.15);
-  --border-strong: rgba(0, 64, 113, 0.15);
-  --accent-strong: #2a8a3c;
-  --accent-secondary: var(--primary);
-  --accent-tertiary: var(--gold);
+  --accent-strong: var(--accent-green);
+  --accent-secondary: var(--accent-blue);
+  --accent-tertiary: var(--accent-gold);
+
+  /* Animation tokens */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 200ms;
+  --duration-normal: 450ms;
+  --duration-slow: 800ms;
+  --stagger-gap: 120ms;
+}
+
+[data-theme="dark"] {
+  --surface-base: #0a1628;
+  --surface-raised: rgba(255, 255, 255, 0.06);
+  --surface-overlay: rgba(255, 255, 255, 0.10);
+  --ink-strong: #f0f2f5;
+  --ink-muted: rgba(255, 255, 255, 0.5);
+  --ink-faint: rgba(255, 255, 255, 0.25);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --accent-green: #37b550;
+  --accent-blue: #007baf;
+  --accent-gold: #d3b257;
+  --accent-red: #e05555;
+  --glow-green: rgba(55, 181, 80, 0.25);
+  --glow-gold: rgba(211, 178, 87, 0.2);
+
+  /* Legacy aliases */
+  --background: var(--surface-base);
+  --foreground: var(--ink-strong);
+  --surface: var(--surface-raised);
+  --surface-strong: rgba(255, 255, 255, 0.1);
+  --surface-dark: rgba(10, 22, 40, 0.95);
+  --accent-strong: var(--accent-green);
+  --accent-secondary: var(--accent-blue);
+  --accent-tertiary: var(--accent-gold);
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --color-background: var(--surface-base);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
-  
+
   --color-brand-primary: var(--primary);
   --color-brand-accent: var(--accent);
   --color-brand-dark: var(--dark);
@@ -46,13 +95,16 @@
   --color-brand-mauve: var(--mauve);
   --color-brand-offwhite: var(--offwhite);
   --color-brand-mutedgold: var(--muted-gold);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: var(--muted);
-    --foreground: var(--royal);
-  }
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent-green: var(--accent-green);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-red: var(--accent-red);
 }
 
 html {
@@ -61,13 +113,11 @@ html {
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 12%, rgba(211, 178, 87, 0.15), transparent 24%),
-    radial-gradient(circle at 82% 8%, rgba(0, 123, 175, 0.15), transparent 22%),
-    linear-gradient(180deg, var(--muted) 0%, var(--light) 25%, var(--light) 100%);
+  background: var(--surface-base);
   color: var(--foreground);
   font-family: var(--font-body), sans-serif;
   position: relative;
+  transition: background-color 300ms var(--ease-smooth), color 300ms var(--ease-smooth);
 }
 
 body::before {
@@ -76,27 +126,14 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    repeating-linear-gradient(
-      115deg,
-      rgba(255, 255, 255, 0.08) 0 2px,
-      transparent 2px 18px
-    );
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.45), transparent 72%);
-  opacity: 0.45;
+    radial-gradient(circle at 12% 12%, rgba(211, 178, 87, 0.15), transparent 24%),
+    radial-gradient(circle at 82% 8%, rgba(0, 123, 175, 0.15), transparent 22%);
+  opacity: 0.6;
+  transition: opacity 300ms var(--ease-smooth);
 }
 
-body::after {
-  content: "";
-  position: fixed;
-  left: 15%;
-  right: 15%;
-  bottom: -16rem;
-  height: 26rem;
-  pointer-events: none;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(211, 178, 87, 0.4), transparent 68%);
-  filter: blur(90px);
-  opacity: 0.85;
+[data-theme="dark"] body::before {
+  opacity: 0.3;
 }
 
 ::selection {
@@ -220,9 +257,10 @@ body::after {
 .surface-section {
   border-radius: 1.5rem;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--surface-raised);
   backdrop-filter: blur(14px);
   box-shadow: 0 18px 50px rgba(16, 37, 62, 0.1);
+  transition: background-color 300ms var(--ease-smooth), border-color 300ms var(--ease-smooth);
 }
 
 .primary-button {
@@ -282,15 +320,16 @@ body::after {
 .select-field {
   width: 100%;
   border-radius: 1rem;
-  border: 1px solid rgba(18, 38, 63, 0.16);
-  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
   color: var(--foreground);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: background-color 300ms var(--ease-smooth), border-color 300ms var(--ease-smooth);
 }
 
 .field::placeholder,
 .textarea-field::placeholder {
-  color: rgba(70, 85, 105, 0.9);
+  color: var(--ink-muted);
 }
 
 @media (min-width: 768px) {
@@ -341,7 +380,6 @@ a[role="button"]:active,
   }
 
   body::before,
-  body::after,
   .page-hero::after {
     display: none;
   }
