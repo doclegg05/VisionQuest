@@ -985,3 +985,17 @@ model WebhookSubscription {
   @@index([isActive])
   @@schema("visionquest")
 }
+
+model SageSnippet {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String   @db.Text
+  keywords  String[] @default([])
+  authorId  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@schema("visionquest")
+}

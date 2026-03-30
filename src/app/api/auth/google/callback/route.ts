@@ -17,6 +17,7 @@ interface GoogleTokenResponse {
   access_token: string;
   id_token: string;
   token_type: string;
+  refresh_token?: string; // Present when access_type=offline on first consent
 }
 
 interface GoogleUserInfo {
@@ -79,6 +80,14 @@ export async function GET(req: NextRequest) {
     }
 
     const tokenData: GoogleTokenResponse = await tokenRes.json();
+
+    // Log refresh token availability (upgrade path: store encrypted in Student model
+    // for persistent Google API access without re-consent)
+    if (tokenData.refresh_token) {
+      logger.info("Google OAuth refresh token received", {
+        hasRefreshToken: true,
+      });
+    }
 
     // Decode user info from the signed id_token (received directly from
     // Google's token endpoint over TLS with our client_secret, so the payload

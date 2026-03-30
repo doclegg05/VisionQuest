@@ -384,6 +384,21 @@ async function loadSageDocuments(): Promise<SageDocument[]> {
   );
 }
 
+interface SageSnippetRow {
+  question: string;
+  answer: string;
+  keywords: string[];
+}
+
+async function loadSageSnippets(): Promise<SageSnippetRow[]> {
+  return cached("sage:snippets", 300, () =>
+    prisma.sageSnippet.findMany({
+      where: { isActive: true },
+      select: { question: true, answer: true, keywords: true },
+    }),
+  );
+}
+
 /**
  * Score a document against the user message using keyword matching
  * on title, certificationId, platformId, and sageContextNote.
@@ -430,24 +445,65 @@ function scoreDocument(doc: SageDocument, messageLower: string): number {
  * Upgrade path: replace keyword matching with pgvector cosine similarity
  * if corpus grows beyond 200 documents. The function signature stays the same.
  */
-export async function getDocumentContext(userMessage: string): Promise<string> {
-  const docs = await loadSageDocuments();
-  if (docs.length === 0) return "";
+function scoreSnippet(snippet: SageSnippetRow, messageLower: string): number {
+  let score = 0;
 
+  // Keyword matches: each match scores its length
+  for (const keyword of snippet.keywords) {
+    if (keyword.length > 0 && messageLower.includes(keyword.toLowerCase())) {
+      score += keyword.length;
+    }
+  }
+
+  // Question word matches: 2x weight
+  const questionWords = snippet.question.toLowerCase().split(/\s+/);
+  for (const word of questionWords) {
+    if (word.length >= 3 && messageLower.includes(word)) {
+      score += word.length * 2;
+    }
+  }
+
+  return score;
+}
+
+export async function getDocumentContext(userMessage: string): Promise<string> {
   const messageLower = userMessage.toLowerCase();
-  const scored = docs
-    .map((doc) => ({ doc, score: scoreDocument(doc, messageLower) }))
-    .filter((entry) => entry.score > 0)
+
+  const [docs, snippets] = await Promise.all([
+    loadSageDocuments(),
+    loadSageSnippets(),
+  ]);
+
+  type ScoredDoc = { type: "doc"; label: string; content: string; score: number };
+  type ScoredSnippet = { type: "snippet"; label: string; content: string; score: number };
+  type ScoredEntry = ScoredDoc | ScoredSnippet;
+
+  const scoredDocs: ScoredEntry[] = docs
+    .map((doc) => ({
+      type: "doc" as const,
+      label: doc.title,
+      content: doc.sageContextNote || doc.title,
+      score: scoreDocument(doc, messageLower),
+    }))
+    .filter((entry) => entry.score > 0);
+
+  const scoredSnippets: ScoredEntry[] = snippets
+    .map((snippet) => ({
+      type: "snippet" as const,
+      label: `Q&A: ${snippet.question}`,
+      content: snippet.answer,
+      score: scoreSnippet(snippet, messageLower),
+    }))
+    .filter((entry) => entry.score > 0);
+
+  const combined = [...scoredDocs, ...scoredSnippets]
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
-  if (scored.length === 0) return "";
+  if (combined.length === 0) return "";
 
-  const content = scored
-    .map((entry) => {
-      const note = entry.doc.sageContextNote || entry.doc.title;
-      return `[${entry.doc.title}]: ${note}`;
-    })
+  const content = combined
+    .map((entry) => `[${entry.label}]: ${entry.content}`)
     .join("\n\n");
 
   return `\n\nPROGRAM DOCUMENT REFERENCE (use this for specific, accurate answers about program materials):\n${content}`;

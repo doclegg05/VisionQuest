@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
     redirect_uri: redirectUri,
     response_type: "code",
     scope: "openid email profile",
+    access_type: "offline", // Request refresh token for persistent sessions
     state,
     prompt: "select_account",
   });
