@@ -407,7 +407,7 @@ export default function CareerManager() {
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">{opportunity.status}</span>
                       {opportunity.deadline ? (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">
                           Deadline {new Date(opportunity.deadline).toLocaleDateString()}
                         </span>
                       ) : null}

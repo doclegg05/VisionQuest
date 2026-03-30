@@ -11,6 +11,8 @@ import {
   rateLimited,
   isStaffRole,
 } from "@/lib/api-error";
+import { awardEvent } from "@/lib/progression/events";
+import { recordDocumentView } from "@/lib/progression/engine";
 
 /**
  * GET /api/documents/download?id=<docId>&mode=view|download
@@ -66,6 +68,18 @@ export const GET = withErrorHandler(async (req: Request) => {
   const disposition = mode === "download"
     ? `attachment; filename="${filename}"`
     : `inline; filename="${filename}"`;
+
+  // Track document view for students (fire-and-forget)
+  if (!isStaffRole(session.role)) {
+    awardEvent({
+      studentId: session.id,
+      eventType: "document_view",
+      sourceType: "document",
+      sourceId: id,
+      xp: 3,
+      mutate: (state) => recordDocumentView(state, id),
+    }).catch(() => {});
+  }
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {

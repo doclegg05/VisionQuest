@@ -199,7 +199,7 @@ export default function SpokesManager() {
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-800">
           {error}
         </div>
       ) : null}
@@ -262,7 +262,7 @@ export default function SpokesManager() {
                     <button
                       type="button"
                       onClick={() => void deleteTemplate("checklist", template.id)}
-                      className="text-xs text-rose-600 hover:text-rose-700"
+                      className="text-xs text-rose-600 hover:text-rose-800"
                     >
                       Delete
                     </button>
@@ -396,7 +396,7 @@ export default function SpokesManager() {
                     <button
                       type="button"
                       onClick={() => void deleteTemplate("module", template.id)}
-                      className="text-xs text-rose-600 hover:text-rose-700"
+                      className="text-xs text-rose-600 hover:text-rose-800"
                     >
                       Delete
                     </button>

@@ -19,10 +19,17 @@ export const GET = withAuth(async (session, req: Request) => {
   const result = await downloadFile(file.storageKey);
   if (!result) return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
 
+  // Sanitize filename for Content-Disposition header (RFC 6266)
+  const safeFilename = file.filename
+    .replace(/[^a-zA-Z0-9._\- ]/g, "_")
+    .replace(/"+/g, "")
+    .replace(/\.+$/, "")
+    .slice(0, 200);
+
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {
       "Content-Type": result.mimeType,
-      "Content-Disposition": `inline; filename="${file.filename}"`,
+      "Content-Disposition": `inline; filename="${safeFilename}"`,
     },
   });
 });

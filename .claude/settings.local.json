@@ -14,7 +14,18 @@
       "WebFetch(domain:secure.cfwv.com)",
       "WebFetch(domain:www.cves.org)",
       "WebFetch(domain:careerexplorer.hawaii.edu)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.erdbdpgfirfbaoswwqby:cygfef-Myxwar-kovge9@aws-0-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true\" DIRECT_URL=\"postgresql://postgres.erdbdpgfirfbaoswwqby:cygfef-Myxwar-kovge9@aws-0-us-west-2.pooler.supabase.com:5432/postgres\" npx prisma migrate resolve --applied 20260323120000_add_career_discovery)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.erdbdpgfirfbaoswwqby:cygfef-Myxwar-kovge9@aws-0-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true\" DIRECT_URL=\"postgresql://postgres.erdbdpgfirfbaoswwqby:cygfef-Myxwar-kovge9@aws-0-us-west-2.pooler.supabase.com:5432/postgres\" npx prisma migrate status)",
+      "Bash(pip show:*)",
+      "Bash(notebooklm --version)",
+      "Bash(echo $NOTEBOOKLM_AUTH_JSON)",
+      "Bash(notebooklm artifact:*)",
+      "Bash(notebooklm download:*)",
+      "Bash(while read:*)",
+      "Bash(do sed:*)"
     ]
   }
 }

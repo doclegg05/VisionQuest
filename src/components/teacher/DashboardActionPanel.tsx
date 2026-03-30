@@ -317,7 +317,7 @@ export default function DashboardActionPanel({
           className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
             message.tone === "success"
               ? "border-emerald-200 bg-emerald-50/80 text-emerald-700"
-              : "border-rose-200 bg-rose-50/80 text-rose-700"
+              : "border-rose-200 bg-rose-50/80 text-rose-800"
           }`}
         >
           {message.text}
@@ -329,7 +329,7 @@ export default function DashboardActionPanel({
       ) : null}
 
       {contextError ? (
-        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-700">
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-800">
           {contextError}
         </div>
       ) : null}
@@ -350,8 +350,8 @@ export default function DashboardActionPanel({
                       <span
                         className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                           submission.status === "pending"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-rose-100 text-rose-700"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-rose-100 text-rose-800"
                         }`}
                       >
                         {submission.status === "pending" ? "Awaiting review" : "Needs revision"}

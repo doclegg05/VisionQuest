@@ -45,14 +45,14 @@ const STATUS_STYLES: Record<GoalStatus, string> = {
   in_progress: "bg-sky-100 text-sky-700",
   blocked: "bg-amber-100 text-amber-800",
   completed: "bg-violet-100 text-violet-700",
-  abandoned: "bg-slate-100 text-slate-600",
+  abandoned: "bg-slate-100 text-slate-700",
 };
 const RESOURCE_STATUS_STYLES: Record<GoalResourceLinkStatus, string> = {
   suggested: "bg-slate-100 text-slate-700",
   assigned: "bg-sky-100 text-sky-700",
   in_progress: "bg-amber-100 text-amber-800",
   completed: "bg-emerald-100 text-emerald-700",
-  blocked: "bg-rose-100 text-rose-700",
+  blocked: "bg-rose-100 text-rose-800",
   dismissed: "bg-zinc-100 text-zinc-600",
 };
 const STUDENT_LINK_STATUSES: GoalResourceLinkStatus[] = ["assigned", "in_progress", "completed", "blocked"];
@@ -294,7 +294,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           className={`surface-section p-4 text-sm ${
             message.tone === "success"
               ? "border border-emerald-200 bg-emerald-50/80 text-emerald-700"
-              : "border border-rose-200 bg-rose-50/80 text-rose-700"
+              : "border border-rose-200 bg-rose-50/80 text-rose-800"
           }`}
         >
           {message.text}

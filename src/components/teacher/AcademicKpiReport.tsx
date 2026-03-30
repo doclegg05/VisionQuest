@@ -248,7 +248,7 @@ function AcademicFunnelSection({ steps, totalStudents }: { steps: AcademicFunnel
           <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Pipeline</p>
           <h3 className="mt-2 text-lg font-semibold text-gray-900">Academic journey funnel</h3>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
           {totalStudents} learners
         </span>
       </div>

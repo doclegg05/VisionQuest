@@ -26,7 +26,7 @@ const GOAL_STATUS_STYLES: Record<string, string> = {
   in_progress: "bg-sky-100 text-sky-700",
   blocked: "bg-amber-100 text-amber-800",
   completed: "bg-violet-100 text-violet-700",
-  abandoned: "bg-slate-100 text-slate-600",
+  abandoned: "bg-slate-100 text-slate-700",
 };
 
 function formatDueDate(value: string | Date | null) {
@@ -156,7 +156,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
           className={`rounded-xl border px-4 py-3 text-sm ${
             message.tone === "success"
               ? "border-emerald-200 bg-emerald-50/80 text-emerald-700"
-              : "border-rose-200 bg-rose-50/80 text-rose-700"
+              : "border-rose-200 bg-rose-50/80 text-rose-800"
           }`}
         >
           {message.text}

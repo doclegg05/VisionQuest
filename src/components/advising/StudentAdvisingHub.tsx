@@ -261,7 +261,7 @@ export default function StudentAdvisingHub({
       </section>
 
       {error ? (
-        <div className="surface-section border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-700">
+        <div className="surface-section border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800">
           {error}
         </div>
       ) : null}
@@ -352,7 +352,7 @@ export default function StudentAdvisingHub({
                 <div key={alert.id} className="rounded-[1.2rem] border border-amber-200 bg-amber-50/80 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
                       {alert.severity}
                     </span>
                   </div>
@@ -412,10 +412,10 @@ export default function StudentAdvisingHub({
                       </div>
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                         task.priority === "high"
-                          ? "bg-rose-100 text-rose-700"
+                          ? "bg-rose-100 text-rose-800"
                           : task.priority === "low"
-                            ? "bg-slate-100 text-slate-600"
-                            : "bg-amber-100 text-amber-700"
+                            ? "bg-slate-100 text-slate-700"
+                            : "bg-amber-100 text-amber-800"
                       }`}>
                         {task.priority}
                       </span>

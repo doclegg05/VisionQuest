@@ -78,10 +78,10 @@ interface ReportPayload {
 }
 
 const SUMMARY_CARDS: Array<{ key: keyof OutcomeSummary; label: string; tone: string }> = [
-  { key: "studentsNeedingAttention", label: "Need attention", tone: "text-rose-700" },
+  { key: "studentsNeedingAttention", label: "Need attention", tone: "text-rose-800" },
   { key: "activeStudents7d", label: "Active this week", tone: "text-emerald-700" },
   { key: "applicationsInFlight", label: "Applications moving", tone: "text-sky-700" },
-  { key: "offers", label: "Offers recorded", tone: "text-amber-700" },
+  { key: "offers", label: "Offers recorded", tone: "text-amber-800" },
   { key: "completedCertifications", label: "Certifications complete", tone: "text-violet-700" },
   { key: "publicCredentialsLive", label: "Public credentials live", tone: "text-teal-700" },
 ];
@@ -151,7 +151,7 @@ export default function OutcomesReport() {
               <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Pipeline</p>
               <h3 className="mt-2 text-lg font-semibold text-gray-900">Student outcome funnel</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
               {data.summary.totalStudents} learners
             </span>
           </div>
@@ -219,7 +219,7 @@ export default function OutcomesReport() {
               <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Outreach queue</p>
               <h3 className="mt-2 text-lg font-semibold text-gray-900">Students who may need a touchpoint</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
               {data.attentionQueue.length} shown
             </span>
           </div>
@@ -243,12 +243,12 @@ export default function OutcomesReport() {
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {student.highSeverityAlertCount > 0 ? (
-                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">
+                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800">
                           {student.highSeverityAlertCount} high
                         </span>
                       ) : null}
                       {student.openAlertCount > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                           {student.openAlertCount} alerts
                         </span>
                       ) : null}

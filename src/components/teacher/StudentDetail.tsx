@@ -274,12 +274,12 @@ interface StudentData {
 }
 
 const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
-  not_started: "bg-slate-100 text-slate-600",
+  not_started: "bg-slate-100 text-slate-700",
   in_progress: "bg-sky-100 text-sky-700",
-  submitted: "bg-amber-100 text-amber-700",
+  submitted: "bg-amber-100 text-amber-800",
   completed: "bg-emerald-100 text-emerald-700",
   approved: "bg-emerald-100 text-emerald-700",
-  blocked: "bg-rose-100 text-rose-700",
+  blocked: "bg-rose-100 text-rose-800",
 };
 
 const REVIEW_KIND_LABELS: Record<ReviewQueueItemData["kind"], string> = {
@@ -313,8 +313,8 @@ function getErrorMessage(payload: unknown, fallback: string) {
 
 function statusBadge(status: string) {
   if (status === "completed") return "bg-emerald-100 text-emerald-700";
-  if (status === "missed") return "bg-rose-100 text-rose-700";
-  if (status === "cancelled") return "bg-slate-100 text-slate-600";
+  if (status === "missed") return "bg-rose-100 text-rose-800";
+  if (status === "cancelled") return "bg-slate-100 text-slate-700";
   return "bg-sky-100 text-sky-700";
 }
 
@@ -912,7 +912,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         <div className="bg-white rounded-xl border border-amber-200 p-5">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-semibold text-gray-700">Open Advising Alerts</h3>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
               {alerts.length} active
             </span>
           </div>
@@ -921,7 +921,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               <div key={alert.id} className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-semibold text-gray-900">{alert.title}</p>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
                     {alert.severity}
                   </span>
                 </div>
@@ -1062,7 +1062,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                                       {evidence?.evidenceLabel || "Waiting for activity"}
                                     </span>
                                     {evidence?.reviewNeeded ? (
-                                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                                         Teacher review
                                       </span>
                                     ) : null}
@@ -1135,8 +1135,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                         submission.status === "approved"
                           ? "bg-emerald-100 text-emerald-700"
                           : submission.status === "rejected"
-                            ? "bg-rose-100 text-rose-700"
-                            : "bg-amber-100 text-amber-700"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
                       }`}>
                         {submission.status}
                       </span>
@@ -1186,7 +1186,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                       type="button"
                       onClick={() => handleReviewForm(submission.id, "rejected")}
                       disabled={reviewingFormId === submission.id}
-                      className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-60"
+                      className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-200 disabled:opacity-60"
                     >
                       Return
                     </button>
@@ -1349,7 +1349,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                             type="button"
                             onClick={() => handleAppointmentStatusChange(appointment.id, "missed")}
                             disabled={updatingAppointmentId === appointment.id}
-                            className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-60"
+                            className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-200 disabled:opacity-60"
                           >
                             Missed
                           </button>
@@ -1489,10 +1489,10 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                         <p className="text-sm font-semibold text-gray-900">{task.title}</p>
                         <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                           task.priority === "high"
-                            ? "bg-rose-100 text-rose-700"
+                            ? "bg-rose-100 text-rose-800"
                             : task.priority === "low"
-                              ? "bg-slate-100 text-slate-600"
-                              : "bg-amber-100 text-amber-700"
+                              ? "bg-slate-100 text-slate-700"
+                              : "bg-amber-100 text-amber-800"
                         }`}>
                           {task.priority}
                         </span>

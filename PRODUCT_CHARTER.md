@@ -6,6 +6,9 @@ Effective window: March 23, 2026 through June 21, 2026
 This charter overrides broader planning artifacts when they conflict with the next 90 days of product work. In particular, it narrows the scope implied by [README.md](./README.md), [ACADEMIC_EFFECTIVENESS_ROADMAP.md](./ACADEMIC_EFFECTIVENESS_ROADMAP.md), [GAMIFICATION_BACKLOG.md](./GAMIFICATION_BACKLOG.md), and [SETUP_WIZARD_PLAN.md](./SETUP_WIZARD_PLAN.md).
 
 Subtraction decisions for this same window are tracked in [PRODUCT_SUBTRACTION_REVIEW.md](./PRODUCT_SUBTRACTION_REVIEW.md).
+Simplification decisions are tracked in [PRODUCT_SIMPLIFICATION_REVIEW.md](./PRODUCT_SIMPLIFICATION_REVIEW.md).
+Cycle-time decisions are tracked in [PRODUCT_ACCELERATION_REVIEW.md](./PRODUCT_ACCELERATION_REVIEW.md).
+Automation decisions are tracked in [PRODUCT_AUTOMATION_REVIEW.md](./PRODUCT_AUTOMATION_REVIEW.md).
 
 ## Product Decision
 

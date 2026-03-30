@@ -7,7 +7,7 @@
   --dark: #004071;
   --light: #FFFFFF;
   --muted: #EDF3F7;
-  --gray: #60636b;
+  --gray: #4a4d54;
   --gold: #d3b257;
   --royal: #00133f;
   --mauve: #a7253f;
@@ -22,7 +22,7 @@
   --surface-strong: #ffffff;
   --surface-dark: rgba(0, 64, 113, 0.88);
   --ink-muted: var(--gray);
-  --border: rgba(96, 99, 107, 0.15);
+  --border: rgba(74, 77, 84, 0.15);
   --border-strong: rgba(0, 64, 113, 0.15);
   --accent-strong: #2a8a3c;
   --accent-secondary: var(--primary);
@@ -290,7 +290,7 @@ body::after {
 
 .field::placeholder,
 .textarea-field::placeholder {
-  color: rgba(95, 111, 132, 0.9);
+  color: rgba(70, 85, 105, 0.9);
 }
 
 @media (min-width: 768px) {

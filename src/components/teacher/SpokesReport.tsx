@@ -45,7 +45,7 @@ const SUMMARY_KEYS: Array<{ key: keyof ReportSummary; label: string; tone: strin
   { key: "orientationComplete", label: "Orientation complete", tone: "text-sky-700" },
   { key: "filesComplete", label: "Files complete", tone: "text-teal-700" },
   { key: "modulesComplete", label: "Modules complete", tone: "text-violet-700" },
-  { key: "followUpsDue", label: "Follow-ups due", tone: "text-amber-700" },
+  { key: "followUpsDue", label: "Follow-ups due", tone: "text-amber-800" },
 ];
 
 function getErrorMessage(payload: unknown, fallback: string) {
@@ -133,11 +133,11 @@ export default function SpokesReport() {
               <p className="mt-2 text-2xl font-bold text-emerald-900">{data.summary.completed}</p>
             </div>
             <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
-              <p className="text-sm font-semibold text-amber-700">Exited</p>
+              <p className="text-sm font-semibold text-amber-800">Exited</p>
               <p className="mt-2 text-2xl font-bold text-amber-900">{data.summary.exited}</p>
             </div>
             <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-4">
-              <p className="text-sm font-semibold text-rose-700">Non-completers</p>
+              <p className="text-sm font-semibold text-rose-800">Non-completers</p>
               <p className="mt-2 text-2xl font-bold text-rose-900">{data.summary.nonCompleters}</p>
             </div>
           </div>
@@ -159,7 +159,7 @@ export default function SpokesReport() {
               <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Attention queue</p>
               <h3 className="mt-2 text-lg font-semibold text-gray-900">Students needing follow-through</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
               {data.attentionQueue.length} shown
             </span>
           </div>
@@ -182,7 +182,7 @@ export default function SpokesReport() {
                       </p>
                     </div>
                     {item.employmentFollowUpsDue > 0 ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                         {item.employmentFollowUpsDue} follow-up due
                       </span>
                     ) : null}

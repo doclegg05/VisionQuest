@@ -11,6 +11,7 @@ import OutcomesReport from "./OutcomesReport";
 import SpokesManager from "./SpokesManager";
 import SpokesReport from "./SpokesReport";
 import AcademicKpiReport from "./AcademicKpiReport";
+import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 
 type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "reports" | "audit" | "documents";
@@ -57,6 +58,7 @@ export default function ManageDashboard() {
       {tab === "career" && <CareerManager />}
       {tab === "reports" && (
         <div className="space-y-8">
+          <GrantKpiReport />
           <OutcomesReport />
           <SpokesReport />
           <AcademicKpiReport />

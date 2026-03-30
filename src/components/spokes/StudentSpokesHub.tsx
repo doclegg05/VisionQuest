@@ -110,7 +110,7 @@ export default function StudentSpokesHub({
                     className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
                       progress?.completed
                         ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
+                        : "bg-slate-100 text-slate-700"
                     }`}
                   >
                     {progress?.completed ? "Complete" : "Pending"}
@@ -221,7 +221,7 @@ export default function StudentSpokesHub({
                           className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
                             progress
                               ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-600"
+                              : "bg-slate-100 text-slate-700"
                           }`}
                         >
                           {progress ? `Completed ${formatDate(progress.completedAt)}` : "Pending"}
@@ -269,8 +269,8 @@ export default function StudentSpokesHub({
                           item.status === "completed"
                             ? "bg-emerald-100 text-emerald-700"
                             : item.status === "due"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-slate-100 text-slate-600"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-700"
                         }`}
                       >
                         {item.status.replaceAll("_", " ")}

@@ -138,7 +138,7 @@ function consolidateItems(items: UnifiedItem[]): ConsolidatedItem[] {
 
       bucket = {
         key: bucketKey,
-        groupCategory: group?.groupCategory || categoryLabel(item.category),
+        groupCategory: group?.groupCategory || getCategoryBadge(item.category).label,
         label: group?.label || item.title,
         count: 0,
         severity: "medium",
@@ -160,11 +160,14 @@ function consolidateItems(items: UnifiedItem[]): ConsolidatedItem[] {
   });
 }
 
-function categoryLabel(cat: string) {
-  switch (cat) {
-    case "inactivity": return "Inactivity";
-    case "review": return "Review";
-    default: return "Alert";
+function getCategoryBadge(category: string) {
+  switch (category) {
+    case "inactivity":
+      return { label: "Inactive", className: "bg-red-100 text-red-700" };
+    case "review":
+      return { label: "Review", className: "bg-blue-100 text-blue-700" };
+    default:
+      return { label: "Alert", className: "bg-amber-100 text-amber-800" };
   }
 }
 
