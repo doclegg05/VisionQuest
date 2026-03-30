@@ -10,6 +10,7 @@ import {
   GOAL_RESOURCE_TYPE_LABELS,
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
+import { apiFetch } from "@/lib/api";
 
 interface GoalData {
   id: string;
