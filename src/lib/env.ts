@@ -112,6 +112,11 @@ export const env = {
   SMTP_PASS: optional("SMTP_PASS"),
   SMTP_FROM: optional("SMTP_FROM"),
 
+  // Twilio SMS (optional — SMS silently disabled when not set)
+  TWILIO_ACCOUNT_SID: optional("TWILIO_ACCOUNT_SID"),
+  TWILIO_AUTH_TOKEN: optional("TWILIO_AUTH_TOKEN"),
+  TWILIO_FROM_NUMBER: optional("TWILIO_FROM_NUMBER"),
+
   // Internal cron protection
   CRON_SECRET: optional("CRON_SECRET"),
 

@@ -1,16 +1,21 @@
 import CertTracker from "@/components/certifications/CertTracker";
 import CredlyBadges from "@/components/certifications/CredlyBadges";
 import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
+import { LearningPathway, LearningPathwayEmpty } from "@/components/career/LearningPathway";
 import CoursesHub from "@/components/lms/CoursesHub";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { getStudentGoalPlanData } from "@/lib/goal-plan-data";
+import { getLearningPathway } from "@/lib/learning-pathway";
 
 export default async function LearningPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const { goals, goalPlans } = await getStudentGoalPlanData(session.id);
+  const [{ goals, goalPlans }, pathway] = await Promise.all([
+    getStudentGoalPlanData(session.id),
+    getLearningPathway(session.id),
+  ]);
 
   return (
     <div className="page-shell">
@@ -19,6 +24,15 @@ export default async function LearningPage() {
         title="Learning"
         description="Keep your goal-aligned platforms, certification progress, and required training work in one place."
       />
+
+      <section id="roadmap" className="mt-6">
+        <h2 className="sr-only">Your Learning Roadmap</h2>
+        {pathway ? (
+          <LearningPathway pathway={pathway} />
+        ) : (
+          <LearningPathwayEmpty />
+        )}
+      </section>
 
       <GoalPlanFocus
         title="Goal-aligned training"

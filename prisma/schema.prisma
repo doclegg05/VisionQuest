@@ -58,7 +58,23 @@ model Student {
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
   moodEntries             MoodEntry[]
+  notificationPreferences NotificationPreference[]
+  coachingArcs            CoachingArc[]
 
+  @@schema("visionquest")
+}
+
+model NotificationPreference {
+  id          String   @id @default(cuid())
+  studentId   String
+  channel     String   // "email" | "sms"
+  enabled     Boolean  @default(true)
+  destination String?  // phone number or email override (null = use student's default)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, channel])
   @@schema("visionquest")
 }
 
@@ -997,5 +1013,22 @@ model SageSnippet {
   updatedAt DateTime @updatedAt
 
   @@index([isActive])
+  @@schema("visionquest")
+}
+
+model CoachingArc {
+  id         String   @id @default(cuid())
+  studentId  String
+  arcType    String   // "standard_6week"
+  weekNumber Int      @default(1)
+  milestones Json     @default("[]")
+  status     String   @default("active") // "active" | "completed" | "paused"
+  startedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, arcType])
   @@schema("visionquest")
 }

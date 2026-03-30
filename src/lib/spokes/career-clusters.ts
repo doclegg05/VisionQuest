@@ -7,6 +7,12 @@
 import { CERTIFICATIONS } from "./certifications";
 import { PLATFORMS } from "./platforms";
 
+export interface RequiredSkill {
+  name: string;
+  category: "communication" | "organization" | "technical" | "interpersonal" | "analytical" | "leadership";
+  importance: "essential" | "important" | "helpful";
+}
+
 export interface CareerCluster {
   id: string;
   label: string;
@@ -15,6 +21,9 @@ export interface CareerCluster {
   platformIds: string[];
   sampleJobs: string[];
   signalKeywords: string[];
+  requiredSkills: RequiredSkill[];
+  pathwayOrder: string[];
+  estimatedWeeks: number;
 }
 
 export const CAREER_CLUSTERS: CareerCluster[] = [
@@ -56,6 +65,19 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "excel",
       "spreadsheet",
     ],
+    requiredSkills: [
+      { name: "Microsoft Word proficiency", category: "technical", importance: "essential" },
+      { name: "Microsoft Excel proficiency", category: "technical", importance: "essential" },
+      { name: "Professional email writing", category: "communication", importance: "essential" },
+      { name: "Calendar management", category: "organization", importance: "important" },
+      { name: "Filing and records management", category: "organization", importance: "important" },
+      { name: "Microsoft Outlook", category: "technical", importance: "important" },
+      { name: "Data entry accuracy", category: "technical", importance: "important" },
+      { name: "Customer interaction", category: "interpersonal", importance: "helpful" },
+      { name: "Microsoft PowerPoint", category: "technical", importance: "helpful" },
+    ],
+    pathwayOrder: ["ic3", "mos-word", "mos-excel", "mos-powerpoint", "mos-outlook", "mos-access"],
+    estimatedWeeks: 12,
   },
   {
     id: "finance-bookkeeping",
@@ -90,6 +112,18 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "taxes",
       "good with numbers",
     ],
+    requiredSkills: [
+      { name: "QuickBooks proficiency", category: "technical", importance: "essential" },
+      { name: "Data entry accuracy", category: "technical", importance: "essential" },
+      { name: "Basic accounting principles", category: "analytical", importance: "essential" },
+      { name: "Spreadsheet analysis", category: "technical", importance: "important" },
+      { name: "Attention to detail", category: "organization", importance: "important" },
+      { name: "Personal finance management", category: "analytical", importance: "important" },
+      { name: "Financial reporting", category: "communication", importance: "helpful" },
+      { name: "Microsoft Excel proficiency", category: "technical", importance: "helpful" },
+    ],
+    pathwayOrder: ["ic3", "intuit-personal-finance", "intuit-quickbooks", "intuit-bookkeeping"],
+    estimatedWeeks: 10,
   },
   {
     id: "tech-digital",
@@ -127,6 +161,18 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "AI",
       "coding",
     ],
+    requiredSkills: [
+      { name: "Computer fundamentals", category: "technical", importance: "essential" },
+      { name: "Internet and digital literacy", category: "technical", importance: "essential" },
+      { name: "Troubleshooting and problem solving", category: "analytical", importance: "essential" },
+      { name: "Cybersecurity awareness", category: "technical", importance: "important" },
+      { name: "AI tools and concepts", category: "technical", importance: "important" },
+      { name: "Technical communication", category: "communication", importance: "important" },
+      { name: "Customer support", category: "interpersonal", importance: "helpful" },
+      { name: "Attention to detail", category: "organization", importance: "helpful" },
+    ],
+    pathwayOrder: ["computer-essentials", "ic3", "ai-foundations", "it-specialist-cybersecurity"],
+    estimatedWeeks: 10,
   },
   {
     id: "creative-design",
@@ -157,6 +203,18 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "crafty",
       "artistic",
     ],
+    requiredSkills: [
+      { name: "Adobe Photoshop", category: "technical", importance: "essential" },
+      { name: "Visual design principles", category: "technical", importance: "essential" },
+      { name: "Creative thinking and ideation", category: "analytical", importance: "essential" },
+      { name: "Adobe Illustrator", category: "technical", importance: "important" },
+      { name: "Typography and layout", category: "technical", importance: "important" },
+      { name: "Client communication", category: "communication", importance: "important" },
+      { name: "Project and file organization", category: "organization", importance: "helpful" },
+      { name: "Design for Delight innovation mindset", category: "analytical", importance: "helpful" },
+    ],
+    pathwayOrder: ["computer-essentials", "intuit-design-delight", "adobe-aca"],
+    estimatedWeeks: 8,
   },
   {
     id: "customer-service",
@@ -194,6 +252,18 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "outgoing",
       "social",
     ],
+    requiredSkills: [
+      { name: "Active listening", category: "interpersonal", importance: "essential" },
+      { name: "Professional communication", category: "communication", importance: "essential" },
+      { name: "Conflict resolution", category: "interpersonal", importance: "essential" },
+      { name: "Work ethic and reliability", category: "organization", importance: "important" },
+      { name: "Hospitality and tourism knowledge", category: "technical", importance: "important" },
+      { name: "Positive attitude and appearance", category: "interpersonal", importance: "important" },
+      { name: "Cash handling and POS systems", category: "technical", importance: "helpful" },
+      { name: "Teamwork", category: "interpersonal", importance: "helpful" },
+    ],
+    pathwayOrder: ["byag", "customer-service-ttce", "customer-service-csm"],
+    estimatedWeeks: 6,
   },
   {
     id: "career-readiness",
@@ -231,6 +301,18 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "professional",
       "workplace",
     ],
+    requiredSkills: [
+      { name: "Workplace math", category: "analytical", importance: "essential" },
+      { name: "Reading workplace documents", category: "analytical", importance: "essential" },
+      { name: "Professional communication", category: "communication", importance: "essential" },
+      { name: "Work ethic and attendance", category: "organization", importance: "essential" },
+      { name: "Resume writing", category: "communication", importance: "important" },
+      { name: "Interview preparation", category: "communication", importance: "important" },
+      { name: "Following workplace instructions", category: "organization", importance: "important" },
+      { name: "Teamwork and cooperation", category: "interpersonal", importance: "helpful" },
+    ],
+    pathwayOrder: ["byag", "professional-communications", "workkeys-ncrc"],
+    estimatedWeeks: 8,
   },
   {
     id: "language-esl",
@@ -258,6 +340,17 @@ export const CAREER_CLUSTERS: CareerCluster[] = [
       "bilingual",
       "translate",
     ],
+    requiredSkills: [
+      { name: "English reading comprehension", category: "communication", importance: "essential" },
+      { name: "English writing", category: "communication", importance: "essential" },
+      { name: "English speaking and listening", category: "communication", importance: "essential" },
+      { name: "Workplace vocabulary", category: "communication", importance: "important" },
+      { name: "Bilingual communication", category: "interpersonal", importance: "important" },
+      { name: "Cross-cultural communication", category: "interpersonal", importance: "helpful" },
+      { name: "Reading workplace documents", category: "analytical", importance: "helpful" },
+    ],
+    pathwayOrder: ["burlington-english"],
+    estimatedWeeks: 10,
   },
 ];
 

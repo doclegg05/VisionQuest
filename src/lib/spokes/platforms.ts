@@ -70,7 +70,7 @@ export const PLATFORMS: SpokesPlatform[] = [
       "Practice tests and video training for Microsoft Office, IC3, QuickBooks, and other industry certifications.",
     category: "certification-prep",
     icon: "📜",
-    loginUrl: "https://www.gmetrix.net",
+    loginUrl: "https://www.gmetrix.com",
     certifications: [
       "ic3",
       "mos-word",
@@ -89,6 +89,11 @@ export const PLATFORMS: SpokesPlatform[] = [
       {
         label: "Register at Certiport",
         url: "https://certiport.pearsonvue.com",
+        audience: "both",
+      },
+      {
+        label: "GMetrix Legacy Login (.net)",
+        url: "https://www.gmetrix.net",
         audience: "both",
       },
       {

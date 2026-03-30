@@ -7,9 +7,14 @@ import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
  * Load an existing conversation or create a new one.
  * For new conversations: fetches goals, determines stage, deactivates old goal convos.
  */
+const ALLOWED_REQUESTED_STAGES = new Set([
+  "career_profile_review",
+]);
+
 export async function getOrCreateConversation(
   studentId: string,
   conversationId: string | null,
+  requestedStage?: string,
 ) {
   if (conversationId) {
     const conversation = await prisma.conversation.findFirst({
@@ -23,18 +28,31 @@ export async function getOrCreateConversation(
     return conversation;
   }
 
-  // New conversation — determine stage from existing goals + discovery status
-  const [goals, discovery] = await Promise.all([
-    prisma.goal.findMany({
-      where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
-      select: { level: true },
-    }),
-    prisma.careerDiscovery.findUnique({
-      where: { studentId },
-      select: { status: true },
-    }),
-  ]);
-  const stage = determineStage(goals, discovery?.status === "complete");
+  // If a specific stage is requested (e.g. from ?stage=career_profile_review), use it
+  // but only for known allowed stages to prevent injection.
+  const explicitStage =
+    requestedStage && ALLOWED_REQUESTED_STAGES.has(requestedStage)
+      ? requestedStage
+      : null;
+
+  let stage: string;
+
+  if (explicitStage) {
+    stage = explicitStage;
+  } else {
+    // New conversation — determine stage from existing goals + discovery status
+    const [goals, discovery] = await Promise.all([
+      prisma.goal.findMany({
+        where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
+        select: { level: true },
+      }),
+      prisma.careerDiscovery.findUnique({
+        where: { studentId },
+        select: { status: true },
+      }),
+    ]);
+    stage = determineStage(goals, discovery?.status === "complete");
+  }
 
   // Deactivate previous goal conversations
   await prisma.conversation.updateMany({

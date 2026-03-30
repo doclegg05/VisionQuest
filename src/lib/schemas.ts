@@ -77,6 +77,7 @@ export const resetPasswordQuestionsSchema = z.object({
 export const chatSendSchema = z.object({
   message: z.string().min(1, "Message is required.").max(10000, "Message too long. Maximum 10,000 characters."),
   conversationId: z.string().cuid("Invalid conversation ID.").nullish(),
+  requestedStage: z.string().max(64).optional(),
 });
 
 // ─── Settings Schemas ───────────────────────────────────────────────────────

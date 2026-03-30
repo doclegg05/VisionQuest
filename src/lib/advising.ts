@@ -968,7 +968,7 @@ async function syncInterventionNotifications({
 export async function syncStudentAlerts(studentId: string) {
   const now = new Date();
 
-  const [tasks, appointments, studentSignals, orientationItems, existing] = await prisma.$transaction([
+  const [tasks, appointments, studentSignals, orientationItems, existing, recentMoodEntries] = await prisma.$transaction([
     prisma.studentTask.findMany({
       where: {
         studentId,
@@ -1170,11 +1170,18 @@ export async function syncStudentAlerts(studentId: string) {
             "goal_stale",
             "orientation_not_started",
             "orientation_overdue",
+            "motivation_declining",
             ...ALL_INACTIVITY_ALERT_TYPES,
           ],
         },
       },
       select: { id: true, alertKey: true, status: true, snoozedUntil: true },
+    }),
+    prisma.moodEntry.findMany({
+      where: { studentId },
+      orderBy: { extractedAt: "desc" },
+      take: 3,
+      select: { score: true, extractedAt: true },
     }),
   ]);
 
@@ -1312,7 +1319,34 @@ export async function syncStudentAlerts(studentId: string) {
     sourceType: item.linkId ? "goal_resource_link" : "goal",
     sourceId: item.linkId || item.goalId,
   }));
-  const desiredAlerts = [...baselineAlerts, ...goalAlerts];
+  // Mood declining alert: last 3 entries strictly descending
+  const motivationAlert: AlertDescriptor | null = (() => {
+    const sorted = [...recentMoodEntries].sort(
+      (a, b) => a.extractedAt.getTime() - b.extractedAt.getTime()
+    );
+    if (
+      sorted.length === 3 &&
+      sorted[0].score > sorted[1].score &&
+      sorted[1].score > sorted[2].score
+    ) {
+      return {
+        alertKey: `motivation_declining:${studentId}`,
+        type: "motivation_declining",
+        severity: "high",
+        title: "Motivation declining",
+        summary: `Student's self-reported motivation has declined over the last 3 check-ins (${sorted[0].score} → ${sorted[1].score} → ${sorted[2].score})`,
+        sourceType: "mood_entry",
+        sourceId: studentId,
+      };
+    }
+    return null;
+  })();
+
+  const desiredAlerts = [
+    ...baselineAlerts,
+    ...goalAlerts,
+    ...(motivationAlert ? [motivationAlert] : []),
+  ];
   const desiredKeys = new Set(desiredAlerts.map((alert) => alert.alertKey));
 
   // Build a map of existing alerts by key for snooze/dismiss checks

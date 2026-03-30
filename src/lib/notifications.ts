@@ -1,5 +1,8 @@
 import { prisma } from "./db";
 import { logger } from "./logger";
+import { sendEmail, isEmailDeliveryConfigured } from "./email";
+import { sendSms } from "./sms";
+import { buildNotificationEmail } from "./email-templates";
 
 /**
  * Map of userId → Set of active SSE writers.
@@ -111,6 +114,84 @@ export async function sendNotificationWithCooldown(
 
   await sendNotification(userId, payload);
   return true;
+}
+
+interface MultiChannelResult {
+  inApp: boolean;
+  email: boolean;
+  sms: boolean;
+}
+
+/**
+ * Send a notification across all channels the student has enabled.
+ * In-app notification always fires (with cooldown); email and SMS are fire-and-forget.
+ */
+export async function sendMultiChannelNotification(
+  studentId: string,
+  payload: { type: string; title: string; body: string },
+  cooldownHours: number,
+): Promise<MultiChannelResult> {
+  const result: MultiChannelResult = { inApp: false, email: false, sms: false };
+
+  // In-app (with cooldown)
+  result.inApp = await sendNotificationWithCooldown(studentId, payload, cooldownHours);
+
+  // Fetch student record and preferences in parallel
+  const [student, preferences] = await Promise.all([
+    prisma.student.findUnique({
+      where: { id: studentId },
+      select: { email: true },
+    }),
+    prisma.notificationPreference.findMany({
+      where: { studentId, enabled: true },
+    }),
+  ]);
+
+  const appBaseUrl = process.env.APP_BASE_URL ?? "https://visionquest.onrender.com";
+  const actionUrl = appBaseUrl;
+
+  const emailPref = preferences.find((p) => p.channel === "email");
+  const smsPref = preferences.find((p) => p.channel === "sms");
+
+  // Email — fire-and-forget
+  if (emailPref && isEmailDeliveryConfigured()) {
+    const destination = emailPref.destination ?? student?.email ?? null;
+    if (destination) {
+      void (async () => {
+        try {
+          await sendEmail({
+            to: destination,
+            subject: payload.title,
+            text: `${payload.title}\n\n${payload.body}\n\n${actionUrl}`,
+            html: buildNotificationEmail(payload.title, payload.body, actionUrl),
+          });
+          logger.info("Notification email sent", { studentId, to: destination });
+        } catch (err) {
+          logger.error("Notification email failed", { studentId, error: String(err) });
+        }
+      })();
+      result.email = true;
+    }
+  }
+
+  // SMS — fire-and-forget
+  if (smsPref) {
+    const phoneNumber = smsPref.destination ?? null;
+    if (phoneNumber) {
+      void (async () => {
+        const maxLen = 160;
+        const raw = `${payload.title}: ${payload.body} — ${actionUrl}`;
+        const smsBody = raw.length > maxLen ? raw.slice(0, maxLen - 1) + "…" : raw;
+        const sent = await sendSms(phoneNumber, smsBody);
+        if (sent) {
+          logger.info("Notification SMS sent", { studentId, to: phoneNumber });
+        }
+      })();
+      result.sms = true;
+    }
+  }
+
+  return result;
 }
 
 /**

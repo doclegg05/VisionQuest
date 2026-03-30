@@ -15,6 +15,9 @@ import { handlePostResponse } from "@/lib/chat/post-response";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { buildStudentStatusSignals, buildStudentStatusSummary } from "@/lib/student-status";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
+import { analyzeSkillGaps } from "@/lib/sage/skill-gap";
+import { getLearningPathway, buildPathwayContextString } from "@/lib/learning-pathway";
+import { getOrCreateCoachingArc, buildArcContextString } from "@/lib/sage/coaching-arcs";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -22,6 +25,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;
+  const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
 
   // Rate limit
@@ -36,7 +40,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   // Get or create conversation (teacher vs student path)
   const conversation = isTeacher
     ? await getOrCreateTeacherConversation(session.id, conversationId)
-    : await getOrCreateConversation(session.id, conversationId);
+    : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
   // Save user message
   await saveMessage(conversation.id, "user", userMessage);
@@ -50,7 +54,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       userMessage,
     });
   } else {
-    const [goals, orientationItems, formSubmissions, orientationProgress, careerDiscovery] = await Promise.all([
+    const [goals, orientationItems, formSubmissions, orientationProgress, careerDiscovery, priorSummaries] = await Promise.all([
       prisma.goal.findMany({
         where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
       }),
@@ -82,7 +86,26 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       }),
       prisma.careerDiscovery.findUnique({
         where: { studentId: session.id },
-        select: { status: true, sageSummary: true, topClusters: true },
+        select: {
+          status: true,
+          sageSummary: true,
+          topClusters: true,
+          hollandCode: true,
+          riasecScores: true,
+          nationalClusters: true,
+          transferableSkills: true,
+          workValues: true,
+        },
+      }),
+      prisma.conversation.findMany({
+        where: {
+          studentId: session.id,
+          id: { not: conversation.id },
+          summary: { not: null },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 3,
+        select: { summary: true, module: true, updatedAt: true },
       }),
     ]);
     const goalsByLevel: Record<string, string> = {};
@@ -102,20 +125,156 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       ? `${careerDiscovery.sageSummary} (Top pathways: ${careerDiscovery.topClusters.join(", ")})`
       : undefined;
 
-    systemPrompt = buildSystemPrompt(conversation.stage as ConversationStage, {
-      studentName: session.displayName,
-      bhag: goalsByLevel["bhag"],
-      monthly: goalsByLevel["monthly"],
-      weekly: goalsByLevel["weekly"],
-      daily: goalsByLevel["daily"],
-      goals_summary: goals.length > 0
-        ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
-        : "No planning goals set yet.",
-      student_status_summary: studentStatusSummary || undefined,
-      userMessage,
-      career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
-      discovery_summary: discoverySummary,
-    });
+    // Build skill gap context for goal-setting stages
+    const goalSettingStages = ["bhag", "monthly", "weekly", "daily"];
+    let skillGapContext: string | undefined;
+    if (goalSettingStages.includes(conversation.stage) && careerDiscovery?.status === "complete") {
+      try {
+        const gapAnalysis = await analyzeSkillGaps(session.id);
+        if (gapAnalysis) {
+          const haveList = gapAnalysis.skills
+            .filter((s) => s.status === "have")
+            .map((s) => s.name)
+            .join(", ");
+          const buildingList = gapAnalysis.skills
+            .filter((s) => s.status === "building")
+            .map((s) => `${s.name} (via ${s.buildingVia ?? "certification"})`)
+            .join(", ");
+          const needList = gapAnalysis.skills
+            .filter((s) => s.status === "need" && s.importance === "essential")
+            .map((s) => s.name)
+            .join(", ");
+          skillGapContext = [
+            `SKILL GAP ANALYSIS for ${gapAnalysis.targetClusterName}:`,
+            haveList ? `The student HAS these skills: ${haveList}.` : "",
+            buildingList ? `They are BUILDING: ${buildingList}.` : "",
+            needList
+              ? `They NEED (essential gaps): ${needList}. When setting goals, prioritize closing these essential skill gaps.`
+              : "No essential skill gaps — focus on reinforcing and applying existing skills.",
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }
+      } catch {
+        // Skill gap analysis is non-critical — never block the chat response
+      }
+    }
+
+    // Build pathway context for action-oriented stages
+    const pathwayStages = ["daily", "weekly", "tasks"];
+    let pathwayContext: string | undefined;
+    if (pathwayStages.includes(conversation.stage)) {
+      try {
+        const pathway = await getLearningPathway(session.id);
+        if (pathway) {
+          pathwayContext = buildPathwayContextString(pathway);
+        }
+      } catch {
+        // Pathway context is non-critical — never block the chat response
+      }
+    }
+
+    // Build coaching arc context — injected into all stages
+    let coachingArcContext: string | undefined;
+    try {
+      const arc = await getOrCreateCoachingArc(session.id);
+      if (arc.status === "active") {
+        coachingArcContext = buildArcContextString(arc);
+      }
+    } catch {
+      // Arc context is non-critical — never block chat response
+    }
+
+    // Build career profile context for profile review stage
+    let careerProfileContext: string | undefined;
+    if (conversation.stage === "career_profile_review" && careerDiscovery?.status === "complete") {
+      const parts: string[] = [];
+      if (careerDiscovery.hollandCode) {
+        parts.push(`Holland Code: ${careerDiscovery.hollandCode}`);
+      }
+      if (careerDiscovery.riasecScores) {
+        try {
+          const scores = JSON.parse(careerDiscovery.riasecScores) as Record<string, number>;
+          const scoreLines = Object.entries(scores)
+            .sort(([, a], [, b]) => b - a)
+            .map(([k, v]) => `  ${k}: ${Math.round(v * 100)}%`)
+            .join("\n");
+          parts.push(`RIASEC Scores:\n${scoreLines}`);
+        } catch {
+          // malformed JSON — skip
+        }
+      }
+      if (careerDiscovery.transferableSkills) {
+        try {
+          const skills = JSON.parse(careerDiscovery.transferableSkills) as Array<{ skill: string; category: string; evidence: string }>;
+          if (skills.length > 0) {
+            const skillLines = skills.map((s) => `  - ${s.skill} (${s.category}): ${s.evidence}`).join("\n");
+            parts.push(`Transferable Skills:\n${skillLines}`);
+          }
+        } catch {
+          // malformed JSON — skip
+        }
+      }
+      if (careerDiscovery.workValues) {
+        try {
+          const values = JSON.parse(careerDiscovery.workValues) as Array<{ value: string; importance: string }>;
+          if (values.length > 0) {
+            const valueLines = values.slice(0, 5).map((v) => `  - ${v.value} (${v.importance})`).join("\n");
+            parts.push(`Work Values:\n${valueLines}`);
+          }
+        } catch {
+          // malformed JSON — skip
+        }
+      }
+      if (careerDiscovery.nationalClusters) {
+        try {
+          const clusters = JSON.parse(careerDiscovery.nationalClusters) as Array<{ cluster_name: string; score: number }>;
+          if (clusters.length > 0) {
+            const top3 = clusters.slice().sort((a, b) => b.score - a.score).slice(0, 3);
+            const clusterLines = top3.map((c) => `  - ${c.cluster_name} (${Math.round(c.score * 100)}% match)`).join("\n");
+            parts.push(`Top Career Clusters:\n${clusterLines}`);
+          }
+        } catch {
+          // malformed JSON — skip
+        }
+      }
+      if (careerDiscovery.sageSummary) {
+        parts.push(`Assessment Summary: ${careerDiscovery.sageSummary}`);
+      }
+      careerProfileContext = parts.join("\n\n");
+    }
+
+    // Build prior conversation context block from summaries of recent other sessions
+    let priorConversationContext = "";
+    if (priorSummaries.length > 0) {
+      const lines = priorSummaries.map((s) => {
+        const date = s.updatedAt.toISOString().slice(0, 10);
+        return `Session from ${date} (${s.module}): ${s.summary}`;
+      });
+      priorConversationContext =
+        `[PREVIOUS_CONVERSATIONS_START]\n${lines.join("\n")}\n[PREVIOUS_CONVERSATIONS_END]\n\n`;
+    }
+
+    systemPrompt =
+      priorConversationContext +
+      buildSystemPrompt(conversation.stage as ConversationStage, {
+        studentName: session.displayName,
+        bhag: goalsByLevel["bhag"],
+        monthly: goalsByLevel["monthly"],
+        weekly: goalsByLevel["weekly"],
+        daily: goalsByLevel["daily"],
+        goals_summary: goals.length > 0
+          ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
+          : "No planning goals set yet.",
+        student_status_summary: studentStatusSummary || undefined,
+        userMessage,
+        career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
+        discovery_summary: discoverySummary,
+        career_profile_context: careerProfileContext,
+        skillGapContext,
+        pathwayContext,
+        coachingArcContext,
+      });
   }
 
   // Inject document-based context from ProgramDocument (RAG layer)
@@ -169,6 +328,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
             conversationId: conversation.id,
             conversationTitle: conversation.title,
             conversationStage: conversation.stage,
+            conversationSummary: conversation.summary ?? null,
             fullResponse,
             studentId: session.id,
             apiKey,

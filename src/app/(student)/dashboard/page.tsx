@@ -12,6 +12,8 @@ import {
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { getLearningPathway } from "@/lib/learning-pathway";
+import { getOrCreateCoachingArc } from "@/lib/sage/coaching-arcs";
 import DashboardClient from "./DashboardClient";
 
 
@@ -20,7 +22,7 @@ export default async function DashboardPage() {
   if (!session) return null;
 
   const now = new Date();
-  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData] = await Promise.all([
+  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData, careerDiscovery, pathway, coachingArc] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id } }),
     prisma.appointment.findFirst({
@@ -64,6 +66,12 @@ export default async function DashboardPage() {
       where: { studentId: session.id },
       select: { id: true },
     }),
+    prisma.careerDiscovery.findUnique({
+      where: { studentId: session.id },
+      select: { status: true },
+    }),
+    getLearningPathway(session.id),
+    getOrCreateCoachingArc(session.id).catch(() => null),
   ]);
 
   // Redirect brand-new students to the welcome flow
@@ -181,6 +189,19 @@ export default async function DashboardPage() {
         readinessScore={readiness.score}
         readinessBreakdown={readiness.breakdown}
         activityDays={activityDays}
+        careerDiscoveryComplete={careerDiscovery?.status === "complete"}
+        coachingArc={
+          coachingArc && coachingArc.status === "active"
+            ? { weekNumber: coachingArc.weekNumber, totalWeeks: coachingArc.template.durationWeeks }
+            : null
+        }
+        pathway={pathway ? {
+          clusterId: pathway.clusterId,
+          clusterName: pathway.clusterName,
+          completedCount: pathway.completedCount,
+          totalCount: pathway.totalCount,
+          currentStepName: pathway.steps.find((s) => s.isCurrent)?.name ?? null,
+        } : null}
       />
     </div>
   );

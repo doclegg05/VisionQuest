@@ -5,6 +5,8 @@ import PageIntro from "@/components/ui/PageIntro";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 
+const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
+
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
@@ -23,13 +25,22 @@ export default function SettingsPage() {
   const [credlySaved, setCredlySaved] = useState(false);
   const [credlyStatus, setCredlyStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
 
+  // Notification preferences state
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [notifStatus, setNotifStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [notifError, setNotifError] = useState("");
+
   useEffect(() => {
     Promise.all([
       fetch("/api/settings/api-key").then((response) => response.json()),
       fetch("/api/settings/security-questions").then((response) => response.json()),
       fetch("/api/settings/credly").then((response) => response.json()),
+      fetch("/api/notifications/preferences").then((response) => response.json()),
     ])
-      .then(([apiKeyData, recoveryData, credlyData]) => {
+      .then(([apiKeyData, recoveryData, credlyData, notifData]) => {
         setHasKey(apiKeyData.hasKey);
         setKeyHint(apiKeyData.keyHint);
         setPlatformKeyConfigured(Boolean(apiKeyData.platformKeyConfigured));
@@ -41,11 +52,60 @@ export default function SettingsPage() {
           setCredlyUsername(credlyData.credlyUsername);
           setCredlySaved(true);
         }
+
+        if (notifData) {
+          setEmailEnabled(Boolean(notifData.email?.enabled));
+          setSmsEnabled(Boolean(notifData.sms?.enabled));
+          setPhoneNumber(notifData.sms?.destination ?? "");
+        }
       })
       .catch(() => {
         setErrorMsg("We could not load your current settings.");
       });
   }, []);
+
+  const saveNotificationPreferences = async (
+    overrides: { email?: boolean; sms?: boolean; phone?: string } = {},
+  ) => {
+    const resolvedEmail = overrides.email ?? emailEnabled;
+    const resolvedSms = overrides.sms ?? smsEnabled;
+    const resolvedPhone = overrides.phone ?? phoneNumber;
+
+    if (resolvedSms && resolvedPhone && !PHONE_REGEX.test(resolvedPhone)) {
+      setPhoneError("Enter a valid phone number, e.g. +12125551234");
+      return;
+    }
+    setPhoneError("");
+    setNotifStatus("saving");
+    setNotifError("");
+
+    try {
+      const res = await fetch("/api/notifications/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: { enabled: resolvedEmail },
+          sms: {
+            enabled: resolvedSms,
+            ...(resolvedPhone ? { phoneNumber: resolvedPhone } : {}),
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setNotifStatus("error");
+        setNotifError(data.error ?? "Could not save notification preferences.");
+        return;
+      }
+
+      setNotifStatus("success");
+      setTimeout(() => setNotifStatus("idle"), 3000);
+    } catch {
+      setNotifStatus("error");
+      setNotifError("Could not contact the server. Please try again.");
+    }
+  };
 
   const handleSave = async () => {
     setStatus("saving");
@@ -301,6 +361,128 @@ export default function SettingsPage() {
           )}
           {status === "error" && (
             <p className="mt-3 text-sm text-red-600">{errorMsg}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="surface-section mt-6 p-6">
+        <div className="mb-6">
+          <p className="page-eyebrow text-[var(--ink-muted)]">Alerts &amp; reminders</p>
+          <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
+            Notification Preferences
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+            Choose how you want to receive daily coaching prompts and reminders from Sage.
+          </p>
+        </div>
+
+        <div className="divide-y divide-[rgba(18,38,63,0.08)]">
+          {/* Email toggle */}
+          <div className="flex items-start justify-between gap-4 py-4">
+            <div>
+              <p className="text-sm font-semibold text-[var(--ink-strong)]">Email Notifications</p>
+              <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                Receive daily coaching prompts and reminders by email
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailEnabled}
+              onClick={() => {
+                const next = !emailEnabled;
+                setEmailEnabled(next);
+                void saveNotificationPreferences({ email: next });
+              }}
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
+                emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-gray-200"
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  emailEnabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* SMS toggle + phone field */}
+          <div className="py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">SMS Notifications</p>
+                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                  Receive daily coaching prompts via text message
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={smsEnabled}
+                onClick={() => {
+                  const next = !smsEnabled;
+                  setSmsEnabled(next);
+                  void saveNotificationPreferences({ sms: next });
+                }}
+                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
+                  smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-gray-200"
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    smsEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {smsEnabled && (
+              <div className="mt-4">
+                <label
+                  htmlFor="phone-number"
+                  className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]"
+                >
+                  Phone number
+                </label>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <input
+                    id="phone-number"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => {
+                      setPhoneNumber(e.target.value);
+                      setPhoneError("");
+                    }}
+                    placeholder="+12125551234"
+                    className="field flex-1 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveNotificationPreferences()}
+                    disabled={!phoneNumber || notifStatus === "saving"}
+                    className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {notifStatus === "saving" ? "Saving..." : "Save number"}
+                  </button>
+                </div>
+                {phoneError && (
+                  <p className="mt-1.5 text-xs text-red-600">{phoneError}</p>
+                )}
+                <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
+                  Standard messaging rates may apply. Use international format, e.g. +12125551234.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          {notifStatus === "success" && (
+            <p className="text-sm text-emerald-600">Notification preferences saved.</p>
+          )}
+          {notifStatus === "error" && (
+            <p className="text-sm text-red-600">{notifError}</p>
           )}
         </div>
       </div>

@@ -1,12 +1,22 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import XpBar from "@/components/ui/XpBar";
 import StreakBadge from "@/components/ui/StreakBadge";
 import SuggestedActions from "@/components/ui/SuggestedActions";
 import StreakCalendar from "@/components/ui/StreakCalendar";
+import { MoodSparkline } from "@/components/progression/MoodSparkline";
+import { CoachingArcBar } from "@/components/progression/CoachingArcBar";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
+
+interface MoodEntry {
+  id: string;
+  score: number;
+  context: string | null;
+  extractedAt: string;
+}
 
 const MountainProgress = dynamic(
   () => import("@/components/ui/MountainProgress"),
@@ -57,6 +67,15 @@ interface DashboardClientProps {
   readinessScore: number;
   readinessBreakdown: ReadinessBreakdown;
   activityDays: Record<string, number>;
+  careerDiscoveryComplete?: boolean;
+  coachingArc?: { weekNumber: number; totalWeeks: number } | null;
+  pathway?: {
+    clusterId: string;
+    clusterName: string;
+    completedCount: number;
+    totalCount: number;
+    currentStepName: string | null;
+  } | null;
 }
 
 export default function DashboardClient({
@@ -80,7 +99,25 @@ export default function DashboardClient({
   readinessScore,
   readinessBreakdown,
   activityDays,
+  careerDiscoveryComplete,
+  coachingArc,
+  pathway,
 }: DashboardClientProps) {
+  const [moodEntries, setMoodEntries] = useState<MoodEntry[]>([]);
+
+  useEffect(() => {
+    fetch("/api/mood")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { entries: MoodEntry[] } | null) => {
+        if (data?.entries) {
+          setMoodEntries(data.entries);
+        }
+      })
+      .catch(() => {
+        // Non-critical — fail silently
+      });
+  }, []);
+
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -93,6 +130,61 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-4">
+      {/* Career DNA ready card */}
+      {careerDiscoveryComplete && (
+        <div className="surface-section p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                Career DNA
+              </p>
+              <p className="mt-1 font-semibold text-[var(--ink-strong)]">
+                Your Career DNA is ready
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                See your Holland code, transferable skills, work values, and top career clusters.
+              </p>
+            </div>
+            <Link
+              href="/profile"
+              prefetch={false}
+              className="primary-button shrink-0 px-5 py-3 text-sm"
+            >
+              View Profile
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Pathway compact card */}
+      {pathway && (
+        <div className="surface-section p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                Your Roadmap
+              </p>
+              <p className="mt-1 font-semibold text-[var(--ink-strong)]">
+                {pathway.clusterName}
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                {pathway.completedCount}/{pathway.totalCount} steps complete
+                {pathway.currentStepName && (
+                  <> &middot; Next: <span className="font-medium text-[var(--ink-strong)]">{pathway.currentStepName}</span></>
+                )}
+              </p>
+            </div>
+            <Link
+              href="/learning"
+              prefetch={false}
+              className="shrink-0 text-sm font-semibold text-[var(--accent-strong)]"
+            >
+              View full roadmap
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* 1. Mountain Progress Hero */}
       <div className="surface-section overflow-hidden p-0">
         <MountainProgress
@@ -101,6 +193,14 @@ export default function DashboardClient({
           level={level}
         />
       </div>
+
+      {/* Coaching Arc Progress Bar */}
+      {coachingArc && (
+        <CoachingArcBar
+          currentWeek={coachingArc.weekNumber}
+          totalWeeks={coachingArc.totalWeeks}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* 2. What's Next — the single most important card */}
@@ -171,7 +271,15 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* 4. Advising — appointment + tasks */}
+        {/* 4. Motivation Trend */}
+        {moodEntries.length > 0 && (
+          <div className="surface-section p-5">
+            <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Motivation Trend</h3>
+            <MoodSparkline entries={moodEntries} />
+          </div>
+        )}
+
+        {/* 5. Advising — appointment + tasks */}
         <div className="surface-section p-5 md:col-span-2">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
