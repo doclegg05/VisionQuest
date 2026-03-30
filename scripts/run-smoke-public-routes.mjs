@@ -7,6 +7,7 @@ const baseUrl = (process.env.SMOKE_BASE_URL || "http://localhost:3000").replace(
 const pythonExecutable = process.env.PYTHON || "python";
 const smokeServerScript = process.env.SMOKE_SERVER_SCRIPT || "dev";
 const smokePythonScript = process.env.SMOKE_PYTHON_SCRIPT || "scripts/smoke_public_routes.py";
+const smokeApiScript = "scripts/smoke_api_routes.py";
 
 loadEnvConfig(process.cwd(), smokeServerScript === "dev");
 
@@ -95,6 +96,20 @@ async function main() {
     if (code !== 0) {
       throw new Error(
         `Smoke test failed with ${signal ? `signal ${signal}` : `exit code ${code}`}.`
+      );
+    }
+
+    // Run API smoke tests (auth rejection, endpoint contracts)
+    console.log("\n--- Running API smoke tests ---\n");
+    const apiSmoke = spawn(pythonExecutable, [smokeApiScript], {
+      env: smokeEnv,
+      stdio: "inherit",
+    });
+
+    const apiResult = await waitForExit(apiSmoke);
+    if (apiResult.code !== 0) {
+      throw new Error(
+        `API smoke test failed with ${apiResult.signal ? `signal ${apiResult.signal}` : `exit code ${apiResult.code}`}.`
       );
     }
   } finally {
