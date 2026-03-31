@@ -46,7 +46,7 @@ export default async function StudentLayout({
         <ProgressionProvider>
           <main
             id="main-content"
-            className="min-h-screen overflow-y-auto pb-24 pt-20 md:ml-[19rem] md:pb-10 md:pr-5 md:pt-5"
+            className="min-h-screen overflow-y-auto pb-28 pt-20 md:ml-[19rem] md:pb-10 md:pr-5 md:pt-5"
           >
             <PageTransition>
               {children}

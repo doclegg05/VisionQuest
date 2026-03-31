@@ -135,60 +135,81 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
       </div>
 
       <nav
-        className="fixed bottom-3 left-3 right-3 z-50 rounded-[1.8rem] border border-white/55 bg-[rgba(255,255,255,0.84)] shadow-[0_18px_50px_rgba(16,37,62,0.16)] backdrop-blur md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)] bg-[var(--surface-base)]/95 backdrop-blur-xl md:hidden"
         role="navigation"
         aria-label="Main navigation"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        <div className="flex">
-          {mobileMain.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={false}
-              className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors ${
-                pathname === item.href || pathname.startsWith(item.href + "/")
-                  ? "text-[var(--ink-strong)]"
-                  : "text-[var(--ink-muted)]"
-              }`}
-              aria-current={pathname === item.href ? "page" : undefined}
-            >
-              <span
-                className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
-                  pathname === item.href || pathname.startsWith(item.href + "/")
-                    ? "bg-[rgba(16,37,62,0.1)]"
-                    : "bg-transparent"
-                }`}
-              >
-                <item.icon
-                  size={20}
-                  weight={pathname === item.href || pathname.startsWith(item.href + "/") ? "fill" : "regular"}
-                />
-              </span>
-              <span className="text-center">{item.label}</span>
-            </Link>
-          ))}
-          {mobileMore.length > 0 ? (
-            <button
-              ref={moreButtonRef}
-              onClick={() => setMoreOpen(!moreOpen)}
-              type="button"
-              className={`flex min-w-0 flex-1 flex-col items-center px-1 py-3 text-[11px] leading-4 transition-colors ${
-                isMoreActive ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"
-              }`}
-              aria-expanded={moreOpen}
-              aria-haspopup="dialog"
-              aria-label="More navigation options"
-            >
-              <span
-                className={`mb-1 grid h-9 w-9 place-items-center rounded-2xl text-lg ${
-                  isMoreActive ? "bg-[rgba(16,37,62,0.1)]" : "bg-transparent"
-                }`}
-              >
-                <DotsThreeOutline size={20} weight={isMoreActive ? "fill" : "regular"} />
-              </span>
-              <span className="text-center">More</span>
-            </button>
-          ) : null}
+        <div className="flex items-end justify-around px-2 pt-1.5 pb-2">
+          {/* Tab 1: Home */}
+          {mobileMain[0] && (() => {
+            const item = mobileMain[0];
+            const IconComponent = item.icon;
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-1" aria-current={active ? "page" : undefined}>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
+                <span className={`text-[10px] font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
+              </Link>
+            );
+          })()}
+
+          {/* Tab 2: Goals */}
+          {mobileMain[1] && (() => {
+            const item = mobileMain[1];
+            const IconComponent = item.icon;
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-1" aria-current={active ? "page" : undefined}>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
+                <span className={`text-[10px] font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
+              </Link>
+            );
+          })()}
+
+          {/* Tab 3: Sage — elevated center FAB */}
+          <Link
+            href="/chat"
+            prefetch={false}
+            className="flex flex-col items-center gap-0.5 px-3"
+            aria-label="Open Sage chat"
+          >
+            <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-[#37b550] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
+              <ChatCircle size={22} weight="fill" />
+            </div>
+            <span className={`text-[10px] font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>Sage</span>
+          </Link>
+
+          {/* Tab 4: Learn */}
+          {mobileMain[2] && (() => {
+            const item = mobileMain.find(i => i.href === "/learning") || mobileMain[2];
+            const IconComponent = item.icon;
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-1" aria-current={active ? "page" : undefined}>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
+                <span className={`text-[10px] font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
+              </Link>
+            );
+          })()}
+
+          {/* Tab 5: More */}
+          <button
+            ref={moreButtonRef}
+            onClick={() => setMoreOpen(!moreOpen)}
+            type="button"
+            className="flex flex-col items-center gap-0.5 px-3 py-1"
+            aria-expanded={moreOpen}
+            aria-haspopup="dialog"
+            aria-label="More navigation options"
+          >
+            <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
+            <span className={`text-[10px] font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>More</span>
+            {isMoreActive && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
+          </button>
         </div>
       </nav>
 
@@ -203,7 +224,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
             role="dialog"
             aria-modal="true"
             aria-label="More navigation options"
-            className="panel panel-strong fixed bottom-24 left-3 right-3 z-50 rounded-[1.75rem] p-4 md:hidden"
+            className="panel panel-strong fixed bottom-16 left-3 right-3 z-50 rounded-[1.75rem] p-4 md:hidden"
           >
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {mobileMore.map((item) => (
@@ -313,7 +334,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
             type="button"
-            className={`fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_30px_rgba(7,23,43,0.35)] transition-all hover:scale-110 md:bottom-6 md:right-6 ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] rotate-0" : "bg-[var(--ink-strong)]"}`}
+            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_30px_rgba(7,23,43,0.35)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] rotate-0" : "bg-[var(--ink-strong)]"}`}
             aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
             aria-expanded={sageMiniOpen}
           >
