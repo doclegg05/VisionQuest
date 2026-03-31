@@ -368,6 +368,63 @@ a[role="button"]:active,
   100% { transform: translateX(100%); }
 }
 
+/* Cinematic animation keyframes */
+@keyframes slide-up-bounce {
+  0% { opacity: 0; transform: translateY(20px); }
+  60% { opacity: 1; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-pop {
+  0% { opacity: 0; transform: scale(0.5) translateY(10px); }
+  50% { transform: scale(1.15) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-green); }
+  50% { box-shadow: 0 0 20px 4px var(--glow-green); }
+}
+
+@keyframes glow-pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-gold); }
+  50% { box-shadow: 0 0 20px 4px var(--glow-gold); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes progress-fill {
+  from { width: 0; }
+}
+
+@keyframes gradient-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-slide-up-bounce {
+  animation: slide-up-bounce var(--duration-normal) var(--ease-bounce) both;
+}
+
+.animate-scale-pop {
+  animation: scale-pop var(--duration-normal) var(--ease-bounce) both;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-glow-pulse-gold {
+  animation: glow-pulse-gold 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
