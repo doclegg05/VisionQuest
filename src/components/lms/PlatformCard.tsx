@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import type { SpokesPlatform } from "@/lib/spokes/platforms";
 
 interface PlatformCardProps {
@@ -32,19 +32,13 @@ export default function PlatformCard({
   const gradientClass =
     CATEGORY_COLORS[platform.category] || "from-gray-400 to-gray-500";
 
-  function handleVisit() {
-    if (platform.loginUrl) {
-      onVisit?.(platform.id);
-      window.open(platform.loginUrl, "_blank", "noopener,noreferrer");
-    }
+  /** Stop inner interactive elements from triggering the card-level link */
+  function stopPropagation(e: MouseEvent) {
+    e.stopPropagation();
   }
 
-  return (
-    <div
-      className={`surface-section relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg ${
-        goalMatch ? "ring-2 ring-[var(--accent-strong)]" : ""
-      }`}
-    >
+  const cardContent = (
+    <>
       {/* Gradient glow strip */}
       <div
         className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${gradientClass}`}
@@ -92,12 +86,9 @@ export default function PlatformCard({
         {/* Actions */}
         <div className="mt-4 flex items-center gap-3">
           {platform.loginUrl ? (
-            <button
-              onClick={handleVisit}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-strong)] hover:underline cursor-pointer"
-            >
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white shadow-sm">
               Open Platform &rarr;
-            </button>
+            </span>
           ) : (
             <span className="text-xs text-[var(--ink-muted)] italic">
               Classroom-based platform
@@ -106,7 +97,11 @@ export default function PlatformCard({
 
           {studentLinks.length > 0 && (
             <button
-              onClick={() => setLinksOpen(!linksOpen)}
+              onClick={(e) => {
+                stopPropagation(e);
+                e.preventDefault();
+                setLinksOpen(!linksOpen);
+              }}
               className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
             >
               {linksOpen ? "Less resources \u25B4" : "More resources \u25BE"}
@@ -116,7 +111,10 @@ export default function PlatformCard({
 
         {/* Expandable links */}
         {linksOpen && studentLinks.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-[var(--muted)]/20 space-y-1.5">
+          <div
+            className="mt-3 pt-3 border-t border-[var(--muted)]/20 space-y-1.5"
+            onClick={stopPropagation}
+          >
             {studentLinks.map((link) => (
               <a
                 key={link.url}
@@ -131,6 +129,30 @@ export default function PlatformCard({
           </div>
         )}
       </div>
+    </>
+  );
+
+  const sharedClasses = `surface-section relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg block ${
+    goalMatch ? "ring-2 ring-[var(--accent-strong)]" : ""
+  }`;
+
+  if (platform.loginUrl) {
+    return (
+      <a
+        href={platform.loginUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => onVisit?.(platform.id)}
+        className={`${sharedClasses} no-underline cursor-pointer`}
+      >
+        {cardContent}
+      </a>
+    );
+  }
+
+  return (
+    <div className={sharedClasses}>
+      {cardContent}
     </div>
   );
 }

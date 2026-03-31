@@ -123,6 +123,7 @@ export default async function StudentDashboardPreview({
       </div>
 
       <DashboardClient
+        studentName={managedStudent.displayName}
         level={state.level}
         xpProgress={xpProgress}
         currentStreak={state.currentStreak}

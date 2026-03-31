@@ -58,7 +58,24 @@ model Student {
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
   moodEntries             MoodEntry[]
+  notificationPreferences NotificationPreference[]
+  coachingArcs            CoachingArc[]
+  savedJobs               StudentSavedJob[]
 
+  @@schema("visionquest")
+}
+
+model NotificationPreference {
+  id          String   @id @default(cuid())
+  studentId   String
+  channel     String   // "email" | "sms"
+  enabled     Boolean  @default(true)
+  destination String?  // phone number or email override (null = use student's default)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, channel])
   @@schema("visionquest")
 }
 
@@ -438,6 +455,7 @@ model SpokesClass {
   createdBy   Student?                 @relation("CreatedClasses", fields: [createdById], references: [id], onDelete: SetNull)
   instructors SpokesClassInstructor[]
   enrollments StudentClassEnrollment[]
+  jobConfig   JobClassConfig?
 
   @@index([status, name])
   @@schema("visionquest")
@@ -997,5 +1015,83 @@ model SageSnippet {
   updatedAt DateTime @updatedAt
 
   @@index([isActive])
+  @@schema("visionquest")
+}
+
+model CoachingArc {
+  id         String   @id @default(cuid())
+  studentId  String
+  arcType    String   // "standard_6week"
+  weekNumber Int      @default(1)
+  milestones Json     @default("[]")
+  status     String   @default("active") // "active" | "completed" | "paused"
+  startedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, arcType])
+  @@schema("visionquest")
+}
+
+model JobClassConfig {
+  id            String    @id @default(cuid())
+  classId       String    @unique
+  region        String
+  radius        Int       @default(25)
+  sources       String[]  @default(["jsearch"])
+  autoRefresh   Boolean   @default(true)
+  lastScrapedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  class       SpokesClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  jobListings JobListing[]
+
+  @@schema("visionquest")
+}
+
+model JobListing {
+  id             String    @id @default(cuid())
+  title          String
+  company        String
+  location       String
+  salary         String?
+  salaryMin      Float?
+  description    String    @db.Text
+  url            String
+  source         String
+  sourceType     String
+  sourceId       String    @unique
+  clusters       String[]  @default([])
+  status         String    @default("active")
+  expiresAt      DateTime?
+  scrapeBatchId  String
+  classConfigId  String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  classConfig     JobClassConfig   @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
+  savedByStudents StudentSavedJob[]
+
+  @@index([classConfigId, status])
+  @@index([status, createdAt])
+  @@schema("visionquest")
+}
+
+model StudentSavedJob {
+  id           String   @id @default(cuid())
+  studentId    String
+  jobListingId String
+  status       String   @default("saved")
+  notes        String?  @db.Text
+  savedAt      DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, jobListingId])
   @@schema("visionquest")
 }

@@ -170,10 +170,16 @@ function ChatWindowInner() {
       setStreamingContent("");
 
       try {
+        const stageParam = searchParams.get("stage") ?? undefined;
         const res = await apiFetch("/api/chat/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, conversationId }),
+          body: JSON.stringify({
+            message: text,
+            conversationId,
+            // Only send on the first message of a new conversation
+            requestedStage: conversationId ? undefined : stageParam,
+          }),
         });
 
         if (!res.ok) {

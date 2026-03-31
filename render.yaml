@@ -89,3 +89,20 @@ services:
           type: web
           name: visionquest
           envVarKey: CRON_SECRET
+  - type: cron
+    name: visionquest-daily-coaching
+    runtime: node
+    schedule: "0 13 * * *"
+    buildCommand: "true"
+    startCommand: node scripts/run-daily-coaching.mjs
+    envVars:
+      - key: APP_BASE_URL
+        fromService:
+          type: web
+          name: visionquest
+          envVarKey: APP_BASE_URL
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: visionquest
+          envVarKey: CRON_SECRET

@@ -11,6 +11,14 @@ import {
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
 import { apiFetch } from "@/lib/api";
+import { MoodSparkline } from "@/components/progression/MoodSparkline";
+
+interface MoodEntryData {
+  id: string;
+  score: number;
+  context: string | null;
+  extractedAt: string;
+}
 
 interface GoalData {
   id: string;
@@ -362,6 +370,18 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     category: "general",
     body: "",
   });
+  const [moodEntries, setMoodEntries] = useState<MoodEntryData[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/teacher/students/${studentId}/mood`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { entries: MoodEntryData[] } | null) => {
+        if (d?.entries) setMoodEntries(d.entries);
+      })
+      .catch(() => {
+        // Non-critical
+      });
+  }, [studentId]);
 
   const loadData = useCallback(async () => {
     try {
@@ -1993,6 +2013,30 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           </div>
         )}
       </div>
+
+      {/* Motivation Trend */}
+      {moodEntries.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Motivation Trend
+            </h3>
+            {(() => {
+              const last3 = moodEntries.slice(-3);
+              const isDeclining =
+                last3.length === 3 &&
+                last3[0].score > last3[1].score &&
+                last3[1].score > last3[2].score;
+              return isDeclining ? (
+                <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">
+                  Motivation declining
+                </span>
+              ) : null;
+            })()}
+          </div>
+          <MoodSparkline entries={moodEntries} showDateLabels />
+        </div>
+      )}
       </>}
     </div>
   );

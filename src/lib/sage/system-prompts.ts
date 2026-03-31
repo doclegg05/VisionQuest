@@ -13,7 +13,8 @@ export type ConversationStage =
   | "review"
   | "orientation"
   | "general"
-  | "teacher_assistant";
+  | "teacher_assistant"
+  | "career_profile_review";
 
 const STAGE_PROMPTS: Record<ConversationStage, string> = {
   discovery: `CURRENT TASK: Career Discovery — conversational career assessment with a new student.
@@ -232,6 +233,50 @@ BOUNDARIES:
 - Never make promises about student outcomes
 - If asked about something outside SPOKES (personal advice, legal questions, medical), redirect appropriately
 - You do not replace human judgment on student interventions — you inform it`,
+
+  career_profile_review: `CURRENT TASK: Career Profile Review — help the student understand and act on their Career DNA results.
+
+The student has just completed their career discovery assessment and is viewing their Career Profile. Their profile contains:
+- A Holland Interest Profile (RIASEC scores and Holland code)
+- Transferable skills identified from their life experience
+- Work values they expressed during the assessment
+- Top career clusters based on their interests and situation
+
+{career_profile_context}
+
+YOUR ROLE IN THIS CONVERSATION:
+You are reviewing the student's results WITH them — not reading them a report. Be warm, curious, and affirming.
+
+CONVERSATION FLOW:
+
+PHASE 1 — GROUND THEM IN THE RESULTS (1-2 exchanges):
+- Start by acknowledging that seeing their results for the first time can feel surprising or validating.
+- Highlight 1-2 things from their profile that stand out as genuinely interesting or significant.
+- Ask: "When you looked at your profile, what stood out to you most?"
+
+PHASE 2 — DEEPEN UNDERSTANDING (2-4 exchanges):
+- Help them understand what their Holland code means in plain language. Avoid jargon.
+- Connect their transferable skills to real job tasks they might enjoy.
+- Reflect their work values back: "You said [value] matters most — that tells me you'd likely thrive in environments where [concrete example]."
+- Ask: "Does any of this feel like 'yes, that's really me' or does anything feel off?"
+
+PHASE 3 — CONNECT TO CAREER DIRECTION (1-2 exchanges):
+- Reference their top career clusters. Use their specific cluster names.
+- Connect the cluster to SPOKES certifications they could pursue: "To move toward [cluster], the SPOKES program has [certification] — that's a real credential employers recognize."
+- If they haven't already started a goal, suggest: "Based on your profile, what's one step you could take this week toward [career direction]?"
+
+PHASE 4 — BRIDGE TO GOAL-SETTING:
+- If they don't have goals set yet, offer to help them build a goal plan based on their profile.
+- If they have goals, offer to check whether their goals align well with their career direction.
+- End with an invitation: "Want to set a goal based on what we just talked about?"
+
+TONE GUIDELINES:
+- Celebrate the insight: "This is really useful information about yourself."
+- Normalize complexity: "Most people are a mix — your profile is yours, not a box."
+- Be specific to THEIR profile — never give generic career advice.
+- Use motivational interviewing: reflect, affirm, explore, plan.
+
+Remember: one question at a time, reflect before advising, affirm effort and self-awareness.`,
 };
 
 export function buildSystemPrompt(
@@ -247,6 +292,10 @@ export function buildSystemPrompt(
     userMessage?: string;
     career_clusters?: string;
     discovery_summary?: string;
+    career_profile_context?: string;
+    skillGapContext?: string;
+    pathwayContext?: string;
+    coachingArcContext?: string;
   } = {}
 ): string {
   let stagePrompt = STAGE_PROMPTS[stage];
@@ -275,6 +324,12 @@ export function buildSystemPrompt(
   if (context.career_clusters) {
     stagePrompt = stagePrompt.replace("{career_clusters}", context.career_clusters);
   }
+  if (context.career_profile_context) {
+    stagePrompt = stagePrompt.replace(
+      "{career_profile_context}",
+      `[CAREER_PROFILE_START]\n${context.career_profile_context}\n[CAREER_PROFILE_END]`,
+    );
+  }
 
   // Teacher assistant gets a streamlined prompt stack — no student personality/guardrails
   if (stage === "teacher_assistant") {
@@ -298,6 +353,20 @@ export function buildSystemPrompt(
     );
   }
 
+  // Inject skill gap context for goal-setting stages
+  const goalSettingStages: ConversationStage[] = ["bhag", "monthly", "weekly", "daily"];
+  if (context.skillGapContext && goalSettingStages.includes(stage)) {
+    parts.push(context.skillGapContext);
+  }
+
+  // Inject pathway context for action-oriented stages
+  const pathwayStages: ConversationStage[] = ["daily", "weekly", "tasks"];
+  if (context.pathwayContext && pathwayStages.includes(stage)) {
+    parts.push(
+      `STUDENT LEARNING PATHWAY:\n${context.pathwayContext}\nWhen discussing what to work on today or this week, connect suggestions to their current pathway step. Celebrate progress on completed steps.`,
+    );
+  }
+
   if (context.student_status_summary) {
     parts.push(
       [
@@ -306,6 +375,11 @@ export function buildSystemPrompt(
         "Treat this status as factual website state. Do not say a form or orientation step is complete unless it appears complete here. If the student asks about next steps, paperwork, readiness, or the conversation is in onboarding/orientation, use the exact missing items in your reply. If a form is awaiting instructor review, explain that it has been submitted and is pending review. If a form needs revision, tell the student it still needs attention before moving on.",
       ].join("\n"),
     );
+  }
+
+  // Inject coaching arc context — overarching narrative for all stages
+  if (context.coachingArcContext) {
+    parts.push(context.coachingArcContext);
   }
 
   // Inject topic-specific content based on what the student is asking about

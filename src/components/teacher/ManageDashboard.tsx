@@ -13,8 +13,9 @@ import SpokesReport from "./SpokesReport";
 import AcademicKpiReport from "./AcademicKpiReport";
 import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
+import { JobConfigSection } from "./JobConfigSection";
 
-type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "reports" | "audit" | "documents";
+type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "job-board" | "reports" | "audit" | "documents";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "orientation", label: "Orientation" },
@@ -23,6 +24,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "certifications", label: "Certifications" },
   { key: "advising", label: "Advising" },
   { key: "career", label: "Career" },
+  { key: "job-board", label: "Job Board" },
   { key: "reports", label: "Reports" },
   { key: "audit", label: "Audit Trail" },
   { key: "documents", label: "Documents" },
@@ -56,6 +58,7 @@ export default function ManageDashboard() {
       {tab === "certifications" && <CertManager />}
       {tab === "advising" && <AdvisingManager />}
       {tab === "career" && <CareerManager />}
+      {tab === "job-board" && <JobConfigSection />}
       {tab === "reports" && (
         <div className="space-y-8">
           <GrantKpiReport />

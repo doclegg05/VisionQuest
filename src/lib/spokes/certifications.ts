@@ -22,6 +22,8 @@ export interface SpokesCertification {
   platforms: string[];
   examProvider: string | null;
   levels?: string[];
+  estimatedHours: number;
+  prerequisites: string[];
 }
 
 export const CERT_CATEGORIES: Record<CertCategory, { label: string; icon: string }> = {
@@ -53,6 +55,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
       "Level 2: Key Applications",
       "Level 3: Living Online",
     ],
+    estimatedHours: 20,
+    prerequisites: [],
   },
   {
     id: "computer-essentials",
@@ -63,6 +67,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "digital-literacy",
     platforms: ["essential-education"],
     examProvider: null,
+    estimatedHours: 8,
+    prerequisites: [],
   },
   {
     id: "ai-foundations",
@@ -73,6 +79,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "digital-literacy",
     platforms: [],
     examProvider: null,
+    estimatedHours: 12,
+    prerequisites: ["ic3"],
   },
 
   // ---------------------------------------------------------------------------
@@ -87,6 +95,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "office",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 15,
+    prerequisites: ["ic3"],
   },
   {
     id: "mos-excel",
@@ -97,6 +107,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "office",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 15,
+    prerequisites: ["ic3"],
   },
   {
     id: "mos-powerpoint",
@@ -107,6 +119,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "office",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 12,
+    prerequisites: ["ic3"],
   },
   {
     id: "mos-outlook",
@@ -117,6 +131,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "office",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 10,
+    prerequisites: ["ic3"],
   },
   {
     id: "mos-access",
@@ -127,6 +143,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "office",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 18,
+    prerequisites: ["ic3", "mos-excel"],
   },
 
   // ---------------------------------------------------------------------------
@@ -141,6 +159,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "creative",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 30,
+    prerequisites: ["computer-essentials"],
   },
 
   // ---------------------------------------------------------------------------
@@ -155,6 +175,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "finance",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 25,
+    prerequisites: ["ic3"],
   },
   {
     id: "intuit-bookkeeping",
@@ -165,6 +187,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "finance",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 20,
+    prerequisites: ["intuit-quickbooks"],
   },
   {
     id: "intuit-personal-finance",
@@ -175,6 +199,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "finance",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 15,
+    prerequisites: [],
   },
   {
     id: "intuit-design-delight",
@@ -185,6 +211,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "creative",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 12,
+    prerequisites: [],
   },
 
   // ---------------------------------------------------------------------------
@@ -200,6 +228,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     platforms: [],
     examProvider: "ACT",
     levels: ["Bronze", "Silver", "Gold", "Platinum"],
+    estimatedHours: 20,
+    prerequisites: [],
   },
 
   // ---------------------------------------------------------------------------
@@ -213,6 +243,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "cybersecurity",
     platforms: ["gmetrix-and-learnkey"],
     examProvider: "Certiport",
+    estimatedHours: 30,
+    prerequisites: ["ic3"],
   },
 
   // ---------------------------------------------------------------------------
@@ -228,6 +260,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     platforms: ["through-the-customers-eyes"],
     examProvider: null,
     levels: ["Part 1", "Part 2"],
+    estimatedHours: 10,
+    prerequisites: [],
   },
   {
     id: "customer-service-csm",
@@ -238,6 +272,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "soft-skills",
     platforms: ["csmlearn"],
     examProvider: null,
+    estimatedHours: 12,
+    prerequisites: ["customer-service-ttce"],
   },
   {
     id: "byag",
@@ -248,6 +284,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "soft-skills",
     platforms: ["bring-your-a-game"],
     examProvider: null,
+    estimatedHours: 8,
+    prerequisites: [],
   },
   {
     id: "professional-communications",
@@ -258,6 +296,8 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "soft-skills",
     platforms: [],
     examProvider: null,
+    estimatedHours: 10,
+    prerequisites: [],
   },
 
   // ---------------------------------------------------------------------------
@@ -272,5 +312,7 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     category: "language",
     platforms: ["burlington-english"],
     examProvider: null,
+    estimatedHours: 40,
+    prerequisites: [],
   },
 ];

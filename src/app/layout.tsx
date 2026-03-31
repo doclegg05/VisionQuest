@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Manrope, Sora } from "next/font/google";
+import { ThemeProvider } from "@/components/ui/ThemeProvider";
+import { getThemeFromCookie, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -35,11 +37,12 @@ export default async function RootLayout({
 }>) {
   const headerStore = await headers();
   const nonce = headerStore.get("x-csp-nonce") ?? "";
+  const cookieStore = await cookies();
+  const theme = getThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
 
   return (
-    <html lang="en" nonce={nonce}>
+    <html lang="en" nonce={nonce} data-theme={theme}>
       <body className={`${manrope.variable} ${sora.variable} antialiased`} nonce={nonce}>
-        {/* Skip to main content link for keyboard users */}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]
@@ -48,7 +51,9 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        {children}
+        <ThemeProvider initialTheme={theme}>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
@@ -12,6 +10,9 @@ import {
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { getLearningPathway } from "@/lib/learning-pathway";
+import { getOrCreateCoachingArc } from "@/lib/sage/coaching-arcs";
+import { rankJobs } from "@/lib/job-board/recommendation";
 import DashboardClient from "./DashboardClient";
 
 
@@ -20,7 +21,7 @@ export default async function DashboardPage() {
   if (!session) return null;
 
   const now = new Date();
-  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData] = await Promise.all([
+  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData, careerDiscovery, pathway, coachingArc] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id } }),
     prisma.appointment.findFirst({
@@ -64,6 +65,12 @@ export default async function DashboardPage() {
       where: { studentId: session.id },
       select: { id: true },
     }),
+    prisma.careerDiscovery.findUnique({
+      where: { studentId: session.id },
+      select: { status: true },
+    }),
+    getLearningPathway(session.id),
+    getOrCreateCoachingArc(session.id).catch(() => null),
   ]);
 
   // Redirect brand-new students to the welcome flow
@@ -122,36 +129,51 @@ export default async function DashboardPage() {
   const goalTexts = planningGoals.map((goal) => goal.content);
   const goalMatchResult = matchGoalsToPlatforms(goalTexts);
 
+  // Fetch job board data for widget
+  const jobBoardData = await (async () => {
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId: session.id, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) return { jobs: [], hasDiscovery: false };
+
+    const jobConfig = await prisma.jobClassConfig.findUnique({
+      where: { classId: enrollment.classId },
+    });
+    if (!jobConfig) return { jobs: [], hasDiscovery: false };
+
+    const [jobListings, discovery] = await Promise.all([
+      prisma.jobListing.findMany({
+        where: { classConfigId: jobConfig.id, status: "active" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, title: true, company: true, location: true, salary: true, clusters: true, url: true },
+      }),
+      prisma.careerDiscovery.findUnique({
+        where: { studentId: session.id },
+        select: { topClusters: true, hollandCode: true },
+      }),
+    ]);
+
+    const recommendations = rankJobs(
+      jobListings.map((j) => ({ id: j.id, location: j.location, clusters: j.clusters })),
+      discovery,
+      jobConfig.region,
+    );
+
+    return {
+      jobs: jobListings.map((j) => {
+        const rec = recommendations.find((r) => r.jobListingId === j.id);
+        return { ...j, matchScore: rec?.score ?? 0, matchLabel: rec?.matchLabel ?? null, savedStatus: null };
+      }).sort((a, b) => b.matchScore - a.matchScore),
+      hasDiscovery: !!discovery,
+    };
+  })();
+
   return (
     <div className="page-shell">
-      <PageIntro
-        eyebrow="Student workspace"
-        title={`Welcome back, ${session.displayName}`}
-        description={
-          goalCount > 0
-            ? `You have ${goalCount} goal${goalCount === 1 ? "" : "s"} in your plan. Keep building steady momentum.`
-            : "Start with Sage or add your first goal in My Goals to turn your vision into a plan."
-        }
-        actions={(
-          <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
-            Open Sage
-          </Link>
-        )}
-      >
-        <div className="mt-6 flex flex-wrap gap-3 text-sm text-white/82">
-          <span className="rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-            Level {state.level}
-          </span>
-          <span className="rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-            {state.currentStreak} day streak
-          </span>
-          <span className="rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-            {achievements.length} achievements
-          </span>
-        </div>
-      </PageIntro>
-
       <DashboardClient
+        studentName={session.displayName}
         level={state.level}
         xpProgress={xpProgress}
         currentStreak={state.currentStreak}
@@ -181,6 +203,20 @@ export default async function DashboardPage() {
         readinessScore={readiness.score}
         readinessBreakdown={readiness.breakdown}
         activityDays={activityDays}
+        careerDiscoveryComplete={careerDiscovery?.status === "complete"}
+        coachingArc={
+          coachingArc && coachingArc.status === "active"
+            ? { weekNumber: coachingArc.weekNumber, totalWeeks: coachingArc.template.durationWeeks }
+            : null
+        }
+        jobBoardData={jobBoardData}
+        pathway={pathway ? {
+          clusterId: pathway.clusterId,
+          clusterName: pathway.clusterName,
+          completedCount: pathway.completedCount,
+          totalCount: pathway.totalCount,
+          currentStepName: pathway.steps.find((s) => s.isCurrent)?.name ?? null,
+        } : null}
       />
     </div>
   );
