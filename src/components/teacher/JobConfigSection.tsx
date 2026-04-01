@@ -15,6 +15,10 @@ interface JobConfig {
   region: string;
   radius: number;
   sources: string[];
+  targetRoles: string[];
+  excludedEmployers: string[];
+  remoteOnly: boolean;
+  wageFloor: number | null;
   autoRefresh: boolean;
   lastScrapedAt: string | null;
 }
@@ -85,6 +89,10 @@ export function JobConfigSection() {
   const [region, setRegion] = useState("");
   const [radius, setRadius] = useState(25);
   const [sources, setSources] = useState<string[]>(["careeronestop"]);
+  const [targetRolesText, setTargetRolesText] = useState("");
+  const [excludedEmployersText, setExcludedEmployersText] = useState("");
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [wageFloor, setWageFloor] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Fetch classes on mount
@@ -124,11 +132,19 @@ export function JobConfigSection() {
           setRegion(data.config.region);
           setRadius(data.config.radius);
           setSources(data.config.sources);
+          setTargetRolesText((data.config.targetRoles ?? []).join("\n"));
+          setExcludedEmployersText((data.config.excludedEmployers ?? []).join("\n"));
+          setRemoteOnly(Boolean(data.config.remoteOnly));
+          setWageFloor(data.config.wageFloor != null ? String(data.config.wageFloor) : "");
           setAutoRefresh(data.config.autoRefresh);
         } else {
           setRegion("");
           setRadius(25);
           setSources(["careeronestop"]);
+          setTargetRolesText("");
+          setExcludedEmployersText("");
+          setRemoteOnly(false);
+          setWageFloor("");
           setAutoRefresh(true);
         }
       } else if (!cancelled) {
@@ -154,6 +170,16 @@ export function JobConfigSection() {
         region,
         radius,
         sources,
+        targetRoles: targetRolesText
+          .split(/\r?\n|,/)
+          .map((value) => value.trim())
+          .filter(Boolean),
+        excludedEmployers: excludedEmployersText
+          .split(/\r?\n|,/)
+          .map((value) => value.trim())
+          .filter(Boolean),
+        remoteOnly,
+        wageFloor: wageFloor.trim() ? Number(wageFloor) : null,
         autoRefresh,
       }),
     });
@@ -387,6 +413,40 @@ export function JobConfigSection() {
 
           {/* Config form */}
           <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div>
+                <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+                  Target Roles
+                </label>
+                <textarea
+                  value={targetRolesText}
+                  onChange={(e) => setTargetRolesText(e.target.value)}
+                  rows={4}
+                  placeholder={"Medical Assistant\nPhlebotomist\nPatient Access Representative"}
+                  className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full"
+                />
+                <p className="text-xs text-[var(--text-secondary)] mt-2">
+                  One role per line. The scraper will use the first role as the primary search term and use the rest for filtering.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+                  Excluded Employers
+                </label>
+                <textarea
+                  value={excludedEmployersText}
+                  onChange={(e) => setExcludedEmployersText(e.target.value)}
+                  rows={4}
+                  placeholder={"Staffing agency\nExample Employer"}
+                  className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full"
+                />
+                <p className="text-xs text-[var(--text-secondary)] mt-2">
+                  Listings from these employers will be filtered out even if a source returns them.
+                </p>
+              </div>
+            </div>
+
             <div>
               <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
                 Region
@@ -415,6 +475,44 @@ export function JobConfigSection() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+                  Wage Floor
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={wageFloor}
+                  onChange={(e) => setWageFloor(e.target.value)}
+                  placeholder="15"
+                  className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full"
+                />
+                <p className="text-xs text-[var(--text-secondary)] mt-2">
+                  Jobs with a known hourly wage below this threshold will be excluded. Jobs without salary data stay visible.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="remoteOnly"
+                    checked={remoteOnly}
+                    onChange={(e) => setRemoteOnly(e.target.checked)}
+                    className="rounded"
+                  />
+                  <label htmlFor="remoteOnly" className="text-sm text-[var(--text-primary)]">
+                    Prioritize remote-only opportunities
+                  </label>
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] mt-2">
+                  This filters out listings that do not appear to be remote and adds a remote hint to supported source queries.
+                </p>
+              </div>
             </div>
 
             <div>

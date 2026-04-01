@@ -1,7 +1,8 @@
 import { parseSalaryToHourly } from "../salary-parser";
 import { logger } from "@/lib/logger";
 import { extractProviderQuotaSnapshots } from "../limits";
-import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
+import { getPrimarySearchTerm } from "../profile";
+import type { JobFetchResult, JobSearchProfile, JobSourceAdapter, NormalizedJob } from "../types";
 
 /**
  * USAJobs adapter — official federal government job listings API.
@@ -38,17 +39,21 @@ export const usajobsAdapter: JobSourceAdapter = {
     return !!process.env.USAJOBS_API_KEY && !!process.env.USAJOBS_EMAIL;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
+  async fetchJobs(profile: JobSearchProfile): Promise<JobFetchResult> {
     const apiKey = process.env.USAJOBS_API_KEY;
     const email = process.env.USAJOBS_EMAIL;
     if (!apiKey || !email) return { jobs: [] };
 
     try {
       const params = new URLSearchParams({
-        LocationName: region,
-        Radius: String(radiusMiles),
+        LocationName: profile.region,
+        Radius: String(profile.radiusMiles),
         ResultsPerPage: "50",
       });
+      const primarySearchTerm = getPrimarySearchTerm(profile);
+      if (primarySearchTerm) {
+        params.set("Keyword", primarySearchTerm);
+      }
 
       const res = await fetch(`${USAJOBS_BASE}?${params}`, {
         headers: {

@@ -8,6 +8,7 @@ import { careerOneStopAdapter } from "@/lib/job-board/adapters/careeronestop";
 import { jsearchAdapter } from "@/lib/job-board/adapters/jsearch";
 import { usajobsAdapter } from "@/lib/job-board/adapters/usajobs";
 import { adzunaAdapter } from "@/lib/job-board/adapters/adzuna";
+import { normalizeProfileEntries } from "@/lib/job-board/profile";
 
 const VALID_SOURCES = ["careeronestop", "jsearch", "usajobs", "adzuna"];
 const SOURCE_STATUS = [
@@ -94,12 +95,16 @@ export const GET = withTeacherAuth(async (_session: Session, req: Request) => {
  */
 export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
   const body = await req.json();
-  const { classId, region, radius, sources, autoRefresh } = body as {
+  const { classId, region, radius, sources, autoRefresh, targetRoles, excludedEmployers, remoteOnly, wageFloor } = body as {
     classId?: string;
     region?: string;
     radius?: number;
     sources?: string[];
     autoRefresh?: boolean;
+    targetRoles?: string[];
+    excludedEmployers?: string[];
+    remoteOnly?: boolean;
+    wageFloor?: number | null;
   };
 
   if (!classId || typeof classId !== "string") throw badRequest("classId is required");
@@ -111,6 +116,12 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
   if (validatedSources.length === 0) {
     throw badRequest(`At least one valid source required. Options: ${VALID_SOURCES.join(", ")}`);
   }
+  const normalizedTargetRoles = normalizeProfileEntries(targetRoles);
+  const normalizedExcludedEmployers = normalizeProfileEntries(excludedEmployers);
+  const normalizedWageFloor =
+    typeof wageFloor === "number" && Number.isFinite(wageFloor) && wageFloor > 0
+      ? wageFloor
+      : null;
 
   const config = await prisma.jobClassConfig.upsert({
     where: { classId },
@@ -119,12 +130,20 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
       region,
       radius: radius ?? 25,
       sources: validatedSources,
+      targetRoles: normalizedTargetRoles,
+      excludedEmployers: normalizedExcludedEmployers,
+      remoteOnly: remoteOnly ?? false,
+      wageFloor: normalizedWageFloor,
       autoRefresh: autoRefresh ?? true,
     },
     update: {
       region,
       radius: radius ?? undefined,
       sources: validatedSources,
+      targetRoles: normalizedTargetRoles,
+      excludedEmployers: normalizedExcludedEmployers,
+      remoteOnly: remoteOnly ?? false,
+      wageFloor: normalizedWageFloor,
       autoRefresh: autoRefresh ?? undefined,
     },
   });
@@ -134,7 +153,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
     actorId: session.id,
     targetType: "JobClassConfig",
     targetId: config.id,
-    summary: `Updated job board config for class ${classId}: region=${region}`,
+    summary: `Updated job board config for class ${classId}: region=${region}, targetRoles=${normalizedTargetRoles.join(", ") || "none"}`,
   });
 
   return NextResponse.json({

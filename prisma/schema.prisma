@@ -1040,7 +1040,11 @@ model JobClassConfig {
   classId       String    @unique
   region        String
   radius        Int       @default(25)
-  sources       String[]  @default(["jsearch"])
+  sources       String[]  @default(["careeronestop"])
+  targetRoles   String[]  @default([])
+  excludedEmployers String[] @default([])
+  remoteOnly    Boolean   @default(false)
+  wageFloor     Float?
   autoRefresh   Boolean   @default(true)
   lastScrapedAt DateTime?
   createdAt     DateTime  @default(now())

@@ -28,6 +28,15 @@ export interface JobFetchResult {
   quotaSnapshots?: ProviderQuotaSnapshot[];
 }
 
+export interface JobSearchProfile {
+  region: string;
+  radiusMiles: number;
+  targetRoles: string[];
+  excludedEmployers: string[];
+  remoteOnly: boolean;
+  wageFloor: number | null;
+}
+
 /**
  * Source adapter interface. Each job source implements this.
  * Adapters that require missing env vars should return an empty array.
@@ -36,7 +45,7 @@ export interface JobSourceAdapter {
   readonly source: string;
   readonly sourceType: "scrape" | "api";
   isConfigured(): boolean;
-  fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult>;
+  fetchJobs(profile: JobSearchProfile): Promise<JobFetchResult>;
 }
 
 /** Status values for StudentSavedJob */

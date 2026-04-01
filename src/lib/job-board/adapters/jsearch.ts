@@ -1,7 +1,8 @@
 import { parseSalaryToHourly } from "../salary-parser";
 import { logger } from "@/lib/logger";
 import { extractProviderQuotaSnapshots } from "../limits";
-import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
+import { getPrimarySearchTerm } from "../profile";
+import type { JobFetchResult, JobSearchProfile, JobSourceAdapter, NormalizedJob } from "../types";
 
 /**
  * JSearch adapter — uses RapidAPI's JSearch endpoint.
@@ -32,15 +33,19 @@ export const jsearchAdapter: JobSourceAdapter = {
     return !!process.env.JSEARCH_API_KEY;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
+  async fetchJobs(profile: JobSearchProfile): Promise<JobFetchResult> {
     const apiKey = process.env.JSEARCH_API_KEY;
     if (!apiKey) return { jobs: [] };
 
     try {
+      const primarySearchTerm = getPrimarySearchTerm(profile);
+      const query = primarySearchTerm
+        ? `${profile.remoteOnly ? "remote " : ""}${primarySearchTerm} jobs in ${profile.region}`
+        : `${profile.remoteOnly ? "remote " : ""}jobs in ${profile.region}`;
       const params = new URLSearchParams({
-        query: `jobs in ${region}`,
+        query,
         num_pages: "2",
-        radius: String(radiusMiles),
+        radius: String(profile.radiusMiles),
       });
 
       const res = await fetch(`https://${JSEARCH_HOST}/search?${params}`, {

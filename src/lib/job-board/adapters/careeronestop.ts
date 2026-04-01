@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 
-import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
+import { getPrimarySearchTerm } from "../profile";
+import type { JobFetchResult, JobSearchProfile, JobSourceAdapter, NormalizedJob } from "../types";
 
 const CAREERONESTOP_BASE = "https://api.careeronestop.org";
 
@@ -45,14 +46,24 @@ export const careerOneStopAdapter: JobSourceAdapter = {
     return !!process.env.CAREERONESTOP_API_TOKEN && !!process.env.CAREERONESTOP_USER_ID;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
+  async fetchJobs(profile: JobSearchProfile): Promise<JobFetchResult> {
     const apiToken = process.env.CAREERONESTOP_API_TOKEN;
     const userId = process.env.CAREERONESTOP_USER_ID;
     if (!apiToken || !userId) return { jobs: [] };
 
     try {
-      const url = new URL(buildCareerOneStopPath(userId, region, radiusMiles), CAREERONESTOP_BASE);
+      const url = new URL(
+        buildCareerOneStopPath(userId, profile.region, profile.radiusMiles),
+        CAREERONESTOP_BASE,
+      );
       url.searchParams.set("enableJobDescriptionSnippet", "true");
+      const primarySearchTerm = getPrimarySearchTerm(profile);
+      if (primarySearchTerm) {
+        url.searchParams.set("keyword", primarySearchTerm);
+      }
+      if (profile.remoteOnly) {
+        url.searchParams.set("telecommute", "true");
+      }
 
       const res = await fetch(url, {
         headers: {
@@ -74,7 +85,7 @@ export const careerOneStopAdapter: JobSourceAdapter = {
       const jobs: NormalizedJob[] = (json.Jobs ?? []).map((job) => ({
         title: job.JobTitle,
         company: job.Company || "CareerOneStop",
-        location: job.Location ?? region,
+        location: job.Location ?? profile.region,
         salary: null,
         salaryMin: null,
         description: job.DescriptionSnippet?.slice(0, 5000) ?? "",

@@ -1,7 +1,8 @@
 import { parseSalaryToHourly } from "../salary-parser";
 import { logger } from "@/lib/logger";
 import { extractProviderQuotaSnapshots } from "../limits";
-import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
+import { getPrimarySearchTerm } from "../profile";
+import type { JobFetchResult, JobSearchProfile, JobSourceAdapter, NormalizedJob } from "../types";
 
 /**
  * Adzuna adapter — aggregated job listings API.
@@ -29,7 +30,7 @@ export const adzunaAdapter: JobSourceAdapter = {
     return !!process.env.ADZUNA_APP_ID && !!process.env.ADZUNA_APP_KEY;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
+  async fetchJobs(profile: JobSearchProfile): Promise<JobFetchResult> {
     const appId = process.env.ADZUNA_APP_ID;
     const appKey = process.env.ADZUNA_APP_KEY;
     if (!appId || !appKey) return { jobs: [] };
@@ -38,11 +39,15 @@ export const adzunaAdapter: JobSourceAdapter = {
       const params = new URLSearchParams({
         app_id: appId,
         app_key: appKey,
-        where: region,
-        distance: String(radiusMiles),
+        where: profile.region,
+        distance: String(profile.radiusMiles),
         results_per_page: "50",
         content_type: "application/json",
       });
+      const primarySearchTerm = getPrimarySearchTerm(profile);
+      if (primarySearchTerm) {
+        params.set("what", primarySearchTerm);
+      }
 
       const res = await fetch(`${ADZUNA_BASE}?${params}`);
       const quotaSnapshots = extractProviderQuotaSnapshots("adzuna", res.headers);

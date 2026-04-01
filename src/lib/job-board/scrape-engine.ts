@@ -8,6 +8,7 @@ import { adzunaAdapter } from "./adapters/adzuna";
 import { careerOneStopAdapter } from "./adapters/careeronestop";
 import { recordProviderQuotaSnapshots, reserveSourceQuota, type JobSource } from "./limits";
 import { buildJobFingerprint, dedupeJobsAcrossSources } from "./dedupe";
+import { buildSearchProfile, filterJobsForProfile } from "./profile";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
@@ -35,6 +36,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
     logger.error("JobClassConfig not found", { configId });
     return 0;
   }
+  const searchProfile = buildSearchProfile(config);
 
   // Filter to adapters that are both configured (env vars) and enabled (sources list)
   const configuredAdapters = ALL_ADAPTERS.filter(
@@ -66,7 +68,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
   // Fetch from all adapters in parallel
   const adapterResults = await Promise.allSettled(
     activeAdapters.map((adapter) =>
-      adapter.fetchJobs(config.region, config.radius).then((result) => ({
+      adapter.fetchJobs(searchProfile).then((result) => ({
         source: adapter.source,
         jobs: result.jobs,
         quotaSnapshots: result.quotaSnapshots ?? [],
@@ -85,7 +87,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
         result.value.source as JobSource,
         result.value.quotaSnapshots,
       );
-      allJobs.push(...result.value.jobs);
+      allJobs.push(...filterJobsForProfile(result.value.jobs, searchProfile));
     } else {
       logger.error("Adapter failed", { reason: String(result.reason) });
     }
