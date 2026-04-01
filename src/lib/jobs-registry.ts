@@ -44,3 +44,8 @@ registerJobHandler("snapshot_grant_kpis", async (payload) => {
   const { takeGrantKpiSnapshot } = await import("./grant-kpi-history");
   await takeGrantKpiSnapshot(payload.classId as string | undefined);
 });
+
+registerJobHandler("scrape_jobs", async (payload) => {
+  const { runScrapeForConfig } = await import("./job-board/scrape-engine");
+  await runScrapeForConfig(payload.configId as string);
+});

@@ -12,6 +12,7 @@ import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { getLearningPathway } from "@/lib/learning-pathway";
 import { getOrCreateCoachingArc } from "@/lib/sage/coaching-arcs";
+import { rankJobs } from "@/lib/job-board/recommendation";
 import DashboardClient from "./DashboardClient";
 
 
@@ -128,6 +129,47 @@ export default async function DashboardPage() {
   const goalTexts = planningGoals.map((goal) => goal.content);
   const goalMatchResult = matchGoalsToPlatforms(goalTexts);
 
+  // Fetch job board data for widget
+  const jobBoardData = await (async () => {
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId: session.id, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) return { jobs: [], hasDiscovery: false };
+
+    const jobConfig = await prisma.jobClassConfig.findUnique({
+      where: { classId: enrollment.classId },
+    });
+    if (!jobConfig) return { jobs: [], hasDiscovery: false };
+
+    const [jobListings, discovery] = await Promise.all([
+      prisma.jobListing.findMany({
+        where: { classConfigId: jobConfig.id, status: "active" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, title: true, company: true, location: true, salary: true, clusters: true, url: true },
+      }),
+      prisma.careerDiscovery.findUnique({
+        where: { studentId: session.id },
+        select: { topClusters: true, hollandCode: true },
+      }),
+    ]);
+
+    const recommendations = rankJobs(
+      jobListings.map((j) => ({ id: j.id, location: j.location, clusters: j.clusters })),
+      discovery,
+      jobConfig.region,
+    );
+
+    return {
+      jobs: jobListings.map((j) => {
+        const rec = recommendations.find((r) => r.jobListingId === j.id);
+        return { ...j, matchScore: rec?.score ?? 0, matchLabel: rec?.matchLabel ?? null, savedStatus: null };
+      }).sort((a, b) => b.matchScore - a.matchScore),
+      hasDiscovery: !!discovery,
+    };
+  })();
+
   return (
     <div className="page-shell">
       <DashboardClient
@@ -167,6 +209,7 @@ export default async function DashboardPage() {
             ? { weekNumber: coachingArc.weekNumber, totalWeeks: coachingArc.template.durationWeeks }
             : null
         }
+        jobBoardData={jobBoardData}
         pathway={pathway ? {
           clusterId: pathway.clusterId,
           clusterName: pathway.clusterName,
