@@ -20,6 +20,7 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import StreakCalendar from "@/components/ui/StreakCalendar";
 import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import { CoachingArcBar } from "@/components/progression/CoachingArcBar";
+import { JobBoardWidget } from "@/components/jobs/JobBoardWidget";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 
 interface MoodEntry {
@@ -78,6 +79,21 @@ interface DashboardClientProps {
     totalCount: number;
     currentStepName: string | null;
   } | null;
+  jobBoardData?: {
+    jobs: Array<{
+      id: string;
+      title: string;
+      company: string;
+      location: string;
+      salary: string | null;
+      matchScore: number;
+      matchLabel: "Strong match" | "Good match" | null;
+      clusters: string[];
+      savedStatus: string | null;
+      url: string;
+    }>;
+    hasDiscovery: boolean;
+  };
 }
 
 export default function DashboardClient({
@@ -105,6 +121,7 @@ export default function DashboardClient({
   careerDiscoveryComplete,
   coachingArc,
   pathway,
+  jobBoardData,
 }: DashboardClientProps) {
   const [moodEntries, setMoodEntries] = useState<MoodEntry[]>([]);
 
@@ -501,6 +518,13 @@ export default function DashboardClient({
               ))}
             </div>
           </div>
+        </AnimatedSection>
+      )}
+
+      {/* Job Board Widget */}
+      {jobBoardData && jobBoardData.jobs.length > 0 && (
+        <AnimatedSection>
+          <JobBoardWidget jobs={jobBoardData.jobs} hasDiscovery={jobBoardData.hasDiscovery} />
         </AnimatedSection>
       )}
     </div>
