@@ -82,6 +82,7 @@ interface DashboardClientProps {
   jobBoardData?: {
     jobs: Array<{
       id: string;
+      opportunityType: "job" | "training" | "apprenticeship";
       title: string;
       company: string;
       location: string;
@@ -521,7 +522,7 @@ export default function DashboardClient({
         </AnimatedSection>
       )}
 
-      {/* Job Board Widget */}
+      {/* Opportunity Board Widget */}
       {jobBoardData && jobBoardData.jobs.length > 0 && (
         <AnimatedSection>
           <JobBoardWidget jobs={jobBoardData.jobs} hasDiscovery={jobBoardData.hasDiscovery} />

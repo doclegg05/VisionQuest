@@ -1,8 +1,11 @@
+export type OpportunityType = "job" | "training" | "apprenticeship";
+
 /**
  * Normalized job listing from any source adapter.
  * All adapters must return this shape.
  */
 export interface NormalizedJob {
+  opportunityType: OpportunityType;
   title: string;
   company: string;
   location: string;
@@ -31,6 +34,7 @@ export interface JobFetchResult {
 export interface JobSearchProfile {
   region: string;
   radiusMiles: number;
+  opportunityTypes: OpportunityType[];
   targetRoles: string[];
   excludedEmployers: string[];
   remoteOnly: boolean;

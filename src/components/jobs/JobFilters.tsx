@@ -17,14 +17,30 @@ const SORT_OPTIONS = [
   { value: "salary", label: "Highest Salary" },
 ];
 
+const TYPE_OPTIONS = [
+  { value: "", label: "All Types" },
+  { value: "job", label: "Jobs" },
+  { value: "training", label: "Training" },
+  { value: "apprenticeship", label: "Apprenticeship" },
+];
+
 interface JobFiltersProps {
   cluster: string;
+  opportunityType: string;
   sort: string;
   onClusterChange: (cluster: string) => void;
+  onOpportunityTypeChange: (type: string) => void;
   onSortChange: (sort: string) => void;
 }
 
-export function JobFilters({ cluster, sort, onClusterChange, onSortChange }: JobFiltersProps) {
+export function JobFilters({
+  cluster,
+  opportunityType,
+  sort,
+  onClusterChange,
+  onOpportunityTypeChange,
+  onSortChange,
+}: JobFiltersProps) {
   return (
     <div className="flex flex-wrap gap-3">
       <select
@@ -33,6 +49,18 @@ export function JobFilters({ cluster, sort, onClusterChange, onSortChange }: Job
         className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm"
       >
         {CLUSTER_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={opportunityType}
+        onChange={(e) => onOpportunityTypeChange(e.target.value)}
+        className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm"
+      >
+        {TYPE_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>

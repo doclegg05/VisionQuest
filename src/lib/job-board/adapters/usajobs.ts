@@ -81,6 +81,7 @@ export const usajobsAdapter: JobSourceAdapter = {
           : null;
 
         return {
+          opportunityType: "job",
           title: desc.PositionTitle,
           company: desc.OrganizationName,
           location: desc.PositionLocationDisplay,

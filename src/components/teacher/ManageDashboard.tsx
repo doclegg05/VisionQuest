@@ -38,7 +38,7 @@ const BASE_TABS: Array<{ key: Exclude<Tab, "audit">; label: string }> = [
   { key: "certifications", label: "Certifications" },
   { key: "advising", label: "Advising" },
   { key: "career", label: "Career" },
-  { key: "job-board", label: "Job Board" },
+  { key: "job-board", label: "Opportunity Board" },
   { key: "reports", label: "Reports" },
   { key: "documents", label: "Documents" },
 ];

@@ -1,4 +1,6 @@
-import type { JobSearchProfile, NormalizedJob } from "./types";
+import type { JobSearchProfile, NormalizedJob, OpportunityType } from "./types";
+
+const VALID_OPPORTUNITY_TYPES: OpportunityType[] = ["job", "training", "apprenticeship"];
 
 function normalizeText(value: string) {
   return value
@@ -22,6 +24,7 @@ export function normalizeProfileEntries(values: string[] | null | undefined) {
 export function buildSearchProfile(config: {
   region: string;
   radius: number;
+  opportunityTypes?: string[];
   targetRoles?: string[];
   excludedEmployers?: string[];
   remoteOnly?: boolean;
@@ -30,11 +33,26 @@ export function buildSearchProfile(config: {
   return {
     region: config.region,
     radiusMiles: config.radius,
+    opportunityTypes: normalizeOpportunityTypes(config.opportunityTypes),
     targetRoles: normalizeProfileEntries(config.targetRoles),
     excludedEmployers: normalizeProfileEntries(config.excludedEmployers),
     remoteOnly: config.remoteOnly ?? false,
     wageFloor: typeof config.wageFloor === "number" ? config.wageFloor : null,
   };
+}
+
+export function normalizeOpportunityTypes(values: string[] | null | undefined): OpportunityType[] {
+  const normalized = Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => value.trim().toLowerCase())
+        .filter((value): value is OpportunityType =>
+          VALID_OPPORTUNITY_TYPES.includes(value as OpportunityType),
+        ),
+    ),
+  );
+
+  return normalized.length > 0 ? normalized : ["job", "training", "apprenticeship"];
 }
 
 export function getPrimarySearchTerm(profile: JobSearchProfile) {
@@ -46,6 +64,10 @@ export function filterJobsForProfile(jobs: NormalizedJob[], profile: JobSearchPr
 }
 
 export function matchesSearchProfile(job: NormalizedJob, profile: JobSearchProfile) {
+  if (!profile.opportunityTypes.includes(job.opportunityType)) {
+    return false;
+  }
+
   const company = normalizeText(job.company);
   if (profile.excludedEmployers.some((entry) => company.includes(normalizeText(entry)))) {
     return false;

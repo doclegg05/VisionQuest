@@ -16,8 +16,11 @@ function normalizeText(value: string) {
     .replace(/\s+/g, " ");
 }
 
-export function buildJobFingerprint(job: Pick<NormalizedJob, "title" | "company" | "location">) {
+export function buildJobFingerprint(
+  job: Pick<NormalizedJob, "opportunityType" | "title" | "company" | "location">,
+) {
   return [
+    normalizeText(job.opportunityType),
     normalizeText(job.title),
     normalizeText(job.company),
     normalizeText(job.location),

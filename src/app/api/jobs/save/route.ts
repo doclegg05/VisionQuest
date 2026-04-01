@@ -8,7 +8,7 @@ const VALID_STATUSES = ["saved", "applied", "interviewing", "offered", "withdraw
 /**
  * POST /api/jobs/save
  *
- * Save or update a student's interaction with a job listing.
+ * Save or update a student's interaction with an opportunity listing.
  * Body: { jobListingId: string, status?: string, notes?: string }
  */
 export const POST = withAuth(async (session: Session, req: Request) => {
@@ -75,7 +75,7 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     actorId: session.id,
     targetType: "JobListing",
     targetId: jobListingId,
-    summary: `${session.displayName} ${saveStatus} job "${job.title}"`,
+    summary: `${session.displayName} ${saveStatus} opportunity "${job.title}"`,
   });
 
   return NextResponse.json({ savedJob });

@@ -8,6 +8,7 @@ import { JobList } from "@/components/jobs/JobList";
 
 interface JobData {
   id: string;
+  opportunityType: "job" | "training" | "apprenticeship";
   title: string;
   company: string;
   location: string;
@@ -30,6 +31,7 @@ export default function JobsPage() {
   const [data, setData] = useState<JobsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [cluster, setCluster] = useState("");
+  const [opportunityType, setOpportunityType] = useState("");
   const [sort, setSort] = useState("recommended");
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -40,6 +42,7 @@ export default function JobsPage() {
       setLoading(true);
       const params = new URLSearchParams();
       if (cluster) params.set("cluster", cluster);
+      if (opportunityType) params.set("type", opportunityType);
       if (sort) params.set("sort", sort);
 
       const res = await fetch(`/api/jobs?${params}`);
@@ -50,7 +53,7 @@ export default function JobsPage() {
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [cluster, sort, refreshKey]);
+  }, [cluster, opportunityType, sort, refreshKey]);
 
   const handleSave = useCallback(async (jobId: string) => {
     const res = await fetch("/api/jobs/save", {
@@ -70,9 +73,9 @@ export default function JobsPage() {
       {/* Header */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Career</p>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)] mt-1">Job Board</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] mt-1">Opportunity Board</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Local job listings matched to your career profile.
+          Jobs, training programs, and apprenticeship support matched to your career profile.
         </p>
       </div>
 
@@ -97,7 +100,7 @@ export default function JobsPage() {
 
       {/* Loading state */}
       {loading && (
-        <div className="text-center py-12 text-[var(--text-secondary)]">Loading jobs...</div>
+        <div className="text-center py-12 text-[var(--text-secondary)]">Loading opportunities...</div>
       )}
 
       {!loading && data && (
@@ -106,10 +109,10 @@ export default function JobsPage() {
           {!data.hasDiscovery && (
             <div className="surface-section rounded-xl p-4 border-l-4 border-[var(--warning)]">
               <p className="text-sm text-[var(--text-primary)] font-medium">
-                Complete your career assessment to get personalized job recommendations.
+                Complete your career assessment to get personalized opportunity recommendations.
               </p>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
-                Chat with Sage about your interests and skills to unlock matched jobs.
+                Chat with Sage about your interests and skills to unlock matched opportunities.
               </p>
             </div>
           )}
@@ -121,11 +124,13 @@ export default function JobsPage() {
 
           {/* Filters */}
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">All Jobs</h2>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">All Opportunities</h2>
             <JobFilters
               cluster={cluster}
+              opportunityType={opportunityType}
               sort={sort}
               onClusterChange={setCluster}
+              onOpportunityTypeChange={setOpportunityType}
               onSortChange={setSort}
             />
           </div>

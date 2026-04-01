@@ -8,13 +8,13 @@ import { careerOneStopAdapter } from "@/lib/job-board/adapters/careeronestop";
 import { jsearchAdapter } from "@/lib/job-board/adapters/jsearch";
 import { usajobsAdapter } from "@/lib/job-board/adapters/usajobs";
 import { adzunaAdapter } from "@/lib/job-board/adapters/adzuna";
-import { normalizeProfileEntries } from "@/lib/job-board/profile";
+import { normalizeOpportunityTypes, normalizeProfileEntries } from "@/lib/job-board/profile";
 
 const VALID_SOURCES = ["careeronestop", "jsearch", "usajobs", "adzuna"];
 const SOURCE_STATUS = [
   {
     source: "careeronestop",
-    label: "CareerOneStop Jobs (Official)",
+    label: "CareerOneStop (Official)",
     kind: "official",
     isConfigured: () => careerOneStopAdapter.isConfigured(),
   },
@@ -100,6 +100,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
     region?: string;
     radius?: number;
     sources?: string[];
+    opportunityTypes?: string[];
     autoRefresh?: boolean;
     targetRoles?: string[];
     excludedEmployers?: string[];
@@ -118,6 +119,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
   }
   const normalizedTargetRoles = normalizeProfileEntries(targetRoles);
   const normalizedExcludedEmployers = normalizeProfileEntries(excludedEmployers);
+  const normalizedOpportunityTypes = normalizeOpportunityTypes(body.opportunityTypes);
   const normalizedWageFloor =
     typeof wageFloor === "number" && Number.isFinite(wageFloor) && wageFloor > 0
       ? wageFloor
@@ -130,6 +132,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
       region,
       radius: radius ?? 25,
       sources: validatedSources,
+      opportunityTypes: normalizedOpportunityTypes,
       targetRoles: normalizedTargetRoles,
       excludedEmployers: normalizedExcludedEmployers,
       remoteOnly: remoteOnly ?? false,
@@ -140,6 +143,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
       region,
       radius: radius ?? undefined,
       sources: validatedSources,
+      opportunityTypes: normalizedOpportunityTypes,
       targetRoles: normalizedTargetRoles,
       excludedEmployers: normalizedExcludedEmployers,
       remoteOnly: remoteOnly ?? false,
@@ -153,7 +157,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
     actorId: session.id,
     targetType: "JobClassConfig",
     targetId: config.id,
-    summary: `Updated job board config for class ${classId}: region=${region}, targetRoles=${normalizedTargetRoles.join(", ") || "none"}`,
+    summary: `Updated opportunity board config for class ${classId}: region=${region}, types=${normalizedOpportunityTypes.join(", ")}, targetRoles=${normalizedTargetRoles.join(", ") || "none"}`,
   });
 
   return NextResponse.json({

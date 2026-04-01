@@ -1041,6 +1041,7 @@ model JobClassConfig {
   region        String
   radius        Int       @default(25)
   sources       String[]  @default(["careeronestop"])
+  opportunityTypes String[] @default(["job", "training", "apprenticeship"])
   targetRoles   String[]  @default([])
   excludedEmployers String[] @default([])
   remoteOnly    Boolean   @default(false)
@@ -1058,6 +1059,7 @@ model JobClassConfig {
 
 model JobListing {
   id             String    @id @default(cuid())
+  opportunityType String   @default("job")
   title          String
   company        String
   location       String

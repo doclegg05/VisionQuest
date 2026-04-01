@@ -13,6 +13,7 @@ import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { getLearningPathway } from "@/lib/learning-pathway";
 import { getOrCreateCoachingArc } from "@/lib/sage/coaching-arcs";
 import { rankJobs } from "@/lib/job-board/recommendation";
+import type { OpportunityType } from "@/lib/job-board/types";
 import DashboardClient from "./DashboardClient";
 
 
@@ -147,7 +148,16 @@ export default async function DashboardPage() {
         where: { classConfigId: jobConfig.id, status: "active" },
         orderBy: { createdAt: "desc" },
         take: 10,
-        select: { id: true, title: true, company: true, location: true, salary: true, clusters: true, url: true },
+        select: {
+          id: true,
+          opportunityType: true,
+          title: true,
+          company: true,
+          location: true,
+          salary: true,
+          clusters: true,
+          url: true,
+        },
       }),
       prisma.careerDiscovery.findUnique({
         where: { studentId: session.id },
@@ -172,6 +182,7 @@ export default async function DashboardPage() {
         const rec = recommendations.find((r) => r.jobListingId === j.id);
         return {
           ...j,
+          opportunityType: j.opportunityType as OpportunityType,
           matchScore: rec?.score ?? 0,
           matchLabel: rec?.matchLabel ?? null,
           savedStatus: savedMap.get(j.id) ?? null,

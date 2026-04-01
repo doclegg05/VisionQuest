@@ -5,6 +5,7 @@ import type { NormalizedJob } from "./types";
 
 function makeJob(overrides: Partial<NormalizedJob> = {}): NormalizedJob {
   return {
+    opportunityType: "job",
     title: "Test Job",
     company: "Test Co",
     location: "Charleston, WV",

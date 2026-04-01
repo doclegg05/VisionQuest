@@ -4,6 +4,7 @@ import { JobCard } from "./JobCard";
 
 interface RecommendedJob {
   id: string;
+  opportunityType: "job" | "training" | "apprenticeship";
   title: string;
   company: string;
   location: string;

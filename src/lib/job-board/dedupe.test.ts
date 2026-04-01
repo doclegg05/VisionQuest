@@ -6,6 +6,7 @@ import type { NormalizedJob } from "./types";
 
 function createJob(overrides: Partial<NormalizedJob>): NormalizedJob {
   return {
+    opportunityType: "job",
     title: "Medical Assistant",
     company: "Valley Health",
     location: "Charleston, WV",
@@ -72,5 +73,16 @@ describe("dedupeJobsAcrossSources", () => {
     const result = dedupeJobsAcrossSources(jobs);
 
     assert.equal(result.uniqueJobs.length, 3);
+  });
+
+  it("keeps distinct opportunity types even when title, employer, and location match", () => {
+    const jobs = [
+      createJob({ sourceId: "careeronestop:job:1", opportunityType: "job" }),
+      createJob({ sourceId: "careeronestop:training:1", opportunityType: "training" }),
+    ];
+
+    const result = dedupeJobsAcrossSources(jobs);
+
+    assert.equal(result.uniqueJobs.length, 2);
   });
 });

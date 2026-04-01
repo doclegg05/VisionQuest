@@ -6,16 +6,18 @@ import { rankJobs } from "@/lib/job-board/recommendation";
 /**
  * GET /api/jobs
  *
- * Returns active job listings for the student's enrolled class,
+ * Returns active opportunities for the student's enrolled class,
  * with recommendation scores if the student has CareerDiscovery data.
  *
  * Query params:
  *   cluster - filter by cluster ID
+ *   type    - "job" | "training" | "apprenticeship"
  *   sort    - "recommended" (default) | "recent" | "salary"
  */
 export const GET = withAuth(async (session: Session, req: Request) => {
   const url = new URL(req.url);
   const clusterFilter = url.searchParams.get("cluster");
+  const opportunityType = url.searchParams.get("type");
   const sort = url.searchParams.get("sort") ?? "recommended";
 
   // Find student's enrolled class
@@ -44,6 +46,9 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   };
   if (clusterFilter) {
     where.clusters = { has: clusterFilter };
+  }
+  if (opportunityType) {
+    where.opportunityType = opportunityType;
   }
 
   const jobs = await prisma.jobListing.findMany({
@@ -75,6 +80,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     const rec = recommendations.find((r) => r.jobListingId === job.id);
     return {
       ...job,
+      opportunityType: job.opportunityType,
       savedStatus: savedMap.get(job.id) ?? null,
       matchScore: rec?.score ?? 0,
       matchLabel: rec?.matchLabel ?? null,

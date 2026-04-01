@@ -9,7 +9,7 @@ import { runScrapeForConfig } from "@/lib/job-board/scrape-engine";
 /**
  * POST /api/teacher/jobs/refresh
  *
- * Manually trigger a job scrape for a class config.
+ * Manually trigger an opportunity scrape for a class config.
  * Body: { classId: string }
  */
 export const POST = withTeacherAuth(async (session: Session, req: Request) => {
@@ -31,7 +31,7 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
     select: { id: true },
   });
 
-  if (!config) throw notFound("No job board config for this class");
+  if (!config) throw notFound("No opportunity board config for this class");
 
   const totalJobs = await runScrapeForConfig(config.id);
 
@@ -40,12 +40,12 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
     actorId: session.id,
     targetType: "JobClassConfig",
     targetId: config.id,
-    summary: `Manual job refresh triggered for class ${classId} (${totalJobs} jobs)`,
+    summary: `Manual opportunity refresh triggered for class ${classId} (${totalJobs} opportunities)`,
   });
 
   return NextResponse.json({
     refreshed: true,
     totalJobs,
-    message: `Refreshed ${totalJobs} job${totalJobs === 1 ? "" : "s"}`,
+    message: `Refreshed ${totalJobs} opportunit${totalJobs === 1 ? "y" : "ies"}`,
   });
 });

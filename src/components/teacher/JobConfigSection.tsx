@@ -15,6 +15,7 @@ interface JobConfig {
   region: string;
   radius: number;
   sources: string[];
+  opportunityTypes: string[];
   targetRoles: string[];
   excludedEmployers: string[];
   remoteOnly: boolean;
@@ -63,13 +64,18 @@ interface ProviderUsageWindow {
 }
 
 const SOURCE_OPTIONS = [
-  { value: "careeronestop", label: "CareerOneStop Jobs (Official)" },
+  { value: "careeronestop", label: "CareerOneStop (Official)" },
   { value: "jsearch", label: "JSearch (RapidAPI)" },
   { value: "usajobs", label: "USAJobs (Federal)" },
   { value: "adzuna", label: "Adzuna" },
 ];
 
 const RADIUS_OPTIONS = [10, 25, 50];
+const OPPORTUNITY_TYPE_OPTIONS = [
+  { value: "job", label: "Jobs" },
+  { value: "training", label: "Training programs" },
+  { value: "apprenticeship", label: "Apprenticeship support" },
+];
 
 export function JobConfigSection() {
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -89,6 +95,11 @@ export function JobConfigSection() {
   const [region, setRegion] = useState("");
   const [radius, setRadius] = useState(25);
   const [sources, setSources] = useState<string[]>(["careeronestop"]);
+  const [opportunityTypes, setOpportunityTypes] = useState<string[]>([
+    "job",
+    "training",
+    "apprenticeship",
+  ]);
   const [targetRolesText, setTargetRolesText] = useState("");
   const [excludedEmployersText, setExcludedEmployersText] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
@@ -132,6 +143,7 @@ export function JobConfigSection() {
           setRegion(data.config.region);
           setRadius(data.config.radius);
           setSources(data.config.sources);
+          setOpportunityTypes(data.config.opportunityTypes ?? ["job", "training", "apprenticeship"]);
           setTargetRolesText((data.config.targetRoles ?? []).join("\n"));
           setExcludedEmployersText((data.config.excludedEmployers ?? []).join("\n"));
           setRemoteOnly(Boolean(data.config.remoteOnly));
@@ -141,6 +153,7 @@ export function JobConfigSection() {
           setRegion("");
           setRadius(25);
           setSources(["careeronestop"]);
+          setOpportunityTypes(["job", "training", "apprenticeship"]);
           setTargetRolesText("");
           setExcludedEmployersText("");
           setRemoteOnly(false);
@@ -148,7 +161,7 @@ export function JobConfigSection() {
           setAutoRefresh(true);
         }
       } else if (!cancelled) {
-        setError("Unable to load job board settings.");
+        setError("Unable to load opportunity board settings.");
         setUsage([]);
         setManualRefresh(null);
         setSourceStatus([]);
@@ -170,6 +183,7 @@ export function JobConfigSection() {
         region,
         radius,
         sources,
+        opportunityTypes,
         targetRoles: targetRolesText
           .split(/\r?\n|,/)
           .map((value) => value.trim())
@@ -184,11 +198,11 @@ export function JobConfigSection() {
       }),
     });
     if (res.ok) {
-      setMessage(config ? "Job board settings updated." : "Job board enabled.");
+      setMessage(config ? "Opportunity board settings updated." : "Opportunity board enabled.");
       setConfigRefreshKey((k) => k + 1);
     } else {
       const data = await res.json().catch(() => null);
-      setError(data?.error ?? "Unable to save job board settings.");
+      setError(data?.error ?? "Unable to save opportunity board settings.");
     }
     setSaving(false);
   };
@@ -208,7 +222,7 @@ export function JobConfigSection() {
       setConfigRefreshKey((k) => k + 1);
     } else {
       const data = await res.json().catch(() => null);
-      setError(data?.error ?? "Unable to refresh jobs right now.");
+      setError(data?.error ?? "Unable to refresh opportunities right now.");
     }
     setRefreshing(false);
   };
@@ -219,6 +233,15 @@ export function JobConfigSection() {
         ? prev.filter((s) => s !== source)
         : [...prev, source],
     );
+  };
+
+  const toggleOpportunityType = (type: string) => {
+    setOpportunityTypes((prev) => {
+      if (prev.includes(type)) {
+        return prev.length === 1 ? prev : prev.filter((value) => value !== type);
+      }
+      return [...prev, type];
+    });
   };
 
   if (classes.length === 0) {
@@ -276,7 +299,7 @@ export function JobConfigSection() {
               <div>
                 <p className="text-sm text-[var(--text-primary)]">
                   <Briefcase size={16} className="inline mr-1" />
-                  <strong>{activeJobCount}</strong> active jobs
+                  <strong>{activeJobCount}</strong> active opportunities
                 </p>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Last refreshed: {config.lastScrapedAt
@@ -299,7 +322,7 @@ export function JobConfigSection() {
             <div>
               <p className="text-sm font-semibold text-[var(--text-primary)]">Source Health</p>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
-                Official sources are preferred. Aggregators stay useful as fallback coverage.
+              Official sources are preferred. Aggregators stay useful as fallback coverage.
               </p>
             </div>
 
@@ -340,6 +363,43 @@ export function JobConfigSection() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="border-t border-[var(--border)]" />
+
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Opportunity Types</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Choose whether this class should surface jobs, training programs, apprenticeship support, or all three.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {OPPORTUNITY_TYPE_OPTIONS.map((option) => {
+                const checked = opportunityTypes.includes(option.value);
+                return (
+                  <label
+                    key={option.value}
+                    className={`rounded-xl border p-3 transition-colors ${
+                      checked
+                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                        : "border-[var(--border)] bg-[var(--surface-elevated)]"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleOpportunityType(option.value)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{option.label}</p>
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
 
             <div className="border-t border-[var(--border)]" />
@@ -560,7 +620,7 @@ export function JobConfigSection() {
               disabled={saving || !region.trim()}
               className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {saving ? "Saving..." : config ? "Update Config" : "Enable Job Board"}
+              {saving ? "Saving..." : config ? "Update Config" : "Enable Opportunity Board"}
             </button>
           </div>
         </>

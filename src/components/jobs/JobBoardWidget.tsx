@@ -7,6 +7,7 @@ import Link from "next/link";
 
 interface WidgetJob {
   id: string;
+  opportunityType: "job" | "training" | "apprenticeship";
   title: string;
   company: string;
   location: string;
@@ -49,7 +50,7 @@ export function JobBoardWidget({ jobs, hasDiscovery }: JobBoardWidgetProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Briefcase size={20} className="text-[var(--primary)]" />
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Job Matches</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Opportunity Matches</h2>
         </div>
         <Link
           href="/jobs"
@@ -61,7 +62,7 @@ export function JobBoardWidget({ jobs, hasDiscovery }: JobBoardWidgetProps) {
 
       {!hasDiscovery && (
         <p className="text-sm text-[var(--text-secondary)] mb-3">
-          Complete your career assessment to get personalized job recommendations.
+          Complete your career assessment to get personalized opportunity recommendations.
         </p>
       )}
 

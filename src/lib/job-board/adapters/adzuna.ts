@@ -69,6 +69,7 @@ export const adzunaAdapter: JobSourceAdapter = {
             : null;
 
         return {
+          opportunityType: "job",
           title: r.title,
           company: r.company?.display_name ?? "Unknown",
           location: r.location?.display_name ?? "",

@@ -67,6 +67,7 @@ export const jsearchAdapter: JobSourceAdapter = {
       const jobs: NormalizedJob[] = results.map((r) => {
         const salaryText = formatJSearchSalary(r);
         return {
+          opportunityType: "job",
           title: r.job_title,
           company: r.employer_name,
           location: [r.job_city, r.job_state].filter(Boolean).join(", "),

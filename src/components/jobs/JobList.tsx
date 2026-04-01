@@ -4,6 +4,7 @@ import { JobCard } from "./JobCard";
 
 interface ListJob {
   id: string;
+  opportunityType: "job" | "training" | "apprenticeship";
   title: string;
   company: string;
   location: string;
@@ -24,8 +25,8 @@ export function JobList({ jobs, onSave }: JobListProps) {
   if (jobs.length === 0) {
     return (
       <div className="text-center py-12 text-[var(--text-secondary)]">
-        <p className="text-lg">No jobs available right now.</p>
-        <p className="text-sm mt-1">Check back soon — new listings are added weekly.</p>
+        <p className="text-lg">No opportunities available right now.</p>
+        <p className="text-sm mt-1">Check back soon — new listings and programs are added weekly.</p>
       </div>
     );
   }

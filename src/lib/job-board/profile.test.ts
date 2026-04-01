@@ -6,6 +6,7 @@ import type { NormalizedJob } from "./types";
 
 function createJob(overrides: Partial<NormalizedJob>): NormalizedJob {
   return {
+    opportunityType: "job",
     title: "Medical Assistant",
     company: "Valley Health",
     location: "Charleston, WV",
@@ -26,11 +27,13 @@ describe("buildSearchProfile", () => {
       region: "Charleston, WV",
       radius: 25,
       targetRoles: [" Medical Assistant ", "Medical Assistant", "Phlebotomist"],
+      opportunityTypes: ["job", "training", "job"],
       excludedEmployers: [" Staffing Agency ", "Staffing Agency"],
       remoteOnly: true,
       wageFloor: 16,
     });
 
+    assert.deepEqual(profile.opportunityTypes, ["job", "training"]);
     assert.deepEqual(profile.targetRoles, ["Medical Assistant", "Phlebotomist"]);
     assert.deepEqual(profile.excludedEmployers, ["Staffing Agency"]);
     assert.equal(profile.remoteOnly, true);
@@ -43,7 +46,8 @@ describe("filterJobsForProfile", () => {
     const profile = buildSearchProfile({
       region: "Charleston, WV",
       radius: 25,
-      targetRoles: ["Medical Assistant"],
+      opportunityTypes: ["training"],
+      targetRoles: ["Front Desk"],
       excludedEmployers: ["Staffing Agency"],
       remoteOnly: true,
       wageFloor: 17,
@@ -69,15 +73,17 @@ describe("filterJobsForProfile", () => {
       }),
       createJob({
         sourceId: "4",
+        opportunityType: "training",
         title: "Front Desk Associate",
         location: "Remote",
         description: "Remote front desk scheduling role for a clinic.",
+        company: "Community College",
       }),
     ];
 
     const filtered = filterJobsForProfile(jobs, profile);
 
     assert.equal(filtered.length, 1);
-    assert.equal(filtered[0]?.sourceId, "1");
+    assert.equal(filtered[0]?.sourceId, "4");
   });
 });

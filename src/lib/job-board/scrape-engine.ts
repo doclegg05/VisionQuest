@@ -9,6 +9,7 @@ import { careerOneStopAdapter } from "./adapters/careeronestop";
 import { recordProviderQuotaSnapshots, reserveSourceQuota, type JobSource } from "./limits";
 import { buildJobFingerprint, dedupeJobsAcrossSources } from "./dedupe";
 import { buildSearchProfile, filterJobsForProfile } from "./profile";
+import type { OpportunityType } from "./types";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
@@ -117,6 +118,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
         },
       },
       create: {
+        opportunityType: job.opportunityType,
         title: job.title,
         company: job.company,
         location: job.location,
@@ -133,6 +135,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
         classConfigId: configId,
       },
       update: {
+        opportunityType: job.opportunityType,
         title: job.title,
         company: job.company,
         location: job.location,
@@ -155,6 +158,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
     },
     select: {
       id: true,
+      opportunityType: true,
       sourceId: true,
       title: true,
       company: true,
@@ -164,7 +168,10 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
 
   const duplicateListingIds = activeListings
     .filter((listing) => {
-      const fingerprint = buildJobFingerprint(listing);
+      const fingerprint = buildJobFingerprint({
+        ...listing,
+        opportunityType: listing.opportunityType as OpportunityType,
+      });
       const selected = selectedByFingerprint.get(fingerprint);
       return selected && selected.sourceId !== listing.sourceId;
     })

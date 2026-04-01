@@ -4,6 +4,7 @@ import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } fro
 
 interface JobCardProps {
   id: string;
+  opportunityType: "job" | "training" | "apprenticeship";
   title: string;
   company: string;
   location: string;
@@ -37,8 +38,21 @@ const CLUSTER_LABELS: Record<string, string> = {
   "language-esl": "ESL",
 };
 
+const OPPORTUNITY_TYPE_LABELS: Record<JobCardProps["opportunityType"], string> = {
+  job: "Job",
+  training: "Training",
+  apprenticeship: "Apprenticeship",
+};
+
+const OPPORTUNITY_TYPE_COLORS: Record<JobCardProps["opportunityType"], string> = {
+  job: "bg-sky-500/20 text-sky-300",
+  training: "bg-emerald-500/20 text-emerald-300",
+  apprenticeship: "bg-amber-500/20 text-amber-300",
+};
+
 export function JobCard({
   id,
+  opportunityType,
   title,
   company,
   location,
@@ -66,13 +80,20 @@ export function JobCard({
       )}
 
       {/* Cluster badge */}
-      {primaryCluster && (
-        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${
+      <div className="mb-2 flex flex-wrap gap-2">
+        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${
+          OPPORTUNITY_TYPE_COLORS[opportunityType]
+        }`}>
+          {OPPORTUNITY_TYPE_LABELS[opportunityType]}
+        </span>
+        {primaryCluster && (
+          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${
           CLUSTER_COLORS[primaryCluster] ?? "bg-gray-500/20 text-gray-300"
         }`}>
           {CLUSTER_LABELS[primaryCluster] ?? primaryCluster}
-        </span>
-      )}
+          </span>
+        )}
+      </div>
 
       {/* Job info */}
       <h3 className={`font-semibold text-[var(--text-primary)] ${compact ? "text-sm" : "text-base"} leading-tight`}>
