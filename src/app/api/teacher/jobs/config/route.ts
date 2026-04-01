@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getAllSourceUsageSummaries, getManualRefreshStatus } from "@/lib/job-board/limits";
 
-const VALID_SOURCES = ["jsearch", "usajobs", "adzuna"];
+const VALID_SOURCES = ["careeronestop", "jsearch", "usajobs", "adzuna"];
 
 /**
  * GET /api/teacher/jobs/config?classId=xxx
@@ -69,7 +69,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
   await assertStaffCanManageClass(session, classId);
 
   // Validate sources
-  const validatedSources = (sources ?? ["jsearch"]).filter((s) => VALID_SOURCES.includes(s));
+  const validatedSources = (sources ?? ["careeronestop"]).filter((s) => VALID_SOURCES.includes(s));
   if (validatedSources.length === 0) {
     throw badRequest(`At least one valid source required. Options: ${VALID_SOURCES.join(", ")}`);
   }

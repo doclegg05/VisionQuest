@@ -50,6 +50,7 @@ interface ProviderUsageWindow {
 }
 
 const SOURCE_OPTIONS = [
+  { value: "careeronestop", label: "CareerOneStop Jobs (Official)" },
   { value: "jsearch", label: "JSearch (RapidAPI)" },
   { value: "usajobs", label: "USAJobs (Federal)" },
   { value: "adzuna", label: "Adzuna" },
@@ -73,7 +74,7 @@ export function JobConfigSection() {
   // Form state
   const [region, setRegion] = useState("");
   const [radius, setRadius] = useState(25);
-  const [sources, setSources] = useState<string[]>(["jsearch"]);
+  const [sources, setSources] = useState<string[]>(["careeronestop"]);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Fetch classes on mount
@@ -116,7 +117,7 @@ export function JobConfigSection() {
         } else {
           setRegion("");
           setRadius(25);
-          setSources(["jsearch"]);
+          setSources(["careeronestop"]);
           setAutoRefresh(true);
         }
       } else if (!cancelled) {

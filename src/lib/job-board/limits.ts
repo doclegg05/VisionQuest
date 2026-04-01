@@ -2,8 +2,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
 import type { ProviderQuotaSnapshot } from "./types";
 
-export type JobSource = "jsearch" | "usajobs" | "adzuna";
-export const JOB_SOURCES: JobSource[] = ["jsearch", "usajobs", "adzuna"];
+export type JobSource = "jsearch" | "usajobs" | "adzuna" | "careeronestop";
+export const JOB_SOURCES: JobSource[] = ["jsearch", "usajobs", "adzuna", "careeronestop"];
 
 interface QuotaReservationResult {
   allowed: boolean;

@@ -5,13 +5,15 @@ import type { JobSourceAdapter, NormalizedJob } from "./types";
 import { jsearchAdapter } from "./adapters/jsearch";
 import { usajobsAdapter } from "./adapters/usajobs";
 import { adzunaAdapter } from "./adapters/adzuna";
-import { recordProviderQuotaSnapshots, reserveSourceQuota } from "./limits";
+import { careerOneStopAdapter } from "./adapters/careeronestop";
+import { recordProviderQuotaSnapshots, reserveSourceQuota, type JobSource } from "./limits";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
   jsearchAdapter,
   usajobsAdapter,
   adzunaAdapter,
+  careerOneStopAdapter,
 ];
 
 /**
@@ -40,7 +42,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
 
   const activeAdapters: JobSourceAdapter[] = [];
   for (const adapter of configuredAdapters) {
-    const quota = await reserveSourceQuota(adapter.source as "jsearch" | "usajobs" | "adzuna");
+    const quota = await reserveSourceQuota(adapter.source as JobSource);
     if (!quota.allowed) {
       logger.warn("Skipping adapter because scrape quota is exhausted", {
         configId,
@@ -78,7 +80,10 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
         source: result.value.source,
         count: result.value.jobs.length,
       });
-      await recordProviderQuotaSnapshots(result.value.source as "jsearch" | "usajobs" | "adzuna", result.value.quotaSnapshots);
+      await recordProviderQuotaSnapshots(
+        result.value.source as JobSource,
+        result.value.quotaSnapshots,
+      );
       allJobs.push(...result.value.jobs);
     } else {
       logger.error("Adapter failed", { reason: String(result.reason) });
