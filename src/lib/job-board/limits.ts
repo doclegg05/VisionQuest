@@ -1,10 +1,36 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { prisma } from "@/lib/db";
 
-type JobSource = "jsearch" | "usajobs" | "adzuna";
+export type JobSource = "jsearch" | "usajobs" | "adzuna";
+export const JOB_SOURCES: JobSource[] = ["jsearch", "usajobs", "adzuna"];
 
 interface QuotaReservationResult {
   allowed: boolean;
   reason?: string;
+}
+
+interface RateLimitSnapshot {
+  count: number;
+  resetTime: number | null;
+}
+
+export interface SourceUsageWindow {
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+  resetTime: number | null;
+}
+
+export interface JobSourceUsageSummary {
+  source: JobSource;
+  daily: SourceUsageWindow;
+  monthly: SourceUsageWindow;
+}
+
+export interface ManualRefreshStatus {
+  cooldownMinutes: number;
+  available: boolean;
+  resetTime: number | null;
 }
 
 function parsePositiveInt(value: string | undefined): number | null {
@@ -52,11 +78,43 @@ function msUntilNextUtcMonth(now: Date) {
   return Math.max(next - now.getTime(), 1000);
 }
 
-export async function reserveSourceQuota(source: JobSource): Promise<QuotaReservationResult> {
+function getSourceLimitConfig(source: JobSource) {
   const prefix = getEnvPrefix(source);
+  return {
+    dailyLimit: parsePositiveInt(process.env[`${prefix}_MAX_REQUESTS_PER_DAY`]),
+    monthlyLimit: parsePositiveInt(process.env[`${prefix}_MAX_REQUESTS_PER_MONTH`]),
+  };
+}
+
+async function getRateLimitSnapshot(key: string): Promise<RateLimitSnapshot> {
+  const entry = await prisma.rateLimitEntry.findUnique({
+    where: { key },
+    select: { count: true, resetTime: true },
+  });
+
+  if (!entry) {
+    return { count: 0, resetTime: null };
+  }
+
+  if (entry.resetTime.getTime() <= Date.now()) {
+    return { count: 0, resetTime: entry.resetTime.getTime() };
+  }
+
+  return { count: entry.count, resetTime: entry.resetTime.getTime() };
+}
+
+function toUsageWindow(limit: number | null, snapshot: RateLimitSnapshot): SourceUsageWindow {
+  return {
+    limit,
+    used: snapshot.count,
+    remaining: limit == null ? null : Math.max(limit - snapshot.count, 0),
+    resetTime: snapshot.resetTime,
+  };
+}
+
+export async function reserveSourceQuota(source: JobSource): Promise<QuotaReservationResult> {
   const now = new Date();
-  const dailyLimit = parsePositiveInt(process.env[`${prefix}_MAX_REQUESTS_PER_DAY`]);
-  const monthlyLimit = parsePositiveInt(process.env[`${prefix}_MAX_REQUESTS_PER_MONTH`]);
+  const { dailyLimit, monthlyLimit } = getSourceLimitConfig(source);
 
   if (dailyLimit) {
     const dayResult = await rateLimit(
@@ -95,5 +153,36 @@ export async function enforceManualRefreshCooldown(classId: string) {
     allowed: result.success,
     cooldownMinutes,
     resetTime: result.resetTime,
+  };
+}
+
+export async function getSourceUsageSummary(source: JobSource): Promise<JobSourceUsageSummary> {
+  const now = new Date();
+  const { dailyLimit, monthlyLimit } = getSourceLimitConfig(source);
+
+  const [dailySnapshot, monthlySnapshot] = await Promise.all([
+    getRateLimitSnapshot(`job-scrape:${source}:day:${getUtcDayKey(now)}`),
+    getRateLimitSnapshot(`job-scrape:${source}:month:${getUtcMonthKey(now)}`),
+  ]);
+
+  return {
+    source,
+    daily: toUsageWindow(dailyLimit, dailySnapshot),
+    monthly: toUsageWindow(monthlyLimit, monthlySnapshot),
+  };
+}
+
+export async function getAllSourceUsageSummaries(): Promise<JobSourceUsageSummary[]> {
+  return Promise.all(JOB_SOURCES.map((source) => getSourceUsageSummary(source)));
+}
+
+export async function getManualRefreshStatus(classId: string): Promise<ManualRefreshStatus> {
+  const cooldownMinutes = parsePositiveInt(process.env.JOB_SCRAPE_MANUAL_REFRESH_COOLDOWN_MINUTES) ?? 30;
+  const snapshot = await getRateLimitSnapshot(`job-scrape:manual-refresh:${classId}`);
+
+  return {
+    cooldownMinutes,
+    available: snapshot.count === 0,
+    resetTime: snapshot.resetTime,
   };
 }

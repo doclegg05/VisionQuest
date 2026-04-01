@@ -19,6 +19,25 @@ interface JobConfig {
   lastScrapedAt: string | null;
 }
 
+interface UsageWindow {
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+  resetTime: number | null;
+}
+
+interface SourceUsage {
+  source: string;
+  daily: UsageWindow;
+  monthly: UsageWindow;
+}
+
+interface ManualRefreshStatus {
+  cooldownMinutes: number;
+  available: boolean;
+  resetTime: number | null;
+}
+
 const SOURCE_OPTIONS = [
   { value: "jsearch", label: "JSearch (RapidAPI)" },
   { value: "usajobs", label: "USAJobs (Federal)" },
@@ -37,6 +56,8 @@ export function JobConfigSection() {
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<SourceUsage[]>([]);
+  const [manualRefresh, setManualRefresh] = useState<ManualRefreshStatus | null>(null);
 
   // Form state
   const [region, setRegion] = useState("");
@@ -74,6 +95,8 @@ export function JobConfigSection() {
         const data = await res.json();
         setConfig(data.config);
         setActiveJobCount(data.activeJobCount);
+        setUsage(data.usage ?? []);
+        setManualRefresh(data.manualRefresh ?? null);
         if (data.config) {
           setRegion(data.config.region);
           setRadius(data.config.radius);
@@ -87,6 +110,8 @@ export function JobConfigSection() {
         }
       } else if (!cancelled) {
         setError("Unable to load job board settings.");
+        setUsage([]);
+        setManualRefresh(null);
       }
       if (!cancelled) setLoading(false);
     })();
@@ -112,7 +137,8 @@ export function JobConfigSection() {
       setMessage(config ? "Job board settings updated." : "Job board enabled.");
       setConfigRefreshKey((k) => k + 1);
     } else {
-      setError("Unable to save job board settings.");
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Unable to save job board settings.");
     }
     setSaving(false);
   };
@@ -131,7 +157,8 @@ export function JobConfigSection() {
       setMessage(data.message ?? "Job refresh complete.");
       setConfigRefreshKey((k) => k + 1);
     } else {
-      setError("Unable to refresh jobs right now.");
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Unable to refresh jobs right now.");
     }
     setRefreshing(false);
   };
@@ -147,6 +174,17 @@ export function JobConfigSection() {
   if (classes.length === 0) {
     return <p className="text-[var(--text-secondary)]">No classes found.</p>;
   }
+
+  const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const sourceLabels: Record<string, string> = Object.fromEntries(
+    SOURCE_OPTIONS.map((option) => [option.value, option.label]),
+  );
 
   return (
     <div className="space-y-6">
@@ -197,7 +235,7 @@ export function JobConfigSection() {
               </div>
               <button
                 onClick={handleRefresh}
-                disabled={refreshing}
+                disabled={refreshing || manualRefresh?.available === false}
                 className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 <ArrowClockwise size={16} className={refreshing ? "animate-spin" : ""} />
@@ -205,6 +243,54 @@ export function JobConfigSection() {
               </button>
             </div>
           )}
+
+          <div className="surface-section rounded-xl p-4 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Usage Guardrails</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                These counters are app-side protection against provider overages. Leave a limit blank in env to disable that cap.
+              </p>
+            </div>
+
+            {manualRefresh && (
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2">
+                <p className="text-sm text-[var(--text-primary)]">
+                  Manual refresh:{" "}
+                  <strong>{manualRefresh.available ? "Available now" : "Cooling down"}</strong>
+                </p>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">
+                  {manualRefresh.available || !manualRefresh.resetTime
+                    ? `Teachers can refresh this class once every ${manualRefresh.cooldownMinutes} minutes.`
+                    : `Available again ${dateTimeFormatter.format(new Date(manualRefresh.resetTime))}.`}
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              {usage.map((item) => (
+                <div
+                  key={item.source}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 space-y-3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {sourceLabels[item.source] ?? item.source}
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">
+                      {item.daily.limit == null && item.monthly.limit == null
+                        ? "No app-side caps configured"
+                        : "Usage resets on UTC windows"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <UsageRow label="Daily" window={item.daily} formatter={dateTimeFormatter} />
+                    <UsageRow label="Monthly" window={item.monthly} formatter={dateTimeFormatter} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Config form */}
           <div className="space-y-4">
@@ -282,6 +368,47 @@ export function JobConfigSection() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function UsageRow({
+  label,
+  window,
+  formatter,
+}: {
+  label: string;
+  window: UsageWindow;
+  formatter: Intl.DateTimeFormat;
+}) {
+  const percentUsed = window.limit ? Math.min((window.used / window.limit) * 100, 100) : 0;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+        <span>{label}</span>
+        <span>
+          {window.limit == null
+            ? `${window.used} used`
+            : `${window.used}/${window.limit} used`}
+        </span>
+      </div>
+      {window.limit != null && (
+        <div className="mt-1 h-2 rounded-full bg-[var(--surface-overlay)]">
+          <div
+            className={`h-full rounded-full transition-all ${
+              percentUsed >= 90 ? "bg-red-400" : percentUsed >= 70 ? "bg-amber-400" : "bg-emerald-400"
+            }`}
+            style={{ width: `${percentUsed}%` }}
+          />
+        </div>
+      )}
+      <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+        {window.remaining == null
+          ? "No configured cap"
+          : `${window.remaining} remaining`}
+        {window.resetTime ? ` · resets ${formatter.format(new Date(window.resetTime))}` : ""}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { getAllSourceUsageSummaries, getManualRefreshStatus } from "@/lib/job-board/limits";
 
 const VALID_SOURCES = ["jsearch", "usajobs", "adzuna"];
 
@@ -27,6 +28,11 @@ export const GET = withTeacherAuth(async (_session: Session, req: Request) => {
       })
     : 0;
 
+  const [usage, manualRefresh] = await Promise.all([
+    getAllSourceUsageSummaries(),
+    getManualRefreshStatus(classId),
+  ]);
+
   return NextResponse.json({
     config: config
       ? {
@@ -37,6 +43,8 @@ export const GET = withTeacherAuth(async (_session: Session, req: Request) => {
         }
       : null,
     activeJobCount: jobCount,
+    usage,
+    manualRefresh,
   });
 });
 
