@@ -7,6 +7,7 @@ import { usajobsAdapter } from "./adapters/usajobs";
 import { adzunaAdapter } from "./adapters/adzuna";
 import { careerOneStopAdapter } from "./adapters/careeronestop";
 import { recordProviderQuotaSnapshots, reserveSourceQuota, type JobSource } from "./limits";
+import { buildJobFingerprint, dedupeJobsAcrossSources } from "./dedupe";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
@@ -90,15 +91,17 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
     }
   }
 
-  // Deduplicate by sourceId
-  const seen = new Set<string>();
-  const uniqueJobs: NormalizedJob[] = [];
+  // First dedupe exact source records, then consolidate cross-provider duplicates.
+  const seenSourceIds = new Set<string>();
+  const sourceUniqueJobs: NormalizedJob[] = [];
   for (const job of allJobs) {
-    if (!seen.has(job.sourceId)) {
-      seen.add(job.sourceId);
-      uniqueJobs.push(job);
+    if (!seenSourceIds.has(job.sourceId)) {
+      seenSourceIds.add(job.sourceId);
+      sourceUniqueJobs.push(job);
     }
   }
+
+  const { uniqueJobs, selectedByFingerprint } = dedupeJobsAcrossSources(sourceUniqueJobs);
 
   // Upsert each job
   for (const job of uniqueJobs) {
@@ -141,6 +144,37 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
       },
     });
     totalUpserted++;
+  }
+
+  const activeListings = await prisma.jobListing.findMany({
+    where: {
+      classConfigId: configId,
+      status: "active",
+    },
+    select: {
+      id: true,
+      sourceId: true,
+      title: true,
+      company: true,
+      location: true,
+    },
+  });
+
+  const duplicateListingIds = activeListings
+    .filter((listing) => {
+      const fingerprint = buildJobFingerprint(listing);
+      const selected = selectedByFingerprint.get(fingerprint);
+      return selected && selected.sourceId !== listing.sourceId;
+    })
+    .map((listing) => listing.id);
+
+  if (duplicateListingIds.length > 0) {
+    await prisma.jobListing.updateMany({
+      where: {
+        id: { in: duplicateListingIds },
+      },
+      data: { status: "expired" },
+    });
   }
 
   // Expire jobs not refreshed in this batch (stale from previous cycles)

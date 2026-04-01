@@ -4,8 +4,38 @@ import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getAllSourceUsageSummaries, getManualRefreshStatus } from "@/lib/job-board/limits";
+import { careerOneStopAdapter } from "@/lib/job-board/adapters/careeronestop";
+import { jsearchAdapter } from "@/lib/job-board/adapters/jsearch";
+import { usajobsAdapter } from "@/lib/job-board/adapters/usajobs";
+import { adzunaAdapter } from "@/lib/job-board/adapters/adzuna";
 
 const VALID_SOURCES = ["careeronestop", "jsearch", "usajobs", "adzuna"];
+const SOURCE_STATUS = [
+  {
+    source: "careeronestop",
+    label: "CareerOneStop Jobs (Official)",
+    kind: "official",
+    isConfigured: () => careerOneStopAdapter.isConfigured(),
+  },
+  {
+    source: "jsearch",
+    label: "JSearch (RapidAPI)",
+    kind: "aggregator",
+    isConfigured: () => jsearchAdapter.isConfigured(),
+  },
+  {
+    source: "usajobs",
+    label: "USAJobs (Federal)",
+    kind: "official",
+    isConfigured: () => usajobsAdapter.isConfigured(),
+  },
+  {
+    source: "adzuna",
+    label: "Adzuna",
+    kind: "aggregator",
+    isConfigured: () => adzunaAdapter.isConfigured(),
+  },
+] as const;
 
 /**
  * GET /api/teacher/jobs/config?classId=xxx
@@ -45,6 +75,14 @@ export const GET = withTeacherAuth(async (_session: Session, req: Request) => {
     activeJobCount: jobCount,
     usage,
     manualRefresh,
+    sourceStatus: SOURCE_STATUS.map((entry) => ({
+      source: entry.source,
+      label: entry.label,
+      kind: entry.kind,
+      configured: entry.isConfigured(),
+      enabled: config?.sources.includes(entry.source) ?? false,
+      recommended: entry.source === "careeronestop",
+    })),
   });
 });
 

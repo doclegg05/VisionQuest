@@ -39,6 +39,15 @@ interface ManualRefreshStatus {
   resetTime: number | null;
 }
 
+interface SourceStatus {
+  source: string;
+  label: string;
+  kind: "official" | "aggregator";
+  configured: boolean;
+  enabled: boolean;
+  recommended: boolean;
+}
+
 interface ProviderUsageWindow {
   id: string;
   label: string;
@@ -70,6 +79,7 @@ export function JobConfigSection() {
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<SourceUsage[]>([]);
   const [manualRefresh, setManualRefresh] = useState<ManualRefreshStatus | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<SourceStatus[]>([]);
 
   // Form state
   const [region, setRegion] = useState("");
@@ -109,6 +119,7 @@ export function JobConfigSection() {
         setActiveJobCount(data.activeJobCount);
         setUsage(data.usage ?? []);
         setManualRefresh(data.manualRefresh ?? null);
+        setSourceStatus(data.sourceStatus ?? []);
         if (data.config) {
           setRegion(data.config.region);
           setRadius(data.config.radius);
@@ -124,6 +135,7 @@ export function JobConfigSection() {
         setError("Unable to load job board settings.");
         setUsage([]);
         setManualRefresh(null);
+        setSourceStatus([]);
       }
       if (!cancelled) setLoading(false);
     })();
@@ -197,6 +209,7 @@ export function JobConfigSection() {
   const sourceLabels: Record<string, string> = Object.fromEntries(
     SOURCE_OPTIONS.map((option) => [option.value, option.label]),
   );
+  const sourceStatusBySource = new Map(sourceStatus.map((entry) => [entry.source, entry]));
 
   return (
     <div className="space-y-6">
@@ -257,6 +270,54 @@ export function JobConfigSection() {
           )}
 
           <div className="surface-section rounded-xl p-4 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Source Health</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Official sources are preferred. Aggregators stay useful as fallback coverage.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {sourceStatus.map((entry) => (
+                <div
+                  key={entry.source}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{entry.label}</p>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1">
+                        {entry.kind === "official" ? "Official/public source" : "Aggregator source"}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-1 text-[11px] font-medium ${
+                        entry.configured
+                          ? "bg-emerald-500/10 text-emerald-300"
+                          : "bg-amber-500/10 text-amber-300"
+                      }`}
+                    >
+                      {entry.configured ? "Configured" : "Missing credentials"}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                    {entry.enabled && (
+                      <span className="rounded-full bg-[var(--primary)]/15 px-2 py-1 text-[var(--primary)]">
+                        Enabled for this class
+                      </span>
+                    )}
+                    {entry.recommended && (
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-300">
+                        Recommended baseline
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-[var(--border)]" />
+
             <div>
               <p className="text-sm font-semibold text-[var(--text-primary)]">Usage Guardrails</p>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
@@ -370,11 +431,17 @@ export function JobConfigSection() {
                         ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
                         : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
                     }`}
+                    title={sourceStatusBySource.get(opt.value)?.configured === false
+                      ? "This source is not configured in environment variables yet."
+                      : undefined}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-2">
+                Missing-credential sources can stay selected, but they will not contribute listings until configured.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
