@@ -70,3 +70,17 @@ tmp_*.txt
 _old_CLAUDE.md/
 _old_CLAUDE.local.md/
 _old_MEMORY.md
+
+# Agent tooling and session state
+.remember/
+.superpowers/
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Analysis report artifacts (root-level)
+COMPETITIVE_ANALYSIS_2026.md
+COMPETITIVE_LANDSCAPE.md
+IMPROVEMENT_BENCHMARK_REPORT.md
+KPI_FRAMEWORK.md

@@ -3,18 +3,36 @@ import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey, validateFile } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
 import { logger } from "@/lib/logger";
-import { withAuth } from "@/lib/api-error";
+import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+
+async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
+  const targetStudentId = requestedStudentId?.trim() || session.id;
+
+  if (targetStudentId !== session.id) {
+    if (!isStaffRole(session.role)) {
+      throw forbidden();
+    }
+
+    await assertStaffCanManageStudent(session, targetStudentId);
+  }
+
+  return targetStudentId;
+}
 
 export const POST = withAuth(async (session, req: NextRequest) => {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const formId = formData.get("formId") as string | null;
+    const requestedStudentId = formData.get("studentId") as string | null;
 
     if (!file || !formId) {
       return NextResponse.json({ error: "File and formId are required." }, { status: 400 });
     }
+
+    const targetStudentId = await resolveTargetStudentId(session, requestedStudentId);
 
     // Validate formId exists in FORMS
     const formDef = FORMS.find(f => f.id === formId);
@@ -35,7 +53,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const storageKey = generateStorageKey(session.id, file.name);
+    const storageKey = generateStorageKey(targetStudentId, file.name);
 
     // Upload to storage
     await uploadFile(storageKey, buffer, file.type);
@@ -43,7 +61,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     // Create FileUpload record
     const fileRecord = await prisma.fileUpload.create({
       data: {
-        studentId: session.id,
+        studentId: targetStudentId,
         filename: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
@@ -55,10 +73,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     // Upsert FormSubmission (allows re-upload)
     const submission = await prisma.formSubmission.upsert({
       where: {
-        studentId_formId: { studentId: session.id, formId },
+        studentId_formId: { studentId: targetStudentId, formId },
       },
       create: {
-        studentId: session.id,
+        studentId: targetStudentId,
         formId,
         fileId: fileRecord.id,
         status: "pending",
@@ -72,7 +90,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       },
     });
 
-    await syncStudentAlerts(session.id);
+    await syncStudentAlerts(targetStudentId);
 
     return NextResponse.json({ submission, fileId: fileRecord.id });
   } catch (error) {

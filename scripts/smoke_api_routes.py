@@ -13,8 +13,9 @@ Requires:
     SMOKE_BASE_URL (default: http://localhost:3000)
 
 Note: These tests hit endpoints that require authentication. Unauthenticated
-requests should return 401. Endpoints that require teacher role should return
-403 for student sessions.
+requests should return 401. State-changing requests may return 403 when
+rejected earlier by CSRF protection. Endpoints that require teacher role should
+return 403 for student sessions.
 """
 
 from __future__ import annotations
@@ -171,14 +172,14 @@ def test_grant_kpi_validation() -> None:
 # ---------------------------------------------------------------------------
 
 def test_case_notes_reject_unauthenticated() -> None:
-    """Verify case notes POST rejects without auth."""
+    """Verify case notes POST rejects without auth or CSRF context."""
     status, body = api_post(
         "/api/teacher/students/fake-id/notes",
         data={"body": "Test note", "category": "general"},
     )
     check(
         "POST /api/teacher/students/fake-id/notes rejects unauthenticated",
-        status == 401,
+        status in (401, 403),
         f"got {status}",
     )
 

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
-import { badRequest, forbidden, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
 import { getSession } from "@/lib/auth";
+import { badRequest, forbidden, isStaffRole, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
   isGoalResourceLinkStatus,
@@ -51,7 +52,9 @@ export const PATCH = withErrorHandler(async (
   });
 
   if (!link) throw notFound("Goal resource link not found.");
-  if (session.role !== "teacher" && link.studentId !== session.id) {
+  if (isStaffRole(session.role)) {
+    await assertStaffCanManageStudent(session, link.studentId);
+  } else if (link.studentId !== session.id) {
     throw forbidden();
   }
 
@@ -68,8 +71,8 @@ export const PATCH = withErrorHandler(async (
   }
 
   if ("dueAt" in body) {
-    if (session.role !== "teacher") {
-      throw forbidden("Only teachers can change due dates.");
+    if (!isStaffRole(session.role)) {
+      throw forbidden("Only staff can change due dates.");
     }
     const dueAt = typeof body.dueAt === "string" && body.dueAt ? new Date(body.dueAt) : null;
     if (dueAt && Number.isNaN(dueAt.getTime())) {
@@ -79,8 +82,8 @@ export const PATCH = withErrorHandler(async (
   }
 
   if ("notes" in body) {
-    if (session.role !== "teacher") {
-      throw forbidden("Only teachers can change plan notes.");
+    if (!isStaffRole(session.role)) {
+      throw forbidden("Only staff can change plan notes.");
     }
     const notes = typeof body.notes === "string" ? body.notes.trim() : "";
     if (notes.length > 1000) {

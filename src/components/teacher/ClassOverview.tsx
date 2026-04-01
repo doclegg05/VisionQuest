@@ -265,6 +265,23 @@ export default function ClassOverview() {
     }).format(new Date(dateStr));
   }
 
+  function buildOrientationWorkspaceHref(studentId: string) {
+    const params = new URLSearchParams({ studentId });
+    if (currentClassId) {
+      params.set("classId", currentClassId);
+    }
+    return `/teacher/orientation?${params.toString()}`;
+  }
+
+  function studentActionLinks(studentId: string) {
+    return {
+      record: `/teacher/students/${studentId}`,
+      orientation: buildOrientationWorkspaceHref(studentId),
+      forms: `/teacher/students/${studentId}#submitted-forms`,
+      goals: `/teacher/students/${studentId}#goal-plans`,
+    };
+  }
+
   function buildAlertQuickIntent(alert: DashboardAlert): DashboardActionIntent | null {
     const quickAction = teacherDashboardAlertQuickAction(alert.type);
     if (!quickAction) return null;
@@ -767,11 +784,12 @@ export default function ClassOverview() {
       {/* Student Cards View */}
       {viewMode === "cards" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((s) => (
-            <Link
+          {filtered.map((s) => {
+            const links = studentActionLinks(s.id);
+
+            return (
+            <div
               key={s.id}
-              href={`/teacher/students/${s.id}`}
-              prefetch={false}
               className={`surface-section group p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${!s.isActive ? "opacity-50" : ""}`}
             >
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -786,7 +804,13 @@ export default function ClassOverview() {
                       if (daysSince <= 7) return <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />;
                       return <span className="h-2.5 w-2.5 rounded-full bg-red-400" />;
                     })()}
-                    <p className="break-words font-display text-base leading-5 text-[var(--ink-strong)]">{s.displayName}</p>
+                    <Link
+                      href={links.record}
+                      prefetch={false}
+                      className="break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:text-[var(--accent-secondary)]"
+                    >
+                      {s.displayName}
+                    </Link>
                   </div>
                   <p className="ml-4 mt-1 break-words text-xs text-[var(--ink-muted)]">{s.studentId}</p>
                 </div>
@@ -847,15 +871,46 @@ export default function ClassOverview() {
                   <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
                 )}
               </div>
-            </Link>
-          ))}
+
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-[rgba(18,38,63,0.08)] pt-3">
+                <Link
+                  href={links.record}
+                  prefetch={false}
+                  className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                >
+                  Record
+                </Link>
+                <Link
+                  href={links.orientation}
+                  prefetch={false}
+                  className="rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-[11px] font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
+                >
+                  Orientation
+                </Link>
+                <Link
+                  href={links.forms}
+                  prefetch={false}
+                  className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                >
+                  Forms
+                </Link>
+                <Link
+                  href={links.goals}
+                  prefetch={false}
+                  className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                >
+                  Goals
+                </Link>
+              </div>
+            </div>
+          )})}
         </div>
       ) : (
 
       /* Student Table */
       <div className="surface-section overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[58rem] w-full text-sm lg:min-w-[62rem]">
+          <table className="min-w-[66rem] w-full text-sm lg:min-w-[72rem]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th
@@ -896,20 +951,24 @@ export default function ClassOverview() {
                 >
                   Last Active {getSortIcon("lastActive")}
                 </th>
+                <th className="px-4 py-3 text-right font-medium whitespace-nowrap text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-gray-400">
+                  <td colSpan={9} className="text-center py-8 text-gray-400">
                     {search ? "No students match your search" : "No students enrolled yet"}
                   </td>
                 </tr>
               ) : (
-                filtered.map((s) => (
+                filtered.map((s) => {
+                  const links = studentActionLinks(s.id);
+
+                  return (
                   <tr key={s.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors${!s.isActive ? " opacity-50" : ""}`}>
                     <td className="px-4 py-3">
-                      <Link href={`/teacher/students/${s.id}`} className="block min-w-0 hover:text-blue-600">
+                      <Link href={links.record} prefetch={false} className="block min-w-0 hover:text-blue-600">
                         <div className="flex min-w-0 items-center gap-2">
                           {/* Activity indicator */}
                           {(() => {
@@ -993,8 +1052,40 @@ export default function ClassOverview() {
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Link
+                          href={links.record}
+                          prefetch={false}
+                          className="rounded-full border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                        >
+                          Record
+                        </Link>
+                        <Link
+                          href={links.orientation}
+                          prefetch={false}
+                          className="rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-[11px] font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
+                        >
+                          Orientation
+                        </Link>
+                        <Link
+                          href={links.forms}
+                          prefetch={false}
+                          className="rounded-full border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                        >
+                          Forms
+                        </Link>
+                        <Link
+                          href={links.goals}
+                          prefetch={false}
+                          className="rounded-full border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                        >
+                          Goals
+                        </Link>
+                      </div>
+                    </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>

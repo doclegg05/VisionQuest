@@ -12,9 +12,21 @@ interface ResourceCardProps {
   form: SpokesForm;
   submissionStatus?: string | null;
   onUploadComplete?: () => void;
+  targetStudentId?: string;
+  helperText?: string;
+  helperHref?: string | null;
+  helperLabel?: string;
 }
 
-export default function ResourceCard({ form, submissionStatus, onUploadComplete }: ResourceCardProps) {
+export default function ResourceCard({
+  form,
+  submissionStatus,
+  onUploadComplete,
+  targetStudentId,
+  helperText = "Ask your instructor for this form",
+  helperHref = `/chat?topic=form&name=${encodeURIComponent(form.title)}`,
+  helperLabel = "Ask Sage →",
+}: ResourceCardProps) {
   const audienceLabel =
     form.audience === "both"
       ? "Both"
@@ -76,35 +88,40 @@ export default function ResourceCard({ form, submissionStatus, onUploadComplete 
             formId={form.id}
             currentStatus={submissionStatus as "pending" | "approved" | "rejected" | null}
             onUploadComplete={onUploadComplete}
+            targetStudentId={targetStudentId}
           />
         </div>
       )}
 
       <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 sm:hidden">
         <p className="text-xs text-[var(--ink-muted)]">
-          Ask your instructor for this form
+          {helperText}
         </p>
-        <Link
-          href={`/chat?topic=form&name=${encodeURIComponent(form.title)}`}
-          prefetch={false}
-          className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
-        >
-          Ask Sage →
-        </Link>
+        {helperHref ? (
+          <Link
+            href={helperHref}
+            prefetch={false}
+            className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+          >
+            {helperLabel}
+          </Link>
+        ) : null}
       </div>
 
       {/* Desktop bottom row — rendered inside flex-row context */}
       <div className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
         <p className="text-xs text-[var(--ink-muted)]">
-          Ask your instructor for this form
+          {helperText}
         </p>
-        <Link
-          href={`/chat?topic=form&name=${encodeURIComponent(form.title)}`}
-          prefetch={false}
-          className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
-        >
-          Ask Sage →
-        </Link>
+        {helperHref ? (
+          <Link
+            href={helperHref}
+            prefetch={false}
+            className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+          >
+            {helperLabel}
+          </Link>
+        ) : null}
       </div>
     </div>
   );

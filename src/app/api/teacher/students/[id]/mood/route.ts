@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { prisma } from "@/lib/db";
 
 export const GET = withTeacherAuth(
-  async (_session, req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  async (session, _req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const { id: studentId } = await params;
+    await assertStaffCanManageStudent(session, studentId);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

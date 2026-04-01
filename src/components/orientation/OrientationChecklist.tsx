@@ -20,6 +20,11 @@ interface SectionGroup {
   items: OrientationItem[];
 }
 
+interface OrientationChecklistProps {
+  targetStudentId?: string;
+  emptyStateHint?: string;
+}
+
 function groupBySection(items: OrientationItem[]): SectionGroup[] {
   const groups: SectionGroup[] = [];
   let current: SectionGroup | null = null;
@@ -35,7 +40,10 @@ function groupBySection(items: OrientationItem[]): SectionGroup[] {
   return groups;
 }
 
-export default function OrientationChecklist() {
+export default function OrientationChecklist({
+  targetStudentId,
+  emptyStateHint = "Your teacher will add items when ready.",
+}: OrientationChecklistProps) {
   const { checkProgression } = useProgression();
   const [items, setItems] = useState<OrientationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +52,8 @@ export default function OrientationChecklist() {
   const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
 
   const fetchFormStatuses = useCallback(() => {
-    fetch("/api/forms/status")
+    const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
+    fetch(`/api/forms/status${params}`)
       .then(res => res.ok ? res.json() : { submissions: [] })
       .then(data => {
         const statusMap: Record<string, string> = {};
@@ -54,16 +63,17 @@ export default function OrientationChecklist() {
         setFormStatuses(statusMap);
       })
       .catch(() => {});
-  }, []);
+  }, [targetStudentId]);
 
   useEffect(() => {
-    fetchItems();
+    void fetchItems();
     fetchFormStatuses();
-  }, [fetchFormStatuses]);
+  }, [fetchFormStatuses, targetStudentId]);
 
   async function fetchItems() {
     try {
-      const res = await fetch("/api/orientation");
+      const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
+      const res = await fetch(`/api/orientation${params}`);
       if (res.ok) {
         const data = await res.json();
         setItems(data.items || []);
@@ -88,7 +98,7 @@ export default function OrientationChecklist() {
       const res = await fetch("/api/orientation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, completed }),
+        body: JSON.stringify({ itemId, completed, studentId: targetStudentId }),
       });
 
       if (!res.ok) {
@@ -103,8 +113,16 @@ export default function OrientationChecklist() {
       setItems((prev) => {
         const allDone = completed && prev.every((i) => i.completed);
         if (allDone) {
-          fetch("/api/orientation/complete", { method: "POST" })
-            .then(() => setTimeout(() => checkProgression(), 500))
+          fetch("/api/orientation/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ studentId: targetStudentId }),
+          })
+            .then(() => {
+              if (!targetStudentId) {
+                setTimeout(() => checkProgression(), 500);
+              }
+            })
             .catch((err) => {
               console.error("Failed to record orientation completion", err);
               setError("All items checked, but we couldn't save your progress. Please refresh and try again.");
@@ -140,7 +158,7 @@ export default function OrientationChecklist() {
       <div className="text-center text-gray-400 py-8">
         <p className="text-4xl mb-3">📋</p>
         <p className="text-sm">No orientation items have been set up yet.</p>
-        <p className="text-xs mt-1">Your teacher will add items when ready.</p>
+        <p className="text-xs mt-1">{emptyStateHint}</p>
       </div>
     );
   }
@@ -277,6 +295,7 @@ export default function OrientationChecklist() {
                         itemLabel={item.label}
                         formStatuses={formStatuses}
                         onUploadComplete={fetchFormStatuses}
+                        targetStudentId={targetStudentId}
                       />
                     )}
                   </div>

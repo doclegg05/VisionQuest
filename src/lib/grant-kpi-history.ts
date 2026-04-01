@@ -1,23 +1,12 @@
-/**
- * Grant KPI snapshot — captures a point-in-time snapshot of grant metrics
- * for historical trend tracking. Run monthly via background job.
- */
-
+import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "./classroom";
 import { prisma } from "./db";
 import { computeGrantKpis, currentProgramYear, type GrantKpiPayload } from "./grant-kpi";
 import { logger } from "./logger";
 
-/**
- * Take a snapshot of current grant KPI metrics and persist to GrantKpiSnapshot.
- * Uses the current date as snapshotDate and derives programYear automatically.
- * Optional classId scopes the snapshot to a specific class's students.
- *
- * Deduplicates by (programYear, snapshotDate, classId) — safe to call multiple times.
- */
 export async function takeGrantKpiSnapshot(classId?: string): Promise<void> {
   const now = new Date();
   const programYear = currentProgramYear(now);
-  const snapshotDate = new Date(now.toISOString().slice(0, 10)); // date only
+  const snapshotDate = new Date(now.toISOString().slice(0, 10));
 
   const pyNum = parseInt(programYear.replace("PY", ""), 10);
   const startDate = new Date(`${pyNum - 1}-07-01`);
@@ -26,6 +15,20 @@ export async function takeGrantKpiSnapshot(classId?: string): Promise<void> {
   const records = await prisma.spokesRecord.findMany({
     where: {
       referralDate: { gte: startDate, lt: endDate },
+      ...(classId
+        ? {
+            student: {
+              is: {
+                classEnrollments: {
+                  some: {
+                    classId,
+                    status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
+                  },
+                },
+              },
+            },
+          }
+        : {}),
     },
     select: {
       id: true,
@@ -43,7 +46,6 @@ export async function takeGrantKpiSnapshot(classId?: string): Promise<void> {
 
   const payload: GrantKpiPayload = computeGrantKpis(records);
 
-  // Upsert by checking for existing snapshot first (nullable classId in unique constraint)
   const existing = await prisma.grantKpiSnapshot.findFirst({
     where: { programYear, snapshotDate, classId: classId ?? null },
     select: { id: true },
@@ -69,12 +71,13 @@ export async function takeGrantKpiSnapshot(classId?: string): Promise<void> {
     });
   }
 
-  logger.info("Grant KPI snapshot saved", { programYear, snapshotDate: snapshotDate.toISOString(), classId });
+  logger.info("Grant KPI snapshot saved", {
+    programYear,
+    snapshotDate: snapshotDate.toISOString(),
+    classId,
+  });
 }
 
-/**
- * Retrieve historical snapshots for a given program year.
- */
 export async function getGrantKpiHistory(
   programYear: string,
   classId?: string,
@@ -92,9 +95,9 @@ export async function getGrantKpiHistory(
     },
   });
 
-  return snapshots.map((s) => ({
-    snapshotDate: s.snapshotDate,
-    metrics: JSON.parse(s.metrics) as GrantKpiPayload["metrics"],
-    counts: JSON.parse(s.counts) as GrantKpiPayload["counts"],
+  return snapshots.map((snapshot) => ({
+    snapshotDate: snapshot.snapshotDate,
+    metrics: JSON.parse(snapshot.metrics) as GrantKpiPayload["metrics"],
+    counts: JSON.parse(snapshot.counts) as GrantKpiPayload["counts"],
   }));
 }

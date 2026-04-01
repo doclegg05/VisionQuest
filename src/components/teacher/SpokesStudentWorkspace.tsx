@@ -15,6 +15,7 @@ interface ChecklistTemplate {
   label: string;
   description: string | null;
   category: string;
+  sortOrder: number;
   required: boolean;
   active: boolean;
 }
@@ -435,6 +436,9 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   const payload = data;
   const orientationTemplates = payload.checklistTemplates.filter((template) => template.category === "orientation");
   const programFileTemplates = payload.checklistTemplates.filter((template) => template.category === "program_file");
+  const countyOptions = payload.checklistTemplates
+    .filter((template) => template.category === "county" && template.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
   const checklistProgress = payload.record.checklistProgress;
 
   function renderChecklistSection(title: string, templates: ChecklistTemplate[]) {
@@ -561,7 +565,25 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             <input value={profileForm.firstName} onChange={(event) => setProfileForm((current) => ({ ...current, firstName: event.target.value }))} placeholder="First name" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.lastName} onChange={(event) => setProfileForm((current) => ({ ...current, lastName: event.target.value }))} placeholder="Last name" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.referralEmail} onChange={(event) => setProfileForm((current) => ({ ...current, referralEmail: event.target.value }))} placeholder="Referral email" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.county} onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))} placeholder="County" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            {countyOptions.length > 0 ? (
+              <select
+                value={profileForm.county}
+                onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+              >
+                <option value="">Select county</option>
+                {profileForm.county && !countyOptions.some((option) => option.label === profileForm.county) ? (
+                  <option value={profileForm.county}>{profileForm.county}</option>
+                ) : null}
+                {countyOptions.map((option) => (
+                  <option key={option.id} value={option.label}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input value={profileForm.county} onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))} placeholder="County" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <input value={profileForm.householdType} onChange={(event) => setProfileForm((current) => ({ ...current, householdType: event.target.value }))} placeholder="Household (1P/2P)" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
               <input value={profileForm.requiredParticipationHours} onChange={(event) => setProfileForm((current) => ({ ...current, requiredParticipationHours: event.target.value }))} placeholder="Required hours" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />

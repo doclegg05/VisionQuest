@@ -14,10 +14,12 @@ function SignAndSubmitButton({
   formId,
   currentStatus,
   onComplete,
+  targetStudentId,
 }: {
   formId: string;
   currentStatus: "pending" | "approved" | "rejected" | null;
   onComplete?: () => void;
+  targetStudentId?: string;
 }) {
   const [showPad, setShowPad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -30,7 +32,7 @@ function SignAndSubmitButton({
       const res = await fetch("/api/forms/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formId, signature: dataUrl }),
+        body: JSON.stringify({ formId, signature: dataUrl, studentId: targetStudentId }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -109,10 +111,12 @@ function OrientationFormCard({
   form,
   currentStatus,
   onUploadComplete,
+  targetStudentId,
 }: {
   form: SpokesForm;
   currentStatus: "pending" | "approved" | "rejected" | null;
   onUploadComplete?: () => void;
+  targetStudentId?: string;
 }) {
   const hasDocument = hasDownloadableFormDocument(form);
 
@@ -174,12 +178,14 @@ function OrientationFormCard({
             formId={form.id}
             currentStatus={currentStatus}
             onComplete={onUploadComplete}
+            targetStudentId={targetStudentId}
           />
         ) : form.acceptsSubmission ? (
           <FormUploadButton
             formId={form.id}
             currentStatus={currentStatus}
             onUploadComplete={onUploadComplete}
+            targetStudentId={targetStudentId}
           />
         ) : null}
       </div>
@@ -195,12 +201,14 @@ interface OrientationFormDetailProps {
   itemLabel: string;
   formStatuses?: Record<string, string>;
   onUploadComplete?: () => void;
+  targetStudentId?: string;
 }
 
 export default function OrientationFormDetail({
   itemLabel,
   formStatuses,
   onUploadComplete,
+  targetStudentId,
 }: OrientationFormDetailProps) {
   const detail = getOrientationStepDetail(itemLabel);
 
@@ -223,6 +231,7 @@ export default function OrientationFormDetail({
           form={form}
           currentStatus={(formStatuses?.[form.id] ?? null) as "pending" | "approved" | "rejected" | null}
           onUploadComplete={onUploadComplete}
+          targetStudentId={targetStudentId}
         />
       ))}
     </div>

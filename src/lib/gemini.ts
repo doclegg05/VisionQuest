@@ -1,11 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const MODEL_NAME = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 
 export function getModel(apiKey: string, systemInstruction?: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: MODEL_NAME,
+    model: GEMINI_MODEL,
     ...(systemInstruction ? { systemInstruction } : {}),
   });
 }
@@ -59,7 +60,7 @@ export async function generateStructuredResponse(
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: MODEL_NAME,
+    model: GEMINI_MODEL,
     systemInstruction: systemPrompt,
     generationConfig: {
       responseMimeType: "application/json",

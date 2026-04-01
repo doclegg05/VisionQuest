@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { isAppointmentStatus, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
 export const PATCH = withTeacherAuth(async (
@@ -36,6 +37,8 @@ export const PATCH = withTeacherAuth(async (
   if (!existing) {
     return NextResponse.json({ error: "Appointment not found." }, { status: 404 });
   }
+
+  await assertStaffCanManageStudent(session, existing.studentId);
 
   const appointment = await prisma.appointment.update({
     where: { id },

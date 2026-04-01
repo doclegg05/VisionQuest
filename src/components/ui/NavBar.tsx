@@ -13,6 +13,7 @@ import {
   Wrench,
   ChatCircle,
   DotsThreeOutline,
+  ClipboardText,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
@@ -21,6 +22,7 @@ import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher", label: "Class Dashboard", icon: Users, phase: 1 },
+  { href: "/teacher/orientation", label: "Orientation", icon: ClipboardText, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
   { href: "/teacher/manage", label: "Manage Content", icon: Gear, phase: 1 },
 ];
@@ -96,7 +98,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
 
   return (
     <>
-      <div className="fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-white/50 bg-[rgba(255,255,255,0.84)] px-3.5 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur md:hidden">
+      <div className="fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur-xl md:hidden">
         <div className="min-w-0 flex-1">
           <BrandLockup
             href={homeHref}
@@ -117,7 +119,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
             <Link
               href="/settings"
               prefetch={false}
-              className="rounded-full border border-[rgba(18,38,63,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+              className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
               aria-label="Settings"
             >
               <Gear size={16} weight="bold" />
@@ -126,7 +128,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           <button
             onClick={handleLogout}
             type="button"
-            className="rounded-full border border-[rgba(18,38,63,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)] min-[390px]:text-xs"
+            className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)] min-[390px]:text-xs"
             aria-label="Log out"
           >
             Log out
@@ -235,8 +237,8 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   onClick={() => setMoreOpen(false)}
                   className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     pathname === item.href || pathname.startsWith(item.href + "/")
-                      ? "bg-[rgba(16,37,62,0.08)] text-[var(--ink-strong)]"
-                      : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                      ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
+                      : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
                   }`}
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
@@ -277,7 +279,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                 prefetch={false}
                 className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
+                    ? "bg-white text-[#00133f] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
                     : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
                 aria-current={pathname === item.href ? "page" : undefined}
@@ -285,7 +287,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                 <span
                   aria-hidden="true"
                   className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
-                    active ? "bg-[var(--ink-strong)] text-white" : "bg-white/10 text-white"
+                    active ? "bg-[#00133f] text-white" : "bg-white/10 text-white"
                   }`}
                 >
                   <item.icon size={20} weight={active ? "fill" : "regular"} />

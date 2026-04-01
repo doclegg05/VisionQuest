@@ -6,6 +6,7 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "uploads");
+const BUNDLED_UPLOAD_DIR = path.join(process.cwd(), "docs-upload");
 
 // Supabase Storage S3-compatible config
 const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT || "";
@@ -67,6 +68,46 @@ function shouldUseLocalDisk(): boolean {
   return IS_DEV && !s3Client;
 }
 
+function resolveStoragePath(baseDir: string, storageKey: string): string {
+  const filePath = path.join(baseDir, storageKey);
+  const resolved = path.resolve(filePath);
+  const relative = path.relative(path.resolve(baseDir), resolved);
+
+  if (relative.startsWith("..") || path.isAbsolute(relative) || !relative) {
+    throw new Error("Invalid storage path");
+  }
+
+  return resolved;
+}
+
+function inferMimeType(storageKey: string): string {
+  const ext = path.extname(storageKey).toLowerCase();
+  const mimeMap: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+  };
+
+  return mimeMap[ext] || "application/octet-stream";
+}
+
+export async function downloadBundledFile(
+  storageKey: string,
+): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  try {
+    const resolved = resolveStoragePath(BUNDLED_UPLOAD_DIR, storageKey);
+    const buffer = await fs.readFile(resolved);
+    return {
+      buffer,
+      mimeType: inferMimeType(storageKey),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function isTransformableBody(body: unknown): body is { transformToByteArray: () => Promise<Uint8Array> } {
   return Boolean(body && typeof body === "object" && "transformToByteArray" in body);
 }
@@ -110,13 +151,9 @@ export async function uploadFile(
   mimeType: string
 ): Promise<void> {
   if (shouldUseLocalDisk()) {
-    const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR) + path.sep)) {
-      throw new Error("Invalid storage path");
-    }
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, buffer);
+    const resolved = resolveStoragePath(LOCAL_UPLOAD_DIR, storageKey);
+    await fs.mkdir(path.dirname(resolved), { recursive: true });
+    await fs.writeFile(resolved, buffer);
     return;
   }
 
@@ -135,24 +172,12 @@ export async function uploadFile(
  */
 export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
   if (shouldUseLocalDisk()) {
-    const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR) + path.sep)) {
-      throw new Error("Invalid storage path");
-    }
     try {
-      const buffer = await fs.readFile(filePath);
-      const ext = path.extname(storageKey).toLowerCase();
-      const mimeMap: Record<string, string> = {
-        ".pdf": "application/pdf",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".gif": "image/gif",
-      };
-      return { buffer, mimeType: mimeMap[ext] || "application/octet-stream" };
+      const resolved = resolveStoragePath(LOCAL_UPLOAD_DIR, storageKey);
+      const buffer = await fs.readFile(resolved);
+      return { buffer, mimeType: inferMimeType(storageKey) };
     } catch {
-      return null;
+      return downloadBundledFile(storageKey);
     }
   }
 
@@ -176,7 +201,7 @@ export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer
       : undefined;
 
     if (statusCode === 404) {
-      return null;
+      return downloadBundledFile(storageKey);
     }
 
     throw error;
@@ -188,13 +213,9 @@ export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer
  */
 export async function deleteFile(storageKey: string): Promise<void> {
   if (shouldUseLocalDisk()) {
-    const filePath = path.join(LOCAL_UPLOAD_DIR, storageKey);
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(path.resolve(LOCAL_UPLOAD_DIR) + path.sep)) {
-      throw new Error("Invalid storage path");
-    }
     try {
-      await fs.unlink(filePath);
+      const resolved = resolveStoragePath(LOCAL_UPLOAD_DIR, storageKey);
+      await fs.unlink(resolved);
     } catch {
       // file may not exist
     }
