@@ -5,7 +5,7 @@ import type { JobSourceAdapter, NormalizedJob } from "./types";
 import { jsearchAdapter } from "./adapters/jsearch";
 import { usajobsAdapter } from "./adapters/usajobs";
 import { adzunaAdapter } from "./adapters/adzuna";
-import { reserveSourceQuota } from "./limits";
+import { recordProviderQuotaSnapshots, reserveSourceQuota } from "./limits";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
@@ -63,9 +63,10 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
   // Fetch from all adapters in parallel
   const adapterResults = await Promise.allSettled(
     activeAdapters.map((adapter) =>
-      adapter.fetchJobs(config.region, config.radius).then((jobs) => ({
+      adapter.fetchJobs(config.region, config.radius).then((result) => ({
         source: adapter.source,
-        jobs,
+        jobs: result.jobs,
+        quotaSnapshots: result.quotaSnapshots ?? [],
       })),
     ),
   );
@@ -77,6 +78,7 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
         source: result.value.source,
         count: result.value.jobs.length,
       });
+      await recordProviderQuotaSnapshots(result.value.source as "jsearch" | "usajobs" | "adzuna", result.value.quotaSnapshots);
       allJobs.push(...result.value.jobs);
     } else {
       logger.error("Adapter failed", { reason: String(result.reason) });

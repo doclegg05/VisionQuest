@@ -1,6 +1,7 @@
-import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { logger } from "@/lib/logger";
+import { extractProviderQuotaSnapshots } from "../limits";
+import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
 
 /**
  * USAJobs adapter — official federal government job listings API.
@@ -37,10 +38,10 @@ export const usajobsAdapter: JobSourceAdapter = {
     return !!process.env.USAJOBS_API_KEY && !!process.env.USAJOBS_EMAIL;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<NormalizedJob[]> {
+  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
     const apiKey = process.env.USAJOBS_API_KEY;
     const email = process.env.USAJOBS_EMAIL;
-    if (!apiKey || !email) return [];
+    if (!apiKey || !email) return { jobs: [] };
 
     try {
       const params = new URLSearchParams({
@@ -56,17 +57,18 @@ export const usajobsAdapter: JobSourceAdapter = {
           Host: "data.usajobs.gov",
         },
       });
+      const quotaSnapshots = extractProviderQuotaSnapshots("usajobs", res.headers);
 
       if (!res.ok) {
         logger.error("USAJobs API error", { status: res.status });
-        return [];
+        return { jobs: [], quotaSnapshots };
       }
 
       const json = await res.json();
       const items: USAJobsSearchItem[] =
         json.SearchResult?.SearchResultItems ?? [];
 
-      return items.map((item) => {
+      const jobs: NormalizedJob[] = items.map((item) => {
         const desc = item.MatchedObjectDescriptor;
         const pay = desc.PositionRemuneration?.[0];
         const salaryText = pay
@@ -86,9 +88,10 @@ export const usajobsAdapter: JobSourceAdapter = {
           sourceId: `usajobs:${item.MatchedObjectId}`,
         };
       });
+      return { jobs, quotaSnapshots };
     } catch (err) {
       logger.error("USAJobs adapter error", { error: String(err) });
-      return [];
+      return { jobs: [] };
     }
   },
 };

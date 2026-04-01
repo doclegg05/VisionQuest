@@ -1,6 +1,7 @@
-import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { logger } from "@/lib/logger";
+import { extractProviderQuotaSnapshots } from "../limits";
+import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
 
 /**
  * Adzuna adapter — aggregated job listings API.
@@ -28,10 +29,10 @@ export const adzunaAdapter: JobSourceAdapter = {
     return !!process.env.ADZUNA_APP_ID && !!process.env.ADZUNA_APP_KEY;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<NormalizedJob[]> {
+  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
     const appId = process.env.ADZUNA_APP_ID;
     const appKey = process.env.ADZUNA_APP_KEY;
-    if (!appId || !appKey) return [];
+    if (!appId || !appKey) return { jobs: [] };
 
     try {
       const params = new URLSearchParams({
@@ -44,16 +45,17 @@ export const adzunaAdapter: JobSourceAdapter = {
       });
 
       const res = await fetch(`${ADZUNA_BASE}?${params}`);
+      const quotaSnapshots = extractProviderQuotaSnapshots("adzuna", res.headers);
 
       if (!res.ok) {
         logger.error("Adzuna API error", { status: res.status });
-        return [];
+        return { jobs: [], quotaSnapshots };
       }
 
       const json = await res.json();
       const results: AdzunaResult[] = json.results ?? [];
 
-      return results.map((r) => {
+      const jobs: NormalizedJob[] = results.map((r) => {
         const salaryText =
           r.salary_min != null
             ? r.salary_max && r.salary_max !== r.salary_min
@@ -74,9 +76,10 @@ export const adzunaAdapter: JobSourceAdapter = {
           sourceId: `adzuna:${r.id}`,
         };
       });
+      return { jobs, quotaSnapshots };
     } catch (err) {
       logger.error("Adzuna adapter error", { error: String(err) });
-      return [];
+      return { jobs: [] };
     }
   },
 };

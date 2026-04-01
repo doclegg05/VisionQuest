@@ -15,6 +15,19 @@ export interface NormalizedJob {
   sourceId: string;
 }
 
+export interface ProviderQuotaSnapshot {
+  id: string;
+  label: string;
+  limit: number;
+  remaining: number;
+  resetTime: number | null;
+}
+
+export interface JobFetchResult {
+  jobs: NormalizedJob[];
+  quotaSnapshots?: ProviderQuotaSnapshot[];
+}
+
 /**
  * Source adapter interface. Each job source implements this.
  * Adapters that require missing env vars should return an empty array.
@@ -23,7 +36,7 @@ export interface JobSourceAdapter {
   readonly source: string;
   readonly sourceType: "scrape" | "api";
   isConfigured(): boolean;
-  fetchJobs(region: string, radiusMiles: number): Promise<NormalizedJob[]>;
+  fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult>;
 }
 
 /** Status values for StudentSavedJob */

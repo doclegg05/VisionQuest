@@ -1,6 +1,7 @@
-import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { logger } from "@/lib/logger";
+import { extractProviderQuotaSnapshots } from "../limits";
+import type { JobFetchResult, JobSourceAdapter, NormalizedJob } from "../types";
 
 /**
  * JSearch adapter — uses RapidAPI's JSearch endpoint.
@@ -31,9 +32,9 @@ export const jsearchAdapter: JobSourceAdapter = {
     return !!process.env.JSEARCH_API_KEY;
   },
 
-  async fetchJobs(region: string, radiusMiles: number): Promise<NormalizedJob[]> {
+  async fetchJobs(region: string, radiusMiles: number): Promise<JobFetchResult> {
     const apiKey = process.env.JSEARCH_API_KEY;
-    if (!apiKey) return [];
+    if (!apiKey) return { jobs: [] };
 
     try {
       const params = new URLSearchParams({
@@ -48,16 +49,17 @@ export const jsearchAdapter: JobSourceAdapter = {
           "x-rapidapi-host": JSEARCH_HOST,
         },
       });
+      const quotaSnapshots = extractProviderQuotaSnapshots("jsearch", res.headers);
 
       if (!res.ok) {
         logger.error("JSearch API error", { status: res.status });
-        return [];
+        return { jobs: [], quotaSnapshots };
       }
 
       const json = await res.json();
       const results: JSearchResult[] = json.data ?? [];
 
-      return results.map((r) => {
+      const jobs: NormalizedJob[] = results.map((r) => {
         const salaryText = formatJSearchSalary(r);
         return {
           title: r.job_title,
@@ -72,9 +74,10 @@ export const jsearchAdapter: JobSourceAdapter = {
           sourceId: `jsearch:${r.job_id}`,
         };
       });
+      return { jobs, quotaSnapshots };
     } catch (err) {
       logger.error("JSearch adapter error", { error: String(err) });
-      return [];
+      return { jobs: [] };
     }
   },
 };

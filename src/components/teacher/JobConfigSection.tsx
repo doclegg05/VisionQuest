@@ -30,12 +30,23 @@ interface SourceUsage {
   source: string;
   daily: UsageWindow;
   monthly: UsageWindow;
+  provider: ProviderUsageWindow[];
 }
 
 interface ManualRefreshStatus {
   cooldownMinutes: number;
   available: boolean;
   resetTime: number | null;
+}
+
+interface ProviderUsageWindow {
+  id: string;
+  label: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  resetTime: number | null;
+  updatedAt: number | null;
 }
 
 const SOURCE_OPTIONS = [
@@ -278,7 +289,9 @@ export function JobConfigSection() {
                     </p>
                     <p className="text-xs text-[var(--text-secondary)] mt-1">
                       {item.daily.limit == null && item.monthly.limit == null
-                        ? "No app-side caps configured"
+                        ? item.provider.length > 0
+                          ? "Showing provider-reported quotas"
+                          : "No app-side caps configured"
                         : "Usage resets on UTC windows"}
                     </p>
                   </div>
@@ -287,6 +300,24 @@ export function JobConfigSection() {
                     <UsageRow label="Daily" window={item.daily} formatter={dateTimeFormatter} />
                     <UsageRow label="Monthly" window={item.monthly} formatter={dateTimeFormatter} />
                   </div>
+
+                  {item.provider.length > 0 && (
+                    <div className="border-t border-[var(--border)] pt-3">
+                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                        Provider headers
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {item.provider.map((window) => (
+                          <UsageRow
+                            key={window.id}
+                            label={window.label}
+                            window={window}
+                            formatter={dateTimeFormatter}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
