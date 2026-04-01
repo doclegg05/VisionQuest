@@ -54,6 +54,7 @@ See [.env.example](./.env.example) for the full list.
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REDIRECT_URI`
 - `GEMINI_API_KEY`
+- `GEMINI_MODEL` (defaults to `gemini-2.5-flash-lite`)
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`

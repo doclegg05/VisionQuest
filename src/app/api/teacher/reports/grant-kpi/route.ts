@@ -3,6 +3,7 @@ import { withTeacherAuth } from "@/lib/api-error";
 import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { computeGrantKpis, currentProgramYear } from "@/lib/grant-kpi";
+import { escapeCsvValue } from "@/lib/csv";
 
 export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
@@ -65,13 +66,13 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     const rows = metricKeys.map((key) => {
       const m = payload.metrics[key];
       return [
-        escapeCsv(m.label),
+        m.label,
         m.numerator,
         m.denominator,
         m.value,
         m.target ?? "",
         m.meetsTarget === null ? "" : m.meetsTarget ? "Yes" : "No",
-      ].join(",");
+      ].map(escapeCsvValue).join(",");
     });
 
     const csv = [header, ...rows].join("\n");
@@ -86,10 +87,4 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   return NextResponse.json(payload);
 });
 
-function escapeCsv(val: string | number | boolean) {
-  const str = String(val);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
+

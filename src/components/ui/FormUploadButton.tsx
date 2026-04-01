@@ -6,12 +6,14 @@ interface FormUploadButtonProps {
   formId: string;
   currentStatus?: "pending" | "approved" | "rejected" | null;
   onUploadComplete?: () => void;
+  targetStudentId?: string;
 }
 
 export default function FormUploadButton({
   formId,
   currentStatus,
   onUploadComplete,
+  targetStudentId,
 }: FormUploadButtonProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -39,6 +41,9 @@ export default function FormUploadButton({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("formId", formId);
+      if (targetStudentId) {
+        formData.append("studentId", targetStudentId);
+      }
 
       const res = await fetch("/api/forms/upload", {
         method: "POST",

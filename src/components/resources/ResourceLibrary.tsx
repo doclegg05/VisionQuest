@@ -8,9 +8,19 @@ const allCategoryKeys = Object.keys(FORM_CATEGORIES) as FormCategory[];
 
 interface ResourceLibraryProps {
   categories?: FormCategory[];
+  targetStudentId?: string;
+  helperText?: string;
+  helperHref?: string | null;
+  helperLabel?: string;
 }
 
-export default function ResourceLibrary({ categories }: ResourceLibraryProps = {}) {
+export default function ResourceLibrary({
+  categories,
+  targetStudentId,
+  helperText,
+  helperHref,
+  helperLabel,
+}: ResourceLibraryProps = {}) {
   const categoryKeys = categories ?? allCategoryKeys;
   const filteredByCategory = categories
     ? FORMS.filter((f) => categories.includes(f.category))
@@ -20,7 +30,8 @@ export default function ResourceLibrary({ categories }: ResourceLibraryProps = {
   const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
 
   const fetchFormStatuses = useCallback(() => {
-    fetch("/api/forms/status")
+    const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
+    fetch(`/api/forms/status${params}`)
       .then(res => res.ok ? res.json() : { submissions: [] })
       .then(data => {
         const statusMap: Record<string, string> = {};
@@ -30,7 +41,7 @@ export default function ResourceLibrary({ categories }: ResourceLibraryProps = {
         setFormStatuses(statusMap);
       })
       .catch(() => {});
-  }, []);
+  }, [targetStudentId]);
 
   useEffect(() => {
     fetchFormStatuses();
@@ -133,11 +144,15 @@ export default function ResourceLibrary({ categories }: ResourceLibraryProps = {
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((form) => (
                 <ResourceCard
-                key={form.id}
-                form={form}
-                submissionStatus={formStatuses[form.id] ?? null}
-                onUploadComplete={fetchFormStatuses}
-              />
+                  key={form.id}
+                  form={form}
+                  submissionStatus={formStatuses[form.id] ?? null}
+                  onUploadComplete={fetchFormStatuses}
+                  targetStudentId={targetStudentId}
+                  helperText={helperText}
+                  helperHref={helperHref}
+                  helperLabel={helperLabel}
+                />
               ))}
           </CategorySection>
         );

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getCertificationProgress } from "@/lib/certifications";
 import { goalCountsTowardPlan } from "@/lib/goals";
+import { escapeCsvValue } from "@/lib/csv";
 
 function latestDate(...values: Array<Date | null | undefined>) {
   return values.reduce<Date | null>((latest, value) => {
@@ -207,17 +208,10 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     ];
   });
 
-  function escapeCsv(val: string | number | boolean) {
-    const str = String(val);
-    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  }
 
   const csv = [
-    headers.map(escapeCsv).join(","),
-    ...rows.map((row) => row.map(escapeCsv).join(",")),
+    headers.map(escapeCsvValue).join(","),
+    ...rows.map((row) => row.map(escapeCsvValue).join(",")),
   ].join("\n");
 
   await logAuditEvent({

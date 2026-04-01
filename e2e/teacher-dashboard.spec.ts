@@ -45,16 +45,16 @@ test.describe("Teacher registration", () => {
 
     await page.getByRole("button", { name: /create teacher account/i }).click();
 
-    // Should show validation error or stay on page
     await expect(page).toHaveURL(/teacher-register/);
   });
 });
 
 test.describe("Teacher dashboard access", () => {
-  test("unauthenticated access to /teacher redirects to login", async ({ page }) => {
+  test("unauthenticated access to /teacher redirects to landing sign-in page", async ({ page }) => {
     await page.goto("/teacher");
 
-    // Should redirect to login page
-    await page.waitForURL(/^\/$|\/login/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+    await expect(page.getByLabel(/username or email/i)).toBeVisible();
   });
 });

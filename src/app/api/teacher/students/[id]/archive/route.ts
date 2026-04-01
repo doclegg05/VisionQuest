@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withTeacherAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logger } from "@/lib/logger";
-import { withTeacherAuth, notFound } from "@/lib/api-error";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/**
- * POST /api/teacher/students/[id]/archive
- * Generate a ZIP archive of all student files and store it.
- */
-export const POST = withTeacherAuth(async (session, req: NextRequest, ctx: unknown) => {
+export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unknown) => {
   const { id: studentId } = await (ctx as RouteContext).params;
-
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
-    select: { id: true, displayName: true },
-  });
-  if (!student) throw notFound("Student not found");
+  const student = await assertStaffCanManageStudent(session, studentId);
 
   try {
     const { storageKey, fileCount } = await generateStudentArchive(
@@ -26,7 +18,6 @@ export const POST = withTeacherAuth(async (session, req: NextRequest, ctx: unkno
       session.id,
     );
 
-    // Log audit event
     await prisma.auditLog.create({
       data: {
         actorId: session.id,
@@ -52,12 +43,10 @@ export const POST = withTeacherAuth(async (session, req: NextRequest, ctx: unkno
   }
 });
 
-/**
- * GET /api/teacher/students/[id]/archive
- * Download the most recent archive for a student.
- */
-export const GET = withTeacherAuth(async (_session, req: NextRequest, ctx: unknown) => {
+export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknown) => {
   const { id: studentId } = await (ctx as RouteContext).params;
+  await assertStaffCanManageStudent(session, studentId);
+
   const url = new URL(req.url);
   const storageKey = url.searchParams.get("key");
 

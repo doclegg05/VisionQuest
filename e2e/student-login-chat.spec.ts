@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  *
  * Verifies that a student can:
  * 1. See the landing page
- * 2. Navigate to the sign-in form
+ * 2. Interact with the sign-in form on the landing page
  * 3. Submit credentials (expects error for invalid creds)
  * 4. Verify the auth error is displayed properly
  *
@@ -19,32 +19,32 @@ test.describe("Student login flow", () => {
       page.getByRole("heading", { name: /build momentum/i }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign In" }).first()).toBeVisible();
+    await expect(page.getByLabel(/username or email/i)).toBeVisible();
+    await expect(page.getByLabel(/password/i)).toBeVisible();
   });
 
   test("sign-in form validates required fields", async ({ page }) => {
     await page.goto("/");
 
-    // Click sign in without filling fields
+    const usernameInput = page.getByLabel(/username or email/i);
+    const passwordInput = page.getByLabel(/password/i);
     const signInButton = page.getByRole("button", { name: "Sign In" }).first();
+
+    await expect(usernameInput).toBeVisible();
+    await expect(passwordInput).toBeVisible();
     await signInButton.click();
 
-    // The form should show validation or the button should be disabled
-    // Either the browser native validation fires, or custom validation shows
-    const studentIdInput = page.getByLabel(/student id/i);
-    await expect(studentIdInput).toBeVisible();
+    await expect(usernameInput).toBeFocused();
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test("sign-in with invalid credentials shows error", async ({ page }) => {
     await page.goto("/");
 
-    // Fill in invalid credentials
-    await page.getByLabel(/student id/i).fill("nonexistent-user");
+    await page.getByLabel(/username or email/i).fill("nonexistent-user");
     await page.getByLabel(/password/i).fill("wrongpassword");
-
-    // Submit
     await page.getByRole("button", { name: /sign in/i }).click();
 
-    // Should show an error message (not redirect to dashboard)
     await expect(
       page.getByText(/invalid|incorrect|not found/i),
     ).toBeVisible({ timeout: 10_000 });

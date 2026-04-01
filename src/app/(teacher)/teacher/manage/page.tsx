@@ -1,7 +1,11 @@
 import ManageDashboard from "@/components/teacher/ManageDashboard";
 import PageIntro from "@/components/ui/PageIntro";
+import { getSession } from "@/lib/auth";
 
-export default function ManagePage() {
+export default async function ManagePage() {
+  const session = await getSession();
+  const canViewAudit = session?.role === "admin";
+
   return (
     <div className="page-shell">
       <PageIntro
@@ -9,7 +13,7 @@ export default function ManagePage() {
         title="Manage Content"
         description="Manage curriculum, advising, opportunities, events, certification requirements, and live outcome reporting from one place."
       />
-      <ManageDashboard />
+      <ManageDashboard canViewAudit={canViewAudit} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import OrientationManager from "./OrientationManager";
 import LmsManager from "./LmsManager";
 import CertManager from "./CertManager";
@@ -14,9 +14,22 @@ import AcademicKpiReport from "./AcademicKpiReport";
 import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 
-type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "reports" | "audit" | "documents";
+type Tab =
+  | "orientation"
+  | "spokes"
+  | "lms"
+  | "certifications"
+  | "advising"
+  | "career"
+  | "reports"
+  | "audit"
+  | "documents";
 
-const TABS: { key: Tab; label: string }[] = [
+interface ManageDashboardProps {
+  canViewAudit: boolean;
+}
+
+const BASE_TABS: Array<{ key: Exclude<Tab, "audit">; label: string }> = [
   { key: "orientation", label: "Orientation" },
   { key: "spokes", label: "SPOKES" },
   { key: "lms", label: "Courses" },
@@ -24,28 +37,37 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "advising", label: "Advising" },
   { key: "career", label: "Career" },
   { key: "reports", label: "Reports" },
-  { key: "audit", label: "Audit Trail" },
   { key: "documents", label: "Documents" },
 ];
 
-export default function ManageDashboard() {
+export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) {
   const [tab, setTab] = useState<Tab>("orientation");
+  const tabs = useMemo<Array<{ key: Tab; label: string }>>(() => {
+    if (!canViewAudit) {
+      return BASE_TABS;
+    }
+
+    return [
+      ...BASE_TABS.slice(0, 7),
+      { key: "audit", label: "Audit Trail" },
+      ...BASE_TABS.slice(7),
+    ];
+  }, [canViewAudit]);
 
   return (
     <div>
-      {/* Tab switcher */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-        {TABS.map((t) => (
+      <div className="mb-6 flex gap-1 rounded-xl bg-gray-100 p-1">
+        {tabs.map((tabOption) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              tab === t.key
+            key={tabOption.key}
+            onClick={() => setTab(tabOption.key)}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+              tab === tabOption.key
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t.label}
+            {tabOption.label}
           </button>
         ))}
       </div>
@@ -64,7 +86,7 @@ export default function ManageDashboard() {
           <AcademicKpiReport />
         </div>
       )}
-      {tab === "audit" && <AuditTrail />}
+      {canViewAudit && tab === "audit" && <AuditTrail />}
       {tab === "documents" && <DocumentBrowser />}
     </div>
   );

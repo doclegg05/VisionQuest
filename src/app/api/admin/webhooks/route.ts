@@ -6,8 +6,7 @@ import { isValidUrl } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
 import { invalidateWebhookCache } from "@/lib/webhooks";
 
-// GET — list all webhook subscriptions
-export const GET = withAdminAuth(async (_session) => {
+export const GET = withAdminAuth(async () => {
   const subscriptions = await prisma.webhookSubscription.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -15,7 +14,6 @@ export const GET = withAdminAuth(async (_session) => {
   return NextResponse.json({ subscriptions });
 });
 
-// POST — create a new webhook subscription
 export const POST = withAdminAuth(async (session, req: Request) => {
   const body = await req.json();
   const { url, eventTypes = [] } = body as {
@@ -26,7 +24,7 @@ export const POST = withAdminAuth(async (session, req: Request) => {
 
   if (!url || typeof url !== "string") throw badRequest("url is required");
   if (!isValidUrl(url)) throw badRequest("Invalid URL. Only http and https URLs are allowed.");
-  if (!Array.isArray(eventTypes) || !eventTypes.every((e) => typeof e === "string")) {
+  if (!Array.isArray(eventTypes) || !eventTypes.every((eventType) => typeof eventType === "string")) {
     throw badRequest("eventTypes must be an array of strings");
   }
 
@@ -38,6 +36,8 @@ export const POST = withAdminAuth(async (session, req: Request) => {
   const subscription = await prisma.webhookSubscription.create({
     data: { url, secret, eventTypes },
   });
+
+  invalidateWebhookCache();
 
   await logAuditEvent({
     actorId: session.id,
@@ -51,7 +51,6 @@ export const POST = withAdminAuth(async (session, req: Request) => {
   return NextResponse.json({ subscription }, { status: 201 });
 });
 
-// PATCH — update an existing webhook subscription
 export const PATCH = withAdminAuth(async (session, req: Request) => {
   const body = await req.json();
   const { id, url, eventTypes, isActive } = body as {
@@ -72,7 +71,7 @@ export const PATCH = withAdminAuth(async (session, req: Request) => {
     }
   }
   if (eventTypes !== undefined) {
-    if (!Array.isArray(eventTypes) || !eventTypes.every((e) => typeof e === "string")) {
+    if (!Array.isArray(eventTypes) || !eventTypes.every((eventType) => typeof eventType === "string")) {
       throw badRequest("eventTypes must be an array of strings");
     }
   }
@@ -105,7 +104,6 @@ export const PATCH = withAdminAuth(async (session, req: Request) => {
   return NextResponse.json({ subscription });
 });
 
-// DELETE — remove a webhook subscription
 export const DELETE = withAdminAuth(async (session, req: Request) => {
   const body = await req.json();
   const { id } = body as { id: unknown };
@@ -130,3 +128,4 @@ export const DELETE = withAdminAuth(async (session, req: Request) => {
 
   return NextResponse.json({ subscription: existing });
 });
+

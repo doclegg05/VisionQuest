@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { isTaskStatus, syncStudentAlerts } from "@/lib/advising";
+import { withAuth, isStaffRole } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
-import { withAuth } from "@/lib/api-error";
 
 export const PATCH = withAuth(async (
   session,
@@ -32,7 +33,9 @@ export const PATCH = withAuth(async (
     return NextResponse.json({ error: "Task not found." }, { status: 404 });
   }
 
-  if (session.role !== "teacher" && existing.studentId !== session.id) {
+  if (isStaffRole(session.role)) {
+    await assertStaffCanManageStudent(session, existing.studentId);
+  } else if (existing.studentId !== session.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

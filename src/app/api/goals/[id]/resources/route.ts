@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { forbidden, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
+import { forbidden, isStaffRole, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
 import { getSession } from "@/lib/auth";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
@@ -30,7 +31,9 @@ export const GET = withErrorHandler(async (
     throw notFound("Goal not found.");
   }
 
-  if (session.role !== "teacher" && goal.studentId !== session.id) {
+  if (isStaffRole(session.role)) {
+    await assertStaffCanManageStudent(session, goal.studentId);
+  } else if (goal.studentId !== session.id) {
     throw forbidden();
   }
 

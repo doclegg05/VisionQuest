@@ -13,6 +13,7 @@ import {
   Wrench,
   ChatCircle,
   DotsThreeOutline,
+  ClipboardText,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
@@ -21,6 +22,7 @@ import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher", label: "Class Dashboard", icon: Users, phase: 1 },
+  { href: "/teacher/orientation", label: "Orientation", icon: ClipboardText, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
   { href: "/teacher/manage", label: "Manage Content", icon: Gear, phase: 1 },
 ];

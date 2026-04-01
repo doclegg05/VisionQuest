@@ -3,8 +3,23 @@ import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
 import { logger } from "@/lib/logger";
-import { withAuth, badRequest } from "@/lib/api-error";
+import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+
+async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
+  const targetStudentId = requestedStudentId?.trim() || session.id;
+
+  if (targetStudentId !== session.id) {
+    if (!isStaffRole(session.role)) {
+      throw forbidden();
+    }
+
+    await assertStaffCanManageStudent(session, targetStudentId);
+  }
+
+  return targetStudentId;
+}
 
 /**
  * POST /api/forms/sign
@@ -15,10 +30,11 @@ import { syncStudentAlerts } from "@/lib/advising";
 export const POST = withAuth(async (session, req: NextRequest) => {
   try {
     const body = await req.json();
-    const { formId, signature, fileId } = body as {
+    const { formId, signature, fileId, studentId } = body as {
       formId?: string;
       signature?: string;
       fileId?: string;
+      studentId?: string;
     };
 
     if (!formId || !signature) {
@@ -39,6 +55,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       throw badRequest("Signature must be a PNG data URL.");
     }
 
+    const targetStudentId = await resolveTargetStudentId(session, studentId);
+
     // Decode and upload signature image
     const base64Data = signature.replace(/^data:image\/png;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
@@ -47,13 +65,13 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       throw badRequest("Signature image too large.");
     }
 
-    const storageKey = generateStorageKey(session.id, `signature-${formId}.png`);
+    const storageKey = generateStorageKey(targetStudentId, `signature-${formId}.png`);
     await uploadFile(storageKey, buffer, "image/png");
 
     // Create FileUpload record for the signature
     const sigFile = await prisma.fileUpload.create({
       data: {
-        studentId: session.id,
+        studentId: targetStudentId,
         filename: `signature-${formId}.png`,
         mimeType: "image/png",
         sizeBytes: buffer.length,
@@ -69,10 +87,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     // Upsert FormSubmission with signature
     const submission = await prisma.formSubmission.upsert({
       where: {
-        studentId_formId: { studentId: session.id, formId },
+        studentId_formId: { studentId: targetStudentId, formId },
       },
       create: {
-        studentId: session.id,
+        studentId: targetStudentId,
         formId,
         fileId: resolvedFileId,
         signatureFileId: sigFile.id,
@@ -89,7 +107,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       },
     });
 
-    await syncStudentAlerts(session.id);
+    await syncStudentAlerts(targetStudentId);
 
     return NextResponse.json({
       submission,
