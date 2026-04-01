@@ -5,6 +5,7 @@ import type { JobSourceAdapter, NormalizedJob } from "./types";
 import { jsearchAdapter } from "./adapters/jsearch";
 import { usajobsAdapter } from "./adapters/usajobs";
 import { adzunaAdapter } from "./adapters/adzuna";
+import { reserveSourceQuota } from "./limits";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
@@ -33,9 +34,23 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
   }
 
   // Filter to adapters that are both configured (env vars) and enabled (sources list)
-  const activeAdapters = ALL_ADAPTERS.filter(
+  const configuredAdapters = ALL_ADAPTERS.filter(
     (a) => a.isConfigured() && config.sources.includes(a.source),
   );
+
+  const activeAdapters: JobSourceAdapter[] = [];
+  for (const adapter of configuredAdapters) {
+    const quota = await reserveSourceQuota(adapter.source as "jsearch" | "usajobs" | "adzuna");
+    if (!quota.allowed) {
+      logger.warn("Skipping adapter because scrape quota is exhausted", {
+        configId,
+        source: adapter.source,
+        reason: quota.reason,
+      });
+      continue;
+    }
+    activeAdapters.push(adapter);
+  }
 
   if (activeAdapters.length === 0) {
     logger.warn("No active adapters for config", { configId, sources: config.sources });

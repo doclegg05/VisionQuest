@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { withTeacherAuth, badRequest, notFound, type Session } from "@/lib/api-error";
+import { withTeacherAuth, badRequest, notFound, rateLimited, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { enforceManualRefreshCooldown } from "@/lib/job-board/limits";
 import { runScrapeForConfig } from "@/lib/job-board/scrape-engine";
 
 /**
@@ -17,6 +18,13 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
 
   if (!classId) throw badRequest("classId is required");
   await assertStaffCanManageClass(session, classId);
+
+  const refreshQuota = await enforceManualRefreshCooldown(classId);
+  if (!refreshQuota.allowed) {
+    throw rateLimited(
+      `This class was refreshed recently. Try again in about ${refreshQuota.cooldownMinutes} minutes.`,
+    );
+  }
 
   const config = await prisma.jobClassConfig.findUnique({
     where: { classId },
