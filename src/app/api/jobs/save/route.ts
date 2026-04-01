@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withAuth, badRequest, type Session } from "@/lib/api-error";
+import { withAuth, badRequest, forbidden, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
@@ -28,13 +28,27 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     throw badRequest(`Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`);
   }
 
-  // Verify job exists
-  const job = await prisma.jobListing.findUnique({
-    where: { id: jobListingId },
+  const enrollment = await prisma.studentClassEnrollment.findFirst({
+    where: { studentId: session.id, status: "active" },
+    select: { classId: true },
+  });
+
+  if (!enrollment) {
+    throw forbidden("You do not have access to this job listing.");
+  }
+
+  // Verify job exists and belongs to the student's active class
+  const job = await prisma.jobListing.findFirst({
+    where: {
+      id: jobListingId,
+      classConfig: {
+        classId: enrollment.classId,
+      },
+    },
     select: { id: true, title: true },
   });
   if (!job) {
-    throw badRequest("Job listing not found");
+    throw forbidden("You do not have access to this job listing.");
   }
 
   const savedJob = await prisma.studentSavedJob.upsert({

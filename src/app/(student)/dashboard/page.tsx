@@ -142,7 +142,7 @@ export default async function DashboardPage() {
     });
     if (!jobConfig) return { jobs: [], hasDiscovery: false };
 
-    const [jobListings, discovery] = await Promise.all([
+    const [jobListings, discovery, savedJobs] = await Promise.all([
       prisma.jobListing.findMany({
         where: { classConfigId: jobConfig.id, status: "active" },
         orderBy: { createdAt: "desc" },
@@ -153,7 +153,13 @@ export default async function DashboardPage() {
         where: { studentId: session.id },
         select: { topClusters: true, hollandCode: true },
       }),
+      prisma.studentSavedJob.findMany({
+        where: { studentId: session.id },
+        select: { jobListingId: true, status: true },
+      }),
     ]);
+
+    const savedMap = new Map(savedJobs.map((job) => [job.jobListingId, job.status]));
 
     const recommendations = rankJobs(
       jobListings.map((j) => ({ id: j.id, location: j.location, clusters: j.clusters })),
@@ -164,7 +170,12 @@ export default async function DashboardPage() {
     return {
       jobs: jobListings.map((j) => {
         const rec = recommendations.find((r) => r.jobListingId === j.id);
-        return { ...j, matchScore: rec?.score ?? 0, matchLabel: rec?.matchLabel ?? null, savedStatus: null };
+        return {
+          ...j,
+          matchScore: rec?.score ?? 0,
+          matchLabel: rec?.matchLabel ?? null,
+          savedStatus: savedMap.get(j.id) ?? null,
+        };
       }).sort((a, b) => b.matchScore - a.matchScore),
       hasDiscovery: !!discovery,
     };

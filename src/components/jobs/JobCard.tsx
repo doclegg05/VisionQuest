@@ -96,30 +96,28 @@ export function JobCard({
       )}
 
       {/* Actions */}
-      {!compact && (
-        <div className="flex items-center gap-2 mt-3">
-          <button
-            onClick={() => onSave?.(id)}
-            className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors ${
-              savedStatus
-                ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                : "bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
-            }`}
-          >
-            <BookmarkSimple size={14} weight={savedStatus ? "fill" : "regular"} />
-            {savedStatus ? savedStatus.charAt(0).toUpperCase() + savedStatus.slice(1) : "Save"}
-          </button>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
-          >
-            <ArrowSquareOut size={14} />
-            View
-          </a>
-        </div>
-      )}
+      <div className="flex items-center gap-2 mt-3">
+        <button
+          onClick={() => onSave?.(id)}
+          className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+            savedStatus
+              ? "bg-[var(--accent)]/20 text-[var(--accent)]"
+              : "bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+          }`}
+        >
+          <BookmarkSimple size={14} weight={savedStatus ? "fill" : "regular"} />
+          {savedStatus ? savedStatus.charAt(0).toUpperCase() + savedStatus.slice(1) : "Save"}
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+        >
+          <ArrowSquareOut size={14} />
+          {compact ? "Open" : "View"}
+        </a>
+      </div>
     </div>
   );
 }

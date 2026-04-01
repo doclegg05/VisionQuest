@@ -35,6 +35,8 @@ export function JobConfigSection() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [region, setRegion] = useState("");
@@ -66,6 +68,7 @@ export function JobConfigSection() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(null);
       const res = await fetch(`/api/teacher/jobs/config?classId=${selectedClassId}`);
       if (!cancelled && res.ok) {
         const data = await res.json();
@@ -82,6 +85,8 @@ export function JobConfigSection() {
           setSources(["jsearch"]);
           setAutoRefresh(true);
         }
+      } else if (!cancelled) {
+        setError("Unable to load job board settings.");
       }
       if (!cancelled) setLoading(false);
     })();
@@ -90,6 +95,8 @@ export function JobConfigSection() {
 
   const handleSave = async () => {
     setSaving(true);
+    setMessage(null);
+    setError(null);
     const res = await fetch("/api/teacher/jobs/config", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -102,23 +109,31 @@ export function JobConfigSection() {
       }),
     });
     if (res.ok) {
+      setMessage(config ? "Job board settings updated." : "Job board enabled.");
       setConfigRefreshKey((k) => k + 1);
+    } else {
+      setError("Unable to save job board settings.");
     }
     setSaving(false);
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetch("/api/teacher/jobs/refresh", {
+    setMessage(null);
+    setError(null);
+    const res = await fetch("/api/teacher/jobs/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ classId: selectedClassId }),
     });
-    // Wait briefly then refresh config to show updated count
-    setTimeout(() => {
+    if (res.ok) {
+      const data = await res.json();
+      setMessage(data.message ?? "Job refresh complete.");
       setConfigRefreshKey((k) => k + 1);
-      setRefreshing(false);
-    }, 3000);
+    } else {
+      setError("Unable to refresh jobs right now.");
+    }
+    setRefreshing(false);
   };
 
   const toggleSource = (source: string) => {
@@ -155,6 +170,17 @@ export function JobConfigSection() {
         <p className="text-[var(--text-secondary)]">Loading config...</p>
       ) : (
         <>
+          {error && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
+          )}
+          {message && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              {message}
+            </div>
+          )}
+
           {/* Status display */}
           {config && (
             <div className="surface-section rounded-xl p-4 flex items-center justify-between">
