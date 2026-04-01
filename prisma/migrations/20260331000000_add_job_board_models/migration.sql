@@ -54,13 +54,16 @@ CREATE TABLE "visionquest"."StudentSavedJob" (
 CREATE UNIQUE INDEX "JobClassConfig_classId_key" ON "visionquest"."JobClassConfig"("classId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "JobListing_sourceId_key" ON "visionquest"."JobListing"("sourceId");
-
--- CreateIndex
 CREATE INDEX "JobListing_classConfigId_status_idx" ON "visionquest"."JobListing"("classConfigId", "status");
 
 -- CreateIndex
 CREATE INDEX "JobListing_status_createdAt_idx" ON "visionquest"."JobListing"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "JobListing_sourceId_idx" ON "visionquest"."JobListing"("sourceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "JobListing_classConfigId_sourceId_key" ON "visionquest"."JobListing"("classConfigId", "sourceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "StudentSavedJob_studentId_jobListingId_key" ON "visionquest"."StudentSavedJob"("studentId", "jobListingId");

@@ -83,7 +83,12 @@ export async function runScrapeForConfig(configId: string): Promise<number> {
     const clusters = matchJobToClusters(job);
 
     await prisma.jobListing.upsert({
-      where: { sourceId: job.sourceId },
+      where: {
+        classConfigId_sourceId: {
+          classConfigId: configId,
+          sourceId: job.sourceId,
+        },
+      },
       create: {
         title: job.title,
         company: job.company,

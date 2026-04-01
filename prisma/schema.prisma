@@ -1063,7 +1063,7 @@ model JobListing {
   url            String
   source         String
   sourceType     String
-  sourceId       String    @unique
+  sourceId       String
   clusters       String[]  @default([])
   status         String    @default("active")
   expiresAt      DateTime?
@@ -1075,8 +1075,10 @@ model JobListing {
   classConfig     JobClassConfig   @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
   savedByStudents StudentSavedJob[]
 
+  @@unique([classConfigId, sourceId])
   @@index([classConfigId, status])
   @@index([status, createdAt])
+  @@index([sourceId])
   @@schema("visionquest")
 }
 

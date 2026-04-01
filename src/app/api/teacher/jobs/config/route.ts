@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
+import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
@@ -14,6 +15,7 @@ export const GET = withTeacherAuth(async (_session: Session, req: Request) => {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId");
   if (!classId) throw badRequest("classId is required");
+  await assertStaffCanManageClass(_session, classId);
 
   const config = await prisma.jobClassConfig.findUnique({
     where: { classId },
@@ -56,6 +58,7 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
 
   if (!classId || typeof classId !== "string") throw badRequest("classId is required");
   if (!region || typeof region !== "string") throw badRequest("region is required");
+  await assertStaffCanManageClass(session, classId);
 
   // Validate sources
   const validatedSources = (sources ?? ["jsearch"]).filter((s) => VALID_SOURCES.includes(s));
