@@ -21,7 +21,25 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const student = isEmail
     ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
     : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
-  if (!student || !verifyPassword(password, student.passwordHash) || !student.isActive) {
+
+  // OAuth-only account: no password set, guide user to Google sign-in
+  if (student && !student.passwordHash && student.authProvider === "google") {
+    logAuditEvent({
+      actorId: student.id,
+      actorRole: student.role,
+      action: "auth.login_failed_oauth",
+      targetType: "student",
+      targetId: student.id,
+      summary: `Password login attempted for Google OAuth account "${login}".`,
+      metadata: { ip },
+    });
+    return NextResponse.json(
+      { error: "This account uses Google sign-in. Please use the Google login button." },
+      { status: 401 }
+    );
+  }
+
+  if (!student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive) {
     const resp = NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
     logAuditEvent({
       actorId: null,

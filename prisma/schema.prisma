@@ -13,8 +13,9 @@ model Student {
   id             String   @id @default(cuid())
   studentId      String   @unique
   displayName    String
-  passwordHash   String
+  passwordHash   String?
   email          String?  @unique
+  authProvider   String?
   geminiApiKey   String?
   credlyUsername String?
   role           String   @default("student")

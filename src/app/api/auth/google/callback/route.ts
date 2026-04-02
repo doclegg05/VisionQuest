@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { setSessionCookie, hashPassword, normalizeEmail } from "@/lib/auth";
+import { setSessionCookie, normalizeEmail } from "@/lib/auth";
 import crypto from "crypto";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
@@ -116,8 +116,6 @@ export async function GET(req: NextRequest) {
       // Create new student from Google info
       // Use email prefix as studentId, ensure unique
       const baseId = userInfo.email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
-      // Generate a random password hash (user won't need it with OAuth)
-      const { hash } = hashPassword(crypto.randomBytes(32).toString("hex"));
 
       // Retry with random suffix to avoid TOCTOU race on studentId uniqueness
       let studentId = baseId;
@@ -129,7 +127,8 @@ export async function GET(req: NextRequest) {
               studentId,
               displayName: userInfo.name || userInfo.email.split("@")[0],
               email: normalizedEmail,
-              passwordHash: hash,
+              passwordHash: null,
+              authProvider: "google",
               role: "student",
             },
           });
