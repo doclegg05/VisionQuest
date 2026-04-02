@@ -1,0 +1,230 @@
+import { NextResponse } from "next/server";
+import { withTeacherAuth } from "@/lib/api-error";
+import { buildManagedStudentWhere } from "@/lib/classroom";
+import { prisma } from "@/lib/db";
+import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { computeUrgencyScore } from "@/lib/intervention-scoring";
+import { isGoalStale } from "@/lib/stale-goal-rules";
+import { getCertificationProgress } from "@/lib/certifications";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function daysBetween(a: Date, b: Date): number {
+  return Math.floor(Math.abs(b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function latestDate(...values: Array<Date | null | undefined>): Date | null {
+  return values.reduce<Date | null>((latest, value) => {
+    if (!value) return latest;
+    if (!latest || value.getTime() > latest.getTime()) return value;
+    return latest;
+  }, null);
+}
+
+// ---------------------------------------------------------------------------
+// GET — intervention queue sorted by urgency score (highest first)
+// ---------------------------------------------------------------------------
+
+export const GET = withTeacherAuth(async (session, req: Request) => {
+  const url = new URL(req.url);
+  const classId = url.searchParams.get("classId")?.trim() || undefined;
+
+  const now = new Date();
+
+  // Fetch all active students managed by this teacher/admin in a single query,
+  // pulling every signal needed for urgency scoring.
+  const students = await prisma.student.findMany({
+    where: buildManagedStudentWhere(session, {
+      classId,
+      includeInactiveAccounts: false,
+    }),
+    select: {
+      id: true,
+      displayName: true,
+      email: true,
+      createdAt: true,
+      updatedAt: true,
+      progression: { select: { state: true } },
+      goals: {
+        select: { level: true, status: true, updatedAt: true },
+      },
+      orientationProgress: {
+        select: { completed: true, completedAt: true },
+      },
+      alerts: {
+        where: { status: "open" },
+        select: { severity: true },
+      },
+      assignedTasks: {
+        where: {
+          status: { not: "completed" },
+          dueAt: { lt: now },
+        },
+        select: { id: true },
+      },
+      conversations: {
+        select: { updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      portfolioItems: { select: { updatedAt: true } },
+      files: { select: { uploadedAt: true } },
+      formSubmissions: {
+        select: { updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      applications: {
+        select: { updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      eventRegistrations: {
+        select: { updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      certifications: {
+        select: {
+          status: true,
+          requirements: {
+            select: { templateId: true, completed: true, verifiedBy: true, fileId: true },
+          },
+        },
+      },
+      resumeData: { select: { id: true } },
+    },
+  });
+
+  // Shared lookups (single queries, not per-student)
+  const [orientationTotal, certTemplates] = await Promise.all([
+    prisma.orientationItem.count(),
+    prisma.certTemplate.findMany({
+      where: { certType: "ready-to-work" },
+      select: { id: true, required: true, needsFile: true, needsVerify: true },
+    }),
+  ]);
+
+  const requiredCertCount = certTemplates.filter((t) => t.required).length;
+
+  // Build queue entries
+  const queue = students
+    .map((s) => {
+      // --- Last active date (proxy for last login, no dedicated field on Student) ---
+      const lastActiveAt =
+        latestDate(
+          s.createdAt,
+          s.conversations[0]?.updatedAt ?? null,
+          ...s.goals.map((g) => g.updatedAt),
+          ...s.orientationProgress.map((op) => op.completedAt ?? null),
+          ...s.portfolioItems.map((p) => p.updatedAt),
+          ...s.files.map((f) => f.uploadedAt),
+          s.formSubmissions[0]?.updatedAt ?? null,
+          s.applications[0]?.updatedAt ?? null,
+          s.eventRegistrations[0]?.updatedAt ?? null,
+        ) ?? s.createdAt;
+
+      const daysSinceLastLogin = daysBetween(lastActiveAt, now);
+
+      // --- Last goal review (most recent updatedAt across active goals) ---
+      const activeGoals = s.goals.filter(
+        (g) => g.status !== "completed" && g.status !== "abandoned",
+      );
+      const lastGoalUpdatedAt =
+        activeGoals.length > 0
+          ? activeGoals.reduce<Date>((latest, g) =>
+              g.updatedAt.getTime() > latest.getTime() ? g.updatedAt : latest,
+            activeGoals[0].updatedAt)
+          : null;
+
+      const daysSinceLastGoalReview = lastGoalUpdatedAt
+        ? daysBetween(lastGoalUpdatedAt, now)
+        : 9999;
+
+      // --- Orientation signals ---
+      const completedOrientationCount = s.orientationProgress.filter((op) => op.completed).length;
+      const orientationComplete =
+        orientationTotal > 0 && completedOrientationCount >= orientationTotal;
+      const orientationProgress =
+        orientationTotal > 0 ? completedOrientationCount / orientationTotal : 1;
+
+      // --- Alerts ---
+      const openAlertCount = s.alerts.length;
+      const highSeverityAlertCount = s.alerts.filter((a) => a.severity === "high").length;
+
+      // --- Overdue tasks ---
+      const overdueTaskCount = s.assignedTasks.length;
+
+      // --- Stalled goals (active/in_progress goals with no recent update) ---
+      const stalledGoalCount = s.goals.filter((g) =>
+        isGoalStale({ level: g.level, status: g.status, updatedAt: g.updatedAt, lastReviewedAt: null }, now),
+      ).length;
+
+      // --- Readiness score ---
+      const completedGoalLevels = [
+        ...new Set(s.goals.filter((g) => g.status === "completed").map((g) => g.level)),
+      ];
+      const bhagCompleted = s.goals.some(
+        (g) => g.level === "bhag" && g.status === "completed",
+      );
+
+      let longestStreak = 0;
+      let portfolioShared = false;
+      if (s.progression?.state) {
+        try {
+          const state = JSON.parse(s.progression.state) as Record<string, unknown>;
+          longestStreak = (state.streaks as Record<string, Record<string, number>> | undefined)?.daily?.longest ?? 0;
+          portfolioShared = !!(state.portfolioShared);
+        } catch { /* ignore malformed state */ }
+      }
+
+      const cert = s.certifications[0];
+      const certificationsEarned = cert
+        ? getCertificationProgress(certTemplates, cert.requirements).done
+        : 0;
+
+      const readiness = computeReadinessScore(
+        {
+          orientationComplete,
+          completedGoalLevels,
+          bhagCompleted,
+          certificationsEarned,
+          portfolioItemCount: s.portfolioItems.length,
+          resumeCreated: !!s.resumeData,
+          portfolioShared,
+          longestStreak,
+        },
+        requiredCertCount,
+      );
+
+      const signals = {
+        daysSinceLastGoalReview,
+        daysSinceLastLogin,
+        orientationComplete,
+        orientationProgress,
+        openAlertCount,
+        highSeverityAlertCount,
+        overdueTaskCount,
+        stalledGoalCount,
+        readinessScore: readiness.score,
+      };
+
+      const urgencyScore = computeUrgencyScore(signals);
+
+      return {
+        studentId: s.id,
+        name: s.displayName,
+        email: s.email ?? null,
+        urgencyScore,
+        signals,
+      };
+    })
+    // Filter out students with zero urgency
+    .filter((entry) => entry.urgencyScore > 0)
+    // Sort highest urgency first
+    .sort((a, b) => b.urgencyScore - a.urgencyScore);
+
+  return NextResponse.json({ queue });
+});
