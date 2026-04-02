@@ -7,8 +7,9 @@ export const dynamic = "force-dynamic";
 
 function isAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  // No secret configured → open access (development / unconfigured environments)
-  if (!secret) return true;
+  const isDev = process.env.NODE_ENV === "development";
+  // No secret configured → allow only in development; deny in all other environments
+  if (!secret) return isDev;
   const authHeader = req.headers.get("authorization");
   return authHeader === `Bearer ${secret}`;
 }
