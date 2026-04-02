@@ -94,6 +94,17 @@ test("returns false for cancelled goal regardless of age", () => {
   assert.equal(isGoalStale(goal, NOW), false);
 });
 
+test("returns false for an abandoned goal regardless of age", () => {
+  const goal: GoalForStalenessCheck = {
+    level: "monthly",
+    status: "abandoned",
+    updatedAt: daysAgo(90, NOW),
+    lastReviewedAt: daysAgo(60, NOW),
+  };
+
+  assert.equal(isGoalStale(goal, NOW), false);
+});
+
 test("uses correct thresholds per level", () => {
   const makeGoal = (level: string, days: number): GoalForStalenessCheck => ({
     level,

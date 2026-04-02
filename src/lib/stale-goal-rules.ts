@@ -5,7 +5,7 @@ export interface GoalForStalenessCheck {
   lastReviewedAt: Date | null;
 }
 
-const TERMINAL_STATUSES = new Set(["completed", "archived", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["completed", "archived", "cancelled", "abandoned"]);
 
 const STALENESS_THRESHOLDS_BY_LEVEL: Record<string, number> = {
   daily: 3,
