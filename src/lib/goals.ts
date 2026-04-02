@@ -12,6 +12,7 @@ export const GOAL_LEVEL_META: Record<GoalLevel, { label: string; icon: string }>
 export const GOAL_STATUSES = [
   "active",
   "in_progress",
+  "confirmed",
   "blocked",
   "completed",
   "abandoned",
@@ -21,6 +22,7 @@ export type GoalStatus = (typeof GOAL_STATUSES)[number];
 export const GOAL_PLANNING_STATUSES = [
   "active",
   "in_progress",
+  "confirmed",
   "blocked",
   "completed",
 ] as const satisfies readonly GoalStatus[];
@@ -28,6 +30,7 @@ export const GOAL_PLANNING_STATUSES = [
 export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
   active: "Active",
   in_progress: "In Progress",
+  confirmed: "Confirmed",
   blocked: "Blocked",
   completed: "Completed",
   abandoned: "Abandoned",
