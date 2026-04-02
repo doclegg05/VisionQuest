@@ -3,6 +3,10 @@ import { isAuthorizedInternalRequest, isUrlHostMatch } from "@/lib/csrf";
 
 const isProduction = process.env.NODE_ENV === "production";
 
+// NOTE: A static fallback CSP is defined in next.config.ts headers().
+// When this proxy is wired as middleware.ts, remove the static CSP
+// from next.config.ts to avoid dual-header conflicts.
+
 /**
  * Combined proxy handling:
  * 1. CSRF protection via Origin header validation
@@ -40,11 +44,12 @@ export function proxy(request: NextRequest) {
 
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'${isProduction ? "" : " 'unsafe-eval'"}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isProduction ? "" : " 'unsafe-eval'"}`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://images.credly.com",
-    "connect-src 'self' https://*.ingest.sentry.io",
+    "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",
+    "connect-src 'self' https://generativelanguage.googleapis.com https://*.ingest.sentry.io",
+    "frame-src 'none'",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",

@@ -13,8 +13,9 @@ model Student {
   id             String   @id @default(cuid())
   studentId      String   @unique
   displayName    String
-  passwordHash   String
+  passwordHash   String?
   email          String?  @unique
+  authProvider   String?
   geminiApiKey   String?
   credlyUsername String?
   role           String   @default("student")
@@ -55,6 +56,7 @@ model Student {
   visionBoardItems        VisionBoardItem[]
   goalResourceLinks       GoalResourceLink[]       @relation("StudentGoalResourceLinks")
   assignedGoalLinks       GoalResourceLink[]       @relation("AssignedGoalResourceLinks")
+  confirmedGoals          Goal[]                   @relation("GoalConfirmer")
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
   moodEntries             MoodEntry[]
@@ -110,17 +112,21 @@ model Message {
 }
 
 model Goal {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   studentId       String
   level           String
   parentId        String?
-  content         String   @db.Text
-  status          String   @default("active")
+  content         String    @db.Text
+  status          String    @default("active")
   sourceMessageId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  confirmedAt     DateTime?
+  confirmedBy     String?
+  lastReviewedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   student       Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  confirmer     Student?           @relation("GoalConfirmer", fields: [confirmedBy], references: [id])
   parent        Goal?              @relation("GoalHierarchy", fields: [parentId], references: [id])
   children      Goal[]             @relation("GoalHierarchy")
   resourceLinks GoalResourceLink[]

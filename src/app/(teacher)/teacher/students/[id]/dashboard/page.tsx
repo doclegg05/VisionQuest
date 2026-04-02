@@ -5,14 +5,12 @@ import { isStaffRole } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
-  createInitialState,
   getAchievementsWithDefs,
   getXpProgress,
-  parseState,
 } from "@/lib/progression/engine";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { MountainProgressLazy } from "@/components/ui/MountainProgressLazy";
 import DashboardClient from "@/app/(student)/dashboard/DashboardClient";
 
 export default async function StudentDashboardPreview({
@@ -27,9 +25,8 @@ export default async function StudentDashboardPreview({
   const managedStudent = await assertStaffCanManageStudent(session, studentId);
 
   const now = new Date();
-  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData] = await Promise.all([
+  const [goalCount, nextAppointment, tasks, alertCount, readinessData, incompleteOrientationItems] = await Promise.all([
     prisma.goal.count({ where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
-    prisma.progression.findUnique({ where: { studentId } }),
     prisma.appointment.findFirst({
       where: { studentId, status: "scheduled", startsAt: { gte: now } },
       select: { id: true, title: true, startsAt: true, endsAt: true, locationType: true, locationLabel: true },
@@ -42,41 +39,30 @@ export default async function StudentDashboardPreview({
       take: 4,
     }),
     prisma.studentAlert.count({ where: { studentId, status: "open" } }),
-    prisma.resumeData.findUnique({ where: { studentId }, select: { id: true } }),
+    fetchStudentReadinessData(studentId),
+    prisma.orientationItem.findMany({
+      where: {
+        required: true,
+        OR: [
+          {
+            progress: {
+              none: { studentId },
+            },
+          },
+          {
+            progress: {
+              some: { studentId, completed: false },
+            },
+          },
+        ],
+      },
+      select: { id: true, label: true },
+      orderBy: { sortOrder: "asc" },
+      take: 3,
+    }),
   ]);
 
-  const since28d = new Date();
-  since28d.setDate(since28d.getDate() - 27);
-  since28d.setHours(0, 0, 0, 0);
-
-  const [orientationDoneCount, orientationTotalCount, activityEvents, bhagGoal] = await Promise.all([
-    prisma.orientationProgress.count({ where: { studentId, completed: true } }),
-    prisma.orientationItem.count(),
-    prisma.progressionEvent.findMany({
-      where: { studentId, occurredAt: { gte: since28d } },
-      select: { occurredAt: true },
-    }),
-    prisma.goal.findFirst({
-      where: { studentId, level: "bhag", status: "completed" },
-      select: { id: true },
-    }),
-  ]);
-
-  const activityDays: Record<string, number> = {};
-  for (const event of activityEvents) {
-    const day = event.occurredAt.toISOString().slice(0, 10);
-    activityDays[day] = (activityDays[day] || 0) + 1;
-  }
-
-  const state = progression ? parseState(progression.state) : createInitialState();
-  if (!state.resumeCreated && resumeData) {
-    state.resumeCreated = true;
-  }
-  const readiness = computeReadinessScore({
-    ...state,
-    bhagCompleted: !!bhagGoal,
-    orientationProgress: { completed: orientationDoneCount, total: orientationTotalCount },
-  });
+  const { state, readiness, orientationProgress } = readinessData;
   const xpProgress = getXpProgress(state);
   const achievements = getAchievementsWithDefs(state);
 
@@ -84,15 +70,9 @@ export default async function StudentDashboardPreview({
     ? { ...state.levelUpHistory[state.levelUpHistory.length - 1] }
     : null;
 
-  const planningGoals = await prisma.goal.findMany({
-    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
-    select: { content: true },
-  });
-  const goalMatchResult = matchGoalsToPlatforms(planningGoals.map((g) => g.content));
-
-
   return (
     <div className="page-shell">
+      {/* Teacher-only preview banner */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-600">Dashboard Preview</p>
@@ -108,20 +88,16 @@ export default async function StudentDashboardPreview({
         </Link>
       </div>
 
-      <div className="mb-6">
-        <div className="page-hero rounded-[2rem] p-5 sm:p-7 md:p-10">
-          <p className="page-eyebrow text-white/60">Student workspace</p>
-          <h1 className="mt-2 font-display text-3xl text-white">
-            Welcome back, {managedStudent.displayName}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-white/75">
-            {goalCount > 0
-              ? `${goalCount} goal${goalCount === 1 ? "" : "s"} in plan. Level ${state.level}, ${state.currentStreak} day streak, ${achievements.length} achievements.`
-              : "No goals set yet."}
-          </p>
-        </div>
+      {/* Section 1: Mountain Progress — matches student dashboard */}
+      <div className="surface-section mb-4 overflow-hidden p-0">
+        <MountainProgressLazy
+          readinessScore={readiness.score}
+          readinessBreakdown={readiness.breakdown}
+          level={state.level}
+        />
       </div>
 
+      {/* Sections 2-4 rendered in DashboardClient */}
       <DashboardClient
         studentName={managedStudent.displayName}
         level={state.level}
@@ -142,17 +118,13 @@ export default async function StudentDashboardPreview({
         }))}
         alertCount={alertCount}
         lastLevelUp={lastLevelUp}
-        xp={state.xp}
         hasGoals={goalCount > 0}
         orientationComplete={state.orientationComplete || false}
         certificationsStarted={state.certificationsStarted || 0}
         platformsVisited={state.platformsVisited?.length || 0}
         resumeCreated={state.resumeCreated || false}
-        orientationProgress={{ completed: orientationDoneCount, total: orientationTotalCount }}
-        goalSuggestions={goalMatchResult.suggestions}
-        readinessScore={readiness.score}
-        readinessBreakdown={readiness.breakdown}
-        activityDays={activityDays}
+        orientationProgress={orientationProgress}
+        incompleteOrientationItems={incompleteOrientationItems}
       />
     </div>
   );

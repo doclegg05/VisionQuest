@@ -21,17 +21,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const student = isEmail
     ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
     : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
-  if (!student || !verifyPassword(password, student.passwordHash) || !student.isActive) {
-    const resp = NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
-    logAuditEvent({
-      actorId: null,
-      actorRole: null,
-      action: "auth.login_failed",
+
+  // Consolidate all failure cases into a single generic response to prevent account enumeration.
+  // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
+  const isOAuthOnly = student && !student.passwordHash && student.authProvider === "google";
+  const isInvalidCredentials =
+    !student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive;
+
+  if (isOAuthOnly || isInvalidCredentials) {
+    await logAuditEvent({
+      actorId: isOAuthOnly ? student.id : null,
+      actorRole: isOAuthOnly ? student.role : null,
+      action: isOAuthOnly ? "auth.login_failed_oauth" : "auth.login_failed",
       targetType: "student",
+      targetId: isOAuthOnly ? student.id : undefined,
       summary: `Failed login attempt for "${login}".`,
       metadata: { ip },
     });
-    return resp;
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);

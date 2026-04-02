@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath } from "@/lib/role-home";
 import { type NavPhase, type NavItem } from "@/lib/nav-progression";
-import { getVisibleNavItems } from "@/lib/nav-items";
+import { getVisibleNavItems, getVisibleSecondaryNavItems } from "@/lib/nav-items";
 import {
   Users,
   Buildings,
@@ -13,7 +13,8 @@ import {
   Wrench,
   ChatCircle,
   DotsThreeOutline,
-  ClipboardText,
+  UserCircle,
+  SignOut,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
@@ -21,10 +22,9 @@ import NotificationBell from "./NotificationBell";
 import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 const STAFF_ITEMS: NavItem[] = [
-  { href: "/teacher", label: "Class Dashboard", icon: Users, phase: 1 },
-  { href: "/teacher/orientation", label: "Orientation", icon: ClipboardText, phase: 1 },
+  { href: "/teacher", label: "Students", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
-  { href: "/teacher/manage", label: "Manage Content", icon: Gear, phase: 1 },
+  { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -43,6 +43,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [sageMiniOpen, setSageMiniOpen] = useState(false);
   const [sagePendingMessage, setSagePendingMessage] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // Listen for sage:open events from anywhere in the app
   const handleSageOpen = useCallback((e: Event) => {
@@ -59,16 +60,38 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
   }, [handleSageOpen]);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreDialogRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const homeHref = getRoleHomePath(role);
+
+  // Primary nav items for the sidebar
   const primaryItems =
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3)
       : role === "admin"
         ? [...ADMIN_ITEMS, ...STAFF_ITEMS]
         : STAFF_ITEMS;
-  const mobileMain = primaryItems.slice(0, 4);
-  const mobileMore = primaryItems.slice(4);
+
+  // Secondary nav items (student only)
+  const secondaryItems =
+    role === "student" ? getVisibleSecondaryNavItems(navPhase ?? 3) : [];
+
+  // Mobile bottom bar: 5 slots — Home, Goals, Sage (center FAB), Learning, More
+  // "More" sheet contains the rest: Career, Advising, Portfolio, Vision Board, Files, Resources, Settings
+  const allStudentItems = [...getVisibleNavItems(navPhase ?? 3), ...getVisibleSecondaryNavItems(navPhase ?? 3)];
+  const mobileMain = role === "student"
+    ? allStudentItems.slice(0, 2) // Home, Goals
+    : primaryItems.slice(0, 2);
+
+  const mobileLearningItem = role === "student"
+    ? allStudentItems.find(i => i.href === "/learning")
+    : primaryItems[2];
+
+  // For student: Career, Advising, Portfolio, Vision Board, Files, Resources (skip Home, Goals, Learning)
+  const mobileMore = role === "student"
+    ? allStudentItems.filter(i => i.href !== "/dashboard" && i.href !== "/goals" && i.href !== "/learning")
+    : primaryItems.slice(3);
 
   const handleLogout = async () => {
     await fetch("/api/auth/session", { method: "DELETE" });
@@ -76,6 +99,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
     router.refresh();
   };
 
+  // Click-outside handler for More sheet
   useEffect(() => {
     if (!moreOpen) return;
     const first = moreDialogRef.current?.querySelector<HTMLElement>("a, button");
@@ -92,9 +116,67 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [moreOpen]);
 
+  // Click-outside handler for profile menu
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(e.target as Node) &&
+        profileButtonRef.current &&
+        !profileButtonRef.current.contains(e.target as Node)
+      ) {
+        setProfileOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setProfileOpen(false);
+        profileButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileOpen]);
+
   const isMoreActive = mobileMore.some(
     (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
   );
+
+  // Shared link renderer for sidebar nav items
+  const renderSidebarLink = (item: NavItem, small?: boolean) => {
+    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        prefetch={false}
+        className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-colors ${
+          active
+            ? "bg-white text-[#00133f] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
+            : "text-white/90 hover:bg-white/10 hover:text-white"
+        }`}
+        aria-current={pathname === item.href ? "page" : undefined}
+      >
+        <span
+          aria-hidden="true"
+          className={`grid ${small ? "h-8 w-8 rounded-xl" : "h-10 w-10 rounded-2xl"} place-items-center text-base ${
+            active ? "bg-[#00133f] text-white" : "bg-white/10 text-white"
+          }`}
+        >
+          <item.icon size={small ? 16 : 20} weight={active ? "fill" : "regular"} />
+        </span>
+        <span className={small ? "text-xs" : ""}>{item.label}</span>
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -115,16 +197,6 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           <div className="text-[var(--ink-strong)]">
             <NotificationBell />
           </div>
-          {role === "student" && (
-            <Link
-              href="/settings"
-              prefetch={false}
-              className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
-              aria-label="Settings"
-            >
-              <Gear size={16} weight="bold" />
-            </Link>
-          )}
           <button
             onClick={handleLogout}
             type="button"
@@ -184,9 +256,9 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
             <span className={`text-[10px] font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>Sage</span>
           </Link>
 
-          {/* Tab 4: Learn */}
-          {mobileMain[2] && (() => {
-            const item = mobileMain.find(i => i.href === "/learning") || mobileMain[2];
+          {/* Tab 4: Learning */}
+          {mobileLearningItem && (() => {
+            const item = mobileLearningItem;
             const IconComponent = item.icon;
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -215,7 +287,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
         </div>
       </nav>
 
-      {moreOpen && mobileMore.length > 0 ? (
+      {moreOpen && (mobileMore.length > 0 || role === "student") ? (
         <>
           <div
             className="fixed inset-0 z-40 bg-black/30 md:hidden"
@@ -246,6 +318,23 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   <span className="text-center leading-4">{item.label}</span>
                 </Link>
               ))}
+              {/* Settings in More sheet for students */}
+              {role === "student" && (
+                <Link
+                  href="/settings"
+                  prefetch={false}
+                  onClick={() => setMoreOpen(false)}
+                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                    pathname === "/settings" || pathname.startsWith("/settings/")
+                      ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
+                      : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
+                  }`}
+                  aria-current={pathname === "/settings" ? "page" : undefined}
+                >
+                  <Gear size={24} weight="regular" className="mb-1" />
+                  <span className="text-center leading-4">Settings</span>
+                </Link>
+              )}
             </div>
           </div>
         </>
@@ -270,63 +359,80 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4">
-          {primaryItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch={false}
-                className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 py-3 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-white text-[#00133f] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
-                    : "text-white/90 hover:bg-white/10 hover:text-white"
-                }`}
-                aria-current={pathname === item.href ? "page" : undefined}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`grid h-10 w-10 place-items-center rounded-2xl text-base ${
-                    active ? "bg-[#00133f] text-white" : "bg-white/10 text-white"
-                  }`}
-                >
-                  <item.icon size={20} weight={active ? "fill" : "regular"} />
-                </span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+          {/* Primary nav items */}
+          {primaryItems.map((item) => renderSidebarLink(item))}
+
+          {/* Secondary nav items (student only) with visual separator */}
+          {secondaryItems.length > 0 && (
+            <>
+              <div className="my-3 border-t border-white/10" />
+              {secondaryItems.map((item) => renderSidebarLink(item, true))}
+            </>
+          )}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
+        <div className="relative border-t border-white/10 p-4">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="break-words text-sm font-semibold leading-5">{studentName}</p>
               <p className="text-xs uppercase tracking-[0.18em] text-white/75">{role}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <ThemeToggle />
               <NotificationBell />
+              <button
+                ref={profileButtonRef}
+                onClick={() => setProfileOpen(!profileOpen)}
+                type="button"
+                className="rounded-full border border-white/12 p-1.5 text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="Profile menu"
+                aria-expanded={profileOpen}
+                aria-haspopup="menu"
+              >
+                <UserCircle size={20} weight="bold" />
+              </button>
+            </div>
+          </div>
+
+          {/* Profile dropdown menu */}
+          {profileOpen && (
+            <div
+              ref={profileMenuRef}
+              role="menu"
+              className="absolute bottom-full left-4 right-4 mb-2 rounded-2xl border border-white/10 bg-[rgba(7,23,43,0.98)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+            >
+              <p className="mb-2 break-words px-2 text-sm font-semibold text-white">
+                {studentName}
+              </p>
               {role === "student" && (
                 <Link
                   href="/settings"
                   prefetch={false}
-                  className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-                  aria-label="Settings"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                  role="menuitem"
                 >
-                  <Gear size={16} weight="bold" />
+                  <Gear size={16} weight="regular" />
+                  Settings
                 </Link>
               )}
+              <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
+                <ThemeToggle />
+                <span className="text-sm text-white/75">Theme</span>
+              </div>
               <button
-                onClick={handleLogout}
+                onClick={() => {
+                  setProfileOpen(false);
+                  handleLogout();
+                }}
                 type="button"
-                className="rounded-full border border-white/12 px-3 py-1 text-xs font-semibold text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-                aria-label="Log out"
+                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                role="menuitem"
               >
+                <SignOut size={16} weight="regular" />
                 Log out
               </button>
             </div>
-          </div>
+          )}
         </div>
       </aside>
 

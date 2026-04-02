@@ -10,7 +10,7 @@ export default async function ManagePage() {
     <div className="page-shell">
       <PageIntro
         eyebrow="Teacher tools"
-        title="Manage Content"
+        title="Program Setup"
         description="Manage curriculum, advising, opportunities, events, certification requirements, and live outcome reporting from one place."
       />
       <ManageDashboard canViewAudit={canViewAudit} />

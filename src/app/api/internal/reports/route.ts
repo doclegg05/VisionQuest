@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { parseState } from "@/lib/progression/engine";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { logger } from "@/lib/logger";
-import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -41,28 +39,6 @@ export async function POST(req: Request) {
             select: {
               id: true,
               displayName: true,
-              progression: { select: { state: true } },
-              goals: {
-                where: { status: { in: [...GOAL_PLANNING_STATUSES] } },
-                select: { level: true, status: true },
-              },
-              orientationProgress: {
-                where: { completed: true },
-                select: { itemId: true },
-              },
-              certifications: {
-                where: { certType: "ready-to-work" },
-                select: {
-                  requirements: {
-                    select: {
-                      completed: true,
-                      template: { select: { required: true } },
-                    },
-                  },
-                },
-                take: 1,
-              },
-              resumeData: { select: { id: true } },
             },
           },
         },
@@ -70,39 +46,25 @@ export async function POST(req: Request) {
     },
   });
 
-  const orientationTotal = await prisma.orientationItem.count();
   const reports: { classId: string; className: string; studentCount: number; avgReadiness: number; readinessBuckets: Record<string, number> }[] = [];
 
   for (const cls of classes) {
     const students = cls.enrollments.map((e) => e.student);
     if (students.length === 0) continue;
 
-    let readinessSum = 0;
     const buckets: Record<string, number> = { "0-25": 0, "26-50": 0, "51-75": 0, "76-100": 0 };
 
-    for (const student of students) {
-      const state = student.progression ? parseState(student.progression.state) : null;
-      const bhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-      const certDone = student.certifications[0]
-        ? student.certifications[0].requirements.filter((r) => r.completed && r.template.required).length
-        : 0;
+    const readinessResults = await Promise.all(
+      students.map((student) => fetchStudentReadinessData(student.id)),
+    );
 
-      const readiness = computeReadinessScore({
-        orientationComplete: state?.orientationComplete || false,
-        orientationProgress: { completed: student.orientationProgress.length, total: orientationTotal },
-        completedGoalLevels: state?.completedGoalLevels || [],
-        bhagCompleted,
-        certificationsEarned: certDone,
-        portfolioItemCount: state?.portfolioItemCount || 0,
-        resumeCreated: state?.resumeCreated || !!student.resumeData,
-        portfolioShared: state?.portfolioShared || false,
-        longestStreak: state?.longestStreak || 0,
-      });
-
-      readinessSum += readiness.score;
-      if (readiness.score <= 25) buckets["0-25"]++;
-      else if (readiness.score <= 50) buckets["26-50"]++;
-      else if (readiness.score <= 75) buckets["51-75"]++;
+    let readinessSum = 0;
+    for (const readinessData of readinessResults) {
+      const score = readinessData.readiness.score;
+      readinessSum += score;
+      if (score <= 25) buckets["0-25"]++;
+      else if (score <= 50) buckets["26-50"]++;
+      else if (score <= 75) buckets["51-75"]++;
       else buckets["76-100"]++;
     }
 
