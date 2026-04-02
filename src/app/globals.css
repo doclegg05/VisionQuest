@@ -28,6 +28,8 @@
   --accent-blue: #005d8a;
   --accent-gold: #ad8806;
   --accent-red: #c43c3c;
+  --error: #c43c3c;
+  --success: #2a8a3c;
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
 
@@ -64,6 +66,8 @@
   --accent-blue: #007baf;
   --accent-gold: #d3b257;
   --accent-red: #e05555;
+  --error: #e05555;
+  --success: #37b550;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
 

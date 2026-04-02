@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import OrientationManager from "./OrientationManager";
 import LmsManager from "./LmsManager";
 import CertManager from "./CertManager";
@@ -15,42 +15,34 @@ import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 import { JobConfigSection } from "./JobConfigSection";
 
-type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "job-board" | "reports" | "audit" | "documents";
+type Tab = "orientation" | "learning" | "career" | "reports";
 
 interface ManageDashboardProps {
   canViewAudit: boolean;
 }
 
-const BASE_TABS: Array<{ key: Exclude<Tab, "audit">; label: string }> = [
-  { key: "orientation", label: "Orientation" },
-  { key: "spokes", label: "SPOKES" },
-  { key: "lms", label: "Courses" },
-  { key: "certifications", label: "Certifications" },
-  { key: "advising", label: "Advising" },
-  { key: "career", label: "Career" },
-  { key: "job-board", label: "Job Board" },
-  { key: "reports", label: "Reports" },
-  { key: "documents", label: "Documents" },
+const TABS: Array<{ key: Tab; label: string; icon: string }> = [
+  { key: "orientation", label: "Orientation", icon: "🧭" },
+  { key: "learning", label: "Learning", icon: "📚" },
+  { key: "career", label: "Career", icon: "💼" },
+  { key: "reports", label: "Reports", icon: "📊" },
 ];
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="mb-4 border-b border-gray-200 pb-2 text-lg font-semibold text-gray-800">
+      {children}
+    </h3>
+  );
+}
 
 export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) {
   const [tab, setTab] = useState<Tab>("orientation");
-  const tabs = useMemo<Array<{ key: Tab; label: string }>>(() => {
-    if (!canViewAudit) {
-      return BASE_TABS;
-    }
-
-    return [
-      ...BASE_TABS.slice(0, 7),
-      { key: "audit", label: "Audit Trail" },
-      ...BASE_TABS.slice(7),
-    ];
-  }, [canViewAudit]);
 
   return (
     <div>
       <div className="mb-6 flex gap-1 rounded-xl bg-gray-100 p-1">
-        {tabs.map((tabOption) => (
+        {TABS.map((tabOption) => (
           <button
             key={tabOption.key}
             onClick={() => setTab(tabOption.key)}
@@ -60,28 +52,85 @@ export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) 
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
+            <span className="mr-1.5">{tabOption.icon}</span>
             {tabOption.label}
           </button>
         ))}
       </div>
 
-      {tab === "orientation" && <OrientationManager />}
-      {tab === "spokes" && <SpokesManager />}
-      {tab === "lms" && <LmsManager />}
-      {tab === "certifications" && <CertManager />}
-      {tab === "advising" && <AdvisingManager />}
-      {tab === "career" && <CareerManager />}
-      {tab === "job-board" && <JobConfigSection />}
-      {tab === "reports" && (
+      {tab === "orientation" && (
         <div className="space-y-8">
-          <GrantKpiReport />
-          <OutcomesReport />
-          <SpokesReport />
-          <AcademicKpiReport />
+          <section>
+            <SectionHeading>Orientation</SectionHeading>
+            <OrientationManager />
+          </section>
+          <section>
+            <SectionHeading>SPOKES</SectionHeading>
+            <SpokesManager />
+          </section>
         </div>
       )}
-      {canViewAudit && tab === "audit" && <AuditTrail />}
-      {tab === "documents" && <DocumentBrowser />}
+
+      {tab === "learning" && (
+        <div className="space-y-8">
+          <section>
+            <SectionHeading>Courses</SectionHeading>
+            <LmsManager />
+          </section>
+          <section>
+            <SectionHeading>Certifications</SectionHeading>
+            <CertManager />
+          </section>
+          <section>
+            <SectionHeading>Documents</SectionHeading>
+            <DocumentBrowser />
+          </section>
+        </div>
+      )}
+
+      {tab === "career" && (
+        <div className="space-y-8">
+          <section>
+            <SectionHeading>Career</SectionHeading>
+            <CareerManager />
+          </section>
+          <section>
+            <SectionHeading>Advising</SectionHeading>
+            <AdvisingManager />
+          </section>
+          <section>
+            <SectionHeading>Job Board</SectionHeading>
+            <JobConfigSection />
+          </section>
+        </div>
+      )}
+
+      {tab === "reports" && (
+        <div className="space-y-8">
+          <section>
+            <SectionHeading>Outcomes Report</SectionHeading>
+            <OutcomesReport />
+          </section>
+          <section>
+            <SectionHeading>SPOKES Report</SectionHeading>
+            <SpokesReport />
+          </section>
+          <section>
+            <SectionHeading>Academic KPI Report</SectionHeading>
+            <AcademicKpiReport />
+          </section>
+          <section>
+            <SectionHeading>Grant KPI Report</SectionHeading>
+            <GrantKpiReport />
+          </section>
+          {canViewAudit && (
+            <section>
+              <SectionHeading>Audit Trail</SectionHeading>
+              <AuditTrail />
+            </section>
+          )}
+        </div>
+      )}
     </div>
   );
 }

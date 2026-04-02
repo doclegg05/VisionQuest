@@ -21,7 +21,25 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "X-XSS-Protection", value: "0" },
-          // CSP is now set dynamically in middleware.ts with per-request nonces
+          // Static CSP — nonce-based CSP requires middleware which is blocked
+          // by Turbopack + standalone mode (no middleware.js generated).
+          // CSRF protection remains via src/proxy.ts Origin header validation.
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",
+              "connect-src 'self' https://generativelanguage.googleapis.com https://*.ingest.sentry.io",
+              "frame-src 'none'",
+              "object-src 'none'",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join("; "),
+          },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",

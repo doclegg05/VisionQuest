@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 
 interface CredlyBadge {
   id: string;
@@ -18,6 +17,10 @@ export default function CredlyBadges() {
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Self-configuration state
+  const [inputValue, setInputValue] = useState("");
+  const [connectStatus, setConnectStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+
   useEffect(() => {
     fetch("/api/credly/badges")
       .then((res) => res.json())
@@ -28,6 +31,39 @@ export default function CredlyBadges() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const handleConnect = async () => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+
+    setConnectStatus("saving");
+    try {
+      const res = await fetch("/api/settings/credly", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credlyUsername: trimmed }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { credlyUsername: string };
+        setUsername(data.credlyUsername);
+        setInputValue("");
+        setConnectStatus("success");
+        setTimeout(() => setConnectStatus("idle"), 3000);
+
+        // Refetch badges now that the username is saved
+        fetch("/api/credly/badges")
+          .then((r) => r.json())
+          .then((badgeData) => {
+            setBadges(badgeData.badges || []);
+          })
+          .catch(() => {});
+      } else {
+        setConnectStatus("error");
+      }
+    } catch {
+      setConnectStatus("error");
+    }
+  };
 
   if (loading) return null;
 
@@ -62,8 +98,8 @@ export default function CredlyBadges() {
             },
             {
               step: "4",
-              title: "Connect to VisionQuest",
-              desc: "Go to Settings, paste your Credly profile URL or username, and click Connect.",
+              title: "Connect below",
+              desc: "Paste your Credly profile URL or username below and click Connect.",
             },
           ].map((item) => (
             <div key={item.step} className="rounded-xl border border-[var(--border)] bg-white/60 p-4">
@@ -78,10 +114,43 @@ export default function CredlyBadges() {
           ))}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Link href="/settings" className="primary-button px-5 py-2.5 text-sm">
-            Connect Credly in Settings
-          </Link>
+        <div className="mt-5 rounded-xl border border-[var(--border)] bg-white/60 p-4">
+          <label htmlFor="credly-username" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+            Credly username or profile URL
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              id="credly-username"
+              type="text"
+              placeholder="e.g., jane-doe or https://www.credly.com/users/jane-doe"
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                setConnectStatus("idle");
+              }}
+              className="field flex-1 px-4 py-3 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void handleConnect()}
+              disabled={!inputValue.trim() || connectStatus === "saving"}
+              className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {connectStatus === "saving" ? "Connecting..." : "Connect Credly"}
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
+            Go to credly.com, click your name in the top-right, then &quot;View Profile.&quot; Copy the URL — it should look like credly.com/users/your-name.
+          </p>
+          {connectStatus === "success" && (
+            <p className="mt-2 text-sm text-emerald-600">Credly profile connected!</p>
+          )}
+          {connectStatus === "error" && (
+            <p className="mt-2 text-sm text-red-600">Could not connect your Credly profile. Please check the username and try again.</p>
+          )}
+        </div>
+
+        <div className="mt-3">
           <a
             href="https://www.credly.com"
             target="_blank"

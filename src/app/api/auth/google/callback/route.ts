@@ -9,8 +9,13 @@ import { logger } from "@/lib/logger";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
-function resolveGoogleRedirectUri(req: NextRequest) {
-  return process.env.GOOGLE_REDIRECT_URI || new URL("/api/auth/google/callback", req.url).toString();
+function resolveGoogleRedirectUri(req: NextRequest): string {
+  const envUri = process.env.GOOGLE_REDIRECT_URI;
+  if (envUri) return envUri;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("GOOGLE_REDIRECT_URI must be set in production");
+  }
+  return new URL("/api/auth/google/callback", req.url).toString();
 }
 
 interface GoogleTokenResponse {

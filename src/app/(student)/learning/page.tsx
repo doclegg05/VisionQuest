@@ -1,5 +1,6 @@
 import CertTracker from "@/components/certifications/CertTracker";
 import CredlyBadges from "@/components/certifications/CredlyBadges";
+import CredlyConnect from "@/components/certifications/CredlyConnect";
 import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
 import { LearningPathway, LearningPathwayEmpty } from "@/components/career/LearningPathway";
 import CoursesHub from "@/components/lms/CoursesHub";
@@ -60,7 +61,10 @@ export default async function LearningPage() {
             Track badge visibility and required certification steps without switching to a second tab.
           </p>
         </div>
-        <CredlyBadges />
+        <CredlyConnect />
+        <div className="mt-4">
+          <CredlyBadges />
+        </div>
         <div className="mt-4">
           <CertTracker />
         </div>

@@ -29,7 +29,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     !student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive;
 
   if (isOAuthOnly || isInvalidCredentials) {
-    logAuditEvent({
+    await logAuditEvent({
       actorId: isOAuthOnly ? student.id : null,
       actorRole: isOAuthOnly ? student.role : null,
       action: isOAuthOnly ? "auth.login_failed_oauth" : "auth.login_failed",

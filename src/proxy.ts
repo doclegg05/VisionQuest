@@ -3,6 +3,10 @@ import { isAuthorizedInternalRequest, isUrlHostMatch } from "@/lib/csrf";
 
 const isProduction = process.env.NODE_ENV === "production";
 
+// NOTE: A static fallback CSP is defined in next.config.ts headers().
+// When this proxy is wired as middleware.ts, remove the static CSP
+// from next.config.ts to avoid dual-header conflicts.
+
 /**
  * Combined proxy handling:
  * 1. CSRF protection via Origin header validation

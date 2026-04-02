@@ -21,10 +21,6 @@ export default function SettingsPage() {
   const [recoveryStatus, setRecoveryStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [recoveryError, setRecoveryError] = useState("");
 
-  const [credlyUsername, setCredlyUsername] = useState("");
-  const [credlySaved, setCredlySaved] = useState(false);
-  const [credlyStatus, setCredlyStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
-
   // Notification preferences state
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [smsEnabled, setSmsEnabled] = useState(false);
@@ -37,21 +33,15 @@ export default function SettingsPage() {
     Promise.all([
       fetch("/api/settings/api-key").then((response) => response.json()),
       fetch("/api/settings/security-questions").then((response) => response.json()),
-      fetch("/api/settings/credly").then((response) => response.json()),
       fetch("/api/notifications/preferences").then((response) => response.json()),
     ])
-      .then(([apiKeyData, recoveryData, credlyData, notifData]) => {
+      .then(([apiKeyData, recoveryData, notifData]) => {
         setHasKey(apiKeyData.hasKey);
         setKeyHint(apiKeyData.keyHint);
         setPlatformKeyConfigured(Boolean(apiKeyData.platformKeyConfigured));
         if (apiKeyData.hasKey || apiKeyData.platformKeyConfigured) setShowTutorial(false);
 
         setRecoveryConfigured(Boolean(recoveryData.configured));
-
-        if (credlyData.credlyUsername) {
-          setCredlyUsername(credlyData.credlyUsername);
-          setCredlySaved(true);
-        }
 
         if (notifData) {
           setEmailEnabled(Boolean(notifData.email?.enabled));
@@ -487,82 +477,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Credly Badge Integration */}
-      <div className="surface-section mt-6 p-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Digital credentials</p>
-            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-              Credly Badges
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
-              Connect your Credly profile to display your earned certification badges on VisionQuest.
-              Certiport badges (IC3, MOS, QuickBooks, IT Specialist) are issued through Credly automatically when you pass an exam.
-            </p>
-          </div>
-          {credlySaved && (
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-              Connected
-            </span>
-          )}
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <label htmlFor="credly-username" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-              Credly username or profile URL
-            </label>
-            <input
-              id="credly-username"
-              type="text"
-              placeholder="e.g., jane-doe or https://www.credly.com/users/jane-doe"
-              value={credlyUsername}
-              onChange={(e) => {
-                setCredlyUsername(e.target.value);
-                setCredlyStatus("idle");
-              }}
-              className="field px-4 py-3 text-sm"
-            />
-            <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
-              Go to credly.com, click your name in the top-right, then &quot;View Profile.&quot; Copy the URL — it should look like credly.com/users/your-name.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={async () => {
-                setCredlyStatus("saving");
-                try {
-                  const res = await fetch("/api/settings/credly", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ credlyUsername }),
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    setCredlyUsername(data.credlyUsername);
-                    setCredlySaved(true);
-                    setCredlyStatus("success");
-                    setTimeout(() => setCredlyStatus("idle"), 3000);
-                  } else {
-                    setCredlyStatus("error");
-                  }
-                } catch {
-                  setCredlyStatus("error");
-                }
-              }}
-              disabled={!credlyUsername.trim() || credlyStatus === "saving"}
-              className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {credlyStatus === "saving" ? "Connecting..." : credlySaved ? "Update" : "Connect Credly"}
-            </button>
-            {credlyStatus === "success" && (
-              <p className="text-sm text-emerald-600">Credly profile connected!</p>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
