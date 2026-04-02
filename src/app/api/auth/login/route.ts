@@ -22,34 +22,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
     : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
 
-  // OAuth-only account: no password set, guide user to Google sign-in
-  if (student && !student.passwordHash && student.authProvider === "google") {
-    logAuditEvent({
-      actorId: student.id,
-      actorRole: student.role,
-      action: "auth.login_failed_oauth",
-      targetType: "student",
-      targetId: student.id,
-      summary: `Password login attempted for Google OAuth account "${login}".`,
-      metadata: { ip },
-    });
-    return NextResponse.json(
-      { error: "This account uses Google sign-in. Please use the Google login button." },
-      { status: 401 }
-    );
-  }
+  // Consolidate all failure cases into a single generic response to prevent account enumeration.
+  // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
+  const isOAuthOnly = student && !student.passwordHash && student.authProvider === "google";
+  const isInvalidCredentials =
+    !student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive;
 
-  if (!student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive) {
-    const resp = NextResponse.json({ error: "Invalid student ID or password." }, { status: 401 });
+  if (isOAuthOnly || isInvalidCredentials) {
     logAuditEvent({
-      actorId: null,
-      actorRole: null,
-      action: "auth.login_failed",
+      actorId: isOAuthOnly ? student.id : null,
+      actorRole: isOAuthOnly ? student.role : null,
+      action: isOAuthOnly ? "auth.login_failed_oauth" : "auth.login_failed",
       targetType: "student",
+      targetId: isOAuthOnly ? student.id : undefined,
       summary: `Failed login attempt for "${login}".`,
       metadata: { ip },
     });
-    return resp;
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);
