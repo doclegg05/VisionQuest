@@ -42,7 +42,13 @@ export const PATCH = withAuth(async (
     throw notFound("Goal not found.");
   }
 
-  const updates: { content?: string; status?: string } = {};
+  const updates: {
+    content?: string;
+    status?: string;
+    confirmedAt?: Date;
+    confirmedBy?: string;
+    lastReviewedAt?: Date;
+  } = {};
 
   if ("content" in body) {
     const content = typeof body.content === "string" ? body.content.trim() : "";
@@ -65,6 +71,21 @@ export const PATCH = withAuth(async (
     if (status !== goal.status) {
       updates.status = status;
     }
+  }
+
+  // Handle confirmation: when status changes to "confirmed", set confirmedAt/By
+  if (updates.status === "confirmed") {
+    const CONFIRMABLE_FROM = ["active", "in_progress"];
+    if (!CONFIRMABLE_FROM.includes(goal.status)) {
+      throw badRequest(`Cannot confirm a goal with status '${goal.status}'. Only active or in-progress goals can be confirmed.`);
+    }
+    updates.confirmedAt = new Date();
+    updates.confirmedBy = session.id;
+  }
+
+  // Handle review: when "reviewed" flag is passed, update lastReviewedAt
+  if ("reviewed" in body && body.reviewed === true) {
+    updates.lastReviewedAt = new Date();
   }
 
   if (Object.keys(updates).length === 0) {
