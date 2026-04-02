@@ -71,9 +71,15 @@ Read when deciding what to build, cut, simplify, or automate.
 | 2026-03-13 | Gemini 2.5-flash with model-level systemInstruction | 2.0-flash retired; chat-level systemInstruction breaks streaming |
 | 2026-03-13 | Separate /teacher-register page | Clear UX separation, requires TEACHER_KEY for authorization |
 | 2026-04-01 | Product docs consolidated into PRODUCT_GUIDE + PRODUCT_DECISIONS | Resolves conflicts — Vision Board, Files, Resources retained |
+| 2026-04-01 | StudentDetail split into 4-tab layout | 2043→472 line parent; tabs: Overview, Goals & Plan, Progress, Operations |
+| 2026-04-01 | Intervention queue as primary teacher dashboard | Urgency-scored student list above ClassOverview |
+| 2026-04-01 | Goal confirmation model added | `confirmed` status, `confirmedAt`, `confirmedBy`, `lastReviewedAt` fields on Goal |
+| 2026-04-01 | Unified readiness computation | Single `fetchStudentReadinessData()` used by all 6 consumers |
+| 2026-04-01 | CSP headers with nonce-based scripts/styles | Hardened via `src/proxy.ts`; Gemini, Credly, Sentry, Google Fonts whitelisted |
 
 ## Known Issues
 - Free tier Render instances sleep after inactivity (30-60s cold start)
-- ~~OAuth users get random password hash~~ — Fixed (2026-04-01): passwordHash is now null for OAuth users; login route returns a clear Google sign-in prompt
-- No CSP headers configured yet (could add with nonces for Next.js compat)
+- ~~OAuth users get random password hash~~ — Fixed (2026-04-01): passwordHash is now null for OAuth users
+- ~~No CSP headers configured~~ — Fixed (2026-04-01): nonce-based CSP in `src/proxy.ts`
 - docs-upload/sage-context/ is intended for RAG grounding documents but is not yet populated or integrated into Sage AI
+- Render free tier may not execute cron jobs (3 declared in render.yaml — verify)
