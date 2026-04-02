@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Fire,
@@ -13,22 +12,8 @@ import {
   Briefcase,
   ClipboardText,
   Certificate,
-  UserCircle,
-  MapTrifold,
 } from "@phosphor-icons/react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
-import StreakCalendar from "@/components/ui/StreakCalendar";
-import { MoodSparkline } from "@/components/progression/MoodSparkline";
-import { CoachingArcBar } from "@/components/progression/CoachingArcBar";
-import { JobBoardWidget } from "@/components/jobs/JobBoardWidget";
-import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
-
-interface MoodEntry {
-  id: string;
-  score: number;
-  context: string | null;
-  extractedAt: string;
-}
 
 interface DashboardClientProps {
   studentName: string;
@@ -59,41 +44,13 @@ interface DashboardClientProps {
   }[];
   alertCount: number;
   lastLevelUp: { level: number; at: string; reason: string } | null;
-  xp: number;
   hasGoals: boolean;
   orientationComplete: boolean;
   certificationsStarted: number;
   platformsVisited: number;
   resumeCreated: boolean;
   orientationProgress: { completed: number; total: number };
-  goalSuggestions: string[];
-  readinessScore: number;
-  readinessBreakdown: ReadinessBreakdown;
-  activityDays: Record<string, number>;
-  careerDiscoveryComplete?: boolean;
-  coachingArc?: { weekNumber: number; totalWeeks: number } | null;
-  pathway?: {
-    clusterId: string;
-    clusterName: string;
-    completedCount: number;
-    totalCount: number;
-    currentStepName: string | null;
-  } | null;
-  jobBoardData?: {
-    jobs: Array<{
-      id: string;
-      title: string;
-      company: string;
-      location: string;
-      salary: string | null;
-      matchScore: number;
-      matchLabel: "Strong match" | "Good match" | null;
-      clusters: string[];
-      savedStatus: string | null;
-      url: string;
-    }>;
-    hasDiscovery: boolean;
-  };
+  incompleteOrientationItems: { id: string; label: string }[];
 }
 
 export default function DashboardClient({
@@ -107,37 +64,14 @@ export default function DashboardClient({
   tasks,
   alertCount,
   lastLevelUp,
-  xp: _xp,
   hasGoals,
   orientationComplete,
   certificationsStarted,
   platformsVisited,
   resumeCreated,
   orientationProgress,
-  goalSuggestions,
-  readinessScore,
-  readinessBreakdown: _readinessBreakdown,
-  activityDays,
-  careerDiscoveryComplete,
-  coachingArc,
-  pathway,
-  jobBoardData,
+  incompleteOrientationItems,
 }: DashboardClientProps) {
-  const [moodEntries, setMoodEntries] = useState<MoodEntry[]>([]);
-
-  useEffect(() => {
-    fetch("/api/mood")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { entries: MoodEntry[] } | null) => {
-        if (data?.entries) {
-          setMoodEntries(data.entries);
-        }
-      })
-      .catch(() => {
-        // Non-critical — fail silently
-      });
-  }, []);
-
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -183,20 +117,19 @@ export default function DashboardClient({
               icon: ChatCircle,
             };
 
-  // Suggested actions (context-aware pills)
+  // Suggested actions (context-aware pills) — merged into "What's Next" section
   const actions: { label: string; href: string; icon: typeof Target }[] = [];
   if (!orientationComplete) actions.push({ label: "Orientation", href: "/orientation", icon: ClipboardText });
   if (!hasGoals) actions.push({ label: "Set Goals", href: "/goals", icon: Target });
   if (certificationsStarted === 0) actions.push({ label: "Certifications", href: "/learning", icon: Certificate });
   if (platformsVisited === 0) actions.push({ label: "Learning", href: "/learning", icon: BookOpen });
   if (!resumeCreated) actions.push({ label: "Resume", href: "/portfolio", icon: Briefcase });
-  if (goalSuggestions.length > 0) actions.push({ label: "Career", href: "/career", icon: Target });
 
   const NextStepIcon = nextStep.icon;
 
   return (
     <div className="space-y-4">
-      {/* 1. Hero Banner */}
+      {/* Hero Banner (simplified — no XP bar) */}
       <AnimatedSection>
         <div className="page-hero">
           <div className="flex-1">
@@ -206,228 +139,158 @@ export default function DashboardClient({
             <h1 className="page-title">
               Welcome back, {studentName}
             </h1>
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/82">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-                <Fire size={16} weight="fill" className="animate-float text-orange-400" />
-                {currentStreak} day streak
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
-                <Star size={16} weight="fill" className="text-[var(--accent-gold)]" />
-                {achievements.length} achievements
-              </span>
-            </div>
-            <div className="mt-5">
+            <div className="mt-4">
               <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
                 <ChatCircle size={18} weight="fill" />
                 Open Sage
               </Link>
             </div>
           </div>
-          {/* Readiness ring */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="relative h-[72px] w-[72px]">
-              <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
-                <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
-                <circle
-                  cx="18" cy="18" r="14" fill="none" stroke="#37b550" strokeWidth="2.5"
-                  strokeDasharray={`${readinessScore} 100`} strokeLinecap="round"
-                  className="transition-all"
-                  style={{ animationName: "progress-fill", animationDuration: "var(--duration-slow)", animationTimingFunction: "var(--ease-spring)", animationFillMode: "both" }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center text-base font-bold text-white">
-                {readinessScore}%
-              </div>
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.15em] text-white/50">Ready</span>
-          </div>
-          {/* XP bar inside hero */}
-          <div className="w-full">
-            <div className="flex items-center justify-between text-xs text-white/50">
-              <span>{xpProgress.current} / {xpProgress.nextTarget} XP</span>
-              <span>Level {level + 1}</span>
-            </div>
-            <div className="mt-1 h-1.5 rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-green)]"
-                style={{ width: `${xpProgress.ratio * 100}%`, animationName: "progress-fill", animationDuration: "var(--duration-slow)", animationTimingFunction: "var(--ease-spring)", animationFillMode: "both" }}
-              />
-            </div>
-          </div>
         </div>
       </AnimatedSection>
 
-      {/* Coaching Arc Progress Bar */}
-      {coachingArc && (
-        <AnimatedSection delay={0.08}>
-          <CoachingArcBar
-            currentWeek={coachingArc.weekNumber}
-            totalWeeks={coachingArc.totalWeeks}
-          />
-        </AnimatedSection>
-      )}
+      {/* ── Section 1: Mountain Progress ── rendered in page.tsx above this component */}
 
-      {/* Career DNA card */}
-      {careerDiscoveryComplete && (
-        <AnimatedSection delay={0.08}>
-          <div className="surface-section p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-green)]">
-                  Career DNA
-                </p>
-                <p className="mt-1 font-semibold text-[var(--ink-strong)]">
-                  Your Career DNA is ready
-                </p>
-                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
-                  See your Holland code, transferable skills, work values, and top career clusters.
-                </p>
-              </div>
-              <Link
-                href="/profile"
-                prefetch={false}
-                className="primary-button shrink-0 px-5 py-3 text-sm"
-              >
-                <UserCircle size={18} weight="bold" />
-                View Profile
-              </Link>
-            </div>
-          </div>
-        </AnimatedSection>
-      )}
-
-      {/* Pathway / Roadmap card */}
-      {pathway && (
-        <AnimatedSection delay={0.08}>
-          <div className="surface-section p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-green)]">
-                  <MapTrifold size={14} weight="bold" className="mr-1 inline-block" />
-                  Your Roadmap
-                </p>
-                <p className="mt-1 font-semibold text-[var(--ink-strong)]">
-                  {pathway.clusterName}
-                </p>
-                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
-                  {pathway.completedCount}/{pathway.totalCount} steps complete
-                  {pathway.currentStepName && (
-                    <> &middot; Next: <span className="font-medium text-[var(--ink-strong)]">{pathway.currentStepName}</span></>
-                  )}
-                </p>
-              </div>
-              <Link
-                href="/learning"
-                prefetch={false}
-                className="shrink-0 text-sm font-semibold text-[var(--accent-green)]"
-              >
-                View full roadmap
-              </Link>
-            </div>
-          </div>
-        </AnimatedSection>
-      )}
-
-      {/* 2. Next Step Card */}
+      {/* ── Section 2: What's Next ── */}
       <AnimatedSection delay={0.12}>
-        <Link href={nextStep.href} prefetch={false} className="surface-section flex items-center gap-4 p-5 transition-transform hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-green)] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)]">
-            <NextStepIcon size={22} weight="bold" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Your Next Step</p>
-            <p className="mt-0.5 font-display text-lg font-bold text-[var(--ink-strong)]">{nextStep.label}</p>
-            <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
-          </div>
-          <ArrowRight size={20} weight="bold" className="shrink-0 text-[var(--accent-green)]" />
-        </Link>
+        <div className="surface-section p-5">
+          <h2 className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+            What&apos;s Next
+          </h2>
+
+          {/* Primary next step */}
+          <Link href={nextStep.href} prefetch={false} className="flex items-center gap-4 rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4 transition-transform hover:-translate-y-0.5 hover:shadow-lg">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-green)] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)]">
+              <NextStepIcon size={22} weight="bold" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg font-bold text-[var(--ink-strong)]">{nextStep.label}</p>
+              <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
+            </div>
+            <ArrowRight size={20} weight="bold" className="shrink-0 text-[var(--accent-green)]" />
+          </Link>
+
+          {/* Incomplete orientation items */}
+          {!orientationComplete && incompleteOrientationItems.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Orientation steps remaining
+              </p>
+              {incompleteOrientationItems.map((item) => (
+                <Link
+                  key={item.id}
+                  href="/orientation"
+                  className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm transition-colors hover:bg-amber-100/50"
+                >
+                  <span className="text-amber-500">○</span>
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Quick action pills */}
+          {actions.length > 0 && (
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {actions.map((action) => {
+                const ActionIcon = action.icon;
+                return (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    prefetch={false}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
+                  >
+                    <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
+                    {action.label}
+                    <ArrowRight size={14} weight="bold" className="text-[var(--ink-faint)]" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </AnimatedSection>
 
-      {/* 3. Suggested Actions — horizontal scroll pills */}
-      {actions.length > 0 && (
-        <AnimatedSection delay={0.24}>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {actions.map((action) => {
-              const ActionIcon = action.icon;
-              return (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  prefetch={false}
-                  className="surface-section inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
-                >
-                  <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
-                  {action.label}
-                  <ArrowRight size={14} weight="bold" className="text-[var(--ink-faint)]" />
-                </Link>
-              );
-            })}
-          </div>
-        </AnimatedSection>
-      )}
+      {/* ── Section 3: Your Progress ── */}
+      <AnimatedSection delay={0.24}>
+        <div className="surface-section p-5">
+          <h2 className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+            Your Progress
+          </h2>
 
-      {/* 4. Progress Section — calendar + achievements */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <AnimatedSection delay={0.36}>
-          <div className="surface-section p-5">
-            <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Activity</h3>
-            <StreakCalendar days={activityDays} />
-            <div className="mt-3 flex items-center gap-3 text-sm text-[var(--ink-muted)]">
-              <Fire size={16} weight="fill" className="text-orange-400" />
-              <span>{currentStreak} day streak</span>
-              <span className="text-[var(--ink-faint)]">&middot;</span>
-              <span>Best: {longestStreak}</span>
+          {/* Stats row */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* XP Level */}
+            <div className="flex items-center gap-2">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-blue)] to-[var(--accent-green)] text-white">
+                <span className="text-sm font-bold">{level}</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Level</p>
+                <div className="mt-0.5 h-1.5 w-24 rounded-full bg-[var(--surface-overlay)]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-green)]"
+                    style={{ width: `${xpProgress.ratio * 100}%` }}
+                  />
+                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--ink-faint)]">{xpProgress.current} / {xpProgress.nextTarget} XP</p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden h-10 w-px bg-[var(--border)] sm:block" />
+
+            {/* Streak */}
+            <div className="flex items-center gap-2">
+              <Fire size={24} weight="fill" className="text-orange-400" />
+              <div>
+                <p className="text-lg font-bold text-[var(--ink-strong)]">{currentStreak}</p>
+                <p className="text-xs text-[var(--ink-muted)]">day streak {longestStreak > currentStreak && <span className="text-[var(--ink-faint)]">&middot; best {longestStreak}</span>}</p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden h-10 w-px bg-[var(--border)] sm:block" />
+
+            {/* Achievement count */}
+            <div className="flex items-center gap-2">
+              <Star size={24} weight="fill" className="text-[var(--accent-gold)]" />
+              <div>
+                <p className="text-lg font-bold text-[var(--ink-strong)]">{achievements.length}</p>
+                <p className="text-xs text-[var(--ink-muted)]">achievements</p>
+              </div>
             </div>
           </div>
-        </AnimatedSection>
 
-        <AnimatedSection delay={0.48}>
-          <div className="surface-section p-5">
-            <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Achievements</h3>
-            {recentAchievements.length > 0 ? (
-              <div className="space-y-2">
-                {recentAchievements.map((a) => (
-                  <div key={a.key} className="flex items-center gap-2.5 text-sm">
-                    <Star size={16} weight="fill" className="shrink-0 text-[var(--accent-gold)]" />
-                    <span className="font-medium text-[var(--ink-strong)]">{a.label}</span>
-                    <span className="text-xs text-[var(--ink-muted)]">{a.desc}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-[var(--ink-muted)]">Complete actions to earn achievements.</p>
-            )}
-            {achievements.length > 3 && (
-              <p className="mt-3 text-xs font-semibold text-[var(--accent-green)]">
-                {achievements.length} total achievements
-              </p>
-            )}
-            {/* Last level up */}
-            {lastLevelUp && (
-              <div className="mt-3 rounded-xl bg-[rgba(15,154,146,0.08)] px-3 py-2 text-xs text-[var(--ink-strong)]">
-                Reached Level {lastLevelUp.level} — {lastLevelUp.reason}
-              </div>
-            )}
-          </div>
-        </AnimatedSection>
-      </div>
+          {/* Recent achievements */}
+          {recentAchievements.length > 0 && (
+            <div className="mt-4 space-y-2 border-t border-[var(--border)] pt-4">
+              {recentAchievements.map((a) => (
+                <div key={a.key} className="flex items-center gap-2.5 text-sm">
+                  <Star size={16} weight="fill" className="shrink-0 text-[var(--accent-gold)]" />
+                  <span className="font-medium text-[var(--ink-strong)]">{a.label}</span>
+                  <span className="text-xs text-[var(--ink-muted)]">{a.desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-      {/* 5. Motivation Trend */}
-      {moodEntries.length > 0 && (
-        <AnimatedSection delay={0.54}>
-          <div className="surface-section p-5">
-            <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Motivation Trend</h3>
-            <MoodSparkline entries={moodEntries} />
-          </div>
-        </AnimatedSection>
-      )}
+          {/* Last level up */}
+          {lastLevelUp && (
+            <div className="mt-3 rounded-xl bg-[rgba(15,154,146,0.08)] px-3 py-2 text-xs text-[var(--ink-strong)]">
+              Reached Level {lastLevelUp.level} — {lastLevelUp.reason}
+            </div>
+          )}
+        </div>
+      </AnimatedSection>
 
-      {/* 6. Advising Card */}
-      <AnimatedSection delay={0.6}>
+      {/* ── Section 4: Advising ── */}
+      <AnimatedSection delay={0.36}>
         <div className="surface-section p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-[var(--ink-muted)]">Advising</h3>
+              <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">Advising</h2>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">
                 Appointments and follow-ups.
               </p>
@@ -498,35 +361,6 @@ export default function DashboardClient({
           </div>
         </div>
       </AnimatedSection>
-
-      {/* 7. Goal Suggestions */}
-      {goalSuggestions.length > 0 && (
-        <AnimatedSection delay={0.72}>
-          <div className="surface-section p-5">
-            <h3 className="mb-3 text-sm font-medium text-[var(--ink-muted)]">Recommended for Your Goals</h3>
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {goalSuggestions.map((suggestion) => (
-                <Link
-                  key={suggestion}
-                  href="/learning"
-                  prefetch={false}
-                  className="shrink-0 rounded-[1rem] border border-[var(--accent-gold)]/20 bg-[var(--surface-raised)] px-4 py-3 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
-                >
-                  <BookOpen size={16} weight="bold" className="mb-1 text-[var(--accent-gold)]" />
-                  <span className="block">{suggestion}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </AnimatedSection>
-      )}
-
-      {/* Job Board Widget */}
-      {jobBoardData && jobBoardData.jobs.length > 0 && (
-        <AnimatedSection>
-          <JobBoardWidget jobs={jobBoardData.jobs} hasDiscovery={jobBoardData.hasDiscovery} />
-        </AnimatedSection>
-      )}
     </div>
   );
 }

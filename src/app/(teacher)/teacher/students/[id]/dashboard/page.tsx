@@ -11,8 +11,6 @@ import {
   parseState,
 } from "@/lib/progression/engine";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { matchGoalsToPlatforms } from "@/lib/spokes/goal-matcher";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import DashboardClient from "@/app/(student)/dashboard/DashboardClient";
 
 export default async function StudentDashboardPreview({
@@ -45,51 +43,41 @@ export default async function StudentDashboardPreview({
     prisma.resumeData.findUnique({ where: { studentId }, select: { id: true } }),
   ]);
 
-  const since28d = new Date();
-  since28d.setDate(since28d.getDate() - 27);
-  since28d.setHours(0, 0, 0, 0);
-
-  const [orientationDoneCount, orientationTotalCount, activityEvents, bhagGoal] = await Promise.all([
+  const [orientationDoneCount, orientationTotalCount, incompleteOrientationItems] = await Promise.all([
     prisma.orientationProgress.count({ where: { studentId, completed: true } }),
     prisma.orientationItem.count(),
-    prisma.progressionEvent.findMany({
-      where: { studentId, occurredAt: { gte: since28d } },
-      select: { occurredAt: true },
-    }),
-    prisma.goal.findFirst({
-      where: { studentId, level: "bhag", status: "completed" },
-      select: { id: true },
+    prisma.orientationItem.findMany({
+      where: {
+        required: true,
+        OR: [
+          {
+            progress: {
+              none: { studentId },
+            },
+          },
+          {
+            progress: {
+              some: { studentId, completed: false },
+            },
+          },
+        ],
+      },
+      select: { id: true, label: true },
+      orderBy: { sortOrder: "asc" },
+      take: 3,
     }),
   ]);
-
-  const activityDays: Record<string, number> = {};
-  for (const event of activityEvents) {
-    const day = event.occurredAt.toISOString().slice(0, 10);
-    activityDays[day] = (activityDays[day] || 0) + 1;
-  }
 
   const state = progression ? parseState(progression.state) : createInitialState();
   if (!state.resumeCreated && resumeData) {
     state.resumeCreated = true;
   }
-  const readiness = computeReadinessScore({
-    ...state,
-    bhagCompleted: !!bhagGoal,
-    orientationProgress: { completed: orientationDoneCount, total: orientationTotalCount },
-  });
   const xpProgress = getXpProgress(state);
   const achievements = getAchievementsWithDefs(state);
 
   const lastLevelUp = state.levelUpHistory?.length > 0
     ? { ...state.levelUpHistory[state.levelUpHistory.length - 1] }
     : null;
-
-  const planningGoals = await prisma.goal.findMany({
-    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
-    select: { content: true },
-  });
-  const goalMatchResult = matchGoalsToPlatforms(planningGoals.map((g) => g.content));
-
 
   return (
     <div className="page-shell">
@@ -142,17 +130,13 @@ export default async function StudentDashboardPreview({
         }))}
         alertCount={alertCount}
         lastLevelUp={lastLevelUp}
-        xp={state.xp}
         hasGoals={goalCount > 0}
         orientationComplete={state.orientationComplete || false}
         certificationsStarted={state.certificationsStarted || 0}
         platformsVisited={state.platformsVisited?.length || 0}
         resumeCreated={state.resumeCreated || false}
         orientationProgress={{ completed: orientationDoneCount, total: orientationTotalCount }}
-        goalSuggestions={goalMatchResult.suggestions}
-        readinessScore={readiness.score}
-        readinessBreakdown={readiness.breakdown}
-        activityDays={activityDays}
+        incompleteOrientationItems={incompleteOrientationItems}
       />
     </div>
   );
