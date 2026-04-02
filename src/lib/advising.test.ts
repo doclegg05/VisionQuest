@@ -201,7 +201,7 @@ test("buildStudentAlertDescriptors adds orientation follow-up alerts from shared
 });
 
 test("buildBookableAdvisorSlots excludes booked slots and sorts the remainder", () => {
-  const now = new Date("2026-03-16T12:00:00.000Z");
+  const now = new Date("2026-03-16T08:00:00.000Z");
   const advisors = buildBookableAdvisorSlots({
     now,
     days: 3,
@@ -226,8 +226,8 @@ test("buildBookableAdvisorSlots excludes booked slots and sorts the remainder", 
     appointments: [
       {
         advisorId: "teacher-1",
-        startsAt: new Date("2026-03-16T13:30:00.000Z"),
-        endsAt: new Date("2026-03-16T14:00:00.000Z"),
+        startsAt: new Date("2026-03-16T09:30:00.000Z"),
+        endsAt: new Date("2026-03-16T10:00:00.000Z"),
         status: "scheduled",
       },
     ],
@@ -238,15 +238,15 @@ test("buildBookableAdvisorSlots excludes booked slots and sorts the remainder", 
   assert.deepEqual(
     advisors[0]?.slots.map((slot) => slot.startsAt),
     [
-      "2026-03-16T13:00:00.000Z",
-      "2026-03-16T14:00:00.000Z",
-      "2026-03-16T14:30:00.000Z",
+      "2026-03-16T09:00:00.000Z",
+      "2026-03-16T10:00:00.000Z",
+      "2026-03-16T10:30:00.000Z",
     ]
   );
 });
 
 test("buildBookableAdvisorSlots respects minimum lead time", () => {
-  const now = new Date("2026-03-16T12:15:00.000Z");
+  const now = new Date("2026-03-16T08:15:00.000Z");
   const advisors = buildBookableAdvisorSlots({
     now,
     days: 1,
@@ -275,9 +275,9 @@ test("buildBookableAdvisorSlots respects minimum lead time", () => {
   assert.deepEqual(
     advisors[0]?.slots.map((slot) => slot.startsAt),
     [
-      "2026-03-16T13:30:00.000Z",
-      "2026-03-16T14:00:00.000Z",
-      "2026-03-16T14:30:00.000Z",
+      "2026-03-16T09:30:00.000Z",
+      "2026-03-16T10:00:00.000Z",
+      "2026-03-16T10:30:00.000Z",
     ]
   );
 });

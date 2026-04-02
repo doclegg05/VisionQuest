@@ -444,19 +444,19 @@ export function timeInputFromMinutes(totalMinutes: number) {
 
 function startOfDay(value: Date) {
   const day = new Date(value);
-  day.setHours(0, 0, 0, 0);
+  day.setUTCHours(0, 0, 0, 0);
   return day;
 }
 
 function addDays(value: Date, amount: number) {
   const day = new Date(value);
-  day.setDate(day.getDate() + amount);
+  day.setUTCDate(day.getUTCDate() + amount);
   return day;
 }
 
 function withMinutes(day: Date, totalMinutes: number) {
   const value = new Date(day);
-  value.setHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
+  value.setUTCHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
   return value;
 }
 
@@ -502,7 +502,7 @@ export function buildBookableAdvisorSlots({
 
     for (let offset = 0; offset < days; offset += 1) {
       const day = addDays(firstDay, offset);
-      if (day.getDay() !== block.weekday) continue;
+      if (day.getUTCDay() !== block.weekday) continue;
 
       for (
         let minute = block.startMinutes;
