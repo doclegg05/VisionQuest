@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { buildManagedStudentWhere } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { computeUrgencyScore } from "@/lib/intervention-scoring";
 import { isGoalStale } from "@/lib/stale-goal-rules";
-import { getCertificationProgress } from "@/lib/certifications";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,20 +97,12 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     },
   });
 
-  // Shared lookups (single queries, not per-student)
-  const [orientationTotal, certTemplates] = await Promise.all([
-    prisma.orientationItem.count(),
-    prisma.certTemplate.findMany({
-      where: { certType: "ready-to-work" },
-      select: { id: true, required: true, needsFile: true, needsVerify: true },
-    }),
-  ]);
+  // Shared lookup for orientation total (used for urgency signals only — readiness uses fetchStudentReadinessData)
+  const orientationTotal = await prisma.orientationItem.count();
 
-  const requiredCertCount = certTemplates.filter((t) => t.required).length;
-
-  // Build queue entries
-  const queue = students
-    .map((s) => {
+  // Build queue entries (fetch readiness per student via shared function)
+  const queueEntries = await Promise.all(
+    students.map(async (s) => {
       // --- Last active date (proxy for last login, no dedicated field on Student) ---
       const lastActiveAt =
         latestDate(
@@ -164,42 +155,8 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         isGoalStale({ level: g.level, status: g.status, updatedAt: g.updatedAt, lastReviewedAt: g.lastReviewedAt }, now),
       ).length;
 
-      // --- Readiness score ---
-      const completedGoalLevels = [
-        ...new Set(s.goals.filter((g) => g.status === "completed").map((g) => g.level)),
-      ];
-      const bhagCompleted = s.goals.some(
-        (g) => g.level === "bhag" && g.status === "completed",
-      );
-
-      let longestStreak = 0;
-      let portfolioShared = false;
-      if (s.progression?.state) {
-        try {
-          const state = JSON.parse(s.progression.state) as Record<string, unknown>;
-          longestStreak = (state.streaks as Record<string, Record<string, number>> | undefined)?.daily?.longest ?? 0;
-          portfolioShared = !!(state.portfolioShared);
-        } catch { /* ignore malformed state */ }
-      }
-
-      const cert = s.certifications[0];
-      const certificationsEarned = cert
-        ? getCertificationProgress(certTemplates, cert.requirements).done
-        : 0;
-
-      const readiness = computeReadinessScore(
-        {
-          orientationComplete,
-          completedGoalLevels,
-          bhagCompleted,
-          certificationsEarned,
-          portfolioItemCount: s.portfolioItems.length,
-          resumeCreated: !!s.resumeData,
-          portfolioShared,
-          longestStreak,
-        },
-        requiredCertCount,
-      );
+      // --- Readiness score (via shared function for consistent scoring) ---
+      const readinessData = await fetchStudentReadinessData(s.id);
 
       const signals = {
         daysSinceLastGoalReview,
@@ -210,7 +167,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         highSeverityAlertCount,
         overdueTaskCount,
         stalledGoalCount,
-        readinessScore: readiness.score,
+        readinessScore: readinessData.readiness.score,
       };
 
       const urgencyScore = computeUrgencyScore(signals);
@@ -222,7 +179,10 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         urgencyScore,
         signals,
       };
-    })
+    }),
+  );
+
+  const queue = queueEntries
     // Filter out students with zero urgency
     .filter((entry) => entry.urgencyScore > 0)
     // Sort highest urgency first

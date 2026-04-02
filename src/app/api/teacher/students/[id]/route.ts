@@ -12,7 +12,7 @@ import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
 import { parseState } from "@/lib/progression/engine";
 import { FORMS } from "@/lib/spokes/forms";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 
 // GET — individual student detail for teacher view
 export const GET = withTeacherAuth(async (
@@ -287,7 +287,7 @@ export const GET = withTeacherAuth(async (
     ...student.formSubmissions.map((s) => s.fileId),
     ...student.formSubmissions.map((s) => s.signatureFileId).filter(Boolean),
   ].filter(Boolean) as string[];
-  const [orientationItems, certTemplates, formFiles] = await Promise.all([
+  const [orientationItems, certTemplates, formFiles, readinessData] = await Promise.all([
     prisma.orientationItem.findMany({
       orderBy: { sortOrder: "asc" },
     }),
@@ -306,11 +306,12 @@ export const GET = withTeacherAuth(async (
           },
         })
       : Promise.resolve([]),
+    fetchStudentReadinessData(id),
   ]);
   const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
 
-  // Parse progression
+  // Parse progression (for xp/level/streaks/achievements display and goal-evidence building)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rawProgression: any = null;
   let parsedProgression = parseState(null);
@@ -323,24 +324,7 @@ export const GET = withTeacherAuth(async (
     } catch { /* ignore */ }
   }
 
-  // Compute readiness score
-  const certDoneCount = student.certifications[0]
-    ? student.certifications[0].requirements.filter((r) => r.completed).length
-    : 0;
-  const bhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-  const readinessResult = computeReadinessScore(
-    {
-      orientationComplete: rawProgression?.orientationComplete ?? false,
-      completedGoalLevels: rawProgression?.completedGoalLevels ?? [],
-      bhagCompleted,
-      certificationsEarned: certDoneCount,
-      portfolioItemCount: rawProgression?.portfolioItemCount ?? student.portfolioItems.length,
-      resumeCreated: rawProgression?.resumeCreated ?? !!student.resumeData,
-      portfolioShared: rawProgression?.portfolioShared ?? false,
-      longestStreak: rawProgression?.streaks?.daily?.longest ?? rawProgression?.longestStreak ?? 0,
-    },
-    certTemplates.filter((t) => t.required).length || 19,
-  );
+  const readinessResult = readinessData.readiness;
 
   // Build conversation summaries (message stats + preview, not full transcripts)
   const conversationSummaries = student.conversations.map((c) => {

@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { goalCountsTowardPlan } from "@/lib/goals";
-import { getCertificationProgress } from "@/lib/certifications";
 
 interface StudentReadiness {
   id: string;
@@ -59,7 +58,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     });
   }
 
-  // Fetch all student data needed for readiness computation
+  // Fetch student identity and goal counts (readiness is fetched via shared function)
   const students = await prisma.student.findMany({
     where: { id: { in: studentIds } },
     select: {
@@ -67,7 +66,6 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       studentId: true,
       displayName: true,
       isActive: true,
-      progression: { select: { state: true } },
       goals: {
         select: {
           id: true,
@@ -76,109 +74,45 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
           createdAt: true,
         },
       },
-      orientationProgress: {
-        where: { completed: true },
-        select: { id: true },
-      },
-      certifications: {
-        select: {
-          status: true,
-          requirements: {
-            select: { templateId: true, completed: true, verifiedBy: true, fileId: true },
-          },
-        },
-      },
-      portfolioItems: { select: { id: true } },
-      resumeData: { select: { id: true } },
     },
     orderBy: { displayName: "asc" },
   });
 
-  // Get orientation total and cert templates for readiness computation
-  const [orientationTotal, certTemplates] = await Promise.all([
-    prisma.orientationItem.count(),
-    prisma.certTemplate.findMany({
-      where: { certType: "ready-to-work" },
-      select: { id: true, required: true, needsFile: true, needsVerify: true },
+  // Compute per-student readiness using shared function
+  const studentResults: StudentReadiness[] = await Promise.all(
+    students.map(async (s) => {
+      const readinessData = await fetchStudentReadinessData(s.id);
+      const { readiness } = readinessData;
+
+      // Goal counts
+      const planningGoals = s.goals.filter((g) => goalCountsTowardPlan(g.status));
+      const completedGoals = s.goals.filter((g) => g.status === "completed");
+      // "confirmed" = goals that count toward the plan
+      const confirmedGoals = planningGoals;
+
+      return {
+        id: s.id,
+        studentId: s.studentId,
+        displayName: s.displayName,
+        isActive: s.isActive,
+        readinessScore: readiness.score,
+        breakdown: {
+          orientation: { score: readiness.breakdown.orientation.score, max: readiness.breakdown.orientation.max },
+          goalPlanning: { score: readiness.breakdown.goalPlanning.score, max: readiness.breakdown.goalPlanning.max },
+          bhagAchieved: { score: readiness.breakdown.bhagAchieved.score, max: readiness.breakdown.bhagAchieved.max },
+          certifications: { score: readiness.breakdown.certifications.score, max: readiness.breakdown.certifications.max },
+          portfolio: { score: readiness.breakdown.portfolio.score, max: readiness.breakdown.portfolio.max },
+          consistency: { score: readiness.breakdown.consistency.score, max: readiness.breakdown.consistency.max },
+        },
+        goals: {
+          total: s.goals.length,
+          active: planningGoals.length,
+          completed: completedGoals.length,
+          confirmed: confirmedGoals.length,
+        },
+      };
     }),
-  ]);
-
-  const requiredCertCount = certTemplates.filter((t) => t.required).length;
-
-  // Compute per-student readiness
-  const studentResults: StudentReadiness[] = students.map((s) => {
-    // Parse progression state for streak data
-    let longestStreak = 0;
-    let portfolioShared = false;
-    if (s.progression?.state) {
-      try {
-        const state = JSON.parse(s.progression.state);
-        longestStreak = state.longestStreak || 0;
-        portfolioShared = !!state.portfolioShared;
-      } catch {
-        /* ignore malformed state */
-      }
-    }
-
-    // Goal counts
-    const planningGoals = s.goals.filter((g) => goalCountsTowardPlan(g.status));
-    const completedGoals = s.goals.filter((g) => g.status === "completed");
-    // "confirmed" = goals with status explicitly set (completed or in_progress with teacher review)
-    // In this context, confirmed means goals that count toward the plan
-    const confirmedGoals = planningGoals;
-
-    // Completed goal levels for readiness
-    const completedGoalLevels: string[] = [];
-    for (const g of completedGoals) {
-      if (!completedGoalLevels.includes(g.level)) {
-        completedGoalLevels.push(g.level);
-      }
-    }
-
-    // Cert progress
-    const cert = s.certifications[0];
-    const certDone = cert
-      ? getCertificationProgress(certTemplates, cert.requirements).done
-      : 0;
-
-    const bhagCompleted = s.goals.some((g) => g.level === "bhag" && g.status === "completed");
-
-    const readiness = computeReadinessScore(
-      {
-        orientationComplete: s.orientationProgress.length >= orientationTotal && orientationTotal > 0,
-        completedGoalLevels,
-        bhagCompleted,
-        certificationsEarned: certDone,
-        portfolioItemCount: s.portfolioItems.length,
-        resumeCreated: !!s.resumeData,
-        portfolioShared,
-        longestStreak,
-      },
-      requiredCertCount,
-    );
-
-    return {
-      id: s.id,
-      studentId: s.studentId,
-      displayName: s.displayName,
-      isActive: s.isActive,
-      readinessScore: readiness.score,
-      breakdown: {
-        orientation: { score: readiness.breakdown.orientation.score, max: readiness.breakdown.orientation.max },
-        goalPlanning: { score: readiness.breakdown.goalPlanning.score, max: readiness.breakdown.goalPlanning.max },
-        bhagAchieved: { score: readiness.breakdown.bhagAchieved.score, max: readiness.breakdown.bhagAchieved.max },
-        certifications: { score: readiness.breakdown.certifications.score, max: readiness.breakdown.certifications.max },
-        portfolio: { score: readiness.breakdown.portfolio.score, max: readiness.breakdown.portfolio.max },
-        consistency: { score: readiness.breakdown.consistency.score, max: readiness.breakdown.consistency.max },
-      },
-      goals: {
-        total: s.goals.length,
-        active: planningGoals.length,
-        completed: completedGoals.length,
-        confirmed: confirmedGoals.length,
-      },
-    };
-  });
+  );
 
   // Summary statistics
   const scores = studentResults.map((s) => s.readinessScore);
