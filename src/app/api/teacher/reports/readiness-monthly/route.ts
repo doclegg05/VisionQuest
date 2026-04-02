@@ -31,22 +31,10 @@ interface StudentReadiness {
 export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? undefined;
-  const month = url.searchParams.get("month"); // e.g. "2026-04"
-
-  // Determine date range for the report
-  let startDate: Date;
-  let endDate: Date;
-
-  if (month && /^\d{4}-\d{2}$/.test(month)) {
-    const [year, mon] = month.split("-").map(Number);
-    startDate = new Date(year, mon - 1, 1);
-    endDate = new Date(year, mon, 1);
-  } else {
-    // Default to current month
-    const now = new Date();
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  }
+  // This report is a point-in-time snapshot of current student readiness,
+  // not a historical report. The month field in the response reflects now.
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   // Get student IDs the teacher manages (respects classroom isolation)
   const studentIds = await listManagedStudentIds(session, {
@@ -56,7 +44,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
 
   if (studentIds.length === 0) {
     return NextResponse.json({
-      month: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}`,
+      month: currentMonth,
       students: [],
       summary: {
         totalStudents: 0,
@@ -125,7 +113,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     if (s.progression?.state) {
       try {
         const state = JSON.parse(s.progression.state);
-        longestStreak = state.streaks?.daily?.longest || 0;
+        longestStreak = state.longestStreak || 0;
         portfolioShared = !!state.portfolioShared;
       } catch {
         /* ignore malformed state */
@@ -141,7 +129,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
 
     // Completed goal levels for readiness
     const completedGoalLevels: string[] = [];
-    for (const g of planningGoals) {
+    for (const g of completedGoals) {
       if (!completedGoalLevels.includes(g.level)) {
         completedGoalLevels.push(g.level);
       }
@@ -209,7 +197,8 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   const totalConfirmed = studentResults.reduce((sum, s) => sum + s.goals.confirmed, 0);
 
   return NextResponse.json({
-    month: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}`,
+    month: currentMonth,
+    snapshotType: "point-in-time",
     students: studentResults,
     summary: {
       totalStudents: studentResults.length,
