@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // Fetch all non-terminal goals with their student ID
     const goals = await prisma.goal.findMany({
       where: {
-        status: { notIn: ["completed", "archived", "cancelled"] },
+        status: { notIn: ["completed", "archived", "cancelled", "abandoned"] },
       },
       select: {
         id: true,
@@ -45,12 +45,11 @@ export async function POST(req: Request) {
         level: true,
         status: true,
         updatedAt: true,
+        lastReviewedAt: true,
       },
     });
 
     // Check each goal against level-aware staleness thresholds.
-    // The Goal model does not have a lastReviewedAt field, so we
-    // pass null and let isGoalStale fall back to updatedAt.
     const staleGoals: Array<{ id: string; studentId: string; level: string; daysSinceUpdate: number }> = [];
 
     for (const goal of goals) {
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
         level: goal.level,
         status: goal.status,
         updatedAt: goal.updatedAt,
-        lastReviewedAt: null,
+        lastReviewedAt: goal.lastReviewedAt,
       };
 
       if (isGoalStale(check, now)) {
@@ -165,8 +164,11 @@ export async function POST(req: Request) {
     logger.error("Stale goal detection failed", { error: message });
 
     return NextResponse.json(
-      { error: "Stale goal detection failed", detail: message },
-      { status: 500 }
+      {
+        error: "Stale goal detection failed",
+        detail: process.env.NODE_ENV === "development" ? message : undefined,
+      },
+      { status: 500 },
     );
   }
 }

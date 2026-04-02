@@ -48,7 +48,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       updatedAt: true,
       progression: { select: { state: true } },
       goals: {
-        select: { level: true, status: true, updatedAt: true },
+        select: { level: true, status: true, updatedAt: true, lastReviewedAt: true },
       },
       orientationProgress: {
         select: { completed: true, completedAt: true },
@@ -128,19 +128,21 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
 
       const daysSinceLastLogin = daysBetween(lastActiveAt, now);
 
-      // --- Last goal review (most recent updatedAt across active goals) ---
+      // --- Last goal review (most recent lastReviewedAt or updatedAt across active goals) ---
       const activeGoals = s.goals.filter(
         (g) => g.status !== "completed" && g.status !== "abandoned",
       );
-      const lastGoalUpdatedAt =
+      const lastGoalReviewedAt =
         activeGoals.length > 0
-          ? activeGoals.reduce<Date>((latest, g) =>
-              g.updatedAt.getTime() > latest.getTime() ? g.updatedAt : latest,
-            activeGoals[0].updatedAt)
+          ? activeGoals.reduce<Date | null>((latest, g) => {
+              const candidate = g.lastReviewedAt ?? g.updatedAt;
+              if (!latest || candidate.getTime() > latest.getTime()) return candidate;
+              return latest;
+            }, null)
           : null;
 
-      const daysSinceLastGoalReview = lastGoalUpdatedAt
-        ? daysBetween(lastGoalUpdatedAt, now)
+      const daysSinceLastGoalReview = lastGoalReviewedAt
+        ? daysBetween(lastGoalReviewedAt, now)
         : 9999;
 
       // --- Orientation signals ---
@@ -159,7 +161,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
 
       // --- Stalled goals (active/in_progress goals with no recent update) ---
       const stalledGoalCount = s.goals.filter((g) =>
-        isGoalStale({ level: g.level, status: g.status, updatedAt: g.updatedAt, lastReviewedAt: null }, now),
+        isGoalStale({ level: g.level, status: g.status, updatedAt: g.updatedAt, lastReviewedAt: g.lastReviewedAt }, now),
       ).length;
 
       // --- Readiness score ---
