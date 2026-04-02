@@ -30,12 +30,14 @@ interface GoalsPlanTabProps {
   data: StudentData;
   dateFormatter: Intl.DateTimeFormat;
   onChanged: () => Promise<void>;
+  onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean }) => Promise<void>;
 }
 
 export default function GoalsPlanTab({
   data,
   dateFormatter,
   onChanged,
+  onGoalAction,
 }: GoalsPlanTabProps) {
   const {
     goals,
@@ -223,6 +225,40 @@ export default function GoalsPlanTab({
           <GoalSupportPlanner goals={goals} goalPlans={goalPlans} onChanged={onChanged} />
         </div>
         <GoalTree goals={goals} />
+
+        {goals.filter(g => g.status === "active" || g.status === "in_progress").length > 0 && (
+          <section className="mt-4 rounded-xl border border-gray-200 bg-white p-5">
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
+              Needs Confirmation
+            </h4>
+            <ul className="space-y-2">
+              {goals
+                .filter(g => g.status === "active" || g.status === "in_progress")
+                .map(goal => (
+                  <li key={goal.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium">{goal.content}</p>
+                      <p className="text-xs text-gray-500">{goal.level} &middot; {goal.status}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => void onGoalAction(goal.id, { confirm: true })}
+                        className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => void onGoalAction(goal.id, { reviewed: true })}
+                        className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-200"
+                      >
+                        Mark Reviewed
+                      </button>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </section>
+        )}
       </div>
 
       {/* Career Discovery */}

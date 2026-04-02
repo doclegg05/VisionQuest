@@ -336,6 +336,20 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   }
 
+  const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean }) => {
+    try {
+      const res = await apiFetch(`/api/teacher/students/${studentId}/goals/${goalId}`, {
+        method: "PATCH",
+        body: JSON.stringify(action),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch (err) {
+      setPanelMessage(err instanceof Error ? err.message : "Could not update the goal.");
+    }
+  };
+
   async function handleReviewForm(submissionId: string, status: "approved" | "rejected") {
     const notes = status === "rejected"
       ? window.prompt("Optional note for the student:", "")
@@ -429,6 +443,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               data={data}
               dateFormatter={dateFormatter}
               onChanged={loadData}
+              onGoalAction={handleGoalAction}
             />
           ),
           progress: (
