@@ -2,13 +2,11 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
-  createInitialState,
   getAchievementsWithDefs,
   getXpProgress,
-  parseState,
 } from "@/lib/progression/engine";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { MountainProgressLazy } from "@/components/ui/MountainProgressLazy";
 import DashboardClient from "./DashboardClient";
 
@@ -18,9 +16,8 @@ export default async function DashboardPage() {
   if (!session) return null;
 
   const now = new Date();
-  const [goalCount, progression, nextAppointment, tasks, alertCount, resumeData] = await Promise.all([
+  const [goalCount, nextAppointment, tasks, alertCount, readinessData, incompleteOrientationItems] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
-    prisma.progression.findUnique({ where: { studentId: session.id } }),
     prisma.appointment.findFirst({
       where: {
         studentId: session.id,
@@ -58,28 +55,7 @@ export default async function DashboardPage() {
         status: "open",
       },
     }),
-    prisma.resumeData.findUnique({
-      where: { studentId: session.id },
-      select: { id: true },
-    }),
-  ]);
-
-  // Redirect brand-new students to the welcome flow
-  if (goalCount === 0 && !progression) {
-    const convCount = await prisma.conversation.count({ where: { studentId: session.id } });
-    if (convCount === 0) {
-      redirect("/welcome");
-    }
-  }
-
-  // Fetch orientation progress for readiness score and incomplete required items
-  const [orientationDoneCount, orientationTotalCount, bhagGoal, incompleteOrientationItems] = await Promise.all([
-    prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
-    prisma.orientationItem.count(),
-    prisma.goal.findFirst({
-      where: { studentId: session.id, level: "bhag", status: "completed" },
-      select: { id: true },
-    }),
+    fetchStudentReadinessData(session.id),
     prisma.orientationItem.findMany({
       where: {
         required: true,
@@ -102,15 +78,15 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  const state = progression ? parseState(progression.state) : createInitialState();
-  if (!state.resumeCreated && resumeData) {
-    state.resumeCreated = true;
+  const { state, readiness, orientationProgress, hasProgressionRecord } = readinessData;
+
+  // Redirect brand-new students to the welcome flow
+  if (goalCount === 0 && !hasProgressionRecord) {
+    const convCount = await prisma.conversation.count({ where: { studentId: session.id } });
+    if (convCount === 0) {
+      redirect("/welcome");
+    }
   }
-  const readiness = computeReadinessScore({
-    ...state,
-    bhagCompleted: !!bhagGoal,
-    orientationProgress: { completed: orientationDoneCount, total: orientationTotalCount },
-  });
   const xpProgress = getXpProgress(state);
   const achievements = getAchievementsWithDefs(state);
 
@@ -155,7 +131,7 @@ export default async function DashboardPage() {
         certificationsStarted={state.certificationsStarted || 0}
         platformsVisited={state.platformsVisited?.length || 0}
         resumeCreated={state.resumeCreated || false}
-        orientationProgress={{ completed: orientationDoneCount, total: orientationTotalCount }}
+        orientationProgress={orientationProgress}
         incompleteOrientationItems={incompleteOrientationItems}
       />
     </div>
