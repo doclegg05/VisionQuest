@@ -7,7 +7,7 @@ describe("getOrientationStepDetail", () => {
     const detail = getOrientationStepDetail("Sign Authorization for Release of Information");
     const formIds = detail.forms.map((form) => form.id);
 
-    assert.deepEqual(formIds, ["auth-release", "dohs-release"]);
+    assert.deepEqual(formIds, ["auth-release", "dohs-release", "ai-data-consent"]);
     assert.ok(detail.note);
   });
 
@@ -29,7 +29,7 @@ describe("getOrientationStepDetail", () => {
     const detail = getOrientationStepDetail("Sign release information");
     const formIds = detail.forms.map((form) => form.id);
 
-    assert.deepEqual(formIds, ["auth-release", "dohs-release"]);
+    assert.deepEqual(formIds, ["auth-release", "dohs-release", "ai-data-consent"]);
   });
 
   it("returns guidance for instructor-led steps with no PDF", () => {
