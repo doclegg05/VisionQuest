@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { badRequest, notFound, withAuth } from "@/lib/api-error";
+import { badRequest, notFound } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
@@ -19,12 +20,8 @@ async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-export const PATCH = withAuth(async (
-  session,
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) => {
-  const { id } = await params;
+export const PATCH = withRegistry("goals.update", async (session, req, ctx, tool) => {
+  const { id } = await ctx.params;
   const body = await readJsonBody(req);
   const goal = await prisma.goal.findFirst({
     where: { id, studentId: session.id },

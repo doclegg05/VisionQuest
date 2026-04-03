@@ -18,11 +18,14 @@ model Student {
   authProvider   String?
   geminiApiKey   String?
   credlyUsername String?
-  role           String   @default("student")
-  isActive       Boolean  @default(true)
-  sessionVersion Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  role           String    @default("student")
+  isActive       Boolean   @default(true)
+  sessionVersion Int       @default(0)
+  mfaSecret      String?   // TOTP secret, encrypted with AES-256-GCM
+  mfaEnabled     Boolean   @default(false)
+  mfaVerifiedAt  DateTime? // When MFA was last verified this session
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   conversations           Conversation[]
   goals                   Goal[]
@@ -1180,5 +1183,53 @@ model SystemConfig {
   updatedAt DateTime @updatedAt
   updatedBy String?
 
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// RBAC — Role-Based Access Control
+// Three-table design: Role → RolePermission → Permission
+// Replaces hardcoded role-string comparisons with granular, runtime-editable
+// permission checks backed by the database.
+// =============================================================================
+
+model Role {
+  id             String   @id @default(cuid())
+  name           String   @unique // "student", "teacher", "admin", "program_admin", "observer"
+  displayName    String
+  hierarchyLevel Int // 1=highest trust (super_admin), 4=lowest (student)
+  description    String?
+  isSystem       Boolean  @default(false) // System roles can't be deleted
+  createdAt      DateTime @default(now())
+
+  permissions RolePermission[]
+
+  @@schema("visionquest")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique // "goals.create", "goals.read.own", "sage.chat", etc.
+  namespace   String // "goals", "sage", "admin", etc.
+  displayName String
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@index([namespace])
+  @@schema("visionquest")
+}
+
+model RolePermission {
+  id           String  @id @default(cuid())
+  roleId       String
+  permissionId String
+  granted      Boolean @default(true) // true=allowed, false=explicitly denied
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
   @@schema("visionquest")
 }

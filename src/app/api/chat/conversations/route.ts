@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { withAuth } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 
-export const GET = withAuth(async (session) => {
+export const GET = withRegistry("sage.conversations", async (session, req, ctx, tool) => {
   const conversations = await prisma.conversation.findMany({
     where: { studentId: session.id },
     orderBy: { updatedAt: "desc" },

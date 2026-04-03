@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { badRequest, withAuth } from "@/lib/api-error";
+import { badRequest } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { cached, invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
@@ -32,7 +33,7 @@ async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-export const GET = withAuth(async (session, req: Request) => {
+export const GET = withRegistry("goals.list", async (session, req, ctx, tool) => {
   const statusFilters = parseGoalStatusFilters(new URL(req.url));
   const allGoals = await cached(`goals:${session.id}`, 30, () =>
     prisma.goal.findMany({
@@ -48,7 +49,7 @@ export const GET = withAuth(async (session, req: Request) => {
   return NextResponse.json({ goals });
 });
 
-export const POST = withAuth(async (session, req: Request) => {
+export const POST = withRegistry("goals.create", async (session, req, ctx, tool) => {
   const body = await readJsonBody(req);
   const rawLevel = typeof body.level === "string" ? body.level.trim().toLowerCase() : "";
   const content = typeof body.content === "string" ? body.content.trim() : "";

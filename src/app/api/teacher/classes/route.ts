@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
+import { badRequest, conflict } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { listManagedClasses, normalizeClassCode } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
@@ -10,7 +11,7 @@ function parseOptionalDate(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export const GET = withTeacherAuth(async (session, req: Request) => {
+export const GET = withRegistry("classes.list", async (session, req, ctx, tool) => {
   const { searchParams } = new URL(req.url);
   const includeArchived = searchParams.get("includeArchived") === "true";
 
@@ -79,7 +80,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   });
 });
 
-export const POST = withTeacherAuth(async (session, req: Request) => {
+export const POST = withRegistry("classes.create", async (session, req, ctx, tool) => {
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = normalizeClassCode(typeof body.code === "string" && body.code.trim() ? body.code : name);

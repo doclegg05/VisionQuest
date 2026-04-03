@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { withTeacherAuth } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { getTeacherDashboardPage } from "@/lib/teacher/dashboard";
 
 // GET — class overview: all students with cross-module progress
-export const GET = withTeacherAuth(async (session, req: Request) => {
+export const GET = withRegistry("classes.dashboard", async (session, req, ctx, tool) => {
   const url = new URL(req.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
   const limit = parseInt(url.searchParams.get("limit") || "50", 10);
