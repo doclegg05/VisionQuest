@@ -1,13 +1,10 @@
-import { useState } from "react";
 import GoalTree from "../GoalTree";
 import GoalSupportPlanner from "../GoalSupportPlanner";
 import GoalPathwayAssigner from "../GoalPathwayAssigner";
 import {
   GOAL_RESOURCE_TYPE_LABELS,
-  type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
 import type {
-  GoalData,
   GoalEvidenceData,
   ReviewQueueItemData,
   StudentData,

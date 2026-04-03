@@ -91,7 +91,7 @@ export interface DashboardAlert {
   };
 }
 
-export interface ReviewQueueItem extends DashboardAlert {}
+export type ReviewQueueItem = DashboardAlert;
 
 export interface UpcomingAppointment {
   id: string;
