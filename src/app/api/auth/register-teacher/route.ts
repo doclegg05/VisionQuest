@@ -61,8 +61,39 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const existing = await prisma.student.findFirst({
     where: { OR: [{ studentId }, { email }] },
-    select: { studentId: true, email: true },
+    select: { id: true, studentId: true, email: true, role: true, sessionVersion: true, displayName: true },
   });
+
+  // Admin registration can promote an existing teacher account
+  if (existing && existing.email === email && role === "admin" && existing.role === "teacher") {
+    const { hash } = hashPassword(password);
+    const promoted = await prisma.student.update({
+      where: { id: existing.id },
+      data: { role: "admin", passwordHash: hash, displayName },
+    });
+
+    await setSessionCookie(promoted.id, promoted.role, existing.sessionVersion);
+
+    await logAuditEvent({
+      actorId: promoted.id,
+      actorRole: promoted.role,
+      action: "auth.promote_to_admin",
+      targetType: "student",
+      targetId: promoted.id,
+      summary: `Teacher promoted to admin: ${promoted.displayName} (${email}).`,
+      metadata: { ip },
+    });
+
+    return NextResponse.json({
+      student: {
+        id: promoted.id,
+        studentId: promoted.studentId,
+        displayName: promoted.displayName,
+        role: promoted.role,
+      },
+    });
+  }
+
   if (existing) {
     if (existing.email === email) {
       return NextResponse.json({ error: "That email is already registered." }, { status: 409 });
