@@ -33,7 +33,7 @@ function ImportanceBadge({ importance }: { importance: SkillGapItem["importance"
 
 function SkillCard({ skill }: { skill: SkillGapItem }) {
   return (
-    <div className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-white/70 p-3">
+    <div className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)]/70 p-3">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-snug text-[var(--ink-strong)]">
           {skill.name}

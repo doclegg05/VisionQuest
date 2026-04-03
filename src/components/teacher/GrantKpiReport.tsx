@@ -71,7 +71,7 @@ function MetricCard({
       ? "text-emerald-700 bg-emerald-50 border-emerald-200"
       : m.meetsTarget === false
         ? "text-amber-800 bg-amber-50 border-amber-200"
-        : "text-[var(--ink-strong)] bg-white border-gray-200";
+        : "text-[var(--ink-strong)] bg-[var(--surface-raised)] border-[var(--border)]";
 
   const metricKey = METRIC_KEY_MAP[m.label];
 
@@ -114,13 +114,13 @@ function ProgramOfTheYearBadge({
       className={`rounded-xl border p-5 ${
         qualified
           ? "border-emerald-300 bg-emerald-50"
-          : "border-gray-200 bg-white"
+          : "border-[var(--border)] bg-[var(--surface-raised)]"
       }`}
     >
       <div className="flex items-center gap-3">
         <span className="text-2xl">{qualified ? "\u2705" : "\u26a0\ufe0f"}</span>
         <div>
-          <p className="font-semibold text-gray-900">
+          <p className="font-semibold text-[var(--ink-strong)]">
             Program of the Year {qualified ? "Qualified" : "Not Yet Qualified"}
           </p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
@@ -135,8 +135,8 @@ function ProgramOfTheYearBadge({
             <span className={c.met ? "text-emerald-600" : "text-amber-600"}>
               {c.met ? "\u2713" : "\u2717"}
             </span>
-            <span className="text-gray-700">{c.label}</span>
-            <span className="ml-auto font-semibold text-gray-900">{c.value}%</span>
+            <span className="text-[var(--ink-strong)]">{c.label}</span>
+            <span className="ml-auto font-semibold text-[var(--ink-strong)]">{c.value}%</span>
           </div>
         ))}
       </div>
@@ -194,7 +194,7 @@ function CountsSummary({ counts }: { counts: GrantKpiPayload["counts"] }) {
   return (
     <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
       {items.map((item) => (
-        <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
+        <div key={item.label} className="theme-card rounded-xl p-4 text-center">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">{item.label}</p>
           <p className={`mt-2 text-3xl font-bold ${item.tone}`}>{item.value}</p>
         </div>
@@ -337,7 +337,7 @@ export default function GrantKpiReport() {
 
       <div>
         <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Performance metrics</p>
-        <h3 className="mt-2 text-lg font-semibold text-gray-900">Grant outcomes</h3>
+        <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Grant outcomes</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {metricEntries.map(({ key, metric: m }) => (
             <div key={m.label}>
@@ -363,15 +363,15 @@ export default function GrantKpiReport() {
       )}
 
       {drillDown && !drillLoading && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-[var(--ink-strong)]">
               {drillDown.metric.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} — {drillDown.students.length} student{drillDown.students.length !== 1 ? "s" : ""}
             </h3>
             <button
               type="button"
               onClick={() => setDrillDown(null)}
-              className="text-sm text-[var(--ink-muted)] hover:text-gray-600"
+              className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink-muted)]"
             >
               Close
             </button>
@@ -392,8 +392,8 @@ export default function GrantKpiReport() {
                 </thead>
                 <tbody>
                   {drillDown.students.map((s) => (
-                    <tr key={s.spokesRecordId} className="border-b border-gray-100">
-                      <td className="py-2 pr-4 font-medium text-gray-900">
+                    <tr key={s.spokesRecordId} className="border-b border-[var(--border)]">
+                      <td className="py-2 pr-4 font-medium text-[var(--ink-strong)]">
                         {s.studentId ? (
                           <a href={`/teacher/students/${s.studentId}`} className="hover:underline">
                             {s.name}
@@ -402,14 +402,14 @@ export default function GrantKpiReport() {
                           s.name
                         )}
                       </td>
-                      <td className="py-2 pr-4 text-gray-600">{s.status}</td>
-                      <td className="py-2 pr-4 text-gray-600">
+                      <td className="py-2 pr-4 text-[var(--ink-muted)]">{s.status}</td>
+                      <td className="py-2 pr-4 text-[var(--ink-muted)]">
                         {s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString() : "—"}
                       </td>
-                      <td className="py-2 pr-4 text-gray-600">
+                      <td className="py-2 pr-4 text-[var(--ink-muted)]">
                         {s.employedAt ? new Date(s.employedAt).toLocaleDateString() : "—"}
                       </td>
-                      <td className="py-2 text-gray-600">
+                      <td className="py-2 text-[var(--ink-muted)]">
                         {s.hourlyWage ? `$${s.hourlyWage.toFixed(2)}/hr` : "—"}
                       </td>
                     </tr>
@@ -430,7 +430,7 @@ export default function GrantKpiReport() {
         <button
           type="button"
           onClick={handleExportCsv}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          className="rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
         >
           Export CSV
         </button>

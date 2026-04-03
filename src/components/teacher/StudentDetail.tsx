@@ -385,7 +385,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading student data...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading student data...</p>;
 
   if (error) {
     return (

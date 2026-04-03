@@ -28,7 +28,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 const STATUS_OPTIONS = [
   { value: "required", label: "Required", color: "bg-red-50 text-red-700 border-red-200" },
   { value: "optional", label: "Optional", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { value: "not_applicable", label: "N/A", color: "bg-gray-50 text-gray-500 border-gray-200" },
+  { value: "not_applicable", label: "N/A", color: "bg-[var(--surface-soft)] text-[var(--ink-muted)] border-[var(--border)]" },
 ];
 
 // Build catalog of items that can be added as requirements
@@ -165,14 +165,14 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
           {requirements.map((r, idx) => (
             <div
               key={r.id}
-              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-2.5"
+              className="flex items-center gap-3 theme-card rounded-xl px-4 py-2.5"
             >
-              <span className="text-xs text-gray-400 w-6 text-center shrink-0">
+              <span className="text-xs text-[var(--ink-faint)] w-6 text-center shrink-0">
                 {idx + 1}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
-                <p className="text-xs text-gray-400">{ITEM_TYPE_LABELS[r.itemType] ?? r.itemType}</p>
+                <p className="text-sm font-medium text-[var(--ink-strong)] truncate">{r.title}</p>
+                <p className="text-xs text-[var(--ink-faint)]">{ITEM_TYPE_LABELS[r.itemType] ?? r.itemType}</p>
               </div>
               <div className="flex gap-1 shrink-0">
                 {STATUS_OPTIONS.map((opt) => (
@@ -183,7 +183,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
                     className={`text-xs px-2 py-1 rounded border transition-colors ${
                       r.status === opt.value
                         ? opt.color + " font-semibold"
-                        : "bg-white border-gray-200 text-gray-400 hover:border-gray-300"
+                        : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-faint)] hover:border-[var(--border-strong)]"
                     }`}
                   >
                     {opt.label}
@@ -193,7 +193,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
               <button
                 type="button"
                 onClick={() => removeRequirement(idx)}
-                className="text-xs text-gray-400 hover:text-red-500 px-1 shrink-0"
+                className="text-xs text-[var(--ink-faint)] hover:text-red-500 px-1 shrink-0"
                 title="Remove"
               >
                 x
@@ -205,15 +205,15 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
 
       <div className="flex gap-2">
         {showCatalog ? (
-          <div className="w-full bg-white rounded-xl border border-gray-200 p-3 space-y-2">
+          <div className="w-full theme-card rounded-xl p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-gray-600">Add from catalog</p>
-              <button onClick={() => setShowCatalog(false)} className="text-xs text-gray-400 hover:text-gray-600">
+              <p className="text-xs font-medium text-[var(--ink-muted)]">Add from catalog</p>
+              <button onClick={() => setShowCatalog(false)} className="text-xs text-[var(--ink-faint)] hover:text-[var(--ink-muted)]">
                 Close
               </button>
             </div>
             {availableCatalog.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2">All catalog items have been added.</p>
+              <p className="text-xs text-[var(--ink-faint)] py-2">All catalog items have been added.</p>
             ) : (
               <div className="max-h-48 overflow-y-auto space-y-1">
                 {availableCatalog.map((item) => (
@@ -221,10 +221,10 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
                     key={`${item.itemType}:${item.itemId}`}
                     type="button"
                     onClick={() => addFromCatalog(item)}
-                    className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-[var(--surface-soft)] transition-colors"
                   >
-                    <span className="font-medium text-gray-900">{item.title}</span>
-                    <span className="ml-2 text-xs text-gray-400">
+                    <span className="font-medium text-[var(--ink-strong)]">{item.title}</span>
+                    <span className="ml-2 text-xs text-[var(--ink-faint)]">
                       {ITEM_TYPE_LABELS[item.itemType]}
                     </span>
                   </button>
@@ -236,7 +236,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
           <button
             type="button"
             onClick={() => setShowCatalog(true)}
-            className="border-2 border-dashed border-gray-300 rounded-xl px-4 py-2 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+            className="border-2 border-dashed border-[var(--border-strong)] rounded-xl px-4 py-2 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
           >
             + Add Requirement
           </button>

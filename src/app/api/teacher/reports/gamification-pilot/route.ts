@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
-import { listManagedStudentIds } from "@/lib/classroom";
+import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { ACHIEVEMENT_DEFS, parseState } from "@/lib/progression/engine";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
@@ -16,6 +16,7 @@ import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-dat
 export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? undefined;
+  if (classId) await assertStaffCanManageClass(session, classId);
 
   const studentIds = await listManagedStudentIds(session, {
     classId,

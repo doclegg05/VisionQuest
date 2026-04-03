@@ -161,15 +161,15 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
         prefetch={false}
         className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-colors ${
           active
-            ? "bg-white text-[#00133f] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
-            : "text-white/90 hover:bg-white/10 hover:text-white"
+            ? "bg-[var(--surface-raised)] text-[#00133f] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
+            : "text-white/90 hover:bg-[var(--surface-raised)]/10 hover:text-white"
         }`}
         aria-current={pathname === item.href ? "page" : undefined}
       >
         <span
           aria-hidden="true"
           className={`grid ${small ? "h-8 w-8 rounded-xl" : "h-10 w-10 rounded-2xl"} place-items-center text-base ${
-            active ? "bg-[#00133f] text-white" : "bg-white/10 text-white"
+            active ? "bg-[#00133f] text-white" : "bg-[var(--surface-raised)]/10 text-white"
           }`}
         >
           <item.icon size={small ? 16 : 20} weight={active ? "fill" : "regular"} />
@@ -384,7 +384,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                 ref={profileButtonRef}
                 onClick={() => setProfileOpen(!profileOpen)}
                 type="button"
-                className="rounded-full border border-white/12 p-1.5 text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                className="rounded-full border border-white/12 p-1.5 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 aria-label="Profile menu"
                 aria-expanded={profileOpen}
                 aria-haspopup="menu"
@@ -409,7 +409,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   href="/settings"
                   prefetch={false}
                   onClick={() => setProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                  className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                   role="menuitem"
                 >
                   <Gear size={16} weight="regular" />
@@ -426,7 +426,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
                   handleLogout();
                 }}
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 role="menuitem"
               >
                 <SignOut size={16} weight="regular" />

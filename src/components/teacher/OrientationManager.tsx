@@ -57,9 +57,9 @@ function WelcomeLetterSlot() {
   if (loading) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700">Welcome Letter</h3>
-      <p className="text-xs text-gray-500">
+    <div className="theme-card rounded-xl p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Welcome Letter</h3>
+      <p className="text-xs text-[var(--ink-muted)]">
         Upload a welcome letter PDF that students can view from the orientation checklist.
       </p>
       {exists ? (
@@ -132,21 +132,21 @@ function InlineEditForm({
         placeholder="Item label"
         value={form.label}
         onChange={(e) => setForm({ ...form, label: e.target.value })}
-        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
       <input
         type="text"
         placeholder="Description (optional)"
         value={form.description}
         onChange={(e) => setForm({ ...form, description: e.target.value })}
-        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
-      <label className="flex items-center gap-2 text-sm text-gray-600">
+      <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
         <input
           type="checkbox"
           checked={form.required}
           onChange={(e) => setForm({ ...form, required: e.target.checked })}
-          className="rounded border-gray-300 text-blue-600"
+          className="rounded border-[var(--border-strong)] text-blue-600"
         />
         Required for orientation completion
       </label>
@@ -160,7 +160,7 @@ function InlineEditForm({
         </button>
         <button
           onClick={onCancel}
-          className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
+          className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
         >
           Cancel
         </button>
@@ -300,7 +300,7 @@ export default function OrientationManager() {
     <div className="space-y-4">
       <WelcomeLetterSlot />
 
-      <p className="text-xs text-gray-500">Drag items to reorder. Click Edit to modify.</p>
+      <p className="text-xs text-[var(--ink-muted)]">Drag items to reorder. Click Edit to modify.</p>
 
       {/* Item list */}
       {items.length === 0 ? (
@@ -330,25 +330,25 @@ export default function OrientationManager() {
                 onDragLeave={handleDragLeave}
                 onDrop={() => handleDrop(item.id)}
                 onDragEnd={handleDragEnd}
-                className={`bg-white rounded-xl border p-4 flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition-all ${
+                className={`bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition-all ${
                   dragOverId === item.id
                     ? "border-blue-400 bg-blue-50 scale-[1.01]"
                     : dragId === item.id
-                      ? "opacity-50 border-gray-200"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "opacity-50 border-[var(--border)]"
+                      : "border-[var(--border)] hover:border-[var(--border-strong)]"
                 }`}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <span className="mt-1 text-gray-300 text-sm select-none" aria-hidden="true">&#x2630;</span>
+                  <span className="mt-1 text-[var(--ink-faint)] text-sm select-none" aria-hidden="true">&#x2630;</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-[var(--ink-strong)]">
                       {item.label}
                       {item.required && (
                         <span className="ml-1.5 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
                       )}
                     </p>
                     {item.description && (
-                      <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                      <p className="text-xs text-[var(--ink-muted)] mt-1">{item.description}</p>
                     )}
                   </div>
                 </div>
@@ -382,7 +382,7 @@ export default function OrientationManager() {
       ) : (
         <button
           onClick={() => { setEditingId(null); setAddingNew(true); }}
-          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
           + Add Orientation Item
         </button>

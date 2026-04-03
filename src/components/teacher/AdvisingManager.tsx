@@ -154,17 +154,17 @@ export default function AdvisingManager() {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Live office hours</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{blocks.length}</p>
-          <p className="text-sm text-gray-500">Availability blocks students can book from</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{blocks.length}</p>
+          <p className="text-sm text-[var(--ink-muted)]">Availability blocks students can book from</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Scheduled</p>
           <p className="mt-2 text-2xl font-bold text-teal-700">{scheduledAppointments}</p>
-          <p className="text-sm text-gray-500">Upcoming advising appointments on your calendar</p>
+          <p className="text-sm text-[var(--ink-muted)]">Upcoming advising appointments on your calendar</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Reminders</p>
           <button
             type="button"
@@ -184,25 +184,25 @@ export default function AdvisingManager() {
       ) : null}
 
       {grouped.length === 0 ? (
-        <div className="text-center text-[var(--ink-muted)] py-8 text-sm bg-white rounded-xl border border-gray-200">
+        <div className="text-center text-[var(--ink-muted)] py-8 text-sm theme-card rounded-xl">
           No advising availability yet. Add office hours so students can self-book.
         </div>
       ) : (
         <div className="space-y-4">
           {grouped.map((weekday) => (
-            <div key={weekday.value} className="bg-white rounded-xl border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-700">{weekday.label}</h3>
+            <div key={weekday.value} className="theme-card rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{weekday.label}</h3>
               <div className="mt-3 space-y-2">
                 {weekday.blocks.map((block) => (
                   <div
                     key={block.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 px-4 py-3"
+                    className="flex items-start justify-between gap-3 theme-card-subtle rounded-lg px-4 py-3"
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-[var(--ink-strong)]">
                         {formatMinutesLabel(block.startMinutes)} to {formatMinutesLabel(block.endMinutes)}
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         {block.slotMinutes}-minute slots • {block.locationLabel || block.locationType.replace("_", " ")}
                       </p>
                       {block.meetingUrl ? (
@@ -225,15 +225,15 @@ export default function AdvisingManager() {
       )}
 
       {showForm ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">New Availability Block</h3>
+        <div className="theme-card rounded-xl p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">New Availability Block</h3>
           <div className="grid gap-3 md:grid-cols-4">
-            <label className="text-sm text-gray-600">
+            <label className="text-sm text-[var(--ink-muted)]">
               <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Day</span>
               <select
                 value={form.weekday}
                 onChange={(event) => setForm((current) => ({ ...current, weekday: event.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {WEEKDAY_OPTIONS.map((weekday) => (
                   <option key={weekday.value} value={weekday.value}>
@@ -243,32 +243,32 @@ export default function AdvisingManager() {
               </select>
             </label>
 
-            <label className="text-sm text-gray-600">
+            <label className="text-sm text-[var(--ink-muted)]">
               <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Start</span>
               <input
                 type="time"
                 value={form.startTime}
                 onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </label>
 
-            <label className="text-sm text-gray-600">
+            <label className="text-sm text-[var(--ink-muted)]">
               <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">End</span>
               <input
                 type="time"
                 value={form.endTime}
                 onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </label>
 
-            <label className="text-sm text-gray-600">
+            <label className="text-sm text-[var(--ink-muted)]">
               <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Slot length</span>
               <select
                 value={form.slotMinutes}
                 onChange={(event) => setForm((current) => ({ ...current, slotMinutes: event.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {[15, 30, 45, 60].map((minutes) => (
                   <option key={minutes} value={minutes}>
@@ -280,12 +280,12 @@ export default function AdvisingManager() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
-            <label className="text-sm text-gray-600">
+            <label className="text-sm text-[var(--ink-muted)]">
               <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Format</span>
               <select
                 value={form.locationType}
                 onChange={(event) => setForm((current) => ({ ...current, locationType: event.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="virtual">Virtual</option>
                 <option value="in_person">In person</option>
@@ -293,14 +293,14 @@ export default function AdvisingManager() {
               </select>
             </label>
 
-            <label className="text-sm text-gray-600 md:col-span-2">
+            <label className="text-sm text-[var(--ink-muted)] md:col-span-2">
               <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Location label</span>
               <input
                 type="text"
                 value={form.locationLabel}
                 onChange={(event) => setForm((current) => ({ ...current, locationLabel: event.target.value }))}
                 placeholder="Zoom, Room 201, Phone"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </label>
           </div>
@@ -310,7 +310,7 @@ export default function AdvisingManager() {
             value={form.meetingUrl}
             onChange={(event) => setForm((current) => ({ ...current, meetingUrl: event.target.value }))}
             placeholder="Optional meeting link"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
           <div className="flex gap-2">
@@ -324,7 +324,7 @@ export default function AdvisingManager() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
+              className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
             >
               Cancel
             </button>
@@ -334,7 +334,7 @@ export default function AdvisingManager() {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
           + Add Office Hours
         </button>

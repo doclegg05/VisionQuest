@@ -187,13 +187,13 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       ref={panelRef}
       role="dialog"
       aria-label="Chat with Sage"
-      className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[rgba(18,38,63,0.12)] bg-white shadow-[0_24px_64px_rgba(7,23,43,0.22)] md:bottom-6 md:right-6"
+      className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] shadow-[0_24px_64px_rgba(7,23,43,0.22)] md:bottom-6 md:right-6"
       style={{ maxHeight: "min(32rem, calc(100dvh - 7rem))" }}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[rgba(18,38,63,0.08)] bg-[linear-gradient(135deg,var(--ink-strong),rgba(8,68,80,0.95))] px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-xl bg-white/15 text-sm font-bold text-white">
+          <span className="grid h-7 w-7 place-items-center rounded-xl bg-[var(--surface-raised)]/15 text-sm font-bold text-white">
             S
           </span>
           <span className="text-sm font-semibold text-white">Sage</span>
@@ -202,7 +202,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
           {!isStaff && (
             <a
               href="/chat"
-              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
               aria-label="Open full chat"
             >
               Expand
@@ -211,7 +211,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
           <button
             onClick={onClose}
             type="button"
-            className="grid h-7 w-7 place-items-center rounded-lg text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+            className="grid h-7 w-7 place-items-center rounded-lg text-white/75 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
             aria-label="Close chat"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

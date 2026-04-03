@@ -342,7 +342,7 @@ export default function DashboardActionPanel({
             </p>
           ) : (
             reviewableForms.map((submission) => (
-              <div key={submission.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-white p-4">
+              <div key={submission.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -415,7 +415,7 @@ export default function DashboardActionPanel({
             </p>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-white p-4">
+              <div className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg">
                     {GOAL_LEVEL_META[selectedGoal.goal.level as keyof typeof GOAL_LEVEL_META]?.icon || "🎯"}
@@ -440,7 +440,7 @@ export default function DashboardActionPanel({
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                            <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                               {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                             </span>
                             <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
@@ -492,7 +492,7 @@ export default function DashboardActionPanel({
                     );
 
                     return (
-                      <div key={draftKey} className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-white p-4">
+                      <div key={draftKey} className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -522,7 +522,7 @@ export default function DashboardActionPanel({
                               type="button"
                               onClick={() => handleAssign(selectedGoal.goal.id, recommendation)}
                               disabled={alreadyLinked || assigningKey === draftKey}
-                              className="rounded-full bg-[var(--ink-strong)] px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:bg-slate-300"
+                              className="rounded-full bg-[var(--ink-strong)] px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                             >
                               {alreadyLinked ? "Assigned" : assigningKey === draftKey ? "Assigning..." : "Assign"}
                             </button>

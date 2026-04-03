@@ -25,7 +25,7 @@ export default function WizardStepIndicator({
                     ? "bg-emerald-500 text-white"
                     : isCurrent
                       ? "bg-[var(--ink-strong)] text-white"
-                      : "bg-gray-200 text-gray-400"
+                      : "bg-[var(--surface-strong)] text-[var(--ink-faint)]"
                 }`}
               >
                 {isComplete ? "✓" : i + 1}
@@ -33,7 +33,7 @@ export default function WizardStepIndicator({
               {i < totalSteps - 1 && (
                 <div
                   className={`h-0.5 w-4 rounded-full transition-colors sm:w-6 ${
-                    isComplete ? "bg-emerald-500" : "bg-gray-200"
+                    isComplete ? "bg-emerald-500" : "bg-[var(--surface-strong)]"
                   }`}
                 />
               )}

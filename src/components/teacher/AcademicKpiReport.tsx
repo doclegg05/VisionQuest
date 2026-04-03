@@ -88,14 +88,14 @@ function GoalAdoptionSection({ data }: { data: GoalAdoptionKpis }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Goal adoption</p>
-      <h3 className="mt-2 text-lg font-semibold text-gray-900">Who is planning</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Who is planning</h3>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {ADOPTION_CARDS.map((card) => (
-          <div key={card.key} className="rounded-xl border border-gray-200 bg-white p-4">
+          <div key={card.key} className="theme-card rounded-xl p-4">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">{card.label}</p>
             <p className={`mt-2 text-3xl font-bold ${card.tone}`}>{data[card.key]}%</p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-[var(--ink-muted)]">
               {data[card.countKey]} of {card.denomLabel === "goals" ? data.totalActiveGoals : data.totalStudents}{" "}
               {card.denomLabel ?? "students"}
             </p>
@@ -110,23 +110,23 @@ function ResourcePipelineSection({ data, totalStudents }: { data: ResourcePipeli
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Resource pipeline</p>
-      <h3 className="mt-2 text-lg font-semibold text-gray-900">From assignment to completion</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">From assignment to completion</h3>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Assigned</p>
           <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">{data.totalAssignedLinks}</p>
-          <p className="mt-1 text-xs text-gray-500">resource links across all students</p>
+          <p className="mt-1 text-xs text-[var(--ink-muted)]">resource links across all students</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Has evidence</p>
           <p className="mt-2 text-3xl font-bold text-sky-700">{data.linksWithEvidence}</p>
-          <p className="mt-1 text-xs text-gray-500">{data.linksWithEvidencePct}% of assigned links</p>
+          <p className="mt-1 text-xs text-[var(--ink-muted)]">{data.linksWithEvidencePct}% of assigned links</p>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Completed</p>
           <p className="mt-2 text-3xl font-bold text-emerald-700">{data.linksCompleted}</p>
-          <p className="mt-1 text-xs text-gray-500">{data.linksCompletedPct}% of assigned links</p>
+          <p className="mt-1 text-xs text-[var(--ink-muted)]">{data.linksCompletedPct}% of assigned links</p>
         </div>
       </div>
 
@@ -154,12 +154,12 @@ function TimeToMilestoneSection({ data }: { data: TimeToMilestoneKpis }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Time to milestone</p>
-      <h3 className="mt-2 text-lg font-semibold text-gray-900">How fast students move</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">How fast students move</h3>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200">
+            <tr className="border-b border-[var(--border)]">
               <th className="pb-2 text-left text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)] font-semibold">
                 Milestone
               </th>
@@ -173,10 +173,10 @@ function TimeToMilestoneSection({ data }: { data: TimeToMilestoneKpis }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.label} className="border-b border-gray-100">
-                <td className="py-3 text-gray-700">{row.label}</td>
-                <td className="py-3 text-right font-semibold text-gray-900">{fmt(row.median)}</td>
-                <td className="py-3 text-right font-semibold text-gray-900">{fmt(row.avg)}</td>
+              <tr key={row.label} className="border-b border-[var(--border)]">
+                <td className="py-3 text-[var(--ink-strong)]">{row.label}</td>
+                <td className="py-3 text-right font-semibold text-[var(--ink-strong)]">{fmt(row.median)}</td>
+                <td className="py-3 text-right font-semibold text-[var(--ink-strong)]">{fmt(row.avg)}</td>
               </tr>
             ))}
           </tbody>
@@ -192,20 +192,20 @@ function ReadinessDistributionSection({ data }: { data: ReadinessDistributionKpi
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Readiness score</p>
-      <h3 className="mt-2 text-lg font-semibold text-gray-900">Where students stand</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Where students stand</h3>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="space-y-3">
             {data.distribution.map((bucket) => {
               const ratio = (bucket.count / maxCount) * 100;
               return (
                 <div key={bucket.bucket}>
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="w-14 text-gray-600">{bucket.bucket}</span>
-                    <span className="font-semibold text-gray-900">{bucket.count}</span>
+                    <span className="w-14 text-[var(--ink-muted)]">{bucket.bucket}</span>
+                    <span className="font-semibold text-[var(--ink-strong)]">{bucket.count}</span>
                   </div>
-                  <div className="mt-1.5 h-2 rounded-full bg-slate-100">
+                  <div className="mt-1.5 h-2 rounded-full bg-[var(--surface-interactive)]">
                     <div
                       className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-secondary),var(--accent-strong))]"
                       style={{ width: `${Math.max(ratio, bucket.count > 0 ? 6 : 0)}%` }}
@@ -242,13 +242,13 @@ function ReadinessDistributionSection({ data }: { data: ReadinessDistributionKpi
 
 function AcademicFunnelSection({ steps, totalStudents }: { steps: AcademicFunnelStep[]; totalStudents: number }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="theme-card rounded-xl p-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Pipeline</p>
-          <h3 className="mt-2 text-lg font-semibold text-gray-900">Academic journey funnel</h3>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Academic journey funnel</h3>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+        <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
           {totalStudents} learners
         </span>
       </div>
@@ -259,10 +259,10 @@ function AcademicFunnelSection({ steps, totalStudents }: { steps: AcademicFunnel
           return (
             <div key={step.label}>
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-gray-600">{step.label}</span>
-                <span className="font-semibold text-gray-900">{step.value}</span>
+                <span className="text-[var(--ink-muted)]">{step.label}</span>
+                <span className="font-semibold text-[var(--ink-strong)]">{step.value}</span>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-slate-100">
+              <div className="mt-2 h-2 rounded-full bg-[var(--surface-interactive)]">
                 <div
                   className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-secondary),var(--accent-strong))]"
                   style={{ width: `${Math.min(100, Math.max(ratio, step.value > 0 ? 6 : 0))}%` }}

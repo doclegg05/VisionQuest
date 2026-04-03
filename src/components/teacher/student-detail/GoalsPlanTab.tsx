@@ -11,7 +11,7 @@ import type {
 } from "./types";
 
 const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
-  not_started: "bg-slate-100 text-slate-700",
+  not_started: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
   in_progress: "bg-sky-100 text-sky-700",
   submitted: "bg-amber-100 text-amber-800",
   completed: "bg-emerald-100 text-emerald-700",
@@ -69,11 +69,11 @@ export default function GoalsPlanTab({
   return (
     <div className="space-y-6">
       {/* Goal Evidence & Review */}
-      <div id="goal-evidence" className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="goal-evidence" className="theme-card rounded-xl p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Goal Evidence & Review</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Goal Evidence & Review</h3>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               Track which assigned resources have real student activity and what still needs instructor follow-up.
             </p>
           </div>
@@ -87,7 +87,7 @@ export default function GoalsPlanTab({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Review queue</p>
             {reviewQueue.length === 0 ? (
-              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-gray-500">
+              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
                 No goal-linked review items are open right now.
               </p>
             ) : (
@@ -104,20 +104,20 @@ export default function GoalsPlanTab({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-600">
+                          <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                             {REVIEW_KIND_LABELS[item.kind]}
                           </span>
-                          <p className="text-sm font-semibold text-gray-900">
+                          <p className="text-sm font-semibold text-[var(--ink-strong)]">
                             {item.resourceTitle || item.goalTitle}
                           </p>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-gray-600">{item.summary}</p>
+                        <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{item.summary}</p>
                         <p className="mt-2 text-xs text-[var(--ink-muted)]">
                           Goal: {item.goalTitle}
                           {item.detectedAt ? ` \u2022 ${dateFormatter.format(new Date(item.detectedAt))}` : ""}
                         </p>
                       </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-700">
+                      <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-strong)]">
                         {item.severity}
                       </span>
                     </div>
@@ -142,7 +142,7 @@ export default function GoalsPlanTab({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Assigned resource evidence</p>
             {goalPlans.every((plan) => plan.links.length === 0) ? (
-              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-gray-500">
+              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
                 No assigned goal resources yet.
               </p>
             ) : (
@@ -154,8 +154,8 @@ export default function GoalsPlanTab({
                     if (!goal) return null;
 
                     return (
-                      <div key={plan.goalId} className="rounded-lg border border-gray-100 p-4">
-                        <p className="text-sm font-semibold text-gray-900">{goal.content}</p>
+                      <div key={plan.goalId} className="theme-card-subtle rounded-lg p-4">
+                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{goal.content}</p>
                         <div className="mt-3 space-y-3">
                           {plan.links.map((link) => {
                             const evidence = evidenceByLinkId.get(link.id);
@@ -164,15 +164,15 @@ export default function GoalsPlanTab({
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                                      <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                         {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                                       </span>
-                                      <p className="text-sm font-semibold text-gray-900">{link.title}</p>
+                                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
                                     </div>
-                                    <p className="mt-2 text-sm text-gray-600">
+                                    <p className="mt-2 text-sm text-[var(--ink-muted)]">
                                       {evidence?.summary || "No evidence summary available."}
                                     </p>
-                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-muted)]">
                                       {evidence?.lastObservedAt ? (
                                         <span>
                                           Last update {dateFormatter.format(new Date(evidence.lastObservedAt))}
@@ -218,16 +218,16 @@ export default function GoalsPlanTab({
       </div>
 
       {/* Goals & Support Planner */}
-      <div id="goal-plans" className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Goals ({goals.length})</h3>
+      <div id="goal-plans" className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">Goals ({goals.length})</h3>
         <div className="mb-5">
           <GoalSupportPlanner goals={goals} goalPlans={goalPlans} onChanged={onChanged} />
         </div>
         <GoalTree goals={goals} />
 
         {goals.filter(g => g.status === "active" || g.status === "in_progress").length > 0 && (
-          <section className="mt-4 rounded-xl border border-gray-200 bg-white p-5">
-            <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
+          <section className="mt-4 theme-card rounded-xl p-5">
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
               Needs Confirmation
             </h4>
             <ul className="space-y-2">
@@ -237,7 +237,7 @@ export default function GoalsPlanTab({
                   <li key={goal.id} className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <p className="text-sm font-medium">{goal.content}</p>
-                      <p className="text-xs text-gray-500">{goal.level} &middot; {goal.status}</p>
+                      <p className="text-xs text-[var(--ink-muted)]">{goal.level} &middot; {goal.status}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -248,7 +248,7 @@ export default function GoalsPlanTab({
                       </button>
                       <button
                         onClick={() => void onGoalAction(goal.id, { reviewed: true })}
-                        className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-200"
+                        className="rounded-lg bg-[var(--surface-interactive)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-strong)]"
                       >
                         Mark Reviewed
                       </button>
@@ -268,8 +268,8 @@ export default function GoalsPlanTab({
       />
 
       {/* Career Discovery */}
-      <div id="career-discovery" className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div id="career-discovery" className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Career Discovery
           {careerDiscovery?.status === "complete" && (
             <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Complete</span>
@@ -283,11 +283,11 @@ export default function GoalsPlanTab({
         ) : (
           <div className="space-y-3">
             {careerDiscovery.sageSummary && (
-              <p className="text-sm text-gray-700">{careerDiscovery.sageSummary}</p>
+              <p className="text-sm text-[var(--ink-strong)]">{careerDiscovery.sageSummary}</p>
             )}
             {careerDiscovery.topClusters.length > 0 && (
               <div>
-                <span className="text-xs font-medium text-gray-500 uppercase">Top Pathways</span>
+                <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {careerDiscovery.topClusters.map((cluster) => (
                     <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
@@ -299,14 +299,14 @@ export default function GoalsPlanTab({
             )}
             {(careerDiscovery.interests.length > 0 || careerDiscovery.strengths.length > 0 || careerDiscovery.subjects.length > 0 || careerDiscovery.problems.length > 0 || careerDiscovery.values.length > 0) && (
               <details className="text-sm">
-                <summary className="text-xs font-medium text-gray-500 uppercase cursor-pointer">Signals</summary>
+                <summary className="text-xs font-medium text-[var(--ink-muted)] uppercase cursor-pointer">Signals</summary>
                 <div className="mt-2 space-y-2">
                   {careerDiscovery.interests.length > 0 && (
                     <div>
                       <span className="text-xs text-[var(--ink-muted)]">Interests:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.interests.map((item, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                          <span key={i} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">{item}</span>
                         ))}
                       </div>
                     </div>
@@ -316,7 +316,7 @@ export default function GoalsPlanTab({
                       <span className="text-xs text-[var(--ink-muted)]">Strengths:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.strengths.map((item, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                          <span key={i} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">{item}</span>
                         ))}
                       </div>
                     </div>
@@ -326,7 +326,7 @@ export default function GoalsPlanTab({
                       <span className="text-xs text-[var(--ink-muted)]">Preferred Subjects:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.subjects.map((item, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                          <span key={i} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">{item}</span>
                         ))}
                       </div>
                     </div>
@@ -336,7 +336,7 @@ export default function GoalsPlanTab({
                       <span className="text-xs text-[var(--ink-muted)]">Problems They Care About:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.problems.map((item, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                          <span key={i} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">{item}</span>
                         ))}
                       </div>
                     </div>
@@ -346,7 +346,7 @@ export default function GoalsPlanTab({
                       <span className="text-xs text-[var(--ink-muted)]">Values:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.values.map((item, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                          <span key={i} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">{item}</span>
                         ))}
                       </div>
                     </div>
@@ -356,7 +356,7 @@ export default function GoalsPlanTab({
                       <span className="text-xs text-[var(--ink-muted)]">Circumstances:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.circumstances.map((item, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
+                          <span key={i} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">{item}</span>
                         ))}
                       </div>
                     </div>

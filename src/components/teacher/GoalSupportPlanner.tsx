@@ -26,7 +26,7 @@ const GOAL_STATUS_STYLES: Record<string, string> = {
   in_progress: "bg-sky-100 text-sky-700",
   blocked: "bg-amber-100 text-amber-800",
   completed: "bg-violet-100 text-violet-700",
-  abandoned: "bg-slate-100 text-slate-700",
+  abandoned: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
 };
 
 function formatDueDate(value: string | Date | null) {
@@ -173,28 +173,28 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
         const meta = GOAL_LEVEL_META[goal.level as keyof typeof GOAL_LEVEL_META];
 
         return (
-          <div key={goal.id} className="rounded-xl border border-gray-200 p-4">
+          <div key={goal.id} className="rounded-xl border border-[var(--border)] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg">{meta?.icon || "🎯"}</span>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm font-semibold text-[var(--ink-strong)]">
                     {meta?.label || goal.level}
                   </p>
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${GOAL_STATUS_STYLES[goal.status] || GOAL_STATUS_STYLES.active}`}>
                     {goalStatusLabel(goal.status)}
                   </span>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-gray-700">{goal.content}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{goal.content}</p>
               </div>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-[var(--ink-faint)]">
                 {plan.links.length} linked
               </span>
             </div>
 
             {plan.links.length > 0 ? (
               <div className="mt-4 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
                   Assigned Resources
                 </p>
                 {plan.links.map((link) => {
@@ -204,17 +204,17 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                            <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                               {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                             </span>
-                            <p className="text-sm font-semibold text-gray-900">{link.title}</p>
+                            <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
                           </div>
                           {link.description ? (
-                            <p className="mt-1 text-sm text-gray-600">{link.description}</p>
+                            <p className="mt-1 text-sm text-[var(--ink-muted)]">{link.description}</p>
                           ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                          <span className="rounded-full bg-[var(--surface-interactive)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-strong)]">
                             {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
                           </span>
                           {link.url ? (
@@ -231,7 +231,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                       </div>
 
                       <div className="mt-3 grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_auto] md:items-end">
-                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                           Due date
                           <input
                             type="date"
@@ -245,11 +245,11 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                                 },
                               }))
                             }
-                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal uppercase tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                            className="mt-1 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal uppercase tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
                           />
                         </label>
 
-                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                           Instructor note
                           <textarea
                             value={draft.notes}
@@ -264,7 +264,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                             }
                             rows={2}
                             placeholder="Add context, a checkpoint, or the next expected move."
-                            className="mt-1 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                            className="mt-1 w-full resize-none theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
                           />
                         </label>
 
@@ -272,7 +272,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                           type="button"
                           onClick={() => handleSaveLink(link.id)}
                           disabled={savingLinkId === link.id}
-                          className="rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {savingLinkId === link.id ? "Saving..." : "Save details"}
                         </button>
@@ -285,7 +285,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
 
             {plan.recommendations.length > 0 ? (
               <div className="mt-4 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
                   Recommended Resources
                 </p>
                 {plan.recommendations.map((recommendation) => {
@@ -295,19 +295,19 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                   const draft = assignmentDrafts[assignKey] || { dueAt: "", notes: "" };
 
                   return (
-                    <div key={linkKey} className="rounded-lg border border-dashed border-[rgba(18,38,63,0.12)] bg-white p-3">
+                    <div key={linkKey} className="rounded-lg border border-dashed border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                               {GOAL_RESOURCE_TYPE_LABELS[recommendation.resourceType]}
                             </span>
-                            <p className="text-sm font-semibold text-gray-900">{recommendation.title}</p>
+                            <p className="text-sm font-semibold text-[var(--ink-strong)]">{recommendation.title}</p>
                           </div>
                           {recommendation.description ? (
-                            <p className="mt-1 text-sm text-gray-600">{recommendation.description}</p>
+                            <p className="mt-1 text-sm text-[var(--ink-muted)]">{recommendation.description}</p>
                           ) : null}
-                          <p className="mt-2 text-xs text-gray-400">{recommendation.reason}</p>
+                          <p className="mt-2 text-xs text-[var(--ink-faint)]">{recommendation.reason}</p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -325,7 +325,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                             type="button"
                             onClick={() => handleAssign(goal.id, recommendation)}
                             disabled={alreadyLinked || assigningKey === assignKey}
-                            className="rounded-full bg-[var(--ink-strong)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:bg-slate-300"
+                            className="rounded-full bg-[var(--ink-strong)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                           >
                             {alreadyLinked ? "Assigned" : assigningKey === assignKey ? "Assigning..." : "Assign"}
                           </button>
@@ -334,7 +334,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
 
                       {!alreadyLinked ? (
                         <div className="mt-3 grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)]">
-                          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                             Due date
                             <input
                               type="date"
@@ -348,11 +348,11 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                                   },
                                 }))
                               }
-                              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal uppercase tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                              className="mt-1 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal uppercase tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
                             />
                           </label>
 
-                          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                             Instructor note
                             <textarea
                               value={draft.notes}
@@ -367,7 +367,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                               }
                               rows={2}
                               placeholder="Optional context or next-step instruction."
-                              className="mt-1 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal tracking-normal text-gray-700 outline-none focus:border-sky-300"
+                              className="mt-1 w-full resize-none theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
                             />
                           </label>
                         </div>
@@ -377,7 +377,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                 })}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-gray-400">No matched resources yet for this goal.</p>
+              <p className="mt-4 text-sm text-[var(--ink-faint)]">No matched resources yet for this goal.</p>
             )}
 
             {plan.suggestions.length > 0 ? (

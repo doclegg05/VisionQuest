@@ -70,21 +70,21 @@ export function timeInputFromMinutes(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
-function startOfDay(value: Date) {
+function startOfDayUTC(value: Date) {
   const day = new Date(value);
-  day.setHours(0, 0, 0, 0);
+  day.setUTCHours(0, 0, 0, 0);
   return day;
 }
 
 function addDays(value: Date, amount: number) {
   const day = new Date(value);
-  day.setDate(day.getDate() + amount);
+  day.setUTCDate(day.getUTCDate() + amount);
   return day;
 }
 
-function withMinutes(day: Date, totalMinutes: number) {
+function withMinutesUTC(day: Date, totalMinutes: number) {
   const value = new Date(day);
-  value.setHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
+  value.setUTCHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
   return value;
 }
 
@@ -108,7 +108,7 @@ export function buildBookableAdvisorSlots({
   minimumLeadMinutes?: number;
 }): BookableAdvisor[] {
   const minimumLeadTime = now.getTime() + minimumLeadMinutes * 60 * 1000;
-  const firstDay = startOfDay(now);
+  const firstDay = startOfDayUTC(now);
   const scheduledByAdvisor = new Map<string, ScheduledAdvisorAppointment[]>();
 
   for (const appointment of appointments) {
@@ -130,15 +130,15 @@ export function buildBookableAdvisorSlots({
 
     for (let offset = 0; offset < days; offset += 1) {
       const day = addDays(firstDay, offset);
-      if (day.getDay() !== block.weekday) continue;
+      if (day.getUTCDay() !== block.weekday) continue;
 
       for (
         let minute = block.startMinutes;
         minute + block.slotMinutes <= block.endMinutes;
         minute += block.slotMinutes
       ) {
-        const startsAt = withMinutes(day, minute);
-        const endsAt = withMinutes(day, minute + block.slotMinutes);
+        const startsAt = withMinutesUTC(day, minute);
+        const endsAt = withMinutesUTC(day, minute + block.slotMinutes);
 
         if (startsAt.getTime() <= minimumLeadTime) continue;
 

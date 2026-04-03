@@ -49,22 +49,22 @@ export default function ProgressTab({
   return (
     <div className="space-y-6">
       {/* Orientation */}
-      <div id="orientation-review" className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div id="orientation-review" className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Orientation ({orientDone}/{orientTotal})
         </h3>
         {orientTotal === 0 ? (
-          <p className="text-sm text-gray-400">No orientation items configured.</p>
+          <p className="text-sm text-[var(--ink-faint)]">No orientation items configured.</p>
         ) : (
           <div className="space-y-1">
             {orientation.items.map((item) => {
               const progressItem = orientation.progress.find((progress) => progress.itemId === item.id);
               return (
                 <div key={item.id} className="flex items-center gap-2 text-sm">
-                  <span className={progressItem?.completed ? "text-green-500" : "text-gray-300"}>
+                  <span className={progressItem?.completed ? "text-green-500" : "text-[var(--ink-faint)]"}>
                     {progressItem?.completed ? "\u2713" : "\u25CB"}
                   </span>
-                  <span className={progressItem?.completed ? "text-gray-700" : "text-gray-500"}>
+                  <span className={progressItem?.completed ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}>
                     {item.label}
                   </span>
                   {item.required && !progressItem?.completed && (
@@ -78,27 +78,27 @@ export default function ProgressTab({
       </div>
 
       {/* Certification */}
-      <div id="certification-review" className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div id="certification-review" className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Ready to Work Certification ({certDone}/{certification.templates.length})
           {certification.cert?.status === "completed" && (
             <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Completed</span>
           )}
         </h3>
         {!certification.cert ? (
-          <p className="text-sm text-gray-400">Student hasn&apos;t started certification yet.</p>
+          <p className="text-sm text-[var(--ink-faint)]">Student hasn&apos;t started certification yet.</p>
         ) : (
           <div className="space-y-2">
             {certification.templates.map((template) => {
               const requirement = certification.cert?.requirements.find((item) => item.templateId === template.id);
               return (
-                <div key={template.id} className="border border-gray-100 rounded-lg p-3">
+                <div key={template.id} className="theme-input rounded-lg p-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <span className={requirement?.completed ? "text-green-500" : "text-gray-300"}>
+                      <span className={requirement?.completed ? "text-green-500" : "text-[var(--ink-faint)]"}>
                         {requirement?.completed ? "\u2713" : "\u25CB"}
                       </span>
-                      <span className="text-sm text-gray-700">{template.label}</span>
+                      <span className="text-sm text-[var(--ink-strong)]">{template.label}</span>
                       {template.required && (
                         <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Required</span>
                       )}
@@ -137,7 +137,7 @@ export default function ProgressTab({
                   </div>
 
                   {requirement?.verifiedAt && (
-                    <p className="text-xs text-gray-400 mt-1 ml-6">
+                    <p className="text-xs text-[var(--ink-faint)] mt-1 ml-6">
                       Verified {new Date(requirement.verifiedAt).toLocaleDateString()}
                     </p>
                   )}
@@ -151,24 +151,24 @@ export default function ProgressTab({
       </div>
 
       {/* Career Progress */}
-      <div id="career-progress" className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div id="career-progress" className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Career Progress ({activeApplications.length} active apps {"\u2022"} {activeEventRegistrations.length} event registrations)
         </h3>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Applications</p>
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-faint)]">Applications</p>
             {applications.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-400">No tracked applications yet.</p>
+              <p className="mt-3 text-sm text-[var(--ink-faint)]">No tracked applications yet.</p>
             ) : (
               <div className="mt-3 space-y-3">
                 {applications.slice(0, 6).map((application) => (
-                  <div key={application.id} className="rounded-lg border border-gray-100 p-4">
+                  <div key={application.id} className="theme-card-subtle rounded-lg p-4">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{application.opportunity.title}</p>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{application.opportunity.title}</p>
+                        <p className="mt-1 text-sm text-[var(--ink-muted)]">
                           {application.opportunity.company} {"\u2022"} {application.opportunity.type}
                         </p>
                       </div>
@@ -176,7 +176,7 @@ export default function ProgressTab({
                         {application.status}
                       </span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs text-[var(--ink-faint)]">
                       Updated {dateFormatter.format(new Date(application.updatedAt))}
                     </p>
                   </div>
@@ -186,17 +186,17 @@ export default function ProgressTab({
           </div>
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Event engagement</p>
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-faint)]">Event engagement</p>
             {eventRegistrations.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-400">No event registrations yet.</p>
+              <p className="mt-3 text-sm text-[var(--ink-faint)]">No event registrations yet.</p>
             ) : (
               <div className="mt-3 space-y-3">
                 {eventRegistrations.slice(0, 6).map((registration) => (
-                  <div key={registration.id} className="rounded-lg border border-gray-100 p-4">
+                  <div key={registration.id} className="theme-card-subtle rounded-lg p-4">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{registration.event.title}</p>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{registration.event.title}</p>
+                        <p className="mt-1 text-sm text-[var(--ink-muted)]">
                           {dateFormatter.format(new Date(registration.event.startsAt))}
                         </p>
                       </div>
@@ -205,7 +205,7 @@ export default function ProgressTab({
                       </span>
                     </div>
                     {registration.event.location ? (
-                      <p className="mt-2 text-xs text-gray-400">{registration.event.location}</p>
+                      <p className="mt-2 text-xs text-[var(--ink-faint)]">{registration.event.location}</p>
                     ) : null}
                   </div>
                 ))}
@@ -216,21 +216,21 @@ export default function ProgressTab({
       </div>
 
       {/* Portfolio */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Portfolio ({portfolio.length} items)
           {hasResume && <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Resume built</span>}
         </h3>
         {portfolio.length === 0 ? (
-          <p className="text-sm text-gray-400">No portfolio items yet.</p>
+          <p className="text-sm text-[var(--ink-faint)]">No portfolio items yet.</p>
         ) : (
           <div className="space-y-1">
             {portfolio.map((item) => (
               <div key={item.id} className="flex items-center gap-2 text-sm">
-                <span className="text-xs text-gray-400 capitalize bg-gray-100 px-1.5 py-0.5 rounded">
+                <span className="text-xs text-[var(--ink-faint)] capitalize bg-[var(--surface-interactive)] px-1.5 py-0.5 rounded">
                   {item.type}
                 </span>
-                <span className="text-gray-700">{item.title}</span>
+                <span className="text-[var(--ink-strong)]">{item.title}</span>
               </div>
             ))}
           </div>
@@ -238,16 +238,16 @@ export default function ProgressTab({
       </div>
 
       {/* Files */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Files ({files.length})</h3>
+      <div className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">Files ({files.length})</h3>
         {files.length === 0 ? (
-          <p className="text-sm text-gray-400">No files uploaded.</p>
+          <p className="text-sm text-[var(--ink-faint)]">No files uploaded.</p>
         ) : (
           <div className="space-y-1">
             {files.map((file) => (
               <div key={file.id} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 capitalize bg-gray-100 px-1.5 py-0.5 rounded">
+                  <span className="text-xs text-[var(--ink-faint)] capitalize bg-[var(--surface-interactive)] px-1.5 py-0.5 rounded">
                     {file.category}
                   </span>
                   <a
@@ -259,7 +259,7 @@ export default function ProgressTab({
                     {file.filename}
                   </a>
                 </div>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-[var(--ink-faint)]">
                   {new Date(file.uploadedAt).toLocaleDateString()}
                 </span>
               </div>
@@ -269,12 +269,12 @@ export default function ProgressTab({
       </div>
 
       {/* Conversations */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+      <div className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Conversations ({conversations.length})
         </h3>
         {conversations.length === 0 ? (
-          <p className="text-sm text-gray-400">No conversations yet.</p>
+          <p className="text-sm text-[var(--ink-faint)]">No conversations yet.</p>
         ) : (
           <div className="space-y-2">
             {(showAllConversations ? conversations : conversations.slice(0, 20)).map((conv) => (
@@ -330,7 +330,7 @@ function PublicCredentialBanner({
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]">
         Public credential
       </p>
-      <p className="mt-2 text-sm text-gray-700">
+      <p className="mt-2 text-sm text-[var(--ink-strong)]">
         {publicCredentialPage?.isPublic
           ? "This student's credential page is live and shareable."
           : "No public credential page is live yet."}

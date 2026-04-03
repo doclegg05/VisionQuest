@@ -33,7 +33,7 @@ const STATUS_CONFIG = {
     cardCls: "",
   },
   not_started: {
-    circleCls: "border-[rgba(18,38,63,0.2)] bg-white text-[var(--ink-muted)]",
+    circleCls: "border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)] text-[var(--ink-muted)]",
     icon: <span className="h-2 w-2 rounded-full bg-[rgba(18,38,63,0.2)]" />,
     badgeCls: "bg-[var(--muted)] text-[var(--ink-muted)]",
     badgeLabel: "Not Started",
@@ -117,7 +117,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
               {/* Step card */}
               <div
                 className={[
-                  "mb-3 min-w-0 flex-1 rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-white/60 px-4 py-3",
+                  "mb-3 min-w-0 flex-1 rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)]/60 px-4 py-3",
                   config.cardCls,
                   step.isCurrent
                     ? "border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.04)]"

@@ -168,19 +168,19 @@ export default function PathwayManager() {
           {pathways.map((p) => (
             <div
               key={p.id}
-              className={`bg-white rounded-xl border p-4 flex items-start justify-between gap-3 ${
-                p.active ? "border-gray-200" : "border-gray-200 opacity-60"
+              className={`bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3 ${
+                p.active ? "border-[var(--border)]" : "border-[var(--border)] opacity-60"
               }`}
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-[var(--ink-strong)]">
                   {p.label}
                   {!p.active && (
-                    <span className="ml-1.5 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Inactive</span>
+                    <span className="ml-1.5 text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">Inactive</span>
                   )}
                 </p>
                 {p.description && (
-                  <p className="text-xs text-gray-500 mt-1">{p.description}</p>
+                  <p className="text-xs text-[var(--ink-muted)] mt-1">{p.description}</p>
                 )}
                 <div className="flex flex-wrap gap-2 mt-2">
                   {p.certifications.length > 0 && (
@@ -206,7 +206,7 @@ export default function PathwayManager() {
                 </div>
               </div>
               <div className="flex gap-1.5 shrink-0">
-                <button onClick={() => handleToggleActive(p)} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">
+                <button onClick={() => handleToggleActive(p)} className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] px-2 py-1">
                   {p.active ? "Deactivate" : "Activate"}
                 </button>
                 <button onClick={() => startEdit(p)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1">
@@ -222,8 +222,8 @@ export default function PathwayManager() {
       )}
 
       {showForm ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700">
+        <div className="theme-card rounded-xl p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
             {editingId ? "Edit Pathway" : "New Pathway"}
           </h3>
 
@@ -236,7 +236,7 @@ export default function PathwayManager() {
             placeholder="Pathway name (e.g., 'Office Administration')"
             value={form.label}
             onChange={(e) => setForm({ ...form, label: e.target.value })}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
           <textarea
@@ -244,11 +244,11 @@ export default function PathwayManager() {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={2}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
 
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-2">Certifications</p>
+            <p className="text-xs font-medium text-[var(--ink-muted)] mb-2">Certifications</p>
             <div className="flex flex-wrap gap-1.5">
               {CERT_OPTIONS.map((c) => (
                 <button
@@ -258,7 +258,7 @@ export default function PathwayManager() {
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                     form.certifications.includes(c.id)
                       ? "bg-purple-100 border-purple-300 text-purple-800"
-                      : "bg-gray-50 border-gray-200 text-gray-600 hover:border-purple-300"
+                      : "bg-[var(--surface-soft)] border-[var(--border)] text-[var(--ink-muted)] hover:border-purple-300"
                   }`}
                 >
                   {c.label}
@@ -268,7 +268,7 @@ export default function PathwayManager() {
           </div>
 
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-2">Learning Platforms</p>
+            <p className="text-xs font-medium text-[var(--ink-muted)] mb-2">Learning Platforms</p>
             <div className="flex flex-wrap gap-1.5">
               {PLATFORM_OPTIONS.map((p) => (
                 <button
@@ -278,7 +278,7 @@ export default function PathwayManager() {
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                     form.platforms.includes(p.id)
                       ? "bg-blue-100 border-blue-300 text-blue-800"
-                      : "bg-gray-50 border-gray-200 text-gray-600 hover:border-blue-300"
+                      : "bg-[var(--surface-soft)] border-[var(--border)] text-[var(--ink-muted)] hover:border-blue-300"
                   }`}
                 >
                   {p.label}
@@ -288,7 +288,7 @@ export default function PathwayManager() {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-600">
+            <label className="text-xs font-medium text-[var(--ink-muted)]">
               Estimated duration (weeks)
             </label>
             <input
@@ -297,7 +297,7 @@ export default function PathwayManager() {
               max={104}
               value={form.estimatedWeeks}
               onChange={(e) => setForm({ ...form, estimatedWeeks: Math.max(0, parseInt(e.target.value) || 0) })}
-              className="ml-2 w-20 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ml-2 w-20 text-sm theme-input rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -309,7 +309,7 @@ export default function PathwayManager() {
             >
               {saving ? "Saving..." : editingId ? "Save Changes" : "Create Pathway"}
             </button>
-            <button onClick={resetForm} className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700">
+            <button onClick={resetForm} className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]">
               Cancel
             </button>
           </div>
@@ -317,7 +317,7 @@ export default function PathwayManager() {
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
           + Add Pathway
         </button>

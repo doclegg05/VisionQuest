@@ -32,7 +32,7 @@ export default function StudentCards({
                 <div className="flex min-w-0 items-center gap-2">
                   {(() => {
                     if (!student.isActive) {
-                      return <span className="h-2.5 w-2.5 rounded-full bg-gray-300" />;
+                      return <span className="h-2.5 w-2.5 rounded-full bg-[var(--border-strong)]" />;
                     }
                     const lastActive = student.lastActive ? new Date(student.lastActive) : null;
                     const daysSince = lastActive
@@ -59,7 +59,7 @@ export default function StudentCards({
                 </p>
               </div>
               {!student.isActive && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
+                <span className="rounded-full bg-[var(--surface-interactive)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)]">
                   Inactive
                 </span>
               )}
@@ -92,7 +92,7 @@ export default function StudentCards({
                     {student.orientationDone}/{student.orientationTotal}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-[var(--surface-strong)] overflow-hidden">
                   <div
                     className="h-full rounded-full bg-emerald-400"
                     style={{
@@ -108,7 +108,7 @@ export default function StudentCards({
                     {student.certDone}/{student.certTotal}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-[var(--surface-strong)] overflow-hidden">
                   <div
                     className="h-full rounded-full bg-amber-400"
                     style={{

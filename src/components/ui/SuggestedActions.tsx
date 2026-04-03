@@ -130,7 +130,7 @@ export default function SuggestedActions({
           key={action.href + action.title}
           href={action.href}
           prefetch={false}
-          className="group flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 transition-all hover:-translate-y-0.5 hover:border-[rgba(15,154,146,0.25)] hover:shadow-sm"
+          className="group flex items-start gap-3 theme-card rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:border-[rgba(15,154,146,0.25)] hover:shadow-sm"
         >
           <span className="text-xl">{action.emoji}</span>
           <div className="flex-1 min-w-0">

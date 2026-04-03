@@ -14,10 +14,10 @@ export default function XpBar({ current, nextTarget, ratio, level }: XpBarProps)
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-gray-700">Level {level}</span>
-        <span className="text-gray-400">{current} / {nextTarget} XP</span>
+        <span className="font-medium text-[var(--ink-strong)]">Level {level}</span>
+        <span className="text-[var(--ink-faint)]">{current} / {nextTarget} XP</span>
       </div>
-      <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+      <div className="h-2.5 bg-[var(--surface-strong)] rounded-full overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}

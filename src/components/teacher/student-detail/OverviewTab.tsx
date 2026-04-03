@@ -68,15 +68,15 @@ export default function OverviewTab({
   return (
     <div className="space-y-6">
       {/* Student Identity Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="theme-card rounded-xl p-5">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{student.displayName}</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-bold text-[var(--ink-strong)]">{student.displayName}</h2>
+            <p className="text-sm text-[var(--ink-muted)]">
               ID: {student.studentId} {student.email && `\u2022 ${student.email}`}
             </p>
             <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--ink-faint)]">
                 Enrolled {new Date(student.createdAt).toLocaleDateString()}
               </p>
               <Link
@@ -100,7 +100,7 @@ export default function OverviewTab({
             </div>
             {showResetPw && (
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <label htmlFor="reset-password-input" className="text-xs text-gray-600">
+                <label htmlFor="reset-password-input" className="text-xs text-[var(--ink-muted)]">
                   New password:
                 </label>
                 <input
@@ -109,12 +109,12 @@ export default function OverviewTab({
                   value={newPassword}
                   onChange={(event) => onNewPasswordChange(event.target.value)}
                   placeholder="New password (6+ chars)"
-                  className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="text-sm theme-input rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   onClick={onResetPassword}
                   disabled={resetStatus === "saving" || newPassword.length < 6}
-                  className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
+                  className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-[var(--border-strong)]"
                 >
                   {resetStatus === "saving" ? "..." : resetStatus === "done" ? "Done!" : "Reset"}
                 </button>
@@ -174,7 +174,7 @@ export default function OverviewTab({
                     </button>
                     <button
                       onClick={() => onSetConfirmDeactivate(false)}
-                      className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                      className="theme-card-subtle rounded-lg px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
                     >
                       Cancel
                     </button>
@@ -215,30 +215,30 @@ export default function OverviewTab({
             <ReadinessScore score={readinessScore} size="sm" />
             <div>
               <p className="text-lg font-bold text-blue-600">Lv {progression.level}</p>
-              <p className="text-xs text-gray-400">{progression.xp} XP</p>
+              <p className="text-xs text-[var(--ink-faint)]">{progression.xp} XP</p>
             </div>
             {progression.streaks.daily.current > 0 && (
               <div>
                 <p className="text-lg font-bold text-orange-500">{"\uD83D\uDD25"} {progression.streaks.daily.current}</p>
-                <p className="text-xs text-gray-400">Day Streak</p>
+                <p className="text-xs text-[var(--ink-faint)]">Day Streak</p>
               </div>
             )}
             <div>
               <p className="text-lg font-bold text-teal-600">{appointments.length}</p>
-              <p className="text-xs text-gray-400">Appointments</p>
+              <p className="text-xs text-[var(--ink-faint)]">Appointments</p>
             </div>
             <div>
               <p className="text-lg font-bold text-violet-600">{openTasks.length}</p>
-              <p className="text-xs text-gray-400">Open Tasks</p>
+              <p className="text-xs text-[var(--ink-faint)]">Open Tasks</p>
             </div>
             <div>
               <p className="text-lg font-bold text-sky-600">{activeApplications.length}</p>
-              <p className="text-xs text-gray-400">Applications</p>
+              <p className="text-xs text-[var(--ink-faint)]">Applications</p>
             </div>
             {alerts.length > 0 && (
               <div>
                 <p className="text-lg font-bold text-rose-600">{alerts.length}</p>
-                <p className="text-xs text-gray-400">Alerts</p>
+                <p className="text-xs text-[var(--ink-faint)]">Alerts</p>
               </div>
             )}
           </div>
@@ -247,9 +247,9 @@ export default function OverviewTab({
 
       {/* Alerts */}
       {alerts.length > 0 && (
-        <div className="bg-white rounded-xl border border-amber-200 p-5">
+        <div className="bg-[var(--surface-raised)] rounded-xl border border-amber-200 p-5">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="text-sm font-semibold text-gray-700">Open Advising Alerts</h3>
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Open Advising Alerts</h3>
             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
               {alerts.length} active
             </span>
@@ -258,13 +258,13 @@ export default function OverviewTab({
             {alerts.map((alert: AlertData) => (
               <div key={alert.id} className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-gray-900">{alert.title}</p>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                  <p className="font-semibold text-[var(--ink-strong)]">{alert.title}</p>
+                  <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
                     {alert.severity}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-gray-600">{alert.summary}</p>
-                <p className="mt-2 text-xs text-gray-400">
+                <p className="mt-2 text-sm text-[var(--ink-muted)]">{alert.summary}</p>
+                <p className="mt-2 text-xs text-[var(--ink-faint)]">
                   Detected {dateFormatter.format(new Date(alert.detectedAt))}
                 </p>
               </div>
@@ -275,8 +275,8 @@ export default function OverviewTab({
 
       {/* Career Discovery Summary */}
       {careerDiscovery && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+        <div className="theme-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
             Career Discovery
             {careerDiscovery.status === "complete" && (
               <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Complete</span>
@@ -287,11 +287,11 @@ export default function OverviewTab({
           </h3>
           <div className="space-y-3">
             {careerDiscovery.sageSummary && (
-              <p className="text-sm text-gray-700">{careerDiscovery.sageSummary}</p>
+              <p className="text-sm text-[var(--ink-strong)]">{careerDiscovery.sageSummary}</p>
             )}
             {careerDiscovery.topClusters.length > 0 && (
               <div>
-                <span className="text-xs font-medium text-gray-500 uppercase">Top Pathways</span>
+                <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {careerDiscovery.topClusters.map((cluster) => (
                     <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
@@ -307,9 +307,9 @@ export default function OverviewTab({
 
       {/* Motivation Trend */}
       {moodEntries.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-gray-700">
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
               Motivation Trend
             </h3>
             {(() => {

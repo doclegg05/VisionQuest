@@ -98,7 +98,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                         event.status === "scheduled"
                           ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-700"
+                          : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                       }`}>
                         {event.status}
                       </span>
@@ -117,7 +117,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         href={event.virtualUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-white"
+                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                       >
                         Open link
                       </a>
@@ -129,7 +129,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         disabled={busyId === event.id}
                         className={`rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
                           isRegistered
-                            ? "border border-[rgba(18,38,63,0.12)] text-[var(--ink-strong)] hover:bg-white"
+                            ? "border border-[rgba(18,38,63,0.12)] text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                             : "primary-button"
                         }`}
                       >

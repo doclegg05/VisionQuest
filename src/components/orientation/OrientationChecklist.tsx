@@ -141,7 +141,7 @@ export default function OrientationChecklist({
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading checklist...</p>;
+    return <p className="text-sm text-[var(--ink-faint)]">Loading checklist...</p>;
   }
 
   if (error) return (
@@ -155,7 +155,7 @@ export default function OrientationChecklist({
 
   if (items.length === 0) {
     return (
-      <div className="text-center text-gray-400 py-8">
+      <div className="text-center text-[var(--ink-faint)] py-8">
         <p className="text-4xl mb-3">📋</p>
         <p className="text-sm">No orientation items have been set up yet.</p>
         <p className="text-xs mt-1">{emptyStateHint}</p>
@@ -184,7 +184,7 @@ export default function OrientationChecklist({
                   ? "bg-green-100 text-green-700"
                   : sDone > 0
                     ? "bg-amber-50 text-amber-800"
-                    : "bg-gray-100 text-[var(--ink-muted)]"
+                    : "bg-[var(--surface-interactive)] text-[var(--ink-muted)]"
               }`}
             >
               {isComplete ? "✓" : `${sDone}/${sTotal}`}
@@ -196,11 +196,11 @@ export default function OrientationChecklist({
 
       {/* Overall progress bar */}
       <div className="space-y-1">
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-[var(--ink-muted)]">
           <span>{done} of {total} completed</span>
           <span>{pct}%</span>
         </div>
-        <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-2.5 bg-[var(--surface-strong)] rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
             style={{ width: `${pct}%` }}
@@ -231,7 +231,7 @@ export default function OrientationChecklist({
             </div>
 
             {/* Section progress bar */}
-            <div className="mb-3 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+            <div className="mb-3 h-1.5 rounded-full bg-[var(--surface-strong)] overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   sectionComplete ? "bg-green-500" : "bg-amber-400"
@@ -252,14 +252,14 @@ export default function OrientationChecklist({
                       className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                         item.completed
                           ? "bg-green-50 border-green-200"
-                          : "bg-white border-gray-200 hover:bg-gray-50 bg-opacity-[86%]"
+                          : "bg-[var(--surface-raised)] border-[var(--border)] hover:bg-[var(--surface-soft)] bg-opacity-[86%]"
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={item.completed}
                         onChange={() => toggleItem(item.id, !item.completed)}
-                        className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
+                        className="h-5 w-5 rounded border-[var(--border-strong)] text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
                       />
                       <div
                         className="flex-1 min-w-0"

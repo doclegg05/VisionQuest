@@ -73,7 +73,7 @@ export default function NotificationBell() {
         ref={triggerRef}
         onClick={() => setOpen(!open)}
         type="button"
-        className="relative grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-white/10"
+        className="relative grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-[var(--surface-raised)]/10"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         aria-expanded={open}
         aria-haspopup="dialog"

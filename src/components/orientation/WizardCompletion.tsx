@@ -39,7 +39,7 @@ export default function WizardCompletion({ completedForms }: WizardCompletionPro
         </div>
       </div>
 
-      <p className="mt-4 text-xs text-gray-400">
+      <p className="mt-4 text-xs text-[var(--ink-faint)]">
         This page will be removed from your menu.
       </p>
 

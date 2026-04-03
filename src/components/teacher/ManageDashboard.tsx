@@ -33,7 +33,7 @@ const TABS: Array<{ key: Tab; label: string; icon: string }> = [
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-4 border-b border-gray-200 pb-2 text-lg font-semibold text-gray-800">
+    <h3 className="mb-4 border-b border-[var(--border)] pb-2 text-lg font-semibold text-[var(--ink-strong)]">
       {children}
     </h3>
   );
@@ -44,15 +44,15 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
 
   return (
     <div>
-      <div className="mb-6 flex gap-1 rounded-xl bg-gray-100 p-1">
+      <div className="mb-6 flex gap-1 rounded-xl theme-segmented p-1">
         {TABS.map((tabOption) => (
           <button
             key={tabOption.key}
             onClick={() => setTab(tabOption.key)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
               tab === tabOption.key
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-sm"
+                : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             }`}
           >
             <span className="mr-1.5">{tabOption.icon}</span>

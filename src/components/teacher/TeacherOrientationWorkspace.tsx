@@ -209,7 +209,7 @@ export default function TeacherOrientationWorkspace() {
             <select
               value={currentClassId}
               onChange={(event) => setCurrentClassId(event.target.value)}
-              className="w-full rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 text-sm text-[var(--ink-strong)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)]/80 px-4 py-3 text-sm text-[var(--ink-strong)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
             >
               {classes.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -227,7 +227,7 @@ export default function TeacherOrientationWorkspace() {
               value={currentStudentId}
               onChange={(event) => setCurrentStudentId(event.target.value)}
               disabled={studentLoading || students.length === 0}
-              className="w-full rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 text-sm text-[var(--ink-strong)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)]/80 px-4 py-3 text-sm text-[var(--ink-strong)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {students.map((student) => (
                 <option key={student.id} value={student.id}>

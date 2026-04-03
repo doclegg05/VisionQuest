@@ -207,7 +207,7 @@ export default function OpportunitiesHub({
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                         opportunity.status === "open"
                           ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-700"
+                          : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                       }`}>
                         {opportunity.status}
                       </span>
@@ -227,7 +227,7 @@ export default function OpportunitiesHub({
                       href={opportunity.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-white"
+                      className="shrink-0 rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                     >
                       Open listing
                     </a>
@@ -253,7 +253,7 @@ export default function OpportunitiesHub({
                         type="button"
                         onClick={() => void attachCurrentResume(opportunity.id)}
                         disabled={attachingId === opportunity.id || savingId === opportunity.id}
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {attachingId === opportunity.id
                           ? "Preparing resume..."
@@ -266,7 +266,7 @@ export default function OpportunitiesHub({
                           href={`/api/files/download?id=${draft.resumeFileId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-white"
+                          className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
                         >
                           View Resume
                         </a>
@@ -297,7 +297,7 @@ export default function OpportunitiesHub({
                         },
                       }))
                     }
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {APPLICATION_STATUSES.map((status) => (
                       <option key={status.value} value={status.value}>
@@ -318,7 +318,7 @@ export default function OpportunitiesHub({
                     }
                     placeholder="Notes, follow-up steps, or interview details"
                     rows={3}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
                     type="button"

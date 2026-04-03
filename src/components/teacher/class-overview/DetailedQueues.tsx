@@ -117,7 +117,7 @@ export default function DetailedQueues({
                               {alert.student.displayName} &bull; {alert.student.studentId}
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                          <span className="shrink-0 rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
                             {alert.severity}
                           </span>
                         </div>
@@ -131,14 +131,14 @@ export default function DetailedQueues({
                               <button
                                 type="button"
                                 onClick={() => onSetActionIntent(quickIntent)}
-                                className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-white"
+                                className="rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
                               >
                                 {quickAction?.label}
                               </button>
                             ) : null}
                             <Link
                               href={action.href}
-                              className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
                             >
                               {action.label}
                             </Link>
@@ -207,7 +207,7 @@ export default function DetailedQueues({
                               {item.student.displayName} &bull; {item.student.studentId}
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-700">
+                          <span className="shrink-0 rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-strong)]">
                             {item.severity}
                           </span>
                         </div>
@@ -221,14 +221,14 @@ export default function DetailedQueues({
                               <button
                                 type="button"
                                 onClick={() => onSetActionIntent(quickIntent)}
-                                className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-white"
+                                className="rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
                               >
                                 {quickAction?.label}
                               </button>
                             ) : null}
                             <Link
                               href={action.href}
-                              className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
                             >
                               {action.label}
                             </Link>
@@ -273,7 +273,7 @@ export default function DetailedQueues({
                             {appointment.student.displayName} &bull; {appointment.student.studentId}
                           </p>
                         </div>
-                        <span className="max-w-full rounded-full bg-white px-2.5 py-1 text-center text-[11px] leading-4 font-semibold text-[var(--accent-secondary)] whitespace-normal">
+                        <span className="max-w-full rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-center text-[11px] leading-4 font-semibold text-[var(--accent-secondary)] whitespace-normal">
                           {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                         </span>
                       </div>
@@ -373,20 +373,20 @@ export default function DetailedQueues({
                                   linkId: null,
                                 })
                               }
-                              className="rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-white"
+                              className="rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
                             >
                               {quickAction.label}
                             </button>
                           ) : null}
                           <Link
                             href={`/teacher/students/${item.student.id}`}
-                            className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
                           >
                             Open student
                           </Link>
                           <Link
                             href={`/teacher/classes${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
-                            className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
                           >
                             Manage roster
                           </Link>

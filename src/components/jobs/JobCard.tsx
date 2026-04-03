@@ -68,7 +68,7 @@ export function JobCard({
       {/* Cluster badge */}
       {primaryCluster && (
         <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${
-          CLUSTER_COLORS[primaryCluster] ?? "bg-gray-500/20 text-gray-300"
+          CLUSTER_COLORS[primaryCluster] ?? "bg-[var(--surface-interactive)] text-[var(--ink-faint)]"
         }`}>
           {CLUSTER_LABELS[primaryCluster] ?? primaryCluster}
         </span>

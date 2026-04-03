@@ -46,15 +46,15 @@ const STATUS_STYLES: Record<GoalStatus, string> = {
   confirmed: "bg-teal-100 text-teal-700",
   blocked: "bg-amber-100 text-amber-800",
   completed: "bg-violet-100 text-violet-700",
-  abandoned: "bg-slate-100 text-slate-700",
+  abandoned: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
 };
 const RESOURCE_STATUS_STYLES: Record<GoalResourceLinkStatus, string> = {
-  suggested: "bg-slate-100 text-slate-700",
+  suggested: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
   assigned: "bg-sky-100 text-sky-700",
   in_progress: "bg-amber-100 text-amber-800",
   completed: "bg-emerald-100 text-emerald-700",
   blocked: "bg-rose-100 text-rose-800",
-  dismissed: "bg-zinc-100 text-zinc-600",
+  dismissed: "bg-[var(--surface-interactive)] text-[var(--ink-muted)]",
 };
 const STUDENT_LINK_STATUSES: GoalResourceLinkStatus[] = ["assigned", "in_progress", "completed", "blocked"];
 
@@ -316,7 +316,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{meta.icon}</span>
                   <h2 className="font-display text-xl text-[var(--ink-strong)]">{meta.label}</h2>
-                  <span className="rounded-full bg-white/75 px-2.5 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                  <span className="rounded-full bg-[var(--surface-raised)]/75 px-2.5 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                     {levelGoals.length}
                   </span>
                 </div>
@@ -341,7 +341,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   setNewGoalStatus("active");
                   setMessage(null);
                 }}
-                className="rounded-full border border-[var(--border-strong)] bg-white/80 px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition hover:-translate-y-0.5 hover:bg-white"
+                className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)]/80 px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-raised)]"
               >
                 Add {level === "task" ? "Task" : "Goal"}
               </button>
@@ -393,7 +393,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         setNewGoalContent("");
                         setNewGoalStatus("active");
                       }}
-                      className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-muted)] transition hover:bg-white/70"
+                      className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-muted)] transition hover:bg-[var(--surface-raised)]/70"
                     >
                       Cancel
                     </button>
@@ -497,7 +497,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               const dueLabel = typeof link.dueAt === "string" ? formatDueDate(link.dueAt) : null;
                               const draftStatus = linkStatusDrafts[link.id] ?? link.status;
                               return (
-                                <div key={link.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+                                <div key={link.id} className="theme-card rounded-xl p-3">
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
@@ -529,7 +529,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                         href={link.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-white"
+                                        className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
                                       >
                                         Open Resource
                                       </a>
@@ -582,7 +582,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           </p>
                           <div className="mt-3 space-y-3">
                             {goalPlan.recommendations.map((resource) => (
-                              <div key={`${resource.resourceType}:${resource.resourceId}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+                              <div key={`${resource.resourceType}:${resource.resourceId}`} className="theme-card rounded-xl p-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
@@ -602,7 +602,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                       href={resource.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-white"
+                                      className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
                                     >
                                       View Resource
                                     </a>

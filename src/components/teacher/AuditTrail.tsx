@@ -46,7 +46,7 @@ export default function AuditTrail() {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading audit trail...</p>;
+    return <p className="text-sm text-[var(--ink-faint)]">Loading audit trail...</p>;
   }
 
   if (error) {
@@ -59,7 +59,7 @@ export default function AuditTrail() {
 
   if (logs.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-white/70 p-6 text-sm text-[var(--ink-muted)]">
+      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)]/70 p-6 text-sm text-[var(--ink-muted)]">
         No tracked teacher actions yet.
       </div>
     );

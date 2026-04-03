@@ -22,7 +22,7 @@ const LEVEL_CONFIG: Record<string, { label: string; icon: string; color: string;
   monthly: { label: "Monthly Goal", icon: GOAL_LEVEL_META.monthly.icon, color: "from-sky-50 to-cyan-50 border-sky-200", indent: 1 },
   weekly: { label: "Weekly Goal", icon: "📋", color: "from-violet-50 to-purple-50 border-violet-200", indent: 2 },
   daily: { label: "Daily Goal", icon: "⚡", color: "from-emerald-50 to-green-50 border-emerald-200", indent: 3 },
-  task: { label: "Action Task", icon: GOAL_LEVEL_META.task.icon, color: "from-slate-50 to-gray-50 border-slate-200", indent: 4 },
+  task: { label: "Action Task", icon: GOAL_LEVEL_META.task.icon, color: "from-[var(--surface-soft)] to-[var(--surface-soft)] border-[var(--border)]", indent: 4 },
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -30,7 +30,7 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   in_progress: { label: "In Progress", className: "bg-sky-100 text-sky-700" },
   blocked: { label: "Blocked", className: "bg-amber-100 text-amber-800" },
   completed: { label: "Done", className: "bg-violet-100 text-violet-700" },
-  abandoned: { label: "Dropped", className: "bg-gray-100 text-gray-500" },
+  abandoned: { label: "Dropped", className: "bg-[var(--surface-interactive)] text-[var(--ink-muted)]" },
 };
 
 export default function GoalTree({ goals }: GoalTreeProps) {
@@ -73,10 +73,10 @@ export default function GoalTree({ goals }: GoalTreeProps) {
   };
 
   function renderGoalNode(goal: GoalData & { children: GoalData[] }, depth: number) {
-    const config = LEVEL_CONFIG[goal.level] || { label: goal.level, icon: "📌", color: "from-gray-50 to-white border-gray-200", indent: 0 };
+    const config = LEVEL_CONFIG[goal.level] || { label: goal.level, icon: "📌", color: "from-[var(--surface-soft)] to-white border-[var(--border)]", indent: 0 };
     const status = STATUS_BADGE[goal.status] || {
       label: goalStatusLabel(goal.status),
-      className: "bg-slate-100 text-slate-700",
+      className: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
     };
     const isCollapsed = collapsed.has(goal.id);
     const hasChildren = goal.children.length > 0;

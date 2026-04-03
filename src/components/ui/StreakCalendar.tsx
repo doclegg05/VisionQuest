@@ -56,12 +56,12 @@ export default function StreakCalendar({ days }: StreakCalendarProps) {
                 cell.isToday
                   ? cell.count > 0
                     ? "bg-green-500 ring-2 ring-green-300"
-                    : "bg-gray-200 ring-2 ring-[var(--accent-strong)]"
+                    : "bg-[var(--surface-strong)] ring-2 ring-[var(--accent-strong)]"
                   : cell.count >= 3
                     ? "bg-green-500"
                     : cell.count > 0
                       ? "bg-green-300"
-                      : "bg-gray-100"
+                      : "bg-[var(--surface-interactive)]"
               }`}
             />
           )

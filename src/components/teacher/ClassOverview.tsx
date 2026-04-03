@@ -163,7 +163,7 @@ export default function ClassOverview({
   }
 
   function getSortIcon(col: SortKey) {
-    if (sortBy !== col) return <span className="ml-1 text-gray-300">↕</span>;
+    if (sortBy !== col) return <span className="ml-1 text-[var(--ink-faint)]">↕</span>;
     return <span className="ml-1 text-[var(--accent-blue)]">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
@@ -358,7 +358,7 @@ export default function ClassOverview({
       {/* View & Filter Controls */}
       <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-full border border-[var(--border)] bg-white/70 p-1">
+          <div className="flex rounded-full border border-[var(--border)] bg-[var(--surface-raised)]/70 p-1">
             <button
               onClick={() => setViewMode("table")}
               className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
@@ -382,7 +382,7 @@ export default function ClassOverview({
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-[var(--accent-secondary)]"
+              className="h-4 w-4 rounded border-[var(--border-strong)] text-[var(--accent-secondary)]"
             />
             Show inactive students
           </label>

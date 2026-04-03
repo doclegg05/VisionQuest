@@ -69,7 +69,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
         {/* Empty state */}
         {items.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-            <div className="rounded-[1.4rem] border border-white/55 bg-white/82 p-8 shadow-[0_18px_45px_rgba(68,43,18,0.18)] backdrop-blur">
+            <div className="rounded-[1.4rem] border border-white/55 bg-[var(--surface-raised)]/82 p-8 shadow-[0_18px_45px_rgba(68,43,18,0.18)] backdrop-blur">
               <p className="mb-3 text-3xl">📌</p>
               <p className="font-display text-lg text-[#5A3E20]">Your vision board is empty</p>
               <p className="mt-2 text-sm text-[#8B6F47]">
@@ -79,7 +79,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
           </div>
         )}
 
-        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-white/24 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/80 shadow-[0_8px_16px_rgba(70,42,10,0.14)]">
+        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-[var(--surface-raised)]/24 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/80 shadow-[0_8px_16px_rgba(70,42,10,0.14)]">
           Creative workspace
         </div>
 

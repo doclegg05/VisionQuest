@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
-import { listManagedStudentIds } from "@/lib/classroom";
+import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { goalCountsTowardPlan } from "@/lib/goals";
@@ -31,6 +31,7 @@ interface StudentReadiness {
 export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? undefined;
+  if (classId) await assertStaffCanManageClass(session, classId);
   // This report is a point-in-time snapshot of current student readiness,
   // not a historical report. The month field in the response reflects now.
   const now = new Date();

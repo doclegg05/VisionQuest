@@ -102,9 +102,9 @@ function QuickTaskModal({
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl space-y-3"
+        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
       >
-        <h3 className="text-sm font-semibold text-gray-700">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
           Quick task for {studentName}
         </h3>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -114,16 +114,16 @@ function QuickTaskModal({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <input
           type="date"
           value={dueAt}
           onChange={(e) => setDueAt(e.target.value)}
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <div className="flex gap-2 justify-end">
-          <button type="button" onClick={onClose} className="text-sm text-gray-500 px-3 py-1.5">
+          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
             Cancel
           </button>
           <button
@@ -202,7 +202,7 @@ function StudentRow({
           onQuickTask(student.studentId, student.name);
         }}
         title="Assign quick task"
-        className="shrink-0 rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-gray-100 hover:text-gray-700"
+        className="shrink-0 rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
       >
         <DotsThree size={18} weight="bold" />
       </button>

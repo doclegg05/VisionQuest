@@ -174,7 +174,7 @@ export default function StudentAdvisingHub({
                       startsAt: nextAdvisor?.slots[0]?.startsAt || "",
                     }));
                   }}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {bookableAdvisors.map((advisor) => (
                     <option key={advisor.advisorId} value={advisor.advisorId}>
@@ -191,7 +191,7 @@ export default function StudentAdvisingHub({
                 <select
                   value={selectedSlot?.startsAt || ""}
                   onChange={(event) => setBookingForm((current) => ({ ...current, startsAt: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {(selectedAdvisor?.slots || []).map((slot) => (
                     <option key={slot.key} value={slot.startsAt}>
@@ -206,7 +206,7 @@ export default function StudentAdvisingHub({
                 value={bookingForm.title}
                 onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="Appointment title (optional)"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
               <textarea
@@ -214,7 +214,7 @@ export default function StudentAdvisingHub({
                 onChange={(event) => setBookingForm((current) => ({ ...current, description: event.target.value }))}
                 placeholder="What would you like help with?"
                 rows={4}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
               <button
@@ -352,7 +352,7 @@ export default function StudentAdvisingHub({
                 <div key={alert.id} className="rounded-[1.2rem] border border-amber-200 bg-amber-50/80 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                    <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
                       {alert.severity}
                     </span>
                   </div>
@@ -414,7 +414,7 @@ export default function StudentAdvisingHub({
                         task.priority === "high"
                           ? "bg-rose-100 text-rose-800"
                           : task.priority === "low"
-                            ? "bg-slate-100 text-slate-700"
+                            ? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                             : "bg-amber-100 text-amber-800"
                       }`}>
                         {task.priority}
@@ -432,7 +432,7 @@ export default function StudentAdvisingHub({
                         onClick={() => updateTaskStatus(task.id, isCompleted ? "open" : "completed")}
                         className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
-                            ? "bg-white text-[var(--ink-strong)] hover:bg-slate-100"
+                            ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
                             : "bg-[var(--ink-strong)] text-white hover:bg-[rgba(16,37,62,0.9)]"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >

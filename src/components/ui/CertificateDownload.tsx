@@ -45,7 +45,7 @@ export default function CertificateDownload({
     <button
       onClick={handleDownload}
       disabled={disabled || generating}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.06)] disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex items-center gap-1.5 theme-card-subtle rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.06)] disabled:opacity-50 disabled:cursor-not-allowed"
     >
       📄 {generating ? "Generating..." : "Download Certificate"}
     </button>

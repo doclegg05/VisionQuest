@@ -62,7 +62,7 @@ export default function BrandLockup({
   const content = (
     <div className={wrapperClassName}>
       <div className="flex shrink-0 items-stretch gap-1.5">
-        <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-white p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
+        <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-[var(--surface-raised)] p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
           <Image
             src="/wvae-logo.png"
             alt="WVAE logo"
@@ -72,7 +72,7 @@ export default function BrandLockup({
             className="h-auto w-auto max-h-full object-contain"
           />
         </div>
-        <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-white p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
+        <div className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-[var(--surface-raised)] p-1.5 shadow-[0_14px_34px_rgba(16,37,62,0.12)]">
           <Image
             src="/spokes-logo.png"
             alt="SPOKES logo"

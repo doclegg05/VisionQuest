@@ -302,7 +302,7 @@ function StudentAccordion({
                 {group.highCount} urgent
               </span>
             )}
-            <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+            <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)]">
               {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
             </span>
           </div>
@@ -336,12 +336,12 @@ function StudentAccordion({
               <div
                 key={c.key}
                 className={`mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[0.85rem] border px-3 py-2.5 ${
-                  isHigh ? "border-red-200 bg-red-50/80" : "border-gray-200 bg-white"
+                  isHigh ? "border-red-200 bg-red-50/80" : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
                       {c.groupCategory}
                     </span>
                     {isHigh && (
@@ -369,7 +369,7 @@ function StudentAccordion({
                   {c.primaryAction && (
                     <Link
                       href={c.primaryAction.href}
-                      className="rounded-full border border-[rgba(18,38,63,0.12)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-gray-50"
+                      className="rounded-full border border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
                     >
                       {c.primaryAction.label}
                     </Link>
