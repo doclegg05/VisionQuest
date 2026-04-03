@@ -34,6 +34,7 @@ export async function checkStudentCompliance(
   const enrollment = await prisma.studentClassEnrollment.findFirst({
     where: { studentId, status: "active" },
     select: { classId: true },
+    orderBy: { enrolledAt: "desc" },
   });
   if (!enrollment) return null;
 
@@ -47,7 +48,7 @@ export async function checkStudentComplianceForClass(
   studentId: string,
   classId: string,
 ): Promise<StudentRequirementCompliance> {
-  const [requirements, certifications, orientationProgress, formSubmissions] =
+  const [requirements, certifications, orientationProgress, formSubmissions, progression] =
     await Promise.all([
       prisma.classRequirement.findMany({
         where: { classId },
@@ -65,16 +66,16 @@ export async function checkStudentComplianceForClass(
         where: { studentId },
         select: { formId: true, status: true },
       }),
+      prisma.progression.findUnique({
+        where: { studentId },
+        select: { state: true },
+      }),
     ]);
 
+  // Only count certifications that are fully completed (not in-progress)
   const completedCerts = new Set(
     certifications
       .filter((c) => c.status === "completed")
-      .map((c) => c.certType),
-  );
-  const inProgressCerts = new Set(
-    certifications
-      .filter((c) => c.status !== "completed")
       .map((c) => c.certType),
   );
   const completedOrientation = new Set(
@@ -86,12 +87,23 @@ export async function checkStudentComplianceForClass(
       .map((f) => f.formId),
   );
 
+  // Parse platform visits from progression state
+  let visitedPlatforms = new Set<string>();
+  if (progression?.state) {
+    try {
+      const state = JSON.parse(progression.state);
+      if (Array.isArray(state.platformsVisited)) {
+        visitedPlatforms = new Set(state.platformsVisited as string[]);
+      }
+    } catch { /* ignore malformed state */ }
+  }
+
   const items: RequirementComplianceItem[] = requirements.map((req) => {
     let met = false;
 
     switch (req.itemType) {
       case "certification":
-        met = completedCerts.has(req.itemId) || inProgressCerts.has(req.itemId);
+        met = completedCerts.has(req.itemId);
         break;
       case "orientation":
         met = completedOrientation.has(req.itemId);
@@ -100,9 +112,7 @@ export async function checkStudentComplianceForClass(
         met = submittedForms.has(req.itemId);
         break;
       case "course":
-        // Courses (platforms) are met if the student has visited the platform
-        // We don't have a direct check here — treat as met for now if not required
-        met = req.status === "not_applicable";
+        met = visitedPlatforms.has(req.itemId);
         break;
     }
 
@@ -155,7 +165,7 @@ export async function checkClassCompliance(
 
   const studentIds = enrollments.map((e) => e.studentId);
 
-  const [allCerts, allOrientation, allForms] = await Promise.all([
+  const [allCerts, allOrientation, allForms, allProgressions] = await Promise.all([
     prisma.certification.findMany({
       where: { studentId: { in: studentIds } },
       select: { studentId: true, certType: true, status: true },
@@ -167,6 +177,10 @@ export async function checkClassCompliance(
     prisma.formSubmission.findMany({
       where: { studentId: { in: studentIds } },
       select: { studentId: true, formId: true, status: true },
+    }),
+    prisma.progression.findMany({
+      where: { studentId: { in: studentIds } },
+      select: { studentId: true, state: true },
     }),
   ]);
 
@@ -189,17 +203,19 @@ export async function checkClassCompliance(
     list.push(f);
     formsByStudent.set(f.studentId, list);
   }
+  const progressionByStudent = new Map<string, string>();
+  for (const p of allProgressions) {
+    progressionByStudent.set(p.studentId, p.state);
+  }
 
   for (const sid of studentIds) {
     const certs = certsByStudent.get(sid) ?? [];
     const orientation = orientationByStudent.get(sid) ?? [];
     const forms = formsByStudent.get(sid) ?? [];
 
+    // Only count completed certifications (not in-progress)
     const completedCerts = new Set(
       certs.filter((c) => c.status === "completed").map((c) => c.certType),
-    );
-    const inProgressCerts = new Set(
-      certs.filter((c) => c.status !== "completed").map((c) => c.certType),
     );
     const completedOrientation = new Set(orientation.map((o) => o.itemId));
     const submittedForms = new Set(
@@ -208,11 +224,23 @@ export async function checkClassCompliance(
         .map((f) => f.formId),
     );
 
+    // Parse platform visits from progression state
+    let visitedPlatforms = new Set<string>();
+    const stateJson = progressionByStudent.get(sid);
+    if (stateJson) {
+      try {
+        const state = JSON.parse(stateJson);
+        if (Array.isArray(state.platformsVisited)) {
+          visitedPlatforms = new Set(state.platformsVisited as string[]);
+        }
+      } catch { /* ignore */ }
+    }
+
     const items: RequirementComplianceItem[] = requirements.map((req) => {
       let met = false;
       switch (req.itemType) {
         case "certification":
-          met = completedCerts.has(req.itemId) || inProgressCerts.has(req.itemId);
+          met = completedCerts.has(req.itemId);
           break;
         case "orientation":
           met = completedOrientation.has(req.itemId);
@@ -221,7 +249,7 @@ export async function checkClassCompliance(
           met = submittedForms.has(req.itemId);
           break;
         case "course":
-          met = req.status === "not_applicable";
+          met = visitedPlatforms.has(req.itemId);
           break;
       }
       return {
