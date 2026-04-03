@@ -14,11 +14,13 @@ import AcademicKpiReport from "./AcademicKpiReport";
 import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 import { JobConfigSection } from "./JobConfigSection";
+import AiConfigPanel from "./AiConfigPanel";
 
 type Tab = "orientation" | "spokes" | "lms" | "certifications" | "advising" | "career" | "job-board" | "reports" | "audit" | "documents";
 
 interface ManageDashboardProps {
   canViewAudit: boolean;
+  canViewAiConfig: boolean;
 }
 
 const BASE_TABS: Array<{ key: Exclude<Tab, "audit">; label: string }> = [
@@ -33,7 +35,7 @@ const BASE_TABS: Array<{ key: Exclude<Tab, "audit">; label: string }> = [
   { key: "documents", label: "Documents" },
 ];
 
-export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) {
+export default function ManageDashboard({ canViewAudit, canViewAiConfig }: ManageDashboardProps) {
   const [tab, setTab] = useState<Tab>("orientation");
   const tabs = useMemo<Array<{ key: Tab; label: string }>>(() => {
     if (!canViewAudit) {
@@ -78,6 +80,12 @@ export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) 
           <OutcomesReport />
           <SpokesReport />
           <AcademicKpiReport />
+          {canViewAiConfig && (
+            <section>
+              <SectionHeading>AI Configuration</SectionHeading>
+              <AiConfigPanel />
+            </section>
+          )}
         </div>
       )}
       {canViewAudit && tab === "audit" && <AuditTrail />}
