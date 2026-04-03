@@ -21,12 +21,15 @@ interface OrientationItem {
   completed: boolean;
 }
 
-type StepType = "sign" | "acknowledge" | "read-only" | "no-pdf";
+type StepType = "sign" | "acknowledge" | "read-only" | "no-pdf" | "instructor-led";
 
 interface WizardStep {
   orientationItemId: string;
-  form: SpokesForm;
+  form?: SpokesForm;
   type: StepType;
+  stepTitle: string;
+  stepDescription: string | null;
+  isLastForItem: boolean;
 }
 
 function classifyStep(form: SpokesForm): StepType {
@@ -41,17 +44,33 @@ function deriveSteps(items: OrientationItem[]): WizardStep[] {
   for (const item of items) {
     if (item.completed) continue;
     const detail = getOrientationStepDetail(item.label);
+    if (detail.forms.length === 0) {
+      if (detail.note) {
+        steps.push({
+          orientationItemId: item.id,
+          type: "instructor-led",
+          stepTitle: item.label,
+          stepDescription: item.description,
+          isLastForItem: true,
+        });
+      }
+      continue;
+    }
+    const formSteps: WizardStep[] = [];
     for (const form of detail.forms) {
-      steps.push({
+      formSteps.push({
         orientationItemId: item.id,
         form,
         type: classifyStep(form),
+        stepTitle: form.title,
+        stepDescription: form.description,
+        isLastForItem: false,
       });
     }
-    // Items with no forms still need acknowledgment
-    if (detail.forms.length === 0) {
-      continue; // Skip items without forms — they're non-document steps
+    if (formSteps.length > 0) {
+      formSteps[formSteps.length - 1].isLastForItem = true;
     }
+    steps.push(...formSteps);
   }
   return steps;
 }
@@ -101,11 +120,14 @@ export default function OrientationWizard() {
   }, [fetchData]);
 
   async function markItemComplete(itemId: string) {
-    await fetch("/api/orientation", {
+    const res = await fetch("/api/orientation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId, completed: true }),
     });
+    if (!res.ok) {
+      throw new Error("Failed to save progress");
+    }
   }
 
   async function handleSign(dataUrl: string) {
@@ -117,15 +139,17 @@ export default function OrientationWizard() {
       const signRes = await fetch("/api/forms/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formId: step.form.id, signature: dataUrl }),
+        body: JSON.stringify({ formId: step.form!.id, signature: dataUrl }),
       });
       if (!signRes.ok) {
         const data = await signRes.json().catch(() => ({}));
         setError(data.error || "Signature submission failed.");
         return;
       }
-      await markItemComplete(step.orientationItemId);
-      advanceStep({ title: step.form.title, type: "signed" });
+      if (step.isLastForItem) {
+        await markItemComplete(step.orientationItemId);
+      }
+      advanceStep({ title: step.stepTitle, type: "signed" });
     } catch {
       setError("Submission failed. Please try again.");
     } finally {
@@ -139,9 +163,11 @@ export default function OrientationWizard() {
     setSubmitting(true);
     setError(null);
     try {
-      await markItemComplete(step.orientationItemId);
+      if (step.isLastForItem) {
+        await markItemComplete(step.orientationItemId);
+      }
       const type = step.type === "acknowledge" ? "acknowledged" : "read";
-      advanceStep({ title: step.form.title, type });
+      advanceStep({ title: step.stepTitle, type });
     } catch {
       setError("Failed to save. Please try again.");
     } finally {
@@ -154,8 +180,10 @@ export default function OrientationWizard() {
     if (!step) return;
     setSubmitting(true);
     try {
-      await markItemComplete(step.orientationItemId);
-      advanceStep({ title: step.form.title, type: "read" });
+      if (step.isLastForItem) {
+        await markItemComplete(step.orientationItemId);
+      }
+      advanceStep({ title: step.stepTitle, type: "read" });
     } catch {
       setError("Failed to save. Please try again.");
     } finally {
@@ -233,7 +261,7 @@ export default function OrientationWizard() {
   const step = steps[currentStep];
   if (!step) return null;
 
-  const pdfUrl = hasDownloadableFormDocument(step.form)
+  const pdfUrl = step.form && hasDownloadableFormDocument(step.form)
     ? buildFormDownloadUrl(step.form, "view")
     : null;
 
@@ -242,11 +270,21 @@ export default function OrientationWizard() {
       <WizardStepIndicator
         totalSteps={steps.length}
         currentStep={currentStep}
-        currentTitle={step.form.title}
+        currentTitle={step.stepTitle}
       />
 
-      {/* PDF Viewer */}
-      {step.type === "no-pdf" ? (
+      {/* PDF Viewer / Instructor-led placeholder */}
+      {step.type === "instructor-led" ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] py-16 gap-3">
+          <p className="text-base font-medium text-[var(--ink-strong)]">{step.stepTitle}</p>
+          {step.stepDescription && (
+            <p className="text-sm text-[var(--ink-muted)] text-center max-w-md">{step.stepDescription}</p>
+          )}
+          <p className="mt-2 text-xs text-gray-400">
+            Your instructor will lead this step.
+          </p>
+        </div>
+      ) : step.type === "no-pdf" ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] py-16">
           <p className="text-sm text-[var(--ink-muted)]">
             This form is not yet available digitally.
@@ -258,9 +296,9 @@ export default function OrientationWizard() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[rgba(16,37,62,0.08)]">
           <iframe
-            key={step.form.id}
+            key={step.form!.id}
             src={pdfUrl!}
-            title={step.form.title}
+            title={step.form!.title}
             className="h-[500px] w-full border-0 bg-white"
           />
         </div>
@@ -268,6 +306,18 @@ export default function OrientationWizard() {
 
       {/* Action area */}
       <div className="rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] p-5 space-y-4">
+        {/* Mark Complete button (instructor-led type) */}
+        {step.type === "instructor-led" && (
+          <button
+            type="button"
+            onClick={handleAcknowledge}
+            disabled={submitting}
+            className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? "Saving..." : "Mark Complete & Continue →"}
+          </button>
+        )}
+
         {/* Read checkbox (for sign and acknowledge types) */}
         {(step.type === "sign" || step.type === "acknowledge") && (
           <label className="flex items-center gap-3 cursor-pointer">
