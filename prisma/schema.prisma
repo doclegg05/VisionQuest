@@ -1095,3 +1095,13 @@ model StudentSavedJob {
   @@unique([studentId, jobListingId])
   @@schema("visionquest")
 }
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@schema("visionquest")
+}
