@@ -13,7 +13,7 @@ interface AchievementListProps {
 export default function AchievementList({ achievements }: AchievementListProps) {
   if (achievements.length === 0) {
     return (
-      <p className="text-sm text-gray-400 italic">
+      <p className="text-sm text-[var(--ink-muted)] italic">
         No achievements yet — keep talking to Sage and working on your goals!
       </p>
     );

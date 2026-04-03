@@ -34,7 +34,7 @@ export default function AchievementUnlock({ label, desc, onDone }: AchievementUn
       >
         <span className="text-3xl">🏅</span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600/70">Achievement Unlocked</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Achievement Unlocked</p>
           <p className="mt-0.5 font-display text-lg text-[var(--ink-strong)]">{label}</p>
           <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{desc}</p>
         </div>

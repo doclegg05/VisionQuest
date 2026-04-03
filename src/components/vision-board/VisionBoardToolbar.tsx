@@ -134,7 +134,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white/70 px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
         >
           📷 {uploading ? "Uploading..." : "Add Image"}
         </button>
@@ -149,7 +149,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         {/* Add Note */}
         <button
           onClick={() => { setShowNoteForm(!showNoteForm); setShowGoalPicker(false); }}
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white/70 px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           📝 Add Note
         </button>
@@ -161,7 +161,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             setShowNoteForm(false);
             if (!showGoalPicker) loadGoals();
           }}
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white/70 px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           🎯 Link Goal
         </button>
@@ -169,7 +169,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
 
       {/* Note form popover */}
       {showNoteForm && (
-        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-white/95 p-4 shadow-xl backdrop-blur-lg z-50">
+        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xl backdrop-blur-lg z-50">
           <p className="text-xs font-semibold text-[var(--ink-muted)] mb-2">New Note</p>
           <textarea
             value={noteText}
@@ -216,7 +216,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
 
       {/* Goal picker popover */}
       {showGoalPicker && (
-        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-white/95 p-4 shadow-xl backdrop-blur-lg z-50">
+        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xl backdrop-blur-lg z-50">
           <p className="text-xs font-semibold text-[var(--ink-muted)] mb-2">Link a Goal</p>
           {loadingGoals ? (
             <p className="text-xs text-[var(--ink-muted)]">Loading goals...</p>

@@ -35,9 +35,10 @@ interface NavBarProps {
   studentName: string;
   role: string;
   navPhase?: NavPhase;
+  orientationComplete?: boolean;
 }
 
-export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
+export default function NavBar({ studentName, role, navPhase, orientationComplete }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);

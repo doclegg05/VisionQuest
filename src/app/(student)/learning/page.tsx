@@ -2,6 +2,7 @@ import CertTracker from "@/components/certifications/CertTracker";
 import CredlyBadges from "@/components/certifications/CredlyBadges";
 import CredlyConnect from "@/components/certifications/CredlyConnect";
 import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
+import StudentPathwayPlan from "@/components/goals/StudentPathwayPlan";
 import { LearningPathway, LearningPathwayEmpty } from "@/components/career/LearningPathway";
 import CoursesHub from "@/components/lms/CoursesHub";
 import PageIntro from "@/components/ui/PageIntro";
@@ -34,6 +35,8 @@ export default async function LearningPage() {
           <LearningPathwayEmpty />
         )}
       </section>
+
+      <StudentPathwayPlan goals={goals} />
 
       <GoalPlanFocus
         title="Goal-aligned training"

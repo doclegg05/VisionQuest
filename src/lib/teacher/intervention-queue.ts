@@ -13,6 +13,7 @@ export interface InterventionQueueStudentRecord {
     status: string;
     updatedAt: Date;
     lastReviewedAt: Date | null;
+    pathwayId: string | null;
   }>;
   orientationProgress: Array<{
     completed: boolean;
@@ -125,6 +126,16 @@ export function buildInterventionQueueEntry(input: {
     totalCertifications: input.totalCertifications,
   });
 
+  // Unmatched goals: confirmed/active goals without pathway assignment
+  const PATHWAY_ELIGIBLE_STATUSES = ["confirmed", "active", "in_progress"];
+  const PATHWAY_ELIGIBLE_LEVELS = ["bhag", "long_term", "monthly"];
+  const unmatchedGoalCount = student.goals.filter(
+    (goal) =>
+      PATHWAY_ELIGIBLE_STATUSES.includes(goal.status) &&
+      PATHWAY_ELIGIBLE_LEVELS.includes(goal.level) &&
+      !goal.pathwayId,
+  ).length;
+
   const signals: StudentSignals = {
     daysSinceLastGoalReview: lastGoalReviewedAt
       ? daysBetween(lastGoalReviewedAt, now)
@@ -151,6 +162,7 @@ export function buildInterventionQueueEntry(input: {
         now,
       ),
     ).length,
+    unmatchedGoalCount,
     readinessScore: readiness.readiness.score,
   };
 

@@ -310,7 +310,7 @@ export default function OrientationChecklist({
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
           <p className="text-lg mb-1">🎉</p>
           <p className="text-sm font-medium text-green-800">Orientation complete!</p>
-          <p className="text-xs text-green-600 mt-0.5">You&apos;re all set to get started with SPOKES.</p>
+          <p className="text-xs text-green-700 mt-0.5">You&apos;re all set to get started with SPOKES.</p>
         </div>
       )}
     </div>

@@ -1,5 +1,7 @@
+import { useState } from "react";
 import GoalTree from "../GoalTree";
 import GoalSupportPlanner from "../GoalSupportPlanner";
+import GoalPathwayAssigner from "../GoalPathwayAssigner";
 import {
   GOAL_RESOURCE_TYPE_LABELS,
   type GoalPlanEntry,
@@ -30,7 +32,7 @@ interface GoalsPlanTabProps {
   data: StudentData;
   dateFormatter: Intl.DateTimeFormat;
   onChanged: () => Promise<void>;
-  onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean }) => Promise<void>;
+  onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => Promise<void>;
 }
 
 export default function GoalsPlanTab({
@@ -86,7 +88,7 @@ export default function GoalsPlanTab({
         <div className="mt-5 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           {/* Review Queue */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Review queue</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Review queue</p>
             {reviewQueue.length === 0 ? (
               <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-gray-500">
                 No goal-linked review items are open right now.
@@ -113,7 +115,7 @@ export default function GoalsPlanTab({
                           </p>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-gray-600">{item.summary}</p>
-                        <p className="mt-2 text-xs text-gray-400">
+                        <p className="mt-2 text-xs text-[var(--ink-muted)]">
                           Goal: {item.goalTitle}
                           {item.detectedAt ? ` \u2022 ${dateFormatter.format(new Date(item.detectedAt))}` : ""}
                         </p>
@@ -141,7 +143,7 @@ export default function GoalsPlanTab({
 
           {/* Assigned Resource Evidence */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Assigned resource evidence</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Assigned resource evidence</p>
             {goalPlans.every((plan) => plan.links.length === 0) ? (
               <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-gray-500">
                 No assigned goal resources yet.
@@ -261,6 +263,13 @@ export default function GoalsPlanTab({
         )}
       </div>
 
+      {/* Pathway Assignment */}
+      <GoalPathwayAssigner
+        studentId={data.student.id}
+        goals={goals}
+        onGoalAction={onGoalAction}
+      />
+
       {/* Career Discovery */}
       <div id="career-discovery" className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -273,7 +282,7 @@ export default function GoalsPlanTab({
           )}
         </h3>
         {!careerDiscovery ? (
-          <p className="text-sm text-gray-400">Student has not started career discovery yet.</p>
+          <p className="text-sm text-[var(--ink-muted)]">Student has not started career discovery yet.</p>
         ) : (
           <div className="space-y-3">
             {careerDiscovery.sageSummary && (
@@ -297,7 +306,7 @@ export default function GoalsPlanTab({
                 <div className="mt-2 space-y-2">
                   {careerDiscovery.interests.length > 0 && (
                     <div>
-                      <span className="text-xs text-gray-400">Interests:</span>
+                      <span className="text-xs text-[var(--ink-muted)]">Interests:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.interests.map((item, i) => (
                           <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
@@ -307,7 +316,7 @@ export default function GoalsPlanTab({
                   )}
                   {careerDiscovery.strengths.length > 0 && (
                     <div>
-                      <span className="text-xs text-gray-400">Strengths:</span>
+                      <span className="text-xs text-[var(--ink-muted)]">Strengths:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.strengths.map((item, i) => (
                           <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
@@ -317,7 +326,7 @@ export default function GoalsPlanTab({
                   )}
                   {careerDiscovery.subjects.length > 0 && (
                     <div>
-                      <span className="text-xs text-gray-400">Preferred Subjects:</span>
+                      <span className="text-xs text-[var(--ink-muted)]">Preferred Subjects:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.subjects.map((item, i) => (
                           <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
@@ -327,7 +336,7 @@ export default function GoalsPlanTab({
                   )}
                   {careerDiscovery.problems.length > 0 && (
                     <div>
-                      <span className="text-xs text-gray-400">Problems They Care About:</span>
+                      <span className="text-xs text-[var(--ink-muted)]">Problems They Care About:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.problems.map((item, i) => (
                           <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
@@ -337,7 +346,7 @@ export default function GoalsPlanTab({
                   )}
                   {careerDiscovery.values.length > 0 && (
                     <div>
-                      <span className="text-xs text-gray-400">Values:</span>
+                      <span className="text-xs text-[var(--ink-muted)]">Values:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.values.map((item, i) => (
                           <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>
@@ -347,7 +356,7 @@ export default function GoalsPlanTab({
                   )}
                   {careerDiscovery.circumstances.length > 0 && (
                     <div>
-                      <span className="text-xs text-gray-400">Circumstances:</span>
+                      <span className="text-xs text-[var(--ink-muted)]">Circumstances:</span>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {careerDiscovery.circumstances.map((item, i) => (
                           <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item}</span>

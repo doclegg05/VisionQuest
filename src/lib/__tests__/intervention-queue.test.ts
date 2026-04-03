@@ -53,12 +53,14 @@ test("buildInterventionQueueEntry derives signals from existing student aggregat
         status: "active",
         updatedAt: new Date("2026-03-10T12:00:00.000Z"),
         lastReviewedAt: null,
+        pathwayId: null,
       },
       {
         level: "bhag",
         status: "completed",
         updatedAt: new Date("2026-03-20T12:00:00.000Z"),
         lastReviewedAt: new Date("2026-03-20T12:00:00.000Z"),
+        pathwayId: null,
       },
     ],
     orientationProgress: [{ completed: true, completedAt: new Date("2026-03-05T12:00:00.000Z") }],
@@ -122,6 +124,7 @@ test("buildInterventionQueueEntry returns zero urgency for an active student wit
         status: "active",
         updatedAt: new Date("2026-04-01T12:00:00.000Z"),
         lastReviewedAt: new Date("2026-04-01T12:00:00.000Z"),
+        pathwayId: "pathway-1",
       },
     ],
     orientationProgress: [

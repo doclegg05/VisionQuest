@@ -22,6 +22,8 @@ export interface StudentSignals {
   overdueTaskCount: number;
   /** Number of goals that have stalled (no recent progress) */
   stalledGoalCount: number;
+  /** Number of confirmed/active goals without a pathway assignment */
+  unmatchedGoalCount: number;
   /** Overall readiness score 0–100 */
   readinessScore: number;
 }
@@ -38,6 +40,7 @@ const LOGIN_INACTIVITY_THRESHOLD_DAYS = 7;
 const POINTS_PER_GOAL_REVIEW_DAY_OVER_THRESHOLD = 2;
 const GOAL_REVIEW_STALENESS_THRESHOLD_DAYS = 14;
 const POINTS_PER_OVERDUE_TASK = 10;
+const POINTS_PER_UNMATCHED_GOAL = 10;
 const ORIENTATION_WEIGHT = 25;
 const LOW_READINESS_THRESHOLD = 40;
 const LOW_READINESS_BASE = 30;
@@ -85,6 +88,9 @@ export function computeUrgencyScore(signals: StudentSignals): number {
 
   // Overdue tasks
   score += signals.overdueTaskCount * POINTS_PER_OVERDUE_TASK;
+
+  // Unmatched goals (confirmed/active goals without pathway assignment)
+  score += signals.unmatchedGoalCount * POINTS_PER_UNMATCHED_GOAL;
 
   // Incomplete orientation: weight by remaining progress fraction
   if (!signals.orientationComplete) {

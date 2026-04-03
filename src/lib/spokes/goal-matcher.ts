@@ -134,3 +134,58 @@ export function getMatchedPlatformNames(platformIds: string[]): string[] {
     .map((id) => PLATFORMS.find((p) => p.id === id)?.name)
     .filter((name): name is string => !!name);
 }
+
+export interface PathwaySuggestion {
+  pathwayId: string;
+  label: string;
+  score: number;
+  reason: string;
+}
+
+/**
+ * Suggest pathways for a goal based on keyword overlap between the goal text
+ * and the certifications/platforms included in each pathway.
+ */
+export function suggestPathwaysForGoal(
+  goalText: string,
+  pathways: Array<{
+    id: string;
+    label: string;
+    certifications: string[];
+    platforms: string[];
+    active: boolean;
+  }>,
+): PathwaySuggestion[] {
+  const activePathways = pathways.filter((p) => p.active);
+  if (activePathways.length === 0) return [];
+
+  const match = matchGoalsToPlatforms([goalText]);
+  const matchedCerts = new Set(match.certificationIds);
+  const matchedPlatforms = new Set(match.platformIds);
+
+  const scored: PathwaySuggestion[] = [];
+
+  for (const pathway of activePathways) {
+    const certOverlap = pathway.certifications.filter((c) => matchedCerts.has(c)).length;
+    const platformOverlap = pathway.platforms.filter((p) => matchedPlatforms.has(p)).length;
+    const total = certOverlap + platformOverlap;
+
+    if (total === 0) continue;
+
+    const maxPossible = pathway.certifications.length + pathway.platforms.length;
+    const score = maxPossible > 0 ? total / maxPossible : 0;
+
+    const parts: string[] = [];
+    if (certOverlap > 0) parts.push(`${certOverlap} matching cert${certOverlap > 1 ? "s" : ""}`);
+    if (platformOverlap > 0) parts.push(`${platformOverlap} matching platform${platformOverlap > 1 ? "s" : ""}`);
+
+    scored.push({
+      pathwayId: pathway.id,
+      label: pathway.label,
+      score,
+      reason: parts.join(", "),
+    });
+  }
+
+  return scored.sort((a, b) => b.score - a.score).slice(0, 3);
+}

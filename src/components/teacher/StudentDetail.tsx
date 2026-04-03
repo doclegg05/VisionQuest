@@ -336,7 +336,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   }
 
-  const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean }) => {
+  const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => {
     try {
       const res = await apiFetch(`/api/teacher/students/${studentId}/goals/${goalId}`, {
         method: "PATCH",
@@ -402,7 +402,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   return (
     <div className="space-y-6">
-      <Link href="/teacher" className="text-sm text-blue-600 hover:text-blue-800">
+      <Link href="/teacher" className="text-sm text-[var(--accent-blue)] hover:text-[var(--ink-strong)]">
         &larr; Back to Class Dashboard
       </Link>
 

@@ -294,7 +294,7 @@ export default function SettingsPage() {
                 body: "Gemini keys usually begin with AIza. Paste it below and VisionQuest will verify it before saving.",
               },
             ].map((item) => (
-              <div key={item.step} className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-white/70 p-4">
+              <div key={item.step} className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
                 <div className="mb-3 flex items-center gap-3">
                   <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[var(--ink-strong)] text-sm font-bold text-white">
                     {item.step}
@@ -307,7 +307,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-white/70 p-5">
+        <div className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-5">
           {platformKeyConfigured && (
             <p className="mb-3 text-sm text-[var(--ink-muted)]">
               A program-managed Gemini key is already active. Adding a personal key here is optional and will override the shared setup for your account.

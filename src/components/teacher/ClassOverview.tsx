@@ -164,7 +164,7 @@ export default function ClassOverview({
 
   function getSortIcon(col: SortKey) {
     if (sortBy !== col) return <span className="ml-1 text-gray-300">↕</span>;
-    return <span className="ml-1 text-blue-600">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    return <span className="ml-1 text-[var(--accent-blue)]">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
   function formatAppointment(dateStr: string) {

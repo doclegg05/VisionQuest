@@ -58,16 +58,16 @@
   --surface-raised: rgba(255, 255, 255, 0.06);
   --surface-overlay: rgba(255, 255, 255, 0.10);
   --ink-strong: #f0f2f5;
-  --ink-muted: rgba(255, 255, 255, 0.5);
-  --ink-faint: rgba(255, 255, 255, 0.25);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --accent-green: #37b550;
-  --accent-blue: #007baf;
-  --accent-gold: #d3b257;
-  --accent-red: #e05555;
-  --error: #e05555;
-  --success: #37b550;
+  --ink-muted: rgba(255, 255, 255, 0.62);
+  --ink-faint: rgba(255, 255, 255, 0.48);
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --accent-green: #3fcf5e;
+  --accent-blue: #38a8d8;
+  --accent-gold: #e0c06a;
+  --accent-red: #f06b6b;
+  --error: #f06b6b;
+  --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
 

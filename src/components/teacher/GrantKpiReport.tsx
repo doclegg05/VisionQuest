@@ -195,7 +195,7 @@ function CountsSummary({ counts }: { counts: GrantKpiPayload["counts"] }) {
     <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
       {items.map((item) => (
         <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-4 text-center">
-          <p className="text-xs uppercase tracking-[0.16em] text-gray-400">{item.label}</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">{item.label}</p>
           <p className={`mt-2 text-3xl font-bold ${item.tone}`}>{item.value}</p>
         </div>
       ))}
@@ -297,7 +297,7 @@ export default function GrantKpiReport() {
     a.click();
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading grant metrics...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading grant metrics...</p>;
 
   if (error || !data) {
     return (
@@ -336,7 +336,7 @@ export default function GrantKpiReport() {
       <CountsSummary counts={data.counts} />
 
       <div>
-        <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Performance metrics</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Performance metrics</p>
         <h3 className="mt-2 text-lg font-semibold text-gray-900">Grant outcomes</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {metricEntries.map(({ key, metric: m }) => (
@@ -348,7 +348,7 @@ export default function GrantKpiReport() {
                     values={getTrendValues(key)}
                     color={m.meetsTarget === true ? "#059669" : m.meetsTarget === false ? "#d97706" : "#6b7280"}
                   />
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-[var(--ink-muted)]">
                     {trendData.length} snapshots
                   </span>
                 </div>
@@ -359,7 +359,7 @@ export default function GrantKpiReport() {
       </div>
 
       {drillLoading && (
-        <p className="text-sm text-gray-400">Loading student details...</p>
+        <p className="text-sm text-[var(--ink-muted)]">Loading student details...</p>
       )}
 
       {drillDown && !drillLoading && (
@@ -371,18 +371,18 @@ export default function GrantKpiReport() {
             <button
               type="button"
               onClick={() => setDrillDown(null)}
-              className="text-sm text-gray-400 hover:text-gray-600"
+              className="text-sm text-[var(--ink-muted)] hover:text-gray-600"
             >
               Close
             </button>
           </div>
           {drillDown.students.length === 0 ? (
-            <p className="mt-3 text-sm text-gray-400">No students match this metric.</p>
+            <p className="mt-3 text-sm text-[var(--ink-muted)]">No students match this metric.</p>
           ) : (
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wider text-gray-400">
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-[var(--ink-muted)]">
                     <th className="pb-2 pr-4">Name</th>
                     <th className="pb-2 pr-4">Status</th>
                     <th className="pb-2 pr-4">Enrolled</th>

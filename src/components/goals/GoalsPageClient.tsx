@@ -348,7 +348,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             </div>
 
             {createLevel === level ? (
-              <div className="mt-4 rounded-[1.25rem] border border-white/80 bg-white/85 p-4 shadow-sm">
+              <div className="mt-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm">
                 <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   New {level === "task" ? "Task" : "Goal"}
                 </label>
@@ -415,7 +415,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   return (
                     <article
                       key={goal.id}
-                      className="rounded-[1.25rem] border border-white/80 bg-white/85 p-4 shadow-sm"
+                      className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span
@@ -497,7 +497,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               const dueLabel = typeof link.dueAt === "string" ? formatDueDate(link.dueAt) : null;
                               const draftStatus = linkStatusDrafts[link.id] ?? link.status;
                               return (
-                                <div key={link.id} className="rounded-xl border border-white/80 bg-white/85 p-3">
+                                <div key={link.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
@@ -576,13 +576,13 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       ) : null}
 
                       {goalPlan.recommendations.length > 0 ? (
-                        <div className="mt-5 rounded-[1.15rem] border border-dashed border-[rgba(16,37,62,0.12)] bg-white/55 p-4">
+                        <div className="mt-5 rounded-[1.15rem] border border-dashed border-[rgba(16,37,62,0.12)] bg-[var(--surface-raised)] p-4">
                           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                             Suggested Resources
                           </p>
                           <div className="mt-3 space-y-3">
                             {goalPlan.recommendations.map((resource) => (
-                              <div key={`${resource.resourceType}:${resource.resourceId}`} className="rounded-xl border border-white/80 bg-white/80 p-3">
+                              <div key={`${resource.resourceType}:${resource.resourceId}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">

@@ -68,7 +68,7 @@ export default function ProgressTab({
                     {item.label}
                   </span>
                   {item.required && !progressItem?.completed && (
-                    <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded">Required</span>
+                    <span className="text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
                   )}
                 </div>
               );

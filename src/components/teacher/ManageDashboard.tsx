@@ -14,6 +14,7 @@ import AcademicKpiReport from "./AcademicKpiReport";
 import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 import { JobConfigSection } from "./JobConfigSection";
+import PathwayManager from "./PathwayManager";
 
 type Tab = "orientation" | "learning" | "career" | "reports";
 
@@ -73,6 +74,10 @@ export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) 
 
       {tab === "learning" && (
         <div className="space-y-8">
+          <section>
+            <SectionHeading>Pathways</SectionHeading>
+            <PathwayManager />
+          </section>
           <section>
             <SectionHeading>Courses</SectionHeading>
             <LmsManager />

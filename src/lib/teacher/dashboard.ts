@@ -34,6 +34,7 @@ export interface QueueStudent {
     readinessScore: number;
     openAlertCount: number;
     daysSinceLastGoalReview: number;
+    unmatchedGoalCount: number;
   };
 }
 
@@ -177,7 +178,7 @@ export async function getInterventionQueue(
       updatedAt: true,
       progression: { select: { state: true } },
       goals: {
-        select: { level: true, status: true, updatedAt: true, lastReviewedAt: true },
+        select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
       },
       orientationProgress: {
         select: { completed: true, completedAt: true },

@@ -81,13 +81,13 @@ export function isAvailabilityLocationType(value: string): value is Availability
 
 function startOfDay(value: Date) {
   const day = new Date(value);
-  day.setHours(0, 0, 0, 0);
+  day.setUTCHours(0, 0, 0, 0);
   return day;
 }
 
 function addDays(value: Date, amount: number) {
   const day = new Date(value);
-  day.setDate(day.getDate() + amount);
+  day.setUTCDate(day.getUTCDate() + amount);
   return day;
 }
 

@@ -151,7 +151,7 @@ export default function DocumentBrowser({
             value={searchInput}
             onChange={(e) => handleSearch(e.target.value)}
             aria-label="Search documents by title or description"
-            className="w-full rounded-2xl border border-[var(--border)] bg-white/70 px-5 py-3 text-sm text-[var(--ink-strong)] placeholder:text-[var(--muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
+            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-3 text-sm text-[var(--ink-strong)] placeholder:text-[var(--muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
           />
         </>
       )}

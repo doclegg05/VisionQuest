@@ -22,7 +22,9 @@ export interface GoalData {
   content: string;
   status: string;
   parentId: string | null;
+  pathwayId: string | null;
   createdAt: string;
+  pathway: { id: string; label: string; active: boolean } | null;
 }
 
 export interface OrientationItemData {

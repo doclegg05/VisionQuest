@@ -42,7 +42,7 @@ export default async function StudentLayout({
   return (
     <NotificationProvider>
       <div className="min-h-screen">
-        <NavBar studentName={session.displayName} role={session.role} navPhase={navPhase} />
+        <NavBar studentName={session.displayName} role={session.role} navPhase={navPhase} orientationComplete={progState.orientationComplete || false} />
         <ProgressionProvider>
           <main
             id="main-content"

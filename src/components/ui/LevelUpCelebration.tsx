@@ -40,7 +40,7 @@ export default function LevelUpCelebration({ newLevel, onDone }: LevelUpCelebrat
       >
         <span className="text-3xl">🚀</span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-500">Level Up!</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">Level Up!</p>
           <p className="mt-0.5 font-display text-2xl text-[var(--ink-strong)]">Level {newLevel}</p>
           {LEVEL_LABELS[newLevel] && (
             <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{LEVEL_LABELS[newLevel]}</p>
