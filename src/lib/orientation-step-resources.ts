@@ -111,8 +111,8 @@ const STEP_DEFINITIONS: OrientationStepDefinition[] = [
       "sign release information",
       "release information",
     ],
-    formIds: ["auth-release", "dohs-release"],
-    note: "Programs often collect both the general release and the DoHS release during intake.",
+    formIds: ["auth-release", "dohs-release", "ai-data-consent"],
+    note: "Collect the general release, DoHS release, and AI data consent together during intake.",
   },
   {
     aliases: [
