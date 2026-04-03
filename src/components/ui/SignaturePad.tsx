@@ -87,9 +87,24 @@ function DrawPad({
       const canvas = canvasRef.current;
       const container = containerRef.current;
       if (!canvas || !container) return;
+
       const width = container.clientWidth;
-      containerWidthRef.current = width;
+      const oldWidth = containerWidthRef.current;
       const dpr = window.devicePixelRatio || 1;
+
+      // Capture existing drawing before resize (if any strokes exist)
+      let savedImage: HTMLImageElement | null = null;
+      if (oldWidth > 0 && canvas.width > 0 && canvas.height > 0) {
+        try {
+          const dataUrl = canvas.toDataURL();
+          savedImage = new Image();
+          savedImage.src = dataUrl;
+        } catch {
+          // Canvas may be tainted or empty
+        }
+      }
+
+      containerWidthRef.current = width;
       canvas.width = width * dpr;
       canvas.height = CANVAS_HEIGHT * dpr;
       canvas.style.width = `${width}px`;
@@ -101,7 +116,23 @@ function DrawPad({
       ctx.lineJoin = "round";
       ctx.lineWidth = STROKE_WIDTH;
       ctx.strokeStyle = STROKE_COLOR;
-      setHasStrokes(false);
+
+      // Restore saved drawing if we had one
+      if (savedImage && savedImage.complete && oldWidth > 0) {
+        ctx.drawImage(savedImage, 0, 0, width, CANVAS_HEIGHT);
+        // hasStrokes stays true — don't reset
+      } else if (savedImage && oldWidth > 0) {
+        // Image not loaded yet (async) — listen for load
+        savedImage.onload = () => {
+          const ctx = canvasRef.current?.getContext("2d");
+          if (ctx && savedImage) {
+            ctx.drawImage(savedImage, 0, 0, width, CANVAS_HEIGHT);
+          }
+        };
+        // hasStrokes stays true
+      } else {
+        setHasStrokes(false);
+      }
     }
 
     resize();
