@@ -111,11 +111,19 @@ export async function downloadBundledFile(
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
+function normalizeForMatch(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  const base = path.basename(filename, ext);
+  return base.toLowerCase().replace(/[^a-z0-9]/g, "") + ext;
+}
+
 async function findInContentDir(
   storageKey: string,
 ): Promise<{ buffer: Buffer; mimeType: string } | null> {
   const targetName = path.basename(storageKey);
   if (!targetName || targetName.includes("..")) return null;
+
+  const allFiles: string[] = [];
 
   async function search(dir: string): Promise<string | null> {
     let entries;
@@ -131,20 +139,44 @@ async function findInContentDir(
         const found = await search(full);
         if (found) return found;
       } else if (entry.name === targetName) {
-        return full;
+        return full; // Exact match — return immediately
+      } else {
+        allFiles.push(full); // Collect for fuzzy pass
       }
     }
     return null;
   }
 
-  const found = await search(CONTENT_DIR);
-  if (!found) return null;
-  try {
-    const buffer = await fs.readFile(found);
-    return { buffer, mimeType: inferMimeType(found) };
-  } catch {
-    return null;
+  // Pass 1: exact match
+  const exactMatch = await search(CONTENT_DIR);
+  if (exactMatch) {
+    try {
+      const buffer = await fs.readFile(exactMatch);
+      return { buffer, mimeType: inferMimeType(exactMatch) };
+    } catch {
+      return null;
+    }
   }
+
+  // Pass 2: normalized fuzzy match
+  const normalizedTarget = normalizeForMatch(targetName);
+  for (const filePath of allFiles) {
+    const normalizedCandidate = normalizeForMatch(path.basename(filePath));
+    if (
+      normalizedTarget === normalizedCandidate ||
+      normalizedTarget.includes(normalizedCandidate) ||
+      normalizedCandidate.includes(normalizedTarget)
+    ) {
+      try {
+        const buffer = await fs.readFile(filePath);
+        return { buffer, mimeType: inferMimeType(filePath) };
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
 }
 
 function isTransformableBody(body: unknown): body is { transformToByteArray: () => Promise<Uint8Array> } {
