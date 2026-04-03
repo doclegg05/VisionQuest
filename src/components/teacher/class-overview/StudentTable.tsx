@@ -86,6 +86,9 @@ export default function StudentTable({
                 Readiness {getSortIcon("readinessScore")}
               </th>
               <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600">
+                Requirements
+              </th>
+              <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600">
                 Goals
               </th>
               <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-gray-600">
@@ -194,6 +197,23 @@ export default function StudentTable({
                       >
                         {student.readinessScore}%
                       </span>
+                    </td>
+                    <td className="text-center px-3 py-3">
+                      {student.requirementsTotal > 0 ? (
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            student.requirementsMet >= student.requirementsTotal
+                              ? "bg-emerald-100 text-emerald-700"
+                              : student.requirementsMet > 0
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {student.requirementsMet}/{student.requirementsTotal}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="text-center px-3 py-3">
                       <span className="text-xs text-gray-600">{student.goalsCount}</span>

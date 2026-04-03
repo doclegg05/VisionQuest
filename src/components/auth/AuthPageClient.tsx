@@ -252,7 +252,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 href="/teacher-register"
                 className="text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
               >
-                Teacher? Register here
+                Staff? Register here
               </a>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />

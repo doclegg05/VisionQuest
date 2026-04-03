@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Warning, Target, CalendarX, UserCircle } from "@phosphor-icons/react";
-import { api } from "@/lib/api";
+import { Warning, Target, CalendarX, UserCircle, ClipboardText, DotsThree } from "@phosphor-icons/react";
+import { api, apiFetch } from "@/lib/api";
 import {
   type InterventionQueueResponse as QueueResponse,
   type QueueStudent,
@@ -24,6 +24,8 @@ function topReason(signals: QueueStudent["signals"]): string {
     return `${signals.stalledGoalCount} stalled goal${signals.stalledGoalCount !== 1 ? "s" : ""}`;
   if (signals.overdueTaskCount > 0)
     return `${signals.overdueTaskCount} overdue task${signals.overdueTaskCount !== 1 ? "s" : ""}`;
+  if (signals.unmatchedGoalCount > 0)
+    return `${signals.unmatchedGoalCount} unmatched goal${signals.unmatchedGoalCount !== 1 ? "s" : ""}`;
   if (signals.daysSinceLastLogin > 7) return `${signals.daysSinceLastLogin}d since login`;
   if (!signals.orientationComplete)
     return `Orientation ${Math.round(signals.orientationProgress * 100)}%`;
@@ -45,32 +47,129 @@ function QueueSkeleton() {
   );
 }
 
+// ─── Quick Task Modal ─────────────────────────────────────────────────────────
+
+function QuickTaskModal({
+  studentId,
+  studentName,
+  onClose,
+  onCreated,
+}: {
+  studentId: string;
+  studentName: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch(`/api/teacher/students/${studentId}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          dueAt: dueAt || undefined,
+          priority: "normal",
+        }),
+      });
+
+      if (res.ok) {
+        onCreated();
+        onClose();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Failed to create task.");
+      }
+    } catch {
+      setError("Failed to create task.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl space-y-3"
+      >
+        <h3 className="text-sm font-semibold text-gray-700">
+          Quick task for {studentName}
+        </h3>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <input
+          type="text"
+          placeholder="What needs to be done?"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <input
+          type="date"
+          value={dueAt}
+          onChange={(e) => setDueAt(e.target.value)}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="text-sm text-gray-500 px-3 py-1.5">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !title.trim()}
+            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Creating..." : "Create Task"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ─── Student Row ──────────────────────────────────────────────────────────────
 
-function StudentRow({ student }: { student: QueueStudent }) {
+function StudentRow({
+  student,
+  onQuickTask,
+}: {
+  student: QueueStudent;
+  onQuickTask: (studentId: string, name: string) => void;
+}) {
   const badge = urgencyBadge(student.urgencyScore);
   const reason = topReason(student.signals);
   const { signals } = student;
 
   return (
-    <Link
-      href={`/teacher/students/${student.studentId}`}
-      className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[rgba(18,38,63,0.04)]"
-    >
+    <div className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[rgba(18,38,63,0.04)]">
       {/* Avatar placeholder */}
-      <UserCircle
-        size={32}
-        weight="light"
-        className="shrink-0 text-[var(--ink-muted)]"
-      />
+      <Link href={`/teacher/students/${student.studentId}`} className="shrink-0">
+        <UserCircle
+          size={32}
+          weight="light"
+          className="text-[var(--ink-muted)]"
+        />
+      </Link>
 
       {/* Name + reason */}
-      <div className="min-w-0 flex-1">
+      <Link href={`/teacher/students/${student.studentId}`} className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
           {student.name}
         </p>
         <p className="truncate text-xs text-[var(--ink-muted)]">{reason}</p>
-      </div>
+      </Link>
 
       {/* Signal icons */}
       <div className="flex shrink-0 items-center gap-2 text-[var(--ink-muted)]">
@@ -89,7 +188,24 @@ function StudentRow({ student }: { student: QueueStudent }) {
             <Warning size={16} weight="duotone" className="text-red-500" />
           </span>
         )}
+        {signals.unmatchedGoalCount > 0 && (
+          <span title={`${signals.unmatchedGoalCount} goal(s) without pathway`}>
+            <ClipboardText size={16} weight="duotone" className="text-purple-500" />
+          </span>
+        )}
       </div>
+
+      {/* Quick action */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          onQuickTask(student.studentId, student.name);
+        }}
+        title="Assign quick task"
+        className="shrink-0 rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-gray-100 hover:text-gray-700"
+      >
+        <DotsThree size={18} weight="bold" />
+      </button>
 
       {/* Urgency badge */}
       <span
@@ -97,7 +213,7 @@ function StudentRow({ student }: { student: QueueStudent }) {
       >
         {badge.label}
       </span>
-    </Link>
+    </div>
   );
 }
 
@@ -111,25 +227,23 @@ export default function InterventionQueuePanel({
   const [queue, setQueue] = useState<QueueStudent[]>(initialQueue ?? []);
   const [loading, setLoading] = useState(initialQueue === undefined);
   const [error, setError] = useState<string | null>(null);
+  const [taskTarget, setTaskTarget] = useState<{ studentId: string; name: string } | null>(null);
+
+  const fetchQueue = useCallback(async () => {
+    try {
+      const data = await api.get<QueueResponse>("/api/teacher/intervention-queue");
+      setQueue(data.queue);
+    } catch {
+      setError("Failed to load intervention queue.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (initialQueue !== undefined) {
-      return;
-    }
-
-    async function fetchQueue() {
-      try {
-        const data = await api.get<QueueResponse>("/api/teacher/intervention-queue");
-        setQueue(data.queue);
-      } catch {
-        setError("Failed to load intervention queue.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
+    if (initialQueue !== undefined) return;
     void fetchQueue();
-  }, [initialQueue]);
+  }, [initialQueue, fetchQueue]);
 
   return (
     <section className="surface-section p-5">
@@ -166,9 +280,23 @@ export default function InterventionQueuePanel({
       {!loading && !error && queue.length > 0 && (
         <div className="space-y-2">
           {queue.map((student) => (
-            <StudentRow key={student.studentId} student={student} />
+            <StudentRow
+              key={student.studentId}
+              student={student}
+              onQuickTask={(id, name) => setTaskTarget({ studentId: id, name })}
+            />
           ))}
         </div>
+      )}
+
+      {/* Quick Task Modal */}
+      {taskTarget && (
+        <QuickTaskModal
+          studentId={taskTarget.studentId}
+          studentName={taskTarget.name}
+          onClose={() => setTaskTarget(null)}
+          onCreated={() => void fetchQueue()}
+        />
       )}
     </section>
   );
