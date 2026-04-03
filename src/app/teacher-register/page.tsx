@@ -5,8 +5,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
 
-export default function TeacherRegisterPage() {
-  const [teacherKey, setTeacherKey] = useState("");
+type StaffRole = "teacher" | "admin";
+
+export default function StaffRegisterPage() {
+  const [role, setRole] = useState<StaffRole>("teacher");
+  const [registrationKey, setRegistrationKey] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +32,7 @@ export default function TeacherRegisterPage() {
       const res = await fetch("/api/auth/register-teacher", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacherKey, displayName, email, password }),
+        body: JSON.stringify({ registrationKey, role, displayName, email, password }),
       });
 
       const data = await res.json();
@@ -38,7 +41,7 @@ export default function TeacherRegisterPage() {
         return;
       }
 
-      router.push("/teacher");
+      router.push(role === "admin" ? "/admin" : "/teacher");
       router.refresh();
     } catch {
       setError("Could not connect to server.");
@@ -53,27 +56,53 @@ export default function TeacherRegisterPage() {
         <div className="panel panel-strong w-full rounded-[2rem] p-6 md:p-10">
           <div className="mb-8">
             <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
-            <p className="page-eyebrow text-[var(--ink-muted)]">Teacher access</p>
+            <p className="page-eyebrow text-[var(--ink-muted)]">Staff access</p>
             <h1 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
-              Teacher Registration
+              Staff Registration
             </h1>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-              Create a teacher account for the SPOKES Program Portal.
-              You will need the teacher registration key provided by your administrator.
+              Create a staff account for the SPOKES Program Portal.
+              You will need the registration key provided by your administrator.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4" aria-label="Teacher registration">
+          <form onSubmit={handleSubmit} className="space-y-4" aria-label="Staff registration">
             <div>
-              <label htmlFor="teacherKey" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                Teacher Key
+              <label className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+                Account Type
+              </label>
+              <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+                {(["teacher", "admin"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      setRole(option);
+                      setRegistrationKey("");
+                      setError("");
+                    }}
+                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                      role === option
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {option === "teacher" ? "Teacher" : "Administrator"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="registrationKey" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+                {role === "admin" ? "Admin Key" : "Teacher Key"}
               </label>
               <input
-                id="teacherKey"
+                id="registrationKey"
                 type="password"
-                value={teacherKey}
-                onChange={(e) => setTeacherKey(e.target.value)}
-                placeholder="Enter the teacher registration key"
+                value={registrationKey}
+                onChange={(e) => setRegistrationKey(e.target.value)}
+                placeholder={`Enter the ${role} registration key`}
                 required
                 className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
@@ -156,7 +185,11 @@ export default function TeacherRegisterPage() {
               disabled={loading}
               className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Creating account..." : "Create Teacher Account"}
+              {loading
+                ? "Creating account..."
+                : role === "admin"
+                  ? "Create Admin Account"
+                  : "Create Teacher Account"}
             </button>
           </form>
 

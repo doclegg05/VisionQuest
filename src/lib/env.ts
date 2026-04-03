@@ -94,6 +94,9 @@ export const env = {
   // Gemini (required for Sage to work)
   GEMINI_API_KEY: optional("GEMINI_API_KEY"),
 
+  // Staff registration keys
+  ADMIN_KEY: optional("ADMIN_KEY"),
+
   // Cloudflare R2 (optional — falls back to local uploads/)
   R2_ACCOUNT_ID: optional("R2_ACCOUNT_ID"),
   R2_ACCESS_KEY: optional("R2_ACCESS_KEY"),

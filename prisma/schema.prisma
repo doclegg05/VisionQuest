@@ -63,6 +63,7 @@ model Student {
   notificationPreferences NotificationPreference[]
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
+  llmCallLogs             LlmCallLog[]
 
   @@schema("visionquest")
 }
@@ -82,15 +83,16 @@ model NotificationPreference {
 }
 
 model Conversation {
-  id        String   @id @default(cuid())
-  studentId String
-  module    String
-  stage     String
-  title     String?
-  summary   String?  @db.Text
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  studentId            String
+  module               String
+  stage                String
+  title                String?
+  summary              String?  @db.Text
+  summaryUpToMessageId String?
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   messages Message[]
@@ -1107,6 +1109,28 @@ model StudentSavedJob {
 }
 
 // =============================================================================
+// LLM Call Logging & Token Quota Enforcement
+// =============================================================================
+
+model LlmCallLog {
+  id           String   @id @default(cuid())
+  studentId    String
+  callSite     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  totalTokens  Int      @default(0)
+  durationMs   Int?
+  createdAt    DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([createdAt])
+  @@schema("visionquest")
+}
+
+// =============================================================================
 // Phase 2: Goal-to-Pathway Alignment
 // =============================================================================
 
@@ -1142,5 +1166,15 @@ model ClassRequirement {
 
   @@unique([classId, itemType, itemId])
   @@index([classId, status])
+  @@schema("visionquest")
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
   @@schema("visionquest")
 }

@@ -10,10 +10,11 @@ import { logger } from "@/lib/logger";
 import { withAuth, isStaffRole } from "@/lib/api-error";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { resolveApiKey } from "@/lib/chat/api-key";
-import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage } from "@/lib/chat/conversation";
+import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
+import { checkTokenQuota } from "@/lib/llm-usage";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -28,6 +29,15 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   const rl = await rateLimit(`chat:${session.id}`, 60, 60 * 60 * 1000);
   if (!rl.success) {
     return new Response(JSON.stringify({ error: "Too many messages. Please wait before sending more." }), { status: 429 });
+  }
+
+  // Check token quota before making AI call
+  const quota = await checkTokenQuota(session.id, session.role);
+  if (!quota.allowed) {
+    return new Response(
+      JSON.stringify({ error: quota.warning }),
+      { status: 429, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   // Resolve API key
@@ -85,12 +95,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     systemPrompt += documentContext;
   }
 
-  // Format message history for Gemini
+  // Format message history for Gemini, using compacted context when available
+  const conversationContext = await getConversationContext(conversation.id);
   const allMessages = [
-    ...conversation.messages.map((m) => ({
-      role: (m.role === "user" ? "user" : "model") as "user" | "model",
-      content: m.content,
-    })),
+    ...conversationContext.messages,
     { role: "user" as const, content: userMessage },
   ];
 
@@ -103,6 +111,11 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       try {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ conversationId: conversation.id })}\n\n`));
 
+        // Send soft-cap warning as an SSE event before the AI response
+        if (quota.warning) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ quotaWarning: quota.warning })}\n\n`));
+        }
+
         for await (const chunk of streamResponse(apiKey, systemPrompt, allMessages)) {
           fullResponse += chunk;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
@@ -110,6 +123,11 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
         // Save assistant message
         await saveMessage(conversation.id, "assistant", fullResponse);
+
+        // Rolling summary compaction (fire-and-forget, both teacher and student)
+        void maybeUpdateSummary(conversation.id, apiKey, session.id).catch((err) =>
+          logger.error("Summary compaction failed", { conversationId: conversation.id, error: String(err) }),
+        );
 
         // Student-only post-processing: XP, goal extraction, stage updates
         if (!isTeacher) {
@@ -130,7 +148,6 @@ export const POST = withAuth(async (session, req: NextRequest) => {
             conversationId: conversation.id,
             conversationTitle: conversation.title,
             conversationStage: conversation.stage,
-            conversationSummary: conversation.summary ?? null,
             fullResponse,
             studentId: session.id,
             apiKey,
