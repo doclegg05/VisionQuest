@@ -47,7 +47,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       updatedAt: true,
       progression: { select: { state: true } },
       goals: {
-        select: { level: true, status: true, updatedAt: true, lastReviewedAt: true },
+        select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
       },
       orientationProgress: {
         select: { completed: true, completedAt: true },
@@ -155,6 +155,16 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         isGoalStale({ level: g.level, status: g.status, updatedAt: g.updatedAt, lastReviewedAt: g.lastReviewedAt }, now),
       ).length;
 
+      // --- Unmatched goals (confirmed/active goals without pathway assignment) ---
+      const PATHWAY_ELIGIBLE_STATUSES = ["confirmed", "active", "in_progress"];
+      const PATHWAY_ELIGIBLE_LEVELS = ["bhag", "long_term", "monthly"];
+      const unmatchedGoalCount = s.goals.filter(
+        (g) =>
+          PATHWAY_ELIGIBLE_STATUSES.includes(g.status) &&
+          PATHWAY_ELIGIBLE_LEVELS.includes(g.level) &&
+          !g.pathwayId,
+      ).length;
+
       // --- Readiness score (via shared function for consistent scoring) ---
       const readinessData = await fetchStudentReadinessData(s.id);
 
@@ -167,6 +177,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         highSeverityAlertCount,
         overdueTaskCount,
         stalledGoalCount,
+        unmatchedGoalCount,
         readinessScore: readinessData.readiness.score,
       };
 

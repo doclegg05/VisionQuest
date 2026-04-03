@@ -40,7 +40,11 @@ export const GET = withTeacherAuth(async (
           content: true,
           status: true,
           parentId: true,
+          pathwayId: true,
           createdAt: true,
+          pathway: {
+            select: { id: true, label: true, active: true },
+          },
         },
         orderBy: { createdAt: "asc" },
       },

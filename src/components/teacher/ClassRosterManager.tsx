@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import ClassRequirementEditor from "./ClassRequirementEditor";
 
 interface InstructorOption {
   id: string;
@@ -103,6 +104,10 @@ export default function ClassRosterManager() {
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes${adminMode ? "?includeArchived=true" : ""}`);
+      if (response.status === 401 || response.status === 403) {
+        window.location.reload();
+        return;
+      }
       const payload = (await response.json()) as ClassesResponse;
       if (!response.ok) {
         throw new Error((payload as { error?: string }).error || "Could not load classes.");
@@ -139,6 +144,10 @@ export default function ClassRosterManager() {
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes/${classId}`);
+      if (response.status === 401 || response.status === 403) {
+        window.location.reload();
+        return;
+      }
       const payload = (await response.json()) as ClassDetailResponse;
       if (!response.ok) {
         throw new Error((payload as { error?: string }).error || "Could not load class details.");
@@ -624,6 +633,19 @@ export default function ClassRosterManager() {
                     </div>
                   ) : null}
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Requirements</p>
+                <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Requirement Matrix</h3>
+                <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                  Define which certifications and courses are required, optional, or not applicable for this class.
+                </p>
+              </div>
+              <div className="mt-4">
+                <ClassRequirementEditor classId={classDetail.id} />
               </div>
             </div>
 

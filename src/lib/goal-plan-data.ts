@@ -18,7 +18,9 @@ export interface StudentGoalPlanGoal {
   content: string;
   status: GoalStatus;
   parentId: string | null;
+  pathwayId: string | null;
   createdAt: string;
+  pathway: { id: string; label: string; description: string | null; certifications: string[]; platforms: string[]; estimatedWeeks: number } | null;
 }
 
 export async function getStudentGoalPlanData(studentId: string): Promise<{
@@ -29,6 +31,18 @@ export async function getStudentGoalPlanData(studentId: string): Promise<{
     prisma.goal.findMany({
       where: { studentId },
       orderBy: { createdAt: "asc" },
+      include: {
+        pathway: {
+          select: {
+            id: true,
+            label: true,
+            description: true,
+            certifications: true,
+            platforms: true,
+            estimatedWeeks: true,
+          },
+        },
+      },
     }),
     prisma.goalResourceLink.findMany({
       where: { studentId },
@@ -64,7 +78,9 @@ export async function getStudentGoalPlanData(studentId: string): Promise<{
         content: goal.content,
         status: goal.status,
         parentId: goal.parentId,
+        pathwayId: goal.pathwayId,
         createdAt: goal.createdAt.toISOString(),
+        pathway: goal.pathway,
       }];
     }),
     goalPlans: serializeGoalPlanEntries(await buildGoalPlanEntries({
