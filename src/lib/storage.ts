@@ -104,6 +104,45 @@ export async function downloadBundledFile(
       mimeType: inferMimeType(storageKey),
     };
   } catch {
+    // Fallback: search content directory by filename
+    return findInContentDir(storageKey);
+  }
+}
+
+const CONTENT_DIR = path.join(process.cwd(), "content");
+
+async function findInContentDir(
+  storageKey: string,
+): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const targetName = path.basename(storageKey);
+  if (!targetName || targetName.includes("..")) return null;
+
+  async function search(dir: string): Promise<string | null> {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name === "_archive") continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const found = await search(full);
+        if (found) return found;
+      } else if (entry.name === targetName) {
+        return full;
+      }
+    }
+    return null;
+  }
+
+  const found = await search(CONTENT_DIR);
+  if (!found) return null;
+  try {
+    const buffer = await fs.readFile(found);
+    return { buffer, mimeType: inferMimeType(found) };
+  } catch {
     return null;
   }
 }
