@@ -45,15 +45,13 @@ function deriveSteps(items: OrientationItem[]): WizardStep[] {
     if (item.completed) continue;
     const detail = getOrientationStepDetail(item.label);
     if (detail.forms.length === 0) {
-      if (detail.note) {
-        steps.push({
-          orientationItemId: item.id,
-          type: "instructor-led",
-          stepTitle: item.label,
-          stepDescription: item.description,
-          isLastForItem: true,
-        });
-      }
+      steps.push({
+        orientationItemId: item.id,
+        type: "instructor-led",
+        stepTitle: item.label,
+        stepDescription: item.description || detail.note,
+        isLastForItem: true,
+      });
       continue;
     }
     const formSteps: WizardStep[] = [];
