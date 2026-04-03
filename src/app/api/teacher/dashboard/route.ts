@@ -185,6 +185,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     const readiness = computeReadinessScore(
       {
         orientationComplete: s.orientationProgress.length >= orientationTotal && orientationTotal > 0,
+        orientationProgress: { completed: s.orientationProgress.length, total: orientationTotal },
         completedGoalLevels,
         bhagCompleted,
         certificationsEarned: certDone,

@@ -402,7 +402,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   return (
     <div className="space-y-6">
-      <Link href="/teacher" className="text-sm text-blue-600 hover:text-blue-800">
+      <Link href="/teacher" className="text-sm text-[var(--accent-blue)] hover:text-[var(--ink-strong)]">
         &larr; Back to Class Dashboard
       </Link>
 

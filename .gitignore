@@ -74,6 +74,7 @@ _old_MEMORY.md
 # Agent tooling and session state
 .remember/
 .superpowers/
+.worktrees/
 
 # Test artifacts
 playwright-report/

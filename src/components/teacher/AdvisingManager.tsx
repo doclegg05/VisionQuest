@@ -133,7 +133,7 @@ export default function AdvisingManager() {
     }
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading...</p>;
 
   if (error) {
     return (
@@ -155,17 +155,17 @@ export default function AdvisingManager() {
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Live office hours</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Live office hours</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{blocks.length}</p>
           <p className="text-sm text-gray-500">Availability blocks students can book from</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Scheduled</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Scheduled</p>
           <p className="mt-2 text-2xl font-bold text-teal-700">{scheduledAppointments}</p>
           <p className="text-sm text-gray-500">Upcoming advising appointments on your calendar</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Reminders</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Reminders</p>
           <button
             type="button"
             onClick={() => void handleSendReminders()}
@@ -184,7 +184,7 @@ export default function AdvisingManager() {
       ) : null}
 
       {grouped.length === 0 ? (
-        <div className="text-center text-gray-400 py-8 text-sm bg-white rounded-xl border border-gray-200">
+        <div className="text-center text-[var(--ink-muted)] py-8 text-sm bg-white rounded-xl border border-gray-200">
           No advising availability yet. Add office hours so students can self-book.
         </div>
       ) : (
@@ -229,7 +229,7 @@ export default function AdvisingManager() {
           <h3 className="text-sm font-semibold text-gray-700">New Availability Block</h3>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="text-sm text-gray-600">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Day</span>
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Day</span>
               <select
                 value={form.weekday}
                 onChange={(event) => setForm((current) => ({ ...current, weekday: event.target.value }))}
@@ -244,7 +244,7 @@ export default function AdvisingManager() {
             </label>
 
             <label className="text-sm text-gray-600">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Start</span>
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Start</span>
               <input
                 type="time"
                 value={form.startTime}
@@ -254,7 +254,7 @@ export default function AdvisingManager() {
             </label>
 
             <label className="text-sm text-gray-600">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">End</span>
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">End</span>
               <input
                 type="time"
                 value={form.endTime}
@@ -264,7 +264,7 @@ export default function AdvisingManager() {
             </label>
 
             <label className="text-sm text-gray-600">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Slot length</span>
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Slot length</span>
               <select
                 value={form.slotMinutes}
                 onChange={(event) => setForm((current) => ({ ...current, slotMinutes: event.target.value }))}
@@ -281,7 +281,7 @@ export default function AdvisingManager() {
 
           <div className="grid gap-3 md:grid-cols-3">
             <label className="text-sm text-gray-600">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Format</span>
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Format</span>
               <select
                 value={form.locationType}
                 onChange={(event) => setForm((current) => ({ ...current, locationType: event.target.value }))}
@@ -294,7 +294,7 @@ export default function AdvisingManager() {
             </label>
 
             <label className="text-sm text-gray-600 md:col-span-2">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">Location label</span>
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Location label</span>
               <input
                 type="text"
                 value={form.locationLabel}

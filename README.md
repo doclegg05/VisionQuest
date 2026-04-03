@@ -1,45 +1,93 @@
-# Visionquest
+# VisionQuest
 
-Visionquest is a Next.js portal for the SPOKES workforce development program. It gives students one place to work with Sage, track goals, complete orientation, manage certifications, store files, and build a portfolio. Teachers get dashboards for student progress and content management.
+VisionQuest is an AI-coach-driven portal for the SPOKES workforce development program. It gives students a single place to work with Sage, track goals, complete orientation, manage certifications, save files, build a portfolio, and explore jobs. Teachers get class operations, student progress views, intervention tooling, and reporting workflows.
+
+## What the App Covers
+
+- Student experience centered around Sage, goals, orientation, certifications, portfolio, files, resources, and job exploration
+- Teacher operations for rosters, student detail, interventions, advising, forms, reports, and content management
+- Background workflows for appointment reminders, job processing, and daily coaching prompts
+- AI-assisted coaching and extraction flows powered by Google Gemini
 
 ## Stack
 
-- Next.js App Router
+- Next.js 16 App Router
 - React 19
-- Prisma + PostgreSQL
-- Google Gemini API
-- Supabase Storage (S3-compatible) or Cloudflare R2 for production file storage
+- TypeScript 5
+- Prisma 6 with PostgreSQL
+- Supabase PostgreSQL and Supabase Storage (S3-compatible)
+- Google Gemini 2.5 Flash Lite by default
+- Tailwind CSS 4
+- Sentry for optional error tracking
+
+## Architecture At A Glance
+
+- Auth uses JWTs stored in `httpOnly` cookies with SameSite strict protection
+- Passwords use PBKDF2-SHA512 hashing; OAuth users now store `null` password hashes
+- Student routes live under [`src/app/(student)`](/Users/brittlegg/visionquest/src/app/(student))
+- Teacher routes live under [`src/app/(teacher)`](/Users/brittlegg/visionquest/src/app/(teacher))
+- API routes live under [`src/app/api`](/Users/brittlegg/visionquest/src/app/api)
+- Sage chat streams responses from `/api/chat/send` and runs a follow-up extraction pass asynchronously
+- Files write to local `./uploads/` in development and to Supabase Storage in production
+- CSP and request hardening are enforced in [`src/proxy.ts`](/Users/brittlegg/visionquest/src/proxy.ts)
+
+For a fuller repo walkthrough, see [`docs/DEVELOPER_GUIDE.md`](/Users/brittlegg/visionquest/docs/DEVELOPER_GUIDE.md).
+
+## Repository Map
+
+- [`src/app`](/Users/brittlegg/visionquest/src/app) App Router pages, layouts, and API routes
+- [`src/components`](/Users/brittlegg/visionquest/src/components) UI grouped by product area
+- [`src/lib`](/Users/brittlegg/visionquest/src/lib) business logic, integrations, progression, auth, and testable services
+- [`prisma/schema.prisma`](/Users/brittlegg/visionquest/prisma/schema.prisma) database schema
+- [`scripts`](/Users/brittlegg/visionquest/scripts) operational scripts, smoke tests, seeding, and promotion helpers
+- [`docs`](/Users/brittlegg/visionquest/docs) product guidance, plans, and implementation references
+- [`DEPLOY.md`](/Users/brittlegg/visionquest/DEPLOY.md) deployment runbook for Render and Supabase
 
 ## Local Setup
 
-1. Install dependencies:
+### 1. Install dependencies
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-2. Copy the environment template and fill in your values:
+### 2. Create local environment config
 
-   ```bash
-   cp .env.example .env.local
-   ```
+```bash
+cp .env.example .env.local
+```
 
-3. Generate the Prisma client and run migrations:
+Fill in the required variables from the next section. For local-only work, you can leave optional integrations blank.
 
-   ```bash
-   npm run prisma:generate
-   npm run prisma:migrate:deploy
-   ```
+### 3. Generate Prisma client and apply migrations
 
-4. Start the app:
+```bash
+npm run prisma:generate
+npm run prisma:migrate:deploy
+```
 
-   ```bash
-   npm run dev
-   ```
+### 4. Start the app
 
-## Required Environment Variables
+```bash
+npm run dev
+```
 
-See [.env.example](./.env.example) for the full list.
+Open `http://localhost:3000`.
+
+### 5. Optional local seed helpers
+
+```bash
+npm run db:seed
+npm run db:seed-documents
+```
+
+Use these when you want local orientation data, template records, or seeded grounding documents.
+
+## Environment Variables
+
+See [`/.env.example`](/Users/brittlegg/visionquest/.env.example) for the authoritative template and inline generation notes.
+
+### Required for local development
 
 - `DATABASE_URL`
 - `DIRECT_URL`
@@ -48,65 +96,94 @@ See [.env.example](./.env.example) for the full list.
 - `API_KEY_ENCRYPTION_KEY`
 - `APP_BASE_URL`
 
-## Optional Integrations
+### Required for production features
+
+- `CRON_SECRET` for internal scheduled routes
+- `GEMINI_API_KEY` for Sage without per-user key entry
+- `STORAGE_ENDPOINT`
+- `STORAGE_BUCKET`
+- `STORAGE_ACCESS_KEY`
+- `STORAGE_SECRET_KEY`
+
+### Optional integrations
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REDIRECT_URI`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL` (defaults to `gemini-2.5-flash-lite`)
+- `GEMINI_MODEL`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_FROM`
-- `STORAGE_ENDPOINT`
-- `STORAGE_BUCKET`
-- `STORAGE_ACCESS_KEY`
-- `STORAGE_SECRET_KEY`
-- `R2_ACCOUNT_ID`
-- `R2_ACCESS_KEY`
-- `R2_SECRET_KEY`
-- `R2_BUCKET_NAME`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
+- `SENTRY_DSN`
+- `NEXT_PUBLIC_SENTRY_DSN`
+- `LOG_LEVEL`
 
-## Production Checklist
+## Common Commands
 
-1. Provision PostgreSQL and run `npm run prisma:migrate:deploy`.
-2. If you deploy on Render with Supabase, use the Supabase **Session pooler** connection string for `DATABASE_URL`.
-3. If Render cannot reach the Supabase direct host, set `DIRECT_URL` to the same Session pooler string until you have an IPv4-compatible direct connection.
-4. Set `JWT_SECRET`, `TEACHER_KEY`, `API_KEY_ENCRYPTION_KEY`, and `APP_BASE_URL` with production values.
-5. Configure `GEMINI_API_KEY` if Sage should work without personal student keys.
-6. Configure `SMTP_*` values if students should be able to reset passwords by email.
-7. Configure storage credentials if file uploads are enabled in production.
-8. If you deploy on Render with [render.yaml](./render.yaml), the reminder cron service is provisioned automatically. Otherwise, schedule `node scripts/run-appointment-reminders.mjs` hourly with `APP_BASE_URL` and `CRON_SECRET`.
-9. Whitelist the deployed Google OAuth callback URL in Google Cloud if Google sign-in is enabled.
-10. Either:
-
-    - set `TEACHER_KEY` and have teachers register at `/teacher-register`, or
-    - promote the first teacher account after that user registers:
-
-   ```bash
-   npm run users:promote-teacher -- <student-id-or-email>
-   ```
-
-11. Verify a student can register, reset a password, open Sage, upload a file, and save a portfolio item.
-12. Run:
-
-   ```bash
-   npm run lint
-   npm run test
-   npm run build
-   ```
-
-## Scripts
+### App lifecycle
 
 - `npm run dev`
 - `npm run build`
 - `npm run start`
 - `npm run lint`
 - `npm run typecheck`
+
+### Tests
+
 - `npm run test`
-- `npm run test:smoke` (boots a local dev server with smoke-safe env defaults; override `SMOKE_BASE_URL` if needed)
+- `npm run test:api`
+- `npm run test:smoke`
+- `npm run test:smoke:api`
+- `npm run test:e2e`
+
+### Database and user operations
+
 - `npm run prisma:generate`
 - `npm run prisma:migrate:deploy`
+- `npm run db:seed`
+- `npm run db:seed-documents`
 - `npm run users:promote-teacher -- <student-id-or-email>`
+- `npm run users:promote-admin -- <student-id-or-email>`
+
+## Recommended Verification Before Shipping
+
+Run the minimum engineering checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+For UI or integration-sensitive changes, also run:
+
+```bash
+npm run test:smoke
+npm run test:e2e
+```
+
+## Deployment
+
+VisionQuest is configured for Render plus Supabase. The blueprint file in [`render.yaml`](/Users/brittlegg/visionquest/render.yaml) provisions:
+
+- 1 web service
+- 3 cron services
+
+  - appointment reminders
+  - job processor
+  - daily coaching
+
+Use [`DEPLOY.md`](/Users/brittlegg/visionquest/DEPLOY.md) for the full deployment runbook.
+
+## Product And Planning Docs
+
+- [`docs/PRODUCT_GUIDE.md`](/Users/brittlegg/visionquest/docs/PRODUCT_GUIDE.md) product intent, user model, and current gaps
+- [`docs/PRODUCT_DECISIONS.md`](/Users/brittlegg/visionquest/docs/PRODUCT_DECISIONS.md) scope authority and current decisions
+- [`docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md`](/Users/brittlegg/visionquest/docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md) learning and evidence strategy
+- [`CLAUDE.md`](/Users/brittlegg/visionquest/CLAUDE.md) project operating rules and doc-routing instructions for agents

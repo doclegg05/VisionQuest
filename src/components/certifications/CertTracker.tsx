@@ -233,7 +233,7 @@ export default function CertTracker() {
                   {req.needsVerify && (
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       req.verifiedBy
-                        ? "bg-green-50 text-green-600"
+                        ? "bg-green-50 text-green-700"
                         : req.completed
                           ? "bg-yellow-50 text-yellow-600"
                           : "bg-gray-50 text-gray-400"

@@ -35,9 +35,10 @@ interface NavBarProps {
   studentName: string;
   role: string;
   navPhase?: NavPhase;
+  orientationComplete?: boolean;
 }
 
-export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
+export default function NavBar({ studentName, role, navPhase, orientationComplete }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -68,7 +69,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
   // Primary nav items for the sidebar
   const primaryItems =
     role === "student"
-      ? getVisibleNavItems(navPhase ?? 3)
+      ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
         ? [...ADMIN_ITEMS, ...STAFF_ITEMS]
         : STAFF_ITEMS;
@@ -79,7 +80,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
 
   // Mobile bottom bar: 5 slots — Home, Goals, Sage (center FAB), Learning, More
   // "More" sheet contains the rest: Career, Advising, Portfolio, Vision Board, Files, Resources, Settings
-  const allStudentItems = [...getVisibleNavItems(navPhase ?? 3), ...getVisibleSecondaryNavItems(navPhase ?? 3)];
+  const allStudentItems = [...getVisibleNavItems(navPhase ?? 3, orientationComplete), ...getVisibleSecondaryNavItems(navPhase ?? 3)];
   const mobileMain = role === "student"
     ? allStudentItems.slice(0, 2) // Home, Goals
     : primaryItems.slice(0, 2);
