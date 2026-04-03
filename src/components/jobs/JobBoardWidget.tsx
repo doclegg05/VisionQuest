@@ -52,7 +52,7 @@ export function JobBoardWidget({ jobs, hasDiscovery }: JobBoardWidgetProps) {
           <h2 className="text-base font-semibold text-[var(--text-primary)]">Job Matches</h2>
         </div>
         <Link
-          href="/jobs"
+          href="/career#jobs"
           className="text-sm text-[var(--primary)] hover:underline"
         >
           View all →

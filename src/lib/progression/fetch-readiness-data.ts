@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
-import { parseState, createInitialState, type ProgressionState } from "./engine";
-import { computeReadinessScore, type ReadinessResult } from "./readiness-score";
+import { type ProgressionState } from "./engine";
+import { type ReadinessResult } from "./readiness-score";
+import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 
 export interface StudentReadinessData {
   state: ProgressionState;
@@ -37,42 +38,22 @@ export async function fetchStudentReadinessData(studentId: string): Promise<Stud
     }),
   ]);
 
-  const state = progression ? parseState(progression.state) : createInitialState();
-
-  // Reconcile DB-sourced values with progression state to ensure consistency
-  if (!state.resumeCreated && resumeData) {
-    state.resumeCreated = true;
-  }
-  if (!state.portfolioShared && publicPage?.isPublic) {
-    state.portfolioShared = true;
-  }
-
   const bhagCompleted = !!bhagGoal;
-  const orientationProgress = { completed: orientationDoneCount, total: orientationTotalCount };
-
-  // Use DB counts as the authoritative source for certifications and portfolio items,
-  // falling back to state when the DB count is higher (handles edge cases where
-  // progression state may be ahead of direct DB counts).
-  const resolvedCertsEarned = Math.max(state.certificationsEarned, certificationsEarned);
-  const resolvedPortfolioItemCount = Math.max(state.portfolioItemCount, portfolioItemCount);
-
-  const readiness = computeReadinessScore({
-    ...state,
+  const snapshot = buildReadinessSnapshot({
+    progressionState: progression?.state ?? null,
+    orientationCompletedCount: orientationDoneCount,
+    orientationTotalCount,
     bhagCompleted,
-    orientationProgress,
-    certificationsEarned: resolvedCertsEarned,
-    portfolioItemCount: resolvedPortfolioItemCount,
+    certificationsEarned,
+    portfolioItemCount,
+    hasResume: Boolean(resumeData),
+    portfolioShared: Boolean(publicPage?.isPublic),
   });
 
-  // Reflect resolved values back onto state for consumers that read state fields directly
-  state.certificationsEarned = resolvedCertsEarned;
-  state.portfolioItemCount = resolvedPortfolioItemCount;
-  state.bhagCompleted = bhagCompleted;
-
   return {
-    state,
-    readiness,
-    orientationProgress,
+    state: snapshot.state,
+    readiness: snapshot.readiness,
+    orientationProgress: snapshot.orientationProgress,
     bhagCompleted,
     hasProgressionRecord: progression !== null,
   };

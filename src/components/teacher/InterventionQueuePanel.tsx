@@ -4,28 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Warning, Target, CalendarX, UserCircle } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface QueueStudent {
-  studentId: string;
-  name: string;
-  email: string | null;
-  urgencyScore: number;
-  signals: {
-    stalledGoalCount: number;
-    highSeverityAlertCount: number;
-    overdueTaskCount: number;
-    daysSinceLastLogin: number;
-    orientationComplete: boolean;
-    orientationProgress: number;
-    readinessScore: number;
-  };
-}
-
-interface QueueResponse {
-  queue: QueueStudent[];
-}
+import {
+  type InterventionQueueResponse as QueueResponse,
+  type QueueStudent,
+} from "@/lib/teacher/dashboard";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,12 +103,20 @@ function StudentRow({ student }: { student: QueueStudent }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function InterventionQueuePanel() {
-  const [queue, setQueue] = useState<QueueStudent[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function InterventionQueuePanel({
+  initialQueue,
+}: {
+  initialQueue?: QueueStudent[];
+}) {
+  const [queue, setQueue] = useState<QueueStudent[]>(initialQueue ?? []);
+  const [loading, setLoading] = useState(initialQueue === undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialQueue !== undefined) {
+      return;
+    }
+
     async function fetchQueue() {
       try {
         const data = await api.get<QueueResponse>("/api/teacher/intervention-queue");
@@ -139,7 +129,7 @@ export default function InterventionQueuePanel() {
     }
 
     void fetchQueue();
-  }, []);
+  }, [initialQueue]);
 
   return (
     <section className="surface-section p-5">
