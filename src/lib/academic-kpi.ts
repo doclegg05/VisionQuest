@@ -226,7 +226,7 @@ export function computeAcademicKpis(
     // Readiness score
     const progState = parseState(student.progressionState);
     const studentBhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-    const readiness = computeReadinessScore({ ...progState, bhagCompleted: studentBhagCompleted });
+    const readiness = computeReadinessScore({ ...progState, bhagCompleted: studentBhagCompleted, orientationProgress: { completed: 0, total: 0 } });
     readinessScores.push(readiness.score);
 
     // Funnel
