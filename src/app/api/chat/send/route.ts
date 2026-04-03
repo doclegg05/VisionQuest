@@ -49,7 +49,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
   // Save user message
-  await saveMessage(conversation.id, "user", userMessage);
+  await saveMessage(conversation.id, "user", userMessage, conversation.studentId);
 
   // Build system prompt — teacher gets a streamlined path
   let systemPrompt: string;
@@ -122,7 +122,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         }
 
         // Save assistant message
-        await saveMessage(conversation.id, "assistant", fullResponse);
+        await saveMessage(conversation.id, "assistant", fullResponse, conversation.studentId);
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
         void maybeUpdateSummary(conversation.id, apiKey, session.id).catch((err) =>

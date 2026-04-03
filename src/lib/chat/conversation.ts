@@ -107,9 +107,10 @@ export async function saveMessage(
   conversationId: string,
   role: "user" | "assistant",
   content: string,
+  studentId: string,
 ) {
   return prisma.message.create({
-    data: { conversationId, role, content },
+    data: { conversationId, role, content, studentId },
   });
 }
 
