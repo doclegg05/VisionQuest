@@ -45,6 +45,11 @@ export interface AlertInputs {
     }[];
     lastConversationAt?: Date | null;
     orientationComplete?: boolean;
+    requirementCompliance?: {
+      requiredCount: number;
+      requiredMet: number;
+      missingTitles: string[];
+    } | null;
   };
   now?: Date;
 }
@@ -303,6 +308,28 @@ export function buildStudentAlertDescriptors({
         sourceId: signals.studentId,
       });
     }
+  }
+
+  // Class requirement compliance
+  const compliance = signals?.requirementCompliance;
+  if (
+    compliance &&
+    compliance.requiredCount > 0 &&
+    compliance.requiredMet < compliance.requiredCount
+  ) {
+    const missing = compliance.missingTitles;
+    alerts.push({
+      alertKey: `requirement_noncompliant:${studentKey}`,
+      type: "requirement_noncompliant",
+      severity: compliance.requiredMet === 0 ? "high" : "medium",
+      title: "Missing required class items",
+      summary:
+        missing.length > 3
+          ? `${missing.slice(0, 3).join(", ")}, and ${missing.length - 3} more required items are not yet completed.`
+          : `${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} still required.`,
+      sourceType: "student",
+      sourceId: signals?.studentId || studentKey,
+    });
   }
 
   return alerts;

@@ -31,6 +31,7 @@ export function buildStudentAlertSyncPlan({
     studentSignals,
     orientationItems,
     recentMoodEntries,
+    compliance,
   } = context;
 
   const certification = studentSignals?.certifications[0];
@@ -131,6 +132,15 @@ export function buildStudentAlertSyncPlan({
           })),
           lastConversationAt: studentSignals.conversations[0]?.updatedAt || null,
           orientationComplete: progressionState?.orientationComplete || false,
+          requirementCompliance: compliance
+            ? {
+                requiredCount: compliance.requiredCount,
+                requiredMet: compliance.requiredMet,
+                missingTitles: compliance.items
+                  .filter((i) => i.requiredStatus === "required" && !i.met)
+                  .map((i) => i.title),
+              }
+            : null,
           certification: certification
             ? {
                 status: certification.status,

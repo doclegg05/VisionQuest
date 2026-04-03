@@ -16,6 +16,7 @@ import {
   getInactivityStageRank,
   normalizeInactivityAlertType,
 } from "@/lib/inactivity";
+import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { buildInterventionQueueEntry } from "@/lib/teacher/intervention-queue";
 
@@ -66,6 +67,8 @@ export interface StudentOverview {
   filesCount: number;
   isActive: boolean;
   readinessScore: number;
+  requirementsMet: number;
+  requirementsTotal: number;
 }
 
 export interface ManagedClassOption {
@@ -342,16 +345,21 @@ export async function getTeacherDashboardPage(
     take: limit,
   });
 
-  const orientationTotal = await prisma.orientationItem.count();
-  const certTemplates = await prisma.certTemplate.findMany({
-    where: { certType: "ready-to-work" },
-    select: {
-      id: true,
-      required: true,
-      needsFile: true,
-      needsVerify: true,
-    },
-  });
+  const [orientationTotal, certTemplates, complianceMap] = await Promise.all([
+    prisma.orientationItem.count(),
+    prisma.certTemplate.findMany({
+      where: { certType: "ready-to-work" },
+      select: {
+        id: true,
+        required: true,
+        needsFile: true,
+        needsVerify: true,
+      },
+    }),
+    requestedClassId
+      ? checkClassCompliance(requestedClassId)
+      : Promise.resolve(new Map()),
+  ]);
 
   const overview = students.map((student) => {
     let xp = 0;
@@ -445,6 +453,8 @@ export async function getTeacherDashboardPage(
       hasResume: !!student.resumeData,
       filesCount: student.files.length,
       readinessScore: readiness.score,
+      requirementsMet: complianceMap.get(student.id)?.requiredMet ?? 0,
+      requirementsTotal: complianceMap.get(student.id)?.requiredCount ?? 0,
     };
   });
 

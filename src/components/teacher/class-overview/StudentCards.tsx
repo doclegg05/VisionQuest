@@ -123,6 +123,11 @@ export default function StudentCards({
               <span className="rounded-full bg-[rgba(16,37,62,0.04)] px-2.5 py-1">
                 {student.goalsCount} goals {student.hasBhag && "• BHAG ✓"}
               </span>
+              {student.requirementsTotal > 0 && student.requirementsMet < student.requirementsTotal && (
+                <span className="rounded-full bg-orange-100 px-2.5 py-1 font-semibold text-orange-700">
+                  {student.requirementsMet}/{student.requirementsTotal} req
+                </span>
+              )}
               {student.certPendingVerify > 0 && (
                 <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">
                   {student.certPendingVerify} pending

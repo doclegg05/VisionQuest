@@ -1,3 +1,4 @@
+import { checkStudentCompliance } from "./class-requirement-compliance";
 import { prisma } from "./db";
 import { ALL_INACTIVITY_ALERT_TYPES } from "./inactivity";
 
@@ -205,6 +206,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             "orientation_not_started",
             "orientation_overdue",
             "motivation_declining",
+            "requirement_noncompliant",
             ...ALL_INACTIVITY_ALERT_TYPES,
           ],
         },
@@ -219,6 +221,9 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
     }),
   ]);
 
+  // Check class requirement compliance (outside the transaction since it's read-only)
+  const compliance = await checkStudentCompliance(studentId);
+
   return {
     tasks,
     appointments,
@@ -226,5 +231,6 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
     orientationItems,
     existing,
     recentMoodEntries,
+    compliance,
   };
 }
