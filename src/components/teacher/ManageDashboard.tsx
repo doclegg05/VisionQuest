@@ -82,7 +82,9 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
           <AcademicKpiReport />
           {canViewAiConfig && (
             <section>
-              <SectionHeading>AI Configuration</SectionHeading>
+              <h3 className="mb-4 border-b border-gray-200 pb-2 text-lg font-semibold text-gray-800">
+                AI Configuration
+              </h3>
               <AiConfigPanel />
             </section>
           )}
