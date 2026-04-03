@@ -126,7 +126,7 @@ export default function OperationsTab({
         </div>
 
         {formSubmissions.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-400">No form submissions yet.</p>
+          <p className="mt-4 text-sm text-[var(--ink-muted)]">No form submissions yet.</p>
         ) : (
           <div className="mt-4 space-y-3">
             {formSubmissions.map((submission: FormSubmissionData) => (
@@ -148,7 +148,7 @@ export default function OperationsTab({
                     {submission.description ? (
                       <p className="mt-2 text-sm text-gray-600">{submission.description}</p>
                     ) : null}
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs text-[var(--ink-muted)]">
                       Updated {dateFormatter.format(new Date(submission.updatedAt))}
                       {submission.reviewedAt ? ` \u2022 Reviewed ${dateFormatter.format(new Date(submission.reviewedAt))}` : ""}
                     </p>
@@ -232,7 +232,7 @@ export default function OperationsTab({
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm text-gray-600">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Start
                 </span>
                 <input
@@ -243,7 +243,7 @@ export default function OperationsTab({
                 />
               </label>
               <label className="text-sm text-gray-600">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   End
                 </span>
                 <input
@@ -256,7 +256,7 @@ export default function OperationsTab({
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="text-sm text-gray-600">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Format
                 </span>
                 <select
@@ -270,7 +270,7 @@ export default function OperationsTab({
                 </select>
               </label>
               <label className="text-sm text-gray-600 sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Location or label
                 </span>
                 <input
@@ -315,7 +315,7 @@ export default function OperationsTab({
 
           <div className="mt-5 space-y-3">
             {appointments.length === 0 ? (
-              <p className="text-sm text-gray-400">No appointments scheduled yet.</p>
+              <p className="text-sm text-[var(--ink-muted)]">No appointments scheduled yet.</p>
             ) : (
               appointments.map((appointment: AppointmentData) => (
                 <div key={appointment.id} className="rounded-lg border border-gray-100 p-4">
@@ -424,7 +424,7 @@ export default function OperationsTab({
             />
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="text-sm text-gray-600">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Due
                 </span>
                 <input
@@ -435,7 +435,7 @@ export default function OperationsTab({
                 />
               </label>
               <label className="text-sm text-gray-600">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Priority
                 </span>
                 <select
@@ -451,7 +451,7 @@ export default function OperationsTab({
                 </select>
               </label>
               <label className="text-sm text-gray-600">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-gray-400">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Linked appointment
                 </span>
                 <select
@@ -479,7 +479,7 @@ export default function OperationsTab({
 
           <div className="mt-5 space-y-3">
             {tasks.length === 0 ? (
-              <p className="text-sm text-gray-400">No follow-up tasks yet.</p>
+              <p className="text-sm text-[var(--ink-muted)]">No follow-up tasks yet.</p>
             ) : (
               tasks.map((task: TaskData) => (
                 <div
@@ -507,7 +507,7 @@ export default function OperationsTab({
                       <p className="mt-1 text-sm text-gray-500">
                         {task.dueAt ? `Due ${dateFormatter.format(new Date(task.dueAt))}` : "No due date"}
                       </p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-gray-400">
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         Created by {task.createdByName}
                       </p>
                     </div>
@@ -582,7 +582,7 @@ export default function OperationsTab({
 
         <div className="mt-5 space-y-3">
           {notes.length === 0 ? (
-            <p className="text-sm text-gray-400">No case notes yet.</p>
+            <p className="text-sm text-[var(--ink-muted)]">No case notes yet.</p>
           ) : (
             notes.map((note: NoteData) => (
               <div key={note.id} className="rounded-lg border border-gray-100 p-4">
@@ -591,7 +591,7 @@ export default function OperationsTab({
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-700">
                       {note.category.replace("_", " ")}
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-[var(--ink-muted)]">
                       {note.authorName} {"\u2022"} {dateFormatter.format(new Date(note.createdAt))}
                     </span>
                   </div>

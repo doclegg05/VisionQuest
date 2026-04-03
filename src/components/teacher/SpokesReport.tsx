@@ -90,7 +90,7 @@ export default function SpokesReport() {
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading SPOKES report...</p>;
+    return <p className="text-sm text-[var(--ink-muted)]">Loading SPOKES report...</p>;
   }
 
   if (error || !data) {
@@ -114,7 +114,7 @@ export default function SpokesReport() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {SUMMARY_KEYS.map((card) => (
           <div key={card.key} className="rounded-xl border border-gray-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-gray-400">{card.label}</p>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">{card.label}</p>
             <p className={`mt-2 text-3xl font-bold ${card.tone}`}>{data.summary[card.key]}</p>
           </div>
         ))}
@@ -122,7 +122,7 @@ export default function SpokesReport() {
 
       <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Program status mix</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Program status mix</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
               <p className="text-sm font-semibold text-slate-700">Referred</p>
@@ -156,7 +156,7 @@ export default function SpokesReport() {
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Attention queue</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Attention queue</p>
               <h3 className="mt-2 text-lg font-semibold text-gray-900">Students needing follow-through</h3>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -177,7 +177,7 @@ export default function SpokesReport() {
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{item.studentName}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-gray-400">
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {item.studentId || "Unlinked record"} • {item.status.replaceAll("_", " ")}
                       </p>
                     </div>
@@ -190,19 +190,19 @@ export default function SpokesReport() {
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Orientation</p>
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Orientation</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
                         {item.orientationDone}/{item.orientationTotal}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Files</p>
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Files</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
                         {item.filesDone}/{item.filesTotal}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Modules</p>
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Modules</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
                         {item.modulesDone}/{item.modulesTotal}
                       </p>

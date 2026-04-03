@@ -98,7 +98,7 @@ function SignAndSubmitButton({
         {currentStatus === "rejected" ? "Re-sign" : "Sign & Submit"}
       </button>
       {currentStatus === "rejected" && (
-        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-600">
+        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-700">
           Returned — please re-sign
         </span>
       )}

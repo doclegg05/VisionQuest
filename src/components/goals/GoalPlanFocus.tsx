@@ -102,7 +102,7 @@ export default function GoalPlanFocus({
                     {plan.links.map((link) => {
                       const dueLabel = formatDueDate(link.dueAt);
                       return (
-                        <div key={link.id} className="rounded-xl border border-white/80 bg-white/85 p-3">
+                        <div key={link.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
@@ -153,7 +153,7 @@ export default function GoalPlanFocus({
                     {plan.recommendations.map((entry) => (
                       <div
                         key={`${entry.resourceType}:${entry.resourceId}`}
-                        className="rounded-xl border border-dashed border-[rgba(16,37,62,0.12)] bg-white/75 p-3"
+                        className="rounded-xl border border-dashed border-[rgba(16,37,62,0.12)] bg-[var(--surface-raised)] p-3"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
