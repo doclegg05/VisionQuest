@@ -13,18 +13,13 @@ import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { generateConversationTitle } from "./conversation";
-import { summarizeConversation } from "./summarizer";
 
 // ─── Main post-response handler ─────────────────────────────────────────────
-
-// Summarization is triggered at these message-count thresholds.
-const SUMMARY_THRESHOLDS = [30, 60, 90] as const;
 
 interface PostResponseParams {
   conversationId: string;
   conversationTitle: string | null;
   conversationStage: string;
-  conversationSummary: string | null;
   fullResponse: string;
   studentId: string;
   apiKey: string;
@@ -47,7 +42,6 @@ export async function handlePostResponse({
   conversationId,
   conversationTitle,
   conversationStage,
-  conversationSummary,
   fullResponse,
   studentId,
   apiKey,
@@ -132,8 +126,7 @@ export async function handlePostResponse({
       logger.error("Failed to generate conversation title", { error: String(err) });
     }
 
-    // Trigger summarization if threshold crossed
-    maybeSummarize(conversationId, conversationSummary, allMessages, apiKey);
+    // Rolling summary compaction is now handled by maybeUpdateSummary in the route
     return;
   }
 
@@ -248,36 +241,5 @@ export async function handlePostResponse({
     logger.error("Failed to generate conversation title", { error: String(err) });
   }
 
-  // 8. Summarize conversation at thresholds (fire-and-forget)
-  maybeSummarize(conversationId, conversationSummary, allMessages, apiKey);
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Fires summarization if the message count has just crossed a threshold and
- * the existing summary is stale (null or was last written at a lower threshold).
- * This is always fire-and-forget — failures are logged and swallowed.
- */
-function maybeSummarize(
-  conversationId: string,
-  currentSummary: string | null,
-  allMessages: { role: "user" | "model"; content: string }[],
-  apiKey: string
-): void {
-  const messageCount = allMessages.length;
-  const shouldSummarize =
-    messageCount >= SUMMARY_THRESHOLDS[0] &&
-    SUMMARY_THRESHOLDS.some((threshold) => messageCount === threshold);
-
-  if (!shouldSummarize && !(messageCount >= SUMMARY_THRESHOLDS[0] && currentSummary === null)) {
-    return;
-  }
-
-  summarizeConversation(conversationId, allMessages, apiKey).catch((err) =>
-    logger.error("Conversation summarization failed", {
-      conversationId,
-      error: String(err),
-    })
-  );
+  // Summary compaction is now handled by maybeUpdateSummary in the route
 }
