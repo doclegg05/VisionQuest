@@ -15,11 +15,13 @@ import GrantKpiReport from "./GrantKpiReport";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 import { JobConfigSection } from "./JobConfigSection";
 import PathwayManager from "./PathwayManager";
+import AiConfigPanel from "./AiConfigPanel";
 
 type Tab = "orientation" | "learning" | "career" | "reports";
 
 interface ManageDashboardProps {
   canViewAudit: boolean;
+  canViewAiConfig: boolean;
 }
 
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
@@ -37,7 +39,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) {
+export default function ManageDashboard({ canViewAudit, canViewAiConfig }: ManageDashboardProps) {
   const [tab, setTab] = useState<Tab>("orientation");
 
   return (
@@ -128,6 +130,12 @@ export default function ManageDashboard({ canViewAudit }: ManageDashboardProps) 
             <SectionHeading>Grant KPI Report</SectionHeading>
             <GrantKpiReport />
           </section>
+          {canViewAiConfig && (
+            <section>
+              <SectionHeading>AI Configuration</SectionHeading>
+              <AiConfigPanel />
+            </section>
+          )}
           {canViewAudit && (
             <section>
               <SectionHeading>Audit Trail</SectionHeading>
