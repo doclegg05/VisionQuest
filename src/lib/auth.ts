@@ -5,12 +5,20 @@ import { prisma } from "./db";
 import { cached, invalidatePrefix } from "./cache";
 
 const TOKEN_TTL = "7d";
+const MFA_TOKEN_TTL = "5m";
 const COOKIE_NAME = "vq-session";
 
 interface SessionClaims {
   sub: string;
   role: string;
   sv: number;
+}
+
+interface MfaSessionClaims {
+  sub: string;
+  role: string;
+  sv: number;
+  purpose: "mfa_challenge";
 }
 
 function getJwtSecret(): string {
@@ -121,4 +129,39 @@ export function normalizeStudentId(raw: string): string {
 
 export function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
+}
+
+// --- MFA session tokens ---
+
+/**
+ * Sign a short-lived JWT (5 minutes) that proves password authentication succeeded
+ * but MFA verification is still required.
+ */
+export function signMfaSessionToken(studentId: string, role: string, sessionVersion: number): string {
+  return jwt.sign(
+    { sub: studentId, role, sv: sessionVersion, purpose: "mfa_challenge" },
+    getJwtSecret(),
+    { expiresIn: MFA_TOKEN_TTL },
+  );
+}
+
+/**
+ * Verify and decode a MFA session token. Returns null if expired, invalid, or
+ * not a MFA-purpose token.
+ */
+export function verifyMfaSessionToken(token: string): MfaSessionClaims | null {
+  try {
+    const payload = jwt.verify(token, getJwtSecret()) as Partial<MfaSessionClaims>;
+    if (
+      typeof payload.sub !== "string" ||
+      typeof payload.role !== "string" ||
+      typeof payload.sv !== "number" ||
+      payload.purpose !== "mfa_challenge"
+    ) {
+      return null;
+    }
+    return payload as MfaSessionClaims;
+  } catch {
+    return null;
+  }
 }

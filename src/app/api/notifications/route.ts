@@ -1,14 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { markAsRead } from "@/lib/notifications";
-import { withErrorHandler, unauthorized, badRequest } from "@/lib/api-error";
+import { badRequest } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 
 // GET — list notifications for the current user
-export const GET = withErrorHandler(async (req: NextRequest) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withRegistry("notifications.list", async (session, req, ctx, tool) => {
   const url = new URL(req.url);
   const unreadOnly = url.searchParams.get("unread") === "true";
   const rawLimit = parseInt(url.searchParams.get("limit") ?? "20", 10);
@@ -31,10 +28,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 // POST — mark notifications as read
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const POST = withRegistry("notifications.mark_read", async (session, req, ctx, tool) => {
   const { ids } = await req.json();
   if (ids !== undefined) {
     if (!Array.isArray(ids) || ids.some((id: unknown) => typeof id !== "string" || id.length === 0)) {

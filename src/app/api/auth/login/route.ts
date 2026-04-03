@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, normalizeStudentId, normalizeEmail, setSessionCookie } from "@/lib/auth";
+import { verifyPassword, normalizeStudentId, normalizeEmail, setSessionCookie, signMfaSessionToken } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -39,6 +39,27 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       metadata: { ip },
     });
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  }
+
+  // If MFA is enabled, return a partial response with a short-lived token
+  // instead of issuing the full session cookie.
+  if (student.mfaEnabled) {
+    const mfaSessionToken = signMfaSessionToken(student.id, student.role, student.sessionVersion);
+
+    await logAuditEvent({
+      actorId: student.id,
+      actorRole: student.role,
+      action: "auth.login_mfa_required",
+      targetType: "student",
+      targetId: student.id,
+      summary: `Password verified for ${student.studentId} — MFA challenge required.`,
+      metadata: { ip },
+    });
+
+    return NextResponse.json({
+      requiresMfa: true,
+      mfaSessionToken,
+    });
   }
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);

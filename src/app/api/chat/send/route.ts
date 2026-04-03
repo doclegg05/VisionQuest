@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { streamResponse } from "@/lib/gemini";
 import { rateLimit } from "@/lib/rate-limit";
@@ -7,7 +6,8 @@ import { getDocumentContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
-import { withAuth, isStaffRole } from "@/lib/api-error";
+import { isStaffRole } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
@@ -18,7 +18,7 @@ import { checkTokenQuota } from "@/lib/llm-usage";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
-export const POST = withAuth(async (session, req: NextRequest) => {
+export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;

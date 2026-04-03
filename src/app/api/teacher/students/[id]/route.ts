@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withTeacherAuth } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
@@ -15,12 +15,8 @@ import { FORMS } from "@/lib/spokes/forms";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 
 // GET — individual student detail for teacher view
-export const GET = withTeacherAuth(async (
-  session,
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) => {
-  const { id } = await params;
+export const GET = withRegistry("admin.student_detail", async (session, req, ctx, tool) => {
+  const { id } = await ctx.params;
   await assertStaffCanManageStudent(session, id);
 
   const student = await prisma.student.findUnique({
