@@ -1,5 +1,7 @@
+import { useState } from "react";
 import GoalTree from "../GoalTree";
 import GoalSupportPlanner from "../GoalSupportPlanner";
+import GoalPathwayAssigner from "../GoalPathwayAssigner";
 import {
   GOAL_RESOURCE_TYPE_LABELS,
   type GoalPlanEntry,
@@ -30,7 +32,7 @@ interface GoalsPlanTabProps {
   data: StudentData;
   dateFormatter: Intl.DateTimeFormat;
   onChanged: () => Promise<void>;
-  onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean }) => Promise<void>;
+  onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => Promise<void>;
 }
 
 export default function GoalsPlanTab({
@@ -260,6 +262,13 @@ export default function GoalsPlanTab({
           </section>
         )}
       </div>
+
+      {/* Pathway Assignment */}
+      <GoalPathwayAssigner
+        studentId={data.student.id}
+        goals={goals}
+        onGoalAction={onGoalAction}
+      />
 
       {/* Career Discovery */}
       <div id="career-discovery" className="bg-white rounded-xl border border-gray-200 p-5">

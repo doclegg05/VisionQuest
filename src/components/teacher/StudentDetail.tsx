@@ -336,7 +336,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   }
 
-  const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean }) => {
+  const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => {
     try {
       const res = await apiFetch(`/api/teacher/students/${studentId}/goals/${goalId}`, {
         method: "PATCH",
