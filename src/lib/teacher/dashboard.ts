@@ -372,8 +372,8 @@ export async function getTeacherDashboardPage(
         const state = JSON.parse(student.progression.state);
         xp = state.xp || 0;
         level = state.level || 1;
-        streak = state.streaks?.daily?.current || 0;
-        longestStreak = state.streaks?.daily?.longest || 0;
+        streak = state.currentStreak || state.streaks?.daily?.current || 0;
+        longestStreak = state.longestStreak || state.streaks?.daily?.longest || 0;
         portfolioShared = !!state.portfolioShared;
       } catch {
         // Ignore malformed progression state and fall back to defaults.
@@ -385,7 +385,7 @@ export async function getTeacherDashboardPage(
     const completedGoalLevels: string[] = [];
     for (const goal of planningGoals) {
       goalsByLevel[goal.level] = (goalsByLevel[goal.level] || 0) + 1;
-      if (!completedGoalLevels.includes(goal.level)) {
+      if (goal.status === "completed" && !completedGoalLevels.includes(goal.level)) {
         completedGoalLevels.push(goal.level);
       }
     }
