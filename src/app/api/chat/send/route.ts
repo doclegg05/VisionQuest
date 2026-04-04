@@ -40,7 +40,22 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
   }
 
   // Resolve AI provider
-  const provider = await getProvider(session.id);
+  let provider;
+  try {
+    provider = await getProvider(session.id);
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
+    const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
+
+    return new Response(
+      JSON.stringify({
+        error: isOffline
+          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
+          : errorMsg,
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   // Get or create conversation (teacher vs student path)
   const conversation = isTeacher
