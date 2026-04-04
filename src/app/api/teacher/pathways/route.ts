@@ -61,6 +61,7 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
       certifications,
       platforms,
       estimatedWeeks,
+      createdBy: session.id,
     },
   });
 
