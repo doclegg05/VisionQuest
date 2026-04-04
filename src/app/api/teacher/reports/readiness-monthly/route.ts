@@ -90,8 +90,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       // Goal counts
       const planningGoals = s.goals.filter((g) => goalCountsTowardPlan(g.status));
       const completedGoals = s.goals.filter((g) => g.status === "completed");
-      // "confirmed" = goals that count toward the plan
-      const confirmedGoals = planningGoals;
+      const confirmedGoals = s.goals.filter((g) => g.status === "confirmed");
 
       return {
         id: s.id,
