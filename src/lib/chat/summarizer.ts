@@ -1,4 +1,4 @@
-import { generateResponse } from "@/lib/gemini";
+import type { AIProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -20,7 +20,7 @@ Write in third person, past tense. Be factual and neutral. Do not include pleasa
 export async function summarizeConversation(
   conversationId: string,
   messages: { role: "user" | "model"; content: string }[],
-  apiKey: string
+  provider: AIProvider
 ): Promise<string> {
   if (messages.length === 0) {
     throw new Error("Cannot summarize an empty conversation");
@@ -31,7 +31,7 @@ export async function summarizeConversation(
     .map((m) => `${m.role === "user" ? "Student" : "Sage"}: ${m.content}`)
     .join("\n\n");
 
-  const summary = await generateResponse(apiKey, SUMMARY_SYSTEM_PROMPT, [
+  const summary = await provider.generateResponse(SUMMARY_SYSTEM_PROMPT, [
     { role: "user", content: `Please summarize this coaching conversation:\n\n${transcript}` },
   ]);
 

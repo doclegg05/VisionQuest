@@ -16,6 +16,7 @@ import DocumentBrowser from "@/components/documents/DocumentBrowser";
 import { JobConfigSection } from "./JobConfigSection";
 import PathwayManager from "./PathwayManager";
 import AiConfigPanel from "./AiConfigPanel";
+import AiProviderPanel from "./AiProviderPanel";
 
 type Tab = "orientation" | "learning" | "career" | "reports";
 
@@ -130,6 +131,12 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
             <SectionHeading>Grant KPI Report</SectionHeading>
             <GrantKpiReport />
           </section>
+          {canViewAiConfig && (
+            <section>
+              <SectionHeading>AI Provider</SectionHeading>
+              <AiProviderPanel />
+            </section>
+          )}
           {canViewAiConfig && (
             <section>
               <SectionHeading>AI Configuration</SectionHeading>

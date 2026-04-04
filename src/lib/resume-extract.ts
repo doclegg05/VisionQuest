@@ -1,4 +1,4 @@
-import { generateStructuredResponse } from "@/lib/gemini";
+import type { AIProvider } from "@/lib/ai";
 import { normalizeResumeContent, type ResumeContent } from "@/lib/resume";
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
@@ -93,7 +93,7 @@ export interface ResumeExtractResult {
 }
 
 export async function extractResumeFromText(
-  apiKey: string,
+  provider: AIProvider,
   rawText: string,
   studentName: string,
 ): Promise<ResumeExtractResult> {
@@ -108,7 +108,7 @@ export async function extractResumeFromText(
     "Parse this resume and return the structured JSON.",
   ].join("\n");
 
-  const responseText = await generateStructuredResponse(apiKey, EXTRACT_PROMPT, [
+  const responseText = await provider.generateStructuredResponse(EXTRACT_PROMPT, [
     { role: "user", content: userMessage },
   ]);
 

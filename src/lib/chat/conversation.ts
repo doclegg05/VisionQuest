@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { generateResponse } from "@/lib/gemini";
+import { getProvider } from "@/lib/ai";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
@@ -203,8 +203,7 @@ const COMPACTION_SYSTEM_PROMPT =
  */
 export async function maybeUpdateSummary(
   conversationId: string,
-  apiKey: string,
-  studentId?: string,
+  studentId: string,
   updateInterval: number = 10,
 ): Promise<void> {
   const conversation = await prisma.conversation.findUnique({
@@ -250,8 +249,8 @@ export async function maybeUpdateSummary(
     ? `Here is the existing conversation summary:\n${existingSummary}\n\nHere are the new messages to incorporate:\n${newText}\n\nUpdate the summary to include the key points from the new messages. Keep it concise (2-3 paragraphs max). Focus on: goals discussed, decisions made, progress reported, and emotional state.`
     : `Summarize this coaching conversation. Focus on: goals discussed, decisions made, progress reported, and emotional state. Keep it concise (2-3 paragraphs max).\n\n${newText}`;
 
-  const updatedSummary = await generateResponse(
-    apiKey,
+  const provider = await getProvider(studentId);
+  const updatedSummary = await provider.generateResponse(
     COMPACTION_SYSTEM_PROMPT,
     [{ role: "user", content: summaryPrompt }],
   );

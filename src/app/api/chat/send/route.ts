@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { streamResponse } from "@/lib/gemini";
+import { getProvider } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base";
@@ -9,7 +9,6 @@ import { logger } from "@/lib/logger";
 import { isStaffRole } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
-import { resolveApiKey } from "@/lib/chat/api-key";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
@@ -40,8 +39,23 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
     );
   }
 
-  // Resolve API key
-  const apiKey = await resolveApiKey(session.id);
+  // Resolve AI provider
+  let provider;
+  try {
+    provider = await getProvider(session.id);
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
+    const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
+
+    return new Response(
+      JSON.stringify({
+        error: isOffline
+          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
+          : errorMsg,
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   // Get or create conversation (teacher vs student path)
   const conversation = isTeacher
@@ -116,7 +130,7 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ quotaWarning: quota.warning })}\n\n`));
         }
 
-        for await (const chunk of streamResponse(apiKey, systemPrompt, allMessages)) {
+        for await (const chunk of provider.streamResponse(systemPrompt, allMessages)) {
           fullResponse += chunk;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
         }
@@ -125,7 +139,7 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
         await saveMessage(conversation.id, "assistant", fullResponse, conversation.studentId);
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
-        void maybeUpdateSummary(conversation.id, apiKey, session.id).catch((err) =>
+        void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
           logger.error("Summary compaction failed", { conversationId: conversation.id, error: String(err) }),
         );
 
@@ -150,7 +164,6 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
             conversationStage: conversation.stage,
             fullResponse,
             studentId: session.id,
-            apiKey,
             allMessages,
           }).catch((err) => logger.error("Post-response error", { error: String(err) }));
         }

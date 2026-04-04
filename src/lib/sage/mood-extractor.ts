@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { generateResponse } from "@/lib/gemini";
+import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 const EXTRACTION_PROMPT = `Analyze this coaching conversation and extract any self-reported mood or motivation scores the student gave on a 1-10 scale. Look for phrases like "I'd say a 7", "maybe like a 3 out of 10", "I'm feeling about a 5", or similar scaling responses.
@@ -20,7 +20,7 @@ export async function extractMoodFromConversation(
   conversationId: string,
   studentId: string,
   messages: { role: "user" | "model"; content: string }[],
-  apiKey: string
+  provider: AIProvider
 ): Promise<void> {
   const recentMessages = messages.slice(-10);
   if (recentMessages.length === 0) {
@@ -33,7 +33,7 @@ export async function extractMoodFromConversation(
 
   let result: ExtractionResult;
   try {
-    const raw = await generateResponse(apiKey, EXTRACTION_PROMPT, [
+    const raw = await provider.generateResponse(EXTRACTION_PROMPT, [
       { role: "user", content: conversationText },
     ]);
 

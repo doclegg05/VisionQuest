@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getProvider } from "@/lib/ai";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
 import { GOAL_PLANNING_STATUSES, isGoalLevel, type GoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
@@ -22,7 +23,6 @@ interface PostResponseParams {
   conversationStage: string;
   fullResponse: string;
   studentId: string;
-  apiKey: string;
   allMessages: { role: "user" | "model"; content: string }[];
 }
 
@@ -44,14 +44,14 @@ export async function handlePostResponse({
   conversationStage,
   fullResponse,
   studentId,
-  apiKey,
   allMessages,
 }: PostResponseParams): Promise<void> {
+  const provider = await getProvider(studentId);
   // 0. Discovery extraction (runs instead of goal extraction during discovery)
   if (conversationStage === "discovery") {
     try {
       const discoveryResult = await extractDiscoverySignals(
-        apiKey,
+        provider,
         [...allMessages, { role: "model" as const, content: fullResponse }],
       );
 
@@ -132,7 +132,7 @@ export async function handlePostResponse({
 
   // 1. Extract goals
   const extracted = await extractGoals(
-    apiKey,
+    provider,
     [...allMessages, { role: "model" as const, content: fullResponse }],
     conversationStage,
   );
@@ -229,7 +229,7 @@ export async function handlePostResponse({
   // 6. Extract mood scores (fire-and-forget, checkin/review stages only)
   if (conversationStage === "checkin" || conversationStage === "review") {
     const moodMessages = [...allMessages, { role: "model" as const, content: fullResponse }];
-    extractMoodFromConversation(conversationId, studentId, moodMessages, apiKey).catch((err) =>
+    extractMoodFromConversation(conversationId, studentId, moodMessages, provider).catch((err) =>
       logger.error("Mood extraction failed", { conversationId, error: String(err) })
     );
   }
