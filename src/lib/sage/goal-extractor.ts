@@ -1,4 +1,4 @@
-import { generateStructuredResponse } from "../gemini";
+import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 const EXTRACTION_PROMPT = `You analyze conversations between Sage (an AI mentor) and a student in a goal-setting program.
@@ -39,7 +39,7 @@ export interface ExtractionResult {
 }
 
 export async function extractGoals(
-  apiKey: string,
+  provider: AIProvider,
   messages: { role: "user" | "model"; content: string }[],
   currentStage: string
 ): Promise<ExtractionResult> {
@@ -53,7 +53,7 @@ export async function extractGoals(
       { role: "user" as const, content: contextPrompt },
     ];
 
-    const result = await generateStructuredResponse(apiKey, EXTRACTION_PROMPT, messagesWithContext);
+    const result = await provider.generateStructuredResponse(EXTRACTION_PROMPT, messagesWithContext);
     const parsed = JSON.parse(result);
 
     // Validate structure before using — Gemini may return malformed JSON
