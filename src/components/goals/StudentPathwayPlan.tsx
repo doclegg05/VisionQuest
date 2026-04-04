@@ -8,7 +8,7 @@ interface StudentPathwayPlanProps {
 }
 
 const PATHWAY_ELIGIBLE_STATUSES = ["confirmed", "active", "in_progress"];
-const PATHWAY_ELIGIBLE_LEVELS = ["bhag", "long_term", "monthly"];
+const PATHWAY_ELIGIBLE_LEVELS = ["bhag", "monthly"];
 
 function getCertLabel(id: string): string {
   return CERTIFICATIONS.find((c) => c.id === id)?.shortName ?? id.replace(/-/g, " ");

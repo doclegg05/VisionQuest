@@ -1,5 +1,6 @@
 import Link from "next/link";
 import GoalsPageClient from "@/components/goals/GoalsPageClient";
+import StudentPathwayPlan from "@/components/goals/StudentPathwayPlan";
 import PageIntro from "@/components/ui/PageIntro";
 import { MountainProgressLazy } from "@/components/ui/MountainProgressLazy";
 import { getSession } from "@/lib/auth";
@@ -35,6 +36,7 @@ export default async function GoalsPage() {
         )}
       />
       <GoalsPageClient initialGoals={initialGoals} initialGoalPlans={initialGoalPlans} />
+      <StudentPathwayPlan goals={initialGoals} />
     </div>
   );
 }
