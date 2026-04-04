@@ -2,7 +2,12 @@ import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { cached, invalidatePrefix } from "@/lib/cache";
 
-export const SYSTEM_CONFIG_KEYS = ["gemini_api_key"] as const;
+export const SYSTEM_CONFIG_KEYS = [
+  "gemini_api_key",
+  "ai_provider",
+  "ai_provider_url",
+  "ai_provider_model",
+] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 
 export function isValidConfigKey(key: string): key is SystemConfigKey {
@@ -56,5 +61,37 @@ export async function setConfigValue(
  */
 export async function deleteConfigValue(key: SystemConfigKey): Promise<void> {
   await prisma.systemConfig.deleteMany({ where: { key } });
+  invalidatePrefix(`sysconfig:${key}`);
+}
+
+/**
+ * Get a config value WITHOUT decryption (for non-secret values like ai_provider).
+ * Returns null if not set.
+ */
+export async function getPlainConfigValue(key: SystemConfigKey): Promise<string | null> {
+  const row = await cached(`sysconfig:${key}`, CACHE_TTL, () =>
+    prisma.systemConfig.findUnique({
+      where: { key },
+      select: { value: true },
+    }),
+  );
+
+  return row?.value ?? null;
+}
+
+/**
+ * Set a config value WITHOUT encryption (for non-secret values).
+ */
+export async function setPlainConfigValue(
+  key: SystemConfigKey,
+  value: string,
+  updatedBy: string,
+): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { key },
+    update: { value, updatedBy },
+    create: { key, value, updatedBy },
+  });
+
   invalidatePrefix(`sysconfig:${key}`);
 }
