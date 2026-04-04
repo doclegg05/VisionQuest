@@ -3,7 +3,7 @@ import { withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
-import { resolveApiKey } from "@/lib/chat/api-key";
+import { getProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import {
   parseStoredResumeData,
@@ -22,7 +22,7 @@ export const POST = withAuth(async (session, req: Request) => {
   }
 
   const body = await parseBody(req, resumeAssistRequestSchema);
-  const apiKey = await resolveApiKey(session.id);
+  const provider = await getProvider(session.id);
 
   const [student, goals, portfolioItems, certifications, storedResume] = await Promise.all([
     prisma.student.findUnique({
@@ -73,7 +73,7 @@ export const POST = withAuth(async (session, req: Request) => {
   }));
 
   try {
-    const result = await generateResumeDraft(apiKey, {
+    const result = await generateResumeDraft(provider, {
       studentName: student?.displayName || session.displayName,
       studentEmail: student?.email || "",
       prompt: body.prompt,
