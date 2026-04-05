@@ -8,9 +8,15 @@ import {
 } from "@/lib/security-questions";
 import { hashSecurityAnswers } from "@/lib/security-question-auth";
 import { logAuditEvent } from "@/lib/audit";
-import { withAuth } from "@/lib/api-error";
+import { isStaffRole, withAuth } from "@/lib/api-error";
 
 export const GET = withAuth(async (session) => {
+  if (isStaffRole(session.role)) {
+    return Response.json(
+      { error: "Security question recovery is only available for student accounts." },
+      { status: 403 },
+    );
+  }
   const student = await prisma.student.findUnique({
     where: { id: session.id },
     select: {
@@ -32,6 +38,13 @@ export const GET = withAuth(async (session) => {
 });
 
 export const POST = withAuth(async (session, req: NextRequest) => {
+  if (isStaffRole(session.role)) {
+    return Response.json(
+      { error: "Security question recovery is only available for student accounts." },
+      { status: 403 },
+    );
+  }
+
   const rl = await rateLimit(`security-questions:${session.id}`, 5, 15 * 60 * 1000);
   if (!rl.success) {
     return Response.json({ error: "Too many attempts. Please try again later." }, { status: 429 });

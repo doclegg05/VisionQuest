@@ -9,7 +9,7 @@ import {
 import { verifySecurityAnswer } from "@/lib/security-question-auth";
 import { isValidEmail } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
-import { withErrorHandler } from "@/lib/api-error";
+import { isStaffRole, withErrorHandler } from "@/lib/api-error";
 import { parseBody, resetPasswordQuestionsSchema } from "@/lib/schemas";
 
 const RESET_ERROR =
@@ -61,6 +61,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!student || !hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey))) {
     return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
+  }
+
+  if (isStaffRole(student.role)) {
+    return NextResponse.json(
+      { error: "Security question recovery is only available for student accounts." },
+      { status: 403 },
+    );
   }
 
   const storedAnswers = new Map(
