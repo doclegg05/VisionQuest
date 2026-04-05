@@ -21,6 +21,8 @@
     "db:seed-documents": "node scripts/seed-documents.mjs",
     "ingest": "tsx scripts/ingest-content.ts",
     "seed:app-knowledge": "tsx scripts/seed-app-knowledge.ts",
+    "eval:rag": "tsx scripts/eval-rag.ts",
+    "eval:rag:smoke": "tsx scripts/eval-rag.ts --smoke",
     "postinstall": "prisma generate"
   },
   "dependencies": {
