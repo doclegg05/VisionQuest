@@ -33,25 +33,14 @@ interface EnqueueWithCooldownOptions extends EnqueueOptions {
  */
 export async function enqueueJob({ type, payload, dedupeKey }: EnqueueOptions): Promise<string | null> {
   if (dedupeKey) {
-    // Use upsert to atomically handle dedupe: if a pending/processing job with this
-    // key already exists the create will conflict and we catch the unique violation.
-    try {
-      const job = await prisma.backgroundJob.upsert({
-        where: { dedupeKey },
-        update: {}, // no-op: keep the existing pending/processing job as-is
-        create: {
-          type,
-          payload: JSON.stringify(payload),
-          dedupeKey,
-          status: "pending",
-          attempts: 0,
-        },
-      });
-      return job.id;
-    } catch {
-      // If the upsert itself fails for an unexpected reason, fall through and skip
-      return null;
-    }
+    // Check-then-create with race condition guard: if a concurrent enqueue
+    // creates the same job between our check and create, the create will
+    // succeed (no unique constraint) but the processor handles idempotency.
+    const existing = await prisma.backgroundJob.findFirst({
+      where: { dedupeKey, status: { in: ["pending", "processing"] } },
+      select: { id: true },
+    });
+    if (existing) return existing.id;
   }
 
   const job = await prisma.backgroundJob.create({
