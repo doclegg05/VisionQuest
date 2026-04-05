@@ -68,6 +68,7 @@ model Student {
   savedJobs               StudentSavedJob[]
   llmCallLogs             LlmCallLog[]
   messages                Message[]
+  createdPathways         Pathway[]                @relation("PathwayCreator")
 
   @@schema("visionquest")
 }
@@ -1149,10 +1150,12 @@ model Pathway {
   platforms      String[] // Platform IDs
   estimatedWeeks Int      @default(0)
   active         Boolean  @default(true)
+  createdBy      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  goals Goal[]
+  goals   Goal[]
+  creator Student? @relation("PathwayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@schema("visionquest")
 }
