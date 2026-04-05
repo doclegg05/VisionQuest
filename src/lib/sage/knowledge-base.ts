@@ -1,4 +1,13 @@
 /**
+ * FALLBACK KNOWLEDGE BASE
+ *
+ * This hardcoded content is now a fallback for when RAG retrieval returns
+ * low confidence results. The RAG system (src/lib/rag/) is the primary
+ * knowledge source. See docs/superpowers/specs/2026-04-04-sage-rag-system-design.md
+ * Section 6.3 for the migration plan.
+ */
+
+/**
  * Condensed SPOKES program knowledge base for Sage's system prompt.
  * This gives Sage always-available knowledge about the program without
  * needing to retrieve from external sources.
