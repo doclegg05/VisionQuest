@@ -12,7 +12,6 @@ export const GET = withErrorHandler(async () => {
     include: {
       registrations: {
         select: {
-          id: true,
           studentId: true,
           status: true,
           registeredAt: true,
@@ -23,10 +22,15 @@ export const GET = withErrorHandler(async () => {
   });
 
   return NextResponse.json({
-    events: events.map((event) => ({
-      ...event,
-      registrationCount: event.registrations.length,
-      registration: event.registrations.find((registration) => registration.studentId === session.id) || null,
-    })),
+    events: events.map(({ registrations, ...event }) => {
+      const userRegistration = registrations.find((r) => r.studentId === session.id);
+      return {
+        ...event,
+        registrationCount: registrations.length,
+        userRegistration: userRegistration
+          ? { status: userRegistration.status, registeredAt: userRegistration.registeredAt }
+          : null,
+      };
+    }),
   });
 });
