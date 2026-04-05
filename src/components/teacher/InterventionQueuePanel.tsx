@@ -11,6 +11,7 @@ import {
   DotsThree,
   NotePencil,
   CalendarPlus,
+  BookOpenText,
 } from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
 import {
@@ -404,6 +405,15 @@ function StudentRow({
           <span title={`${signals.unmatchedGoalCount} goal(s) without pathway`}>
             <ClipboardText size={16} weight="duotone" className="text-purple-500" />
           </span>
+        )}
+        {signals.evidenceGapCount > 0 && (
+          <Link
+            href={`/teacher/students/${student.studentId}`}
+            title={`${signals.evidenceGapCount} evidence gap(s) — review Goals & Plan`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <BookOpenText size={16} weight="duotone" className="text-blue-500" />
+          </Link>
         )}
       </div>
 
