@@ -24,6 +24,8 @@ export interface StudentSignals {
   stalledGoalCount: number;
   /** Number of confirmed/active goals without a pathway assignment */
   unmatchedGoalCount: number;
+  /** Number of open alerts with type "evidence_gap" (unmet class requirements) */
+  evidenceGapCount: number;
   /** Overall readiness score 0–100 */
   readinessScore: number;
 }
@@ -41,6 +43,7 @@ const POINTS_PER_GOAL_REVIEW_DAY_OVER_THRESHOLD = 2;
 const GOAL_REVIEW_STALENESS_THRESHOLD_DAYS = 14;
 const POINTS_PER_OVERDUE_TASK = 10;
 const POINTS_PER_UNMATCHED_GOAL = 10;
+const POINTS_PER_EVIDENCE_GAP = 8;
 const ORIENTATION_WEIGHT = 25;
 const LOW_READINESS_THRESHOLD = 40;
 const LOW_READINESS_BASE = 30;
@@ -91,6 +94,9 @@ export function computeUrgencyScore(signals: StudentSignals): number {
 
   // Unmatched goals (confirmed/active goals without pathway assignment)
   score += signals.unmatchedGoalCount * POINTS_PER_UNMATCHED_GOAL;
+
+  // Evidence gaps (unmet required class requirements)
+  score += signals.evidenceGapCount * POINTS_PER_EVIDENCE_GAP;
 
   // Incomplete orientation: weight by remaining progress fraction
   if (!signals.orientationComplete) {
