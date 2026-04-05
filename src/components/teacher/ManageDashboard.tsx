@@ -17,6 +17,7 @@ import { JobConfigSection } from "./JobConfigSection";
 import PathwayManager from "./PathwayManager";
 import AiConfigPanel from "./AiConfigPanel";
 import AiProviderPanel from "./AiProviderPanel";
+import MonthlyKpiDashboard from "./MonthlyKpiDashboard";
 
 type Tab = "orientation" | "learning" | "career" | "reports";
 
@@ -115,6 +116,10 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
 
       {tab === "reports" && (
         <div className="space-y-8">
+          <section>
+            <SectionHeading>Monthly KPI Dashboard</SectionHeading>
+            <MonthlyKpiDashboard />
+          </section>
           <section>
             <SectionHeading>Outcomes Report</SectionHeading>
             <OutcomesReport />
