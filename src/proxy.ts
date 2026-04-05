@@ -40,6 +40,10 @@ export function proxy(request: NextRequest) {
   }
 
   // --- CSP nonce + response headers ---
+  // NOTE: next.config.ts also sets a static CSP via headers(). When this
+  // middleware runs, its nonce-based CSP overwrites the static one. The static
+  // CSP in next.config.ts serves as a fallback for environments where
+  // middleware doesn't execute (e.g. Turbopack standalone builds).
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
 
   const csp = [
