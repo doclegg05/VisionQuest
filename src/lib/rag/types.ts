@@ -124,3 +124,20 @@ export const TIER_CAPS = {
 } as const;
 
 export const MAX_RAG_TOKENS = 1500;
+
+export const CONFIDENCE_THRESHOLDS = {
+  high: 0.045,
+  medium: 0.03,
+  low: 0.015,
+  marginForMedium: 0.01,
+} as const;
+
+export interface RetrievalResult {
+  chunks: ScoredChunk[];
+  context: AssembledContext | null;
+  confidence: ConfidenceResult;
+  queryType: QueryType;
+  rewrittenQuery: string | null;
+  resolvedEntities: string[];
+  fallbackUsed: boolean;
+}
