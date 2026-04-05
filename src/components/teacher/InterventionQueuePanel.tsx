@@ -10,6 +10,7 @@ import {
   ClipboardText,
   DotsThree,
   NotePencil,
+  CalendarPlus,
 } from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
 import {
@@ -250,16 +251,114 @@ function QuickNoteModal({
   );
 }
 
+// ─── Quick Appointment Modal ──────────────────────────────────────────────────
+
+function QuickAppointmentModal({
+  studentId,
+  studentName,
+  onClose,
+  onCreated,
+}: {
+  studentId: string;
+  studentName: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !startsAt) return;
+
+    setSaving(true);
+    setError(null);
+
+    const startDate = new Date(startsAt);
+    const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+
+    try {
+      const res = await apiFetch(`/api/teacher/students/${studentId}/appointments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          startsAt: startDate.toISOString(),
+          endsAt: endDate.toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        onCreated();
+        onClose();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Failed to schedule appointment.");
+      }
+    } catch {
+      setError("Failed to schedule appointment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
+      >
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+          Schedule appointment with {studentName}
+        </h3>
+        <p className="text-xs text-[var(--ink-muted)]">Duration defaults to 30 minutes.</p>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <input
+          type="text"
+          placeholder="Appointment title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <input
+          type="datetime-local"
+          value={startsAt}
+          onChange={(e) => setStartsAt(e.target.value)}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !title.trim() || !startsAt}
+            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Scheduling..." : "Schedule"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ─── Student Row ──────────────────────────────────────────────────────────────
 
 function StudentRow({
   student,
   onQuickTask,
   onQuickNote,
+  onSchedule,
 }: {
   student: QueueStudent;
   onQuickTask: (studentId: string, name: string) => void;
   onQuickNote: (studentId: string, name: string) => void;
+  onSchedule: (studentId: string, name: string) => void;
 }) {
   const badge = urgencyBadge(student.urgencyScore);
   const reason = topReason(student.signals);
@@ -323,6 +422,16 @@ function StudentRow({
         <button
           onClick={(e) => {
             e.preventDefault();
+            onSchedule(student.studentId, student.name);
+          }}
+          title="Schedule appointment"
+          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+        >
+          <CalendarPlus size={16} weight="regular" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
             onQuickTask(student.studentId, student.name);
           }}
           title="Assign quick task"
@@ -354,6 +463,7 @@ export default function InterventionQueuePanel({
   const [error, setError] = useState<string | null>(null);
   const [taskTarget, setTaskTarget] = useState<{ studentId: string; name: string } | null>(null);
   const [noteTarget, setNoteTarget] = useState<{ studentId: string; name: string } | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<{ studentId: string; name: string } | null>(null);
 
   const fetchQueue = useCallback(async () => {
     try {
@@ -411,6 +521,7 @@ export default function InterventionQueuePanel({
               student={student}
               onQuickTask={(id, name) => setTaskTarget({ studentId: id, name })}
               onQuickNote={(id, name) => setNoteTarget({ studentId: id, name })}
+              onSchedule={(id, name) => setScheduleTarget({ studentId: id, name })}
             />
           ))}
         </div>
@@ -432,6 +543,16 @@ export default function InterventionQueuePanel({
           studentId={noteTarget.studentId}
           studentName={noteTarget.name}
           onClose={() => setNoteTarget(null)}
+          onCreated={() => void fetchQueue()}
+        />
+      )}
+
+      {/* Quick Appointment Modal */}
+      {scheduleTarget && (
+        <QuickAppointmentModal
+          studentId={scheduleTarget.studentId}
+          studentName={scheduleTarget.name}
+          onClose={() => setScheduleTarget(null)}
           onCreated={() => void fetchQueue()}
         />
       )}
