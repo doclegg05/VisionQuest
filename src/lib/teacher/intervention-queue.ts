@@ -20,6 +20,7 @@ export interface InterventionQueueStudentRecord {
     completedAt: Date | null;
   }>;
   alerts: Array<{
+    type: string;
     severity: string;
   }>;
   assignedTasks: Array<{
@@ -149,6 +150,9 @@ export function buildInterventionQueueEntry(input: {
     openAlertCount: student.alerts.length,
     highSeverityAlertCount: student.alerts.filter(
       (alert) => alert.severity === "high",
+    ).length,
+    evidenceGapCount: student.alerts.filter(
+      (alert) => alert.type === "evidence_gap",
     ).length,
     overdueTaskCount: student.assignedTasks.length,
     stalledGoalCount: student.goals.filter((goal) =>

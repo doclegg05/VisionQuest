@@ -64,7 +64,7 @@ test("buildInterventionQueueEntry derives signals from existing student aggregat
       },
     ],
     orientationProgress: [{ completed: true, completedAt: new Date("2026-03-05T12:00:00.000Z") }],
-    alerts: [{ severity: "high" }, { severity: "medium" }],
+    alerts: [{ type: "goal_stale", severity: "high" }, { type: "inactivity", severity: "medium" }],
     assignedTasks: [{ id: "task-1" }, { id: "task-2" }],
     conversations: [{ updatedAt: new Date("2026-03-21T12:00:00.000Z") }],
     certifications: [{ status: "completed" }, { status: "in_progress" }],

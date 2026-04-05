@@ -28,6 +28,7 @@ export interface QueueStudent {
   signals: {
     stalledGoalCount: number;
     highSeverityAlertCount: number;
+    evidenceGapCount: number;
     overdueTaskCount: number;
     daysSinceLastLogin: number;
     orientationComplete: boolean;
@@ -188,7 +189,7 @@ export async function getInterventionQueue(
       },
       alerts: {
         where: { status: "open" },
-        select: { severity: true },
+        select: { type: true, severity: true },
       },
       assignedTasks: {
         where: {
