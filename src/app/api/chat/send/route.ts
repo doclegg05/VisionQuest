@@ -104,7 +104,7 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
   }
 
   // Inject document-based context from ProgramDocument (RAG layer)
-  const documentContext = await getDocumentContext(userMessage);
+  const documentContext = await getDocumentContext(userMessage, isTeacher ? "staff" : "student");
   if (documentContext) {
     systemPrompt += documentContext;
   }
