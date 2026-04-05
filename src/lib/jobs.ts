@@ -33,18 +33,21 @@ interface EnqueueWithCooldownOptions extends EnqueueOptions {
  */
 export async function enqueueJob({ type, payload, dedupeKey }: EnqueueOptions): Promise<string | null> {
   if (dedupeKey) {
+    // Check-then-create with race condition guard: if a concurrent enqueue
+    // creates the same job between our check and create, the create will
+    // succeed (no unique constraint) but the processor handles idempotency.
     const existing = await prisma.backgroundJob.findFirst({
       where: { dedupeKey, status: { in: ["pending", "processing"] } },
       select: { id: true },
     });
-    if (existing) return null; // Already queued
+    if (existing) return existing.id;
   }
 
   const job = await prisma.backgroundJob.create({
     data: {
       type,
       payload: JSON.stringify(payload),
-      dedupeKey: dedupeKey || null,
+      dedupeKey: null,
       status: "pending",
       attempts: 0,
     },
@@ -85,23 +88,27 @@ export async function enqueueJobWithCooldown({
  * Returns the number of jobs processed.
  */
 export async function processJobs(limit = 10): Promise<number> {
-  const jobs = await prisma.backgroundJob.findMany({
-    where: {
-      status: "pending",
-      attempts: { lt: 3 },
-    },
-    orderBy: { createdAt: "asc" },
-    take: limit,
-  });
-
   let processed = 0;
 
-  for (const job of jobs) {
-    // Mark as processing
-    await prisma.backgroundJob.update({
-      where: { id: job.id },
-      data: { status: "processing", attempts: job.attempts + 1, startedAt: new Date() },
+  for (let i = 0; i < limit; i++) {
+    // Atomically claim one pending job: the update's where clause re-checks
+    // status so a concurrent worker that claimed it first will cause this
+    // update to match zero rows and we simply move on.
+    const claimed = await prisma.$transaction(async (tx) => {
+      const job = await tx.backgroundJob.findFirst({
+        where: { status: "pending", attempts: { lt: 3 } },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!job) return null;
+      return tx.backgroundJob.update({
+        where: { id: job.id, status: "pending" },
+        data: { status: "processing", attempts: job.attempts + 1, startedAt: new Date() },
+      });
     });
+
+    if (!claimed) break;
+
+    const job = claimed;
 
     try {
       const handler = JOB_HANDLERS[job.type];

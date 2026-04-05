@@ -13,10 +13,11 @@ export const POST = withAuth(async (
 
   const event = await prisma.careerEvent.findUnique({
     where: { id },
-    include: {
-      registrations: {
-        select: { id: true },
-      },
+    select: {
+      id: true,
+      title: true,
+      capacity: true,
+      registrationRequired: true,
     },
   });
 
@@ -24,27 +25,42 @@ export const POST = withAuth(async (
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
 
-  if (event.registrationRequired && event.capacity !== null && event.registrations.length >= event.capacity) {
-    return NextResponse.json({ error: "This event is full." }, { status: 409 });
-  }
+  let registration: Awaited<ReturnType<typeof prisma.eventRegistration.upsert>>;
+  try {
+    registration = await prisma.$transaction(async (tx) => {
+      if (event.registrationRequired && event.capacity !== null) {
+        const registeredCount = await tx.eventRegistration.count({
+          where: { eventId: id, status: "registered" },
+        });
+        if (registeredCount >= event.capacity) {
+          throw new Error("Event is full");
+        }
+      }
 
-  const registration = await prisma.eventRegistration.upsert({
-    where: {
-      studentId_eventId: {
-        studentId: session.id,
-        eventId: id,
-      },
-    },
-    update: {
-      status: "registered",
-      registeredAt: new Date(),
-    },
-    create: {
-      studentId: session.id,
-      eventId: id,
-      status: "registered",
-    },
-  });
+      return tx.eventRegistration.upsert({
+        where: {
+          studentId_eventId: {
+            studentId: session.id,
+            eventId: id,
+          },
+        },
+        update: {
+          status: "registered",
+          registeredAt: new Date(),
+        },
+        create: {
+          studentId: session.id,
+          eventId: id,
+          status: "registered",
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "Event is full") {
+      return NextResponse.json({ error: "This event is full." }, { status: 409 });
+    }
+    throw err;
+  }
 
   await logAuditEvent({
     actorId: session.id,
