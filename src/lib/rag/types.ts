@@ -28,6 +28,13 @@ export interface ExtractedDocument {
   mimeType: string;
 }
 
+export interface RewrittenQuery {
+  standaloneQuery: string;
+  resolvedEntities: string[];
+  queryType: QueryType;
+  skipRewrite: boolean;
+}
+
 export interface ChunkData {
   content: string;
   breadcrumb: string;
@@ -40,3 +47,23 @@ export interface ChunkData {
   ocrUsed: boolean;
   parentIndex: number | null;
 }
+
+export interface ScoredChunk {
+  chunkId: string;
+  sourceDocumentId: string;
+  sourceDocTitle: string;
+  sourceTier: string;
+  sourceWeight: number;
+  content: string;
+  breadcrumb: string;
+  sectionHeading: string | null;
+  pageNumber: number | null;
+  chunkIndex: number;
+  chunkType: string | null;
+  parentId: string | null;
+  score: number;
+}
+
+export const SOURCE_PRIORS = { canonical: 0.03, curated: 0.015, user_uploaded: 0.0 } as const;
+export const IDENTIFIER_BONUS = 0.02;
+export const RRF_K = 60;
