@@ -64,6 +64,63 @@ export interface ScoredChunk {
   score: number;
 }
 
+export interface RetrievalDiagnostic {
+  conversationId: string;
+  userMessage: string;
+  queryType: QueryType;
+  rewrittenQuery: string | null;
+  rewriteSkipped: boolean;
+  resolvedEntities: string[];
+  vectorTopK: { chunkId: string; score: number }[];
+  lexicalTopK: { chunkId: string; score: number }[];
+  identifierMatches: string[];
+  fusedTopK: { chunkId: string; score: number }[];
+  finalIncluded: {
+    chunkId: string;
+    sourceDocTitle: string;
+    sourceTier: string;
+  }[];
+  uploadedDocsInfluenced: boolean;
+  fallbackUsed: boolean;
+  confidenceScore: number;
+  latencyMs: number;
+  timestamp: Date;
+}
+
 export const SOURCE_PRIORS = { canonical: 0.03, curated: 0.015, user_uploaded: 0.0 } as const;
 export const IDENTIFIER_BONUS = 0.02;
 export const RRF_K = 60;
+
+export type ConfidenceLevel = "high" | "medium" | "low" | "none";
+
+export interface ConfidenceResult {
+  level: ConfidenceLevel;
+  topScore: number;
+  scoreMargin: number;
+  hasIdentifierMatch: boolean;
+  topTierIsCanonical: boolean;
+}
+
+export interface Citation {
+  index: number;
+  sourceDocTitle: string;
+  pageNumber: number | null;
+  sectionHeading: string | null;
+  sourceTier: string;
+}
+
+export interface AssembledContext {
+  referenceBlock: string;
+  citations: Citation[];
+  confidence: ConfidenceLevel;
+  chunksIncluded: number;
+  tokenEstimate: number;
+}
+
+export const TIER_CAPS = {
+  canonical: { perQuery: 4, perDocument: 2 },
+  curated: { perQuery: 2, perDocument: 2 },
+  user_uploaded: { perQuery: 1, perDocument: 1 },
+} as const;
+
+export const MAX_RAG_TOKENS = 1500;
