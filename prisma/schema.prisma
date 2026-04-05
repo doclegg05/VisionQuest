@@ -69,6 +69,7 @@ model Student {
   llmCallLogs             LlmCallLog[]
   messages                Message[]
   createdPathways         Pathway[]                @relation("PathwayCreator")
+  uploadedDocuments       SourceDocument[]          @relation("UploadedDocuments")
 
   @@schema("visionquest")
 }
@@ -864,6 +865,8 @@ model ProgramDocument {
   @@index([platformId])
   @@index([usedBySage, isActive])
   @@schema("visionquest")
+
+  sourceDocuments SourceDocument[]
 }
 
 enum ProgramDocCategory {
@@ -1035,6 +1038,122 @@ model SageSnippet {
   updatedAt DateTime @updatedAt
 
   @@index([isActive])
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// RAG — Retrieval-Augmented Generation for Sage AI
+// =============================================================================
+
+enum SourceType {
+  program_doc
+  platform_guide
+  uploaded
+  app_knowledge
+
+  @@schema("visionquest")
+}
+
+enum SourceTier {
+  canonical
+  curated
+  user_uploaded
+
+  @@schema("visionquest")
+}
+
+enum IngestionStatus {
+  pending
+  processing
+  completed
+  failed
+  needs_review
+
+  @@schema("visionquest")
+}
+
+enum EmbeddingJobStatus {
+  pending
+  processing
+  completed
+  failed
+
+  @@schema("visionquest")
+}
+
+model SourceDocument {
+  id              String          @id @default(cuid())
+  sourceType      SourceType
+  sourceTier      SourceTier
+  programDocId    String?
+  sourcePath      String?
+  title           String
+  mimeType        String          @default("application/pdf")
+  metadata        Json            @default("{}")
+  certificationId String?
+  platformId      String?
+  formCode        String?
+  aliases         String[]        @default([])
+  sourceWeight    Float           @default(1.0)
+  uploadedBy      String?
+  contentHash     String
+  parserVersion   String          @default("v1")
+  ingestionStatus IngestionStatus @default(pending)
+  ingestionError  String?         @db.Text
+  lastIngestedAt  DateTime?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  chunks      ContentChunk[]
+  programDoc  ProgramDocument? @relation(fields: [programDocId], references: [id])
+  uploader    Student?         @relation("UploadedDocuments", fields: [uploadedBy], references: [id])
+
+  @@unique([sourceType, sourcePath, contentHash])
+  @@index([isActive])
+  @@index([sourceType])
+  @@schema("visionquest")
+}
+
+model ContentChunk {
+  id               String   @id @default(cuid())
+  sourceDocumentId String
+  parentId         String?
+  chunkIndex       Int
+  sectionHeading   String?
+  breadcrumb       String   @default("")
+  content          String   @db.Text
+  pageNumber       Int?
+  charStart        Int?
+  charEnd          Int?
+  tokenCount       Int      @default(0)
+  chunkType        String?
+  ocrUsed          Boolean  @default(false)
+  embeddingModel   String   @default("text-embedding-004")
+  embeddingVersion String   @default("v1")
+  chunkingVersion  String   @default("v1")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sourceDocument SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  parent         ContentChunk?  @relation("ChunkHierarchy", fields: [parentId], references: [id])
+  children       ContentChunk[] @relation("ChunkHierarchy")
+
+  @@index([sourceDocumentId, chunkIndex])
+  @@index([isActive])
+  @@schema("visionquest")
+}
+
+model EmbeddingJob {
+  id            String             @id @default(cuid())
+  status        EmbeddingJobStatus @default(pending)
+  sourcePath    String?
+  chunksCreated Int                @default(0)
+  error         String?            @db.Text
+  startedAt     DateTime           @default(now())
+  completedAt   DateTime?
+
   @@schema("visionquest")
 }
 
