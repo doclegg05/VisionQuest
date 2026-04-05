@@ -1,5 +1,13 @@
 // src/lib/rag/types.ts
 
+export type QueryType =
+  | "document"
+  | "app_navigation"
+  | "external_platform"
+  | "conversation_memory"
+  | "personal_status"
+  | "mixed";
+
 export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>;
   readonly dimensions: number;
