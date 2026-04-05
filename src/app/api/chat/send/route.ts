@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import { getProvider } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
-import { getDocumentContext } from "@/lib/sage/knowledge-base";
+import { getRelevantContent } from "@/lib/sage/knowledge-base";
+import { retrieve } from "@/lib/rag/retrieve";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
@@ -103,18 +104,34 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
       });
   }
 
-  // Inject document-based context from ProgramDocument (RAG layer)
-  const documentContext = await getDocumentContext(userMessage, isTeacher ? "staff" : "student");
-  if (documentContext) {
-    systemPrompt += documentContext;
-  }
-
   // Format message history for Gemini, using compacted context when available
   const conversationContext = await getConversationContext(conversation.id);
   const allMessages = [
     ...conversationContext.messages,
     { role: "user" as const, content: userMessage },
   ];
+
+  // RAG retrieval — replaces keyword-based getDocumentContext
+  const ragResult = await retrieve(
+    userMessage,
+    conversation.id,
+    allMessages.slice(-6),
+    {
+      userId: session.id,
+      role: session.role,
+      teacherId: isTeacher ? session.id : undefined,
+    },
+  );
+
+  if (!ragResult.fallbackUsed && ragResult.context?.referenceBlock) {
+    systemPrompt += "\n\n" + ragResult.context.referenceBlock;
+  } else {
+    // Fallback to keyword-based content from hardcoded knowledge base
+    const keywordContent = getRelevantContent(userMessage);
+    if (keywordContent) {
+      systemPrompt += keywordContent;
+    }
+  }
 
   // Stream response via SSE
   const encoder = new TextEncoder();
