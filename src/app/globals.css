@@ -94,8 +94,8 @@
   --glow-gold: rgba(211, 178, 87, 0.2);
 
   /* Chat surfaces — dark mode */
-  --chat-bubble-assistant-bg: rgba(255, 255, 255, 0.08);
-  --chat-bubble-assistant-border: rgba(255, 255, 255, 0.12);
+  --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
+  --chat-bubble-assistant-border: rgba(15, 154, 146, 0.25);
   --chat-bubble-user-bg: linear-gradient(135deg, #0a2a4a, rgba(15, 154, 146, 0.85));
   --chat-bubble-user-avatar: #0a2a4a;
   --chat-input-bg: rgba(255, 255, 255, 0.06);
