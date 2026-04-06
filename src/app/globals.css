@@ -47,6 +47,18 @@
   --accent-secondary: var(--accent-blue);
   --accent-tertiary: var(--accent-gold);
 
+  /* Chat surfaces — Sage message bubbles, input area, typing indicator */
+  --chat-bubble-assistant-bg: rgba(255, 255, 255, 0.82);
+  --chat-bubble-assistant-border: rgba(255, 255, 255, 0.55);
+  --chat-input-bg: rgba(255, 255, 255, 0.72);
+  --chat-input-border: rgba(18, 38, 63, 0.08);
+  --chat-area-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.38) 100%);
+  --chat-header-bg: rgba(255, 255, 255, 0.7);
+  --chat-typing-dot: var(--ink-muted);
+  --chat-error-bg: #fffbeb;
+  --chat-error-border: #fde68a;
+  --chat-error-text: #92400e;
+
   /* Animation tokens */
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -78,6 +90,18 @@
   --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
+
+  /* Chat surfaces — dark mode */
+  --chat-bubble-assistant-bg: rgba(255, 255, 255, 0.08);
+  --chat-bubble-assistant-border: rgba(255, 255, 255, 0.12);
+  --chat-input-bg: rgba(255, 255, 255, 0.06);
+  --chat-input-border: rgba(255, 255, 255, 0.10);
+  --chat-area-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.04) 100%);
+  --chat-header-bg: rgba(255, 255, 255, 0.06);
+  --chat-typing-dot: var(--ink-muted);
+  --chat-error-bg: rgba(180, 83, 9, 0.15);
+  --chat-error-border: rgba(251, 191, 36, 0.25);
+  --chat-error-text: #fbbf24;
 
   /* Legacy aliases */
   --background: var(--surface-base);
