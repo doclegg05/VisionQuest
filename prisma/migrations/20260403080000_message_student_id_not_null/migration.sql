@@ -1,35 +1,19 @@
--- Ensure all messages have studentId populated (safety backfill for any stragglers)
+-- Add studentId column as nullable first
+ALTER TABLE "visionquest"."Message" ADD COLUMN IF NOT EXISTS "studentId" TEXT;
+
+-- Backfill from conversation owner
 UPDATE "visionquest"."Message" m
 SET "studentId" = c."studentId"
 FROM "visionquest"."Conversation" c
 WHERE m."conversationId" = c.id
 AND m."studentId" IS NULL;
 
--- Add the column as NOT NULL (backfill guarantees no NULLs remain)
--- If the column doesn't exist yet, add it; if it exists as nullable, just set NOT NULL
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'visionquest'
-      AND table_name = 'Message'
-      AND column_name = 'studentId'
-  ) THEN
-    -- Column doesn't exist: add it nullable, backfill, then set NOT NULL
-    ALTER TABLE "visionquest"."Message" ADD COLUMN "studentId" TEXT;
+-- Delete any orphaned messages that still have NULL studentId
+-- (messages from conversations with no studentId — should not exist but be safe)
+DELETE FROM "visionquest"."Message" WHERE "studentId" IS NULL;
 
-    UPDATE "visionquest"."Message" m
-    SET "studentId" = c."studentId"
-    FROM "visionquest"."Conversation" c
-    WHERE m."conversationId" = c.id
-    AND m."studentId" IS NULL;
-
-    ALTER TABLE "visionquest"."Message" ALTER COLUMN "studentId" SET NOT NULL;
-  ELSE
-    -- Column exists: ensure NOT NULL
-    ALTER TABLE "visionquest"."Message" ALTER COLUMN "studentId" SET NOT NULL;
-  END IF;
-END $$;
+-- Now safe to set NOT NULL
+ALTER TABLE "visionquest"."Message" ALTER COLUMN "studentId" SET NOT NULL;
 
 -- Add foreign key if not exists
 DO $$
