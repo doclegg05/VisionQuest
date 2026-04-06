@@ -50,8 +50,8 @@
   /* Chat surfaces — Sage message bubbles, input area, typing indicator */
   --chat-bubble-assistant-bg: rgba(255, 255, 255, 0.82);
   --chat-bubble-assistant-border: rgba(255, 255, 255, 0.55);
-  --chat-bubble-user-bg: linear-gradient(135deg, #00133f, rgba(15, 154, 146, 0.9));
-  --chat-bubble-user-avatar: #00133f;
+  --chat-bubble-user-bg: linear-gradient(135deg, #2a8a3c, #1e6e30);
+  --chat-bubble-user-avatar: #2a8a3c;
   --chat-input-bg: rgba(255, 255, 255, 0.72);
   --chat-input-border: rgba(18, 38, 63, 0.08);
   --chat-area-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.38) 100%);
@@ -96,8 +96,8 @@
   /* Chat surfaces — dark mode */
   --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
   --chat-bubble-assistant-border: rgba(15, 154, 146, 0.25);
-  --chat-bubble-user-bg: linear-gradient(135deg, #0a2a4a, rgba(15, 154, 146, 0.85));
-  --chat-bubble-user-avatar: #0a2a4a;
+  --chat-bubble-user-bg: linear-gradient(135deg, #3fcf5e, #2a8a3c);
+  --chat-bubble-user-avatar: #2a8a3c;
   --chat-input-bg: rgba(255, 255, 255, 0.06);
   --chat-input-border: rgba(255, 255, 255, 0.10);
   --chat-area-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.04) 100%);
