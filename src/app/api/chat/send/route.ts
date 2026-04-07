@@ -66,7 +66,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
   // Save user message
-  await saveMessage(conversation.id, "user", userMessage);
+  await saveMessage(conversation.id, session.id, "user", userMessage);
 
   // Build system prompt — teacher gets a streamlined path
   let systemPrompt: string;
@@ -339,7 +339,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
         }
 
         // Save assistant message
-        await saveMessage(conversation.id, "assistant", fullResponse);
+        await saveMessage(conversation.id, session.id, "assistant", fullResponse);
 
         // Student-only post-processing: XP, goal extraction, stage updates
         if (!isTeacher) {

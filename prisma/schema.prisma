@@ -25,6 +25,7 @@ model Student {
   updatedAt      DateTime @updatedAt
 
   conversations           Conversation[]
+  messages                Message[]
   goals                   Goal[]
   progression             Progression?
   files                   FileUpload[]
@@ -101,12 +102,14 @@ model Conversation {
 model Message {
   id             String   @id @default(cuid())
   conversationId String
+  studentId      String
   role           String
   content        String   @db.Text
   metadata       String?  @db.Text
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@schema("visionquest")
 }

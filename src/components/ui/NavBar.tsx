@@ -442,7 +442,7 @@ export default function NavBar({ studentName, role, navPhase }: NavBarProps) {
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
             type="button"
-            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_30px_rgba(7,23,43,0.35)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] rotate-0" : "bg-[var(--ink-strong)]"}`}
+            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl text-[#f0efe8] shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)]" : "bg-gradient-to-br from-[#37b550] to-[#2a8a3c]"}`}
             aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
             aria-expanded={sageMiniOpen}
           >

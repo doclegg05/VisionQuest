@@ -103,11 +103,12 @@ export async function getOrCreateTeacherConversation(
  */
 export async function saveMessage(
   conversationId: string,
+  studentId: string,
   role: "user" | "assistant",
   content: string,
 ) {
   return prisma.message.create({
-    data: { conversationId, role, content },
+    data: { conversationId, studentId, role, content },
   });
 }
 
