@@ -68,7 +68,6 @@ model Student {
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
   llmCallLogs             LlmCallLog[]
-  messages                Message[]
   createdPathways         Pathway[]                @relation("PathwayCreator")
 
   @@schema("visionquest")
