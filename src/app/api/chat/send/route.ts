@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { streamResponse } from "@/lib/gemini";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
@@ -28,10 +28,33 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
 
-  // Rate limit
-  const rl = await rateLimit(`chat:${session.id}`, 60, 60 * 60 * 1000);
-  if (!rl.success) {
-    return new Response(JSON.stringify({ error: "Too many messages. Please wait before sending more." }), { status: 429 });
+  // Rate limits — skip if kill switch is enabled
+  const rateLimitsDisabled = process.env.VISIONQUEST_DISABLE_RATE_LIMITS === "true";
+  let dailyRemaining: number | null = null;
+
+  if (!rateLimitsDisabled) {
+    // Hourly limit by role
+    const hourlyLimit = isTeacher ? (session.role === "admin" ? 120 : 60) : 40;
+    const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
+    if (!hourlyRl.success) {
+      return new Response(
+        JSON.stringify({ error: "Too many messages this hour. Please wait before sending more." }),
+        { status: 429 },
+      );
+    }
+
+    // Daily limit by role (calendar-day, resets midnight UTC)
+    if (session.role !== "admin") {
+      const dailyLimit = isTeacher ? 400 : 200;
+      const dailyRl = await rateLimitDaily(`chat-daily:${session.id}`, dailyLimit);
+      if (!dailyRl.success) {
+        return new Response(
+          JSON.stringify({ error: "I've reached my daily limit. I'll be fresh and ready tomorrow! For urgent questions, please ask your instructor." }),
+          { status: 429 },
+        );
+      }
+      dailyRemaining = dailyRl.remaining;
+    }
   }
 
   // Resolve API key
@@ -281,6 +304,15 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   const documentContext = await getDocumentContext(userMessage);
   if (documentContext) {
     systemPrompt += documentContext;
+  }
+
+  // 80% daily warning — inject into system prompt so Sage mentions it naturally
+  if (dailyRemaining !== null) {
+    const dailyLimit = isStaffRole(session.role) ? 400 : 200;
+    const usagePercent = 1 - (dailyRemaining / dailyLimit);
+    if (usagePercent >= 0.8) {
+      systemPrompt += `\n\n[SYSTEM NOTE: This user has used ${Math.round(usagePercent * 100)}% of their daily message limit. Naturally mention that you're getting a lot of questions today and your answers may be shorter for a bit. Do not make it alarming.]`;
+    }
   }
 
   // Format message history for Gemini
