@@ -161,7 +161,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
         prefetch={false}
         className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-colors ${
           active
-            ? "bg-[var(--surface-raised)] text-[#00133f] shadow-[0_18px_36px_rgba(255,255,255,0.12)]"
+            ? "bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
             : "text-white/90 hover:bg-[var(--surface-raised)]/10 hover:text-white"
         }`}
         aria-current={pathname === item.href ? "page" : undefined}
@@ -169,7 +169,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
         <span
           aria-hidden="true"
           className={`grid ${small ? "h-8 w-8 rounded-xl" : "h-10 w-10 rounded-2xl"} place-items-center text-base ${
-            active ? "bg-[#00133f] text-white" : "bg-[var(--surface-raised)]/10 text-white"
+            active ? "bg-white/20 text-white" : "bg-[var(--surface-raised)]/10 text-white"
           }`}
         >
           <item.icon size={small ? 16 : 20} weight={active ? "fill" : "regular"} />
