@@ -243,7 +243,8 @@ export async function syncSageDocuments(
 
   for (let i = 0; i < allFiles.length; i++) {
     const relativePath = allFiles[i];
-    const storageKey = `docs-upload/${relativePath}`;
+    // storageKey matches existing convention — no "docs-upload/" prefix
+    const storageKey = relativePath;
     seenKeys.add(storageKey);
 
     if (overrides.exclude.includes(relativePath)) {
