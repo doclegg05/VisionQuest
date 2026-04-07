@@ -5,7 +5,8 @@
  * Idempotent — safe to re-run. Skips already-ingested files.
  */
 
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
 
 // Dynamic import to support ESM + path aliases via tsx
 const { syncSageDocuments } = await import("../src/lib/sage/ingest.ts");

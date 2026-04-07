@@ -315,14 +315,16 @@ export async function syncSageDocuments(
         isActive: true,
       };
 
-      if (existing) {
-        await prisma.programDocument.update({
-          where: { storageKey },
-          data,
-        });
+      // Upsert handles race conditions and storageKey mismatches from prior seeds
+      const before = existing ? "update" : "create";
+      await prisma.programDocument.upsert({
+        where: { storageKey },
+        update: data,
+        create: data,
+      });
+      if (before === "update") {
         result.updated++;
       } else {
-        await prisma.programDocument.create({ data });
         result.added++;
       }
     } catch (error) {
