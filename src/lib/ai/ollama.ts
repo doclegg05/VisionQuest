@@ -60,6 +60,12 @@ export class OllamaProvider implements AIProvider {
       );
     }
 
+    if (!tagsResponse.ok) {
+      throw new Error(
+        `Ollama health check failed (${tagsResponse.status}). Start Ollama or set AI_PROVIDER=gemini in .env.local`,
+      );
+    }
+
     const data = (await tagsResponse.json()) as {
       models: Array<{ name: string }>;
     };
@@ -146,7 +152,7 @@ export class OllamaProvider implements AIProvider {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      while (true) {
+      outer: while (true) {
         if (signal?.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
@@ -159,7 +165,7 @@ export class OllamaProvider implements AIProvider {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data: ")) continue;
           const payload = trimmed.slice(6);
-          if (payload === "[DONE]") break;
+          if (payload === "[DONE]") break outer;
 
           try {
             const parsed = JSON.parse(payload) as {
@@ -212,7 +218,7 @@ export class OllamaProvider implements AIProvider {
       try {
         JSON.parse(content);
         return content;
-      } catch (err) {
+      } catch {
         lastError = new Error(
           `Ollama returned malformed JSON (attempt ${attempt + 1}/${maxRetries + 1}): ${content.slice(0, 200)}`,
         );

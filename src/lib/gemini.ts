@@ -15,8 +15,9 @@ export async function* streamResponse(
   apiKey: string,
   systemPrompt: string,
   messages: { role: "user" | "model"; content: string }[],
+  signal?: AbortSignal,
 ): AsyncGenerator<string> {
-  yield* getProvider(apiKey).streamResponse(systemPrompt, messages);
+  yield* getProvider(apiKey).streamResponse(systemPrompt, messages, signal);
 }
 
 export async function generateStructuredResponse(
