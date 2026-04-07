@@ -837,6 +837,7 @@ model ProgramDocument {
   usedBySage      Boolean @default(false)
   // Short text summary Sage can read (avoids loading full PDF into prompt)
   sageContextNote String? @db.Text
+  fileModifiedAt  DateTime? // Filesystem mtime at ingestion — for change detection
 
   // --- Metadata ---
   sortOrder  Int      @default(0)
