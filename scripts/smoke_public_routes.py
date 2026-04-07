@@ -89,7 +89,7 @@ def run() -> None:
 
             goto_with_retry(page, f"{BASE_URL}/teacher-register")
             expect(
-                page.get_by_role("heading", name="Teacher Registration").is_visible(),
+                page.get_by_role("heading", name="Staff Registration").is_visible(),
                 "Teacher registration page did not load.",
             )
 
