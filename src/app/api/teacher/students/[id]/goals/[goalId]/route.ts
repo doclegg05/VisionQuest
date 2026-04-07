@@ -31,6 +31,7 @@ export const PATCH = withTeacherAuth(async (
     confirmedAt?: Date;
     confirmedBy?: string;
     lastReviewedAt?: Date;
+    pathwayId?: string | null;
   } = {};
 
   if ("content" in body) {
@@ -60,6 +61,21 @@ export const PATCH = withTeacherAuth(async (
 
   if ("reviewed" in body && body.reviewed === true) {
     updates.lastReviewedAt = new Date();
+  }
+
+  // Pathway assignment (set or clear)
+  if ("pathwayId" in body) {
+    if (body.pathwayId === null || body.pathwayId === "") {
+      updates.pathwayId = null;
+    } else if (typeof body.pathwayId === "string") {
+      const pathway = await prisma.pathway.findUnique({
+        where: { id: body.pathwayId },
+        select: { id: true, active: true },
+      });
+      if (!pathway) throw badRequest("Pathway not found.");
+      if (!pathway.active) throw badRequest("Cannot assign an inactive pathway.");
+      updates.pathwayId = pathway.id;
+    }
   }
 
   if (Object.keys(updates).length === 0) {

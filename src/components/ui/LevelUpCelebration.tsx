@@ -33,14 +33,14 @@ export default function LevelUpCelebration({ newLevel, onDone }: LevelUpCelebrat
       }`}
     >
       <div
-        className="flex items-center gap-4 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 via-white to-amber-50 px-5 py-4 shadow-[0_20px_50px_rgba(249,115,22,0.2)] backdrop-blur-lg"
+        className="flex items-center gap-4 rounded-2xl border border-[var(--toast-celebration-border)] bg-[var(--toast-celebration-bg)] px-5 py-4 shadow-[0_20px_50px_rgba(211,178,87,0.15)]"
         onClick={() => onDone?.()}
         role="status"
         aria-live="polite"
       >
         <span className="text-3xl">🚀</span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">Level Up!</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--toast-celebration-text)]">Level Up!</p>
           <p className="mt-0.5 font-display text-2xl text-[var(--ink-strong)]">Level {newLevel}</p>
           {LEVEL_LABELS[newLevel] && (
             <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{LEVEL_LABELS[newLevel]}</p>

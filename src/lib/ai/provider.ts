@@ -1,29 +1,33 @@
-import type { AIProvider } from "./types";
-import { GeminiProvider } from "./gemini";
-import { OllamaProvider } from "./ollama";
-import { MockProvider } from "./mock";
+import { getPlainConfigValue } from "@/lib/system-config";
+import { resolveApiKey } from "@/lib/chat/api-key";
+import { OllamaProvider } from "./ollama-provider";
+import { GeminiProvider } from "./gemini-provider";
+import type { AIProvider, AIProviderType } from "./types";
 
-let ollamaInstance: OllamaProvider | null = null;
+const DEFAULT_OLLAMA_MODEL = "gemma4:26b";
 
-export function getProvider(apiKey?: string): AIProvider {
-  const provider = process.env.AI_PROVIDER || "gemini";
+/**
+ * Resolve the active AI provider based on SystemConfig.
+ *
+ * - "local" → OllamaProvider (reads ai_provider_url, ai_provider_model)
+ * - "cloud" or unset → GeminiProvider (uses existing API key resolution)
+ */
+export async function getProvider(studentId: string): Promise<AIProvider> {
+  const providerType = ((await getPlainConfigValue("ai_provider")) || "cloud") as AIProviderType;
 
-  switch (provider) {
-    case "ollama":
-      if (!ollamaInstance) ollamaInstance = new OllamaProvider();
-      return ollamaInstance;
-    case "mock":
-      return new MockProvider();
-    case "gemini":
-    default:
-      if (!apiKey) {
-        throw new Error(
-          "Gemini provider requires an API key. Set GEMINI_API_KEY or configure a personal key in Settings.",
-        );
-      }
-      return new GeminiProvider(apiKey);
+  if (providerType === "local") {
+    const url = await getPlainConfigValue("ai_provider_url");
+    if (!url) {
+      throw new Error(
+        "Local AI server URL is not configured. Set it in Program Setup > AI Provider.",
+      );
+    }
+    const model =
+      (await getPlainConfigValue("ai_provider_model")) || DEFAULT_OLLAMA_MODEL;
+    return new OllamaProvider(url, model);
   }
-}
 
-// Re-export types for convenience
-export type { AIProvider, ChatMessage } from "./types";
+  // Default: cloud (Gemini)
+  const apiKey = await resolveApiKey(studentId);
+  return new GeminiProvider(apiKey);
+}

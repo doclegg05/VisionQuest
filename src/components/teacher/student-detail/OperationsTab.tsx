@@ -22,7 +22,7 @@ type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled"
 function statusBadge(status: string): string {
   if (status === "completed") return "bg-emerald-100 text-emerald-700";
   if (status === "missed") return "bg-rose-100 text-rose-800";
-  if (status === "cancelled") return "bg-slate-100 text-slate-700";
+  if (status === "cancelled") return "bg-[var(--surface-interactive)] text-[var(--ink-strong)]";
   return "bg-sky-100 text-sky-700";
 }
 
@@ -112,11 +112,11 @@ export default function OperationsTab({
   return (
     <div className="space-y-6">
       {/* Submitted Forms */}
-      <div id="submitted-forms" className="bg-white rounded-xl border border-gray-200 p-5">
+      <div id="submitted-forms" className="theme-card rounded-xl p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Submitted Forms</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Submitted Forms</h3>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
               Review uploaded paperwork and clear pending review items from the advising queue.
             </p>
           </div>
@@ -130,12 +130,12 @@ export default function OperationsTab({
         ) : (
           <div className="mt-4 space-y-3">
             {formSubmissions.map((submission: FormSubmissionData) => (
-              <div key={submission.id} className="rounded-lg border border-gray-100 p-4">
+              <div key={submission.id} className="theme-card-subtle rounded-lg p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900">{submission.title}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{submission.title}</p>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         submission.status === "approved"
                           ? "bg-emerald-100 text-emerald-700"
                           : submission.status === "rejected"
@@ -146,14 +146,14 @@ export default function OperationsTab({
                       </span>
                     </div>
                     {submission.description ? (
-                      <p className="mt-2 text-sm text-gray-600">{submission.description}</p>
+                      <p className="mt-2 text-sm text-[var(--ink-muted)]">{submission.description}</p>
                     ) : null}
                     <p className="mt-2 text-xs text-[var(--ink-muted)]">
                       Updated {dateFormatter.format(new Date(submission.updatedAt))}
                       {submission.reviewedAt ? ` \u2022 Reviewed ${dateFormatter.format(new Date(submission.reviewedAt))}` : ""}
                     </p>
                     {submission.notes ? (
-                      <p className="mt-2 text-sm text-gray-600">Note: {submission.notes}</p>
+                      <p className="mt-2 text-sm text-[var(--ink-muted)]">Note: {submission.notes}</p>
                     ) : null}
                   </div>
 
@@ -163,7 +163,7 @@ export default function OperationsTab({
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-white"
+                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                       >
                         Open file
                       </a>
@@ -205,11 +205,11 @@ export default function OperationsTab({
       {/* Appointments & Tasks Grid */}
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Appointments */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700">Appointments</h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Appointments</h3>
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
                 Schedule check-ins and update the outcome after each meeting.
               </p>
             </div>
@@ -221,17 +221,17 @@ export default function OperationsTab({
               value={appointmentForm.title}
               onChange={(event) => onAppointmentFormChange((current) => ({ ...current, title: event.target.value }))}
               placeholder="Appointment title"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <textarea
               value={appointmentForm.description}
               onChange={(event) => onAppointmentFormChange((current) => ({ ...current, description: event.target.value }))}
               placeholder="What is this session for?"
               rows={3}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Start
                 </span>
@@ -239,10 +239,10 @@ export default function OperationsTab({
                   type="datetime-local"
                   value={appointmentForm.startsAt}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, startsAt: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   End
                 </span>
@@ -250,26 +250,26 @@ export default function OperationsTab({
                   type="datetime-local"
                   value={appointmentForm.endsAt}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, endsAt: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Format
                 </span>
                 <select
                   value={appointmentForm.locationType}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, locationType: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="virtual">Virtual</option>
                   <option value="in_person">In person</option>
                   <option value="phone">Phone</option>
                 </select>
               </label>
-              <label className="text-sm text-gray-600 sm:col-span-2">
+              <label className="text-sm text-[var(--ink-muted)] sm:col-span-2">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Location or label
                 </span>
@@ -278,7 +278,7 @@ export default function OperationsTab({
                   value={appointmentForm.locationLabel}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, locationLabel: event.target.value }))}
                   placeholder="Zoom room, Office 201, Phone call"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
             </div>
@@ -287,16 +287,16 @@ export default function OperationsTab({
               value={appointmentForm.meetingUrl}
               onChange={(event) => onAppointmentFormChange((current) => ({ ...current, meetingUrl: event.target.value }))}
               placeholder="Meeting URL (optional)"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <input
               type="text"
               value={appointmentForm.notes}
               onChange={(event) => onAppointmentFormChange((current) => ({ ...current, notes: event.target.value }))}
               placeholder="Student-facing note (optional)"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <label className="flex items-center gap-2 text-sm text-gray-600">
+            <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input
                 type="checkbox"
                 checked={appointmentForm.followUpRequired}
@@ -318,25 +318,25 @@ export default function OperationsTab({
               <p className="text-sm text-[var(--ink-muted)]">No appointments scheduled yet.</p>
             ) : (
               appointments.map((appointment: AppointmentData) => (
-                <div key={appointment.id} className="rounded-lg border border-gray-100 p-4">
+                <div key={appointment.id} className="theme-card-subtle rounded-lg p-4">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-900">{appointment.title}</p>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusBadge(appointment.status)}`}>
+                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadge(appointment.status)}`}>
                           {appointment.status}
                         </span>
                         {appointment.followUpRequired && (
-                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
                             follow-up
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-gray-500">
+                      <p className="mt-1 text-sm text-[var(--ink-muted)]">
                         {dateFormatter.format(new Date(appointment.startsAt))} {"\u2022"} {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                       </p>
                       {appointment.description ? (
-                        <p className="mt-2 text-sm text-gray-600">{appointment.description}</p>
+                        <p className="mt-2 text-sm text-[var(--ink-muted)]">{appointment.description}</p>
                       ) : null}
                     </div>
 
@@ -363,7 +363,7 @@ export default function OperationsTab({
                             type="button"
                             onClick={() => onAppointmentStatusChange(appointment.id, "cancelled")}
                             disabled={updatingAppointmentId === appointment.id}
-                            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                            className="rounded-full bg-[var(--surface-interactive)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive-hover)] disabled:opacity-60"
                           >
                             Cancel
                           </button>
@@ -392,7 +392,7 @@ export default function OperationsTab({
                         Open link
                       </a>
                     ) : null}
-                    {appointment.notes ? <span className="text-gray-500">Note: {appointment.notes}</span> : null}
+                    {appointment.notes ? <span className="text-[var(--ink-muted)]">Note: {appointment.notes}</span> : null}
                   </div>
                 </div>
               ))
@@ -401,9 +401,9 @@ export default function OperationsTab({
         </div>
 
         {/* Tasks */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-700">Follow-Up Tasks</h3>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="theme-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Follow-Up Tasks</h3>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
             Assign next steps that the student can track and complete.
           </p>
 
@@ -413,17 +413,17 @@ export default function OperationsTab({
               value={taskForm.title}
               onChange={(event) => onTaskFormChange((current) => ({ ...current, title: event.target.value }))}
               placeholder="Task title"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <textarea
               value={taskForm.description}
               onChange={(event) => onTaskFormChange((current) => ({ ...current, description: event.target.value }))}
               placeholder="What should the student do next?"
               rows={3}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Due
                 </span>
@@ -431,17 +431,17 @@ export default function OperationsTab({
                   type="datetime-local"
                   value={taskForm.dueAt}
                   onChange={(event) => onTaskFormChange((current) => ({ ...current, dueAt: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Priority
                 </span>
                 <select
                   value={taskForm.priority}
                   onChange={(event) => onTaskFormChange((current) => ({ ...current, priority: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {TASK_PRIORITIES.map((priority) => (
                     <option key={priority} value={priority}>
@@ -450,14 +450,14 @@ export default function OperationsTab({
                   ))}
                 </select>
               </label>
-              <label className="text-sm text-gray-600">
+              <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   Linked appointment
                 </span>
                 <select
                   value={taskForm.appointmentId}
                   onChange={(event) => onTaskFormChange((current) => ({ ...current, appointmentId: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">None</option>
                   {appointments.map((appointment: AppointmentData) => (
@@ -487,24 +487,24 @@ export default function OperationsTab({
                   className={`rounded-lg border p-4 ${
                     task.status === "completed"
                       ? "border-emerald-200 bg-emerald-50/70"
-                      : "border-gray-100 bg-white"
+                      : "border-[var(--border)] bg-[var(--surface-raised)]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-900">{task.title}</p>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                           task.priority === "high"
                             ? "bg-rose-100 text-rose-800"
                             : task.priority === "low"
-                              ? "bg-slate-100 text-slate-700"
+                              ? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                               : "bg-amber-100 text-amber-800"
                         }`}>
                           {task.priority}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-gray-500">
+                      <p className="mt-1 text-sm text-[var(--ink-muted)]">
                         {task.dueAt ? `Due ${dateFormatter.format(new Date(task.dueAt))}` : "No due date"}
                       </p>
                       <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
@@ -518,7 +518,7 @@ export default function OperationsTab({
                       disabled={updatingTaskId === task.id}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60 ${
                         task.status === "completed"
-                          ? "bg-white text-slate-700 hover:bg-slate-100"
+                          ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
                           : "bg-[var(--ink-strong)] text-white hover:bg-[rgba(16,37,62,0.9)]"
                       }`}
                     >
@@ -531,7 +531,7 @@ export default function OperationsTab({
                   </div>
 
                   {task.description ? (
-                    <p className="mt-3 text-sm text-gray-600">{task.description}</p>
+                    <p className="mt-3 text-sm text-[var(--ink-muted)]">{task.description}</p>
                   ) : null}
                   {task.completedAt ? (
                     <p className="mt-2 text-xs text-emerald-700">
@@ -546,9 +546,9 @@ export default function OperationsTab({
       </div>
 
       {/* Case Notes */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700">Case Notes</h3>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Case Notes</h3>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Capture advising context, concerns, and wins for the teaching team.
         </p>
 
@@ -556,7 +556,7 @@ export default function OperationsTab({
           <select
             value={noteForm.category}
             onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {NOTE_CATEGORIES.map((category) => (
               <option key={category.value} value={category.value}>
@@ -569,7 +569,7 @@ export default function OperationsTab({
             onChange={(event) => onNoteFormChange((current) => ({ ...current, body: event.target.value }))}
             placeholder="What happened, what matters, and what should happen next?"
             rows={3}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="submit"
@@ -585,10 +585,10 @@ export default function OperationsTab({
             <p className="text-sm text-[var(--ink-muted)]">No case notes yet.</p>
           ) : (
             notes.map((note: NoteData) => (
-              <div key={note.id} className="rounded-lg border border-gray-100 p-4">
+              <div key={note.id} className="theme-card-subtle rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-700">
+                    <span className="rounded-full bg-[var(--surface-interactive)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-strong)]">
                       {note.category.replace("_", " ")}
                     </span>
                     <span className="text-xs text-[var(--ink-muted)]">
@@ -596,7 +596,7 @@ export default function OperationsTab({
                     </span>
                   </div>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-gray-600">{note.body}</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">{note.body}</p>
               </div>
             ))
           )}

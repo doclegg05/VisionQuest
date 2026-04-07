@@ -1,4 +1,4 @@
-import { generateStructuredResponse } from "../gemini";
+import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 import { NATIONAL_CAREER_CLUSTERS } from "@/lib/spokes/national-clusters";
@@ -271,7 +271,7 @@ function validateWorkValues(raw: unknown): WorkValue[] {
 }
 
 export async function extractDiscoverySignals(
-  apiKey: string,
+  provider: AIProvider,
   messages: { role: "user" | "model"; content: string }[],
 ): Promise<DiscoveryResult> {
   try {
@@ -283,8 +283,7 @@ export async function extractDiscoverySignals(
       { role: "user" as const, content: contextPrompt },
     ];
 
-    const result = await generateStructuredResponse(
-      apiKey,
+    const result = await provider.generateStructuredResponse(
       DISCOVERY_EXTRACTION_PROMPT,
       messagesWithContext,
     );

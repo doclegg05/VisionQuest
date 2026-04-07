@@ -11,14 +11,14 @@ export default function StreakBadge({ currentStreak, longestStreak }: StreakBadg
       <div className="flex items-center gap-1.5">
         <span className="text-lg">🔥</span>
         <div>
-          <p className="text-sm font-bold text-gray-900">{currentStreak}</p>
+          <p className="text-sm font-bold text-[var(--ink-strong)]">{currentStreak}</p>
           <p className="text-xs text-[var(--ink-muted)]">day streak</p>
         </div>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-lg">⭐</span>
         <div>
-          <p className="text-sm font-bold text-gray-900">{longestStreak}</p>
+          <p className="text-sm font-bold text-[var(--ink-strong)]">{longestStreak}</p>
           <p className="text-xs text-[var(--ink-muted)]">best streak</p>
         </div>
       </div>

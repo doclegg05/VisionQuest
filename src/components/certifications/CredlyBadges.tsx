@@ -102,7 +102,7 @@ export default function CredlyBadges() {
               desc: "Paste your Credly profile URL or username below and click Connect.",
             },
           ].map((item) => (
-            <div key={item.step} className="rounded-xl border border-[var(--border)] bg-white/60 p-4">
+            <div key={item.step} className="theme-card rounded-xl/60 p-4">
               <div className="mb-2 flex items-center gap-2">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-strong)] text-xs font-bold text-white">
                   {item.step}
@@ -114,7 +114,7 @@ export default function CredlyBadges() {
           ))}
         </div>
 
-        <div className="mt-5 rounded-xl border border-[var(--border)] bg-white/60 p-4">
+        <div className="mt-5 theme-card rounded-xl/60 p-4">
           <label htmlFor="credly-username" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
             Credly username or profile URL
           </label>
@@ -214,7 +214,7 @@ export default function CredlyBadges() {
             href={badge.badgeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex flex-col items-center gap-2 rounded-xl border border-[var(--border)] bg-white/60 p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="group flex flex-col items-center gap-2 theme-card rounded-xl/60 p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
             {badge.imageUrl ? (
               <img
@@ -222,6 +222,8 @@ export default function CredlyBadges() {
                 alt={badge.name}
                 width={80}
                 height={80}
+                loading="lazy"
+                decoding="async"
                 className="h-20 w-20 object-contain"
               />
             ) : (
@@ -233,10 +235,10 @@ export default function CredlyBadges() {
               {badge.name}
             </p>
             {badge.issuerName && (
-              <p className="text-[10px] text-[var(--ink-muted)]">{badge.issuerName}</p>
+              <p className="text-xs text-[var(--ink-muted)]">{badge.issuerName}</p>
             )}
             {badge.issuedAt && (
-              <p className="text-[10px] text-[var(--ink-muted)]">
+              <p className="text-xs text-[var(--ink-muted)]">
                 {new Date(badge.issuedAt).toLocaleDateString()}
               </p>
             )}

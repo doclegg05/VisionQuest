@@ -104,7 +104,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               {HIGHLIGHTS.map((highlight) => (
                 <div
                   key={highlight}
-                  className="flex items-start gap-3 rounded-[1.35rem] border border-white/12 bg-white/10 px-3.5 py-3 backdrop-blur-sm sm:rounded-2xl sm:px-4"
+                  className="flex items-start gap-3 rounded-[1.35rem] border border-white/12 bg-[var(--surface-raised)]/10 px-3.5 py-3 sm:rounded-2xl sm:px-4"
                 >
                   <span className="mt-0.5 text-[var(--accent-tertiary)]">✦</span>
                   <p>{highlight}</p>
@@ -116,9 +116,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               {MODULE_SPOTLIGHT.map((module) => (
                 <div
                   key={module.label}
-                  className="rounded-[1.35rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-3.5 backdrop-blur-sm sm:rounded-[1.4rem] sm:p-4"
+                  className="rounded-[1.35rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-3.5 sm:rounded-[1.4rem] sm:p-4"
                 >
-                  <div className="mb-2.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/14 text-xl sm:mb-3 sm:h-11 sm:w-11">
+                  <div className="mb-2.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--surface-raised)]/14 text-xl sm:mb-3 sm:h-11 sm:w-11">
                     {module.icon}
                   </div>
                   <p className="font-semibold text-white">{module.label}</p>
@@ -128,15 +128,15 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             </div>
 
             <div className="mt-6 grid gap-3 pt-6 sm:mt-auto sm:grid-cols-3 sm:pt-8">
-              <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
+              <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Sage</p>
                 <p className="mt-2 text-lg font-semibold">Coaching with context</p>
               </div>
-              <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
+              <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Progression</p>
                 <p className="mt-2 text-lg font-semibold">Wins that stay visible</p>
               </div>
-              <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
+              <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Portfolio</p>
                 <p className="mt-2 text-lg font-semibold">Proof of readiness</p>
               </div>
@@ -225,7 +225,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 <a
                   href="/api/auth/google"
                   className="flex w-full items-center justify-center gap-3 rounded-[1rem] border border-[rgba(18,38,63,0.14)]
-                             bg-white px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors
+                             bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors
                              hover:bg-[rgba(16,37,62,0.04)]"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -252,13 +252,13 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 href="/teacher-register"
                 className="text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
               >
-                Teacher? Register here
+                Staff? Register here
               </a>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
                 <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
               </div>
-              <p className="text-[10px] uppercase font-semibold tracking-widest text-[var(--ink-muted)]">
+              <p className="text-xs uppercase font-semibold tracking-widest text-[var(--ink-muted)]">
                 SPOKES Workforce Development Program
               </p>
             </div>

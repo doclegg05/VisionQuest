@@ -18,11 +18,14 @@ model Student {
   authProvider   String?
   geminiApiKey   String?
   credlyUsername String?
-  role           String   @default("student")
-  isActive       Boolean  @default(true)
-  sessionVersion Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  role           String    @default("student")
+  isActive       Boolean   @default(true)
+  sessionVersion Int       @default(0)
+  mfaSecret      String?   // TOTP secret, encrypted with AES-256-GCM
+  mfaEnabled     Boolean   @default(false)
+  mfaVerifiedAt  DateTime? // When MFA was last verified this session
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   conversations           Conversation[]
   messages                Message[]
@@ -64,6 +67,9 @@ model Student {
   notificationPreferences NotificationPreference[]
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
+  llmCallLogs             LlmCallLog[]
+  messages                Message[]
+  createdPathways         Pathway[]                @relation("PathwayCreator")
 
   @@schema("visionquest")
 }
@@ -83,15 +89,16 @@ model NotificationPreference {
 }
 
 model Conversation {
-  id        String   @id @default(cuid())
-  studentId String
-  module    String
-  stage     String
-  title     String?
-  summary   String?  @db.Text
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  studentId            String
+  module               String
+  stage                String
+  title                String?
+  summary              String?  @db.Text
+  summaryUpToMessageId String?
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   messages Message[]
@@ -111,6 +118,7 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@index([studentId])
   @@schema("visionquest")
 }
 
@@ -1111,6 +1119,28 @@ model StudentSavedJob {
 }
 
 // =============================================================================
+// LLM Call Logging & Token Quota Enforcement
+// =============================================================================
+
+model LlmCallLog {
+  id           String   @id @default(cuid())
+  studentId    String
+  callSite     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  totalTokens  Int      @default(0)
+  durationMs   Int?
+  createdAt    DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([createdAt])
+  @@schema("visionquest")
+}
+
+// =============================================================================
 // Phase 2: Goal-to-Pathway Alignment
 // =============================================================================
 
@@ -1122,10 +1152,12 @@ model Pathway {
   platforms      String[] // Platform IDs
   estimatedWeeks Int      @default(0)
   active         Boolean  @default(true)
+  createdBy      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  goals Goal[]
+  goals   Goal[]
+  creator Student? @relation("PathwayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@schema("visionquest")
 }
@@ -1146,5 +1178,63 @@ model ClassRequirement {
 
   @@unique([classId, itemType, itemId])
   @@index([classId, status])
+  @@schema("visionquest")
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// RBAC — Role-Based Access Control
+// Three-table design: Role → RolePermission → Permission
+// Replaces hardcoded role-string comparisons with granular, runtime-editable
+// permission checks backed by the database.
+// =============================================================================
+
+model Role {
+  id             String   @id @default(cuid())
+  name           String   @unique // "student", "teacher", "admin", "program_admin", "observer"
+  displayName    String
+  hierarchyLevel Int // 1=highest trust (super_admin), 4=lowest (student)
+  description    String?
+  isSystem       Boolean  @default(false) // System roles can't be deleted
+  createdAt      DateTime @default(now())
+
+  permissions RolePermission[]
+
+  @@schema("visionquest")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique // "goals.create", "goals.read.own", "sage.chat", etc.
+  namespace   String // "goals", "sage", "admin", etc.
+  displayName String
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@index([namespace])
+  @@schema("visionquest")
+}
+
+model RolePermission {
+  id           String  @id @default(cuid())
+  roleId       String
+  permissionId String
+  granted      Boolean @default(true) // true=allowed, false=explicitly denied
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
   @@schema("visionquest")
 }

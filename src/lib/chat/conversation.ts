@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
+import { getProvider } from "@/lib/ai";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { logger } from "@/lib/logger";
 
 /**
  * Load an existing conversation or create a new one.
@@ -128,5 +130,146 @@ export async function generateConversationTitle(
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { title: titleSummary + (titleSummary.length >= 60 ? "..." : "") },
+  });
+}
+
+// ─── Session Summary Compaction ─────────────────────────────────────────────
+
+export interface ConversationContext {
+  messages: { role: "user" | "model"; content: string }[];
+  summaryInjected: boolean;
+}
+
+/**
+ * Returns an optimized message history for a Gemini call.
+ * If the conversation has a rolling summary and more messages than
+ * `maxRecentMessages`, the summary is prepended as a synthetic model
+ * message and only the most recent messages are returned.
+ */
+export async function getConversationContext(
+  conversationId: string,
+  maxRecentMessages: number = 20,
+): Promise<ConversationContext> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { summary: true, summaryUpToMessageId: true },
+  });
+
+  // Load recent messages (descending, then reverse for chronological order)
+  const messages = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "desc" },
+    take: maxRecentMessages,
+    select: { id: true, role: true, content: true, createdAt: true },
+  });
+  messages.reverse();
+
+  const formatted = messages.map((m) => ({
+    role: (m.role === "user" ? "user" : "model") as "user" | "model",
+    content: m.content,
+  }));
+
+  // If we have a summary and there are more messages than we loaded, prepend it
+  if (conversation?.summary) {
+    const totalCount = await prisma.message.count({ where: { conversationId } });
+    if (totalCount > maxRecentMessages) {
+      return {
+        messages: [
+          {
+            role: "model" as const,
+            content: `[Previous conversation summary: ${conversation.summary}]`,
+          },
+          ...formatted,
+        ],
+        summaryInjected: true,
+      };
+    }
+  }
+
+  return { messages: formatted, summaryInjected: false };
+}
+
+const COMPACTION_SYSTEM_PROMPT =
+  "You are a conversation summarizer for an AI coaching platform called VisionQuest. " +
+  "Produce clear, factual summaries in third person, past tense. " +
+  "Focus on: goals discussed, decisions made, progress reported, emotional state, " +
+  "and any important personal context. Keep summaries concise (2-3 paragraphs max).";
+
+/**
+ * Checks whether the rolling conversation summary needs updating and, if so,
+ * summarizes new messages and appends them to the existing summary.
+ *
+ * Called fire-and-forget after the AI response is saved.
+ */
+export async function maybeUpdateSummary(
+  conversationId: string,
+  studentId: string,
+  updateInterval: number = 10,
+): Promise<void> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { summary: true, summaryUpToMessageId: true },
+  });
+
+  // Build a where clause for messages since the last summary point
+  const whereClause: {
+    conversationId: string;
+    createdAt?: { gt: Date };
+  } = { conversationId };
+
+  if (conversation?.summaryUpToMessageId) {
+    const lastSummarizedMsg = await prisma.message.findUnique({
+      where: { id: conversation.summaryUpToMessageId },
+      select: { createdAt: true },
+    });
+    if (lastSummarizedMsg) {
+      whereClause.createdAt = { gt: lastSummarizedMsg.createdAt };
+    }
+  }
+
+  const newMessageCount = await prisma.message.count({ where: whereClause });
+  if (newMessageCount < updateInterval) return;
+
+  // Get messages to summarize
+  const messagesToSummarize = await prisma.message.findMany({
+    where: whereClause,
+    orderBy: { createdAt: "asc" },
+    select: { id: true, role: true, content: true },
+  });
+
+  if (messagesToSummarize.length === 0) return;
+
+  // Build text to summarize
+  const existingSummary = conversation?.summary || "";
+  const newText = messagesToSummarize
+    .map((m) => `${m.role === "user" ? "Student" : "Sage"}: ${m.content}`)
+    .join("\n\n");
+
+  const summaryPrompt = existingSummary
+    ? `Here is the existing conversation summary:\n${existingSummary}\n\nHere are the new messages to incorporate:\n${newText}\n\nUpdate the summary to include the key points from the new messages. Keep it concise (2-3 paragraphs max). Focus on: goals discussed, decisions made, progress reported, and emotional state.`
+    : `Summarize this coaching conversation. Focus on: goals discussed, decisions made, progress reported, and emotional state. Keep it concise (2-3 paragraphs max).\n\n${newText}`;
+
+  const provider = await getProvider(studentId);
+  const updatedSummary = await provider.generateResponse(
+    COMPACTION_SYSTEM_PROMPT,
+    [{ role: "user", content: summaryPrompt }],
+  );
+
+  const lastMessageId =
+    messagesToSummarize[messagesToSummarize.length - 1].id;
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: {
+      summary: updatedSummary,
+      summaryUpToMessageId: lastMessageId,
+    },
+  });
+
+  logger.info("Rolling conversation summary updated", {
+    conversationId,
+    studentId,
+    messagesCompacted: messagesToSummarize.length,
+    summaryLength: updatedSummary.length,
   });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withTeacherAuth } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
@@ -15,12 +15,8 @@ import { FORMS } from "@/lib/spokes/forms";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 
 // GET — individual student detail for teacher view
-export const GET = withTeacherAuth(async (
-  session,
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) => {
-  const { id } = await params;
+export const GET = withRegistry("admin.student_detail", async (session, req, ctx, tool) => {
+  const { id } = await ctx.params;
   await assertStaffCanManageStudent(session, id);
 
   const student = await prisma.student.findUnique({
@@ -40,7 +36,11 @@ export const GET = withTeacherAuth(async (
           content: true,
           status: true,
           parentId: true,
+          pathwayId: true,
           createdAt: true,
+          pathway: {
+            select: { id: true, label: true, active: true },
+          },
         },
         orderBy: { createdAt: "asc" },
       },
@@ -250,6 +250,7 @@ export const GET = withTeacherAuth(async (
           messages: {
             select: { role: true, content: true, createdAt: true },
             orderBy: { createdAt: "desc" },
+            take: 1,
           },
         },
         orderBy: { updatedAt: "desc" },
@@ -327,10 +328,9 @@ export const GET = withTeacherAuth(async (
   const readinessResult = readinessData.readiness;
 
   // Build conversation summaries (message stats + preview, not full transcripts)
+  // messages is take:1 desc — only the newest message is loaded for the preview.
   const conversationSummaries = student.conversations.map((c) => {
     const lastMsg = c.messages[0] ?? null;
-    const firstMsg = c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
-    const userMessageCount = c.messages.filter((m) => m.role === "user").length;
 
     return {
       id: c.id,
@@ -340,10 +340,6 @@ export const GET = withTeacherAuth(async (
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
       messageCount: c._count.messages,
-      userMessageCount,
-      duration: firstMsg && lastMsg
-        ? { firstMessageAt: firstMsg.createdAt.toISOString(), lastMessageAt: lastMsg.createdAt.toISOString() }
-        : null,
       lastMessagePreview: lastMsg
         ? lastMsg.content.substring(0, 150) + (lastMsg.content.length > 150 ? "..." : "")
         : null,

@@ -91,7 +91,7 @@ export default function CredentialSharePanel() {
   }
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading credential sharing...</p>;
+    return <p className="text-sm text-[var(--ink-faint)]">Loading credential sharing...</p>;
   }
 
   return (
@@ -108,7 +108,7 @@ export default function CredentialSharePanel() {
           <button
             type="button"
             onClick={() => void copyUrl()}
-            className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-white"
+            className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
           >
             Copy link
           </button>
@@ -128,14 +128,14 @@ export default function CredentialSharePanel() {
                 value={form.headline}
                 onChange={(event) => setForm((current) => ({ ...current, headline: event.target.value }))}
                 placeholder="Headline for the public page"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <textarea
                 value={form.summary}
                 onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
                 rows={4}
                 placeholder="What should visitors know about this credential and what it represents?"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
                 <input

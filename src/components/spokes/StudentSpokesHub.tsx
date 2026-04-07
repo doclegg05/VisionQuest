@@ -93,7 +93,7 @@ export default function StudentSpokesHub({
                 className={`rounded-xl border p-3 ${
                   progress?.completed
                     ? "border-emerald-200 bg-emerald-50/80"
-                    : "border-[var(--border)] bg-white"
+                    : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -107,10 +107,10 @@ export default function StudentSpokesHub({
                     ) : null}
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       progress?.completed
                         ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-700"
+                        : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                     }`}
                   >
                     {progress?.completed ? "Complete" : "Pending"}
@@ -170,19 +170,19 @@ export default function StudentSpokesHub({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Milestones</p>
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Where you are in the SPOKES process</h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                <div className="theme-card rounded-xl p-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Referral logged</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{formatDate(record.referralDate)}</p>
                 </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                <div className="theme-card rounded-xl p-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Enrollment</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{formatDate(record.enrolledAt)}</p>
                 </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                <div className="theme-card rounded-xl p-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">WV Family Survey</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{formatDate(record.familySurveyOfferedAt)}</p>
                 </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                <div className="theme-card rounded-xl p-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Post-secondary</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">
                     {record.postSecondaryEnteredAt
@@ -190,7 +190,7 @@ export default function StudentSpokesHub({
                       : "Not recorded yet"}
                   </p>
                 </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:col-span-2">
+                <div className="theme-card rounded-xl p-4 sm:col-span-2">
                   <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Employment follow-up</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">
                     {record.unsubsidizedEmploymentAt
@@ -209,7 +209,7 @@ export default function StudentSpokesHub({
                   const progress = moduleProgress.find((item) => item.templateId === template.id);
 
                   return (
-                    <div key={template.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                    <div key={template.id} className="theme-card rounded-xl p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-[var(--ink-strong)]">{template.label}</p>
@@ -218,10 +218,10 @@ export default function StudentSpokesHub({
                           ) : null}
                         </div>
                         <span
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             progress
                               ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-700"
+                              : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                           }`}
                         >
                           {progress ? `Completed ${formatDate(progress.completedAt)}` : "Pending"}
@@ -256,7 +256,7 @@ export default function StudentSpokesHub({
               </p>
               <div className="mt-5 space-y-3">
                 {summary.employmentFollowUpSchedule.map((item) => (
-                  <div key={item.checkpointMonths} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                  <div key={item.checkpointMonths} className="theme-card rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-[var(--ink-strong)]">{item.checkpointMonths}-month follow-up</p>
@@ -265,12 +265,12 @@ export default function StudentSpokesHub({
                         </p>
                       </div>
                       <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
                           item.status === "completed"
                             ? "bg-emerald-100 text-emerald-700"
                             : item.status === "due"
                               ? "bg-amber-100 text-amber-800"
-                              : "bg-slate-100 text-slate-700"
+                              : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                         }`}
                       >
                         {item.status.replaceAll("_", " ")}

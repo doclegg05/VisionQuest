@@ -346,7 +346,7 @@ export default function SpokesManager() {
   }, [checklistTemplates]);
 
   if (loading) {
-    return <p className="text-sm text-gray-400">Loading SPOKES settings...</p>;
+    return <p className="text-sm text-[var(--ink-faint)]">Loading SPOKES settings...</p>;
   }
 
   return (
@@ -398,7 +398,7 @@ export default function SpokesManager() {
                 setCountyFilter(nextCounty);
                 void loadData(nextCounty);
               }}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+              className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
             >
               <option value="all">All counties</option>
               {countyTemplates.map((template) => (
@@ -421,7 +421,7 @@ export default function SpokesManager() {
                     setReferralForm((current) => ({ ...current, firstName: event.target.value }))
                   }
                   placeholder="First name"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
                 <input
                   value={referralForm.lastName}
@@ -429,7 +429,7 @@ export default function SpokesManager() {
                     setReferralForm((current) => ({ ...current, lastName: event.target.value }))
                   }
                   placeholder="Last name"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
               <input
@@ -438,7 +438,7 @@ export default function SpokesManager() {
                   setReferralForm((current) => ({ ...current, referralEmail: event.target.value }))
                 }
                 placeholder="Referral email"
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               {countyTemplates.length > 0 ? (
                 <select
@@ -446,7 +446,7 @@ export default function SpokesManager() {
                   onChange={(event) =>
                     setReferralForm((current) => ({ ...current, county: event.target.value }))
                   }
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 >
                   <option value="">Select county</option>
                   {countyTemplates.map((template) => (
@@ -462,7 +462,7 @@ export default function SpokesManager() {
                     setReferralForm((current) => ({ ...current, county: event.target.value }))
                   }
                   placeholder="County"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               )}
               <div className="grid gap-3 sm:grid-cols-2">
@@ -472,7 +472,7 @@ export default function SpokesManager() {
                     setReferralForm((current) => ({ ...current, householdType: event.target.value }))
                   }
                   placeholder="Household (1P/2P)"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
                 <input
                   value={referralForm.requiredParticipationHours}
@@ -483,7 +483,7 @@ export default function SpokesManager() {
                     }))
                   }
                   placeholder="Required hours"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
               <input
@@ -492,7 +492,7 @@ export default function SpokesManager() {
                 onChange={(event) =>
                   setReferralForm((current) => ({ ...current, referralDate: event.target.value }))
                 }
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <textarea
                 value={referralForm.notes}
@@ -501,7 +501,7 @@ export default function SpokesManager() {
                 }
                 placeholder="Notes"
                 rows={3}
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <button
                 type="button"
@@ -652,7 +652,7 @@ export default function SpokesManager() {
                 value={checklistForm.label}
                 onChange={(event) => setChecklistForm((current) => ({ ...current, label: event.target.value }))}
                 placeholder="Template label"
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <textarea
                 value={checklistForm.description}
@@ -661,7 +661,7 @@ export default function SpokesManager() {
                 }
                 placeholder="Description"
                 rows={2}
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <div className="grid gap-3 sm:grid-cols-2">
                 <select
@@ -669,7 +669,7 @@ export default function SpokesManager() {
                   onChange={(event) =>
                     setChecklistForm((current) => ({ ...current, category: event.target.value }))
                   }
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 >
                   {CHECKLIST_CATEGORY_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -683,7 +683,7 @@ export default function SpokesManager() {
                     setChecklistForm((current) => ({ ...current, sortOrder: event.target.value }))
                   }
                   placeholder="Sort order (optional)"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
               </div>
               <div className="flex flex-wrap gap-4 text-sm text-[var(--ink-muted)]">
@@ -720,7 +720,7 @@ export default function SpokesManager() {
                   <button
                     type="button"
                     onClick={resetChecklistForm}
-                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-gray-300 hover:text-[var(--ink-strong)]"
+                    className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--ink-strong)]"
                   >
                     Cancel
                   </button>
@@ -801,7 +801,7 @@ export default function SpokesManager() {
                 value={moduleForm.label}
                 onChange={(event) => setModuleForm((current) => ({ ...current, label: event.target.value }))}
                 placeholder="Module label"
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <textarea
                 value={moduleForm.description}
@@ -810,7 +810,7 @@ export default function SpokesManager() {
                 }
                 placeholder="Description"
                 rows={2}
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <input
                 value={moduleForm.sortOrder}
@@ -818,7 +818,7 @@ export default function SpokesManager() {
                   setModuleForm((current) => ({ ...current, sortOrder: event.target.value }))
                 }
                 placeholder="Sort order (optional)"
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
               />
               <div className="flex flex-wrap gap-4 text-sm text-[var(--ink-muted)]">
                 <label className="flex items-center gap-2">
@@ -854,7 +854,7 @@ export default function SpokesManager() {
                   <button
                     type="button"
                     onClick={resetModuleForm}
-                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-gray-300 hover:text-[var(--ink-strong)]"
+                    className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--ink-strong)]"
                   >
                     Cancel
                   </button>

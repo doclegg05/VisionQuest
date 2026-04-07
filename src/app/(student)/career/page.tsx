@@ -1,5 +1,4 @@
-import EventsHub from "@/components/career/EventsHub";
-import OpportunitiesHub from "@/components/career/OpportunitiesHub";
+import CareerHub from "@/components/career/CareerHub";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -47,59 +46,40 @@ export default async function CareerPage() {
       <PageIntro
         eyebrow="Career"
         title="Career"
-        description="Manage applications and upcoming career events from one place so your next steps stay visible."
+        description="Keep jobs, applications, and career events in one place so your search stays visible and actionable."
       />
-
-      <section id="opportunities">
-        <div className="mb-4">
-          <h2 className="font-display text-2xl text-[var(--ink-strong)]">Opportunities</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Save roles, attach your current resume, and keep your application pipeline current.
-          </p>
-        </div>
-        <OpportunitiesHub
-          opportunities={opportunities.map((opportunity) => ({
-            ...opportunity,
-            deadline: opportunity.deadline ? opportunity.deadline.toISOString() : null,
-            application: opportunity.applications[0]
+      <CareerHub
+        opportunities={opportunities.map((opportunity) => ({
+          ...opportunity,
+          deadline: opportunity.deadline ? opportunity.deadline.toISOString() : null,
+          application: opportunity.applications[0]
+            ? {
+                ...opportunity.applications[0],
+                appliedAt: opportunity.applications[0].appliedAt
+                  ? opportunity.applications[0].appliedAt.toISOString()
+                  : null,
+                createdAt: opportunity.applications[0].createdAt.toISOString(),
+              }
+            : null,
+        }))}
+        events={events.map((event) => {
+          const registration =
+            event.registrations.find((item) => item.studentId === session.id) || null;
+          return {
+            ...event,
+            startsAt: event.startsAt.toISOString(),
+            endsAt: event.endsAt.toISOString(),
+            registration: registration
               ? {
-                  ...opportunity.applications[0],
-                  appliedAt: opportunity.applications[0].appliedAt
-                    ? opportunity.applications[0].appliedAt.toISOString()
-                    : null,
-                  createdAt: opportunity.applications[0].createdAt.toISOString(),
+                  id: registration.id,
+                  status: registration.status,
+                  registeredAt: registration.registeredAt.toISOString(),
                 }
               : null,
-          }))}
-        />
-      </section>
-
-      <section id="events" className="mt-10">
-        <div className="mb-4">
-          <h2 className="font-display text-2xl text-[var(--ink-strong)]">Events</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Register for workshops, fairs, and hiring events without leaving your career workflow.
-          </p>
-        </div>
-        <EventsHub
-          events={events.map((event) => {
-            const registration = event.registrations.find((item) => item.studentId === session.id) || null;
-            return {
-              ...event,
-              startsAt: event.startsAt.toISOString(),
-              endsAt: event.endsAt.toISOString(),
-              registration: registration
-                ? {
-                    id: registration.id,
-                    status: registration.status,
-                    registeredAt: registration.registeredAt.toISOString(),
-                  }
-                : null,
-              registrationCount: event.registrations.length,
-            };
-          })}
-        />
-      </section>
+            registrationCount: event.registrations.length,
+          };
+        })}
+      />
     </div>
   );
 }

@@ -18,6 +18,10 @@
   /* Theme tokens — Light */
   --surface-base: #f4f6f9;
   --surface-raised: rgba(255, 255, 255, 0.86);
+  --surface-soft: rgba(255, 255, 255, 0.72);
+  --surface-muted: rgba(18, 38, 63, 0.05);
+  --surface-interactive: rgba(0, 64, 113, 0.08);
+  --surface-interactive-hover: rgba(0, 64, 113, 0.12);
   --surface-overlay: rgba(0, 0, 0, 0.04);
   --ink-strong: #00133f;
   --ink-muted: #4a4d54;
@@ -33,6 +37,29 @@
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
 
+  /* Status badges */
+  --badge-success-bg: rgba(42, 138, 60, 0.12);
+  --badge-success-text: #1a6b2a;
+  --badge-warning-bg: rgba(173, 136, 6, 0.12);
+  --badge-warning-text: #8a6d05;
+  --badge-error-bg: rgba(196, 60, 60, 0.12);
+  --badge-error-text: #a33232;
+  --badge-info-bg: rgba(0, 93, 138, 0.12);
+  --badge-info-text: #004d73;
+
+  /* Toast/celebration */
+  --toast-celebration-bg: rgba(211, 178, 87, 0.12);
+  --toast-celebration-border: rgba(211, 178, 87, 0.3);
+  --toast-celebration-text: #8a6d05;
+
+  /* Urgency (teacher) */
+  --urgency-critical-bg: rgba(196, 60, 60, 0.12);
+  --urgency-critical-text: #a33232;
+  --urgency-high-bg: rgba(173, 136, 6, 0.12);
+  --urgency-high-text: #8a6d05;
+  --urgency-medium-bg: rgba(0, 93, 138, 0.12);
+  --urgency-medium-text: #004d73;
+
   /* Legacy aliases */
   --background: var(--surface-base);
   --foreground: var(--ink-strong);
@@ -42,6 +69,20 @@
   --accent-strong: var(--accent-green);
   --accent-secondary: var(--accent-blue);
   --accent-tertiary: var(--accent-gold);
+
+  /* Chat surfaces — Sage message bubbles, input area, typing indicator */
+  --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
+  --chat-bubble-assistant-border: rgba(15, 154, 146, 0.25);
+  --chat-bubble-user-bg: linear-gradient(135deg, #2a8a3c, #1e6e30);
+  --chat-bubble-user-avatar: #2a8a3c;
+  --chat-input-bg: rgba(255, 255, 255, 0.72);
+  --chat-input-border: rgba(18, 38, 63, 0.08);
+  --chat-area-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.38) 100%);
+  --chat-header-bg: rgba(255, 255, 255, 0.7);
+  --chat-typing-dot: var(--ink-muted);
+  --chat-error-bg: #fffbeb;
+  --chat-error-border: #fde68a;
+  --chat-error-text: #92400e;
 
   /* Animation tokens */
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -56,6 +97,10 @@
 [data-theme="dark"] {
   --surface-base: #0a1628;
   --surface-raised: rgba(255, 255, 255, 0.06);
+  --surface-soft: rgba(255, 255, 255, 0.08);
+  --surface-muted: rgba(255, 255, 255, 0.05);
+  --surface-interactive: rgba(255, 255, 255, 0.08);
+  --surface-interactive-hover: rgba(255, 255, 255, 0.12);
   --surface-overlay: rgba(255, 255, 255, 0.10);
   --ink-strong: #f0f2f5;
   --ink-muted: rgba(255, 255, 255, 0.62);
@@ -70,6 +115,43 @@
   --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
+
+  /* Status badges */
+  --badge-success-bg: rgba(63, 207, 94, 0.15);
+  --badge-success-text: #3fcf5e;
+  --badge-warning-bg: rgba(224, 192, 106, 0.15);
+  --badge-warning-text: #e0c06a;
+  --badge-error-bg: rgba(240, 107, 107, 0.15);
+  --badge-error-text: #f06b6b;
+  --badge-info-bg: rgba(56, 168, 216, 0.15);
+  --badge-info-text: #38a8d8;
+
+  /* Toast/celebration */
+  --toast-celebration-bg: rgba(224, 192, 106, 0.15);
+  --toast-celebration-border: rgba(224, 192, 106, 0.3);
+  --toast-celebration-text: #e0c06a;
+
+  /* Urgency (teacher) */
+  --urgency-critical-bg: rgba(240, 107, 107, 0.15);
+  --urgency-critical-text: #f06b6b;
+  --urgency-high-bg: rgba(224, 192, 106, 0.15);
+  --urgency-high-text: #e0c06a;
+  --urgency-medium-bg: rgba(56, 168, 216, 0.15);
+  --urgency-medium-text: #38a8d8;
+
+  /* Chat surfaces — dark mode */
+  --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
+  --chat-bubble-assistant-border: rgba(15, 154, 146, 0.25);
+  --chat-bubble-user-bg: linear-gradient(135deg, #3fcf5e, #2a8a3c);
+  --chat-bubble-user-avatar: #2a8a3c;
+  --chat-input-bg: rgba(255, 255, 255, 0.06);
+  --chat-input-border: rgba(255, 255, 255, 0.10);
+  --chat-area-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.04) 100%);
+  --chat-header-bg: rgba(255, 255, 255, 0.06);
+  --chat-typing-dot: var(--ink-muted);
+  --chat-error-bg: rgba(180, 83, 9, 0.15);
+  --chat-error-border: rgba(251, 191, 36, 0.25);
+  --chat-error-text: #fbbf24;
 
   /* Legacy aliases */
   --background: var(--surface-base);
@@ -160,6 +242,79 @@ body::before {
 
 .panel-strong {
   background: var(--surface-strong);
+}
+
+.theme-card {
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface-soft));
+  border: 1px solid var(--border);
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 var(--surface-overlay);
+}
+
+[data-theme="dark"] .theme-card {
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.theme-card-subtle {
+  background: linear-gradient(180deg, var(--surface-soft), var(--surface-muted));
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 var(--surface-overlay);
+}
+
+.theme-segmented {
+  background: linear-gradient(180deg, var(--surface-muted), var(--surface-soft));
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 var(--surface-overlay);
+}
+
+.theme-input {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  color: var(--ink-strong);
+  box-shadow:
+    inset 0 1px 0 var(--surface-overlay),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.theme-input::placeholder {
+  color: var(--ink-faint);
+}
+
+input.theme-card-subtle,
+textarea.theme-card-subtle,
+select.theme-card-subtle,
+input.theme-input,
+textarea.theme-input,
+select.theme-input {
+  background: var(--surface-soft);
+  color: var(--ink-strong);
+  box-shadow:
+    inset 0 1px 0 var(--surface-overlay),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+input.theme-card-subtle::placeholder,
+textarea.theme-card-subtle::placeholder,
+select.theme-card-subtle::placeholder,
+input.theme-input::placeholder,
+textarea.theme-input::placeholder,
+select.theme-input::placeholder {
+  color: var(--ink-faint);
+}
+
+.theme-chip-muted {
+  background: var(--surface-interactive);
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+}
+
+.theme-empty-state {
+  background: linear-gradient(180deg, var(--surface-soft), var(--surface-muted));
+  border: 1px dashed var(--border-strong);
+  color: var(--ink-muted);
 }
 
 .page-shell {
@@ -410,7 +565,7 @@ a[role="button"]:active,
 }
 
 .animate-slide-up-bounce {
-  animation: slide-up-bounce var(--duration-normal) var(--ease-bounce) both;
+  animation: slide-up-bounce var(--duration-normal) var(--ease-spring) both;
 }
 
 .animate-scale-pop {

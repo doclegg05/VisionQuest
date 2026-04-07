@@ -113,7 +113,7 @@ export default function OutcomesReport() {
     }
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading reports...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading reports...</p>;
 
   if (error || !data) {
     return (
@@ -137,21 +137,21 @@ export default function OutcomesReport() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {SUMMARY_CARDS.map((card) => (
-          <div key={card.key} className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-gray-400">{card.label}</p>
+          <div key={card.key} className="theme-card rounded-xl p-4">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">{card.label}</p>
             <p className={`mt-2 text-3xl font-bold ${card.tone}`}>{data.summary[card.key]}</p>
           </div>
         ))}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Pipeline</p>
-              <h3 className="mt-2 text-lg font-semibold text-gray-900">Student outcome funnel</h3>
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Pipeline</p>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Student outcome funnel</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {data.summary.totalStudents} learners
             </span>
           </div>
@@ -162,10 +162,10 @@ export default function OutcomesReport() {
               return (
                 <div key={item.label}>
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-gray-600">{item.label}</span>
-                    <span className="font-semibold text-gray-900">{item.value}</span>
+                    <span className="text-[var(--ink-muted)]">{item.label}</span>
+                    <span className="font-semibold text-[var(--ink-strong)]">{item.value}</span>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-slate-100">
+                  <div className="mt-2 h-2 rounded-full bg-[var(--surface-interactive)]">
                     <div
                       className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-secondary),var(--accent-strong))]"
                       style={{ width: `${Math.min(100, Math.max(ratio, 6))}%` }}
@@ -177,9 +177,9 @@ export default function OutcomesReport() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Operational snapshot</p>
-          <h3 className="mt-2 text-lg font-semibold text-gray-900">What needs follow-through</h3>
+        <div className="theme-card rounded-xl p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Operational snapshot</p>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">What needs follow-through</h3>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
@@ -213,42 +213,42 @@ export default function OutcomesReport() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Outreach queue</p>
-              <h3 className="mt-2 text-lg font-semibold text-gray-900">Students who may need a touchpoint</h3>
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Outreach queue</p>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Students who may need a touchpoint</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {data.attentionQueue.length} shown
             </span>
           </div>
 
           {data.attentionQueue.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-500">Everyone is looking healthy right now.</p>
+            <p className="mt-4 text-sm text-[var(--ink-muted)]">Everyone is looking healthy right now.</p>
           ) : (
             <div className="mt-4 space-y-3">
               {data.attentionQueue.map((student) => (
                 <a
                   key={student.id}
                   href={`/teacher/students/${student.id}`}
-                  className="block rounded-lg border border-gray-100 p-4 transition-colors hover:border-[rgba(18,38,63,0.18)]"
+                  className="block theme-card-subtle rounded-lg p-4 transition-colors hover:border-[rgba(18,38,63,0.18)]"
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{student.displayName}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-gray-400">
+                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{student.displayName}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">
                         {student.studentId}
                       </p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {student.highSeverityAlertCount > 0 ? (
-                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800">
+                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">
                           {student.highSeverityAlertCount} high
                         </span>
                       ) : null}
                       {student.openAlertCount > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
                           {student.openAlertCount} alerts
                         </span>
                       ) : null}
@@ -257,26 +257,26 @@ export default function OutcomesReport() {
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Last activity</p>
-                      <p className="mt-1 text-sm text-gray-700">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Last activity</p>
+                      <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.lastActivityAt ? `${student.daysSinceActivity}d ago` : "No activity yet"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Next appointment</p>
-                      <p className="mt-1 text-sm text-gray-700">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Next appointment</p>
+                      <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.nextAppointmentAt ? dateFormatter.format(new Date(student.nextAppointmentAt)) : "None"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Career actions</p>
-                      <p className="mt-1 text-sm text-gray-700">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Career actions</p>
+                      <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.applicationsInFlight} apps • {student.eventRegistrationCount} events
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-gray-400">Readiness</p>
-                      <p className="mt-1 text-sm text-gray-700">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Readiness</p>
+                      <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.completedCertification ? "Certified" : "In progress"}
                         {student.publicCredentialLive ? " • Public" : ""}
                       </p>
@@ -284,7 +284,7 @@ export default function OutcomesReport() {
                   </div>
 
                   {student.topAlertTitle ? (
-                    <p className="mt-3 text-sm text-gray-600">{student.topAlertTitle}</p>
+                    <p className="mt-3 text-sm text-[var(--ink-muted)]">{student.topAlertTitle}</p>
                   ) : null}
                 </a>
               ))}
@@ -293,28 +293,28 @@ export default function OutcomesReport() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Recent applications</p>
-            <h3 className="mt-2 text-lg font-semibold text-gray-900">Career pipeline movement</h3>
+          <div className="theme-card rounded-xl p-5">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Recent applications</p>
+            <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Career pipeline movement</h3>
 
             {data.recentApplications.length === 0 ? (
-              <p className="mt-4 text-sm text-gray-500">No applications have moved into the active pipeline yet.</p>
+              <p className="mt-4 text-sm text-[var(--ink-muted)]">No applications have moved into the active pipeline yet.</p>
             ) : (
               <div className="mt-4 space-y-3">
                 {data.recentApplications.map((application) => (
-                  <div key={application.id} className="rounded-lg border border-gray-100 p-4">
+                  <div key={application.id} className="theme-card-subtle rounded-lg p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{application.opportunity.title}</p>
-                        <p className="mt-1 text-sm text-gray-600">
+                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{application.opportunity.title}</p>
+                        <p className="mt-1 text-sm text-[var(--ink-muted)]">
                           {application.student.displayName} • {application.opportunity.company}
                         </p>
                       </div>
-                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
+                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">
                         {application.status}
                       </span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs text-[var(--ink-faint)]">
                       Updated {dateFormatter.format(new Date(application.updatedAt))}
                     </p>
                   </div>
@@ -323,21 +323,21 @@ export default function OutcomesReport() {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-[0.16em] text-gray-400">Upcoming events</p>
-            <h3 className="mt-2 text-lg font-semibold text-gray-900">Who is showing up</h3>
+          <div className="theme-card rounded-xl p-5">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Upcoming events</p>
+            <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Who is showing up</h3>
 
             {data.upcomingEvents.length === 0 ? (
-              <p className="mt-4 text-sm text-gray-500">No upcoming events are currently scheduled.</p>
+              <p className="mt-4 text-sm text-[var(--ink-muted)]">No upcoming events are currently scheduled.</p>
             ) : (
               <div className="mt-4 space-y-3">
                 {data.upcomingEvents.map((event) => (
-                  <div key={event.id} className="rounded-lg border border-gray-100 p-4">
-                    <p className="text-sm font-semibold text-gray-900">{event.title}</p>
-                    <p className="mt-1 text-sm text-gray-600">
+                  <div key={event.id} className="theme-card-subtle rounded-lg p-4">
+                    <p className="text-sm font-semibold text-[var(--ink-strong)]">{event.title}</p>
+                    <p className="mt-1 text-sm text-[var(--ink-muted)]">
                       {dateFormatter.format(new Date(event.startsAt))}
                     </p>
-                    <p className="mt-2 text-xs text-gray-400">
+                    <p className="mt-2 text-xs text-[var(--ink-faint)]">
                       {event.registrationCount} registration{event.registrationCount === 1 ? "" : "s"}
                     </p>
                   </div>

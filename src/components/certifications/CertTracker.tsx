@@ -130,7 +130,7 @@ export default function CertTracker() {
     fileInputRef.current?.click();
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading certification...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading certification...</p>;
 
   if (error) return (
     <div className="text-center py-12">
@@ -143,7 +143,7 @@ export default function CertTracker() {
 
   if (!data || data.requirements.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+      <div className="theme-card rounded-xl p-8 text-center text-[var(--ink-faint)]">
         <p className="text-4xl mb-3">🏆</p>
         <p className="text-sm">No certification requirements have been set up yet.</p>
         <p className="text-xs mt-1">Your teacher will configure the Ready to Work certification.</p>
@@ -167,7 +167,7 @@ export default function CertTracker() {
       {/* Progress */}
       <div className="surface-section p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">SPOKES Ready to Work Certification</h3>
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">SPOKES Ready to Work Certification</h3>
           {isComplete && (
             <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-1 rounded-full">
               Completed
@@ -175,11 +175,11 @@ export default function CertTracker() {
           )}
         </div>
         <div className="space-y-1">
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-[var(--ink-muted)]">
             <span>{data.done} of {data.total} requirements</span>
             <span>{pct}%</span>
           </div>
-          <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-3 bg-[var(--surface-strong)] rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 isComplete
@@ -197,7 +197,7 @@ export default function CertTracker() {
         {data.requirements.map((req) => (
           <div
             key={req.templateId}
-            className={`bg-white rounded-xl border p-4 ${
+            className={`bg-[var(--surface-raised)] rounded-xl border p-4 ${
               req.completed ? "border-green-200" : "border-[rgba(18,38,63,0.08)]"
             }`}
           >
@@ -207,15 +207,15 @@ export default function CertTracker() {
                 checked={req.completed}
                 disabled={toggling === req.id || !req.id || (req.needsFile && !req.fileId && !req.completed)}
                 onChange={() => req.id && toggleRequirement(req.id, !req.completed)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="mt-0.5 h-4 w-4 rounded border-[var(--border-strong)] text-green-600 focus:ring-green-500"
               />
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${req.completed ? "text-green-800" : "text-gray-900"}`}>
+                <p className={`text-sm font-medium ${req.completed ? "text-green-800" : "text-[var(--ink-strong)]"}`}>
                   {req.label}
                   {req.required && <span className="ml-1 text-xs text-red-400 font-normal">*</span>}
                 </p>
                 {req.description && (
-                  <p className="text-xs text-gray-500 mt-0.5">{req.description}</p>
+                  <p className="text-xs text-[var(--ink-muted)] mt-0.5">{req.description}</p>
                 )}
                 {req.url && (
                   <a
@@ -236,7 +236,7 @@ export default function CertTracker() {
                         ? "bg-green-50 text-green-700"
                         : req.completed
                           ? "bg-yellow-50 text-yellow-600"
-                          : "bg-gray-50 text-gray-400"
+                          : "bg-[var(--surface-soft)] text-[var(--ink-faint)]"
                     }`}>
                       {req.verifiedBy ? "Verified" : req.completed ? "Pending verification" : "Needs verification"}
                     </span>
@@ -256,7 +256,7 @@ export default function CertTracker() {
                         <button
                           onClick={() => req.id && triggerUpload(req.id)}
                           disabled={uploading === req.id}
-                          className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 hover:bg-gray-100"
+                          className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)]"
                         >
                           {uploading === req.id ? "Uploading..." : "Attach file"}
                         </button>

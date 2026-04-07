@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getProvider } from "@/lib/ai";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
 import { GOAL_PLANNING_STATUSES, isGoalLevel, type GoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
@@ -13,21 +14,15 @@ import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { generateConversationTitle } from "./conversation";
-import { summarizeConversation } from "./summarizer";
 
 // ─── Main post-response handler ─────────────────────────────────────────────
-
-// Summarization is triggered at these message-count thresholds.
-const SUMMARY_THRESHOLDS = [30, 60, 90] as const;
 
 interface PostResponseParams {
   conversationId: string;
   conversationTitle: string | null;
   conversationStage: string;
-  conversationSummary: string | null;
   fullResponse: string;
   studentId: string;
-  apiKey: string;
   allMessages: { role: "user" | "model"; content: string }[];
 }
 
@@ -47,17 +42,16 @@ export async function handlePostResponse({
   conversationId,
   conversationTitle,
   conversationStage,
-  conversationSummary,
   fullResponse,
   studentId,
-  apiKey,
   allMessages,
 }: PostResponseParams): Promise<void> {
+  const provider = await getProvider(studentId);
   // 0. Discovery extraction (runs instead of goal extraction during discovery)
   if (conversationStage === "discovery") {
     try {
       const discoveryResult = await extractDiscoverySignals(
-        apiKey,
+        provider,
         [...allMessages, { role: "model" as const, content: fullResponse }],
       );
 
@@ -132,14 +126,13 @@ export async function handlePostResponse({
       logger.error("Failed to generate conversation title", { error: String(err) });
     }
 
-    // Trigger summarization if threshold crossed
-    maybeSummarize(conversationId, conversationSummary, allMessages, apiKey);
+    // Rolling summary compaction is now handled by maybeUpdateSummary in the route
     return;
   }
 
   // 1. Extract goals
   const extracted = await extractGoals(
-    apiKey,
+    provider,
     [...allMessages, { role: "model" as const, content: fullResponse }],
     conversationStage,
   );
@@ -236,7 +229,7 @@ export async function handlePostResponse({
   // 6. Extract mood scores (fire-and-forget, checkin/review stages only)
   if (conversationStage === "checkin" || conversationStage === "review") {
     const moodMessages = [...allMessages, { role: "model" as const, content: fullResponse }];
-    extractMoodFromConversation(conversationId, studentId, moodMessages, apiKey).catch((err) =>
+    extractMoodFromConversation(conversationId, studentId, moodMessages, provider).catch((err) =>
       logger.error("Mood extraction failed", { conversationId, error: String(err) })
     );
   }
@@ -248,36 +241,5 @@ export async function handlePostResponse({
     logger.error("Failed to generate conversation title", { error: String(err) });
   }
 
-  // 8. Summarize conversation at thresholds (fire-and-forget)
-  maybeSummarize(conversationId, conversationSummary, allMessages, apiKey);
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Fires summarization if the message count has just crossed a threshold and
- * the existing summary is stale (null or was last written at a lower threshold).
- * This is always fire-and-forget — failures are logged and swallowed.
- */
-function maybeSummarize(
-  conversationId: string,
-  currentSummary: string | null,
-  allMessages: { role: "user" | "model"; content: string }[],
-  apiKey: string
-): void {
-  const messageCount = allMessages.length;
-  const shouldSummarize =
-    messageCount >= SUMMARY_THRESHOLDS[0] &&
-    SUMMARY_THRESHOLDS.some((threshold) => messageCount === threshold);
-
-  if (!shouldSummarize && !(messageCount >= SUMMARY_THRESHOLDS[0] && currentSummary === null)) {
-    return;
-  }
-
-  summarizeConversation(conversationId, allMessages, apiKey).catch((err) =>
-    logger.error("Conversation summarization failed", {
-      conversationId,
-      error: String(err),
-    })
-  );
+  // Summary compaction is now handled by maybeUpdateSummary in the route
 }

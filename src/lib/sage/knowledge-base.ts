@@ -369,18 +369,30 @@ interface SageDocument {
   sageContextNote: string | null;
   certificationId: string | null;
   platformId: string | null;
+  audience: string;
 }
 
-async function loadSageDocuments(): Promise<SageDocument[]> {
-  return cached("sage:documents", 300, () =>
+type CallerRole = "student" | "staff";
+
+async function loadSageDocuments(callerRole: CallerRole): Promise<SageDocument[]> {
+  const cacheKey = `sage:documents:${callerRole}`;
+  // Filter by audience: students only see STUDENT + BOTH; staff see all
+  return cached(cacheKey, 300, () =>
     prisma.programDocument.findMany({
-      where: { usedBySage: true, isActive: true },
+      where: {
+        usedBySage: true,
+        isActive: true,
+        ...(callerRole === "student"
+          ? { audience: { not: "TEACHER" } }
+          : {}),
+      },
       select: {
         id: true,
         title: true,
         sageContextNote: true,
         certificationId: true,
         platformId: true,
+        audience: true,
       },
     }),
   );
@@ -424,9 +436,9 @@ function scoreDocument(doc: SageDocument, messageLower: string): number {
     score += doc.platformId.length * 2;
   }
 
-  // Match keywords in sageContextNote (first 200 chars for efficiency)
+  // Match keywords in sageContextNote (first 500 chars for better recall)
   if (doc.sageContextNote) {
-    const noteWords = doc.sageContextNote.toLowerCase().slice(0, 200).split(/\s+/);
+    const noteWords = doc.sageContextNote.toLowerCase().slice(0, 500).split(/\s+/);
     for (const word of noteWords) {
       if (word.length >= 4 && messageLower.includes(word)) {
         score += 1; // lower weight for note matches
@@ -483,12 +495,13 @@ function formatEntry(entry: ScoredEntry): string {
 
 export async function getDocumentContext(
   userMessage: string,
+  callerRole: CallerRole = "student",
   maxResults: number = 3,
 ): Promise<string> {
   const messageLower = userMessage.toLowerCase();
 
   const [docs, snippets] = await Promise.all([
-    loadSageDocuments(),
+    loadSageDocuments(callerRole),
     loadSageSnippets(),
   ]);
 

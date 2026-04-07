@@ -247,7 +247,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
             e.stopPropagation();
             onDelete(item.id);
           }}
-          className="absolute -right-2 -top-3 z-20 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-[11px] text-white shadow-md transition-colors hover:bg-red-600"
+          className="absolute -right-2 -top-3 z-20 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white shadow-md transition-colors hover:bg-red-600"
           aria-label="Delete pin"
         >
           ×
@@ -263,7 +263,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.38),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.22),transparent_32%)]" />
           <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(180deg,transparent_0_1.45rem,rgba(255,255,255,0.14)_1.45rem_1.52rem)]" />
           <div className={`pointer-events-none absolute inset-x-0 top-4 h-px ${noteStyle.line}`} />
-          <div className="pointer-events-none absolute right-0 top-0 h-7 w-7 translate-x-[24%] -translate-y-[24%] rotate-45 rounded-sm bg-white/35 shadow-[0_1px_3px_rgba(0,0,0,0.08)]" />
+          <div className="pointer-events-none absolute right-0 top-0 h-7 w-7 translate-x-[24%] -translate-y-[24%] rotate-45 rounded-sm bg-[var(--surface-raised)]/35 shadow-[0_1px_3px_rgba(0,0,0,0.08)]" />
           <p className={`relative text-sm leading-6 whitespace-pre-wrap ${noteStyle.text}`}>
             {item.content}
           </p>
@@ -276,7 +276,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         >
           <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(180deg,transparent_0_1.6rem,rgba(15,154,146,0.08)_1.6rem_1.66rem)]" />
           <div className="relative">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
               Linked goal
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{item.content}</p>
@@ -284,17 +284,16 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         </div>
       ) : (
         <div
-          className={`mt-2 overflow-hidden rounded-[1rem] border border-white/70 bg-white p-2 shadow-[2px_4px_10px_rgba(0,0,0,0.14)] ${
+          className={`mt-2 overflow-hidden rounded-[1rem] border border-white/70 bg-[var(--surface-raised)] p-2 shadow-[2px_4px_10px_rgba(0,0,0,0.14)] ${
             hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,0,0,0.18)]" : ""
           }`}
         >
           {item.fileId ? (
-            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[0.85rem] bg-slate-100">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[0.85rem] bg-[var(--surface-interactive)]">
               <Image
                 src={`/api/files/download?id=${item.fileId}`}
                 alt="Vision board image"
                 fill
-                unoptimized
                 sizes="(max-width: 768px) 50vw, 28vw"
                 className="object-cover"
               />
@@ -307,7 +306,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         type="button"
         data-resize-handle="true"
         onPointerDown={handleResizeStart}
-        className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/70 bg-white/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity hover:opacity-100"
+        className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity hover:opacity-100"
         aria-label="Resize pin"
       >
         <span className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]" />

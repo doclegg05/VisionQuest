@@ -308,12 +308,12 @@ function ChatWindowInner() {
         />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.22),rgba(255,255,255,0.38)_100%)]">
-        <div className="md:hidden flex items-center gap-3 border-b border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.7)] px-4 py-3 backdrop-blur">
+      <div className="flex min-w-0 flex-1 flex-col bg-[var(--chat-area-bg)]">
+        <div className="md:hidden flex items-center gap-3 border-b border-[var(--chat-input-border)] bg-[var(--chat-header-bg)] px-4 py-3 backdrop-blur">
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             type="button"
-            className="rounded-2xl border border-[rgba(18,38,63,0.1)] px-3 py-2 text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+            className="rounded-2xl border border-[var(--border)] px-3 py-2 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
           >
             ☰
           </button>
@@ -380,7 +380,7 @@ function ChatWindowInner() {
         )}
 
         {chatError && (
-          <div className="mx-4 mb-2 rounded-[1.15rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="mx-4 mb-2 rounded-[1.15rem] border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-4 py-3 text-sm text-[var(--chat-error-text)]">
             <p>{chatError}</p>
             {(chatError.includes("API key") || chatError.includes("Sage is not configured")) && (
               <Link href="/settings" prefetch={false} className="mt-2 inline-block font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]">

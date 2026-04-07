@@ -134,7 +134,7 @@ export default function PortfolioGrid() {
     setForm({ title: "", description: "", type: "project", url: "", fileId: "" });
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading portfolio...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading portfolio...</p>;
 
   if (error) return (
     <div className="text-center py-12">
@@ -157,14 +157,14 @@ export default function PortfolioGrid() {
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
 
       {items.length === 0 && !showForm ? (
-        <div className="text-center text-gray-400 py-8">
+        <div className="text-center text-[var(--ink-faint)] py-8">
           <p className="text-4xl mb-3">💼</p>
           <p className="text-sm">Your portfolio is empty. Add your first item!</p>
         </div>
       ) : (
         Object.entries(grouped).map(([type, typeItems]) => (
           <div key={type}>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-[var(--ink-muted)] uppercase tracking-wide mb-2">
               {TYPE_ICONS[type] || "📁"} {TYPE_LABELS[type] || type} ({typeItems.length})
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -172,9 +172,9 @@ export default function PortfolioGrid() {
                 <div key={item.id} className="surface-section p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                      <p className="text-sm font-medium text-[var(--ink-strong)]">{item.title}</p>
                       {item.description && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                        <p className="text-xs text-[var(--ink-muted)] mt-1 line-clamp-2">{item.description}</p>
                       )}
                       <div className="flex gap-2 mt-2">
                         {item.fileId && (
@@ -230,7 +230,7 @@ export default function PortfolioGrid() {
                 >
                   <span className="text-2xl">{opt.icon}</span>
                   <span className="text-sm font-semibold text-[var(--ink-strong)]">{opt.label}</span>
-                  <span className="text-[11px] leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
+                  <span className="text-xs leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
                 </button>
               ))}
             </div>

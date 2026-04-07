@@ -222,7 +222,7 @@ export default function OrientationWizard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-gray-400">Loading orientation...</p>
+        <p className="text-sm text-[var(--ink-faint)]">Loading orientation...</p>
       </div>
     );
   }
@@ -278,7 +278,7 @@ export default function OrientationWizard() {
           {step.stepDescription && (
             <p className="text-sm text-[var(--ink-muted)] text-center max-w-md">{step.stepDescription}</p>
           )}
-          <p className="mt-2 text-xs text-gray-400">
+          <p className="mt-2 text-xs text-[var(--ink-faint)]">
             Your instructor will lead this step.
           </p>
         </div>
@@ -287,7 +287,7 @@ export default function OrientationWizard() {
           <p className="text-sm text-[var(--ink-muted)]">
             This form is not yet available digitally.
           </p>
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-[var(--ink-faint)]">
             Your instructor will provide a paper copy.
           </p>
         </div>
@@ -297,7 +297,7 @@ export default function OrientationWizard() {
             key={step.form!.id}
             src={pdfUrl!}
             title={step.form!.title}
-            className="h-[500px] w-full border-0 bg-white"
+            className="h-[500px] w-full border-0 bg-[var(--surface-raised)]"
           />
         </div>
       )}
@@ -323,7 +323,7 @@ export default function OrientationWizard() {
               type="checkbox"
               checked={hasRead}
               onChange={(e) => setHasRead(e.target.checked)}
-              className="h-5 w-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              className="h-5 w-5 rounded border-[var(--border-strong)] text-emerald-600 focus:ring-emerald-500"
             />
             <span className="text-sm text-[var(--ink-strong)]">
               I have read this document

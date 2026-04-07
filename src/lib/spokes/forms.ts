@@ -176,6 +176,21 @@ export const FORMS: SpokesForm[] = [
     sortOrder: 8,
   },
   {
+    id: "ai-data-consent",
+    title: "AI Data Usage Consent",
+    description:
+      "Acknowledgement of how your information is used when interacting with Sage, VisionQuest's AI coach",
+    category: "onboarding",
+    fileName: "VisionQuest_AI_Data_Consent_v1.html",
+    storageKey: null,
+    fillable: false,
+    required: true,
+    audience: "student",
+    acceptsSubmission: false,
+    requiresSignature: true,
+    sortOrder: 9,
+  },
+  {
     id: "media-release",
     title: "Media Release Form",
     description:

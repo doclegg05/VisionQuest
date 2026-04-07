@@ -253,7 +253,7 @@ export default function CareerManager() {
     setTab("events");
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading...</p>;
 
   if (error) {
     return (
@@ -268,7 +268,7 @@ export default function CareerManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+      <div className="flex gap-1 bg-[var(--surface-interactive)] rounded-xl p-1">
         {[
           { key: "opportunities", label: "Opportunities" },
           { key: "events", label: "Events" },
@@ -278,7 +278,7 @@ export default function CareerManager() {
             type="button"
             onClick={() => setTab(item.key as CareerTab)}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              tab === item.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              tab === item.key ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-sm" : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             }`}
           >
             {item.label}
@@ -294,8 +294,8 @@ export default function CareerManager() {
 
       {tab === "opportunities" ? (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">
+          <div className="theme-card rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
               {editingOpportunityId ? "Edit Opportunity" : "New Opportunity"}
             </h3>
             <div className="grid gap-3 md:grid-cols-2">
@@ -304,21 +304,21 @@ export default function CareerManager() {
                 placeholder="Title"
                 value={opportunityForm.title}
                 onChange={(event) => setOpportunityForm((current) => ({ ...current, title: event.target.value }))}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="text"
                 placeholder="Company"
                 value={opportunityForm.company}
                 onChange={(event) => setOpportunityForm((current) => ({ ...current, company: event.target.value }))}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <select
                 value={opportunityForm.type}
                 onChange={(event) => setOpportunityForm((current) => ({ ...current, type: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {OPPORTUNITY_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -331,13 +331,13 @@ export default function CareerManager() {
                 placeholder="Location"
                 value={opportunityForm.location}
                 onChange={(event) => setOpportunityForm((current) => ({ ...current, location: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="datetime-local"
                 value={opportunityForm.deadline}
                 onChange={(event) => setOpportunityForm((current) => ({ ...current, deadline: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <input
@@ -345,20 +345,20 @@ export default function CareerManager() {
               placeholder="External link"
               value={opportunityForm.url}
               onChange={(event) => setOpportunityForm((current) => ({ ...current, url: event.target.value }))}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <textarea
               placeholder="Description"
               value={opportunityForm.description}
               onChange={(event) => setOpportunityForm((current) => ({ ...current, description: event.target.value }))}
               rows={4}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {editingOpportunityId ? (
               <select
                 value={opportunityForm.status}
                 onChange={(event) => setOpportunityForm((current) => ({ ...current, status: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {APPLICATION_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -379,7 +379,7 @@ export default function CareerManager() {
                 <button
                   type="button"
                   onClick={resetOpportunityForm}
-                  className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
+                  className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
                 >
                   Cancel
                 </button>
@@ -388,21 +388,21 @@ export default function CareerManager() {
           </div>
 
           {opportunities.length === 0 ? (
-            <div className="text-center text-gray-400 py-8 text-sm bg-white rounded-xl border border-gray-200">
+            <div className="text-center text-[var(--ink-faint)] py-8 text-sm theme-card rounded-xl">
               No opportunities posted yet.
             </div>
           ) : (
             <div className="space-y-2">
               {opportunities.map((opportunity) => (
-                <div key={opportunity.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3">
+                <div key={opportunity.id} className="theme-card rounded-xl p-4 flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{opportunity.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-sm font-medium text-[var(--ink-strong)]">{opportunity.title}</p>
+                    <p className="text-xs text-[var(--ink-muted)] mt-1">
                       {opportunity.company} • {opportunity.type}
                       {opportunity.location ? ` • ${opportunity.location}` : ""}
                     </p>
                     {opportunity.description ? (
-                      <p className="text-xs text-gray-500 mt-2">{opportunity.description}</p>
+                      <p className="text-xs text-[var(--ink-muted)] mt-2">{opportunity.description}</p>
                     ) : null}
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">{opportunity.status}</span>
@@ -428,8 +428,8 @@ export default function CareerManager() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">
+          <div className="theme-card rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
               {editingEventId ? "Edit Event" : "New Event"}
             </h3>
             <input
@@ -437,27 +437,27 @@ export default function CareerManager() {
               placeholder="Title"
               value={eventForm.title}
               onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <textarea
               placeholder="Description"
               value={eventForm.description}
               onChange={(event) => setEventForm((current) => ({ ...current, description: event.target.value }))}
               rows={4}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="grid gap-3 md:grid-cols-2">
               <input
                 type="datetime-local"
                 value={eventForm.startsAt}
                 onChange={(event) => setEventForm((current) => ({ ...current, startsAt: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="datetime-local"
                 value={eventForm.endsAt}
                 onChange={(event) => setEventForm((current) => ({ ...current, endsAt: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="grid gap-3 md:grid-cols-3">
@@ -466,14 +466,14 @@ export default function CareerManager() {
                 placeholder="Location"
                 value={eventForm.location}
                 onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="url"
                 placeholder="Virtual URL"
                 value={eventForm.virtualUrl}
                 onChange={(event) => setEventForm((current) => ({ ...current, virtualUrl: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="number"
@@ -481,10 +481,10 @@ export default function CareerManager() {
                 placeholder="Capacity"
                 value={eventForm.capacity}
                 onChange={(event) => setEventForm((current) => ({ ...current, capacity: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <label className="flex items-center gap-2 text-sm text-gray-600">
+            <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input
                 type="checkbox"
                 checked={eventForm.registrationRequired}
@@ -496,7 +496,7 @@ export default function CareerManager() {
               <select
                 value={eventForm.status}
                 onChange={(event) => setEventForm((current) => ({ ...current, status: event.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {EVENT_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -517,7 +517,7 @@ export default function CareerManager() {
                 <button
                   type="button"
                   onClick={resetEventForm}
-                  className="text-sm text-gray-500 px-4 py-2 hover:text-gray-700"
+                  className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
                 >
                   Cancel
                 </button>
@@ -526,23 +526,23 @@ export default function CareerManager() {
           </div>
 
           {events.length === 0 ? (
-            <div className="text-center text-gray-400 py-8 text-sm bg-white rounded-xl border border-gray-200">
+            <div className="text-center text-[var(--ink-faint)] py-8 text-sm theme-card rounded-xl">
               No events scheduled yet.
             </div>
           ) : (
             <div className="space-y-2">
               {events.map((event) => (
-                <div key={event.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3">
+                <div key={event.id} className="theme-card rounded-xl p-4 flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{event.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-sm font-medium text-[var(--ink-strong)]">{event.title}</p>
+                    <p className="text-xs text-[var(--ink-muted)] mt-1">
                       {new Date(event.startsAt).toLocaleString()} to {new Date(event.endsAt).toLocaleTimeString()}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-[var(--ink-muted)] mt-1">
                       {event.location || "No location"} • {event.registrationCount} registered
                     </p>
                     {event.description ? (
-                      <p className="text-xs text-gray-500 mt-2">{event.description}</p>
+                      <p className="text-xs text-[var(--ink-muted)] mt-2">{event.description}</p>
                     ) : null}
                   </div>
                   <div className="flex gap-1.5">

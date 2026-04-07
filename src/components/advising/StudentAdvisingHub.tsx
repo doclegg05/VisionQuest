@@ -174,7 +174,7 @@ export default function StudentAdvisingHub({
                       startsAt: nextAdvisor?.slots[0]?.startsAt || "",
                     }));
                   }}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {bookableAdvisors.map((advisor) => (
                     <option key={advisor.advisorId} value={advisor.advisorId}>
@@ -191,7 +191,7 @@ export default function StudentAdvisingHub({
                 <select
                   value={selectedSlot?.startsAt || ""}
                   onChange={(event) => setBookingForm((current) => ({ ...current, startsAt: event.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {(selectedAdvisor?.slots || []).map((slot) => (
                     <option key={slot.key} value={slot.startsAt}>
@@ -206,7 +206,7 @@ export default function StudentAdvisingHub({
                 value={bookingForm.title}
                 onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="Appointment title (optional)"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               />
 
               <textarea
@@ -214,7 +214,7 @@ export default function StudentAdvisingHub({
                 onChange={(event) => setBookingForm((current) => ({ ...current, description: event.target.value }))}
                 placeholder="What would you like help with?"
                 rows={4}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               />
 
               <button
@@ -261,7 +261,7 @@ export default function StudentAdvisingHub({
       </section>
 
       {error ? (
-        <div className="surface-section border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800">
+        <div className="surface-section border border-[var(--toast-celebration-border)] bg-[var(--badge-error-bg)] p-4 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       ) : null}
@@ -349,10 +349,10 @@ export default function StudentAdvisingHub({
           ) : (
             <div className="space-y-3">
               {alerts.map((alert) => (
-                <div key={alert.id} className="rounded-[1.2rem] border border-amber-200 bg-amber-50/80 p-4">
+                <div key={alert.id} className="rounded-[1.2rem] border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                    <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
                       {alert.severity}
                     </span>
                   </div>
@@ -398,7 +398,7 @@ export default function StudentAdvisingHub({
                     key={task.id}
                     className={`rounded-[1.2rem] border p-4 ${
                       isCompleted
-                        ? "border-emerald-200 bg-emerald-50/70"
+                        ? "border-[var(--accent-green)]/20 bg-[var(--badge-success-bg)]"
                         : "border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)]"
                     }`}
                   >
@@ -410,12 +410,12 @@ export default function StudentAdvisingHub({
                           Added by {task.createdByName}
                         </p>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         task.priority === "high"
-                          ? "bg-rose-100 text-rose-800"
+                          ? "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
                           : task.priority === "low"
-                            ? "bg-slate-100 text-slate-700"
-                            : "bg-amber-100 text-amber-800"
+                            ? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
+                            : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
                       }`}>
                         {task.priority}
                       </span>
@@ -432,7 +432,7 @@ export default function StudentAdvisingHub({
                         onClick={() => updateTaskStatus(task.id, isCompleted ? "open" : "completed")}
                         className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
-                            ? "bg-white text-[var(--ink-strong)] hover:bg-slate-100"
+                            ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
                             : "bg-[var(--ink-strong)] text-white hover:bg-[rgba(16,37,62,0.9)]"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
@@ -494,7 +494,7 @@ export default function StudentAdvisingHub({
               ) : (
                 <div className="mt-2 space-y-2">
                   {completedTasks.slice(0, 5).map((task) => (
-                    <div key={task.id} className="rounded-[1rem] border border-emerald-200 bg-emerald-50/70 p-3">
+                    <div key={task.id} className="rounded-[1rem] border border-[var(--accent-green)]/20 bg-[var(--badge-success-bg)] p-3">
                       <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
                       <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         Completed {task.completedAt ? dateFormatter.format(new Date(task.completedAt)) : "recently"}

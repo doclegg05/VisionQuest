@@ -218,9 +218,11 @@ function DrawPad({
 
   return (
     <>
-      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-white">
+      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)]">
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label="Signature drawing area. Use the text input below for an accessible alternative."
           className="block cursor-crosshair touch-none"
           onMouseDown={startStroke}
           onMouseMove={draw}
@@ -231,12 +233,12 @@ function DrawPad({
           onTouchEnd={endStroke}
         />
         <div className="pointer-events-none absolute left-6 right-6" style={{ bottom: "24px" }}>
-          <div className="border-b border-gray-300" />
-          <p className="mt-1 text-center text-[10px] text-[var(--ink-muted)]">Sign above this line</p>
+          <div className="border-b border-[var(--border-strong)]" />
+          <p className="mt-1 text-center text-xs text-[var(--ink-muted)]">Sign above this line</p>
         </div>
         {!hasStrokes && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-gray-300">Draw your signature here</p>
+            <p className="text-sm text-[var(--ink-faint)]">Draw your signature here</p>
           </div>
         )}
       </div>
@@ -295,21 +297,21 @@ function TypePad({
   return (
     <>
       <div ref={containerRef} className="space-y-3">
-        <div className="rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-white p-4">
+        <div className="rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)] p-4">
           <label className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
-            Type your full name
+            Type your full legal name
           </label>
           <input
             type="text"
             value={typedName}
             onChange={(e) => onTypedNameChange(e.target.value)}
             placeholder="Your full legal name"
-            className="w-full border-b-2 border-gray-300 bg-transparent pb-1 text-lg text-[var(--ink-strong)] placeholder:text-gray-300 outline-none focus:border-[var(--accent-secondary)]"
+            className="w-full border-b-2 border-[var(--border-strong)] bg-transparent pb-1 text-lg text-[var(--ink-strong)] placeholder:text-[var(--ink-faint)] outline-none focus:border-[var(--accent-secondary)]"
             autoComplete="name"
           />
           {trimmed && (
-            <div className="mt-4 border-t border-gray-100 pt-3">
-              <p className="text-[10px] text-[var(--ink-muted)] mb-1">Preview</p>
+            <div className="mt-4 border-t border-[var(--border)] pt-3">
+              <p className="text-xs text-[var(--ink-muted)] mb-1">Preview</p>
               <p className="font-serif text-2xl italic text-[#1a2a3a]">{trimmed}</p>
             </div>
           )}

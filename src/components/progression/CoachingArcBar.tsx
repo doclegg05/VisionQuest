@@ -95,7 +95,7 @@ export function CoachingArcBar({ currentWeek, totalWeeks = 6 }: CoachingArcBarPr
                 </span>
                 <span
                   className={[
-                    "text-[10px] font-medium leading-tight",
+                    "text-xs font-medium leading-tight",
                     isCurrent
                       ? "text-[var(--accent-strong)]"
                       : "text-[var(--ink-muted)]",

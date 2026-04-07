@@ -1,38 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Warning, Target, CalendarX, UserCircle } from "@phosphor-icons/react";
-import { api } from "@/lib/api";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface QueueStudent {
-  studentId: string;
-  name: string;
-  email: string | null;
-  urgencyScore: number;
-  signals: {
-    stalledGoalCount: number;
-    highSeverityAlertCount: number;
-    overdueTaskCount: number;
-    daysSinceLastLogin: number;
-    orientationComplete: boolean;
-    orientationProgress: number;
-    readinessScore: number;
-  };
-}
-
-interface QueueResponse {
-  queue: QueueStudent[];
-}
+import {
+  Warning,
+  Target,
+  CalendarX,
+  UserCircle,
+  ClipboardText,
+  DotsThree,
+  NotePencil,
+  CalendarPlus,
+  BookOpenText,
+} from "@phosphor-icons/react";
+import { api, apiFetch } from "@/lib/api";
+import {
+  type InterventionQueueResponse as QueueResponse,
+  type QueueStudent,
+} from "@/lib/teacher/dashboard";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function urgencyBadge(score: number): { label: string; color: string } {
-  if (score >= 50) return { label: "Critical", color: "bg-red-100 text-red-700" };
-  if (score >= 25) return { label: "High", color: "bg-amber-100 text-amber-700" };
-  return { label: "Medium", color: "bg-yellow-100 text-yellow-700" };
+  if (score >= 50) return { label: "Critical", color: "bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]" };
+  if (score >= 25) return { label: "High", color: "bg-[var(--urgency-high-bg)] text-[var(--urgency-high-text)]" };
+  return { label: "Medium", color: "bg-[var(--urgency-medium-bg)] text-[var(--urgency-medium-text)]" };
 }
 
 function topReason(signals: QueueStudent["signals"]): string {
@@ -42,6 +34,8 @@ function topReason(signals: QueueStudent["signals"]): string {
     return `${signals.stalledGoalCount} stalled goal${signals.stalledGoalCount !== 1 ? "s" : ""}`;
   if (signals.overdueTaskCount > 0)
     return `${signals.overdueTaskCount} overdue task${signals.overdueTaskCount !== 1 ? "s" : ""}`;
+  if (signals.unmatchedGoalCount > 0)
+    return `${signals.unmatchedGoalCount} unmatched goal${signals.unmatchedGoalCount !== 1 ? "s" : ""}`;
   if (signals.daysSinceLastLogin > 7) return `${signals.daysSinceLastLogin}d since login`;
   if (!signals.orientationComplete)
     return `Orientation ${Math.round(signals.orientationProgress * 100)}%`;
@@ -63,32 +57,332 @@ function QueueSkeleton() {
   );
 }
 
+// ─── Note Categories ──────────────────────────────────────────────────────────
+
+const NOTE_CATEGORY_OPTIONS = [
+  { value: "general", label: "General" },
+  { value: "check_in", label: "Check-in" },
+  { value: "risk", label: "Risk" },
+  { value: "career", label: "Career" },
+  { value: "celebration", label: "Celebration" },
+] as const;
+
+// ─── Quick Task Modal ─────────────────────────────────────────────────────────
+
+function QuickTaskModal({
+  studentId,
+  studentName,
+  onClose,
+  onCreated,
+}: {
+  studentId: string;
+  studentName: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch(`/api/teacher/students/${studentId}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          dueAt: dueAt || undefined,
+          priority: "normal",
+        }),
+      });
+
+      if (res.ok) {
+        onCreated();
+        onClose();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Failed to create task.");
+      }
+    } catch {
+      setError("Failed to create task.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
+      >
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+          Quick task for {studentName}
+        </h3>
+        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        <input
+          type="text"
+          placeholder="What needs to be done?"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+        />
+        <input
+          type="date"
+          value={dueAt}
+          onChange={(e) => setDueAt(e.target.value)}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+        />
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !title.trim()}
+            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Creating..." : "Create Task"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ─── Quick Note Modal ─────────────────────────────────────────────────────────
+
+function QuickNoteModal({
+  studentId,
+  studentName,
+  onClose,
+  onCreated,
+}: {
+  studentId: string;
+  studentName: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [body, setBody] = useState("");
+  const [category, setCategory] = useState<string>("general");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim()) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await apiFetch(`/api/teacher/students/${studentId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: body.trim(), category }),
+      });
+
+      if (res.ok) {
+        onCreated();
+        onClose();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Failed to save note.");
+      }
+    } catch {
+      setError("Failed to save note.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
+      >
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+          Quick note for {studentName}
+        </h3>
+        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+        >
+          {NOTE_CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <textarea
+          placeholder="Add a note about this student..."
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          autoFocus
+          rows={3}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
+        />
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !body.trim()}
+            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Note"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ─── Quick Appointment Modal ──────────────────────────────────────────────────
+
+function QuickAppointmentModal({
+  studentId,
+  studentName,
+  onClose,
+  onCreated,
+}: {
+  studentId: string;
+  studentName: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !startsAt) return;
+
+    setSaving(true);
+    setError(null);
+
+    const startDate = new Date(startsAt);
+    const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+
+    try {
+      const res = await apiFetch(`/api/teacher/students/${studentId}/appointments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          startsAt: startDate.toISOString(),
+          endsAt: endDate.toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        onCreated();
+        onClose();
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Failed to schedule appointment.");
+      }
+    } catch {
+      setError("Failed to schedule appointment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
+      >
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+          Schedule appointment with {studentName}
+        </h3>
+        <p className="text-xs text-[var(--ink-muted)]">Duration defaults to 30 minutes.</p>
+        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        <input
+          type="text"
+          placeholder="Appointment title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+        />
+        <input
+          type="datetime-local"
+          value={startsAt}
+          onChange={(e) => setStartsAt(e.target.value)}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+        />
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !title.trim() || !startsAt}
+            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Scheduling..." : "Schedule"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ─── Student Row ──────────────────────────────────────────────────────────────
 
-function StudentRow({ student }: { student: QueueStudent }) {
+function StudentRow({
+  student,
+  onQuickTask,
+  onQuickNote,
+  onSchedule,
+}: {
+  student: QueueStudent;
+  onQuickTask: (studentId: string, name: string) => void;
+  onQuickNote: (studentId: string, name: string) => void;
+  onSchedule: (studentId: string, name: string) => void;
+}) {
   const badge = urgencyBadge(student.urgencyScore);
   const reason = topReason(student.signals);
   const { signals } = student;
 
   return (
-    <Link
-      href={`/teacher/students/${student.studentId}`}
-      className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[rgba(18,38,63,0.04)]"
-    >
+    <div className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[rgba(18,38,63,0.04)]">
       {/* Avatar placeholder */}
-      <UserCircle
-        size={32}
-        weight="light"
-        className="shrink-0 text-[var(--ink-muted)]"
-      />
+      <Link href={`/teacher/students/${student.studentId}`} className="shrink-0">
+        <UserCircle
+          size={32}
+          weight="light"
+          className="text-[var(--ink-muted)]"
+        />
+      </Link>
 
       {/* Name + reason */}
-      <div className="min-w-0 flex-1">
+      <Link href={`/teacher/students/${student.studentId}`} className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
           {student.name}
         </p>
         <p className="truncate text-xs text-[var(--ink-muted)]">{reason}</p>
-      </div>
+      </Link>
 
       {/* Signal icons */}
       <div className="flex shrink-0 items-center gap-2 text-[var(--ink-muted)]">
@@ -107,39 +401,95 @@ function StudentRow({ student }: { student: QueueStudent }) {
             <Warning size={16} weight="duotone" className="text-red-500" />
           </span>
         )}
+        {signals.unmatchedGoalCount > 0 && (
+          <span title={`${signals.unmatchedGoalCount} goal(s) without pathway`}>
+            <ClipboardText size={16} weight="duotone" className="text-purple-500" />
+          </span>
+        )}
+        {signals.evidenceGapCount > 0 && (
+          <Link
+            href={`/teacher/students/${student.studentId}`}
+            title={`${signals.evidenceGapCount} evidence gap(s) — review Goals & Plan`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <BookOpenText size={16} weight="duotone" className="text-blue-500" />
+          </Link>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onQuickNote(student.studentId, student.name);
+          }}
+          title="Add quick note"
+          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+        >
+          <NotePencil size={16} weight="regular" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onSchedule(student.studentId, student.name);
+          }}
+          title="Schedule appointment"
+          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+        >
+          <CalendarPlus size={16} weight="regular" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onQuickTask(student.studentId, student.name);
+          }}
+          title="Assign quick task"
+          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+        >
+          <DotsThree size={18} weight="bold" />
+        </button>
       </div>
 
       {/* Urgency badge */}
       <span
-        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${badge.color}`}
+        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.color}`}
       >
         {badge.label}
       </span>
-    </Link>
+    </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function InterventionQueuePanel() {
-  const [queue, setQueue] = useState<QueueStudent[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function InterventionQueuePanel({
+  initialQueue,
+}: {
+  initialQueue?: QueueStudent[];
+}) {
+  const [queue, setQueue] = useState<QueueStudent[]>(initialQueue ?? []);
+  const [loading, setLoading] = useState(initialQueue === undefined);
   const [error, setError] = useState<string | null>(null);
+  const [taskTarget, setTaskTarget] = useState<{ studentId: string; name: string } | null>(null);
+  const [noteTarget, setNoteTarget] = useState<{ studentId: string; name: string } | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<{ studentId: string; name: string } | null>(null);
+
+  const fetchQueue = useCallback(async () => {
+    try {
+      const data = await api.get<QueueResponse>("/api/teacher/intervention-queue");
+      setQueue(data.queue);
+    } catch {
+      setError("Failed to load intervention queue.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchQueue() {
-      try {
-        const data = await api.get<QueueResponse>("/api/teacher/intervention-queue");
-        setQueue(data.queue);
-      } catch {
-        setError("Failed to load intervention queue.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
+    if (initialQueue !== undefined) return;
     void fetchQueue();
-  }, []);
+  }, [initialQueue, fetchQueue]);
 
   return (
     <section className="surface-section p-5">
@@ -162,7 +512,7 @@ export default function InterventionQueuePanel() {
       {loading && <QueueSkeleton />}
 
       {!loading && error && (
-        <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-red-600">
+        <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--error)]" role="alert">
           {error}
         </p>
       )}
@@ -176,9 +526,45 @@ export default function InterventionQueuePanel() {
       {!loading && !error && queue.length > 0 && (
         <div className="space-y-2">
           {queue.map((student) => (
-            <StudentRow key={student.studentId} student={student} />
+            <StudentRow
+              key={student.studentId}
+              student={student}
+              onQuickTask={(id, name) => setTaskTarget({ studentId: id, name })}
+              onQuickNote={(id, name) => setNoteTarget({ studentId: id, name })}
+              onSchedule={(id, name) => setScheduleTarget({ studentId: id, name })}
+            />
           ))}
         </div>
+      )}
+
+      {/* Quick Task Modal */}
+      {taskTarget && (
+        <QuickTaskModal
+          studentId={taskTarget.studentId}
+          studentName={taskTarget.name}
+          onClose={() => setTaskTarget(null)}
+          onCreated={() => void fetchQueue()}
+        />
+      )}
+
+      {/* Quick Note Modal */}
+      {noteTarget && (
+        <QuickNoteModal
+          studentId={noteTarget.studentId}
+          studentName={noteTarget.name}
+          onClose={() => setNoteTarget(null)}
+          onCreated={() => void fetchQueue()}
+        />
+      )}
+
+      {/* Quick Appointment Modal */}
+      {scheduleTarget && (
+        <QuickAppointmentModal
+          studentId={scheduleTarget.studentId}
+          studentName={scheduleTarget.name}
+          onClose={() => setScheduleTarget(null)}
+          onCreated={() => void fetchQueue()}
+        />
       )}
     </section>
   );

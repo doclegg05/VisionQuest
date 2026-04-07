@@ -53,7 +53,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
         <div className="w-full space-y-1.5">
           {Object.values(breakdown).map((item) => (
             <div key={item.label} className="flex items-center gap-2">
-              <span className="w-20 text-[10px] text-[var(--ink-muted)] text-right">{item.label}</span>
+              <span className="w-20 text-xs text-[var(--ink-muted)] text-right">{item.label}</span>
               <div className="flex-1 h-1.5 rounded-full bg-[rgba(18,38,63,0.06)] overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
@@ -63,7 +63,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
                   }}
                 />
               </div>
-              <span className="w-8 text-[10px] text-[var(--ink-muted)]">{item.score}/{item.max}</span>
+              <span className="w-8 text-xs text-[var(--ink-muted)]">{item.score}/{item.max}</span>
             </div>
           ))}
         </div>

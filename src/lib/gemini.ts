@@ -1,29 +1,6 @@
-import { getProvider } from "./ai/provider";
+// src/lib/gemini.ts
+// Legacy module — kept for GEMINI_MODEL export used by API key test routes.
+// All AI inference now goes through src/lib/ai/provider.ts.
 
-// Re-export constants for api-key validation route
-export { DEFAULT_GEMINI_MODEL, GEMINI_MODEL } from "./ai/gemini";
-
-export async function generateResponse(
-  apiKey: string,
-  systemPrompt: string,
-  messages: { role: "user" | "model"; content: string }[],
-): Promise<string> {
-  return getProvider(apiKey).generateResponse(systemPrompt, messages);
-}
-
-export async function* streamResponse(
-  apiKey: string,
-  systemPrompt: string,
-  messages: { role: "user" | "model"; content: string }[],
-  signal?: AbortSignal,
-): AsyncGenerator<string> {
-  yield* getProvider(apiKey).streamResponse(systemPrompt, messages, signal);
-}
-
-export async function generateStructuredResponse(
-  apiKey: string,
-  systemPrompt: string,
-  messages: { role: "user" | "model"; content: string }[],
-): Promise<string> {
-  return getProvider(apiKey).generateStructuredResponse(systemPrompt, messages);
-}
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;

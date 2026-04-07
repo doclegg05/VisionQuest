@@ -41,7 +41,7 @@ export default function StreakCalendar({ days }: StreakCalendarProps) {
       <p className="mb-2 text-xs font-medium text-[var(--ink-muted)]">Last 4 weeks</p>
       <div className="grid grid-cols-7 gap-1">
         {DAY_LABELS.map((label, i) => (
-          <div key={i} className="text-center text-[10px] text-[var(--ink-muted)]">
+          <div key={i} className="text-center text-xs text-[var(--ink-muted)]">
             {label}
           </div>
         ))}
@@ -56,12 +56,12 @@ export default function StreakCalendar({ days }: StreakCalendarProps) {
                 cell.isToday
                   ? cell.count > 0
                     ? "bg-green-500 ring-2 ring-green-300"
-                    : "bg-gray-200 ring-2 ring-[var(--accent-strong)]"
+                    : "bg-[var(--surface-strong)] ring-2 ring-[var(--accent-strong)]"
                   : cell.count >= 3
                     ? "bg-green-500"
                     : cell.count > 0
                       ? "bg-green-300"
-                      : "bg-gray-100"
+                      : "bg-[var(--surface-interactive)]"
               }`}
             />
           )

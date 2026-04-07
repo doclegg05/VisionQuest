@@ -27,14 +27,14 @@ export default function AchievementUnlock({ label, desc, onDone }: AchievementUn
       }`}
     >
       <div
-        className="flex items-center gap-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-yellow-50 px-5 py-4 shadow-[0_20px_50px_rgba(245,158,11,0.2)] backdrop-blur-lg"
+        className="flex items-center gap-4 rounded-2xl border border-[var(--toast-celebration-border)] bg-[var(--toast-celebration-bg)] px-5 py-4 shadow-[0_20px_50px_rgba(211,178,87,0.15)]"
         onClick={() => onDone?.()}
         role="status"
         aria-live="polite"
       >
         <span className="text-3xl">🏅</span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Achievement Unlocked</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--toast-celebration-text)]">Achievement Unlocked</p>
           <p className="mt-0.5 font-display text-lg text-[var(--ink-strong)]">{label}</p>
           <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{desc}</p>
         </div>

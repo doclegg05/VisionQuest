@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { generateStructuredResponse } from "@/lib/gemini";
+import type { AIProvider } from "@/lib/ai";
 import { EMPTY_RESUME, type ResumeCertification, type ResumeContent, normalizeResumeContent } from "@/lib/resume";
 
 const resumeAssistResponseSchema = z.object({
@@ -118,8 +118,8 @@ function buildContextMessage(context: ResumeAssistContext): string {
   ].join("\n");
 }
 
-export async function generateResumeDraft(apiKey: string, context: ResumeAssistContext): Promise<ResumeAssistResponse> {
-  const responseText = await generateStructuredResponse(apiKey, RESUME_ASSIST_PROMPT, [
+export async function generateResumeDraft(provider: AIProvider, context: ResumeAssistContext): Promise<ResumeAssistResponse> {
+  const responseText = await provider.generateStructuredResponse(RESUME_ASSIST_PROMPT, [
     { role: "user", content: buildContextMessage(context) },
   ]);
 

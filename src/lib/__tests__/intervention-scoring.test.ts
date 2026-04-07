@@ -17,8 +17,10 @@ function makeActiveStudent(overrides: Partial<StudentSignals> = {}): StudentSign
     orientationProgress: 1.0,
     openAlertCount: 0,
     highSeverityAlertCount: 0,
+    evidenceGapCount: 0,
     overdueTaskCount: 0,
     stalledGoalCount: 0,
+    unmatchedGoalCount: 0,
     readinessScore: 80,
     ...overrides,
   };
@@ -120,11 +122,13 @@ describe("computeUrgencyScore", () => {
       orientationProgress: 0.0,      // 25 × (1 - 0) = +25
       openAlertCount: 5,             // non-high = 5 - 2 = 3 → 3 × 5 = +15
       highSeverityAlertCount: 2,     // 2 × 20 = +40
+      evidenceGapCount: 0,           // 0 × 8 = +0
       overdueTaskCount: 2,           // 2 × 10 = +20
       stalledGoalCount: 1,           // 1 × 15 = +15
+      unmatchedGoalCount: 1,         // 1 × 10 = +10
       readinessScore: 20,            // 30 - 20 × 0.5 = +20
     });
-    // Expected: 14 + 21 + 25 + 15 + 40 + 20 + 15 + 20 = 170
-    assert.equal(score, 170);
+    // Expected: 14 + 21 + 25 + 15 + 40 + 20 + 15 + 10 + 20 = 180
+    assert.equal(score, 180);
   });
 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
-import { listManagedStudentIds } from "@/lib/classroom";
+import { checkClassCompliance } from "@/lib/class-requirement-compliance";
+import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { goalCountsTowardPlan } from "@/lib/goals";
@@ -30,6 +31,7 @@ interface StudentReadiness {
 export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const classId = url.searchParams.get("classId") ?? undefined;
+  if (classId) await assertStaffCanManageClass(session, classId);
   // This report is a point-in-time snapshot of current student readiness,
   // not a historical report. The month field in the response reflects now.
   const now = new Date();
@@ -71,6 +73,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
           id: true,
           level: true,
           status: true,
+          pathwayId: true,
           createdAt: true,
         },
       },
@@ -87,8 +90,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       // Goal counts
       const planningGoals = s.goals.filter((g) => goalCountsTowardPlan(g.status));
       const completedGoals = s.goals.filter((g) => g.status === "completed");
-      // "confirmed" = goals that count toward the plan
-      const confirmedGoals = planningGoals;
+      const confirmedGoals = s.goals.filter((g) => g.status === "confirmed");
 
       return {
         id: s.id,
@@ -130,6 +132,39 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   const totalCompleted = studentResults.reduce((sum, s) => sum + s.goals.completed, 0);
   const totalConfirmed = studentResults.reduce((sum, s) => sum + s.goals.confirmed, 0);
 
+  // Pathway coverage: how many eligible goals have a pathway assigned?
+  const PATHWAY_ELIGIBLE_LEVELS = ["bhag", "long_term", "monthly"];
+  const PATHWAY_ELIGIBLE_STATUSES = ["confirmed", "active", "in_progress"];
+  let eligibleGoals = 0;
+  let goalsWithPathway = 0;
+  for (const s of students) {
+    for (const g of s.goals) {
+      if (PATHWAY_ELIGIBLE_LEVELS.includes(g.level) && PATHWAY_ELIGIBLE_STATUSES.includes(g.status)) {
+        eligibleGoals++;
+        if (g.pathwayId) goalsWithPathway++;
+      }
+    }
+  }
+
+  // Class requirement compliance (if filtering by class)
+  let requirementCompliance = null;
+  if (classId) {
+    const complianceMap = await checkClassCompliance(classId);
+    const complianceEntries = Array.from(complianceMap.values());
+    if (complianceEntries.length > 0 && complianceEntries[0].requiredCount > 0) {
+      const compliant = complianceEntries.filter((c) => c.compliant).length;
+      requirementCompliance = {
+        totalStudents: complianceEntries.length,
+        compliantStudents: compliant,
+        complianceRate: Math.round((compliant / complianceEntries.length) * 100),
+        totalRequired: complianceEntries[0].requiredCount,
+        averageMet: Math.round(
+          complianceEntries.reduce((sum, c) => sum + c.requiredMet, 0) / complianceEntries.length,
+        ),
+      };
+    }
+  }
+
   return NextResponse.json({
     month: currentMonth,
     snapshotType: "point-in-time",
@@ -146,6 +181,14 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       totalGoals,
       totalCompleted,
       totalConfirmed,
+      pathwayCoverage: {
+        eligibleGoals,
+        goalsWithPathway,
+        coverageRate: eligibleGoals > 0
+          ? Math.round((goalsWithPathway / eligibleGoals) * 100)
+          : 100,
+      },
+      requirementCompliance,
     },
   });
 });

@@ -113,7 +113,7 @@ export default function SpokesReport() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {SUMMARY_KEYS.map((card) => (
-          <div key={card.key} className="rounded-xl border border-gray-200 bg-white p-4">
+          <div key={card.key} className="theme-card rounded-xl p-4">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">{card.label}</p>
             <p className={`mt-2 text-3xl font-bold ${card.tone}`}>{data.summary[card.key]}</p>
           </div>
@@ -121,12 +121,12 @@ export default function SpokesReport() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="theme-card rounded-xl p-5">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Program status mix</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
-              <p className="text-sm font-semibold text-slate-700">Referred</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">{data.summary.referred}</p>
+            <div className="theme-card-subtle rounded-lg bg-[var(--surface-soft)] p-4">
+              <p className="text-sm font-semibold text-[var(--ink-strong)]">Referred</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.referred}</p>
             </div>
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
               <p className="text-sm font-semibold text-emerald-700">Completed</p>
@@ -153,36 +153,36 @@ export default function SpokesReport() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Attention queue</p>
-              <h3 className="mt-2 text-lg font-semibold text-gray-900">Students needing follow-through</h3>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Students needing follow-through</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {data.attentionQueue.length} shown
             </span>
           </div>
 
           {data.attentionQueue.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-500">No immediate SPOKES follow-through items right now.</p>
+            <p className="mt-4 text-sm text-[var(--ink-muted)]">No immediate SPOKES follow-through items right now.</p>
           ) : (
             <div className="mt-4 space-y-3">
               {data.attentionQueue.map((item) => (
                 <a
                   key={item.id}
                   href={item.studentId ? `/teacher/students/${item.studentId}/spokes` : "/teacher/manage"}
-                  className="block rounded-lg border border-gray-100 p-4 transition-colors hover:border-[rgba(18,38,63,0.18)]"
+                  className="block theme-card-subtle rounded-lg p-4 transition-colors hover:border-[rgba(18,38,63,0.18)]"
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{item.studentName}</p>
+                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{item.studentName}</p>
                       <p className="mt-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {item.studentId || "Unlinked record"} • {item.status.replaceAll("_", " ")}
                       </p>
                     </div>
                     {item.employmentFollowUpsDue > 0 ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
                         {item.employmentFollowUpsDue} follow-up due
                       </span>
                     ) : null}
@@ -190,20 +190,20 @@ export default function SpokesReport() {
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Orientation</p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Orientation</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--ink-strong)]">
                         {item.orientationDone}/{item.orientationTotal}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Files</p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Files</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--ink-strong)]">
                         {item.filesDone}/{item.filesTotal}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Modules</p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Modules</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--ink-strong)]">
                         {item.modulesDone}/{item.modulesTotal}
                       </p>
                     </div>
@@ -213,7 +213,7 @@ export default function SpokesReport() {
                     {item.reasons.map((reason) => (
                       <span
                         key={reason}
-                        className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-strong)]"
+                        className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-1 text-xs font-medium text-[var(--ink-strong)]"
                       >
                         {reason}
                       </span>

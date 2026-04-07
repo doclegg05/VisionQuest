@@ -523,7 +523,7 @@ export default function MountainProgress({
       {/* Tooltip overlay */}
       {activeMilestone && (
         <div
-          className="pointer-events-none absolute z-10 rounded-xl border border-white/20 bg-[rgba(10,20,40,0.85)] px-3 py-2 text-xs text-white shadow-lg backdrop-blur-sm"
+          className="pointer-events-none absolute z-10 rounded-xl border border-white/20 bg-[rgba(10,20,40,0.85)] px-3 py-2 text-xs text-white shadow-lg"
           style={{
             top: tooltipPos.y,
             left: tooltipPos.x,

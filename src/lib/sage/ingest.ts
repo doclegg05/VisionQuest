@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { generateResponse } from "@/lib/gemini";
+import { GeminiProvider } from "@/lib/ai/gemini-provider";
 import { extractText, containsPII } from "@/lib/sage/extract";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
@@ -162,11 +162,10 @@ const SUMMARIZE_PROMPT = `Summarize this SPOKES program document in 2-3 sentence
 
 async function generateSummary(
   text: string,
-  apiKey: string,
+  provider: GeminiProvider,
 ): Promise<string | null> {
   try {
-    const result = await generateResponse(
-      apiKey,
+    const result = await provider.generateResponse(
       SUMMARIZE_PROMPT,
       [{ role: "user", content: text }],
     );
@@ -233,6 +232,7 @@ export async function syncSageDocuments(
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is required for Sage document sync");
   }
+  const gemini = new GeminiProvider(apiKey);
 
   const overrides = await loadOverrides();
   const allFiles = await collectFiles(DOCS_ROOT);
@@ -289,7 +289,7 @@ export async function syncSageDocuments(
               result.errors.push(`${relativePath}: possible PII detected`);
               continue;
             }
-            sageContextNote = await generateSummary(extraction.text, apiKey);
+            sageContextNote = await generateSummary(extraction.text, gemini);
             geminiUsed++;
             await delay(500);
           }

@@ -83,3 +83,11 @@ Read when deciding what to build, cut, simplify, or automate.
 - ~~No CSP headers configured~~ — Fixed (2026-04-01): nonce-based CSP in `src/proxy.ts`
 - docs-upload/sage-context/ is intended for RAG grounding documents but is not yet populated or integrated into Sage AI
 - Render free tier may not execute cron jobs (3 declared in render.yaml — verify)
+
+## Design Context
+- **Full design context**: See [.impeccable.md](./.impeccable.md) for complete design principles, color system, typography, and accessibility requirements
+- **Brand personality**: Bold, Supportive, Practical — direct, action-oriented ally
+- **Emotional goals**: Confidence, Momentum, Safety, Pride
+- **Reference**: Khan Academy — warm, educational, progress-focused, not childish
+- **Accessibility**: WCAG AA + low literacy focus (plain language, visual cues, large touch targets, 6th-grade reading level)
+- **Design principles**: (1) Clarity over cleverness (2) Progress is visible (3) Warm but not childish (4) Action-first surfaces (5) Inclusive by default

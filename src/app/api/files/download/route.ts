@@ -2,19 +2,26 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
 import { isStaffRole, withAuth } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 
 export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  // Students can download their own files; staff can download any file
+  // Students can only download their own files
   const where = isStaffRole(session.role)
     ? { id }
     : { id, studentId: session.id };
 
   const file = await prisma.fileUpload.findFirst({ where });
   if (!file) return NextResponse.json({ error: "File not found" }, { status: 404 });
+
+  // Teachers can only download files belonging to students they manage;
+  // admins can download any file
+  if (session.role === "teacher") {
+    await assertStaffCanManageStudent(session, file.studentId);
+  }
 
   const result = await downloadFile(file.storageKey);
   if (!result) return NextResponse.json({ error: "File not found in storage" }, { status: 404 });

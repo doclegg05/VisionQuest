@@ -18,7 +18,7 @@ const NOTE_COLOR_OPTIONS = [
   { id: "pink", label: "Pink", className: "bg-pink-200 border-pink-300" },
   { id: "blue", label: "Blue", className: "bg-sky-200 border-sky-300" },
   { id: "green", label: "Green", className: "bg-emerald-200 border-emerald-300" },
-  { id: "white", label: "White", className: "bg-white border-gray-300" },
+  { id: "white", label: "White", className: "bg-[var(--surface-raised)] border-[var(--border-strong)]" },
 ];
 
 export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarProps) {
@@ -134,7 +134,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+          className="inline-flex items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
         >
           📷 {uploading ? "Uploading..." : "Add Image"}
         </button>
@@ -149,7 +149,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         {/* Add Note */}
         <button
           onClick={() => { setShowNoteForm(!showNoteForm); setShowGoalPicker(false); }}
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           📝 Add Note
         </button>
@@ -161,7 +161,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             setShowNoteForm(false);
             if (!showGoalPicker) loadGoals();
           }}
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           🎯 Link Goal
         </button>
@@ -169,7 +169,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
 
       {/* Note form popover */}
       {showNoteForm && (
-        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xl backdrop-blur-lg z-50">
+        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xl-lg z-50">
           <p className="text-xs font-semibold text-[var(--ink-muted)] mb-2">New Note</p>
           <textarea
             value={noteText}
@@ -179,11 +179,11 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             className="textarea-field w-full resize-none text-sm"
             autoFocus
           />
-          <p className="mt-1 text-right text-[10px] text-[var(--ink-muted)]">{noteText.length}/200</p>
+          <p className="mt-1 text-right text-xs text-[var(--ink-muted)]">{noteText.length}/200</p>
 
           {/* Color picker */}
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] text-[var(--ink-muted)]">Color:</span>
+            <span className="text-xs text-[var(--ink-muted)]">Color:</span>
             {NOTE_COLOR_OPTIONS.map((c) => (
               <button
                 key={c.id}
@@ -206,7 +206,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             </button>
             <button
               onClick={() => setShowNoteForm(false)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-gray-50"
+              className="theme-card-subtle rounded-lg px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
             >
               Cancel
             </button>
@@ -216,7 +216,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
 
       {/* Goal picker popover */}
       {showGoalPicker && (
-        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xl backdrop-blur-lg z-50">
+        <div className="absolute bottom-full left-0 mb-3 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xl-lg z-50">
           <p className="text-xs font-semibold text-[var(--ink-muted)] mb-2">Link a Goal</p>
           {loadingGoals ? (
             <p className="text-xs text-[var(--ink-muted)]">Loading goals...</p>
@@ -228,7 +228,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
                 <button
                   key={goal.id}
                   onClick={() => handleLinkGoal(goal)}
-                  className="w-full rounded-lg border border-[var(--border)] p-2.5 text-left text-xs transition-colors hover:bg-[rgba(15,154,146,0.06)] hover:border-[rgba(15,154,146,0.2)]"
+                  className="w-full theme-card-subtle rounded-lg p-2.5 text-left text-xs transition-colors hover:bg-[rgba(15,154,146,0.06)] hover:border-[rgba(15,154,146,0.2)]"
                 >
                   <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[9px] font-semibold text-[var(--accent-secondary)]">
                     {GOAL_LEVEL_META[goal.level as keyof typeof GOAL_LEVEL_META]?.label || goal.level}
@@ -240,7 +240,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
           )}
           <button
             onClick={() => setShowGoalPicker(false)}
-            className="mt-3 rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-gray-50 w-full"
+            className="mt-3 theme-card-subtle rounded-lg px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] w-full"
           >
             Cancel
           </button>

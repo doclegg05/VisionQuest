@@ -1,27 +1,23 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { streamResponse } from "@/lib/gemini";
+import { getProvider } from "@/lib/ai";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
-import { withAuth, isStaffRole } from "@/lib/api-error";
+import { isStaffRole } from "@/lib/api-error";
+import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
-import { resolveApiKey } from "@/lib/chat/api-key";
-import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage } from "@/lib/chat/conversation";
+import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
-import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { buildStudentStatusSignals, buildStudentStatusSummary } from "@/lib/student-status";
+import { getStudentPromptContext } from "@/lib/chat/context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
-import { analyzeSkillGaps } from "@/lib/sage/skill-gap";
-import { getLearningPathway, buildPathwayContextString } from "@/lib/learning-pathway";
-import { getOrCreateCoachingArc, buildArcContextString } from "@/lib/sage/coaching-arcs";
+import { checkTokenQuota } from "@/lib/llm-usage";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
-export const POST = withAuth(async (session, req: NextRequest) => {
+export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;
@@ -57,8 +53,32 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
   }
 
-  // Resolve API key
-  const apiKey = await resolveApiKey(session.id);
+  // Check token quota before making AI call
+  const quota = await checkTokenQuota(session.id, session.role);
+  if (!quota.allowed) {
+    return new Response(
+      JSON.stringify({ error: quota.warning }),
+      { status: 429, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Resolve AI provider
+  let provider;
+  try {
+    provider = await getProvider(session.id);
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
+    const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
+
+    return new Response(
+      JSON.stringify({
+        error: isOffline
+          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
+          : errorMsg,
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   // Get or create conversation (teacher vs student path)
   const conversation = isTeacher
@@ -77,231 +97,37 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       userMessage,
     });
   } else {
-    const [goals, orientationItems, formSubmissions, orientationProgress, careerDiscovery, priorSummaries] = await Promise.all([
-      prisma.goal.findMany({
-        where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
-      }),
-      prisma.orientationItem.findMany({
-        select: {
-          id: true,
-          label: true,
-          required: true,
-        },
-        orderBy: { sortOrder: "asc" },
-      }),
-      prisma.formSubmission.findMany({
-        where: { studentId: session.id },
-        select: {
-          formId: true,
-          status: true,
-          updatedAt: true,
-          reviewedAt: true,
-          notes: true,
-        },
-      }),
-      prisma.orientationProgress.findMany({
-        where: { studentId: session.id },
-        select: {
-          itemId: true,
-          completed: true,
-          completedAt: true,
-        },
-      }),
-      prisma.careerDiscovery.findUnique({
-        where: { studentId: session.id },
-        select: {
-          status: true,
-          sageSummary: true,
-          topClusters: true,
-          hollandCode: true,
-          riasecScores: true,
-          nationalClusters: true,
-          transferableSkills: true,
-          workValues: true,
-        },
-      }),
-      prisma.conversation.findMany({
-        where: {
-          studentId: session.id,
-          id: { not: conversation.id },
-          summary: { not: null },
-        },
-        orderBy: { updatedAt: "desc" },
-        take: 3,
-        select: { summary: true, module: true, updatedAt: true },
-      }),
-    ]);
-    const goalsByLevel: Record<string, string> = {};
-    for (const g of goals) goalsByLevel[g.level] = g.content;
-    const studentStatusSummary = buildStudentStatusSummary(
-      buildStudentStatusSignals({
-        formSubmissions,
-        orientationItems,
-        orientationProgress,
-      }),
-      { includePositiveSummary: conversation.stage === "orientation" || conversation.stage === "onboarding" },
+    const promptContext = await getStudentPromptContext(
+      session.id,
+      conversation.id,
+      conversation.stage as ConversationStage,
     );
 
-    // Build discovery context for the prompt
-    const isDiscoveryStage = conversation.stage === "discovery";
-    const discoverySummary = careerDiscovery?.sageSummary && careerDiscovery.topClusters.length > 0
-      ? `${careerDiscovery.sageSummary} (Top pathways: ${careerDiscovery.topClusters.join(", ")})`
-      : undefined;
-
-    // Build skill gap context for goal-setting stages
-    const goalSettingStages = ["bhag", "monthly", "weekly", "daily"];
-    let skillGapContext: string | undefined;
-    if (goalSettingStages.includes(conversation.stage) && careerDiscovery?.status === "complete") {
-      try {
-        const gapAnalysis = await analyzeSkillGaps(session.id);
-        if (gapAnalysis) {
-          const haveList = gapAnalysis.skills
-            .filter((s) => s.status === "have")
-            .map((s) => s.name)
-            .join(", ");
-          const buildingList = gapAnalysis.skills
-            .filter((s) => s.status === "building")
-            .map((s) => `${s.name} (via ${s.buildingVia ?? "certification"})`)
-            .join(", ");
-          const needList = gapAnalysis.skills
-            .filter((s) => s.status === "need" && s.importance === "essential")
-            .map((s) => s.name)
-            .join(", ");
-          skillGapContext = [
-            `SKILL GAP ANALYSIS for ${gapAnalysis.targetClusterName}:`,
-            haveList ? `The student HAS these skills: ${haveList}.` : "",
-            buildingList ? `They are BUILDING: ${buildingList}.` : "",
-            needList
-              ? `They NEED (essential gaps): ${needList}. When setting goals, prioritize closing these essential skill gaps.`
-              : "No essential skill gaps — focus on reinforcing and applying existing skills.",
-          ]
-            .filter(Boolean)
-            .join(" ");
-        }
-      } catch {
-        // Skill gap analysis is non-critical — never block the chat response
-      }
-    }
-
-    // Build pathway context for action-oriented stages
-    const pathwayStages = ["daily", "weekly", "tasks"];
-    let pathwayContext: string | undefined;
-    if (pathwayStages.includes(conversation.stage)) {
-      try {
-        const pathway = await getLearningPathway(session.id);
-        if (pathway) {
-          pathwayContext = buildPathwayContextString(pathway);
-        }
-      } catch {
-        // Pathway context is non-critical — never block the chat response
-      }
-    }
-
-    // Build coaching arc context — injected into all stages
-    let coachingArcContext: string | undefined;
-    try {
-      const arc = await getOrCreateCoachingArc(session.id);
-      if (arc.status === "active") {
-        coachingArcContext = buildArcContextString(arc);
-      }
-    } catch {
-      // Arc context is non-critical — never block chat response
-    }
-
-    // Build career profile context for profile review stage
-    let careerProfileContext: string | undefined;
-    if (conversation.stage === "career_profile_review" && careerDiscovery?.status === "complete") {
-      const parts: string[] = [];
-      if (careerDiscovery.hollandCode) {
-        parts.push(`Holland Code: ${careerDiscovery.hollandCode}`);
-      }
-      if (careerDiscovery.riasecScores) {
-        try {
-          const scores = JSON.parse(careerDiscovery.riasecScores) as Record<string, number>;
-          const scoreLines = Object.entries(scores)
-            .sort(([, a], [, b]) => b - a)
-            .map(([k, v]) => `  ${k}: ${Math.round(v * 100)}%`)
-            .join("\n");
-          parts.push(`RIASEC Scores:\n${scoreLines}`);
-        } catch {
-          // malformed JSON — skip
-        }
-      }
-      if (careerDiscovery.transferableSkills) {
-        try {
-          const skills = JSON.parse(careerDiscovery.transferableSkills) as Array<{ skill: string; category: string; evidence: string }>;
-          if (skills.length > 0) {
-            const skillLines = skills.map((s) => `  - ${s.skill} (${s.category}): ${s.evidence}`).join("\n");
-            parts.push(`Transferable Skills:\n${skillLines}`);
-          }
-        } catch {
-          // malformed JSON — skip
-        }
-      }
-      if (careerDiscovery.workValues) {
-        try {
-          const values = JSON.parse(careerDiscovery.workValues) as Array<{ value: string; importance: string }>;
-          if (values.length > 0) {
-            const valueLines = values.slice(0, 5).map((v) => `  - ${v.value} (${v.importance})`).join("\n");
-            parts.push(`Work Values:\n${valueLines}`);
-          }
-        } catch {
-          // malformed JSON — skip
-        }
-      }
-      if (careerDiscovery.nationalClusters) {
-        try {
-          const clusters = JSON.parse(careerDiscovery.nationalClusters) as Array<{ cluster_name: string; score: number }>;
-          if (clusters.length > 0) {
-            const top3 = clusters.slice().sort((a, b) => b.score - a.score).slice(0, 3);
-            const clusterLines = top3.map((c) => `  - ${c.cluster_name} (${Math.round(c.score * 100)}% match)`).join("\n");
-            parts.push(`Top Career Clusters:\n${clusterLines}`);
-          }
-        } catch {
-          // malformed JSON — skip
-        }
-      }
-      if (careerDiscovery.sageSummary) {
-        parts.push(`Assessment Summary: ${careerDiscovery.sageSummary}`);
-      }
-      careerProfileContext = parts.join("\n\n");
-    }
-
-    // Build prior conversation context block from summaries of recent other sessions
-    let priorConversationContext = "";
-    if (priorSummaries.length > 0) {
-      const lines = priorSummaries.map((s) => {
-        const date = s.updatedAt.toISOString().slice(0, 10);
-        return `Session from ${date} (${s.module}): ${s.summary}`;
-      });
-      priorConversationContext =
-        `[PREVIOUS_CONVERSATIONS_START]\n${lines.join("\n")}\n[PREVIOUS_CONVERSATIONS_END]\n\n`;
-    }
-
     systemPrompt =
-      priorConversationContext +
+      promptContext.priorConversationContext +
       buildSystemPrompt(conversation.stage as ConversationStage, {
         studentName: session.displayName,
-        bhag: goalsByLevel["bhag"],
-        monthly: goalsByLevel["monthly"],
-        weekly: goalsByLevel["weekly"],
-        daily: goalsByLevel["daily"],
-        goals_summary: goals.length > 0
-          ? goals.map((g) => `- ${g.level.toUpperCase()}: ${g.content}`).join("\n")
-          : "No planning goals set yet.",
-        student_status_summary: studentStatusSummary || undefined,
+        bhag: promptContext.goalsByLevel["bhag"],
+        monthly: promptContext.goalsByLevel["monthly"],
+        weekly: promptContext.goalsByLevel["weekly"],
+        daily: promptContext.goalsByLevel["daily"],
+        goals_summary: promptContext.goalsSummary,
+        student_status_summary: promptContext.studentStatusSummary,
         userMessage,
-        career_clusters: isDiscoveryStage ? formatClustersForPrompt() : undefined,
-        discovery_summary: discoverySummary,
-        career_profile_context: careerProfileContext,
-        skillGapContext,
-        pathwayContext,
-        coachingArcContext,
+        career_clusters:
+          conversation.stage === "discovery"
+            ? formatClustersForPrompt()
+            : undefined,
+        discovery_summary: promptContext.discoverySummary,
+        career_profile_context: promptContext.careerProfileContext,
+        skillGapContext: promptContext.skillGapContext,
+        pathwayContext: promptContext.pathwayContext,
+        coachingArcContext: promptContext.coachingArcContext,
       });
   }
 
   // Inject document-based context from ProgramDocument (RAG layer)
-  const documentContext = await getDocumentContext(userMessage);
+  const documentContext = await getDocumentContext(userMessage, isTeacher ? "staff" : "student");
   if (documentContext) {
     systemPrompt += documentContext;
   }
@@ -315,12 +141,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
   }
 
-  // Format message history for Gemini
+  // Format message history for Gemini, using compacted context when available
+  const conversationContext = await getConversationContext(conversation.id);
   const allMessages = [
-    ...conversation.messages.map((m) => ({
-      role: (m.role === "user" ? "user" : "model") as "user" | "model",
-      content: m.content,
-    })),
+    ...conversationContext.messages,
     { role: "user" as const, content: userMessage },
   ];
 
@@ -333,13 +157,23 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       try {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ conversationId: conversation.id })}\n\n`));
 
-        for await (const chunk of streamResponse(apiKey, systemPrompt, allMessages)) {
+        // Send soft-cap warning as an SSE event before the AI response
+        if (quota.warning) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ quotaWarning: quota.warning })}\n\n`));
+        }
+
+        for await (const chunk of provider.streamResponse(systemPrompt, allMessages)) {
           fullResponse += chunk;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
         }
 
         // Save assistant message
         await saveMessage(conversation.id, session.id, "assistant", fullResponse);
+
+        // Rolling summary compaction (fire-and-forget, both teacher and student)
+        void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
+          logger.error("Summary compaction failed", { conversationId: conversation.id, error: String(err) }),
+        );
 
         // Student-only post-processing: XP, goal extraction, stage updates
         if (!isTeacher) {
@@ -360,10 +194,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
             conversationId: conversation.id,
             conversationTitle: conversation.title,
             conversationStage: conversation.stage,
-            conversationSummary: conversation.summary ?? null,
             fullResponse,
             studentId: session.id,
-            apiKey,
             allMessages,
           }).catch((err) => logger.error("Post-response error", { error: String(err) }));
         }

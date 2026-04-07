@@ -208,7 +208,7 @@ function SkillsSection({ skills }: { skills: TransferableSkill[] }) {
         {Object.entries(grouped).map(([category, items]) => (
           <div key={category}>
             <span
-              className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize ${CATEGORY_COLORS[category] ?? "bg-slate-100 text-slate-700"}`}
+              className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${CATEGORY_COLORS[category] ?? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"}`}
             >
               {category}
             </span>
@@ -216,7 +216,7 @@ function SkillsSection({ skills }: { skills: TransferableSkill[] }) {
               {items.map((s) => (
                 <div
                   key={s.skill}
-                  className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-white/70 p-3"
+                  className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)]/70 p-3"
                 >
                   <p className="text-sm font-semibold text-[var(--ink-strong)]">{s.skill}</p>
                   {s.evidence && (
@@ -303,11 +303,11 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
           return (
             <div
               key={nc.cluster_name}
-              className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/70 p-4"
+              className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)]/70 p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(0,123,175,0.12)] text-[11px] font-bold text-[var(--primary)]">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(0,123,175,0.12)] text-xs font-bold text-[var(--primary)]">
                     {rank + 1}
                   </span>
                   <p className="font-semibold text-[var(--ink-strong)]">{nc.cluster_name}</p>
@@ -326,7 +326,7 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
                     {spokesMatch.sampleJobs.slice(0, 4).map((job) => (
                       <span
                         key={job}
-                        className="rounded-full border border-[rgba(18,38,63,0.1)] bg-[rgba(18,38,63,0.04)] px-2.5 py-0.5 text-[11px] text-[var(--ink-muted)]"
+                        className="rounded-full border border-[rgba(18,38,63,0.1)] bg-[rgba(18,38,63,0.04)] px-2.5 py-0.5 text-xs text-[var(--ink-muted)]"
                       >
                         {job}
                       </span>

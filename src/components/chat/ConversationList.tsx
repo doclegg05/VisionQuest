@@ -70,7 +70,7 @@ export default function ConversationList({
 
       <div className="flex-1 overflow-y-auto p-3">
         {conversations.length === 0 ? (
-          <div className="rounded-[1.2rem] border border-dashed border-white/12 bg-white/5 p-4 text-center text-sm text-white/75">
+          <div className="rounded-[1.2rem] border border-dashed border-white/12 bg-[var(--surface-raised)]/5 p-4 text-center text-sm text-white/75">
             No conversations yet. Start one!
           </div>
         ) : (
@@ -81,12 +81,12 @@ export default function ConversationList({
               type="button"
               className={`mb-2 w-full rounded-[1.15rem] border px-4 py-3.5 text-left transition-colors
                 ${activeId === conv.id
-                  ? "border-white/40 bg-white text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.08)]"
-                  : "border-white/8 bg-white/6 text-white/82 hover:bg-white/10"
+                  ? "border-white/40 bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.08)]"
+                  : "border-white/8 bg-[var(--surface-raised)]/6 text-white/82 hover:bg-[var(--surface-raised)]/10"
                 }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className={`min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                <span className={`min-w-0 flex-1 text-xs font-semibold uppercase tracking-[0.18em] ${
                   activeId === conv.id ? "text-[var(--accent-strong)]" : "text-white/75"
                 }`}>
                   {STAGE_LABELS[conv.stage] || conv.stage}

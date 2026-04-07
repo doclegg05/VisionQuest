@@ -30,7 +30,7 @@ export default function PlatformCard({
   );
 
   const gradientClass =
-    CATEGORY_COLORS[platform.category] || "from-gray-400 to-gray-500";
+    CATEGORY_COLORS[platform.category] || "from-[var(--ink-faint)] to-[var(--ink-muted)]";
 
   /** Stop inner interactive elements from triggering the card-level link */
   function stopPropagation(e: MouseEvent) {

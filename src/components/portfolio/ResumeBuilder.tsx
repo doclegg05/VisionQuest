@@ -19,9 +19,9 @@ interface ResumeAssistResponse {
 }
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 const SECONDARY_BUTTON_CLASS =
-  "rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
 
 function sanitizeFileName(value: string) {
   return value
@@ -351,7 +351,7 @@ export default function ResumeBuilder() {
     if (file) void handleUpload(file);
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading resume...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading resume...</p>;
 
   return (
     <div className="space-y-6">
@@ -420,7 +420,7 @@ export default function ResumeBuilder() {
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h4 className="text-sm font-semibold text-gray-700">Upload Existing Resume</h4>
+            <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Upload Existing Resume</h4>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               Have a resume already? Upload it and Sage will extract the content, rewrite it with ATS-friendly language,
               and populate the builder below. Supports PDF and Word documents.
@@ -473,7 +473,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h4 className="text-sm font-semibold text-gray-700">Write with Sage</h4>
+            <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Write with Sage</h4>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               Give Sage a target role, job posting summary, or tone request. It will rewrite the resume using only
               information already stored in VisionQuest and the facts already on this page.
@@ -494,7 +494,7 @@ export default function ResumeBuilder() {
           onChange={(event) => setAssistantPrompt(event.target.value)}
           placeholder="Example: Tailor this for entry-level office administrator roles. Highlight customer service, Microsoft Office, reliability, and any training or certifications."
           rows={4}
-          className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="mt-4 w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
 
         {assistantMessage ? (
@@ -516,13 +516,13 @@ export default function ResumeBuilder() {
       </div>
 
       <div className="surface-section p-5">
-        <h4 className="mb-3 text-sm font-semibold text-gray-700">Header</h4>
+        <h4 className="mb-3 text-sm font-semibold text-[var(--ink-strong)]">Header</h4>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Display name
             </label>
-            <input value={displayName} readOnly className={`${INPUT_CLASS} bg-gray-50 text-gray-500`} />
+            <input value={displayName} readOnly className={`${INPUT_CLASS} bg-[var(--surface-soft)] text-[var(--ink-muted)]`} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
@@ -595,18 +595,18 @@ export default function ResumeBuilder() {
       </div>
 
       <div className="surface-section p-5">
-        <h4 className="mb-2 text-sm font-semibold text-gray-700">Professional Summary</h4>
+        <h4 className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">Professional Summary</h4>
         <textarea
           value={resume.objective}
           onChange={(event) => setResume((current) => ({ ...current, objective: event.target.value }))}
           placeholder="Write 2-4 lines summarizing the kind of work you want, the strengths you bring, and the training or experience that supports you."
           rows={5}
-          className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
       <div className="surface-section p-5">
-        <h4 className="mb-2 text-sm font-semibold text-gray-700">Skills</h4>
+        <h4 className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">Skills</h4>
         <div className="mb-3 flex flex-wrap gap-2">
           {resume.skills.map((skill, index) => (
             <span
@@ -634,7 +634,7 @@ export default function ResumeBuilder() {
             placeholder="Add a skill such as Microsoft Excel, customer service, scheduling, or inventory tracking"
             className={`${INPUT_CLASS} flex-1`}
           />
-          <button type="button" onClick={addSkill} className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200">
+          <button type="button" onClick={addSkill} className="rounded-lg bg-[var(--surface-interactive)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-strong)]">
             Add Skill
           </button>
         </div>
@@ -642,7 +642,7 @@ export default function ResumeBuilder() {
 
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold text-gray-700">Work Experience</h4>
+          <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Work Experience</h4>
           <button type="button" onClick={addExperience} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
             Add Experience
           </button>
@@ -652,7 +652,7 @@ export default function ResumeBuilder() {
             <p className="text-sm text-[var(--ink-muted)]">Add jobs, volunteer roles, internships, or program work that shows readiness.</p>
           ) : null}
           {resume.experience.map((item, index) => (
-            <div key={`experience-${index}`} className="rounded-xl border border-gray-100 p-4">
+            <div key={`experience-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Experience {index + 1}</p>
                 <button type="button" onClick={() => removeExperience(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
@@ -690,7 +690,7 @@ export default function ResumeBuilder() {
                 onChange={(event) => updateExperience(index, "description", event.target.value)}
                 rows={4}
                 placeholder={"Use short bullet lines, for example:\n- Helped customers with questions and scheduling\n- Organized records and completed data entry accurately"}
-                className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-3 w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           ))}
@@ -699,7 +699,7 @@ export default function ResumeBuilder() {
 
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold text-gray-700">Education</h4>
+          <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Education</h4>
           <button type="button" onClick={addEducation} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
             Add Education
           </button>
@@ -709,7 +709,7 @@ export default function ResumeBuilder() {
             <p className="text-sm text-[var(--ink-muted)]">Add schools, training programs, GED/HSE work, or structured coursework.</p>
           ) : null}
           {resume.education.map((item, index) => (
-            <div key={`education-${index}`} className="rounded-xl border border-gray-100 p-4">
+            <div key={`education-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Education {index + 1}</p>
                 <button type="button" onClick={() => removeEducation(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
@@ -749,7 +749,7 @@ export default function ResumeBuilder() {
 
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold text-gray-700">Certifications</h4>
+          <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Certifications</h4>
           <button type="button" onClick={addCertification} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
             Add Certification
           </button>
@@ -759,7 +759,7 @@ export default function ResumeBuilder() {
             <p className="text-sm text-[var(--ink-muted)]">List completed certifications or credentials that should appear on the resume.</p>
           ) : null}
           {resume.certifications.map((item, index) => (
-            <div key={`certification-${index}`} className="rounded-xl border border-gray-100 p-4">
+            <div key={`certification-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Certification {index + 1}</p>
                 <button type="button" onClick={() => removeCertification(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
@@ -792,13 +792,13 @@ export default function ResumeBuilder() {
       </div>
 
       <div className="surface-section p-5">
-        <h4 className="mb-2 text-sm font-semibold text-gray-700">References</h4>
+        <h4 className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">References</h4>
         <textarea
           value={resume.references}
           onChange={(event) => setResume((current) => ({ ...current, references: event.target.value }))}
           placeholder="Usually this should be: Available upon request"
           rows={3}
-          className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 

@@ -18,7 +18,13 @@ export const POST = withTeacherAuth(async (
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
   const priority = typeof body.priority === "string" ? body.priority.trim() : "normal";
-  const dueAt = typeof body.dueAt === "string" && body.dueAt ? new Date(body.dueAt) : null;
+  const rawDueAt = typeof body.dueAt === "string" ? body.dueAt.trim() : "";
+  // Date-only strings (YYYY-MM-DD) parse as UTC midnight, which can shift to
+  // the previous day in negative-offset timezones. Append T12:00:00 to keep
+  // the date stable across all timezones.
+  const dueAt = rawDueAt
+    ? new Date(rawDueAt.length === 10 ? `${rawDueAt}T12:00:00` : rawDueAt)
+    : null;
   const appointmentId = typeof body.appointmentId === "string" ? body.appointmentId.trim() : "";
 
   if (!title) {

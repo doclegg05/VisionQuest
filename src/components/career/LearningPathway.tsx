@@ -33,7 +33,7 @@ const STATUS_CONFIG = {
     cardCls: "",
   },
   not_started: {
-    circleCls: "border-[rgba(18,38,63,0.2)] bg-white text-[var(--ink-muted)]",
+    circleCls: "border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)] text-[var(--ink-muted)]",
     icon: <span className="h-2 w-2 rounded-full bg-[rgba(18,38,63,0.2)]" />,
     badgeCls: "bg-[var(--muted)] text-[var(--ink-muted)]",
     badgeLabel: "Not Started",
@@ -117,7 +117,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
               {/* Step card */}
               <div
                 className={[
-                  "mb-3 min-w-0 flex-1 rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-white/60 px-4 py-3",
+                  "mb-3 min-w-0 flex-1 rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)]/60 px-4 py-3",
                   config.cardCls,
                   step.isCurrent
                     ? "border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.04)]"
@@ -132,7 +132,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
                       </span>
                       {step.name}
                       {step.isCurrent && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                        <span className="ml-2 inline-flex items-center rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">
                           You are here
                         </span>
                       )}
@@ -158,7 +158,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
                     </span>
                     <span
                       className={[
-                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        "rounded-full px-2 py-0.5 text-xs font-semibold",
                         config.badgeCls,
                       ].join(" ")}
                     >

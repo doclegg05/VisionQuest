@@ -27,14 +27,14 @@ export default function XpToast({ amount, label, onDone }: XpToastProps) {
       }`}
     >
       <div
-        className="flex items-center gap-2 rounded-2xl border border-[rgba(249,115,22,0.2)] bg-[rgba(255,255,255,0.92)] px-4 py-3 shadow-[0_20px_50px_rgba(249,115,22,0.15)] backdrop-blur-lg"
+        className="flex items-center gap-2 rounded-2xl border border-[rgba(249,115,22,0.2)] bg-[rgba(255,255,255,0.92)] px-4 py-3 shadow-[0_20px_50px_rgba(249,115,22,0.15)]"
         role="status"
         aria-live="polite"
       >
         <span className="text-lg">⚡</span>
         <div>
           <p className="text-sm font-bold text-[var(--accent-strong)]">+{amount} XP</p>
-          {label && <p className="text-[10px] text-[var(--ink-muted)]">{label}</p>}
+          {label && <p className="text-xs text-[var(--ink-muted)]">{label}</p>}
         </div>
       </div>
     </div>

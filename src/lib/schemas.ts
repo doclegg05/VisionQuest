@@ -51,6 +51,16 @@ export const registerTeacherSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
 });
 
+// ─── Staff Registration Schema ──────────────────────────────────────────────
+
+export const registerStaffSchema = z.object({
+  registrationKey: z.string().min(1, "Registration key is required."),
+  role: z.enum(["teacher", "admin"], { message: "Role must be teacher or admin." }),
+  displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
+  email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
+});
+
 // ─── Password Reset Schema ─────────────────────────────────────────────────
 
 export const resetPasswordSchema = z.object({

@@ -13,19 +13,27 @@ export default function WizardStepIndicator({
 }: WizardStepIndicatorProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
+      <div
+        className="flex items-center gap-1.5"
+        role="progressbar"
+        aria-valuenow={currentStep + 1}
+        aria-valuemin={1}
+        aria-valuemax={totalSteps}
+        aria-label={`Step ${currentStep + 1} of ${totalSteps}: ${currentTitle}`}
+      >
         {Array.from({ length: totalSteps }, (_, i) => {
           const isComplete = i < currentStep;
           const isCurrent = i === currentStep;
           return (
             <div key={i} className="flex items-center gap-1.5">
               <div
+                aria-current={isCurrent ? "step" : undefined}
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   isComplete
                     ? "bg-emerald-500 text-white"
                     : isCurrent
                       ? "bg-[var(--ink-strong)] text-white"
-                      : "bg-gray-200 text-gray-400"
+                      : "bg-[var(--surface-strong)] text-[var(--ink-faint)]"
                 }`}
               >
                 {isComplete ? "✓" : i + 1}
@@ -33,7 +41,7 @@ export default function WizardStepIndicator({
               {i < totalSteps - 1 && (
                 <div
                   className={`h-0.5 w-4 rounded-full transition-colors sm:w-6 ${
-                    isComplete ? "bg-emerald-500" : "bg-gray-200"
+                    isComplete ? "bg-emerald-500" : "bg-[var(--surface-strong)]"
                   }`}
                 />
               )}
