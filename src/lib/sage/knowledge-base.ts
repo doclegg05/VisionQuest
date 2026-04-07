@@ -364,6 +364,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 
 interface SageDocument {
+  id: string;
   title: string;
   sageContextNote: string | null;
   certificationId: string | null;
@@ -375,6 +376,7 @@ async function loadSageDocuments(): Promise<SageDocument[]> {
     prisma.programDocument.findMany({
       where: { usedBySage: true, isActive: true },
       select: {
+        id: true,
         title: true,
         sageContextNote: true,
         certificationId: true,
@@ -466,7 +468,23 @@ function scoreSnippet(snippet: SageSnippetRow, messageLower: string): number {
   return score;
 }
 
-export async function getDocumentContext(userMessage: string): Promise<string> {
+const TOKEN_BUDGET_CHARS = 6000; // ~2,000 tokens at ~3 chars/token for Gemini
+
+type ScoredDoc = { type: "doc"; id: string; label: string; content: string; score: number };
+type ScoredSnippet = { type: "snippet"; label: string; content: string; score: number };
+type ScoredEntry = ScoredDoc | ScoredSnippet;
+
+function formatEntry(entry: ScoredEntry): string {
+  if (entry.type === "doc") {
+    return `[${entry.label}]\nLink: /api/documents/download?id=${entry.id}&mode=view\nSummary: ${entry.content}`;
+  }
+  return `[${entry.label}]: ${entry.content}`;
+}
+
+export async function getDocumentContext(
+  userMessage: string,
+  maxResults: number = 3,
+): Promise<string> {
   const messageLower = userMessage.toLowerCase();
 
   const [docs, snippets] = await Promise.all([
@@ -474,13 +492,10 @@ export async function getDocumentContext(userMessage: string): Promise<string> {
     loadSageSnippets(),
   ]);
 
-  type ScoredDoc = { type: "doc"; label: string; content: string; score: number };
-  type ScoredSnippet = { type: "snippet"; label: string; content: string; score: number };
-  type ScoredEntry = ScoredDoc | ScoredSnippet;
-
   const scoredDocs: ScoredEntry[] = docs
     .map((doc) => ({
       type: "doc" as const,
+      id: doc.id,
       label: doc.title,
       content: doc.sageContextNote || doc.title,
       score: scoreDocument(doc, messageLower),
@@ -496,15 +511,20 @@ export async function getDocumentContext(userMessage: string): Promise<string> {
     }))
     .filter((entry) => entry.score > 0);
 
-  const combined = [...scoredDocs, ...scoredSnippets]
+  let combined = [...scoredDocs, ...scoredSnippets]
     .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+    .slice(0, maxResults);
 
   if (combined.length === 0) return "";
 
-  const content = combined
-    .map((entry) => `[${entry.label}]: ${entry.content}`)
-    .join("\n\n");
+  // Enforce token budget — drop lowest-scoring entries until under budget
+  let totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  while (totalChars > TOKEN_BUDGET_CHARS && combined.length > 1) {
+    combined = combined.slice(0, -1);
+    totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  }
+
+  const content = combined.map(formatEntry).join("\n\n");
 
   return `\n\nPROGRAM DOCUMENT REFERENCE (use this for specific, accurate answers about program materials):\n${content}`;
 }
