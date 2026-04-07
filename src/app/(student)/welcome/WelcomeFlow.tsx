@@ -72,7 +72,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                 { icon: "🎯", text: "Set career goals and track your progress with AI coaching" },
                 { icon: "🏆", text: "Earn industry certifications and build your professional portfolio" },
               ].map((item) => (
-                <div key={item.text} className="flex items-start gap-3 rounded-xl bg-white/60 p-3">
+                <div key={item.text} className="flex items-start gap-3 rounded-xl bg-[var(--surface-raised)] p-3">
                   <span className="text-xl">{item.icon}</span>
                   <p className="text-sm text-[var(--ink-strong)]">{item.text}</p>
                 </div>
@@ -100,7 +100,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                 { icon: "🔥", text: "Check in daily and celebrate your wins" },
                 { icon: "❓", text: "Answer questions about certifications, platforms, and the program" },
               ].map((item) => (
-                <div key={item.text} className="flex items-start gap-3 rounded-xl bg-white/60 p-3">
+                <div key={item.text} className="flex items-start gap-3 rounded-xl bg-[var(--surface-raised)] p-3">
                   <span className="text-xl">{item.icon}</span>
                   <p className="text-sm text-[var(--ink-strong)]">{item.text}</p>
                 </div>
@@ -139,7 +139,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                       className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                         done
                           ? "border-green-200 bg-green-50"
-                          : "border-[var(--border)] bg-white/60"
+                          : "border-[var(--border)] bg-[var(--surface-raised)]"
                       }`}
                     >
                       <div className="min-w-0 flex-1">
@@ -218,7 +218,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
             <div className="mt-8 space-y-3">
               <Link
                 href="/chat"
-                className="group flex items-start gap-4 rounded-[1.5rem] border-2 border-[var(--accent-strong)] bg-white/80 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                className="group flex items-start gap-4 rounded-[1.5rem] border-2 border-[var(--accent-strong)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--ink-strong)] text-2xl text-white">
                   💬
@@ -232,7 +232,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
               </Link>
               <Link
                 href="/orientation"
-                className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-white/60 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--ink-strong)] text-2xl text-white">
                   📋
@@ -246,7 +246,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
               </Link>
               <Link
                 href="/dashboard"
-                className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-white/60 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--ink-strong)] text-2xl text-white">
                   📊

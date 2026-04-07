@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getXpProgress, getAchievementsWithDefs, recordDailyCheckin, checkReadinessAchievements } from "@/lib/progression/engine";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
-import { getProgression } from "@/lib/progression/service";
+import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { awardEvent, getRecentEvents } from "@/lib/progression/events";
 import { withErrorHandler, unauthorized } from "@/lib/api-error";
-import { prisma } from "@/lib/db";
 
 export const GET = withErrorHandler(async () => {
   const session = await getSession();
@@ -23,12 +21,9 @@ export const GET = withErrorHandler(async () => {
   });
 
   // Re-read after potential daily checkin write, then check readiness achievements
-  const { state: freshState } = await getProgression(session.id);
-  const bhagGoal = await prisma.goal.findFirst({
-    where: { studentId: session.id, level: "bhag", status: "completed" },
-    select: { id: true },
-  });
-  const readiness = computeReadinessScore({ ...freshState, bhagCompleted: !!bhagGoal });
+  const readinessData = await fetchStudentReadinessData(session.id);
+  const freshState = readinessData.state;
+  const readiness = readinessData.readiness;
 
   const prevAchievementCount = freshState.achievements.length;
   checkReadinessAchievements(freshState, readiness.score);
@@ -44,16 +39,10 @@ export const GET = withErrorHandler(async () => {
   }
 
   // Final read for display
-  const { state } = await getProgression(session.id);
-  const resumeData = await prisma.resumeData.findUnique({
-    where: { studentId: session.id },
-    select: { id: true },
-  });
-  if (!state.resumeCreated && resumeData) {
-    state.resumeCreated = true;
-  }
+  const finalReadinessData = await fetchStudentReadinessData(session.id);
+  const state = finalReadinessData.state;
   const xpProgress = getXpProgress(state);
-  const finalReadiness = computeReadinessScore({ ...state, bhagCompleted: !!bhagGoal });
+  const finalReadiness = finalReadinessData.readiness;
   const achievements = getAchievementsWithDefs(state);
 
   // Recent activity: last 5 achievements with timestamps (from achievements array order)

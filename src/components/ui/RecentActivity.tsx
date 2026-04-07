@@ -30,7 +30,7 @@ export default function RecentActivity({ achievements, lastLevelUp, currentStrea
         </div>
       )}
       {recentItems.map((a) => (
-        <div key={a.key} className="flex items-center gap-3 rounded-xl bg-white/60 border border-[var(--border)] p-3">
+        <div key={a.key} className="flex items-center gap-3 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] p-3">
           <span className="text-lg">🏅</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[var(--ink-strong)]">{a.label}</p>

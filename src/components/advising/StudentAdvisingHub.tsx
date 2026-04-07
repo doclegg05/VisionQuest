@@ -159,7 +159,7 @@ export default function StudentAdvisingHub({
           </div>
         ) : (
           <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
-            <div className="space-y-3 rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-4">
+            <div className="space-y-3 rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-4">
               <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
@@ -289,7 +289,7 @@ export default function StudentAdvisingHub({
               {upcomingAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-4"
+                  className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -399,7 +399,7 @@ export default function StudentAdvisingHub({
                     className={`rounded-[1.2rem] border p-4 ${
                       isCompleted
                         ? "border-emerald-200 bg-emerald-50/70"
-                        : "border-[rgba(18,38,63,0.1)] bg-white/72"
+                        : "border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)]"
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -471,7 +471,7 @@ export default function StudentAdvisingHub({
               ) : (
                 <div className="mt-2 space-y-2">
                   {pastAppointments.slice(0, 5).map((appointment) => (
-                    <div key={appointment.id} className="rounded-[1rem] border border-[rgba(18,38,63,0.1)] bg-white/72 p-3">
+                    <div key={appointment.id} className="rounded-[1rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
                         <span className="text-xs text-[var(--ink-muted)]">

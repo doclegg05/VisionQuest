@@ -443,7 +443,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
 
   function renderChecklistSection(title: string, templates: ChecklistTemplate[]) {
     return (
-      <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-white/70 p-4">
+      <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{title}</h3>
         <div className="mt-3 space-y-2">
           {templates.map((template) => {
@@ -456,7 +456,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 className={`flex items-start gap-3 rounded-xl border p-3 transition-colors ${
                   completed
                     ? "border-emerald-200 bg-emerald-50/80"
-                    : "border-[var(--border-soft)] bg-white"
+                    : "border-[var(--border)] bg-white"
                 }`}
               >
                 <input
@@ -504,7 +504,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             {payload.student.email ? ` • ${payload.student.email}` : ""}
           </p>
         </div>
-        <div className="rounded-[1rem] border border-[var(--border-soft)] bg-white/75 px-4 py-3 text-sm text-[var(--ink-muted)]">
+        <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-sm text-[var(--ink-muted)]">
           Status: <span className="font-semibold text-[var(--ink-strong)]">{payload.summary.status.replaceAll("_", " ")}</span>
         </div>
       </div>
@@ -651,7 +651,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
               const progress = payload.record.moduleProgress.find((item) => item.templateId === template.id);
 
               return (
-                <div key={template.id} className="rounded-[1rem] border border-[var(--border-soft)] p-4">
+                <div key={template.id} className="rounded-[1rem] border border-[var(--border)] p-4">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
@@ -721,11 +721,11 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         </div>
 
         <div className="mt-5 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-white/70 p-4">
+          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Schedule</h3>
             <div className="mt-3 space-y-3">
               {payload.summary.employmentFollowUpSchedule.map((item) => (
-                <div key={item.checkpointMonths} className="rounded-xl border border-[var(--border-soft)] p-3">
+                <div key={item.checkpointMonths} className="rounded-xl border border-[var(--border)] p-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{item.checkpointMonths}-month follow-up</p>
@@ -777,7 +777,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             </div>
           </div>
 
-          <div className="rounded-[1.25rem] border border-[var(--border-soft)] bg-white/70 p-4">
+          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Record a follow-up</h3>
             <div className="mt-3 grid gap-3">
               <select

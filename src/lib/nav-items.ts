@@ -29,8 +29,12 @@ export const STUDENT_SECONDARY_NAV: NavItem[] = [
   { href: "/resources", label: "Resources", icon: Newspaper, phase: 1 },
 ];
 
-export function getVisibleNavItems(phase: NavPhase): NavItem[] {
-  return STUDENT_NAV_ITEMS.filter((item) => item.phase <= phase);
+export function getVisibleNavItems(phase: NavPhase, orientationComplete?: boolean): NavItem[] {
+  return STUDENT_NAV_ITEMS.filter((item) => {
+    if (item.phase > phase) return false;
+    if (orientationComplete && item.href === "/orientation") return false;
+    return true;
+  });
 }
 
 export function getVisibleSecondaryNavItems(phase: NavPhase): NavItem[] {

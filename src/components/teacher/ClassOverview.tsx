@@ -254,7 +254,7 @@ export default function ClassOverview() {
 
   function getSortIcon(col: SortKey) {
     if (sortBy !== col) return <span className="ml-1 text-gray-300">↕</span>;
-    return <span className="ml-1 text-blue-600">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    return <span className="ml-1 text-[var(--accent-blue)]">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
   function formatAppointment(dateStr: string) {
@@ -370,7 +370,7 @@ export default function ClassOverview() {
         </div>
         <div className="surface-section p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Average XP</p>
-          <p className="mt-3 text-3xl font-bold text-blue-600">{avgXp}</p>
+          <p className="mt-3 text-3xl font-bold text-[var(--accent-blue)]">{avgXp}</p>
         </div>
       </div>
 
@@ -909,7 +909,7 @@ export default function ClassOverview() {
                   <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">{s.certPendingVerify} pending</span>
                 )}
                 {s.openAlertCount > 0 && (
-                  <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
+                  <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-700">{s.openAlertCount} alert{s.openAlertCount > 1 ? "s" : ""}</span>
                 )}
               </div>
 
@@ -1009,7 +1009,7 @@ export default function ClassOverview() {
                   return (
                   <tr key={s.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors${!s.isActive ? " opacity-50" : ""}`}>
                     <td className="px-4 py-3">
-                      <Link href={links.record} prefetch={false} className="block min-w-0 hover:text-blue-600">
+                      <Link href={links.record} prefetch={false} className="block min-w-0 hover:text-[var(--accent-blue)]">
                         <div className="flex min-w-0 items-center gap-2">
                           {/* Activity indicator */}
                           {(() => {

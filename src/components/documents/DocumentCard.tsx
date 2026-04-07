@@ -74,7 +74,7 @@ export default function DocumentCard({
 
   if (compact) {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-white/60 px-4 py-3 transition-shadow hover:shadow-sm sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-shadow hover:shadow-sm sm:flex-row sm:items-center">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[rgba(16,37,62,0.06)] text-lg">{icon}</span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 break-words text-sm font-medium leading-5 text-[var(--ink-strong)]">{doc.title}</p>
@@ -109,7 +109,7 @@ export default function DocumentCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white/60 p-4 transition-shadow hover:shadow-md sm:p-5">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 transition-shadow hover:shadow-md sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <span className="mt-0.5 text-2xl">{icon}</span>

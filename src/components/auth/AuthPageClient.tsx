@@ -129,15 +129,15 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
             <div className="mt-6 grid gap-3 pt-6 sm:mt-auto sm:grid-cols-3 sm:pt-8">
               <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/55">Sage</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/75">Sage</p>
                 <p className="mt-2 text-lg font-semibold">Coaching with context</p>
               </div>
               <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/55">Progression</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/75">Progression</p>
                 <p className="mt-2 text-lg font-semibold">Wins that stay visible</p>
               </div>
               <div className="rounded-[1.3rem] border border-white/12 bg-white/10 px-4 py-3.5 backdrop-blur-sm sm:rounded-[1.5rem] sm:py-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/55">Portfolio</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/75">Portfolio</p>
                 <p className="mt-2 text-lg font-semibold">Proof of readiness</p>
               </div>
             </div>
@@ -195,7 +195,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
 
               {error && (
-                <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+                <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
               )}
 
               <button

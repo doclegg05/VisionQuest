@@ -128,11 +128,14 @@ model Goal {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  pathwayId     String?
+
   student       Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
   confirmer     Student?           @relation("GoalConfirmer", fields: [confirmedBy], references: [id])
   parent        Goal?              @relation("GoalHierarchy", fields: [parentId], references: [id])
   children      Goal[]             @relation("GoalHierarchy")
   resourceLinks GoalResourceLink[]
+  pathway       Pathway?           @relation(fields: [pathwayId], references: [id], onDelete: SetNull)
 
   @@schema("visionquest")
 }
@@ -461,10 +464,11 @@ model SpokesClass {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  createdBy   Student?                 @relation("CreatedClasses", fields: [createdById], references: [id], onDelete: SetNull)
-  instructors SpokesClassInstructor[]
-  enrollments StudentClassEnrollment[]
-  jobConfig   JobClassConfig?
+  createdBy    Student?                 @relation("CreatedClasses", fields: [createdById], references: [id], onDelete: SetNull)
+  instructors  SpokesClassInstructor[]
+  enrollments  StudentClassEnrollment[]
+  jobConfig    JobClassConfig?
+  requirements ClassRequirement[]
 
   @@index([status, name])
   @@schema("visionquest")
@@ -1103,5 +1107,44 @@ model StudentSavedJob {
   jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, jobListingId])
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// Phase 2: Goal-to-Pathway Alignment
+// =============================================================================
+
+model Pathway {
+  id             String   @id @default(cuid())
+  label          String
+  description    String?  @db.Text
+  certifications String[] // Ordered cert IDs for this pathway
+  platforms      String[] // Platform IDs
+  estimatedWeeks Int      @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  goals Goal[]
+
+  @@schema("visionquest")
+}
+
+model ClassRequirement {
+  id          String   @id @default(cuid())
+  classId     String
+  itemType    String   // "certification" | "form" | "orientation" | "course"
+  itemId      String
+  title       String
+  status      String   @default("required") // "required" | "optional" | "not_applicable"
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  class SpokesClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, itemType, itemId])
+  @@index([classId, status])
   @@schema("visionquest")
 }

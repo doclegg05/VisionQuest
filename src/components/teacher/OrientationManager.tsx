@@ -285,7 +285,7 @@ export default function OrientationManager() {
     setDragOverId(null);
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading...</p>;
 
   if (error) return (
     <div className="text-center py-12">
@@ -304,7 +304,7 @@ export default function OrientationManager() {
 
       {/* Item list */}
       {items.length === 0 ? (
-        <div className="text-center text-gray-400 py-8 text-sm">
+        <div className="text-center text-[var(--ink-muted)] py-8 text-sm">
           No orientation items yet. Add one to get started.
         </div>
       ) : (
@@ -344,7 +344,7 @@ export default function OrientationManager() {
                     <p className="text-sm font-medium text-gray-900">
                       {item.label}
                       {item.required && (
-                        <span className="ml-1.5 text-xs bg-red-50 text-red-500 px-1.5 py-0.5 rounded">Required</span>
+                        <span className="ml-1.5 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
                       )}
                     </p>
                     {item.description && (

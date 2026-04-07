@@ -104,7 +104,7 @@ export default function CertManager() {
     setForm({ label: "", description: "", url: "", required: true, needsFile: false, needsVerify: true });
   }
 
-  if (loading) return <p className="text-sm text-gray-400">Loading...</p>;
+  if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading...</p>;
 
   if (error) return (
     <div className="text-center py-12">
@@ -118,7 +118,7 @@ export default function CertManager() {
   return (
     <div className="space-y-4">
       {templates.length === 0 ? (
-        <div className="text-center text-gray-400 py-8 text-sm">
+        <div className="text-center text-[var(--ink-muted)] py-8 text-sm">
           No certification requirements yet. Add one to define the Ready to Work certification.
         </div>
       ) : (
@@ -132,7 +132,7 @@ export default function CertManager() {
                 <p className="text-sm font-medium text-gray-900">
                   {t.label}
                   {t.required && (
-                    <span className="ml-1.5 text-xs bg-red-50 text-red-500 px-1.5 py-0.5 rounded">Required</span>
+                    <span className="ml-1.5 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
                   )}
                 </p>
                 {t.description && (
@@ -144,10 +144,10 @@ export default function CertManager() {
                 )}
                 <div className="flex gap-2 mt-1.5">
                   {t.needsFile && (
-                    <span className="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">File required</span>
+                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">File required</span>
                   )}
                   {t.needsVerify && (
-                    <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">Needs verification</span>
+                    <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">Needs verification</span>
                   )}
                 </div>
               </div>
