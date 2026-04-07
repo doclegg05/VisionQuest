@@ -349,10 +349,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
             {createLevel === level ? (
               <div className="mt-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm">
-                <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                <label htmlFor="new-goal-content" className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   New {level === "task" ? "Task" : "Goal"}
                 </label>
                 <textarea
+                  id="new-goal-content"
                   value={newGoalContent}
                   onChange={(event) => setNewGoalContent(event.target.value.slice(0, 500))}
                   rows={3}
@@ -360,11 +361,12 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   className="textarea-field mt-2 resize-none px-4 py-3 text-sm"
                 />
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <label className="text-sm text-[var(--ink-muted)]">
+                  <label htmlFor="new-goal-status" className="text-sm text-[var(--ink-muted)]">
                     <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                       Status
                     </span>
                     <select
+                      id="new-goal-status"
                       value={newGoalStatus}
                       onChange={(event) => setNewGoalStatus(event.target.value as GoalStatus)}
                       className="select-field min-w-[12rem] px-4 py-2.5 text-sm"
@@ -428,10 +430,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         </span>
                       </div>
 
-                      <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                      <label htmlFor={`goal-content-${goal.id}`} className="mt-4 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                         Goal
                       </label>
                       <textarea
+                        id={`goal-content-${goal.id}`}
                         value={draft.content}
                         onChange={(event) =>
                           setDrafts((current) => ({
@@ -447,11 +450,12 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       />
 
                       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-                        <label className="text-sm text-[var(--ink-muted)]">
+                        <label htmlFor={`goal-status-${goal.id}`} className="text-sm text-[var(--ink-muted)]">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                             Status
                           </span>
                           <select
+                            id={`goal-status-${goal.id}`}
                             value={draft.status}
                             onChange={(event) =>
                               setDrafts((current) => ({
@@ -483,8 +487,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </div>
 
                       {goalPlan.links.length > 0 ? (
-                        <div className="mt-5 rounded-[1.15rem] border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.03)] p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="mt-5">
+                          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--border)]">
                             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                               Current Plan
                             </p>
@@ -492,16 +496,16 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               {goalPlan.links.length} linked resource{goalPlan.links.length === 1 ? "" : "s"}
                             </span>
                           </div>
-                          <div className="mt-3 space-y-3">
+                          <div className="space-y-0">
                             {goalPlan.links.map((link) => {
                               const dueLabel = typeof link.dueAt === "string" ? formatDueDate(link.dueAt) : null;
                               const draftStatus = linkStatusDrafts[link.id] ?? link.status;
                               return (
-                                <div key={link.id} className="theme-card rounded-xl p-3">
+                                <div key={link.id} className="border-t border-[var(--border)] pt-3 pb-3">
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                                        <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                           {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                                         </span>
                                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
@@ -576,17 +580,17 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       ) : null}
 
                       {goalPlan.recommendations.length > 0 ? (
-                        <div className="mt-5 rounded-[1.15rem] border border-dashed border-[rgba(16,37,62,0.12)] bg-[var(--surface-raised)] p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                        <div className="mt-5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)] pb-3 border-b border-dashed border-[var(--border)]">
                             Suggested Resources
                           </p>
-                          <div className="mt-3 space-y-3">
+                          <div className="space-y-0">
                             {goalPlan.recommendations.map((resource) => (
-                              <div key={`${resource.resourceType}:${resource.resourceId}`} className="theme-card rounded-xl p-3">
+                              <div key={`${resource.resourceType}:${resource.resourceId}`} className="border-t border-[var(--border)] pt-3 pb-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                                      <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                         {GOAL_RESOURCE_TYPE_LABELS[resource.resourceType]}
                                       </span>
                                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{resource.title}</p>

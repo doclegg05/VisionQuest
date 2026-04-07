@@ -120,12 +120,12 @@ export default function DocumentCard({
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {doc.sizeBytes ? (
-                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
+                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
                   {formatSize(doc.sizeBytes)}
                 </span>
               ) : null}
               {doc.mimeType !== "application/pdf" && (
-                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
+                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
                   {doc.mimeType.split("/").pop()?.toUpperCase()}
                 </span>
               )}

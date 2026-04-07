@@ -298,11 +298,11 @@ function StudentAccordion({
               {group.student.displayName}
             </span>
             {group.highCount > 0 && (
-              <span className="rounded-full bg-red-200 px-2 py-0.5 text-[10px] font-semibold text-red-800">
+              <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
                 {group.highCount} urgent
               </span>
             )}
-            <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)]">
+            <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
               {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
             </span>
           </div>
@@ -341,7 +341,7 @@ function StudentAccordion({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-faint)]">
                       {c.groupCategory}
                     </span>
                     {isHigh && (

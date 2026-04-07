@@ -16,14 +16,14 @@ const SIZE_MAP = {
     imageWidth: 54,
     imageHeight: 36,
     titleClassName: "text-base",
-    subtitleClassName: "text-[10px] tracking-[0.18em]",
+    subtitleClassName: "text-xs tracking-[0.18em]",
     gapClassName: "gap-2.5",
   },
   md: {
     imageWidth: 76,
     imageHeight: 50,
     titleClassName: "text-xl",
-    subtitleClassName: "text-[11px] tracking-[0.2em]",
+    subtitleClassName: "text-xs tracking-[0.2em]",
     gapClassName: "gap-3",
   },
   lg: {

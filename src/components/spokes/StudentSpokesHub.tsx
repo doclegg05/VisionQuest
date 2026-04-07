@@ -107,7 +107,7 @@ export default function StudentSpokesHub({
                     ) : null}
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       progress?.completed
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
@@ -218,7 +218,7 @@ export default function StudentSpokesHub({
                           ) : null}
                         </div>
                         <span
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             progress
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
@@ -265,7 +265,7 @@ export default function StudentSpokesHub({
                         </p>
                       </div>
                       <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
                           item.status === "completed"
                             ? "bg-emerald-100 text-emerald-700"
                             : item.status === "due"

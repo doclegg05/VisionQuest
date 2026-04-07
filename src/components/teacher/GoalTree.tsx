@@ -95,10 +95,10 @@ export default function GoalTree({ goals }: GoalTreeProps) {
                 </button>
               )}
               <span className="shrink-0">{config.icon}</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">{config.label}</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">{config.label}</span>
               <p className="text-sm text-[var(--ink-strong)]">{goal.content}</p>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.className}`}>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
               {status.label}
             </span>
           </div>

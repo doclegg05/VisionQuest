@@ -222,6 +222,8 @@ export default function CredlyBadges() {
                 alt={badge.name}
                 width={80}
                 height={80}
+                loading="lazy"
+                decoding="async"
                 className="h-20 w-20 object-contain"
               />
             ) : (
@@ -233,10 +235,10 @@ export default function CredlyBadges() {
               {badge.name}
             </p>
             {badge.issuerName && (
-              <p className="text-[10px] text-[var(--ink-muted)]">{badge.issuerName}</p>
+              <p className="text-xs text-[var(--ink-muted)]">{badge.issuerName}</p>
             )}
             {badge.issuedAt && (
-              <p className="text-[10px] text-[var(--ink-muted)]">
+              <p className="text-xs text-[var(--ink-muted)]">
                 {new Date(badge.issuedAt).toLocaleDateString()}
               </p>
             )}

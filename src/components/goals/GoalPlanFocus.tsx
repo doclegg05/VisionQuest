@@ -86,7 +86,7 @@ export default function GoalPlanFocus({
                       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                         {levelMeta.label}
                       </span>
-                      <span className="rounded-full bg-[var(--surface-raised)]/85 px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)]">
+                      <span className="rounded-full bg-[var(--surface-raised)]/85 px-2.5 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                         {goalStatusLabel(goal.status)}
                       </span>
                     </div>
@@ -106,7 +106,7 @@ export default function GoalPlanFocus({
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                   {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                                 </span>
                                 <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
@@ -158,7 +158,7 @@ export default function GoalPlanFocus({
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                 {GOAL_RESOURCE_TYPE_LABELS[entry.resourceType]}
                               </span>
                               <p className="text-sm font-semibold text-[var(--ink-strong)]">{entry.title}</p>

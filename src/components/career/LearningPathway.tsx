@@ -132,7 +132,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
                       </span>
                       {step.name}
                       {step.isCurrent && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                        <span className="ml-2 inline-flex items-center rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">
                           You are here
                         </span>
                       )}
@@ -158,7 +158,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
                     </span>
                     <span
                       className={[
-                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        "rounded-full px-2 py-0.5 text-xs font-semibold",
                         config.badgeCls,
                       ].join(" ")}
                     >

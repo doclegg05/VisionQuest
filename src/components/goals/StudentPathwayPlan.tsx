@@ -61,7 +61,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
                     )}
                   </div>
                   {pw.estimatedWeeks > 0 && (
-                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 shrink-0">
+                    <span className="rounded-full bg-[var(--badge-success-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-success-text)] shrink-0">
                       ~{pw.estimatedWeeks} week{pw.estimatedWeeks !== 1 ? "s" : ""}
                     </span>
                   )}
@@ -76,7 +76,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
                       {pw.certifications.map((certId) => (
                         <span
                           key={certId}
-                          className="rounded-full bg-purple-50 text-purple-700 px-3 py-1 text-xs font-medium"
+                          className="rounded-full bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-3 py-1 text-xs font-medium"
                         >
                           {getCertLabel(certId)}
                         </span>
@@ -94,7 +94,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
                       {pw.platforms.map((platformId) => (
                         <span
                           key={platformId}
-                          className="rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium"
+                          className="rounded-full bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-3 py-1 text-xs font-medium"
                         >
                           {getPlatformLabel(platformId)}
                         </span>
@@ -109,7 +109,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
       )}
 
       {goalsWithoutPathway.length > 0 && (
-        <div className="mt-4 surface-section p-5 border-l-4 border-l-amber-400">
+        <div className="mt-4 surface-section p-5 border-l-4 border-l-[var(--accent-gold)]">
           <p className="text-sm font-medium text-[var(--ink-strong)]">
             {goalsWithoutPathway.length === 1
               ? "1 goal doesn't have a pathway yet"
@@ -121,7 +121,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
           <ul className="mt-3 space-y-1.5">
             {goalsWithoutPathway.map((goal) => (
               <li key={goal.id} className="text-sm text-[var(--ink-muted)] flex items-start gap-2">
-                <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[var(--accent-gold)] shrink-0" />
                 {goal.content}
               </li>
             ))}

@@ -13,13 +13,21 @@ export default function WizardStepIndicator({
 }: WizardStepIndicatorProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
+      <div
+        className="flex items-center gap-1.5"
+        role="progressbar"
+        aria-valuenow={currentStep + 1}
+        aria-valuemin={1}
+        aria-valuemax={totalSteps}
+        aria-label={`Step ${currentStep + 1} of ${totalSteps}: ${currentTitle}`}
+      >
         {Array.from({ length: totalSteps }, (_, i) => {
           const isComplete = i < currentStep;
           const isCurrent = i === currentStep;
           return (
             <div key={i} className="flex items-center gap-1.5">
               <div
+                aria-current={isCurrent ? "step" : undefined}
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   isComplete
                     ? "bg-emerald-500 text-white"

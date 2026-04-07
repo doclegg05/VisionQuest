@@ -71,7 +71,7 @@ export default function StaffRegisterPage() {
               <label className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
                 Account Type
               </label>
-              <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+              <div className="flex gap-1 rounded-xl bg-[var(--surface-muted)] p-1">
                 {(["teacher", "admin"] as const).map((option) => (
                   <button
                     key={option}
@@ -83,8 +83,8 @@ export default function StaffRegisterPage() {
                     }}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
                       role === option
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
+                        ? "bg-[var(--surface-strong)] text-[var(--ink-strong)] shadow-sm"
+                        : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
                     }`}
                   >
                     {option === "teacher" ? "Teacher" : "Administrator"}
@@ -175,7 +175,7 @@ export default function StaffRegisterPage() {
             </div>
 
             {error && (
-              <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              <p role="alert" className="rounded-2xl bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
                 {error}
               </p>
             )}

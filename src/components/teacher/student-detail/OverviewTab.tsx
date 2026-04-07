@@ -259,7 +259,7 @@ export default function OverviewTab({
               <div key={alert.id} className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                  <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                  <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
                     {alert.severity}
                   </span>
                 </div>

@@ -83,7 +83,7 @@ export default function NotificationBell() {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--accent-strong)] px-1 text-[10px] font-bold text-white">
+          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--accent-strong)] px-1 text-xs font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -94,8 +94,8 @@ export default function NotificationBell() {
           ref={dialogRef}
           role="dialog"
           aria-label="Notifications"
-          className="fixed right-3 top-[4.5rem] z-[60] w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[rgba(255,255,255,0.96)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] backdrop-blur md:left-[18rem] md:right-auto md:top-4"
-          style={{ maxHeight: "calc(100vh - 6rem)" }}
+          className="fixed right-3 top-[4.5rem] z-[60] w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[var(--surface-raised)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] md:left-[18rem] md:right-auto md:top-4"
+          style={{ maxHeight: "min(calc(100dvh - 6rem), 28rem)" }}
         >
           <div className="flex items-center justify-between border-b border-[rgba(18,38,63,0.08)] px-4 py-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Notifications</h3>
@@ -133,7 +133,7 @@ export default function NotificationBell() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--ink-strong)]">{n.title}</p>
                       {n.body && <p className="mt-0.5 line-clamp-3 break-words text-xs leading-5 text-[var(--ink-muted)]">{n.body}</p>}
-                      <p className="mt-1 text-[10px] text-[var(--ink-muted)]">{timeAgo(n.createdAt)}</p>
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">{timeAgo(n.createdAt)}</p>
                     </div>
                   </div>
                 );

@@ -67,7 +67,7 @@ export default function FormUploadButton({
   // Status badge rendering
   if (currentStatus === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
         ✓ Approved
       </span>
     );
@@ -76,13 +76,14 @@ export default function FormUploadButton({
   if (currentStatus === "pending") {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-800">
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
           ⏳ Pending Review
         </span>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="text-[10px] font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+          aria-label="Upload document"
+          className="text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
         >
           Re-upload
         </button>
@@ -100,13 +101,14 @@ export default function FormUploadButton({
   if (currentStatus === "rejected") {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-600">
+        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-600">
           ✗ Rejected
         </span>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="text-[10px] font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+          aria-label="Upload document"
+          className="text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
         >
           {uploading ? "Uploading..." : "Re-upload"}
         </button>
@@ -127,9 +129,11 @@ export default function FormUploadButton({
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-[10px] font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)] disabled:opacity-50"
+        aria-label="Upload document"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)] disabled:opacity-50"
       >
-        📎 {uploading ? "Uploading..." : "Upload Form"}
+        <span aria-hidden="true">📎</span>
+        <span>{uploading ? "Uploading..." : "Upload Form"}</span>
       </button>
       <input
         ref={fileInputRef}
@@ -138,7 +142,7 @@ export default function FormUploadButton({
         onChange={handleFileChange}
         className="hidden"
       />
-      {error && <p className="mt-1 text-[10px] text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }

@@ -19,7 +19,7 @@ export default function XpBar({ current, nextTarget, ratio, level }: XpBarProps)
       </div>
       <div className="h-2.5 bg-[var(--surface-strong)] rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500"
+          className="h-full bg-[var(--accent-blue)] rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>

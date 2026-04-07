@@ -201,7 +201,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           <button
             onClick={handleLogout}
             type="button"
-            className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)] min-[390px]:text-xs"
+            className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
             aria-label="Log out"
           >
             Log out
@@ -222,9 +222,9 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const IconComponent = item.icon;
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
-              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-1" aria-current={active ? "page" : undefined}>
+              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-                <span className={`text-[10px] font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -236,9 +236,9 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const IconComponent = item.icon;
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
-              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-1" aria-current={active ? "page" : undefined}>
+              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-                <span className={`text-[10px] font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -254,7 +254,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-[#37b550] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
               <ChatCircle size={22} weight="fill" />
             </div>
-            <span className={`text-[10px] font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>Sage</span>
+            <span className={`text-xs font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>Sage</span>
           </Link>
 
           {/* Tab 4: Learning */}
@@ -263,9 +263,9 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const IconComponent = item.icon;
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
-              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-1" aria-current={active ? "page" : undefined}>
+              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-                <span className={`text-[10px] font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -276,13 +276,13 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             ref={moreButtonRef}
             onClick={() => setMoreOpen(!moreOpen)}
             type="button"
-            className="flex flex-col items-center gap-0.5 px-3 py-1"
+            className="flex flex-col items-center gap-0.5 px-3 py-2.5"
             aria-expanded={moreOpen}
             aria-haspopup="dialog"
             aria-label="More navigation options"
           >
             <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-            <span className={`text-[10px] font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>More</span>
+            <span className={`text-xs font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>More</span>
             {isMoreActive && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
           </button>
         </div>
@@ -298,9 +298,10 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             ref={moreDialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label="More navigation options"
+            aria-labelledby="more-nav-title"
             className="panel panel-strong fixed bottom-16 left-3 right-3 z-50 rounded-[1.75rem] p-4 md:hidden"
           >
+            <h2 id="more-nav-title" className="sr-only">Navigation menu</h2>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {mobileMore.map((item) => (
                 <Link

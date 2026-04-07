@@ -247,7 +247,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
             e.stopPropagation();
             onDelete(item.id);
           }}
-          className="absolute -right-2 -top-3 z-20 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-[11px] text-white shadow-md transition-colors hover:bg-red-600"
+          className="absolute -right-2 -top-3 z-20 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white shadow-md transition-colors hover:bg-red-600"
           aria-label="Delete pin"
         >
           ×
@@ -276,7 +276,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         >
           <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(180deg,transparent_0_1.6rem,rgba(15,154,146,0.08)_1.6rem_1.66rem)]" />
           <div className="relative">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
               Linked goal
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{item.content}</p>
@@ -294,7 +294,6 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
                 src={`/api/files/download?id=${item.fileId}`}
                 alt="Vision board image"
                 fill
-                unoptimized
                 sizes="(max-width: 768px) 50vw, 28vw"
                 className="object-cover"
               />

@@ -55,7 +55,56 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
   }, [onMove, onResize]);
 
   return (
-    <div className="overflow-x-auto pb-2">
+    <div className="pb-2">
+      {/* Mobile: stacked scrollable card list */}
+      <div className="md:hidden space-y-3">
+        {items.length === 0 ? (
+          <div className="flex items-center justify-center rounded-[1.35rem] border border-[rgba(196,168,124,0.4)] bg-[linear-gradient(145deg,#c4a87c_0%,#b8956a_24%,#c9a97a_49%,#a88656_74%,#c4a87c_100%)] px-6 py-12 text-center shadow-[0_8px_24px_rgba(52,34,15,0.15)]">
+            <div className="rounded-[1.4rem] border border-white/55 bg-[var(--surface-raised)]/82 p-6 shadow-[0_18px_45px_rgba(68,43,18,0.18)]">
+              <p className="mb-3 text-3xl">📌</p>
+              <p className="font-display text-base text-[#5A3E20]">Your vision board is empty</p>
+              <p className="mt-2 text-sm text-[#8B6F47]">
+                Start by pinning a note, image, or goal.
+              </p>
+            </div>
+          </div>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} className="rounded-2xl border border-[rgba(196,168,124,0.35)] bg-[linear-gradient(145deg,#c9a97a,#b8956a)] p-1">
+              <div className="rounded-xl bg-[var(--surface-raised)]/90 px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    {item.type === "note" && (
+                      <p className="text-sm text-[var(--ink-strong)] whitespace-pre-wrap break-words">{item.content}</p>
+                    )}
+                    {item.type === "image" && item.fileId && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={`/api/files/download?id=${item.fileId}`} alt={item.content || "Vision board image"} className="max-h-48 w-full rounded-lg object-cover" loading="lazy" />
+                    )}
+                    {item.type === "goal" && (
+                      <div>
+                        <span className="mb-1 inline-block rounded-full bg-[var(--accent-green)]/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--accent-green)]">Goal</span>
+                        <p className="text-sm font-medium text-[var(--ink-strong)] break-words">{item.content}</p>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onDelete(item.id)}
+                    type="button"
+                    aria-label="Remove pin"
+                    className="shrink-0 rounded-full p-1.5 text-[var(--ink-faint)] hover:bg-red-50 hover:text-red-500 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: full corkboard canvas */}
+      <div className="hidden md:block overflow-x-auto">
       <div
         ref={canvasRef}
         onDragOver={handleDragOver}
@@ -69,7 +118,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
         {/* Empty state */}
         {items.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-            <div className="rounded-[1.4rem] border border-white/55 bg-[var(--surface-raised)]/82 p-8 shadow-[0_18px_45px_rgba(68,43,18,0.18)] backdrop-blur">
+            <div className="rounded-[1.4rem] border border-white/55 bg-[var(--surface-raised)]/82 p-8 shadow-[0_18px_45px_rgba(68,43,18,0.18)]">
               <p className="mb-3 text-3xl">📌</p>
               <p className="font-display text-lg text-[#5A3E20]">Your vision board is empty</p>
               <p className="mt-2 text-sm text-[#8B6F47]">
@@ -79,7 +128,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
           </div>
         )}
 
-        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-[var(--surface-raised)]/24 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/80 shadow-[0_8px_16px_rgba(70,42,10,0.14)]">
+        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-[var(--surface-raised)]/24 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/80 shadow-[0_8px_16px_rgba(70,42,10,0.14)]">
           Creative workspace
         </div>
 
@@ -95,6 +144,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
       <p className="mt-2 px-1 text-xs text-[var(--ink-muted)]">
         Tip: if the board feels larger than your screen, scroll sideways inside the workspace to reach the full corkboard.
       </p>
+      </div>
     </div>
   );
 }

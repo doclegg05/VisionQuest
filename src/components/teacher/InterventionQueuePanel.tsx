@@ -22,9 +22,9 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function urgencyBadge(score: number): { label: string; color: string } {
-  if (score >= 50) return { label: "Critical", color: "bg-red-100 text-red-700" };
-  if (score >= 25) return { label: "High", color: "bg-amber-100 text-amber-700" };
-  return { label: "Medium", color: "bg-yellow-100 text-yellow-700" };
+  if (score >= 50) return { label: "Critical", color: "bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]" };
+  if (score >= 25) return { label: "High", color: "bg-[var(--urgency-high-bg)] text-[var(--urgency-high-text)]" };
+  return { label: "Medium", color: "bg-[var(--urgency-medium-bg)] text-[var(--urgency-medium-text)]" };
 }
 
 function topReason(signals: QueueStudent["signals"]): string {
@@ -127,20 +127,20 @@ function QuickTaskModal({
         <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
           Quick task for {studentName}
         </h3>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
         <input
           type="text"
           placeholder="What needs to be done?"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
         />
         <input
           type="date"
           value={dueAt}
           onChange={(e) => setDueAt(e.target.value)}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
         />
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
@@ -215,11 +215,11 @@ function QuickNoteModal({
         <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
           Quick note for {studentName}
         </h3>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
         >
           {NOTE_CATEGORY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -233,7 +233,7 @@ function QuickNoteModal({
           onChange={(e) => setBody(e.target.value)}
           autoFocus
           rows={3}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
         />
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
@@ -316,20 +316,20 @@ function QuickAppointmentModal({
           Schedule appointment with {studentName}
         </h3>
         <p className="text-xs text-[var(--ink-muted)]">Duration defaults to 30 minutes.</p>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
         <input
           type="text"
           placeholder="Appointment title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
         />
         <input
           type="datetime-local"
           value={startsAt}
           onChange={(e) => setStartsAt(e.target.value)}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
         />
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
@@ -453,7 +453,7 @@ function StudentRow({
 
       {/* Urgency badge */}
       <span
-        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${badge.color}`}
+        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.color}`}
       >
         {badge.label}
       </span>
@@ -512,7 +512,7 @@ export default function InterventionQueuePanel({
       {loading && <QueueSkeleton />}
 
       {!loading && error && (
-        <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-red-600">
+        <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--error)]" role="alert">
           {error}
         </p>
       )}

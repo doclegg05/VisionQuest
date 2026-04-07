@@ -202,7 +202,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
           {!isStaff && (
             <a
               href="/chat"
-              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-white/75 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
               aria-label="Open full chat"
             >
               Expand

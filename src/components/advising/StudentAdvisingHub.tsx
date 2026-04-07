@@ -352,7 +352,7 @@ export default function StudentAdvisingHub({
                 <div key={alert.id} className="rounded-[1.2rem] border border-amber-200 bg-amber-50/80 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                    <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                    <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
                       {alert.severity}
                     </span>
                   </div>
@@ -410,7 +410,7 @@ export default function StudentAdvisingHub({
                           Added by {task.createdByName}
                         </p>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         task.priority === "high"
                           ? "bg-rose-100 text-rose-800"
                           : task.priority === "low"

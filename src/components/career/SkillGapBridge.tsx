@@ -22,7 +22,7 @@ function ImportanceBadge({ importance }: { importance: SkillGapItem["importance"
   return (
     <span className="flex items-center gap-1">
       <span className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${style.dot}`} />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
         {style.label}
       </span>
     </span>
@@ -137,7 +137,7 @@ function ReadinessBar({
         />
       </div>
 
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[var(--ink-muted)]">
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ink-muted)]">
         <span className="flex items-center gap-1">
           <span className="h-2 w-2 rounded-sm bg-emerald-500" />
           Have ({haveCount})

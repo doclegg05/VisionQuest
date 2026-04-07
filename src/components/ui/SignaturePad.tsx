@@ -221,6 +221,8 @@ function DrawPad({
       <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)]">
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label="Signature drawing area. Use the text input below for an accessible alternative."
           className="block cursor-crosshair touch-none"
           onMouseDown={startStroke}
           onMouseMove={draw}
@@ -232,7 +234,7 @@ function DrawPad({
         />
         <div className="pointer-events-none absolute left-6 right-6" style={{ bottom: "24px" }}>
           <div className="border-b border-[var(--border-strong)]" />
-          <p className="mt-1 text-center text-[10px] text-[var(--ink-muted)]">Sign above this line</p>
+          <p className="mt-1 text-center text-xs text-[var(--ink-muted)]">Sign above this line</p>
         </div>
         {!hasStrokes && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -297,7 +299,7 @@ function TypePad({
       <div ref={containerRef} className="space-y-3">
         <div className="rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)] p-4">
           <label className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
-            Type your full name
+            Type your full legal name
           </label>
           <input
             type="text"
@@ -309,7 +311,7 @@ function TypePad({
           />
           {trimmed && (
             <div className="mt-4 border-t border-[var(--border)] pt-3">
-              <p className="text-[10px] text-[var(--ink-muted)] mb-1">Preview</p>
+              <p className="text-xs text-[var(--ink-muted)] mb-1">Preview</p>
               <p className="font-serif text-2xl italic text-[#1a2a3a]">{trimmed}</p>
             </div>
           )}

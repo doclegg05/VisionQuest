@@ -41,7 +41,7 @@ export default function StreakCalendar({ days }: StreakCalendarProps) {
       <p className="mb-2 text-xs font-medium text-[var(--ink-muted)]">Last 4 weeks</p>
       <div className="grid grid-cols-7 gap-1">
         {DAY_LABELS.map((label, i) => (
-          <div key={i} className="text-center text-[10px] text-[var(--ink-muted)]">
+          <div key={i} className="text-center text-xs text-[var(--ink-muted)]">
             {label}
           </div>
         ))}

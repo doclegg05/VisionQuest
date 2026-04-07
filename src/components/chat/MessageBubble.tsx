@@ -25,7 +25,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
         className={`max-w-[82%] rounded-[1.4rem] px-4 py-3 text-[15px] leading-7 shadow-[0_16px_36px_rgba(16,37,62,0.08)]
           ${isUser
             ? "rounded-br-md bg-[var(--chat-bubble-user-bg)] text-white"
-            : "rounded-bl-md border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] text-[var(--ink-strong)] backdrop-blur"
+            : "rounded-bl-md border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] text-[var(--ink-strong)]"
           }
           ${isStreaming ? "animate-pulse" : ""}`}
       >

@@ -243,12 +243,12 @@ export default function OutcomesReport() {
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {student.highSeverityAlertCount > 0 ? (
-                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800">
+                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">
                           {student.highSeverityAlertCount} high
                         </span>
                       ) : null}
                       {student.openAlertCount > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
                           {student.openAlertCount} alerts
                         </span>
                       ) : null}
@@ -257,25 +257,25 @@ export default function OutcomesReport() {
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">Last activity</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Last activity</p>
                       <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.lastActivityAt ? `${student.daysSinceActivity}d ago` : "No activity yet"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">Next appointment</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Next appointment</p>
                       <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.nextAppointmentAt ? dateFormatter.format(new Date(student.nextAppointmentAt)) : "None"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">Career actions</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Career actions</p>
                       <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.applicationsInFlight} apps • {student.eventRegistrationCount} events
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-faint)]">Readiness</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-faint)]">Readiness</p>
                       <p className="mt-1 text-sm text-[var(--ink-strong)]">
                         {student.completedCertification ? "Certified" : "In progress"}
                         {student.publicCredentialLive ? " • Public" : ""}
@@ -310,7 +310,7 @@ export default function OutcomesReport() {
                           {application.student.displayName} • {application.opportunity.company}
                         </p>
                       </div>
-                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
+                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">
                         {application.status}
                       </span>
                     </div>

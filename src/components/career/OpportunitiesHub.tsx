@@ -204,7 +204,7 @@ export default function OpportunitiesHub({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="break-words font-display text-2xl text-[var(--ink-strong)]">{opportunity.title}</h2>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         opportunity.status === "open"
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"

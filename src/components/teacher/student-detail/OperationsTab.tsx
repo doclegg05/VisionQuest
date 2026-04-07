@@ -135,7 +135,7 @@ export default function OperationsTab({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{submission.title}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         submission.status === "approved"
                           ? "bg-emerald-100 text-emerald-700"
                           : submission.status === "rejected"
@@ -323,11 +323,11 @@ export default function OperationsTab({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusBadge(appointment.status)}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadge(appointment.status)}`}>
                           {appointment.status}
                         </span>
                         {appointment.followUpRequired && (
-                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
                             follow-up
                           </span>
                         )}
@@ -494,7 +494,7 @@ export default function OperationsTab({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                           task.priority === "high"
                             ? "bg-rose-100 text-rose-800"
                             : task.priority === "low"
@@ -588,7 +588,7 @@ export default function OperationsTab({
               <div key={note.id} className="theme-card-subtle rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="rounded-full bg-[var(--surface-interactive)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-strong)]">
+                    <span className="rounded-full bg-[var(--surface-interactive)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-strong)]">
                       {note.category.replace("_", " ")}
                     </span>
                     <span className="text-xs text-[var(--ink-muted)]">

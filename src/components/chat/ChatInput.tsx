@@ -41,8 +41,11 @@ export default function ChatInput({ onSend, disabled, compact }: ChatInputProps)
   const handleInput = () => {
     const el = textareaRef.current;
     if (el) {
+      const scrollHeight = el.scrollHeight;
       el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 160) + "px";
+      requestAnimationFrame(() => {
+        el.style.height = Math.min(scrollHeight, 160) + "px";
+      });
     }
   };
 

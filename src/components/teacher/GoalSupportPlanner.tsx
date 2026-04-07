@@ -181,7 +181,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                   <p className="text-sm font-semibold text-[var(--ink-strong)]">
                     {meta?.label || goal.level}
                   </p>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${GOAL_STATUS_STYLES[goal.status] || GOAL_STATUS_STYLES.active}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${GOAL_STATUS_STYLES[goal.status] || GOAL_STATUS_STYLES.active}`}>
                     {goalStatusLabel(goal.status)}
                   </span>
                 </div>
@@ -204,7 +204,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                            <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                               {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                             </span>
                             <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
@@ -214,7 +214,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                           ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-[var(--surface-interactive)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-strong)]">
+                          <span className="rounded-full bg-[var(--surface-interactive)] px-2.5 py-1 text-xs font-semibold text-[var(--ink-strong)]">
                             {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
                           </span>
                           {link.url ? (
@@ -299,7 +299,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                               {GOAL_RESOURCE_TYPE_LABELS[recommendation.resourceType]}
                             </span>
                             <p className="text-sm font-semibold text-[var(--ink-strong)]">{recommendation.title}</p>

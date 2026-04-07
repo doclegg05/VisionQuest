@@ -86,7 +86,7 @@ export default function ConversationList({
                 }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className={`min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                <span className={`min-w-0 flex-1 text-xs font-semibold uppercase tracking-[0.18em] ${
                   activeId === conv.id ? "text-[var(--accent-strong)]" : "text-white/75"
                 }`}>
                   {STAGE_LABELS[conv.stage] || conv.stage}

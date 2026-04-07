@@ -182,7 +182,7 @@ export default function SpokesReport() {
                       </p>
                     </div>
                     {item.employmentFollowUpsDue > 0 ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
                         {item.employmentFollowUpsDue} follow-up due
                       </span>
                     ) : null}
@@ -190,19 +190,19 @@ export default function SpokesReport() {
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Orientation</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Orientation</p>
                       <p className="mt-1 text-sm font-semibold text-[var(--ink-strong)]">
                         {item.orientationDone}/{item.orientationTotal}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Files</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Files</p>
                       <p className="mt-1 text-sm font-semibold text-[var(--ink-strong)]">
                         {item.filesDone}/{item.filesTotal}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Modules</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Modules</p>
                       <p className="mt-1 text-sm font-semibold text-[var(--ink-strong)]">
                         {item.modulesDone}/{item.modulesTotal}
                       </p>
@@ -213,7 +213,7 @@ export default function SpokesReport() {
                     {item.reasons.map((reason) => (
                       <span
                         key={reason}
-                        className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-strong)]"
+                        className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-1 text-xs font-medium text-[var(--ink-strong)]"
                       >
                         {reason}
                       </span>

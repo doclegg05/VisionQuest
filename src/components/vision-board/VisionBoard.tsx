@@ -135,7 +135,7 @@ export default function VisionBoard() {
           <p className="max-w-2xl">
             Drag pins anywhere on the board. Use the corner grip to resize notes, images, and linked goals.
           </p>
-          <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+          <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
             {items.length} pinned
           </span>
         </div>

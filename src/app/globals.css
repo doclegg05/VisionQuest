@@ -37,6 +37,29 @@
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
 
+  /* Status badges */
+  --badge-success-bg: rgba(42, 138, 60, 0.12);
+  --badge-success-text: #1a6b2a;
+  --badge-warning-bg: rgba(173, 136, 6, 0.12);
+  --badge-warning-text: #8a6d05;
+  --badge-error-bg: rgba(196, 60, 60, 0.12);
+  --badge-error-text: #a33232;
+  --badge-info-bg: rgba(0, 93, 138, 0.12);
+  --badge-info-text: #004d73;
+
+  /* Toast/celebration */
+  --toast-celebration-bg: rgba(211, 178, 87, 0.12);
+  --toast-celebration-border: rgba(211, 178, 87, 0.3);
+  --toast-celebration-text: #8a6d05;
+
+  /* Urgency (teacher) */
+  --urgency-critical-bg: rgba(196, 60, 60, 0.12);
+  --urgency-critical-text: #a33232;
+  --urgency-high-bg: rgba(173, 136, 6, 0.12);
+  --urgency-high-text: #8a6d05;
+  --urgency-medium-bg: rgba(0, 93, 138, 0.12);
+  --urgency-medium-text: #004d73;
+
   /* Legacy aliases */
   --background: var(--surface-base);
   --foreground: var(--ink-strong);
@@ -92,6 +115,29 @@
   --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
+
+  /* Status badges */
+  --badge-success-bg: rgba(63, 207, 94, 0.15);
+  --badge-success-text: #3fcf5e;
+  --badge-warning-bg: rgba(224, 192, 106, 0.15);
+  --badge-warning-text: #e0c06a;
+  --badge-error-bg: rgba(240, 107, 107, 0.15);
+  --badge-error-text: #f06b6b;
+  --badge-info-bg: rgba(56, 168, 216, 0.15);
+  --badge-info-text: #38a8d8;
+
+  /* Toast/celebration */
+  --toast-celebration-bg: rgba(224, 192, 106, 0.15);
+  --toast-celebration-border: rgba(224, 192, 106, 0.3);
+  --toast-celebration-text: #e0c06a;
+
+  /* Urgency (teacher) */
+  --urgency-critical-bg: rgba(240, 107, 107, 0.15);
+  --urgency-critical-text: #f06b6b;
+  --urgency-high-bg: rgba(224, 192, 106, 0.15);
+  --urgency-high-text: #e0c06a;
+  --urgency-medium-bg: rgba(56, 168, 216, 0.15);
+  --urgency-medium-text: #38a8d8;
 
   /* Chat surfaces — dark mode */
   --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
@@ -519,7 +565,7 @@ a[role="button"]:active,
 }
 
 .animate-slide-up-bounce {
-  animation: slide-up-bounce var(--duration-normal) var(--ease-bounce) both;
+  animation: slide-up-bounce var(--duration-normal) var(--ease-spring) both;
 }
 
 .animate-scale-pop {

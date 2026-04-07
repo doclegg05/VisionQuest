@@ -230,7 +230,7 @@ export default function PortfolioGrid() {
                 >
                   <span className="text-2xl">{opt.icon}</span>
                   <span className="text-sm font-semibold text-[var(--ink-strong)]">{opt.label}</span>
-                  <span className="text-[11px] leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
+                  <span className="text-xs leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
                 </button>
               ))}
             </div>

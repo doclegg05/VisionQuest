@@ -476,7 +476,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                   ) : null}
                 </div>
                 {progress?.completedAt ? (
-                  <span className="text-[11px] uppercase tracking-[0.12em] text-emerald-700">
+                  <span className="text-xs uppercase tracking-[0.12em] text-emerald-700">
                     {formatDateInput(progress.completedAt)}
                   </span>
                 ) : null}

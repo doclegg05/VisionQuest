@@ -179,8 +179,8 @@ export default function SettingsPage() {
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
               recoveryConfigured
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-800"
+                ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
+                : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
             }`}
           >
             {recoveryConfigured ? "Configured" : "Not set up yet"}
@@ -218,10 +218,10 @@ export default function SettingsPage() {
           </button>
 
           {recoveryStatus === "success" && (
-            <p className="text-sm text-emerald-600">Recovery questions saved.</p>
+            <p className="text-sm text-[var(--success)]">Recovery questions saved.</p>
           )}
           {recoveryStatus === "error" && (
-            <p className="text-sm text-red-600">{recoveryError}</p>
+            <p className="text-sm text-[var(--error)]">{recoveryError}</p>
           )}
         </div>
       </div>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
       {(hasKey || platformKeyConfigured) && (
         <div className="surface-section mb-6 flex items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">Sage is active</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--success)]">Sage is active</p>
             <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">
               {hasKey ? "Personal API key connected" : "Platform API key connected"}
             </p>
@@ -345,12 +345,12 @@ export default function SettingsPage() {
           </div>
 
           {status === "success" && (
-            <p className="mt-3 text-sm text-emerald-600">
+            <p className="mt-3 text-sm text-[var(--success)]">
               Key saved successfully. Sage is ready to chat.
             </p>
           )}
           {status === "error" && (
-            <p className="mt-3 text-sm text-red-600">{errorMsg}</p>
+            <p className="mt-3 text-sm text-[var(--error)]">{errorMsg}</p>
           )}
         </div>
       </div>
@@ -386,7 +386,7 @@ export default function SettingsPage() {
                 void saveNotificationPreferences({ email: next });
               }}
               className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
-                emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-gray-200"
+                emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
               }`}
             >
               <span
@@ -416,7 +416,7 @@ export default function SettingsPage() {
                   void saveNotificationPreferences({ sms: next });
                 }}
                 className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
-                  smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-gray-200"
+                  smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
                 }`}
               >
                 <span
@@ -457,7 +457,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 {phoneError && (
-                  <p className="mt-1.5 text-xs text-red-600">{phoneError}</p>
+                  <p className="mt-1.5 text-xs text-[var(--error)]">{phoneError}</p>
                 )}
                 <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
                   Standard messaging rates may apply. Use international format, e.g. +12125551234.
@@ -469,10 +469,10 @@ export default function SettingsPage() {
 
         <div className="mt-4 flex items-center gap-3">
           {notifStatus === "success" && (
-            <p className="text-sm text-emerald-600">Notification preferences saved.</p>
+            <p className="text-sm text-[var(--success)]">Notification preferences saved.</p>
           )}
           {notifStatus === "error" && (
-            <p className="text-sm text-red-600">{notifError}</p>
+            <p className="text-sm text-[var(--error)]">{notifError}</p>
           )}
         </div>
       </div>
