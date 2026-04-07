@@ -28,6 +28,7 @@ model Student {
   updatedAt      DateTime  @updatedAt
 
   conversations           Conversation[]
+  messages                Message[]
   goals                   Goal[]
   progression             Progression?
   files                   FileUpload[]
@@ -67,7 +68,6 @@ model Student {
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
   llmCallLogs             LlmCallLog[]
-  messages                Message[]
   createdPathways         Pathway[]                @relation("PathwayCreator")
 
   @@schema("visionquest")
@@ -851,6 +851,7 @@ model ProgramDocument {
   usedBySage      Boolean @default(false)
   // Short text summary Sage can read (avoids loading full PDF into prompt)
   sageContextNote String? @db.Text
+  fileModifiedAt  DateTime? // Filesystem mtime at ingestion — for change detection
 
   // --- Metadata ---
   sortOrder  Int      @default(0)

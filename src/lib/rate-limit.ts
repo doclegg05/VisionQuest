@@ -71,3 +71,22 @@ export async function rateLimit(
 
   throw new Error("Unable to apply rate limit after retries.");
 }
+
+/**
+ * Daily rate limit with calendar-day window (resets at midnight UTC).
+ * Returns the same RateLimitResult shape as rateLimit().
+ */
+export async function rateLimitDaily(
+  key: string,
+  limit: number,
+): Promise<RateLimitResult> {
+  const now = new Date();
+  const tomorrow = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+  ));
+  const windowMs = tomorrow.getTime() - now.getTime();
+
+  return rateLimit(key, limit, windowMs);
+}

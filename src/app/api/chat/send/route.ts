@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getProvider } from "@/lib/ai";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
@@ -24,22 +24,7 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
 
-  // Rate limit
-  const rl = await rateLimit(`chat:${session.id}`, 60, 60 * 60 * 1000);
-  if (!rl.success) {
-    return new Response(JSON.stringify({ error: "Too many messages. Please wait before sending more." }), { status: 429 });
-  }
-
-  // Check token quota before making AI call
-  const quota = await checkTokenQuota(session.id, session.role);
-  if (!quota.allowed) {
-    return new Response(
-      JSON.stringify({ error: quota.warning }),
-      { status: 429, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
-  // Resolve AI provider
+  // Resolve AI provider first — guardrails depend on whether it's cloud or local
   let provider;
   try {
     provider = await getProvider(session.id);
@@ -57,13 +42,54 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
     );
   }
 
+  // All token/rate guardrails only apply to cloud providers (local models have no API cost)
+  const isCloudProvider = provider.name === "gemini";
+  const rateLimitsDisabled = process.env.VISIONQUEST_DISABLE_RATE_LIMITS === "true";
+  let dailyRemaining: number | null = null;
+
+  if (isCloudProvider && !rateLimitsDisabled) {
+    // Hourly limit by role
+    const hourlyLimit = isTeacher ? (session.role === "admin" ? 120 : 60) : 40;
+    const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
+    if (!hourlyRl.success) {
+      return new Response(
+        JSON.stringify({ error: "Too many messages this hour. Please wait before sending more." }),
+        { status: 429 },
+      );
+    }
+
+    // Daily limit by role (calendar-day, resets midnight UTC)
+    if (session.role !== "admin") {
+      const dailyLimit = isTeacher ? 400 : 200;
+      const dailyRl = await rateLimitDaily(`chat-daily:${session.id}`, dailyLimit);
+      if (!dailyRl.success) {
+        return new Response(
+          JSON.stringify({ error: "I've reached my daily limit. I'll be fresh and ready tomorrow! For urgent questions, please ask your instructor." }),
+          { status: 429 },
+        );
+      }
+      dailyRemaining = dailyRl.remaining;
+    }
+  }
+
+  // Token quota only applies to cloud providers
+  const quota = isCloudProvider
+    ? await checkTokenQuota(session.id, session.role)
+    : { allowed: true, warning: null };
+  if (!quota.allowed) {
+    return new Response(
+      JSON.stringify({ error: quota.warning }),
+      { status: 429, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // Get or create conversation (teacher vs student path)
   const conversation = isTeacher
     ? await getOrCreateTeacherConversation(session.id, conversationId)
     : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
   // Save user message
-  await saveMessage(conversation.id, "user", userMessage, conversation.studentId);
+  await saveMessage(conversation.id, session.id, "user", userMessage);
 
   // Build system prompt — teacher gets a streamlined path
   let systemPrompt: string;
@@ -109,6 +135,15 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
     systemPrompt += documentContext;
   }
 
+  // 80% daily warning — inject into system prompt so Sage mentions it naturally
+  if (dailyRemaining !== null) {
+    const dailyLimit = isStaffRole(session.role) ? 400 : 200;
+    const usagePercent = 1 - (dailyRemaining / dailyLimit);
+    if (usagePercent >= 0.8) {
+      systemPrompt += `\n\n[SYSTEM NOTE: This user has used ${Math.round(usagePercent * 100)}% of their daily message limit. Naturally mention that you're getting a lot of questions today and your answers may be shorter for a bit. Do not make it alarming.]`;
+    }
+  }
+
   // Format message history for Gemini, using compacted context when available
   const conversationContext = await getConversationContext(conversation.id);
   const allMessages = [
@@ -136,7 +171,7 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
         }
 
         // Save assistant message
-        await saveMessage(conversation.id, "assistant", fullResponse, conversation.studentId);
+        await saveMessage(conversation.id, session.id, "assistant", fullResponse);
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
         void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
