@@ -24,11 +24,30 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
 
-  // Rate limits — skip if kill switch is enabled
+  // Resolve AI provider first — guardrails depend on whether it's cloud or local
+  let provider;
+  try {
+    provider = await getProvider(session.id);
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
+    const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
+
+    return new Response(
+      JSON.stringify({
+        error: isOffline
+          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
+          : errorMsg,
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // All token/rate guardrails only apply to cloud providers (local models have no API cost)
+  const isCloudProvider = provider.name === "gemini";
   const rateLimitsDisabled = process.env.VISIONQUEST_DISABLE_RATE_LIMITS === "true";
   let dailyRemaining: number | null = null;
 
-  if (!rateLimitsDisabled) {
+  if (isCloudProvider && !rateLimitsDisabled) {
     // Hourly limit by role
     const hourlyLimit = isTeacher ? (session.role === "admin" ? 120 : 60) : 40;
     const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
@@ -53,30 +72,14 @@ export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) =>
     }
   }
 
-  // Check token quota before making AI call
-  const quota = await checkTokenQuota(session.id, session.role);
+  // Token quota only applies to cloud providers
+  const quota = isCloudProvider
+    ? await checkTokenQuota(session.id, session.role)
+    : { allowed: true, warning: null };
   if (!quota.allowed) {
     return new Response(
       JSON.stringify({ error: quota.warning }),
       { status: 429, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
-  // Resolve AI provider
-  let provider;
-  try {
-    provider = await getProvider(session.id);
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
-    const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
-
-    return new Response(
-      JSON.stringify({
-        error: isOffline
-          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
-          : errorMsg,
-      }),
-      { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
 
