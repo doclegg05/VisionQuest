@@ -1,0 +1,10 @@
+{
+  "exclude": [
+    "forms/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+  ],
+  "overrides": {
+    "lms/Aztec/Aztecs_Continuum_of_Learning_Chart_1.png": {
+      "sageContextNote": "Visual chart showing Aztec learning progression levels and curriculum structure"
+    }
+  }
+}
