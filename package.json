@@ -19,6 +19,7 @@
     "users:promote-admin": "node scripts/promote-admin.mjs",
     "db:seed": "node scripts/seed-data.mjs",
     "db:seed-documents": "node scripts/seed-documents.mjs",
+    "seed:sage-context": "node scripts/seed-sage-context.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
