@@ -31,7 +31,11 @@ export class OllamaProvider implements AIProvider {
   }
 
   private get headers(): Record<string, string> {
-    const h: Record<string, string> = { "Content-Type": "application/json" };
+    const h: Record<string, string> = {
+      "Content-Type": "application/json",
+      "User-Agent": "VisionQuest",
+      "ngrok-skip-browser-warning": "true",
+    };
     if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
     return h;
   }

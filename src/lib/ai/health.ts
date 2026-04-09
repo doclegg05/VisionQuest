@@ -14,6 +14,10 @@ export async function checkOllamaHealth(
 
     const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/api/tags`, {
       signal: controller.signal,
+      headers: {
+        "User-Agent": "VisionQuest",
+        "ngrok-skip-browser-warning": "true",
+      },
     });
     clearTimeout(timer);
 
