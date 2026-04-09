@@ -1,5 +1,5 @@
 import { TOOLS } from "./tools";
-import type { ToolDefinition, Role, ToolNamespace, AuditLevel } from "./types";
+import type { ToolDefinition, Role, ToolNamespace } from "./types";
 
 export type { ToolDefinition, Role, ToolNamespace, AuditLevel } from "./types";
 export { TOOLS } from "./tools";

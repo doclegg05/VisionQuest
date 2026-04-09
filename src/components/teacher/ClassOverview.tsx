@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import InterventionQueue from "./InterventionQueue";
 import DetailedQueues from "./class-overview/DetailedQueues";

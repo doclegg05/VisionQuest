@@ -93,7 +93,19 @@ Students (any classroom)
                     --> Gemini API (existing path)
 ```
 
-**Cloudflare Tunnel (free, zero IT involvement):**
+**Tunnel Options (choose one):**
+
+| Option | Best For | Cost | Setup |
+|--------|----------|------|-------|
+| ngrok Free | Dev/testing, 1 classroom pilot | Free (1GB/mo bandwidth) | `ngrok http 11434` — instant |
+| ngrok Pro | Multi-classroom deployment | $10/mo (unlimited bandwidth) | Fixed subdomain, IP policies |
+| Cloudflare Tunnel | Production (recommended for July) | Free (unlimited) | Requires domain on Cloudflare nameservers |
+
+**Current (pilot):** ngrok — instant setup, no domain required. URL set as `ai_provider_url` in admin config.
+
+**Production (July multi-classroom):** Migrate to Cloudflare Tunnel before scaling to 11 classrooms. Requires purchasing or transferring a domain to Cloudflare nameservers (~$12/year for a `.dev` domain). Benefits: free unlimited bandwidth, stable URL (`llm.yourdomain.com`), Access Service Tokens for security.
+
+**Cloudflare Tunnel details (for production):**
 - `cloudflared` daemon runs on Mac Studio, establishes outbound HTTPS connection to Cloudflare
 - Exposes `llm.yourdomain.com` pointing at Ollama (port 11434)
 - Works through any school firewall — outbound-only on port 443

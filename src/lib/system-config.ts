@@ -7,6 +7,7 @@ export const SYSTEM_CONFIG_KEYS = [
   "ai_provider",
   "ai_provider_url",
   "ai_provider_model",
+  "ai_provider_api_key",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

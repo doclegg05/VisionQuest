@@ -33,7 +33,7 @@ async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-export const GET = withRegistry("goals.list", async (session, req, ctx, tool) => {
+export const GET = withRegistry("goals.list", async (session, req, _ctx, _tool) => {
   const statusFilters = parseGoalStatusFilters(new URL(req.url));
   const allGoals = await cached(`goals:${session.id}`, 30, () =>
     prisma.goal.findMany({
@@ -49,7 +49,7 @@ export const GET = withRegistry("goals.list", async (session, req, ctx, tool) =>
   return NextResponse.json({ goals });
 });
 
-export const POST = withRegistry("goals.create", async (session, req, ctx, tool) => {
+export const POST = withRegistry("goals.create", async (session, req, _ctx, _tool) => {
   const body = await readJsonBody(req);
   const rawLevel = typeof body.level === "string" ? body.level.trim().toLowerCase() : "";
   const content = typeof body.content === "string" ? body.content.trim() : "";

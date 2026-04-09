@@ -5,7 +5,7 @@ import { badRequest } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 
 // GET — list notifications for the current user
-export const GET = withRegistry("notifications.list", async (session, req, ctx, tool) => {
+export const GET = withRegistry("notifications.list", async (session, req, _ctx, _tool) => {
   const url = new URL(req.url);
   const unreadOnly = url.searchParams.get("unread") === "true";
   const rawLimit = parseInt(url.searchParams.get("limit") ?? "20", 10);
@@ -28,7 +28,7 @@ export const GET = withRegistry("notifications.list", async (session, req, ctx, 
 });
 
 // POST — mark notifications as read
-export const POST = withRegistry("notifications.mark_read", async (session, req, ctx, tool) => {
+export const POST = withRegistry("notifications.mark_read", async (session, req, _ctx, _tool) => {
   const { ids } = await req.json();
   if (ids !== undefined) {
     if (!Array.isArray(ids) || ids.some((id: unknown) => typeof id !== "string" || id.length === 0)) {

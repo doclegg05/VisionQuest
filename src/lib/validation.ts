@@ -9,6 +9,42 @@ export function isValidUrl(url: string): boolean {
   }
 }
 
+/**
+ * Block URLs targeting internal/private network destinations.
+ * Prevents SSRF via admin-configured webhooks or similar features.
+ */
+export function isSafeExternalUrl(url: string): boolean {
+  if (!isValidUrl(url)) return false;
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block loopback
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return false;
+    }
+    // Block link-local and metadata endpoints
+    if (hostname === "169.254.169.254" || hostname.startsWith("169.254.")) {
+      return false;
+    }
+    // Block private RFC1918 ranges (simple prefix check for common patterns)
+    if (hostname.startsWith("10.") || hostname.startsWith("192.168.")) {
+      return false;
+    }
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
+      return false;
+    }
+    // Block 0.0.0.0
+    if (hostname === "0.0.0.0") return false;
+    // Block [::] and other IPv6 loopback/private forms
+    if (hostname.startsWith("[")) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function sanitizeUrl(url: string): string | null {
   return isValidUrl(url) ? url : null;
 }

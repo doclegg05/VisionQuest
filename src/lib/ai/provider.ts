@@ -1,4 +1,4 @@
-import { getPlainConfigValue } from "@/lib/system-config";
+import { getPlainConfigValue, getConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
@@ -16,15 +16,17 @@ export async function getProvider(studentId: string): Promise<AIProvider> {
   const providerType = ((await getPlainConfigValue("ai_provider")) || "cloud") as AIProviderType;
 
   if (providerType === "local") {
-    const url = await getPlainConfigValue("ai_provider_url");
+    const [url, model, apiKey] = await Promise.all([
+      getPlainConfigValue("ai_provider_url"),
+      getPlainConfigValue("ai_provider_model"),
+      getConfigValue("ai_provider_api_key"),
+    ]);
     if (!url) {
       throw new Error(
         "Local AI server URL is not configured. Set it in Program Setup > AI Provider.",
       );
     }
-    const model =
-      (await getPlainConfigValue("ai_provider_model")) || DEFAULT_OLLAMA_MODEL;
-    return new OllamaProvider(url, model);
+    return new OllamaProvider(url, model || DEFAULT_OLLAMA_MODEL, apiKey || undefined);
   }
 
   // Default: cloud (Gemini)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { generateCertificatePDF, type CertificateData } from "@/lib/certificate-generator";
+import { generateCertificatePDF } from "@/lib/certificate-generator";
 
 interface CertificateDownloadProps {
   studentName: string;

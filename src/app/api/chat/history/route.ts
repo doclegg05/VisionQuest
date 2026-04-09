@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withRegistry } from "@/lib/registry/middleware";
 
-export const GET = withRegistry("sage.history", async (session, req, ctx, tool) => {
+export const GET = withRegistry("sage.history", async (session, req, _ctx, _tool) => {
   const conversationId = req.nextUrl.searchParams.get("conversationId");
   if (!conversationId) {
     return NextResponse.json({ error: "conversationId is required." }, { status: 400 });

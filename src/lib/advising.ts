@@ -1,8 +1,3 @@
-import { buildStudentAlertDescriptors, type AlertDescriptor } from "./advising-alerts";
-import {
-  sendAppointmentConfirmation,
-  sendPendingAppointmentReminders,
-} from "./advising-appointments";
 import { syncInterventionNotifications } from "./advising-interventions";
 import { loadStudentAlertSyncContext } from "./advising-sync-context";
 import {
@@ -11,13 +6,6 @@ import {
 } from "./advising-sync";
 import {
   buildBookableAdvisorSlots,
-  formatMinutesLabel,
-  minutesFromTimeInput,
-  timeInputFromMinutes,
-  type AdvisorAvailabilityRecord,
-  type BookableAdvisor,
-  type BookableSlot,
-  type ScheduledAdvisorAppointment,
 } from "./advising-scheduling";
 import { prisma } from "./db";
 import { logger } from "./logger";

@@ -11,7 +11,7 @@ function parseOptionalDate(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export const GET = withRegistry("classes.list", async (session, req, ctx, tool) => {
+export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool) => {
   const { searchParams } = new URL(req.url);
   const includeArchived = searchParams.get("includeArchived") === "true";
 
@@ -80,7 +80,7 @@ export const GET = withRegistry("classes.list", async (session, req, ctx, tool) 
   });
 });
 
-export const POST = withRegistry("classes.create", async (session, req, ctx, tool) => {
+export const POST = withRegistry("classes.create", async (session, req, _ctx, _tool) => {
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = normalizeClassCode(typeof body.code === "string" && body.code.trim() ? body.code : name);

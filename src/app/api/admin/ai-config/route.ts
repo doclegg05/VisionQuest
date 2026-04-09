@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdminAuth, badRequest } from "@/lib/api-error";
-import { getConfigValue, setConfigValue, deleteConfigValue } from "@/lib/system-config";
+import { setConfigValue, deleteConfigValue } from "@/lib/system-config";
 import { decrypt } from "@/lib/crypto";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";

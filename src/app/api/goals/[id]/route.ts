@@ -20,7 +20,7 @@ async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-export const PATCH = withRegistry("goals.update", async (session, req, ctx, tool) => {
+export const PATCH = withRegistry("goals.update", async (session, req, ctx, _tool) => {
   const { id } = await ctx.params;
   const body = await readJsonBody(req);
   const goal = await prisma.goal.findFirst({

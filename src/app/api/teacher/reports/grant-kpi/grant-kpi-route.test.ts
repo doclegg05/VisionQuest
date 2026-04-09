@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { computeGrantKpis, currentProgramYear, type GrantKpiRecord } from "@/lib/grant-kpi";
+import { computeGrantKpis, type GrantKpiRecord } from "@/lib/grant-kpi";
 
 // ---------------------------------------------------------------------------
 // These tests extend the existing grant-kpi.test.ts with route-level concerns:

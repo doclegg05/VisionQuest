@@ -65,12 +65,7 @@ export default function OrientationChecklist({
       .catch(() => {});
   }, [targetStudentId]);
 
-  useEffect(() => {
-    void fetchItems();
-    fetchFormStatuses();
-  }, [fetchFormStatuses, targetStudentId]);
-
-  async function fetchItems() {
+  const fetchItems = useCallback(async () => {
     try {
       const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
       const res = await fetch(`/api/orientation${params}`);
@@ -85,7 +80,12 @@ export default function OrientationChecklist({
     } finally {
       setLoading(false);
     }
-  }
+  }, [targetStudentId]);
+
+  useEffect(() => {
+    void fetchItems();
+    fetchFormStatuses();
+  }, [fetchFormStatuses, fetchItems, targetStudentId]);
 
   async function toggleItem(itemId: string, completed: boolean) {
     setItems((prev) => prev.map((item) =>

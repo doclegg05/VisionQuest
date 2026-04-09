@@ -28,6 +28,7 @@ export class GeminiProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
   ): Promise<string> {
+    if (messages.length === 0) throw new Error("messages array must not be empty");
     const model = this.getModel(systemPrompt);
     const chat = model.startChat({
       history: messages.slice(0, -1).map((m) => ({
@@ -45,6 +46,7 @@ export class GeminiProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
   ): AsyncGenerator<string> {
+    if (messages.length === 0) throw new Error("messages array must not be empty");
     const model = this.getModel(systemPrompt);
     const chat = model.startChat({
       history: messages.slice(0, -1).map((m) => ({
@@ -66,6 +68,7 @@ export class GeminiProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
   ): Promise<string> {
+    if (messages.length === 0) throw new Error("messages array must not be empty");
     const genAI = new GoogleGenerativeAI(this.apiKey);
     const model = genAI.getGenerativeModel({
       model: MODEL,

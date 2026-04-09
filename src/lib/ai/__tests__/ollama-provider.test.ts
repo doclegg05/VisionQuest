@@ -1,69 +1,69 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, beforeEach, mock } from "node:test";
+import assert from "node:assert/strict";
 import { OllamaProvider } from "../ollama-provider";
 
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+const mockFetch = mock.fn<typeof globalThis.fetch>();
+globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
 
 describe("OllamaProvider", () => {
   const provider = new OllamaProvider("http://localhost:11434", "gemma4:26b");
 
   beforeEach(() => {
-    mockFetch.mockReset();
+    mockFetch.mock.resetCalls();
   });
 
   describe("generateResponse", () => {
     it("sends correct request and returns response text", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
           choices: [{ message: { content: "Hello there!" } }],
         }),
-      });
+      );
 
       const result = await provider.generateResponse("Be helpful.", [
         { role: "user", content: "Hi" },
       ]);
 
-      expect(result).toBe("Hello there!");
+      assert.equal(result, "Hello there!");
 
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toBe("http://localhost:11434/v1/chat/completions");
-      const body = JSON.parse(options.body);
-      expect(body.model).toBe("gemma4:26b");
-      expect(body.stream).toBe(false);
-      expect(body.messages[0]).toEqual({ role: "system", content: "Be helpful." });
-      expect(body.messages[1]).toEqual({ role: "user", content: "Hi" });
+      const call = mockFetch.mock.calls[0];
+      assert.equal(call.arguments[0], "http://localhost:11434/v1/chat/completions");
+      const body = JSON.parse((call.arguments[1] as RequestInit).body as string);
+      assert.equal(body.model, "gemma4:26b");
+      assert.equal(body.stream, false);
+      assert.deepEqual(body.messages[0], { role: "system", content: "Be helpful." });
+      assert.deepEqual(body.messages[1], { role: "user", content: "Hi" });
     });
 
     it("throws on non-ok response", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        text: async () => "Internal Server Error",
-      });
+      mockFetch.mock.mockImplementationOnce(async () =>
+        new Response("Internal Server Error", { status: 500 }),
+      );
 
-      await expect(
+      await assert.rejects(
         provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
-      ).rejects.toThrow("Ollama request failed (500)");
+        /Local AI request failed \(500\)/,
+      );
     });
   });
 
   describe("generateStructuredResponse", () => {
     it("sets response_format for JSON output", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
           choices: [{ message: { content: '{"goals_found":[]}' } }],
         }),
-      });
+      );
 
       const result = await provider.generateStructuredResponse("Extract goals.", [
         { role: "user", content: "I want to learn coding" },
       ]);
 
-      expect(result).toBe('{"goals_found":[]}');
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.response_format).toEqual({ type: "json_object" });
+      assert.equal(result, '{"goals_found":[]}');
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.deepEqual(body.response_format, { type: "json_object" });
     });
   });
 
@@ -85,10 +85,9 @@ describe("OllamaProvider", () => {
         },
       });
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        body: stream,
-      });
+      mockFetch.mock.mockImplementationOnce(
+        async () => new Response(stream, { status: 200 }),
+      );
 
       const result: string[] = [];
       for await (const chunk of provider.streamResponse("sys", [
@@ -97,20 +96,21 @@ describe("OllamaProvider", () => {
         result.push(chunk);
       }
 
-      expect(result).toEqual(["Hello", " world"]);
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.stream).toBe(true);
+      assert.deepEqual(result, ["Hello", " world"]);
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(body.stream, true);
     });
   });
 
   describe("message role mapping", () => {
     it("maps 'model' role to 'assistant' for OpenAI format", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
           choices: [{ message: { content: "ok" } }],
         }),
-      });
+      );
 
       await provider.generateResponse("sys", [
         { role: "user", content: "Hi" },
@@ -118,10 +118,12 @@ describe("OllamaProvider", () => {
         { role: "user", content: "How are you?" },
       ]);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.messages[1]).toEqual({ role: "user", content: "Hi" });
-      expect(body.messages[2]).toEqual({ role: "assistant", content: "Hello" });
-      expect(body.messages[3]).toEqual({ role: "user", content: "How are you?" });
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.deepEqual(body.messages[1], { role: "user", content: "Hi" });
+      assert.deepEqual(body.messages[2], { role: "assistant", content: "Hello" });
+      assert.deepEqual(body.messages[3], { role: "user", content: "How are you?" });
     });
   });
 });

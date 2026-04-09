@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { withAdminAuth, badRequest, notFound } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
-import { isValidUrl } from "@/lib/validation";
+import { isSafeExternalUrl } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
 import { invalidateWebhookCache } from "@/lib/webhooks";
 
@@ -23,7 +23,7 @@ export const POST = withAdminAuth(async (session, req: Request) => {
   };
 
   if (!url || typeof url !== "string") throw badRequest("url is required");
-  if (!isValidUrl(url)) throw badRequest("Invalid URL. Only http and https URLs are allowed.");
+  if (!isSafeExternalUrl(url)) throw badRequest("Invalid URL. Must be a public http/https endpoint (no internal or private addresses).");
   if (!Array.isArray(eventTypes) || !eventTypes.every((eventType) => typeof eventType === "string")) {
     throw badRequest("eventTypes must be an array of strings");
   }
@@ -66,8 +66,8 @@ export const PATCH = withAdminAuth(async (session, req: Request) => {
   if (!existing) throw notFound("Webhook subscription not found");
 
   if (url !== undefined) {
-    if (typeof url !== "string" || !isValidUrl(url)) {
-      throw badRequest("Invalid URL. Only http and https URLs are allowed.");
+    if (typeof url !== "string" || !isSafeExternalUrl(url)) {
+      throw badRequest("Invalid URL. Must be a public http/https endpoint (no internal or private addresses).");
     }
   }
   if (eventTypes !== undefined) {

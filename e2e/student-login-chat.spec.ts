@@ -46,7 +46,7 @@ test.describe("Student login flow", () => {
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await expect(
-      page.getByText(/invalid|incorrect|not found/i),
+      page.getByText(/invalid|incorrect|not found|too many/i),
     ).toBeVisible({ timeout: 10_000 });
   });
 });

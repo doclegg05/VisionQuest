@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/db";
 import { getProvider } from "@/lib/ai";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
@@ -17,7 +16,7 @@ import { checkTokenQuota } from "@/lib/llm-usage";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
-export const POST = withRegistry("sage.chat", async (session, req, ctx, tool) => {
+export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;

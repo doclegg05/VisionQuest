@@ -15,7 +15,7 @@ import { FORMS } from "@/lib/spokes/forms";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 
 // GET — individual student detail for teacher view
-export const GET = withRegistry("admin.student_detail", async (session, req, ctx, tool) => {
+export const GET = withRegistry("admin.student_detail", async (session, _req, ctx, _tool) => {
   const { id } = await ctx.params;
   await assertStaffCanManageStudent(session, id);
 

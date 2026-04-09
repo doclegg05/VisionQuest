@@ -31,7 +31,7 @@ test.describe("Public pages", () => {
 
   test("teacher registration page renders", async ({ page }) => {
     await page.goto("/teacher-register");
-    await expect(page.getByRole("heading", { name: /teacher registration/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /(teacher|staff) registration/i })).toBeVisible();
   });
 });
 

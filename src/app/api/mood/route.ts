@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withRegistry } from "@/lib/registry/middleware";
 
-export const GET = withRegistry("learning.mood", async (session, req, ctx, tool) => {
+export const GET = withRegistry("learning.mood", async (session, _req, _ctx, _tool) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

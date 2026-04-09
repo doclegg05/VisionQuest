@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 interface CredlyBadge {
   id: string;
@@ -217,13 +218,12 @@ export default function CredlyBadges() {
             className="group flex flex-col items-center gap-2 theme-card rounded-xl/60 p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
             {badge.imageUrl ? (
-              <img
+              <Image
                 src={badge.imageUrl}
                 alt={badge.name}
                 width={80}
                 height={80}
                 loading="lazy"
-                decoding="async"
                 className="h-20 w-20 object-contain"
               />
             ) : (

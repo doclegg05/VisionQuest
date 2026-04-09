@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withRegistry } from "@/lib/registry/middleware";
 
-export const GET = withRegistry("sage.conversations", async (session, req, ctx, tool) => {
+export const GET = withRegistry("sage.conversations", async (session, _req, _ctx, _tool) => {
   const conversations = await prisma.conversation.findMany({
     where: { studentId: session.id },
     orderBy: { updatedAt: "desc" },

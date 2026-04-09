@@ -22,10 +22,18 @@ export class OllamaProvider implements AIProvider {
   readonly name = "ollama";
   private readonly baseUrl: string;
   private readonly model: string;
+  private readonly apiKey: string | null;
 
-  constructor(baseUrl: string, model: string) {
+  constructor(baseUrl: string, model: string, apiKey?: string) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.model = model;
+    this.apiKey = apiKey || null;
+  }
+
+  private get headers(): Record<string, string> {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
+    return h;
   }
 
   async generateResponse(
@@ -34,7 +42,7 @@ export class OllamaProvider implements AIProvider {
   ): Promise<string> {
     const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers,
       body: JSON.stringify({
         model: this.model,
         messages: toOpenAIMessages(systemPrompt, messages),
@@ -43,8 +51,7 @@ export class OllamaProvider implements AIProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Ollama request failed (${res.status}): ${text}`);
+      throw new Error(`Local AI request failed (${res.status})`);
     }
 
     const data = await res.json();
@@ -57,7 +64,7 @@ export class OllamaProvider implements AIProvider {
   ): AsyncGenerator<string> {
     const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers,
       body: JSON.stringify({
         model: this.model,
         messages: toOpenAIMessages(systemPrompt, messages),
@@ -66,11 +73,11 @@ export class OllamaProvider implements AIProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Ollama stream failed (${res.status}): ${text}`);
+      throw new Error(`Local AI stream failed (${res.status})`);
     }
 
-    const reader = res.body!.getReader();
+    if (!res.body) throw new Error("Ollama returned empty stream body");
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -88,9 +95,12 @@ export class OllamaProvider implements AIProvider {
         const payload = trimmed.slice(6);
         if (payload === "[DONE]") return;
 
-        const parsed = JSON.parse(payload) as {
-          choices?: Array<{ delta?: { content?: string } }>;
-        };
+        let parsed: { choices?: Array<{ delta?: { content?: string } }> };
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          continue;
+        }
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) yield content;
       }
@@ -103,7 +113,7 @@ export class OllamaProvider implements AIProvider {
   ): Promise<string> {
     const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers,
       body: JSON.stringify({
         model: this.model,
         messages: toOpenAIMessages(systemPrompt, messages),
@@ -113,8 +123,7 @@ export class OllamaProvider implements AIProvider {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Ollama structured request failed (${res.status}): ${text}`);
+      throw new Error(`Local AI structured request failed (${res.status})`);
     }
 
     const data = await res.json();

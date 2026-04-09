@@ -7,7 +7,7 @@ interface RecentActivityProps {
   xp: number;
 }
 
-export default function RecentActivity({ achievements, lastLevelUp, currentStreak, xp }: RecentActivityProps) {
+export default function RecentActivity({ achievements, lastLevelUp, currentStreak: _currentStreak, xp: _xp }: RecentActivityProps) {
   const recentItems = achievements.slice(0, 5);
 
   if (recentItems.length === 0 && !lastLevelUp) {

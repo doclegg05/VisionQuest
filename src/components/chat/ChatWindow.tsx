@@ -268,7 +268,7 @@ function ChatWindowInner() {
         setIsLoading(false);
       }
     },
-    [conversationId, pollForGoals, refreshConversationList, checkProgression]
+    [conversationId, pollForGoals, refreshConversationList, checkProgression, searchParams]
   );
 
   // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links

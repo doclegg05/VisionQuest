@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface ChecklistTemplate {
   id: string;
@@ -108,12 +108,11 @@ export default function SpokesManager() {
     notes: "",
   });
 
-  useEffect(() => {
-    void loadData();
-  }, []);
+  const countyFilterRef = useRef(countyFilter);
+  countyFilterRef.current = countyFilter;
 
-  async function loadData(selectedCounty?: string) {
-    const county = selectedCounty ?? countyFilter;
+  const loadData = useCallback(async (selectedCounty?: string) => {
+    const county = selectedCounty ?? countyFilterRef.current;
     const referralUrl =
       county && county !== "all"
         ? `/api/teacher/spokes/referrals?county=${encodeURIComponent(county)}`
@@ -144,7 +143,11 @@ export default function SpokesManager() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   function resetChecklistForm() {
     setEditingChecklistId(null);

@@ -15,7 +15,7 @@ test.describe("Teacher registration", () => {
   test("teacher registration page loads", async ({ page }) => {
     await page.goto("/teacher-register");
     await expect(
-      page.getByRole("heading", { name: /teacher registration/i }),
+      page.getByRole("heading", { name: /(teacher|staff) registration/i }),
     ).toBeVisible();
   });
 
