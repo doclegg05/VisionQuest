@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth, badRequest, notFound, type Session } from "@/lib/api-error";
+import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { enqueueJob, processJobs } from "@/lib/jobs";
 import "@/lib/jobs-registry";
@@ -16,6 +17,8 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
   const { classId } = body as { classId?: string };
 
   if (!classId) throw badRequest("classId is required");
+
+  await assertStaffCanManageClass(session, classId);
 
   const config = await prisma.jobClassConfig.findUnique({
     where: { classId },

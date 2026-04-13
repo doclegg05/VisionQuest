@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAdminAuth } from "@/lib/api-error";
 import { getPlainConfigValue, setPlainConfigValue, setConfigValue, getConfigValue } from "@/lib/system-config";
 import { logAuditEvent } from "@/lib/audit";
+import { badRequest } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
+import { isSafeAiProviderUrl } from "@/lib/validation";
 import { z } from "zod";
 
 const providerSchema = z.object({
@@ -30,6 +32,12 @@ export const GET = withAdminAuth(async () => {
 
 export const PUT = withAdminAuth(async (session, req: NextRequest) => {
   const body = await parseBody(req, providerSchema);
+
+  if (body.url !== undefined && !isSafeAiProviderUrl(body.url)) {
+    throw badRequest(
+      "Invalid local AI server URL. Use localhost/127.0.0.1/::1 or a public http/https endpoint.",
+    );
+  }
 
   await setPlainConfigValue("ai_provider", body.provider, session.id);
 

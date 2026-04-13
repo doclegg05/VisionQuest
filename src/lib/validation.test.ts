@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isValidEmail, isValidUrl, checkLength, requireString, MAX_LENGTHS } from "./validation";
+import {
+  isValidEmail,
+  isValidUrl,
+  isSafeAiProviderUrl,
+  checkLength,
+  requireString,
+  MAX_LENGTHS,
+} from "./validation";
 
 describe("isValidEmail", () => {
   it("accepts valid emails", () => {
@@ -29,6 +36,20 @@ describe("isValidUrl", () => {
     assert.ok(!isValidUrl("ftp://example.com"));
     assert.ok(!isValidUrl("javascript:alert(1)"));
     assert.ok(!isValidUrl("not-a-url"));
+  });
+});
+
+describe("isSafeAiProviderUrl", () => {
+  it("accepts loopback and public endpoints", () => {
+    assert.ok(isSafeAiProviderUrl("http://localhost:11434"));
+    assert.ok(isSafeAiProviderUrl("http://127.0.0.1:11434"));
+    assert.ok(isSafeAiProviderUrl("https://llm.example.com"));
+  });
+
+  it("rejects private and link-local endpoints", () => {
+    assert.ok(!isSafeAiProviderUrl("http://10.0.0.8:11434"));
+    assert.ok(!isSafeAiProviderUrl("http://192.168.1.25:11434"));
+    assert.ok(!isSafeAiProviderUrl("http://169.254.169.254/latest/meta-data"));
   });
 });
 

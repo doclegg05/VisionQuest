@@ -35,6 +35,9 @@ interface AuthPageClientProps {
 function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaToken, setMfaToken] = useState("");
+  const [mfaSessionToken, setMfaSessionToken] = useState<string | null>(null);
+  const [mfaMessage, setMfaMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -43,9 +46,22 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const oauthError = searchParams.get("error");
   const oauthErrorMessage = oauthError ? (ERROR_MESSAGES[oauthError] || "An error occurred. Please try again.") : null;
 
+  const finishLogin = (role: string) => {
+    const nextPath =
+      role === "admin"
+        ? "/admin"
+        : role === "teacher"
+          ? "/teacher"
+          : "/dashboard";
+
+    router.push(nextPath);
+    router.refresh();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMfaMessage("");
     setLoading(true);
 
     try {
@@ -61,16 +77,54 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
         return;
       }
 
-      const nextRole = data?.student?.role;
-      const nextPath =
-        nextRole === "admin"
-          ? "/admin"
-          : nextRole === "teacher"
-            ? "/teacher"
-            : "/dashboard";
+      if (data.requiresMfa && data.mfaSessionToken) {
+        setMfaSessionToken(data.mfaSessionToken);
+        setMfaToken("");
+        setMfaMessage("Password accepted. Enter your 6-digit authenticator code or a saved backup code to finish signing in.");
+        return;
+      }
 
-      router.push(nextPath);
-      router.refresh();
+      finishLogin(data?.student?.role);
+    } catch {
+      setError("Could not connect to server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaSessionToken) return;
+
+    setError("");
+    setLoading(true);
+    setMfaMessage("");
+
+    try {
+      const res = await fetch("/api/auth/mfa/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: mfaToken,
+          mfaSessionToken,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not verify your MFA code.");
+        return;
+      }
+
+      if (data.backupCodeUsed) {
+        setMfaMessage(
+          `Backup code accepted. ${data.backupCodesRemaining} backup code${data.backupCodesRemaining === 1 ? "" : "s"} remaining.`,
+        );
+        window.setTimeout(() => finishLogin(data?.student?.role), 1200);
+        return;
+      }
+
+      finishLogin(data?.student?.role);
     } catch {
       setError("Could not connect to server.");
     } finally {
@@ -149,10 +203,12 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             <div className="mb-7 sm:mb-8">
               <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
               <h2 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
-                Welcome back
+                {mfaSessionToken ? "Two-step verification" : "Welcome back"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-                Sign in with your username or email and password.
+                {mfaSessionToken
+                  ? "Enter the 6-digit code from your authenticator app or one of your saved backup codes."
+                  : "Sign in with your username or email and password."}
               </p>
             </div>
 
@@ -165,56 +221,112 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4" aria-label="Sign in">
-              <div>
-                <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Username or Email</label>
-                <input
-                  id="studentId"
-                  type="text"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g., john.doe or john@example.com"
-                  autoComplete="username"
-                  required
-                  className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-              </div>
+            {mfaSessionToken ? (
+              <form onSubmit={handleMfaSubmit} className="space-y-4" aria-label="MFA sign in">
+                <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+                  Signing in as <span className="font-semibold text-[var(--ink-strong)]">{studentId}</span>.
+                </div>
 
-              <div>
-                <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  autoComplete="current-password"
-                  className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-              </div>
+                <div>
+                  <label htmlFor="mfaToken" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Authenticator code or backup code</label>
+                  <input
+                    id="mfaToken"
+                    type="text"
+                    value={mfaToken}
+                    onChange={(e) => setMfaToken(e.target.value)}
+                    placeholder="123456 or deadbeef"
+                    autoComplete="one-time-code"
+                    required
+                    className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                  <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">
+                    Backup codes are eight characters long and each one can only be used once.
+                  </p>
+                </div>
 
-              {error && (
-                <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
-              )}
+                {mfaMessage && (
+                  <p className="rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+                    {mfaMessage}
+                  </p>
+                )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? "Please wait..." : "Sign In"}
-              </button>
+                {error && (
+                  <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+                )}
 
-              <a
-                href="/forgot-password"
-                className="block text-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
-              >
-                Forgot your password?
-              </a>
-            </form>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? "Verifying..." : "Finish Sign In"}
+                </button>
 
-            {googleAuthEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMfaSessionToken(null);
+                    setMfaToken("");
+                    setMfaMessage("");
+                    setError("");
+                  }}
+                  className="w-full rounded-[1rem] border border-[rgba(18,38,63,0.14)] bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                >
+                  Use a different account
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4" aria-label="Sign in">
+                <div>
+                  <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Username or Email</label>
+                  <input
+                    id="studentId"
+                    type="text"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    placeholder="e.g., john.doe or john@example.com"
+                    autoComplete="username"
+                    required
+                    className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    autoComplete="current-password"
+                    className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </div>
+
+                {error && (
+                  <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? "Please wait..." : "Sign In"}
+                </button>
+
+                <a
+                  href="/forgot-password"
+                  className="block text-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+                >
+                  Forgot your password?
+                </a>
+              </form>
+            )}
+
+            {!mfaSessionToken && googleAuthEnabled ? (
               <>
                 <div className="my-5 flex items-center gap-3">
                   <div className="h-px flex-1 bg-[rgba(18,38,63,0.12)]" />
@@ -237,11 +349,11 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   Sign in with Google
                 </a>
               </>
-            ) : (
+            ) : !mfaSessionToken ? (
               <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                 Google sign-in is not enabled in this environment. Use the sign-in form above.
               </div>
-            )}
+            ) : null}
 
             <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
               Your instructor will provide your username and password.

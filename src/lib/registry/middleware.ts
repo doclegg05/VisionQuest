@@ -5,7 +5,7 @@ import { getTool } from "@/lib/registry";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { ApiError } from "@/lib/api-error";
-import { hasPermission } from "@/lib/rbac";
+import { resolvePermission } from "@/lib/rbac";
 import type { ToolDefinition } from "@/lib/registry/types";
 
 interface RouteContext {
@@ -25,8 +25,8 @@ type RegistryHandler = (
  * logs audit events per auditLevel, then executes the handler.
  *
  * Permission check order:
- *   1. RBAC database lookup via hasPermission()
- *   2. Falls back to static requiredRoles array if RBAC tables are empty
+ *   1. RBAC database lookup via resolvePermission()
+ *   2. Falls back to static requiredRoles array only if RBAC is unavailable/unseeded
  *
  * Usage:
  *   export const GET = withRegistry("goals.list", async (session, req, ctx, tool) => { ... });
@@ -61,18 +61,18 @@ export function withRegistry(toolId: string, handler: RegistryHandler) {
       // Falls back to the static requiredRoles array when the RBAC
       // tables have not been seeded yet (hasPermission returns false
       // for every key when the tables are empty).
-      let allowed: boolean;
-      try {
-        allowed = await hasPermission(session.role, toolId);
-      } catch {
-        // If the RBAC tables don't exist yet (e.g. migration not applied),
-        // fall back to the static role list so the app stays functional.
-        allowed = false;
-      }
+      const permission = await resolvePermission(session.role, toolId);
 
-      if (!allowed) {
+      if (!permission.allowed) {
+        if (permission.source === "rbac") {
+          return NextResponse.json(
+            { error: "Forbidden", code: "FORBIDDEN" },
+            { status: 403 },
+          );
+        }
+
         // Fallback: check the static requiredRoles array from the registry.
-        // This keeps the system functional before the RBAC seed has run.
+        // This keeps the system functional before RBAC is seeded or available.
         const staticAllowed = tool.requiredRoles.includes(
           session.role as ToolDefinition["requiredRoles"][number],
         );

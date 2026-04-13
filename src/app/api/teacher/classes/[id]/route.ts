@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
-import { assertStaffCanManageClass, normalizeClassCode } from "@/lib/classroom";
+import {
+  assertStaffCanManageClass,
+  assertTeacherAssignmentLimit,
+  normalizeClassCode,
+  normalizeInstructorIds,
+} from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
@@ -87,11 +92,23 @@ export const PATCH = withTeacherAuth(async (
 
     const existing = await prisma.spokesClass.findUnique({
       where: { id },
-      select: { id: true, name: true, code: true, status: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        status: true,
+        instructors: {
+          select: {
+            instructorId: true,
+          },
+        },
+      },
     });
     if (!existing) {
       return NextResponse.json({ error: "Class not found." }, { status: 404 });
     }
+
+    await assertStaffCanManageClass(session, id);
 
     const nextName = typeof body.name === "string" ? body.name.trim() : existing.name;
     const nextCode = normalizeClassCode(
@@ -105,9 +122,9 @@ export const PATCH = withTeacherAuth(async (
           ? body.description.trim()
           : undefined;
     const instructorIds = Array.isArray(body.instructorIds)
-      ? body.instructorIds.filter(
+      ? normalizeInstructorIds(body.instructorIds.filter(
           (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
-        )
+        ))
       : null;
 
     if (!nextName) {
@@ -142,6 +159,12 @@ export const PATCH = withTeacherAuth(async (
         throw badRequest("One or more selected instructors are invalid.");
       }
     }
+
+    const nextInstructorIds = instructorIds ?? existing.instructors.map((entry) => entry.instructorId);
+    await assertTeacherAssignmentLimit(nextInstructorIds, {
+      excludeClassId: id,
+      targetClassStatus: nextStatus,
+    });
 
     await prisma.$transaction(async (tx) => {
       await tx.spokesClass.update({

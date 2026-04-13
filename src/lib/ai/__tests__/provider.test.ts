@@ -87,4 +87,18 @@ describe("getProvider", () => {
       /Local AI server URL is not configured/,
     );
   });
+
+  it("throws when local provider uses a private-network URL", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "local";
+      if (key === "ai_provider_url") return "http://10.0.0.8:11434";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+
+    await assert.rejects(
+      getProvider("student-123"),
+      /Local AI server URL is invalid/,
+    );
+  });
 });

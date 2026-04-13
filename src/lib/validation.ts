@@ -45,6 +45,32 @@ export function isSafeExternalUrl(url: string): boolean {
   }
 }
 
+/**
+ * Allow a locally hosted Ollama endpoint on loopback, or a public http/https
+ * endpoint. Reject private/link-local/internal network targets.
+ */
+export function isSafeAiProviderUrl(url: string): boolean {
+  if (!isValidUrl(url)) return false;
+
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]"
+    ) {
+      return true;
+    }
+
+    return isSafeExternalUrl(url);
+  } catch {
+    return false;
+  }
+}
+
 export function sanitizeUrl(url: string): string | null {
   return isValidUrl(url) ? url : null;
 }

@@ -1,9 +1,10 @@
-import { randomBytes, createHmac } from "node:crypto";
+import { randomBytes, createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { encrypt, decrypt } from "./crypto";
 
 // --- Base32 encoding/decoding (RFC 4648) ---
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const BACKUP_CODE_RE = /^[a-f0-9]{8}$/;
 
 function base32Encode(buffer: Buffer): string {
   let bits = 0;
@@ -130,4 +131,40 @@ export function generateBackupCodes(): string[] {
     codes.push(randomBytes(4).toString("hex"));
   }
   return codes;
+}
+
+export function normalizeBackupCode(token: string): string {
+  return token.trim().toLowerCase().replace(/[^a-f0-9]/g, "");
+}
+
+export function hashBackupCode(code: string): string {
+  return createHash("sha256").update(normalizeBackupCode(code)).digest("hex");
+}
+
+export function hashBackupCodes(codes: string[]): string[] {
+  return codes.map(hashBackupCode);
+}
+
+export function consumeBackupCode(
+  storedHashes: string[],
+  candidate: string,
+): string[] | null {
+  const normalized = normalizeBackupCode(candidate);
+  if (!BACKUP_CODE_RE.test(normalized)) {
+    return null;
+  }
+
+  const candidateHash = hashBackupCode(normalized);
+  const candidateBuffer = Buffer.from(candidateHash);
+
+  for (const [index, storedHash] of storedHashes.entries()) {
+    if (storedHash.length !== candidateHash.length) {
+      continue;
+    }
+    if (timingSafeEqual(Buffer.from(storedHash), candidateBuffer)) {
+      return storedHashes.filter((_, currentIndex) => currentIndex !== index);
+    }
+  }
+
+  return null;
 }

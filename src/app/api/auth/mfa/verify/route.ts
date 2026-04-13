@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
-import { verifyTotp, generateBackupCodes } from "@/lib/mfa";
+import { verifyTotp, generateBackupCodes, hashBackupCodes } from "@/lib/mfa";
 
 const mfaVerifySchema = z.object({
   token: z.string().length(6, "Token must be exactly 6 digits.").regex(/^\d{6}$/, "Token must be 6 digits."),
@@ -15,7 +15,7 @@ const mfaVerifySchema = z.object({
  *
  * Verifies a TOTP token during initial MFA setup.
  * If valid, enables MFA on the account (sets mfaEnabled=true).
- * Returns one-time-display backup codes.
+ * Returns one-time-display backup codes after storing only their hashes.
  */
 export const POST = withTeacherAuth(async (session, req: NextRequest) => {
   const body = await parseBody(req, mfaVerifySchema);
@@ -54,16 +54,17 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     return NextResponse.json({ error: "Invalid token. Please try again." }, { status: 401 });
   }
 
-  // Enable MFA
+  const backupCodes = generateBackupCodes();
+
+  // Enable MFA and persist only the hashed recovery codes.
   await prisma.student.update({
     where: { id: student.id },
     data: {
       mfaEnabled: true,
       mfaVerifiedAt: new Date(),
+      mfaBackupCodes: hashBackupCodes(backupCodes),
     },
   });
-
-  const backupCodes = generateBackupCodes();
 
   await logAuditEvent({
     actorId: student.id,
@@ -76,6 +77,6 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
 
   return NextResponse.json({
     enabled: true,
-    backupCodes, // One-time display — the client must instruct the user to save these
+    backupCodes,
   });
 });

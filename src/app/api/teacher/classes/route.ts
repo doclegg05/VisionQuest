@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { badRequest, conflict } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
-import { listManagedClasses, normalizeClassCode } from "@/lib/classroom";
+import {
+  assertTeacherAssignmentLimit,
+  listManagedClasses,
+  normalizeClassCode,
+  normalizeInstructorIds,
+} from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
@@ -85,11 +90,13 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = normalizeClassCode(typeof body.code === "string" && body.code.trim() ? body.code : name);
   const description = typeof body.description === "string" ? body.description.trim() : "";
-  const instructorIds = Array.isArray(body.instructorIds)
-    ? body.instructorIds.filter(
+  const instructorIds = normalizeInstructorIds(
+    Array.isArray(body.instructorIds)
+      ? body.instructorIds.filter(
         (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
       )
-    : [];
+      : [],
+  );
   const startDate = parseOptionalDate(body.startDate);
   const endDate = parseOptionalDate(body.endDate);
 
@@ -118,6 +125,8 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     if (matchingTeachers !== instructorIds.length) {
       throw badRequest("One or more selected instructors are invalid.");
     }
+
+    await assertTeacherAssignmentLimit(instructorIds);
   }
 
   const createdClass = await prisma.spokesClass.create({

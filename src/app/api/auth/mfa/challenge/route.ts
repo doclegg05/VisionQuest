@@ -6,10 +6,10 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
-import { verifyTotp } from "@/lib/mfa";
+import { consumeBackupCode, verifyTotp } from "@/lib/mfa";
 
 const mfaChallengeSchema = z.object({
-  token: z.string().length(6, "Token must be exactly 6 digits.").regex(/^\d{6}$/, "Token must be 6 digits."),
+  token: z.string().min(6, "MFA code is required.").max(32, "MFA code is too long."),
   mfaSessionToken: z.string().min(1, "MFA session token is required."),
 });
 
@@ -18,8 +18,9 @@ const mfaChallengeSchema = z.object({
  *
  * Second-factor verification during login.
  * Called after successful password auth when mfaEnabled=true.
- * Requires the short-lived mfaSessionToken (proves password was correct) plus a valid TOTP code.
- * On success, issues the real session JWT cookie.
+ * Requires the short-lived mfaSessionToken (proves password was correct) plus
+ * either a valid TOTP code or a one-time backup code. On success, issues the
+ * real session JWT cookie.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -54,6 +55,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       isActive: true,
       mfaEnabled: true,
       mfaSecret: true,
+      mfaBackupCodes: true,
     },
   });
 
@@ -69,7 +71,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     );
   }
 
-  const isValid = verifyTotp(student.mfaSecret, body.token);
+  const isTotpToken = /^\d{6}$/.test(body.token);
+  const isValidTotp = isTotpToken && verifyTotp(student.mfaSecret, body.token);
+  const remainingBackupCodes = isValidTotp
+    ? null
+    : consumeBackupCode(student.mfaBackupCodes, body.token);
+  const usedBackupCode = remainingBackupCodes !== null;
+  const isValid = isValidTotp || usedBackupCode;
+
   if (!isValid) {
     await logAuditEvent({
       actorId: student.id,
@@ -87,7 +96,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // MFA verified — update timestamp and issue the real session
   await prisma.student.update({
     where: { id: student.id },
-    data: { mfaVerifiedAt: new Date() },
+    data: {
+      mfaVerifiedAt: new Date(),
+      ...(usedBackupCode ? { mfaBackupCodes: remainingBackupCodes } : {}),
+    },
   });
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);
@@ -99,10 +111,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     targetType: "student",
     targetId: student.id,
     summary: `MFA challenge passed for ${student.studentId}.`,
-    metadata: { ip },
+    metadata: {
+      ip,
+      method: usedBackupCode ? "backup_code" : "totp",
+    },
   });
 
   return NextResponse.json({
+    backupCodeUsed: usedBackupCode,
+    backupCodesRemaining: usedBackupCode ? remainingBackupCodes.length : student.mfaBackupCodes.length,
     student: {
       id: student.id,
       studentId: student.studentId,

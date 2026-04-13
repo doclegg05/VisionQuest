@@ -1,4 +1,4 @@
-import { forbidden, type Session } from "@/lib/api-error";
+import { badRequest, forbidden, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 
 export const NON_ARCHIVED_ENROLLMENT_STATUSES = [
@@ -8,6 +8,8 @@ export const NON_ARCHIVED_ENROLLMENT_STATUSES = [
   "withdrawn",
 ] as const;
 
+export const MAX_ACTIVE_CLASSES_PER_TEACHER = 2;
+
 export function normalizeClassCode(value: string) {
   return value
     .trim()
@@ -15,6 +17,10 @@ export function normalizeClassCode(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+}
+
+export function normalizeInstructorIds(instructorIds: string[]): string[] {
+  return [...new Set(instructorIds.map((id) => id.trim()).filter(Boolean))];
 }
 
 export function buildManagedStudentWhere(
@@ -85,6 +91,54 @@ export async function assertStaffCanManageClass(session: Session, classId: strin
   return managedClass;
 }
 
+export async function assertTeacherAssignmentLimit(
+  instructorIds: string[],
+  options: {
+    excludeClassId?: string;
+    targetClassStatus?: string | null;
+  } = {},
+) {
+  const normalizedInstructorIds = normalizeInstructorIds(instructorIds);
+  if (normalizedInstructorIds.length === 0) {
+    return;
+  }
+
+  const targetClassStatus = options.targetClassStatus?.trim().toLowerCase() || "active";
+  if (targetClassStatus === "archived") {
+    return;
+  }
+
+  const activeAssignments = await prisma.spokesClassInstructor.findMany({
+    where: {
+      instructorId: { in: normalizedInstructorIds },
+      ...(options.excludeClassId ? { classId: { not: options.excludeClassId } } : {}),
+      class: {
+        status: { not: "archived" },
+      },
+    },
+    select: {
+      instructorId: true,
+    },
+  });
+
+  const assignmentCounts = new Map<string, number>();
+  for (const assignment of activeAssignments) {
+    assignmentCounts.set(
+      assignment.instructorId,
+      (assignmentCounts.get(assignment.instructorId) ?? 0) + 1,
+    );
+  }
+
+  for (const instructorId of normalizedInstructorIds) {
+    const projectedCount = (assignmentCounts.get(instructorId) ?? 0) + 1;
+    if (projectedCount > MAX_ACTIVE_CLASSES_PER_TEACHER) {
+      throw badRequest(
+        `Teachers can only be assigned to up to ${MAX_ACTIVE_CLASSES_PER_TEACHER} active classes.`,
+      );
+    }
+  }
+}
+
 export async function assertStaffCanManageStudent(session: Session, studentId: string) {
   const managedStudent = await prisma.student.findFirst({
     where: {
@@ -152,4 +206,3 @@ export async function listManagedStudentIds(
 
   return students.map((student) => student.id);
 }
-

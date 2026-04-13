@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import PageIntro from "@/components/ui/PageIntro";
+import StaffMfaPanel from "@/components/auth/StaffMfaPanel";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 
 const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
 
 export default function SettingsPage() {
+  const [sessionRole, setSessionRole] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [keyHint, setKeyHint] = useState<string | null>(null);
@@ -30,28 +32,47 @@ export default function SettingsPage() {
   const [notifError, setNotifError] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/settings/api-key").then((response) => response.json()),
-      fetch("/api/settings/security-questions").then((response) => response.json()),
-      fetch("/api/notifications/preferences").then((response) => response.json()),
-    ])
-      .then(([apiKeyData, recoveryData, notifData]) => {
+    async function loadSettings() {
+      try {
+        const [sessionRes, apiKeyRes, notifRes] = await Promise.all([
+          fetch("/api/auth/session"),
+          fetch("/api/settings/api-key"),
+          fetch("/api/notifications/preferences"),
+        ]);
+
+        const [sessionData, apiKeyData, notifData] = await Promise.all([
+          sessionRes.json(),
+          apiKeyRes.json(),
+          notifRes.json(),
+        ]);
+
+        const role = sessionData?.student?.role ?? "student";
+        setSessionRole(role);
+
         setHasKey(apiKeyData.hasKey);
         setKeyHint(apiKeyData.keyHint);
         setPlatformKeyConfigured(Boolean(apiKeyData.platformKeyConfigured));
         if (apiKeyData.hasKey || apiKeyData.platformKeyConfigured) setShowTutorial(false);
-
-        setRecoveryConfigured(Boolean(recoveryData.configured));
 
         if (notifData) {
           setEmailEnabled(Boolean(notifData.email?.enabled));
           setSmsEnabled(Boolean(notifData.sms?.enabled));
           setPhoneNumber(notifData.sms?.destination ?? "");
         }
-      })
-      .catch(() => {
+
+        if (role !== "teacher" && role !== "admin") {
+          const recoveryRes = await fetch("/api/settings/security-questions");
+          const recoveryData = await recoveryRes.json();
+          if (recoveryRes.ok) {
+            setRecoveryConfigured(Boolean(recoveryData.configured));
+          }
+        }
+      } catch {
         setErrorMsg("We could not load your current settings.");
-      });
+      }
+    }
+
+    void loadSettings();
   }, []);
 
   const saveNotificationPreferences = async (
@@ -162,9 +183,20 @@ export default function SettingsPage() {
       <PageIntro
         eyebrow="Configuration"
         title="Settings"
-        description="Manage Sage access and the classroom-only recovery questions used for internal password resets."
+        description={
+          sessionRole === "teacher" || sessionRole === "admin"
+            ? "Manage staff account security and your personal Sage access."
+            : "Manage Sage access and the classroom-only recovery questions used for internal password resets."
+        }
       />
 
+      {(sessionRole === "teacher" || sessionRole === "admin") && (
+        <div className="mb-6">
+          <StaffMfaPanel />
+        </div>
+      )}
+
+      {sessionRole !== "teacher" && sessionRole !== "admin" && (
       <div className="surface-section mb-6 p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -225,6 +257,7 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+      )}
 
       {(hasKey || platformKeyConfigured) && (
         <div className="surface-section mb-6 flex items-center justify-between gap-4 p-5">

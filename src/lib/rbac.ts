@@ -13,7 +13,29 @@ const permissionCache = new Map<
   string,
   { permissions: Set<string>; expiresAt: number }
 >();
+let rolePermissionSeedState:
+  | { hasAssignments: boolean; expiresAt: number }
+  | null = null;
 const CACHE_TTL_MS = 60_000; // 1 minute
+
+export interface PermissionResolution {
+  allowed: boolean;
+  source: "rbac" | "fallback";
+}
+
+async function hasSeededRolePermissions(): Promise<boolean> {
+  if (rolePermissionSeedState && rolePermissionSeedState.expiresAt > Date.now()) {
+    return rolePermissionSeedState.hasAssignments;
+  }
+
+  const count = await prisma.rolePermission.count();
+  const hasAssignments = count > 0;
+  rolePermissionSeedState = {
+    hasAssignments,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  };
+  return hasAssignments;
+}
 
 /**
  * Get all granted permission keys for a role name.
@@ -55,8 +77,34 @@ export async function hasPermission(
 }
 
 /**
+ * Resolve a permission check while preserving the distinction between:
+ * - RBAC explicitly allowing/denying a permission
+ * - RBAC being unavailable or unseeded, in which case callers may fall back
+ */
+export async function resolvePermission(
+  roleName: string,
+  permissionKey: string,
+): Promise<PermissionResolution> {
+  try {
+    const hasAssignments = await hasSeededRolePermissions();
+    if (!hasAssignments) {
+      return { allowed: false, source: "fallback" };
+    }
+
+    const permissions = await getPermissionsForRole(roleName);
+    return {
+      allowed: permissions.has(permissionKey),
+      source: "rbac",
+    };
+  } catch {
+    return { allowed: false, source: "fallback" };
+  }
+}
+
+/**
  * Clear the permission cache (call after role-permission changes).
  */
 export function clearPermissionCache(): void {
   permissionCache.clear();
+  rolePermissionSeedState = null;
 }

@@ -1,5 +1,6 @@
 import { getPlainConfigValue, getConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
+import { isSafeAiProviderUrl } from "@/lib/validation";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
 import type { AIProvider, AIProviderType } from "./types";
@@ -24,6 +25,11 @@ export async function getProvider(studentId: string): Promise<AIProvider> {
     if (!url) {
       throw new Error(
         "Local AI server URL is not configured. Set it in Program Setup > AI Provider.",
+      );
+    }
+    if (!isSafeAiProviderUrl(url)) {
+      throw new Error(
+        "Local AI server URL is invalid. Use localhost/127.0.0.1/::1 or a public http/https endpoint.",
       );
     }
     return new OllamaProvider(url, model || DEFAULT_OLLAMA_MODEL, apiKey || undefined);
