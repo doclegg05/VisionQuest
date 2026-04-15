@@ -2,8 +2,16 @@ import crypto from "crypto";
 
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 
+function getTokenHmacSecret(): string {
+  const secret = process.env.API_KEY_ENCRYPTION_KEY;
+  if (!secret) {
+    throw new Error("API_KEY_ENCRYPTION_KEY is required for password reset token hashing");
+  }
+  return secret;
+}
+
 export function hashPasswordResetToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
+  return crypto.createHmac("sha256", getTokenHmacSecret()).update(token).digest("hex");
 }
 
 export function generatePasswordResetToken() {
