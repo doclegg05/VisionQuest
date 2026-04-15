@@ -120,7 +120,7 @@ describe("MFA backup code routes", () => {
     mockVerifyMfaSessionToken.mock.resetCalls();
     mockSetSessionCookie.mock.resetCalls();
 
-    mockVerifyTotp.mock.mockImplementation(() => true);
+    mockVerifyTotp.mock.mockImplementation(() => ({ valid: true, counter: 1 }));
     mockGenerateBackupCodes.mock.mockImplementation(() => ["deadbeef", "cafebabe"]);
     mockHashBackupCodes.mock.mockImplementation((codes: string[]) =>
       codes.map((code) => `hash:${code}`),
@@ -164,7 +164,7 @@ describe("MFA backup code routes", () => {
   });
 
   it("accepts a valid backup code during login and consumes it", async () => {
-    mockVerifyTotp.mock.mockImplementation(() => false);
+    mockVerifyTotp.mock.mockImplementation(() => ({ valid: false, counter: null }));
     mockConsumeBackupCode.mock.mockImplementation((stored: string[], token: string) =>
       token === "deadbeef" ? stored.slice(1) : null,
     );
@@ -200,7 +200,7 @@ describe("MFA backup code routes", () => {
   });
 
   it("rejects invalid backup codes", async () => {
-    mockVerifyTotp.mock.mockImplementation(() => false);
+    mockVerifyTotp.mock.mockImplementation(() => ({ valid: false, counter: null }));
     mockConsumeBackupCode.mock.mockImplementation(() => null);
     mockFindUnique.mock.mockImplementation(async () => ({
       id: "teacher-1",
