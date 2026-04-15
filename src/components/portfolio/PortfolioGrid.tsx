@@ -48,7 +48,7 @@ export default function PortfolioGrid() {
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load portfolio:", err);
+      console.error("Failed to load portfolio:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -75,7 +75,7 @@ export default function PortfolioGrid() {
         setForm((prev) => ({ ...prev, fileId: uploaded.id }));
       }
     } catch (err) {
-      console.error("Upload failed:", err);
+      console.error("Upload failed:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -98,7 +98,7 @@ export default function PortfolioGrid() {
         fetchItems();
       }
     } catch (err) {
-      console.error("Failed to save:", err);
+      console.error("Failed to save:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -112,7 +112,7 @@ export default function PortfolioGrid() {
       });
       fetchItems();
     } catch (err) {
-      console.error("Failed to delete:", err);
+      console.error("Failed to delete:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 

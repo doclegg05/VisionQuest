@@ -54,7 +54,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
       });
       if (itemRes.ok) onItemAdded();
     } catch (err) {
-      console.error("Image upload failed:", err);
+      console.error("Image upload failed:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -76,7 +76,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         onItemAdded();
       }
     } catch (err) {
-      console.error("Add note failed:", err);
+      console.error("Add note failed:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -110,7 +110,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         onItemAdded();
       }
     } catch (err) {
-      console.error("Link goal failed:", err);
+      console.error("Link goal failed:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 

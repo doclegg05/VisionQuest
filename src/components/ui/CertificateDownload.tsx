@@ -35,7 +35,7 @@ export default function CertificateDownload({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Certificate generation failed:", err);
+      console.error("Certificate generation failed:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setGenerating(false);
     }

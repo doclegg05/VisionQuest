@@ -52,7 +52,7 @@ export default function FileManager() {
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load files:", err);
+      console.error("Failed to load files:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -82,7 +82,7 @@ export default function FileManager() {
         alert(err.error || "Upload failed");
       }
     } catch (err) {
-      console.error("Upload failed:", err);
+      console.error("Upload failed:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -100,7 +100,7 @@ export default function FileManager() {
       });
       if (res.ok) fetchFiles();
     } catch (err) {
-      console.error("Delete failed:", err);
+      console.error("Delete failed:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 

@@ -50,7 +50,7 @@ export default function CertTracker() {
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load certification:", err);
+      console.error("Failed to load certification:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -73,7 +73,7 @@ export default function CertTracker() {
       setError(null);
       fetchCert();
     } catch (err) {
-      console.error("Failed to toggle requirement:", err);
+      console.error("Failed to toggle requirement:", err instanceof Error ? err.message : "Unknown error");
       setError("Could not update this requirement.");
     } finally {
       setToggling(null);
@@ -116,7 +116,7 @@ export default function CertTracker() {
         setError(data?.error || "Could not upload this file.");
       }
     } catch (err) {
-      console.error("Failed to upload file:", err);
+      console.error("Failed to upload file:", err instanceof Error ? err.message : "Unknown error");
       setError("Could not upload this file.");
     } finally {
       setUploading(null);

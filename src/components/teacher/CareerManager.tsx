@@ -90,7 +90,7 @@ export default function CareerManager() {
       setEvents(eventsPayload.events || []);
       setError(null);
     } catch (err) {
-      console.error("Failed to load career data:", err);
+      console.error("Failed to load career data:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Could not load career data.");
     } finally {
       setLoading(false);

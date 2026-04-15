@@ -35,7 +35,7 @@ export default function AuditTrail() {
         setLogs(data.logs || []);
         setError(null);
       } catch (err) {
-        console.error("Failed to load audit trail:", err);
+        console.error("Failed to load audit trail:", err instanceof Error ? err.message : "Unknown error");
         setError("Could not load audit activity right now.");
       } finally {
         setLoading(false);

@@ -304,7 +304,7 @@ export default function AcademicKpiReport() {
       setData(payload);
       setError(null);
     } catch (err) {
-      console.error("Failed to load academic KPI report:", err);
+      console.error("Failed to load academic KPI report:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Could not load KPI report.");
     } finally {
       setLoading(false);

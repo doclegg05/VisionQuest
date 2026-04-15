@@ -65,7 +65,7 @@ function ChatWindowInner() {
         setChatError(null);
       }
     } catch (err) {
-      console.error("Failed to load conversation:", err);
+      console.error("Failed to load conversation:", err instanceof Error ? err.message : "Unknown error");
     }
     setShowSidebar(false);
   }, []);
@@ -85,7 +85,7 @@ function ChatWindowInner() {
           await loadConversationById(active.id);
         }
       } catch (err) {
-        console.error("Failed to load conversations:", err);
+        console.error("Failed to load conversations:", err instanceof Error ? err.message : "Unknown error");
       }
     }
 
@@ -251,7 +251,7 @@ function ChatWindowInner() {
         // Check for XP/achievement/level changes
         setTimeout(() => checkProgression(), 2000);
       } catch (err) {
-        console.error("Send error:", err);
+        console.error("Send error:", err instanceof Error ? err.message : "Unknown error");
         const message = err instanceof Error ? err.message : "Sorry, I had trouble responding. Please try again.";
         setChatError(message);
         setMessages((prev) => [

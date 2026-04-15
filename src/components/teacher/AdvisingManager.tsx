@@ -51,7 +51,7 @@ export default function AdvisingManager() {
       setScheduledAppointments(payload.scheduledAppointments || 0);
       setError(null);
     } catch (err) {
-      console.error("Failed to load advising settings:", err);
+      console.error("Failed to load advising settings:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Failed to load availability.");
     } finally {
       setLoading(false);

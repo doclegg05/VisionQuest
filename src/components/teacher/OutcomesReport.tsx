@@ -106,7 +106,7 @@ export default function OutcomesReport() {
       setData(payload);
       setError(null);
     } catch (err) {
-      console.error("Failed to load outcome report:", err);
+      console.error("Failed to load outcome report:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Could not load reports.");
     } finally {
       setLoading(false);

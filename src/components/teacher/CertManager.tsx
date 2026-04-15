@@ -42,7 +42,7 @@ export default function CertManager() {
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load templates:", err);
+      console.error("Failed to load templates:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ export default function CertManager() {
         fetchTemplates();
       }
     } catch (err) {
-      console.error("Failed to save template:", err);
+      console.error("Failed to save template:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -81,7 +81,7 @@ export default function CertManager() {
       });
       if (res.ok) fetchTemplates();
     } catch (err) {
-      console.error("Failed to delete template:", err);
+      console.error("Failed to delete template:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 

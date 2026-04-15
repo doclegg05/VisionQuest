@@ -96,7 +96,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         setError(getErrorMessage(payload, "Failed to load. Please try again."));
       }
     } catch (err) {
-      console.error("Failed to load student:", err);
+      console.error("Failed to load student:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -124,7 +124,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       });
       await loadData();
     } catch (err) {
-      console.error("Failed to verify:", err);
+      console.error("Failed to verify:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setVerifying(null);
     }
@@ -168,7 +168,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         await loadData();
       }
     } catch (err) {
-      console.error("Failed to toggle student status:", err);
+      console.error("Failed to toggle student status:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setDeactivating(false);
       setConfirmDeactivate(false);

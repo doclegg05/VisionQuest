@@ -30,7 +30,7 @@ export default function CoursesHub() {
       setGoalMatches(data.goalMatches || []);
       setError(null);
     } catch (err) {
-      console.error("Failed to load platforms:", err);
+      console.error("Failed to load platforms:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load platforms. Please try again.");
     } finally {
       setLoading(false);

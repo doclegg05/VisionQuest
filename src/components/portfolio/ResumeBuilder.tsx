@@ -62,7 +62,7 @@ export default function ResumeBuilder() {
       setDisplayName(data.displayName || "");
       setError(null);
     } catch (err) {
-      console.error("Failed to load resume:", err);
+      console.error("Failed to load resume:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ export default function ResumeBuilder() {
       setError(null);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      console.error("Failed to save resume:", err);
+      console.error("Failed to save resume:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Could not save your resume.");
     } finally {
       setSaving(false);
@@ -236,7 +236,7 @@ export default function ResumeBuilder() {
         );
       }
     } catch (err) {
-      console.error("Resume assist failed:", err);
+      console.error("Resume assist failed:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Could not draft the resume.");
     } finally {
       setAssistantLoading(false);
@@ -249,7 +249,7 @@ export default function ResumeBuilder() {
       setCopyState("done");
       setTimeout(() => setCopyState("idle"), 1800);
     } catch (err) {
-      console.error("Failed to copy resume text:", err);
+      console.error("Failed to copy resume text:", err instanceof Error ? err.message : "Unknown error");
       setCopyState("error");
       setTimeout(() => setCopyState("idle"), 1800);
     }
@@ -269,7 +269,7 @@ export default function ResumeBuilder() {
       anchor.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to generate PDF:", err);
+      console.error("Failed to generate PDF:", err instanceof Error ? err.message : "Unknown error");
       setError("Could not generate the PDF export.");
     } finally {
       setExportingPdf(false);
@@ -294,7 +294,7 @@ export default function ResumeBuilder() {
         printWindow.print();
       }, 200);
     } catch (err) {
-      console.error("Failed to print resume:", err);
+      console.error("Failed to print resume:", err instanceof Error ? err.message : "Unknown error");
       setError("Could not open the print view. Check whether pop-ups are blocked.");
     } finally {
       setPrinting(false);
@@ -336,7 +336,7 @@ export default function ResumeBuilder() {
         );
       }
     } catch (err) {
-      console.error("Resume upload failed:", err);
+      console.error("Resume upload failed:", err instanceof Error ? err.message : "Unknown error");
       setError(err instanceof Error ? err.message : "Could not process the resume.");
     } finally {
       setUploading(false);

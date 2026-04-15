@@ -41,7 +41,7 @@ export default function ConversationList({
           setConversations(data.conversations || []);
         }
       } catch (err) {
-        console.error("Failed to load conversations:", err);
+        console.error("Failed to load conversations:", err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
       }

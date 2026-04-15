@@ -50,7 +50,7 @@ export default function LmsManager() {
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load links:", err);
+      console.error("Failed to load links:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -76,7 +76,7 @@ export default function LmsManager() {
         fetchLinks();
       }
     } catch (err) {
-      console.error("Failed to save link:", err);
+      console.error("Failed to save link:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 
@@ -91,7 +91,7 @@ export default function LmsManager() {
       });
       if (res.ok) fetchLinks();
     } catch (err) {
-      console.error("Failed to delete link:", err);
+      console.error("Failed to delete link:", err instanceof Error ? err.message : "Unknown error");
     }
   }
 

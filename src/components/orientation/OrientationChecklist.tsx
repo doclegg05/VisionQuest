@@ -75,7 +75,7 @@ export default function OrientationChecklist({
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load orientation items:", err);
+      console.error("Failed to load orientation items:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -124,14 +124,14 @@ export default function OrientationChecklist({
               }
             })
             .catch((err) => {
-              console.error("Failed to record orientation completion", err);
+              console.error("Failed to record orientation completion", err instanceof Error ? err.message : "Unknown error");
               setError("All items checked, but we couldn't save your progress. Please refresh and try again.");
             });
         }
         return prev;
       });
     } catch (err) {
-      console.error("Failed to toggle item:", err);
+      console.error("Failed to toggle item:", err instanceof Error ? err.message : "Unknown error");
       setItems((prev) => prev.map((item) =>
         item.id === itemId
           ? { ...item, completed: !completed, completedAt: null }
