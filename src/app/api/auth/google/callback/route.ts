@@ -94,19 +94,26 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Decode user info from the signed id_token (received directly from
-    // Google's token endpoint over TLS with our client_secret, so the payload
-    // is trustworthy without additional signature verification per Google's
-    // server-side auth docs).
+    // Verify the id_token cryptographically against Google's public JWK set.
+    // This validates the RS256 signature, audience, issuer, and expiry.
     let userInfo: GoogleUserInfo;
     try {
-      const payload = tokenData.id_token.split(".")[1];
-      if (!payload) throw new Error("Missing id_token payload");
-      const decoded = JSON.parse(Buffer.from(payload, "base64url").toString());
-      if (!decoded.sub || !decoded.email) throw new Error("id_token missing required claims");
-      if (decoded.aud !== GOOGLE_CLIENT_ID) throw new Error("id_token aud mismatch");
-      if (decoded.iss !== "accounts.google.com" && decoded.iss !== "https://accounts.google.com") throw new Error("id_token iss mismatch");
-      userInfo = { sub: decoded.sub, email: decoded.email, name: decoded.name || "", picture: decoded.picture };
+      const { OAuth2Client } = await import("google-auth-library");
+      const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+      const ticket = await client.verifyIdToken({
+        idToken: tokenData.id_token,
+        audience: GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.sub || !payload.email) {
+        throw new Error("id_token missing required claims");
+      }
+      userInfo = {
+        sub: payload.sub,
+        email: payload.email,
+        name: payload.name || "",
+        picture: payload.picture,
+      };
     } catch {
       return NextResponse.redirect(new URL("/?error=oauth_token_invalid", req.url));
     }

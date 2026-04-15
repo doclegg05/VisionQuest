@@ -43,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "framer-motion": "^12.38.0",
+    "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "mammoth": "^1.12.0",
