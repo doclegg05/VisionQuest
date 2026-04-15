@@ -23,8 +23,9 @@ model Student {
   sessionVersion Int       @default(0)
   mfaSecret      String?   // TOTP secret, encrypted with AES-256-GCM
   mfaEnabled     Boolean   @default(false)
-  mfaBackupCodes String[]  @default([]) // SHA-256 hashes of one-time recovery codes
-  mfaVerifiedAt  DateTime? // When MFA was last verified this session
+  mfaBackupCodes    String[]  @default([]) // SHA-256 hashes of one-time recovery codes
+  mfaVerifiedAt     DateTime? // When MFA was last verified this session
+  mfaLastUsedCounter Int?     // Last accepted TOTP counter — prevents replay within 90s window
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

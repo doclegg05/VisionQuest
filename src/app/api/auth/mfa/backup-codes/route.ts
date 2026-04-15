@@ -27,6 +27,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       role: true,
       mfaEnabled: true,
       mfaSecret: true,
+      mfaLastUsedCounter: true,
     },
   });
 
@@ -38,7 +39,8 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     return NextResponse.json({ error: "MFA is not enabled on this account." }, { status: 400 });
   }
 
-  if (!verifyTotp(student.mfaSecret, body.token)) {
+  const { valid: isValid, counter } = verifyTotp(student.mfaSecret, body.token, student.mfaLastUsedCounter);
+  if (!isValid) {
     await logAuditEvent({
       actorId: student.id,
       actorRole: student.role,
@@ -57,6 +59,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     where: { id: student.id },
     data: {
       mfaBackupCodes: hashBackupCodes(backupCodes),
+      ...(counter != null ? { mfaLastUsedCounter: counter } : {}),
     },
   });
 

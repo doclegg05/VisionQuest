@@ -56,6 +56,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       mfaEnabled: true,
       mfaSecret: true,
       mfaBackupCodes: true,
+      mfaLastUsedCounter: true,
     },
   });
 
@@ -72,7 +73,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const isTotpToken = /^\d{6}$/.test(body.token);
-  const isValidTotp = isTotpToken && verifyTotp(student.mfaSecret, body.token);
+  const totpResult = isTotpToken
+    ? verifyTotp(student.mfaSecret, body.token, student.mfaLastUsedCounter)
+    : { valid: false, counter: null };
+  const isValidTotp = totpResult.valid;
   const remainingBackupCodes = isValidTotp
     ? null
     : consumeBackupCode(student.mfaBackupCodes, body.token);
@@ -99,6 +103,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     data: {
       mfaVerifiedAt: new Date(),
       ...(usedBackupCode ? { mfaBackupCodes: remainingBackupCodes } : {}),
+      ...(isValidTotp && totpResult.counter != null ? { mfaLastUsedCounter: totpResult.counter } : {}),
     },
   });
 

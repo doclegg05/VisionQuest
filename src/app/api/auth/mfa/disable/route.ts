@@ -28,7 +28,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
 
   const student = await prisma.student.findUnique({
     where: { id: session.id },
-    select: { id: true, studentId: true, role: true, mfaSecret: true, mfaEnabled: true },
+    select: { id: true, studentId: true, role: true, mfaSecret: true, mfaEnabled: true, mfaLastUsedCounter: true },
   });
 
   if (!student) {
@@ -39,7 +39,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     return NextResponse.json({ error: "MFA is not enabled on this account." }, { status: 400 });
   }
 
-  const isValid = verifyTotp(student.mfaSecret, body.token);
+  const { valid: isValid } = verifyTotp(student.mfaSecret, body.token, student.mfaLastUsedCounter);
   if (!isValid) {
     await logAuditEvent({
       actorId: student.id,
@@ -60,6 +60,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       mfaEnabled: false,
       mfaBackupCodes: [],
       mfaVerifiedAt: null,
+      mfaLastUsedCounter: null,
     },
   });
 

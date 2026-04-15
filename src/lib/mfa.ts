@@ -64,10 +64,11 @@ function generateTotpCode(secret: Buffer, counter: bigint): string {
 /**
  * Verify a TOTP token against a secret, allowing a configurable time window.
  * Window of 1 means we check the current period, one before, and one after (90s total).
+ * Returns the matching counter value on success, or null on failure.
  */
-function verifyTotpRaw(secret: Buffer, token: string, window: number = 1): boolean {
+function verifyTotpRaw(secret: Buffer, token: string, window: number = 1): number | null {
   if (!/^\d{6}$/.test(token)) {
-    return false;
+    return null;
   }
 
   const timeStep = 30;
@@ -85,11 +86,11 @@ function verifyTotpRaw(secret: Buffer, token: string, window: number = 1): boole
       }
     }
     if (match) {
-      return true;
+      return Number(counter);
     }
   }
 
-  return false;
+  return null;
 }
 
 // --- Public API ---
@@ -114,11 +115,27 @@ export function generateTotpUri(secret: string, email: string): string {
 
 /**
  * Verify a 6-digit TOTP token against an encrypted secret from the database.
+ * Accepts an optional lastUsedCounter to reject replayed tokens.
  */
-export function verifyTotp(encryptedSecret: string, token: string): boolean {
+export function verifyTotp(
+  encryptedSecret: string,
+  token: string,
+  lastUsedCounter?: number | null,
+): { valid: boolean; counter: number | null } {
   const secret = decrypt(encryptedSecret);
   const keyBuffer = base32Decode(secret);
-  return verifyTotpRaw(keyBuffer, token);
+  const matchedCounter = verifyTotpRaw(keyBuffer, token);
+
+  if (matchedCounter === null) {
+    return { valid: false, counter: null };
+  }
+
+  // Reject replay: if this counter was already used, deny it
+  if (lastUsedCounter != null && matchedCounter <= lastUsedCounter) {
+    return { valid: false, counter: null };
+  }
+
+  return { valid: true, counter: matchedCounter };
 }
 
 /**

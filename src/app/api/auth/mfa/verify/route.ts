@@ -46,7 +46,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     );
   }
 
-  const isValid = verifyTotp(student.mfaSecret, body.token);
+  const { valid: isValid, counter } = verifyTotp(student.mfaSecret, body.token);
   if (!isValid) {
     await logAuditEvent({
       actorId: student.id,
@@ -69,6 +69,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       mfaEnabled: true,
       mfaVerifiedAt: new Date(),
       mfaBackupCodes: hashBackupCodes(backupCodes),
+      ...(counter != null ? { mfaLastUsedCounter: counter } : {}),
     },
   });
 
