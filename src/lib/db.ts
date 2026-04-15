@@ -13,16 +13,19 @@ import { PrismaClient } from "@prisma/client";
  * For multi-instance deployments, reduce pool size per instance:
  *   2 instances × 5 pool = 10 connections (well under Supabase 50 limit)
  *
- * --- RLS STATUS ---
- * RLS policies exist in migrations (e.g. 20260403060000_rls_remaining_tables)
- * but are NOT enforced at runtime. This client connects as the `postgres` role
- * which bypasses RLS entirely. Tenant isolation relies on app-layer `where`
- * clauses (studentId ownership checks in every query).
+ * --- RLS STATUS (updated 2026-04-15) ---
+ * RLS is ENABLED on ALL tables:
+ *   - Migration 20260403060000: RLS + vq_app policies on 29 student-data tables
+ *   - Migration 20260415000000: RLS enabled on remaining 32 tables (no policies
+ *     needed — enabled RLS with no matching policy = deny all for non-superusers)
  *
- * TODO: To activate RLS, either:
- *   1. Add a Prisma client extension that sets `app.current_student_id` GUC
- *      per-request via `SET LOCAL`, OR
- *   2. Create a restricted DB role and use a dual-client setup.
+ * This client connects as `postgres` (superuser) which bypasses RLS entirely.
+ * Tenant isolation relies on app-layer `where` clauses (studentId ownership
+ * checks in every query). The Supabase PostgREST API (anon/authenticated roles)
+ * is now fully blocked by RLS on every table.
+ *
+ * TODO (defense-in-depth): Create a restricted `vq_app` DB role, add a Prisma
+ * client extension to SET LOCAL GUCs per request, and connect as vq_app.
  * See: docs/plans/supabase-optimization.md
  */
 function buildPrismaClient(): PrismaClient {
