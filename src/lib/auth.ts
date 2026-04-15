@@ -26,6 +26,9 @@ function getJwtSecret(): string {
   if (!secret) {
     throw new Error("JWT_SECRET environment variable is required");
   }
+  if (secret.length < 32) {
+    throw new Error("JWT_SECRET must be at least 32 characters");
+  }
   return secret;
 }
 
@@ -51,12 +54,12 @@ export function verifyPassword(password: string, stored: string): boolean {
 // --- JWT ---
 
 export function signToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), { expiresIn: TOKEN_TTL });
+  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), { expiresIn: TOKEN_TTL, algorithm: "HS256" });
 }
 
 export function verifyToken(token: string): SessionClaims | null {
   try {
-    const payload = jwt.verify(token, getJwtSecret()) as Partial<SessionClaims>;
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<SessionClaims>;
     if (
       typeof payload.sub !== "string" ||
       typeof payload.role !== "string" ||
@@ -141,7 +144,7 @@ export function signMfaSessionToken(studentId: string, role: string, sessionVers
   return jwt.sign(
     { sub: studentId, role, sv: sessionVersion, purpose: "mfa_challenge" },
     getJwtSecret(),
-    { expiresIn: MFA_TOKEN_TTL },
+    { expiresIn: MFA_TOKEN_TTL, algorithm: "HS256" },
   );
 }
 
@@ -151,7 +154,7 @@ export function signMfaSessionToken(studentId: string, role: string, sessionVers
  */
 export function verifyMfaSessionToken(token: string): MfaSessionClaims | null {
   try {
-    const payload = jwt.verify(token, getJwtSecret()) as Partial<MfaSessionClaims>;
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<MfaSessionClaims>;
     if (
       typeof payload.sub !== "string" ||
       typeof payload.role !== "string" ||
