@@ -22,6 +22,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
     : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
 
+  // Per-user rate limit — prevents distributed brute force against a single account
+  if (student) {
+    const userRl = await rateLimit(`login:user:${student.id}`, 5, 15 * 60 * 1000);
+    if (!userRl.success) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429 },
+      );
+    }
+  }
+
   // Consolidate all failure cases into a single generic response to prevent account enumeration.
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
   const isOAuthOnly = student && !student.passwordHash && student.authProvider === "google";
