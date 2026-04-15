@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
 import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { parseBody } from "@/lib/schemas";
 import { recordPortfolioItem } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { syncStudentAlerts } from "@/lib/advising";
+
+const portfolioCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional(),
+  type: z.enum(["project", "resume", "achievement", "skill", "certification", "other"]).optional(),
+  fileId: z.string().cuid().optional().nullable(),
+  url: z.string().url().max(2000).optional().nullable(),
+});
+
+const portfolioUpdateSchema = portfolioCreateSchema.partial().extend({
+  id: z.string().cuid(),
+});
 
 // GET — list student's portfolio items
 export const GET = withErrorHandler(async () => {
@@ -26,8 +40,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   const session = await getSession();
   if (!session) throw unauthorized();
 
-  const { title, description, type, fileId, url } = await req.json();
-  if (!title) throw badRequest("title is required");
+  const { title, description, type, fileId, url } = await parseBody(req, portfolioCreateSchema);
   if (url && !isValidUrl(url)) {
     throw badRequest("Invalid URL. Only http and https URLs are allowed");
   }
@@ -81,8 +94,7 @@ export const PUT = withErrorHandler(async (req: Request) => {
   const session = await getSession();
   if (!session) throw unauthorized();
 
-  const { id, title, description, type, fileId, url } = await req.json();
-  if (!id) throw badRequest("id is required");
+  const { id, title, description, type, fileId, url } = await parseBody(req, portfolioUpdateSchema);
 
   const existing = await prisma.portfolioItem.findFirst({
     where: { id, studentId: session.id },

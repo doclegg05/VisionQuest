@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { syncStudentAlerts } from "@/lib/advising";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress, validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
 import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { parseBody } from "@/lib/schemas";
 import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
+
+const certUpdateSchema = z.object({
+  requirementId: z.string().cuid(),
+  completed: z.boolean().optional(),
+  fileId: z.string().cuid().optional().nullable(),
+  notes: z.string().max(2000).optional(),
+});
 
 // GET — get student's certification with requirements
 export const GET = withErrorHandler(async () => {
@@ -104,8 +113,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   const session = await getSession();
   if (!session) throw unauthorized();
 
-  const { requirementId, completed, fileId, notes } = await req.json();
-  if (!requirementId) throw badRequest("requirementId is required");
+  const { requirementId, completed, fileId, notes } = await parseBody(req, certUpdateSchema);
 
   // Verify the requirement belongs to this student's certification
   const requirement = await prisma.certRequirement.findFirst({

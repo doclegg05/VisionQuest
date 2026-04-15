@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import { parseBody } from "@/lib/schemas";
+
+const teacherResetPasswordSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters").max(200, "Password must be 200 characters or fewer"),
+});
 
 // POST — reset a student's password
 export const POST = withTeacherAuth(async (
@@ -12,14 +18,7 @@ export const POST = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-  const { newPassword } = await req.json();
-
-  if (!newPassword || newPassword.length < 6) {
-    return NextResponse.json(
-      { error: "Password must be at least 6 characters" },
-      { status: 400 }
-    );
-  }
+  const { newPassword } = await parseBody(req, teacherResetPasswordSchema);
 
   const student = await assertStaffCanManageStudent(session, id);
   if (!student || student.role === "teacher") {

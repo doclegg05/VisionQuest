@@ -4,6 +4,7 @@ import { encrypt, decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withAuth } from "@/lib/api-error";
+import { parseBody, apiKeySchema } from "@/lib/schemas";
 import { GEMINI_MODEL } from "@/lib/gemini";
 
 export const GET = withAuth(async (session) => {
@@ -41,12 +42,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     return Response.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
   }
 
-  const body = await req.json();
-  const apiKey = (body.apiKey || "").trim();
-
-  if (!apiKey) {
-    return Response.json({ error: "API key is required." }, { status: 400 });
-  }
+  const body = await parseBody(req, apiKeySchema);
+  const apiKey = body.apiKey.trim();
 
   // Basic format validation
   if (!apiKey.startsWith("AIza")) {
