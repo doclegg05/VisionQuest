@@ -438,11 +438,11 @@ export default function ClassRosterManager() {
             rows={3}
             className="field px-4 py-3 text-sm"
           />
-          <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] p-4">
+          <div className="rounded-2xl border border-[var(--border)] p-4">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {availableInstructors.map((instructor) => (
-                <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[rgba(18,38,63,0.08)] px-3 py-2 text-sm text-[var(--ink-strong)]">
+                <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
                   <input
                     type="checkbox"
                     checked={newInstructorIds.includes(instructor.id)}
@@ -496,7 +496,7 @@ export default function ClassRosterManager() {
         ) : classDetail ? (
           <div className="space-y-5">
             <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-display text-2xl text-[var(--ink-strong)]">{classDetail.name}</h3>
@@ -513,7 +513,7 @@ export default function ClassRosterManager() {
                         type="button"
                         onClick={() => void saveClassSettings()}
                         disabled={saving}
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Save Settings
                       </button>
@@ -521,7 +521,7 @@ export default function ClassRosterManager() {
                         type="button"
                         onClick={() => void updateClassStatus(classDetail.status === "archived" ? "active" : "archived")}
                         disabled={saving}
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {classDetail.status === "archived" ? "Reactivate Class" : "Archive Class"}
                       </button>
@@ -563,7 +563,7 @@ export default function ClassRosterManager() {
                     />
                     <div className="grid gap-2 md:grid-cols-2">
                       {availableInstructors.map((instructor) => (
-                        <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[rgba(18,38,63,0.08)] px-3 py-2 text-sm text-[var(--ink-strong)]">
+                        <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
                           <input
                             type="checkbox"
                             checked={selectedInstructorIds.includes(instructor.id)}
@@ -584,7 +584,7 @@ export default function ClassRosterManager() {
                 )}
               </div>
 
-              <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Add student</p>
                 <p className="mt-1 text-sm text-[var(--ink-muted)]">Create an account and enroll in this class.</p>
                 <div className="mt-3 space-y-3">
@@ -636,7 +636,7 @@ export default function ClassRosterManager() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Requirements</p>
                 <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Requirement Matrix</h3>
@@ -649,13 +649,13 @@ export default function ClassRosterManager() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.55)] p-4">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Roster</p>
                   <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in this class</h3>
                 </div>
-                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                   {classDetail.enrollments.length} total
                 </span>
               </div>
@@ -664,7 +664,7 @@ export default function ClassRosterManager() {
                   <p className="text-sm text-[var(--ink-muted)]">No students enrolled in this class yet. Use the form above to create student accounts.</p>
                 ) : (
                   classDetail.enrollments.map((enrollment) => (
-                    <div key={enrollment.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] px-4 py-3">
+                    <div key={enrollment.id} className="rounded-xl border border-[var(--border)] px-4 py-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-[var(--ink-strong)]">{enrollment.student.displayName}</p>
@@ -677,7 +677,7 @@ export default function ClassRosterManager() {
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                          <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                             {enrollment.status}
                           </span>
                           {enrollment.status === "archived" ? (
@@ -685,7 +685,7 @@ export default function ClassRosterManager() {
                               type="button"
                               onClick={() => void updateEnrollmentStatus(enrollment.id, "active")}
                               disabled={saving}
-                              className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Restore
                             </button>
@@ -695,7 +695,7 @@ export default function ClassRosterManager() {
                                 type="button"
                                 onClick={() => void updateEnrollmentStatus(enrollment.id, enrollment.status === "inactive" ? "active" : "inactive")}
                                 disabled={saving}
-                                className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {enrollment.status === "inactive" ? "Mark Active" : "Mark Inactive"}
                               </button>
@@ -703,7 +703,7 @@ export default function ClassRosterManager() {
                                 type="button"
                                 onClick={() => void updateEnrollmentStatus(enrollment.id, "archived")}
                                 disabled={saving}
-                                className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 Archive
                               </button>
