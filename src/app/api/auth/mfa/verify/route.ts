@@ -5,6 +5,7 @@ import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
 import { verifyTotp, generateBackupCodes, hashBackupCodes } from "@/lib/mfa";
+import { rateLimit } from "@/lib/rate-limit";
 
 const mfaVerifySchema = z.object({
   token: z.string().length(6, "Token must be exactly 6 digits.").regex(/^\d{6}$/, "Token must be 6 digits."),
@@ -18,6 +19,11 @@ const mfaVerifySchema = z.object({
  * Returns one-time-display backup codes after storing only their hashes.
  */
 export const POST = withTeacherAuth(async (session, req: NextRequest) => {
+  const rl = await rateLimit(`mfa-verify:${session.id}`, 5, 5 * 60 * 1000);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+  }
+
   const body = await parseBody(req, mfaVerifySchema);
 
   const student = await prisma.student.findUnique({
