@@ -31,11 +31,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
     const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
 
+    logger.error("AI provider initialization failed", { error: errorMsg, studentId: session.id });
+
     return new Response(
       JSON.stringify({
         error: isOffline
           ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
-          : errorMsg,
+          : "Sage is temporarily unavailable. Please try again in a moment.",
       }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
