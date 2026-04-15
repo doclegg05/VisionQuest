@@ -17,9 +17,8 @@ const TEACHER_KEY = normalizeKey(process.env.TEACHER_KEY || "");
 const ADMIN_KEY = normalizeKey(process.env.ADMIN_KEY || "");
 
 function timingSafeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
+  const bufA = crypto.createHmac("sha256", "vq-key-compare").update(a).digest();
+  const bufB = crypto.createHmac("sha256", "vq-key-compare").update(b).digest();
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
