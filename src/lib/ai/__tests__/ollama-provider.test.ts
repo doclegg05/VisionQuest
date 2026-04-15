@@ -5,11 +5,14 @@ import { OllamaProvider } from "../ollama-provider";
 const mockFetch = mock.fn<typeof globalThis.fetch>();
 globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
 
-describe("OllamaProvider", () => {
+describe("OllamaProvider", { concurrency: false }, () => {
   let provider: OllamaProvider;
 
   beforeEach(() => {
     mockFetch.mock.resetCalls();
+    mockFetch.mock.mockImplementation(async () => {
+      throw new Error("Unexpected fetch call in OllamaProvider test");
+    });
     provider = new OllamaProvider("http://localhost:11434", "gemma4:26b");
   });
 
@@ -48,14 +51,16 @@ describe("OllamaProvider", () => {
     });
 
     it("falls back to native Ollama chat when the OpenAI path returns 404", async () => {
-      mockFetch.mock.mockImplementationOnce(async () =>
-        new Response("Not Found", { status: 404 }),
-      );
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response("Not Found", { status: 404 });
+        }
+        return Response.json({
           message: { content: "Hello from native Ollama!" },
-        }),
-      );
+        });
+      });
 
       const result = await provider.generateResponse("Be helpful.", [
         { role: "user", content: "Hi" },
@@ -87,14 +92,16 @@ describe("OllamaProvider", () => {
     });
 
     it("falls back to native JSON mode when the OpenAI path returns 404", async () => {
-      mockFetch.mock.mockImplementationOnce(async () =>
-        new Response("Not Found", { status: 404 }),
-      );
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response("Not Found", { status: 404 });
+        }
+        return Response.json({
           message: { content: '{"goals_found":[]}' },
-        }),
-      );
+        });
+      });
 
       const result = await provider.generateStructuredResponse("Extract goals.", [
         { role: "user", content: "I want to learn coding" },
@@ -170,12 +177,14 @@ describe("OllamaProvider", () => {
         },
       });
 
-      mockFetch.mock.mockImplementationOnce(async () =>
-        new Response("Not Found", { status: 404 }),
-      );
-      mockFetch.mock.mockImplementationOnce(
-        async () => new Response(nativeStream, { status: 200 }),
-      );
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response("Not Found", { status: 404 });
+        }
+        return new Response(nativeStream, { status: 200 });
+      });
 
       const result: string[] = [];
       for await (const chunk of provider.streamResponse("sys", [
@@ -209,6 +218,75 @@ describe("OllamaProvider", () => {
       assert.deepEqual(body.messages[1], { role: "user", content: "Hi" });
       assert.deepEqual(body.messages[2], { role: "assistant", content: "Hello" });
       assert.deepEqual(body.messages[3], { role: "user", content: "How are you?" });
+    });
+  });
+
+  describe("auth headers", () => {
+    it("sends bearer auth when configured", async () => {
+      provider = new OllamaProvider("http://localhost:11434", "gemma4:26b", {
+        authMode: "bearer",
+        apiKey: "test-token",
+      });
+
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [{ message: { content: "ok" } }],
+        }),
+      );
+
+      await provider.generateResponse("sys", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      const headers = (mockFetch.mock.calls[0].arguments[1] as RequestInit)
+        .headers as Record<string, string>;
+      assert.equal(headers.Authorization, "Bearer test-token");
+    });
+
+    it("sends Cloudflare Access service-token headers when configured", async () => {
+      provider = new OllamaProvider("http://localhost:11434", "gemma4:26b", {
+        authMode: "cloudflare_service_token",
+        cloudflareAccessClientId: "client-id",
+        cloudflareAccessClientSecret: "client-secret",
+      });
+
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [{ message: { content: "ok" } }],
+        }),
+      );
+
+      await provider.generateResponse("sys", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      const headers = (mockFetch.mock.calls[0].arguments[1] as RequestInit)
+        .headers as Record<string, string>;
+      assert.equal(headers["CF-Access-Client-Id"], "client-id");
+      assert.equal(headers["CF-Access-Client-Secret"], "client-secret");
+    });
+
+    it("throws when bearer auth is selected without a token", async () => {
+      provider = new OllamaProvider("http://localhost:11434", "gemma4:26b", {
+        authMode: "bearer",
+      });
+
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        /bearer token is not configured/i,
+      );
+    });
+
+    it("throws when Cloudflare auth is selected without both credentials", async () => {
+      provider = new OllamaProvider("http://localhost:11434", "gemma4:26b", {
+        authMode: "cloudflare_service_token",
+        cloudflareAccessClientId: "client-id",
+      });
+
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        /cloudflare access service token is not configured/i,
+      );
     });
   });
 });

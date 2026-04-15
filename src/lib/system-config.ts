@@ -7,7 +7,10 @@ export const SYSTEM_CONFIG_KEYS = [
   "ai_provider",
   "ai_provider_url",
   "ai_provider_model",
+  "ai_provider_auth_mode",
   "ai_provider_api_key",
+  "ai_provider_cloudflare_access_client_id",
+  "ai_provider_cloudflare_access_client_secret",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

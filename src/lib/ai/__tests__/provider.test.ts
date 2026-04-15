@@ -66,13 +66,27 @@ describe("getProvider", () => {
       if (key === "ai_provider") return "local";
       if (key === "ai_provider_url") return "http://localhost:11434";
       if (key === "ai_provider_model") return "gemma4:26b";
+      if (key === "ai_provider_auth_mode") return "cloudflare_service_token";
       return null;
     });
-    mockGetConfig.mock.mockImplementation(async () => null);
+    mockGetConfig.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider_cloudflare_access_client_id") return "client-id";
+      if (key === "ai_provider_cloudflare_access_client_secret") return "client-secret";
+      return null;
+    });
 
     const provider = await getProvider("student-123");
     assert.ok(provider instanceof OllamaProvider);
     assert.equal(provider.name, "ollama");
+    assert.deepEqual(
+      (provider as unknown as { authConfig: unknown }).authConfig,
+      {
+        authMode: "cloudflare_service_token",
+        apiKey: null,
+        cloudflareAccessClientId: "client-id",
+        cloudflareAccessClientSecret: "client-secret",
+      },
+    );
   });
 
   it("throws when local provider has no URL configured", async () => {

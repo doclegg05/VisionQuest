@@ -1,4 +1,5 @@
-import type { AIProvider, ChatMessage } from "./types";
+import { buildLocalAiHeaders, DEFAULT_LOCAL_AI_AUTH_MODE } from "./local-auth";
+import type { AIProvider, ChatMessage, LocalAIAuthConfig } from "./types";
 
 interface OpenAIMessage {
   role: "system" | "user" | "assistant";
@@ -47,23 +48,37 @@ export class OllamaProvider implements AIProvider {
   readonly name = "ollama";
   private readonly baseUrl: string;
   private readonly model: string;
-  private readonly apiKey: string | null;
+  private readonly authConfig: LocalAIAuthConfig;
   private apiMode: OllamaApiMode = "unknown";
 
-  constructor(baseUrl: string, model: string, apiKey?: string) {
+  constructor(
+    baseUrl: string,
+    model: string,
+    authConfigOrApiKey?: LocalAIAuthConfig | string,
+  ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.model = model;
-    this.apiKey = apiKey || null;
+    this.authConfig =
+      typeof authConfigOrApiKey === "string"
+        ? {
+            authMode: "bearer",
+            apiKey: authConfigOrApiKey,
+          }
+        : {
+            authMode:
+              authConfigOrApiKey?.authMode ?? DEFAULT_LOCAL_AI_AUTH_MODE,
+            apiKey: authConfigOrApiKey?.apiKey ?? null,
+            cloudflareAccessClientId:
+              authConfigOrApiKey?.cloudflareAccessClientId ?? null,
+            cloudflareAccessClientSecret:
+              authConfigOrApiKey?.cloudflareAccessClientSecret ?? null,
+          };
   }
 
   private get headers(): Record<string, string> {
-    const h: Record<string, string> = {
+    return buildLocalAiHeaders(this.authConfig, {
       "Content-Type": "application/json",
-      "User-Agent": "VisionQuest",
-      "ngrok-skip-browser-warning": "true",
-    };
-    if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
-    return h;
+    });
   }
 
   private async postOpenAIChat(body: unknown): Promise<Response> {

@@ -97,13 +97,13 @@ Students (any classroom)
 
 | Option | Best For | Cost | Setup |
 |--------|----------|------|-------|
-| ngrok Free | Dev/testing, 1 classroom pilot | Free (1GB/mo bandwidth) | `ngrok http 11434` — instant |
+| ngrok Free | Dev/testing only | Free (1GB/mo bandwidth) | `ngrok http 11434` — instant but ephemeral |
 | ngrok Pro | Multi-classroom deployment | $10/mo (unlimited bandwidth) | Fixed subdomain, IP policies |
 | Cloudflare Tunnel | Production (recommended for July) | Free (unlimited) | Requires domain on Cloudflare nameservers |
 
-**Current (pilot):** ngrok — instant setup, no domain required. URL set as `ai_provider_url` in admin config.
+**Observed reality (April 15, 2026):** local Ollama was healthy, but the public `ngrok-free.dev` endpoint returned `403 Forbidden` before requests reached the model host. Treat `ngrok free` as a developer convenience only, not as the production Sage endpoint from Render.
 
-**Production (July multi-classroom):** Migrate to Cloudflare Tunnel before scaling to 11 classrooms. Requires purchasing or transferring a domain to Cloudflare nameservers (~$12/year for a `.dev` domain). Benefits: free unlimited bandwidth, stable URL (`llm.yourdomain.com`), Access Service Tokens for security.
+**Production path:** Use Cloudflare Tunnel before scaling to 11 classrooms. Requires purchasing or transferring a domain to Cloudflare nameservers (~$12/year for a `.dev` domain). Benefits: free unlimited bandwidth, stable URL (`llm.yourdomain.com`), Access Service Tokens for security.
 
 **Cloudflare Tunnel details (for production):**
 - `cloudflared` daemon runs on Mac Studio, establishes outbound HTTPS connection to Cloudflare

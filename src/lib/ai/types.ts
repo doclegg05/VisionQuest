@@ -28,6 +28,14 @@ export interface AIProvider {
 }
 
 export type AIProviderType = "cloud" | "local";
+export type LocalAIAuthMode = "none" | "bearer" | "cloudflare_service_token";
+
+export interface LocalAIAuthConfig {
+  authMode: LocalAIAuthMode;
+  apiKey?: string | null;
+  cloudflareAccessClientId?: string | null;
+  cloudflareAccessClientSecret?: string | null;
+}
 
 export interface AIProviderConfig {
   type: AIProviderType;
@@ -35,4 +43,6 @@ export interface AIProviderConfig {
   url?: string;
   /** Model name for Ollama (e.g. "gemma4:26b") */
   model?: string;
+  /** Authentication mode for the local AI endpoint. */
+  authMode?: LocalAIAuthMode;
 }
