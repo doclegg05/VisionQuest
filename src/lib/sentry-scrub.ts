@@ -1,10 +1,10 @@
-import type { Event } from "@sentry/nextjs";
+import type { ErrorEvent, EventHint } from "@sentry/nextjs";
 
 /**
  * Strip PII from Sentry events before transmission.
  * VisionQuest handles TANF/SNAP recipients — no student data should reach Sentry.
  */
-export function scrubPii(event: Event): Event {
+export function scrubPii(event: ErrorEvent, _hint: EventHint): ErrorEvent | null {
   if (event.user) {
     delete event.user.email;
     delete event.user.username;
