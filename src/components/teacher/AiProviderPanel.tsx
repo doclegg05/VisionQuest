@@ -76,7 +76,13 @@ export default function AiProviderPanel() {
       const modelList = data.models?.length
         ? data.models.join(", ")
         : "no models loaded";
-      setMessage(`Connected to local AI server. Loaded models: ${modelList}`);
+      const apiModeLabel =
+        data.apiMode === "native"
+          ? "native Ollama API fallback"
+          : data.apiMode === "openai"
+            ? "OpenAI-compatible API"
+            : "detected chat API";
+      setMessage(`Connected to local AI server. Loaded models: ${modelList}. Chat path: ${apiModeLabel}.`);
     } catch {
       setError("Could not contact the server.");
     } finally {

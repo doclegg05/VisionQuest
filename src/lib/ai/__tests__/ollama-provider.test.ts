@@ -6,10 +6,11 @@ const mockFetch = mock.fn<typeof globalThis.fetch>();
 globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
 
 describe("OllamaProvider", () => {
-  const provider = new OllamaProvider("http://localhost:11434", "gemma4:26b");
+  let provider: OllamaProvider;
 
   beforeEach(() => {
     mockFetch.mock.resetCalls();
+    provider = new OllamaProvider("http://localhost:11434", "gemma4:26b");
   });
 
   describe("generateResponse", () => {
@@ -45,6 +46,25 @@ describe("OllamaProvider", () => {
         /Local AI request failed \(500\)/,
       );
     });
+
+    it("falls back to native Ollama chat when the OpenAI path returns 404", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        new Response("Not Found", { status: 404 }),
+      );
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          message: { content: "Hello from native Ollama!" },
+        }),
+      );
+
+      const result = await provider.generateResponse("Be helpful.", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      assert.equal(result, "Hello from native Ollama!");
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+    });
   });
 
   describe("generateStructuredResponse", () => {
@@ -64,6 +84,27 @@ describe("OllamaProvider", () => {
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.deepEqual(body.response_format, { type: "json_object" });
+    });
+
+    it("falls back to native JSON mode when the OpenAI path returns 404", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        new Response("Not Found", { status: 404 }),
+      );
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          message: { content: '{"goals_found":[]}' },
+        }),
+      );
+
+      const result = await provider.generateStructuredResponse("Extract goals.", [
+        { role: "user", content: "I want to learn coding" },
+      ]);
+
+      assert.equal(result, '{"goals_found":[]}');
+      const nativeBody = JSON.parse(
+        (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(nativeBody.format, "json");
     });
   });
 
@@ -101,6 +142,50 @@ describe("OllamaProvider", () => {
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.equal(body.stream, true);
+    });
+
+    it("falls back to native streamed chat when the OpenAI path returns 404", async () => {
+      const encoder = new TextEncoder();
+      const nativeChunks = [
+        JSON.stringify({
+          message: { content: "Hello" },
+          done: false,
+        }) + "\n",
+        JSON.stringify({
+          message: { content: " world" },
+          done: false,
+        }) + "\n",
+        JSON.stringify({
+          message: { content: "" },
+          done: true,
+        }) + "\n",
+      ];
+
+      const nativeStream = new ReadableStream({
+        start(controller) {
+          for (const chunk of nativeChunks) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        },
+      });
+
+      mockFetch.mock.mockImplementationOnce(async () =>
+        new Response("Not Found", { status: 404 }),
+      );
+      mockFetch.mock.mockImplementationOnce(
+        async () => new Response(nativeStream, { status: 200 }),
+      );
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Hello", " world"]);
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
     });
   });
 

@@ -31,5 +31,6 @@ export const POST = withAdminAuth(async () => {
   return NextResponse.json({
     success: true,
     models: health.models,
+    apiMode: health.apiMode,
   });
 });

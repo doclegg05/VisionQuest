@@ -5,6 +5,31 @@ interface OpenAIMessage {
   content: string;
 }
 
+interface OpenAIChatResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
+interface OpenAIStreamChunk {
+  choices?: Array<{
+    delta?: {
+      content?: string;
+    };
+  }>;
+}
+
+interface NativeChatResponse {
+  message?: {
+    content?: string;
+  };
+  done?: boolean;
+}
+
+type OllamaApiMode = "unknown" | "openai" | "native";
+
 function toOpenAIMessages(
   systemPrompt: string,
   messages: ChatMessage[],
@@ -23,6 +48,7 @@ export class OllamaProvider implements AIProvider {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly apiKey: string | null;
+  private apiMode: OllamaApiMode = "unknown";
 
   constructor(baseUrl: string, model: string, apiKey?: string) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
@@ -40,48 +66,98 @@ export class OllamaProvider implements AIProvider {
     return h;
   }
 
+  private async postOpenAIChat(body: unknown): Promise<Response> {
+    return fetch(`${this.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(body),
+    });
+  }
+
+  private async postNativeChat(body: unknown): Promise<Response> {
+    return fetch(`${this.baseUrl}/api/chat`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(body),
+    });
+  }
+
+  private async postChat(
+    openAIBody: unknown,
+    nativeBody: unknown,
+  ): Promise<{ mode: Exclude<OllamaApiMode, "unknown">; response: Response }> {
+    if (this.apiMode === "native") {
+      const response = await this.postNativeChat(nativeBody);
+      return { mode: "native", response };
+    }
+
+    const openAIResponse = await this.postOpenAIChat(openAIBody);
+    if (openAIResponse.status !== 404) {
+      if (openAIResponse.ok) {
+        this.apiMode = "openai";
+      }
+      return { mode: "openai", response: openAIResponse };
+    }
+
+    const nativeResponse = await this.postNativeChat(nativeBody);
+    if (nativeResponse.ok) {
+      this.apiMode = "native";
+    }
+    return { mode: "native", response: nativeResponse };
+  }
+
   async generateResponse(
     systemPrompt: string,
     messages: ChatMessage[],
   ): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify({
+    const openAIMessages = toOpenAIMessages(systemPrompt, messages);
+    const { mode, response } = await this.postChat(
+      {
         model: this.model,
-        messages: toOpenAIMessages(systemPrompt, messages),
+        messages: openAIMessages,
         stream: false,
-      }),
-    });
+      },
+      {
+        model: this.model,
+        messages: openAIMessages,
+        stream: false,
+      },
+    );
 
-    if (!res.ok) {
-      throw new Error(`Local AI request failed (${res.status})`);
+    if (!response.ok) {
+      throw new Error(`Local AI request failed (${response.status})`);
     }
 
-    const data = await res.json();
-    return data.choices[0].message.content;
+    const data = (await response.json()) as OpenAIChatResponse | NativeChatResponse;
+    return mode === "openai"
+      ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
+      : (data as NativeChatResponse).message?.content ?? "";
   }
 
   async *streamResponse(
     systemPrompt: string,
     messages: ChatMessage[],
   ): AsyncGenerator<string> {
-    const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify({
+    const openAIMessages = toOpenAIMessages(systemPrompt, messages);
+    const { mode, response } = await this.postChat(
+      {
         model: this.model,
-        messages: toOpenAIMessages(systemPrompt, messages),
+        messages: openAIMessages,
         stream: true,
-      }),
-    });
+      },
+      {
+        model: this.model,
+        messages: openAIMessages,
+        stream: true,
+      },
+    );
 
-    if (!res.ok) {
-      throw new Error(`Local AI stream failed (${res.status})`);
+    if (!response.ok) {
+      throw new Error(`Local AI stream failed (${response.status})`);
     }
 
-    if (!res.body) throw new Error("Ollama returned empty stream body");
-    const reader = res.body.getReader();
+    if (!response.body) throw new Error("Ollama returned empty stream body");
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -95,19 +171,60 @@ export class OllamaProvider implements AIProvider {
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed.startsWith("data: ")) continue;
-        const payload = trimmed.slice(6);
-        if (payload === "[DONE]") return;
+        if (!trimmed) continue;
 
-        let parsed: { choices?: Array<{ delta?: { content?: string } }> };
+        if (mode === "openai") {
+          if (!trimmed.startsWith("data: ")) continue;
+          const payload = trimmed.slice(6);
+          if (payload === "[DONE]") return;
+
+          let parsed: OpenAIStreamChunk;
+          try {
+            parsed = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) yield content;
+          continue;
+        }
+
+        let parsed: NativeChatResponse;
         try {
-          parsed = JSON.parse(payload);
+          parsed = JSON.parse(trimmed);
         } catch {
           continue;
         }
+        const content = parsed.message?.content;
+        if (content) yield content;
+        if (parsed.done) return;
+      }
+    }
+
+    const finalChunk = buffer.trim();
+    if (!finalChunk) return;
+
+    if (mode === "openai") {
+      if (!finalChunk.startsWith("data: ")) return;
+      const payload = finalChunk.slice(6);
+      if (payload === "[DONE]") return;
+
+      try {
+        const parsed = JSON.parse(payload) as OpenAIStreamChunk;
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) yield content;
+      } catch {
+        return;
       }
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(finalChunk) as NativeChatResponse;
+      const content = parsed.message?.content;
+      if (content) yield content;
+    } catch {
+      return;
     }
   }
 
@@ -115,22 +232,29 @@ export class OllamaProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
   ): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify({
+    const openAIMessages = toOpenAIMessages(systemPrompt, messages);
+    const { mode, response } = await this.postChat(
+      {
         model: this.model,
-        messages: toOpenAIMessages(systemPrompt, messages),
+        messages: openAIMessages,
         stream: false,
         response_format: { type: "json_object" },
-      }),
-    });
+      },
+      {
+        model: this.model,
+        messages: openAIMessages,
+        stream: false,
+        format: "json",
+      },
+    );
 
-    if (!res.ok) {
-      throw new Error(`Local AI structured request failed (${res.status})`);
+    if (!response.ok) {
+      throw new Error(`Local AI structured request failed (${response.status})`);
     }
 
-    const data = await res.json();
-    return data.choices[0].message.content;
+    const data = (await response.json()) as OpenAIChatResponse | NativeChatResponse;
+    return mode === "openai"
+      ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
+      : (data as NativeChatResponse).message?.content ?? "";
   }
 }
