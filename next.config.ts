@@ -21,15 +21,15 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "X-XSS-Protection", value: "0" },
-          // Static CSP — nonce-based CSP requires middleware which is blocked
-          // by Turbopack + standalone mode (no middleware.js generated).
-          // CSRF protection remains via src/proxy.ts Origin header validation.
+          // Nonce-based CSP is handled by src/middleware.ts (via src/proxy.ts).
+          // This static fallback applies only if middleware fails to execute.
+          // It is intentionally restrictive — no unsafe-inline.
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "script-src 'self'",
+              "style-src 'self' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",
               "connect-src 'self' https://generativelanguage.googleapis.com https://*.ingest.sentry.io",
