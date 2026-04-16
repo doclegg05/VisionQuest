@@ -491,6 +491,11 @@ select.theme-input::placeholder {
   color: var(--ink-muted);
 }
 
+select.field option {
+  background: #fff;
+  color: #1a1a1a;
+}
+
 @media (min-width: 768px) {
   .page-shell {
     padding: 1.5rem 1.5rem 5rem;

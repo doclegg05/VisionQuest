@@ -275,7 +275,7 @@ export default function AiProviderPanel() {
           </div>
 
           {authMode === "bearer" && (
-            <div className="space-y-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-white/70 p-4">
+            <div className="space-y-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-[var(--ink-strong)]">
                   Saved bearer token:{" "}
@@ -318,7 +318,7 @@ export default function AiProviderPanel() {
           )}
 
           {authMode === "cloudflare_service_token" && (
-            <div className="space-y-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-white/70 p-4">
+            <div className="space-y-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-[var(--ink-strong)]">
                   Saved Cloudflare credentials:{" "}
