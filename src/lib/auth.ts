@@ -51,6 +51,28 @@ export function verifyPassword(password: string, stored: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(candidate));
 }
 
+// Precomputed dummy hash used to equalize timing when the account doesn't exist.
+// The verify will always fail, but it burns the same CPU as a real check,
+// preventing a timing oracle that would let attackers enumerate valid accounts.
+const DUMMY_HASH = (() => {
+  const salt = crypto.randomBytes(32).toString("hex");
+  const hash = crypto
+    .pbkdf2Sync("dummy-password-never-matches", salt, 100000, 64, "sha512")
+    .toString("hex");
+  return `${salt}:${hash}`;
+})();
+
+/**
+ * Verify a password, always running the KDF even when `stored` is null/empty.
+ * Prevents timing-based account enumeration by ensuring the request spends
+ * roughly the same CPU time whether or not the account exists.
+ */
+export function verifyPasswordSafe(password: string, stored: string | null | undefined): boolean {
+  const target = stored && stored.includes(":") ? stored : DUMMY_HASH;
+  const result = verifyPassword(password, target);
+  return stored ? result : false;
+}
+
 // --- JWT ---
 
 export function signToken(studentId: string, role: string, sessionVersion: number): string {

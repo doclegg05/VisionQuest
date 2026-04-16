@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, normalizeStudentId, normalizeEmail, setSessionCookie, signMfaSessionToken } from "@/lib/auth";
+import { verifyPasswordSafe, normalizeStudentId, normalizeEmail, setSessionCookie, signMfaSessionToken } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -36,8 +36,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Consolidate all failure cases into a single generic response to prevent account enumeration.
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
   const isOAuthOnly = student && !student.passwordHash && student.authProvider === "google";
+  // Always run the KDF to equalize timing and avoid an account-enumeration oracle.
+  const passwordMatches = verifyPasswordSafe(password, student?.passwordHash ?? null);
   const isInvalidCredentials =
-    !student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive;
+    !student || !student.passwordHash || !passwordMatches || !student.isActive;
 
   if (isOAuthOnly || isInvalidCredentials) {
     await logAuditEvent({
