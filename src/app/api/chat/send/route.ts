@@ -207,8 +207,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversation.id })}\n\n`));
         controller.close();
       } catch (error) {
-        logger.error("Stream error", { error: error instanceof Error ? error.message : String(error) });
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Something went wrong generating a response. Please try again." })}\n\n`));
+        const msg = error instanceof Error ? error.message : String(error);
+        const cause = error instanceof Error && error.cause ? String(error.cause) : undefined;
+        logger.error("Stream error", { error: msg, cause, provider: provider.name });
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` })}\n\n`));
         controller.close();
       }
     },
