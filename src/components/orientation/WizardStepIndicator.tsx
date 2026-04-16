@@ -32,7 +32,7 @@ export default function WizardStepIndicator({
                   isComplete
                     ? "bg-emerald-500 text-white"
                     : isCurrent
-                      ? "bg-[var(--ink-strong)] text-white"
+                      ? "bg-[var(--accent-strong)] text-white"
                       : "bg-[var(--surface-strong)] text-[var(--ink-faint)]"
                 }`}
               >
