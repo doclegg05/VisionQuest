@@ -216,6 +216,7 @@ function ChatWindowInner() {
                   setConversationId(data.conversationId);
                   maybeRefreshConversations(data.conversationId);
                 }
+                if (data.error) throw new Error(data.error);
                 if (data.text) {
                   fullContent += data.text;
                   setStreamingContent(fullContent);

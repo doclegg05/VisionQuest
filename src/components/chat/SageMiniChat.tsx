@@ -132,6 +132,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
               try {
                 const data = JSON.parse(line.slice(6));
                 if (data.conversationId) setConversationId(data.conversationId);
+                if (data.error) throw new Error(data.error);
                 if (data.text) {
                   fullContent += data.text;
                   setStreamingContent(fullContent);
