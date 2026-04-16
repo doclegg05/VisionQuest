@@ -4,7 +4,9 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 
 const mockFindMany = mock.fn() as any;
 
-mock.module("@/lib/db", {
+// mock.module goes through Node's native resolver, which does not honor the
+// "@/*" path alias from tsconfig. Use a relative path so the spec resolves.
+mock.module("./db", {
   namedExports: {
     prisma: {
       spokesClassInstructor: {
