@@ -61,14 +61,14 @@ test("createStudentSchema requires username min 3 chars", () => {
   assert.ok(result.error.issues[0].message.includes("3 characters"));
 });
 
-test("createStudentSchema requires password min 6 chars", () => {
+test("createStudentSchema requires password min 8 chars", () => {
   const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane",
-    password: "12345",
+    password: "1234567",
   });
   assert.ok(!result.success);
-  assert.ok(result.error.issues[0].message.includes("6 characters"));
+  assert.ok(result.error.issues[0].message.includes("8 characters"));
 });
 
 test("createStudentSchema allows empty string for email", () => {
