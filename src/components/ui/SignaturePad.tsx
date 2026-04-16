@@ -26,7 +26,7 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
           onClick={() => setMode("draw")}
           className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
             mode === "draw"
-              ? "bg-[var(--ink-strong)] text-white"
+              ? "bg-[var(--accent-strong)] text-white"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
           }`}
         >
@@ -37,7 +37,7 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
           onClick={() => setMode("type")}
           className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
             mode === "type"
-              ? "bg-[var(--ink-strong)] text-white"
+              ? "bg-[var(--accent-strong)] text-white"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
           }`}
         >

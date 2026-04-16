@@ -97,7 +97,7 @@ export default function ResourceLibrary({
             onClick={() => setSelectedCategory("all")}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
-                ? "bg-[var(--ink-strong)] text-white"
+                ? "bg-[var(--accent-strong)] text-white"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
             }`}
           >
@@ -110,7 +110,7 @@ export default function ResourceLibrary({
               onClick={() => setSelectedCategory(key)}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 selectedCategory === key
-                  ? "bg-[var(--ink-strong)] text-white"
+                  ? "bg-[var(--accent-strong)] text-white"
                   : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >

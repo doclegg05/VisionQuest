@@ -45,17 +45,30 @@ const RULES = [
 
   // --- Critical: white-on-white button in dark mode -------------------------
   // `bg-[var(--ink-strong)] text-white` → invisible in dark mode (ink-strong is white).
-  // Replace with theme-aware accent primary.
+  // Replace with theme-aware accent primary (green) across all variants.
   [
     /bg-\[var\(--ink-strong\)\] text-white hover:bg-\[rgba\(16,\s*37,\s*62,\s*0\.9\)\]/g,
     "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90",
     "btn-ink-primary",
   ],
-  // Some use a comma after hover class (transition-colors sits between)
   [
     /bg-\[var\(--ink-strong\)\] ([^"'`]*?)hover:bg-\[rgba\(16,\s*37,\s*62,\s*0\.9\)\]/g,
     "bg-[var(--accent-strong)] $1hover:bg-[var(--accent-green)]/90",
     "btn-ink-primary-chained",
+  ],
+  // Redundant hover: now that default is accent-strong, `hover:bg-[var(--accent-strong)]`
+  // becomes a no-op. Swap hover to a subtle brightness tweak.
+  [
+    /bg-\[var\(--ink-strong\)\] ([^"'`]*?)hover:bg-\[var\(--accent-strong\)\]/g,
+    "bg-[var(--accent-strong)] $1hover:brightness-110",
+    "btn-ink-accent-hover",
+  ],
+  // All remaining `bg-[var(--ink-strong)] text-white` — toggles, badges, selected
+  // states. Green is readable in both themes.
+  [
+    /bg-\[var\(--ink-strong\)\] text-white/g,
+    "bg-[var(--accent-strong)] text-white",
+    "btn-ink-generic",
   ],
 
   // --- Border colors --------------------------------------------------------

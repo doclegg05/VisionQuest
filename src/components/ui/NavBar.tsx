@@ -147,13 +147,31 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
     };
   }, [profileOpen]);
 
-  const isMoreActive = mobileMore.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+  // Longest-match-wins active detection — prevents `/teacher` from highlighting
+  // when the user is on `/teacher/classes`. The set of candidates is every href
+  // currently visible in the NavBar (primary + secondary + static links).
+  const allNavHrefs = Array.from(
+    new Set<string>([
+      ...primaryItems.map((i) => i.href),
+      ...secondaryItems.map((i) => i.href),
+      "/settings",
+      "/chat",
+    ]),
   );
+  const isActive = (href: string): boolean => {
+    const matches = allNavHrefs.filter(
+      (h) => pathname === h || pathname.startsWith(h + "/"),
+    );
+    if (matches.length === 0) return false;
+    const longest = matches.reduce((a, b) => (a.length >= b.length ? a : b));
+    return longest === href;
+  };
+
+  const isMoreActive = mobileMore.some((item) => isActive(item.href));
 
   // Shared link renderer for sidebar nav items
   const renderSidebarLink = (item: NavItem, small?: boolean) => {
-    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+    const active = isActive(item.href);
     return (
       <Link
         key={item.href}
@@ -164,7 +182,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             ? "bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
             : "text-white/90 hover:bg-[var(--surface-raised)]/10 hover:text-white"
         }`}
-        aria-current={pathname === item.href ? "page" : undefined}
+        aria-current={active ? "page" : undefined}
       >
         <span
           aria-hidden="true"
@@ -220,7 +238,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {mobileMain[0] && (() => {
             const item = mobileMain[0];
             const IconComponent = item.icon;
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = isActive(item.href);
             return (
               <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
@@ -234,7 +252,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {mobileMain[1] && (() => {
             const item = mobileMain[1];
             const IconComponent = item.icon;
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = isActive(item.href);
             return (
               <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
@@ -261,7 +279,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {mobileLearningItem && (() => {
             const item = mobileLearningItem;
             const IconComponent = item.icon;
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = isActive(item.href);
             return (
               <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
@@ -310,11 +328,11 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
-                    pathname === item.href || pathname.startsWith(item.href + "/")
+                    isActive(item.href)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
                   }`}
-                  aria-current={pathname === item.href ? "page" : undefined}
+                  aria-current={isActive(item.href) ? "page" : undefined}
                 >
                   <item.icon size={24} weight="regular" className="mb-1" />
                   <span className="text-center leading-4">{item.label}</span>
@@ -327,11 +345,11 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
-                    pathname === "/settings" || pathname.startsWith("/settings/")
+                    isActive("/settings")
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
                   }`}
-                  aria-current={pathname === "/settings" ? "page" : undefined}
+                  aria-current={isActive("/settings") ? "page" : undefined}
                 >
                   <Gear size={24} weight="regular" className="mb-1" />
                   <span className="text-center leading-4">Settings</span>
