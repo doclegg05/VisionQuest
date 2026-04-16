@@ -153,9 +153,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   ];
 
   // Stream response via SSE
-  // For local providers, use non-streaming inference then send via SSE.
-  // Streaming fetch fails on Render's Node.js runtime inside ReadableStream callbacks.
-  const useNonStreaming = provider.name === "ollama";
+  // Local (Ollama) providers MUST use streaming: Cloudflare Tunnel returns 524
+  // if the origin takes >100s to send the first byte. With stream:true, Ollama
+  // emits the first token within seconds, keeping the tunnel alive. With
+  // stream:false, the entire generation must complete before any bytes flow,
+  // which exceeds the tunnel timeout for large prompts on big models.
+  const useNonStreaming = false;
   const encoder = new TextEncoder();
   let fullResponse = "";
 

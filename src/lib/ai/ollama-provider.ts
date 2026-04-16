@@ -51,6 +51,20 @@ export class OllamaProvider implements AIProvider {
   private readonly authConfig: LocalAIAuthConfig;
   private apiMode: OllamaApiMode = "unknown";
 
+  /**
+   * Timeout for non-streaming requests (full generation must complete).
+   * Must be under Cloudflare Tunnel's 100s origin timeout.
+   * Health checks use 30s; chat generation needs more headroom.
+   */
+  private static readonly GENERATE_TIMEOUT_MS = 90_000;
+
+  /**
+   * Timeout for streaming requests (first byte must arrive).
+   * Ollama typically emits the first token within seconds once
+   * the model is loaded, so 60s is generous.
+   */
+  private static readonly STREAM_FIRST_BYTE_TIMEOUT_MS = 60_000;
+
   constructor(
     baseUrl: string,
     model: string,
@@ -81,32 +95,71 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  private async postOpenAIChat(body: unknown): Promise<Response> {
-    return fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
+  /**
+   * Create a fetch call with an AbortController timeout.
+   * Cloudflare Tunnel returns 524 if the origin takes >100s to send
+   * the first byte.  We abort before that threshold so callers get a
+   * clear timeout error instead of a cryptic 524.
+   */
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutMs: number,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  private async postNativeChat(body: unknown): Promise<Response> {
-    return fetch(`${this.baseUrl}/api/chat`, {
-      method: "POST",
-      headers: this.headers,
-      body: JSON.stringify(body),
-    });
+  private async postOpenAIChat(
+    body: unknown,
+    timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
+  ): Promise<Response> {
+    return this.fetchWithTimeout(
+      `${this.baseUrl}/v1/chat/completions`,
+      {
+        method: "POST",
+        headers: this.headers,
+        body: JSON.stringify(body),
+      },
+      timeoutMs,
+    );
+  }
+
+  private async postNativeChat(
+    body: unknown,
+    timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
+  ): Promise<Response> {
+    return this.fetchWithTimeout(
+      `${this.baseUrl}/api/chat`,
+      {
+        method: "POST",
+        headers: this.headers,
+        body: JSON.stringify(body),
+      },
+      timeoutMs,
+    );
   }
 
   private async postChat(
     openAIBody: unknown,
     nativeBody: unknown,
+    timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
   ): Promise<{ mode: Exclude<OllamaApiMode, "unknown">; response: Response }> {
     if (this.apiMode === "native") {
-      const response = await this.postNativeChat(nativeBody);
+      const response = await this.postNativeChat(nativeBody, timeoutMs);
       return { mode: "native", response };
     }
 
-    const openAIResponse = await this.postOpenAIChat(openAIBody);
+    const openAIResponse = await this.postOpenAIChat(openAIBody, timeoutMs);
     if (openAIResponse.status !== 404) {
       if (openAIResponse.ok) {
         this.apiMode = "openai";
@@ -114,7 +167,7 @@ export class OllamaProvider implements AIProvider {
       return { mode: "openai", response: openAIResponse };
     }
 
-    const nativeResponse = await this.postNativeChat(nativeBody);
+    const nativeResponse = await this.postNativeChat(nativeBody, timeoutMs);
     if (nativeResponse.ok) {
       this.apiMode = "native";
     }
@@ -136,6 +189,7 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: false,
+        keep_alive: "10m",
       },
     );
 
@@ -154,6 +208,9 @@ export class OllamaProvider implements AIProvider {
     messages: ChatMessage[],
   ): AsyncGenerator<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
+    // Use the streaming-specific timeout (first-byte only).
+    // Once the first byte arrives, Cloudflare keeps the connection alive
+    // as long as data continues to flow.
     const { mode, response } = await this.postChat(
       {
         model: this.model,
@@ -164,7 +221,9 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: true,
+        keep_alive: "10m",
       },
+      OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
     );
 
     if (!response.ok) {
@@ -260,6 +319,7 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         format: "json",
+        keep_alive: "10m",
       },
     );
 
