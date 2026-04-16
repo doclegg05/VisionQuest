@@ -170,7 +170,7 @@ export default function AdvisingManager() {
             type="button"
             onClick={() => void handleSendReminders()}
             disabled={sendingReminders}
-            className="mt-3 inline-flex rounded-full bg-[var(--ink-strong)] px-4 py-2 text-sm font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-3 inline-flex rounded-full bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {sendingReminders ? "Sending..." : "Send upcoming reminders"}
           </button>

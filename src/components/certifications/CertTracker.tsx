@@ -198,7 +198,7 @@ export default function CertTracker() {
           <div
             key={req.templateId}
             className={`bg-[var(--surface-raised)] rounded-xl border p-4 ${
-              req.completed ? "border-green-200" : "border-[rgba(18,38,63,0.08)]"
+              req.completed ? "border-green-200" : "border-[var(--border)]"
             }`}
           >
             <div className="flex items-start gap-3">

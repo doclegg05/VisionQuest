@@ -505,7 +505,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                                        <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                           {GOAL_RESOURCE_TYPE_LABELS[link.resourceType]}
                                         </span>
                                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{link.title}</p>
@@ -521,7 +521,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                           {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
                                         </span>
                                         {dueLabel ? (
-                                          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-1 text-[var(--ink-muted)]">
+                                          <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-1 text-[var(--ink-muted)]">
                                             Due {dueLabel}
                                           </span>
                                         ) : null}
@@ -590,7 +590,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                                      <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                         {GOAL_RESOURCE_TYPE_LABELS[resource.resourceType]}
                                       </span>
                                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{resource.title}</p>

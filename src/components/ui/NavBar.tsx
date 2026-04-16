@@ -181,7 +181,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
 
   return (
     <>
-      <div className="fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[0_16px_40px_rgba(16,37,62,0.12)] backdrop-blur-xl md:hidden">
+      <div className="fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl md:hidden">
         <div className="min-w-0 flex-1">
           <BrandLockup
             href={homeHref}
@@ -343,6 +343,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       ) : null}
 
       <aside
+        // Always-dark sidebar gradient — intentional raw rgba for the navy→teal ramp.
+        // eslint-disable-next-line no-restricted-syntax
         className="fixed inset-y-4 left-4 z-40 hidden w-[17rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(7,23,43,0.96),rgba(16,37,62,0.94)_34%,rgba(8,68,80,0.92))] text-white shadow-[0_30px_90px_rgba(7,23,43,0.28)] md:flex"
         role="navigation"
         aria-label="Main navigation"

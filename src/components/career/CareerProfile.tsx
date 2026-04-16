@@ -73,7 +73,7 @@ function RadarChart({ scores }: { scores: RiasecScores }) {
             key={level}
             d={ringPath}
             fill="none"
-            stroke="rgba(18,38,63,0.1)"
+            stroke="var(--border)"
             strokeWidth="1"
           />
         );
@@ -87,7 +87,7 @@ function RadarChart({ scores }: { scores: RiasecScores }) {
           y1={CENTER}
           x2={ax}
           y2={ay}
-          stroke="rgba(18,38,63,0.12)"
+          stroke="var(--border)"
           strokeWidth="1"
         />
       ))}
@@ -164,7 +164,7 @@ function RiasecSection({
                   <span className="font-medium text-[var(--ink-strong)]">{label}</span>
                   <span className="text-[var(--ink-muted)]">{pct}%</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[rgba(18,38,63,0.08)]">
+                <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                   <div
                     className="h-full rounded-full bg-[var(--accent-strong)]"
                     style={{ width: `${pct}%` }}
@@ -216,7 +216,7 @@ function SkillsSection({ skills }: { skills: TransferableSkill[] }) {
               {items.map((s) => (
                 <div
                   key={s.skill}
-                  className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)]/70 p-3"
+                  className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-3"
                 >
                   <p className="text-sm font-semibold text-[var(--ink-strong)]">{s.skill}</p>
                   {s.evidence && (
@@ -264,7 +264,7 @@ function ValuesSection({ values }: { values: WorkValue[] }) {
                 </span>
                 <span className="text-xs text-[var(--ink-muted)]">{v.importance}</span>
               </div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[rgba(18,38,63,0.08)]">
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                 <div
                   className={`h-full rounded-full bg-[var(--primary)] ${IMPORTANCE_WIDTH[v.importance]}`}
                 />
@@ -303,7 +303,7 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
           return (
             <div
               key={nc.cluster_name}
-              className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)]/70 p-4"
+              className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -326,7 +326,7 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
                     {spokesMatch.sampleJobs.slice(0, 4).map((job) => (
                       <span
                         key={job}
-                        className="rounded-full border border-[rgba(18,38,63,0.1)] bg-[rgba(18,38,63,0.04)] px-2.5 py-0.5 text-xs text-[var(--ink-muted)]"
+                        className="rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs text-[var(--ink-muted)]"
                       >
                         {job}
                       </span>

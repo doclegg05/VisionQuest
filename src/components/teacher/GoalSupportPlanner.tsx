@@ -64,7 +64,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
   const planningGoals = goals.filter((goal) => goalCountsTowardPlan(goal.status));
   if (planningGoals.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-5 text-sm text-[var(--ink-muted)]">
+      <div className="rounded-xl border border-dashed border-[var(--border)] p-5 text-sm text-[var(--ink-muted)]">
         No active goal plans to assign resources to yet.
       </div>
     );
@@ -200,7 +200,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                 {plan.links.map((link) => {
                   const draft = linkDrafts[link.id] || { dueAt: "", notes: "" };
                   return (
-                    <div key={link.id} className="rounded-lg border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] p-3">
+                    <div key={link.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -295,11 +295,11 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                   const draft = assignmentDrafts[assignKey] || { dueAt: "", notes: "" };
 
                   return (
-                    <div key={linkKey} className="rounded-lg border border-dashed border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] p-3">
+                    <div key={linkKey} className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                            <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                               {GOAL_RESOURCE_TYPE_LABELS[recommendation.resourceType]}
                             </span>
                             <p className="text-sm font-semibold text-[var(--ink-strong)]">{recommendation.title}</p>
@@ -325,7 +325,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                             type="button"
                             onClick={() => handleAssign(goal.id, recommendation)}
                             disabled={alreadyLinked || assigningKey === assignKey}
-                            className="rounded-full bg-[var(--ink-strong)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
+                            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                           >
                             {alreadyLinked ? "Assigned" : assigningKey === assignKey ? "Assigning..." : "Assign"}
                           </button>

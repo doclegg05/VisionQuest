@@ -120,7 +120,7 @@ export default function OperationsTab({
               Review uploaded paperwork and clear pending review items from the advising queue.
             </p>
           </div>
-          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+          <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
             {formSubmissions.length} submission{formSubmissions.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -163,7 +163,7 @@ export default function OperationsTab({
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                       >
                         Open file
                       </a>
@@ -307,7 +307,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingAppointment}
-              className="w-full rounded-full bg-[var(--ink-strong)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {savingAppointment ? "Scheduling..." : "Schedule Appointment"}
             </button>
@@ -471,7 +471,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingTask}
-              className="w-full rounded-full bg-[var(--ink-strong)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {savingTask ? "Saving..." : "Create Task"}
             </button>
@@ -519,7 +519,7 @@ export default function OperationsTab({
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60 ${
                         task.status === "completed"
                           ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-                          : "bg-[var(--ink-strong)] text-white hover:bg-[rgba(16,37,62,0.9)]"
+                          : "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90"
                       }`}
                     >
                       {updatingTaskId === task.id
@@ -574,7 +574,7 @@ export default function OperationsTab({
           <button
             type="submit"
             disabled={savingNote}
-            className="rounded-full bg-[var(--ink-strong)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {savingNote ? "Saving..." : "Add Note"}
           </button>

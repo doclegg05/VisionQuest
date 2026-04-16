@@ -181,7 +181,7 @@ export default function FileManager() {
                   className="surface-section flex flex-col gap-3 p-3.5 sm:flex-row sm:items-start sm:gap-4"
                 >
                   <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[rgba(16,37,62,0.06)] text-lg">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--surface-muted)] text-lg">
                       {fileIcon(file.mimeType)}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -197,7 +197,7 @@ export default function FileManager() {
                       href={`/api/files/download?id=${file.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
                     >
                       View
                     </a>

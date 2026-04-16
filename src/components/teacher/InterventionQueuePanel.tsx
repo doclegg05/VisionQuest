@@ -366,7 +366,7 @@ function StudentRow({
   const { signals } = student;
 
   return (
-    <div className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[rgba(18,38,63,0.04)]">
+    <div className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)]">
       {/* Avatar placeholder */}
       <Link href={`/teacher/students/${student.studentId}`} className="shrink-0">
         <UserCircle
@@ -512,13 +512,13 @@ export default function InterventionQueuePanel({
       {loading && <QueueSkeleton />}
 
       {!loading && error && (
-        <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--error)]" role="alert">
+        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--error)]" role="alert">
           {error}
         </p>
       )}
 
       {!loading && !error && queue.length === 0 && (
-        <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           All students are on track. No interventions needed right now.
         </p>
       )}

@@ -14,7 +14,7 @@ interface SkillGapBridgeProps {
 const IMPORTANCE_STYLES: Record<SkillGapItem["importance"], { dot: string; label: string }> = {
   essential: { dot: "bg-red-500", label: "essential" },
   important:  { dot: "bg-amber-400", label: "important" },
-  helpful:    { dot: "bg-[rgba(18,38,63,0.25)]", label: "helpful" },
+  helpful:    { dot: "bg-[var(--surface-muted)]", label: "helpful" },
 };
 
 function ImportanceBadge({ importance }: { importance: SkillGapItem["importance"] }) {
@@ -33,7 +33,7 @@ function ImportanceBadge({ importance }: { importance: SkillGapItem["importance"
 
 function SkillCard({ skill }: { skill: SkillGapItem }) {
   return (
-    <div className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)]/70 p-3">
+    <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-3">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-snug text-[var(--ink-strong)]">
           {skill.name}
@@ -124,7 +124,7 @@ function ReadinessBar({
         </span>
       </div>
 
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-[rgba(18,38,63,0.08)]">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]">
         <div
           className="h-full bg-emerald-500 transition-all"
           style={{ width: `${havePct}%` }}
@@ -147,7 +147,7 @@ function ReadinessBar({
           Building ({buildingCount})
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-[rgba(18,38,63,0.15)]" />
+          <span className="h-2 w-2 rounded-sm bg-[var(--surface-muted)]" />
           Need ({needCount})
         </span>
       </div>

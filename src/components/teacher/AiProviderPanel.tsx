@@ -194,7 +194,7 @@ export default function AiProviderPanel() {
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "local"
               ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-[var(--accent-strong)]"
-              : "border-[rgba(18,38,63,0.12)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
+              : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
           Local AI Server
@@ -205,7 +205,7 @@ export default function AiProviderPanel() {
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "cloud"
               ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-[var(--accent-strong)]"
-              : "border-[rgba(18,38,63,0.12)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
+              : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
           Google Gemini Cloud
@@ -213,7 +213,7 @@ export default function AiProviderPanel() {
       </div>
 
       {provider === "local" && (
-        <div className="space-y-4 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
+        <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
           <div>
             <label htmlFor="ollama-url" className="mb-1 block text-sm font-medium text-[var(--ink-strong)]">
               Server URL
@@ -275,7 +275,7 @@ export default function AiProviderPanel() {
           </div>
 
           {authMode === "bearer" && (
-            <div className="space-y-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-[var(--ink-strong)]">
                   Saved bearer token:{" "}
@@ -318,7 +318,7 @@ export default function AiProviderPanel() {
           )}
 
           {authMode === "cloudflare_service_token" && (
-            <div className="space-y-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-[var(--ink-strong)]">
                   Saved Cloudflare credentials:{" "}
@@ -391,7 +391,7 @@ export default function AiProviderPanel() {
             type="button"
             onClick={() => void handleTest()}
             disabled={testing || !url}
-            className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {testing ? "Testing..." : "Test Connection"}
           </button>

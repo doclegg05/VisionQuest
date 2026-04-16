@@ -117,7 +117,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         href={event.virtualUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                       >
                         Open link
                       </a>
@@ -129,7 +129,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         disabled={busyId === event.id}
                         className={`rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
                           isRegistered
-                            ? "border border-[rgba(18,38,63,0.12)] text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                            ? "border border-[var(--border)] text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                             : "primary-button"
                         }`}
                       >

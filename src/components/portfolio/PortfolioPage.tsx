@@ -13,13 +13,13 @@ export default function PortfolioPage() {
 
   return (
     <div>
-      <div className="mb-6 grid grid-cols-3 gap-2 rounded-2xl bg-[rgba(16,37,62,0.06)] p-1.5">
+      <div className="mb-6 grid grid-cols-3 gap-2 rounded-2xl bg-[var(--surface-muted)] p-1.5">
         <button
           onClick={() => setTab("portfolio")}
           type="button"
           className={`rounded-[1rem] py-3 text-sm font-semibold transition-colors ${
             tab === "portfolio"
-              ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
+              ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
               : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
           }`}
         >
@@ -30,7 +30,7 @@ export default function PortfolioPage() {
           type="button"
           className={`rounded-[1rem] py-3 text-sm font-semibold transition-colors ${
             tab === "resume"
-              ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
+              ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
               : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
           }`}
         >
@@ -41,7 +41,7 @@ export default function PortfolioPage() {
           type="button"
           className={`rounded-[1rem] py-3 text-sm font-semibold transition-colors ${
             tab === "sharing"
-              ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
+              ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
               : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
           }`}
         >

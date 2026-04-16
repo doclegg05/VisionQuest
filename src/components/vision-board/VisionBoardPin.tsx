@@ -309,7 +309,11 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity hover:opacity-100"
         aria-label="Resize pin"
       >
-        <span className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]" />
+        <span
+          // Decorative hatch pattern inside resize handle — intentional raw rgba.
+          // eslint-disable-next-line no-restricted-syntax
+          className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
+        />
       </button>
     </div>
   );

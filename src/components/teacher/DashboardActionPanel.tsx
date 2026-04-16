@@ -298,14 +298,14 @@ export default function DashboardActionPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/teacher/students/${intent.student.id}`}
-            className="rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+            className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
           >
             Open student
           </Link>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+            className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
           >
             Close
           </button>
@@ -337,12 +337,12 @@ export default function DashboardActionPanel({
       {!loadingContext && !contextError && intent.kind === "review_forms" ? (
         <div className="mt-5 space-y-3">
           {reviewableForms.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+            <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               No pending or returned forms are available for quick review right now.
             </p>
           ) : (
             reviewableForms.map((submission) => (
-              <div key={submission.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
+              <div key={submission.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -374,7 +374,7 @@ export default function DashboardActionPanel({
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                       >
                         View file
                       </a>
@@ -410,12 +410,12 @@ export default function DashboardActionPanel({
       {!loadingContext && !contextError && intent.kind === "assign_support" ? (
         <div className="mt-5">
           {!selectedGoal ? (
-            <p className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+            <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               The goal tied to this review item could not be loaded. Open the full student workspace to continue.
             </p>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg">
                     {GOAL_LEVEL_META[selectedGoal.goal.level as keyof typeof GOAL_LEVEL_META]?.icon || "🎯"}
@@ -436,7 +436,7 @@ export default function DashboardActionPanel({
                     Existing support
                   </p>
                   {selectedGoal.plan.links.map((link) => (
-                    <div key={link.id} className="rounded-xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] p-4">
+                    <div key={link.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -462,7 +462,7 @@ export default function DashboardActionPanel({
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                           >
                             Open
                           </a>
@@ -474,7 +474,7 @@ export default function DashboardActionPanel({
               ) : null}
 
               {selectedGoal.plan.recommendations.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+                <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                   No matched support recommendations are available for this goal yet.
                 </p>
               ) : (
@@ -492,11 +492,11 @@ export default function DashboardActionPanel({
                     );
 
                     return (
-                      <div key={draftKey} className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] p-4">
+                      <div key={draftKey} className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                              <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                                 {GOAL_RESOURCE_TYPE_LABELS[recommendation.resourceType]}
                               </span>
                               <p className="text-sm font-semibold text-[var(--ink-strong)]">{recommendation.title}</p>
@@ -513,7 +513,7 @@ export default function DashboardActionPanel({
                                 href={recommendation.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                               >
                                 View
                               </a>
@@ -522,7 +522,7 @@ export default function DashboardActionPanel({
                               type="button"
                               onClick={() => handleAssign(selectedGoal.goal.id, recommendation)}
                               disabled={alreadyLinked || assigningKey === draftKey}
-                              className="rounded-full bg-[var(--ink-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
+                              className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                             >
                               {alreadyLinked ? "Assigned" : assigningKey === draftKey ? "Assigning..." : "Assign"}
                             </button>
@@ -545,7 +545,7 @@ export default function DashboardActionPanel({
                                     },
                                   }))
                                 }
-                                className="mt-1 w-full rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
+                                className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
                               />
                             </label>
 
@@ -564,7 +564,7 @@ export default function DashboardActionPanel({
                                 }
                                 rows={2}
                                 placeholder="Optional context or checkpoint."
-                                className="mt-1 w-full resize-none rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
+                                className="mt-1 w-full resize-none rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
                               />
                             </label>
                           </div>
@@ -587,7 +587,7 @@ export default function DashboardActionPanel({
               type="text"
               value={taskForm.title}
               onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value.slice(0, 120) }))}
-              className="mt-1 w-full rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
+              className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
               required
             />
           </label>
@@ -598,7 +598,7 @@ export default function DashboardActionPanel({
               type="date"
               value={taskForm.dueAt}
               onChange={(event) => setTaskForm((current) => ({ ...current, dueAt: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
+              className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
             />
           </label>
 
@@ -607,7 +607,7 @@ export default function DashboardActionPanel({
             <select
               value={taskForm.priority}
               onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
+              className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
             >
               <option value="low">Low</option>
               <option value="normal">Normal</option>
@@ -618,7 +618,7 @@ export default function DashboardActionPanel({
           <button
             type="submit"
             disabled={savingTask}
-            className="rounded-full bg-[var(--ink-strong)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-end"
+            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-end"
           >
             {savingTask ? "Saving..." : "Create task"}
           </button>
@@ -631,7 +631,7 @@ export default function DashboardActionPanel({
                 setTaskForm((current) => ({ ...current, description: event.target.value.slice(0, 1000) }))
               }
               rows={3}
-              className="mt-1 w-full resize-none rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
+              className="mt-1 w-full resize-none rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-secondary)]"
             />
           </label>
         </form>

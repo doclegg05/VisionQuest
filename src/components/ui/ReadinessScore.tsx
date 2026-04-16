@@ -26,7 +26,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
             cy={dims.r + dims.stroke}
             r={dims.r}
             fill="none"
-            stroke="rgba(18,38,63,0.08)"
+            stroke="var(--border)"
             strokeWidth={dims.stroke}
           />
           <circle
@@ -54,7 +54,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
           {Object.values(breakdown).map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               <span className="w-20 text-xs text-[var(--ink-muted)] text-right">{item.label}</span>
-              <div className="flex-1 h-1.5 rounded-full bg-[rgba(18,38,63,0.06)] overflow-hidden">
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--surface-muted)] overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{

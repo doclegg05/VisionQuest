@@ -59,7 +59,7 @@ export default function AuditTrail() {
 
   if (logs.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)]/70 p-6 text-sm text-[var(--ink-muted)]">
+      <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-raised)]/70 p-6 text-sm text-[var(--ink-muted)]">
         No tracked teacher actions yet.
       </div>
     );
@@ -84,15 +84,15 @@ export default function AuditTrail() {
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--ink-muted)]">
             {log.actorRole && (
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-1">
+              <span className="rounded-full bg-[var(--surface-muted)] px-2 py-1">
                 Actor: {log.actorRole}
               </span>
             )}
-            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-1">
+            <span className="rounded-full bg-[var(--surface-muted)] px-2 py-1">
               Target: {log.targetType}
             </span>
             {log.targetId && (
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-1">
+              <span className="rounded-full bg-[var(--surface-muted)] px-2 py-1">
                 ID: {log.targetId}
               </span>
             )}

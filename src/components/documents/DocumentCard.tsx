@@ -75,7 +75,7 @@ export default function DocumentCard({
   if (compact) {
     return (
       <div className="flex flex-col gap-3 theme-card rounded-xl px-4 py-3 transition-shadow hover:shadow-sm sm:flex-row sm:items-center">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[rgba(16,37,62,0.06)] text-lg">{icon}</span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--surface-muted)] text-lg">{icon}</span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 break-words text-sm font-medium leading-5 text-[var(--ink-strong)]">{doc.title}</p>
         </div>
@@ -84,7 +84,7 @@ export default function DocumentCard({
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] sm:flex-none"
+            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] sm:flex-none"
             aria-label={`View ${doc.title}`}
           >
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -96,7 +96,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)] hover:text-[var(--ink-strong)] disabled:opacity-40 sm:flex-none"
+            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] disabled:opacity-40 sm:flex-none"
             aria-label={`Download ${doc.title}`}
           >
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -120,12 +120,12 @@ export default function DocumentCard({
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {doc.sizeBytes ? (
-                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
+                <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
                   {formatSize(doc.sizeBytes)}
                 </span>
               ) : null}
               {doc.mimeType !== "application/pdf" && (
-                <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
+                <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
                   {doc.mimeType.split("/").pop()?.toUpperCase()}
                 </span>
               )}
@@ -139,7 +139,7 @@ export default function DocumentCard({
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] sm:flex-none"
+            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] sm:flex-none"
             aria-label={`View ${doc.title}`}
           >
             View
@@ -148,7 +148,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.06)] disabled:opacity-40 sm:flex-none"
+            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:flex-none"
             aria-label={`Download ${doc.title}`}
           >
             {downloading ? "..." : downloadError ? "Failed" : "Download"}

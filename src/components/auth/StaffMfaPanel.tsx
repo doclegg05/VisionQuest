@@ -219,7 +219,7 @@ export default function StaffMfaPanel() {
         </div>
       )}
 
-      <div className="rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-5">
+      <div className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="page-eyebrow text-[var(--ink-muted)]">Account security</p>
@@ -243,7 +243,7 @@ export default function StaffMfaPanel() {
 
         {enabled && (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-white px-4 py-3">
+            <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                 Backup codes remaining
               </p>
@@ -251,7 +251,7 @@ export default function StaffMfaPanel() {
                 {backupCodesRemaining}
               </p>
             </div>
-            <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-white px-4 py-3">
+            <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                 Last verified
               </p>
@@ -276,11 +276,11 @@ export default function StaffMfaPanel() {
         )}
 
         {setupSecret && (
-          <div className="mt-5 space-y-4 rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-white p-5">
+          <div className="mt-5 space-y-4 rounded-[1.4rem] border border-[var(--border)] bg-white p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Step 1: Add this secret to your authenticator app</p>
-                <code className="mt-3 block rounded-2xl bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+                <code className="mt-3 block rounded-2xl bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-strong)]">
                   {setupSecret}
                 </code>
                 <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">
@@ -289,7 +289,7 @@ export default function StaffMfaPanel() {
                 <textarea
                   readOnly
                   value={setupUri}
-                  className="mt-3 min-h-24 w-full rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] px-4 py-3 text-xs text-[var(--ink-muted)]"
+                  className="mt-3 min-h-24 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-xs text-[var(--ink-muted)]"
                 />
               </div>
               <div>
@@ -319,7 +319,7 @@ export default function StaffMfaPanel() {
                       setVerificationToken("");
                       setMessage("");
                     }}
-                    className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+                    className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
                   >
                     Cancel
                   </button>
@@ -359,7 +359,7 @@ export default function StaffMfaPanel() {
         )}
 
         {enabled && pendingAction && (
-          <div className="mt-5 rounded-[1.4rem] border border-[rgba(18,38,63,0.08)] bg-white p-5">
+          <div className="mt-5 rounded-[1.4rem] border border-[var(--border)] bg-white p-5">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">
               {pendingAction === "disable"
                 ? "Enter a current 6-digit code to disable MFA"
@@ -394,7 +394,7 @@ export default function StaffMfaPanel() {
                   setPendingAction(null);
                   setConfirmToken("");
                 }}
-                className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
               >
                 Cancel
               </button>
@@ -429,14 +429,14 @@ export default function StaffMfaPanel() {
             <button
               type="button"
               onClick={handlePrintCodes}
-              className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
             >
               Print
             </button>
             <button
               type="button"
               onClick={dismissBackupCodes}
-              className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
             >
               I saved them
             </button>

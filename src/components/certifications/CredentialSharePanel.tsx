@@ -108,7 +108,7 @@ export default function CredentialSharePanel() {
           <button
             type="button"
             onClick={() => void copyUrl()}
-            className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
           >
             Copy link
           </button>
@@ -116,7 +116,7 @@ export default function CredentialSharePanel() {
       </div>
 
       {!data?.eligible ? (
-        <div className="mt-4 rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+        <div className="mt-4 rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           Finish certification first. Once your Ready to Work certification is completed and verified, you can publish a public credential page here.
         </div>
       ) : (

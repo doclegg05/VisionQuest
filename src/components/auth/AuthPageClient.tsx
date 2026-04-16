@@ -223,7 +223,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
             {mfaSessionToken ? (
               <form onSubmit={handleMfaSubmit} className="space-y-4" aria-label="MFA sign in">
-                <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                   Signing in as <span className="font-semibold text-[var(--ink-strong)]">{studentId}</span>.
                 </div>
 
@@ -270,7 +270,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                     setMfaMessage("");
                     setError("");
                   }}
-                  className="w-full rounded-[1rem] border border-[rgba(18,38,63,0.14)] bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                  className="w-full rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
                 >
                   Use a different account
                 </button>
@@ -329,16 +329,16 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             {!mfaSessionToken && googleAuthEnabled ? (
               <>
                 <div className="my-5 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-[rgba(18,38,63,0.12)]" />
+                  <div className="h-px flex-1 bg-[var(--border)]" />
                   <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">or</span>
-                  <div className="h-px flex-1 bg-[rgba(18,38,63,0.12)]" />
+                  <div className="h-px flex-1 bg-[var(--border)]" />
                 </div>
 
                 <a
                   href="/api/auth/google"
-                  className="flex w-full items-center justify-center gap-3 rounded-[1rem] border border-[rgba(18,38,63,0.14)]
+                  className="flex w-full items-center justify-center gap-3 rounded-[1rem] border border-[var(--border)]
                              bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors
-                             hover:bg-[rgba(16,37,62,0.04)]"
+                             hover:bg-[var(--surface-interactive-hover)]"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -350,12 +350,12 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 </a>
               </>
             ) : !mfaSessionToken ? (
-              <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+              <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                 Google sign-in is not enabled in this environment. Use the sign-in form above.
               </div>
             ) : null}
 
-            <div className="mt-5 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.04)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+            <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
               Your instructor will provide your username and password.
             </div>
 

@@ -20,14 +20,14 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
   return (
     <div className="space-y-3">
       {/* Mode toggle */}
-      <div className="flex overflow-hidden rounded-lg border border-[rgba(18,38,63,0.12)]">
+      <div className="flex overflow-hidden rounded-lg border border-[var(--border)]">
         <button
           type="button"
           onClick={() => setMode("draw")}
           className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
             mode === "draw"
               ? "bg-[var(--ink-strong)] text-white"
-              : "bg-[rgba(16,37,62,0.03)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.06)]"
+              : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
           }`}
         >
           Draw
@@ -38,7 +38,7 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
           className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
             mode === "type"
               ? "bg-[var(--ink-strong)] text-white"
-              : "bg-[rgba(16,37,62,0.03)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.06)]"
+              : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
           }`}
         >
           Type
@@ -218,7 +218,7 @@ function DrawPad({
 
   return (
     <>
-      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)]">
+      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)]">
         <canvas
           ref={canvasRef}
           role="img"
@@ -297,7 +297,7 @@ function TypePad({
   return (
     <>
       <div ref={containerRef} className="space-y-3">
-        <div className="rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.2)] bg-[var(--surface-raised)] p-4">
+        <div className="rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-4">
           <label className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
             Type your full legal name
           </label>
@@ -351,7 +351,7 @@ function SignatureButtons({
         type="button"
         onClick={onClear}
         disabled={!canClear}
-        className="rounded-lg border border-[rgba(18,38,63,0.12)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
+        className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
       >
         Clear
       </button>
@@ -359,7 +359,7 @@ function SignatureButtons({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-[rgba(18,38,63,0.12)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+          className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
         >
           Cancel
         </button>

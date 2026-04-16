@@ -520,7 +520,7 @@ export default function SpokesManager() {
           <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Pending referrals</h4>
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+              <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
                 {referrals.length} items
               </span>
             </div>
@@ -578,7 +578,7 @@ export default function SpokesManager() {
                 Checklists, counties, and benchmark helpers
               </h3>
             </div>
-            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {checklistTemplates.length} items
             </span>
           </div>
@@ -741,7 +741,7 @@ export default function SpokesManager() {
               </p>
               <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Required SPOKES modules</h3>
             </div>
-            <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {moduleTemplates.length} modules
             </span>
           </div>
