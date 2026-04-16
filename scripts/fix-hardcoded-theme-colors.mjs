@@ -70,6 +70,16 @@ const RULES = [
     "bg-[var(--accent-strong)] text-white",
     "btn-ink-generic",
   ],
+  // Non-adjacent variant: bg-[var(--ink-strong)] and text-white separated by
+  // layout utility classes inside the same className (e.g. count-badge spans
+  // like `rounded-full bg-[var(--ink-strong)] px-2.5 py-0.5 text-xs font-semibold text-white`).
+  // Scoped to same className attribute via a tight non-greedy match that cannot
+  // cross quotes or class-group terminators.
+  [
+    /bg-\[var\(--ink-strong\)\]([^"'`{}\n]*?text-white)/g,
+    "bg-[var(--accent-strong)]$1",
+    "btn-ink-nonadjacent",
+  ],
 
   // --- Border colors --------------------------------------------------------
   [

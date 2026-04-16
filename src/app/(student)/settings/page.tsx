@@ -329,7 +329,7 @@ export default function SettingsPage() {
             ].map((item) => (
               <div key={item.step} className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
                 <div className="mb-3 flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[var(--ink-strong)] text-sm font-bold text-white">
+                  <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[var(--accent-strong)] text-sm font-bold text-white">
                     {item.step}
                   </span>
                   <h3 className="font-semibold text-[var(--ink-strong)]">{item.title}</h3>
