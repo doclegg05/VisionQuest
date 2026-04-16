@@ -153,6 +153,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   ];
 
   // Stream response via SSE
+  // For local providers, use non-streaming inference then send via SSE.
+  // Streaming fetch fails on Render's Node.js runtime inside ReadableStream callbacks.
+  const useNonStreaming = provider.name === "ollama";
   const encoder = new TextEncoder();
   let fullResponse = "";
 
@@ -166,9 +169,14 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ quotaWarning: quota.warning })}\n\n`));
         }
 
-        for await (const chunk of provider.streamResponse(systemPrompt, allMessages)) {
-          fullResponse += chunk;
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+        if (useNonStreaming) {
+          fullResponse = await provider.generateResponse(systemPrompt, allMessages);
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: fullResponse })}\n\n`));
+        } else {
+          for await (const chunk of provider.streamResponse(systemPrompt, allMessages)) {
+            fullResponse += chunk;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+          }
         }
 
         // Save assistant message
