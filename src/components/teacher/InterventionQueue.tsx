@@ -320,7 +320,7 @@ function StudentAccordion({
           </button>
           <Link
             href={`/teacher/students/${group.student.id}`}
-            className="rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="rounded-full border border-[var(--accent-secondary)] bg-[var(--accent-secondary)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--accent-secondary)]/20"
           >
             View student
           </Link>
@@ -457,7 +457,7 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
           <button
             type="button"
             onClick={openStudents.size === studentGroups.length ? collapseAll : expandAll}
-            className="rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="rounded-full border border-[var(--accent-secondary)] bg-[var(--accent-secondary)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--accent-secondary)]/20"
           >
             {openStudents.size === studentGroups.length ? "Collapse all" : "Expand all"}
           </button>
