@@ -53,17 +53,18 @@ export class OllamaProvider implements AIProvider {
 
   /**
    * Timeout for non-streaming requests (full generation must complete).
-   * Must be under Cloudflare Tunnel's 100s origin timeout.
-   * Health checks use 30s; chat generation needs more headroom.
+   * The local relay sends heartbeats to keep Cloudflare's tunnel alive,
+   * so this can be generous. 5 minutes covers large prompts on CPU.
    */
-  private static readonly GENERATE_TIMEOUT_MS = 90_000;
+  private static readonly GENERATE_TIMEOUT_MS = 300_000;
 
   /**
-   * Timeout for streaming requests (first byte must arrive).
-   * Ollama typically emits the first token within seconds once
-   * the model is loaded, so 60s is generous.
+   * Timeout for streaming requests (first byte from relay must arrive).
+   * The relay responds immediately with headers and sends heartbeat
+   * pings every 25s, so this only needs to cover the initial connection.
+   * 5 minutes allows for slow prompt evaluation on CPU hardware.
    */
-  private static readonly STREAM_FIRST_BYTE_TIMEOUT_MS = 60_000;
+  private static readonly STREAM_FIRST_BYTE_TIMEOUT_MS = 300_000;
 
   constructor(
     baseUrl: string,
