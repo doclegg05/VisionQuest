@@ -88,13 +88,13 @@ export default async function PublicCredentialPage({
             This public page confirms that the learner completed the program&apos;s readiness credential and met the required verification checkpoints.
           </p>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-4">
+            <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Requirements complete</p>
               <p className="mt-2 text-3xl font-bold text-[var(--ink-strong)]">
                 {completedRequirements}/{certification.requirements.length}
               </p>
             </div>
-            <div className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-4">
+            <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Verification status</p>
               <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">Completed</p>
             </div>

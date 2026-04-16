@@ -3,6 +3,30 @@ import { withAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 
+interface CredlyBadgeTemplate {
+  name?: string;
+  description?: string;
+  image?: { url?: string };
+  image_url?: string;
+}
+
+interface CredlyIssuerEntity {
+  entity?: { name?: string };
+}
+
+interface CredlyBadge {
+  id: string;
+  issued_at?: string;
+  issued_at_date?: string;
+  created_at?: string;
+  badge_template?: CredlyBadgeTemplate;
+  issuer?: { entities?: CredlyIssuerEntity[] };
+}
+
+interface CredlyBadgesResponse {
+  data?: CredlyBadge[];
+}
+
 /**
  * GET /api/credly/badges
  *
@@ -34,12 +58,11 @@ export const GET = withAuth(async (session) => {
 
       if (!res.ok) return [];
 
-      const data = await res.json();
+      const data = (await res.json()) as CredlyBadgesResponse;
 
       if (!data?.data || !Array.isArray(data.data)) return [];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.data.map((badge: any) => ({
+      return data.data.map((badge) => ({
         id: badge.id,
         name: badge.badge_template?.name || "Unknown Badge",
         description: badge.badge_template?.description || "",

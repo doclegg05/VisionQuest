@@ -87,7 +87,7 @@ export default function GoalsPlanTab({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Review queue</p>
             {reviewQueue.length === 0 ? (
-              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+              <p className="mt-3 rounded-lg border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                 No goal-linked review items are open right now.
               </p>
             ) : (
@@ -142,7 +142,7 @@ export default function GoalsPlanTab({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Assigned resource evidence</p>
             {goalPlans.every((plan) => plan.links.length === 0) ? (
-              <p className="mt-3 rounded-lg border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+              <p className="mt-3 rounded-lg border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                 No assigned goal resources yet.
               </p>
             ) : (
@@ -160,7 +160,7 @@ export default function GoalsPlanTab({
                           {plan.links.map((link) => {
                             const evidence = evidenceByLinkId.get(link.id);
                             return (
-                              <div key={link.id} className="rounded-lg border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.02)] p-3">
+                              <div key={link.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">

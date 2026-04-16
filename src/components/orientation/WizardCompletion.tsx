@@ -25,7 +25,7 @@ export default function WizardCompletion({ completedForms }: WizardCompletionPro
         <span className="font-bold text-amber-500">75 XP</span>
       </p>
 
-      <div className="mt-6 rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] p-5 text-left">
+      <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 text-left">
         <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-muted)] mb-3">
           Documents Completed
         </p>

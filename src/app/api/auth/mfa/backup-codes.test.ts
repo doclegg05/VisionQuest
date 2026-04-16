@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest, mockTeacherSession } from "@/lib/test-helpers";

@@ -165,7 +165,7 @@ export default function AiConfigPanel() {
       </div>
 
       {status === "connected" && keyHint && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
           <p className="text-sm text-[var(--ink-strong)]">
             Active key: <span className="font-mono font-semibold">{keyHint}</span>
           </p>
@@ -174,7 +174,7 @@ export default function AiConfigPanel() {
               type="button"
               onClick={() => void handleTest()}
               disabled={testing}
-              className="rounded-full border border-[rgba(18,38,63,0.12)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {testing ? "Testing..." : "Test Connection"}
             </button>
@@ -189,7 +189,7 @@ export default function AiConfigPanel() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] p-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
         <label htmlFor="admin-api-key" className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
           {status === "connected" ? "Replace API key" : "Enter Gemini API key"}
         </label>

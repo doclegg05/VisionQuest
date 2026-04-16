@@ -163,7 +163,7 @@ export default function LmsManager() {
                   <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     <button
                       onClick={() => startEdit(link)}
-                      className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
                     >
                       Edit
                     </button>
@@ -235,7 +235,7 @@ export default function LmsManager() {
             </button>
             <button
               onClick={resetForm}
-              className="rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)] hover:text-[var(--ink-strong)]"
+              className="rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)]"
             >
               Cancel
             </button>
@@ -244,7 +244,7 @@ export default function LmsManager() {
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full rounded-xl border-2 border-dashed border-[rgba(18,38,63,0.18)] p-3 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]"
+          className="w-full rounded-xl border-2 border-dashed border-[var(--border)] p-3 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]"
         >
           + Add Course Link
         </button>

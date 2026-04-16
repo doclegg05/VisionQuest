@@ -172,7 +172,7 @@ export default function SpokesReport() {
                 <a
                   key={item.id}
                   href={item.studentId ? `/teacher/students/${item.studentId}/spokes` : "/teacher/manage"}
-                  className="block theme-card-subtle rounded-lg p-4 transition-colors hover:border-[rgba(18,38,63,0.18)]"
+                  className="block theme-card-subtle rounded-lg p-4 transition-colors hover:border-[var(--border)]"
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -213,7 +213,7 @@ export default function SpokesReport() {
                     {item.reasons.map((reason) => (
                       <span
                         key={reason}
-                        className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-1 text-xs font-medium text-[var(--ink-strong)]"
+                        className="rounded-full bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-medium text-[var(--ink-strong)]"
                       >
                         {reason}
                       </span>

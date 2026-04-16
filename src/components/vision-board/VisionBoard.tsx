@@ -131,7 +131,7 @@ export default function VisionBoard() {
   return (
     <div className="space-y-4">
       <div className="surface-section overflow-hidden p-3 sm:p-4">
-        <div className="mb-3 flex flex-col gap-2 rounded-[1.25rem] border border-[rgba(18,38,63,0.08)] bg-[var(--surface-raised)] px-4 py-3 text-sm text-[var(--ink-muted)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-3 flex flex-col gap-2 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-sm text-[var(--ink-muted)] sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl">
             Drag pins anywhere on the board. Use the corner grip to resize notes, images, and linked goals.
           </p>

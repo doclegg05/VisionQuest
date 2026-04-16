@@ -3,16 +3,13 @@ import { isAuthorizedInternalRequest, isUrlHostMatch } from "@/lib/csrf";
 
 const isProduction = process.env.NODE_ENV === "production";
 
-// NOTE: A static fallback CSP is defined in next.config.ts headers().
-// When this proxy is wired as middleware.ts, remove the static CSP
-// from next.config.ts to avoid dual-header conflicts.
+// Next.js 16 proxy (middleware) convention — filename must be `proxy.ts` and the
+// exported function must be named `proxy`. Handles:
+//   1. CSRF protection via Origin / Referer validation for state-changing API requests
+//   2. Per-request CSP nonce generation (replaces static unsafe-inline)
+//   3. X-API-Version response header on /api/* responses
+// The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
 
-/**
- * Combined proxy handling:
- * 1. CSRF protection via Origin header validation
- * 2. Per-request CSP nonce generation (replaces static unsafe-inline)
- * 3. API version header
- */
 export function proxy(request: NextRequest) {
   // --- CSRF protection (state-changing API requests only) ---
   const method = request.method.toUpperCase();
@@ -40,10 +37,6 @@ export function proxy(request: NextRequest) {
   }
 
   // --- CSP nonce + response headers ---
-  // NOTE: next.config.ts also sets a static CSP via headers(). When this
-  // middleware runs, its nonce-based CSP overwrites the static one. The static
-  // CSP in next.config.ts serves as a fallback for environments where
-  // middleware doesn't execute (e.g. Turbopack standalone builds).
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
 
   const csp = [

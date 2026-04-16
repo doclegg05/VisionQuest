@@ -37,7 +37,7 @@ export function CoachingArcBar({ currentWeek, totalWeeks = 6 }: CoachingArcBarPr
       {/* Progress bar */}
       <div className="relative mt-4">
         {/* Connecting line */}
-        <div className="absolute top-3.5 right-3.5 left-3.5 h-px bg-[rgba(18,38,63,0.12)]" aria-hidden />
+        <div className="absolute top-3.5 right-3.5 left-3.5 h-px bg-[var(--border)]" aria-hidden />
         {/* Progress fill */}
         <div
           className="absolute top-3.5 left-3.5 h-px bg-[var(--accent-strong)] transition-all duration-500"
@@ -72,7 +72,7 @@ export function CoachingArcBar({ currentWeek, totalWeeks = 6 }: CoachingArcBarPr
                       ? "bg-[var(--accent-strong)] text-white"
                       : isCurrent
                         ? "animate-pulse bg-[var(--accent-strong)] text-white ring-4 ring-[rgba(15,154,146,0.20)]"
-                        : "bg-[rgba(18,38,63,0.08)] text-[var(--ink-muted)]",
+                        : "bg-[var(--surface-muted)] text-[var(--ink-muted)]",
                   ].join(" ")}
                 >
                   {isDone ? (

@@ -276,7 +276,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
               className={`h-2 rounded-full transition-all ${
                 i === step
                   ? "w-6 bg-[var(--accent-strong)]"
-                  : "w-2 bg-[rgba(18,38,63,0.15)]"
+                  : "w-2 bg-[var(--surface-muted)]"
               }`}
             />
           ))}

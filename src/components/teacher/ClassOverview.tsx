@@ -309,7 +309,7 @@ export default function ClassOverview({
       />
 
       {/* ── All Students ────────────────────────────────────────────────── */}
-      <div className="border-t-2 border-[rgba(18,38,63,0.10)] pt-6">
+      <div className="border-t-2 border-[var(--border)] pt-6">
         <h2 className="mb-4 font-display text-2xl text-[var(--ink-strong)]">All Students</h2>
       </div>
 
@@ -348,7 +348,7 @@ export default function ClassOverview({
         </div>
         <a
           href={`/api/teacher/export${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
-          className="inline-flex items-center justify-center rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+          className="inline-flex items-center justify-center rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
         >
           Export CSV
         </a>
@@ -361,7 +361,7 @@ export default function ClassOverview({
             <button
               onClick={() => setViewMode("table")}
               className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                viewMode === "table" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               Table
@@ -369,7 +369,7 @@ export default function ClassOverview({
             <button
               onClick={() => setViewMode("cards")}
               className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                viewMode === "cards" ? "bg-[var(--ink-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               Cards

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, normalizeStudentId, normalizeEmail, setSessionCookie, signMfaSessionToken } from "@/lib/auth";
+import {
+  verifyPasswordSafeWithStatus,
+  hashPassword,
+  normalizeStudentId,
+  normalizeEmail,
+  setSessionCookie,
+  signMfaSessionToken,
+} from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, loginSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -36,8 +44,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Consolidate all failure cases into a single generic response to prevent account enumeration.
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
   const isOAuthOnly = student && !student.passwordHash && student.authProvider === "google";
+  // Always run the KDF to equalize timing and avoid an account-enumeration oracle.
+  const { valid: passwordMatches, needsRehash } = verifyPasswordSafeWithStatus(
+    password,
+    student?.passwordHash ?? null,
+  );
   const isInvalidCredentials =
-    !student || !student.passwordHash || !verifyPassword(password, student.passwordHash) || !student.isActive;
+    !student || !student.passwordHash || !passwordMatches || !student.isActive;
 
   if (isOAuthOnly || isInvalidCredentials) {
     await logAuditEvent({
@@ -50,6 +63,21 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       metadata: { ip },
     });
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  }
+
+  // Silent migration: if the stored hash used the legacy PBKDF2 format,
+  // rehash with the current scrypt format. Failures here must not block
+  // login — the user is already authenticated with the legacy hash.
+  if (needsRehash && student) {
+    try {
+      const { hash: newHash } = hashPassword(password);
+      await prisma.student.update({
+        where: { id: student.id },
+        data: { passwordHash: newHash },
+      });
+    } catch (err) {
+      logger.warn("Password rehash failed", { studentId: student.id, error: String(err) });
+    }
   }
 
   // If MFA is enabled, return a partial response with a short-lived token

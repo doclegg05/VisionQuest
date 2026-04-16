@@ -21,7 +21,7 @@ interface ResumeAssistResponse {
 const INPUT_CLASS =
   "w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 const SECONDARY_BUTTON_CLASS =
-  "rounded-lg border border-[rgba(18,38,63,0.12)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
 
 function sanitizeFileName(value: string) {
   return value
@@ -438,7 +438,7 @@ export default function ResumeBuilder() {
               type="button"
               onClick={() => uploadInputRef.current?.click()}
               disabled={uploading}
-              className="rounded-lg bg-[var(--ink-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploading ? "Sage is reading..." : "Upload Resume"}
             </button>
@@ -483,7 +483,7 @@ export default function ResumeBuilder() {
             type="button"
             onClick={() => void handleAssist()}
             disabled={assistantLoading}
-            className="rounded-lg bg-[var(--ink-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[rgba(16,37,62,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {assistantLoading ? "Sage is drafting..." : "Draft with Sage"}
           </button>

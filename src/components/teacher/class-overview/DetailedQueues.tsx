@@ -72,16 +72,16 @@ export default function DetailedQueues({
         </svg>
         <div className="flex flex-1 items-center gap-3">
           <h2 className="font-display text-lg text-[var(--ink-strong)]">Detailed Queues</h2>
-          <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
+          <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
             {alerts.length} alerts &middot; {reviewQueue.length} reviews &middot; {upcomingAppointments.length} appointments &middot; {inactivityQueue.length} inactive
           </span>
         </div>
       </button>
 
       {detailsOpen ? (
-        <div className="space-y-6 border-t border-[rgba(18,38,63,0.08)] px-5 pb-5 pt-4">
+        <div className="space-y-6 border-t border-[var(--border)] px-5 pb-5 pt-4">
           <div className="grid gap-4 xl:grid-cols-3">
-            <div className="rounded-[1.15rem] border border-[rgba(18,38,63,0.08)] p-5">
+            <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
@@ -95,7 +95,7 @@ export default function DetailedQueues({
               </div>
 
               {alerts.length === 0 ? (
-                <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+                <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                   No active advising alerts right now.
                 </p>
               ) : (
@@ -138,14 +138,14 @@ export default function DetailedQueues({
                             ) : null}
                             <Link
                               href={action.href}
-                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                             >
                               {action.label}
                             </Link>
                             <button
                               type="button"
                               onClick={() => void onSnoozeAlert(alert.id)}
-                              className="rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                              className="rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
                               title="Snooze for 24 hours"
                             >
                               Snooze
@@ -153,7 +153,7 @@ export default function DetailedQueues({
                             <button
                               type="button"
                               onClick={() => void onDismissAlert(alert.id)}
-                              className="rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                              className="rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
                               title="Dismiss this alert"
                             >
                               Dismiss
@@ -167,7 +167,7 @@ export default function DetailedQueues({
               )}
             </div>
 
-            <div className="rounded-[1.15rem] border border-[rgba(18,38,63,0.08)] p-5">
+            <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
@@ -181,7 +181,7 @@ export default function DetailedQueues({
               </div>
 
               {reviewQueue.length === 0 ? (
-                <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+                <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                   No goal-linked review items are waiting right now.
                 </p>
               ) : (
@@ -228,7 +228,7 @@ export default function DetailedQueues({
                             ) : null}
                             <Link
                               href={action.href}
-                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                             >
                               {action.label}
                             </Link>
@@ -241,7 +241,7 @@ export default function DetailedQueues({
               )}
             </div>
 
-            <div className="rounded-[1.15rem] border border-[rgba(18,38,63,0.08)] p-5">
+            <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
@@ -255,7 +255,7 @@ export default function DetailedQueues({
               </div>
 
               {upcomingAppointments.length === 0 ? (
-                <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+                <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                   No appointments are scheduled in the next 7 days.
                 </p>
               ) : (
@@ -287,7 +287,7 @@ export default function DetailedQueues({
             </div>
           </div>
 
-          <div className="rounded-[1.15rem] border border-[rgba(18,38,63,0.08)] p-5">
+          <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
@@ -304,7 +304,7 @@ export default function DetailedQueues({
             </div>
 
             <div className="mb-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+              <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                 14-day {inactivitySummary.followUp14}
               </span>
               <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
@@ -319,7 +319,7 @@ export default function DetailedQueues({
             </div>
 
             {inactivityQueue.length === 0 ? (
-              <p className="rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+              <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                 No students are currently in the inactivity follow-up queue.
               </p>
             ) : (
@@ -331,7 +331,7 @@ export default function DetailedQueues({
                   return (
                     <div
                       key={item.id}
-                      className="rounded-[1rem] border border-[rgba(18,38,63,0.08)] bg-[rgba(255,255,255,0.68)] p-4"
+                      className="rounded-[1rem] border border-[var(--border)] bg-[rgba(255,255,255,0.68)] p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
@@ -348,7 +348,7 @@ export default function DetailedQueues({
                                 ? "bg-orange-100 text-orange-700"
                                 : item.type === "inactive_student_30"
                                   ? "bg-amber-100 text-amber-800"
-                                  : "bg-[rgba(16,37,62,0.06)] text-[var(--ink-muted)]"
+                                  : "bg-[var(--surface-muted)] text-[var(--ink-muted)]"
                           }`}
                         >
                           {item.stageLabel}
@@ -380,13 +380,13 @@ export default function DetailedQueues({
                           ) : null}
                           <Link
                             href={`/teacher/students/${item.student.id}`}
-                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                           >
                             Open student
                           </Link>
                           <Link
                             href={`/teacher/classes${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
-                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.06)]"
+                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                           >
                             Manage roster
                           </Link>

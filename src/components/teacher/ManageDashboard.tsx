@@ -19,19 +19,20 @@ import AiConfigPanel from "./AiConfigPanel";
 import AiProviderPanel from "./AiProviderPanel";
 import MonthlyKpiDashboard from "./MonthlyKpiDashboard";
 
-type Tab = "orientation" | "learning" | "career" | "reports";
+type Tab = "orientation" | "learning" | "career" | "reports" | "ai";
 
 interface ManageDashboardProps {
   canViewAudit: boolean;
   canViewAiConfig: boolean;
 }
 
-const TABS: Array<{ key: Tab; label: string; icon: string }> = [
+const BASE_TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: "orientation", label: "Orientation", icon: "🧭" },
   { key: "learning", label: "Learning", icon: "📚" },
   { key: "career", label: "Career", icon: "💼" },
   { key: "reports", label: "Reports", icon: "📊" },
 ];
+const AI_TAB = { key: "ai" as Tab, label: "AI", icon: "🤖" };
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -43,11 +44,12 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export default function ManageDashboard({ canViewAudit, canViewAiConfig }: ManageDashboardProps) {
   const [tab, setTab] = useState<Tab>("orientation");
+  const tabs = canViewAiConfig ? [...BASE_TABS, AI_TAB] : BASE_TABS;
 
   return (
     <div>
       <div className="mb-6 flex gap-1 rounded-xl theme-segmented p-1">
-        {TABS.map((tabOption) => (
+        {tabs.map((tabOption) => (
           <button
             key={tabOption.key}
             onClick={() => setTab(tabOption.key)}
@@ -136,24 +138,25 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
             <SectionHeading>Grant KPI Report</SectionHeading>
             <GrantKpiReport />
           </section>
-          {canViewAiConfig && (
-            <section>
-              <SectionHeading>AI Provider</SectionHeading>
-              <AiProviderPanel />
-            </section>
-          )}
-          {canViewAiConfig && (
-            <section>
-              <SectionHeading>AI Configuration</SectionHeading>
-              <AiConfigPanel />
-            </section>
-          )}
           {canViewAudit && (
             <section>
               <SectionHeading>Audit Trail</SectionHeading>
               <AuditTrail />
             </section>
           )}
+        </div>
+      )}
+
+      {tab === "ai" && canViewAiConfig && (
+        <div className="space-y-8">
+          <section>
+            <SectionHeading>AI Provider</SectionHeading>
+            <AiProviderPanel />
+          </section>
+          <section>
+            <SectionHeading>AI Configuration</SectionHeading>
+            <AiConfigPanel />
+          </section>
         </div>
       )}
     </div>

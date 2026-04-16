@@ -320,7 +320,7 @@ function StudentAccordion({
           </button>
           <Link
             href={`/teacher/students/${group.student.id}`}
-            className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
           >
             View student
           </Link>
@@ -369,7 +369,7 @@ function StudentAccordion({
                   {c.primaryAction && (
                     <Link
                       href={c.primaryAction.href}
-                      className="rounded-full border border-[rgba(18,38,63,0.12)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
+                      className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
                     >
                       {c.primaryAction.label}
                     </Link>
@@ -380,7 +380,7 @@ function StudentAccordion({
                       const first = c.items[0];
                       onAction({ type: first.type, studentId: first.student.id, alertId: first.id, studentName: first.student.displayName });
                     }}
-                    className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
                   >
                     Actions
                   </button>
@@ -425,7 +425,7 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
     return (
       <div className="surface-section p-5">
         <h2 className="font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
-        <p className="mt-3 rounded-[1rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+        <p className="mt-3 rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           No students need attention right now. Great work!
         </p>
       </div>
@@ -457,7 +457,7 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
           <button
             type="button"
             onClick={openStudents.size === studentGroups.length ? collapseAll : expandAll}
-            className="rounded-full border border-[rgba(18,38,63,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
           >
             {openStudents.size === studentGroups.length ? "Collapse all" : "Expand all"}
           </button>

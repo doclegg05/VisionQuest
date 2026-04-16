@@ -227,7 +227,7 @@ export default function CredlyBadges() {
                 className="h-20 w-20 object-contain"
               />
             ) : (
-              <div className="grid h-20 w-20 place-items-center rounded-full bg-[rgba(16,37,62,0.06)] text-3xl">
+              <div className="grid h-20 w-20 place-items-center rounded-full bg-[var(--surface-muted)] text-3xl">
                 🏅
               </div>
             )}

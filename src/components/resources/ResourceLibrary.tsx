@@ -98,7 +98,7 @@ export default function ResourceLibrary({
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
                 ? "bg-[var(--ink-strong)] text-white"
-                : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
             }`}
           >
             All
@@ -111,7 +111,7 @@ export default function ResourceLibrary({
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 selectedCategory === key
                   ? "bg-[var(--ink-strong)] text-white"
-                  : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[rgba(16,37,62,0.04)]"
+                  : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               {FORM_CATEGORIES[key].icon} {FORM_CATEGORIES[key].label}

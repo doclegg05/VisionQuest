@@ -37,6 +37,10 @@
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
 
+  /* Elevation shadows — theme-aware so cards remain visible in dark mode */
+  --shadow-card: 0 12px 28px rgba(16, 37, 62, 0.12);
+  --shadow-card-lg: 0 16px 36px rgba(16, 37, 62, 0.08);
+
   /* Status badges */
   --badge-success-bg: rgba(42, 138, 60, 0.12);
   --badge-success-text: #1a6b2a;
@@ -115,6 +119,10 @@
   --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
+
+  /* Elevation shadows — deeper + darker for dark surfaces */
+  --shadow-card: 0 12px 28px rgba(0, 0, 0, 0.45);
+  --shadow-card-lg: 0 16px 36px rgba(0, 0, 0, 0.35);
 
   /* Status badges */
   --badge-success-bg: rgba(63, 207, 94, 0.15);
@@ -236,7 +244,7 @@ body::before {
   backdrop-filter: blur(18px);
   border: 1px solid var(--border);
   box-shadow:
-    0 22px 70px rgba(16, 37, 62, 0.12),
+    var(--shadow-card-lg),
     inset 0 1px 0 var(--surface-overlay);
 }
 
@@ -418,7 +426,7 @@ select.theme-input::placeholder {
   border: 1px solid var(--border);
   background: var(--surface-raised);
   backdrop-filter: blur(14px);
-  box-shadow: 0 18px 50px rgba(16, 37, 62, 0.1);
+  box-shadow: var(--shadow-card-lg);
   transition: background-color 300ms var(--ease-smooth), border-color 300ms var(--ease-smooth);
 }
 

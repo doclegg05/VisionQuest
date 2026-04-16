@@ -219,7 +219,7 @@ export default function OrientationFormDetail({
   return (
     <div className="ml-7 mt-2 space-y-2">
       {detail.note && (
-        <div className="rounded-xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.03)] p-3">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
           <p className="text-xs font-semibold text-[var(--ink-strong)]">Step guidance</p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">{detail.note}</p>
         </div>

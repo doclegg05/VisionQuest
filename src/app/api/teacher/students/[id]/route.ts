@@ -313,14 +313,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
 
   // Parse progression (for xp/level/streaks/achievements display and goal-evidence building)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let rawProgression: any = null;
   let parsedProgression = parseState(null);
   let progression = { xp: 0, level: 1, streaks: { daily: { current: 0, longest: 0 } }, achievements: [] as string[] };
   if (student.progression?.state) {
     try {
-      rawProgression = JSON.parse(student.progression.state);
-      progression = rawProgression;
+      progression = JSON.parse(student.progression.state) as typeof progression;
       parsedProgression = parseState(student.progression.state);
     } catch { /* ignore */ }
   }

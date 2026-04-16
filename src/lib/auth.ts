@@ -33,22 +33,126 @@ function getJwtSecret(): string {
 }
 
 // --- Password hashing ---
+//
+// Two formats are supported simultaneously:
+//   Legacy PBKDF2:  "<salt>:<hash>"
+//   Current scrypt: "scrypt$<salt>$<hash>"
+//
+// New hashes always use scrypt. On a successful login against a legacy
+// PBKDF2 hash, the login route rehashes transparently to migrate the
+// user to scrypt without prompting them. Over time the PBKDF2 population
+// decays to zero.
+
+const SCRYPT_PARAMS = {
+  // N=2^15 (32768) balances ~50-80ms login latency with memory-hard
+  // resistance on modest hardware (e.g. Render free tier). If p95 login
+  // latency goes above ~200ms in prod, drop to 2^14 (16384) — still above
+  // OWASP 2024 minimums, and existing scrypt hashes remain verifiable.
+  N: 1 << 15,
+  r: 8,
+  p: 1,
+  keylen: 64,
+  // Scrypt uses ~128 * N * r bytes of memory. Node's default maxmem is 32 MiB,
+  // which is right at the edge for N=2^15/r=8. Bump to 64 MiB to leave headroom.
+  maxmem: 64 * 1024 * 1024,
+} as const;
+
+function scryptHash(password: string, salt: string): string {
+  return crypto
+    .scryptSync(password, salt, SCRYPT_PARAMS.keylen, {
+      N: SCRYPT_PARAMS.N,
+      r: SCRYPT_PARAMS.r,
+      p: SCRYPT_PARAMS.p,
+      maxmem: SCRYPT_PARAMS.maxmem,
+    })
+    .toString("hex");
+}
 
 export function hashPassword(password: string): { hash: string; salt: string } {
   const salt = crypto.randomBytes(32).toString("hex");
-  const hash = crypto
-    .pbkdf2Sync(password, salt, 100000, 64, "sha512")
-    .toString("hex");
-  return { hash: `${salt}:${hash}`, salt };
+  const derived = scryptHash(password, salt);
+  return { hash: `scrypt$${salt}$${derived}`, salt };
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
+export interface PasswordVerifyResult {
+  valid: boolean;
+  needsRehash: boolean;
+}
+
+export function verifyPasswordWithStatus(password: string, stored: string): PasswordVerifyResult {
+  // Current format: scrypt$<salt>$<hash>
+  if (stored.startsWith("scrypt$")) {
+    const parts = stored.split("$");
+    if (parts.length !== 3) return { valid: false, needsRehash: false };
+    const [, salt, hash] = parts;
+    if (!salt || !hash) return { valid: false, needsRehash: false };
+    try {
+      const candidate = scryptHash(password, salt);
+      const expected = Buffer.from(hash, "hex");
+      const actual = Buffer.from(candidate, "hex");
+      if (expected.length !== actual.length) return { valid: false, needsRehash: false };
+      const valid = crypto.timingSafeEqual(expected, actual);
+      return { valid, needsRehash: false };
+    } catch {
+      return { valid: false, needsRehash: false };
+    }
+  }
+
+  // Legacy format: <salt>:<hash> (PBKDF2)
   const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const candidate = crypto
-    .pbkdf2Sync(password, salt, 100000, 64, "sha512")
-    .toString("hex");
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(candidate));
+  if (!salt || !hash) return { valid: false, needsRehash: false };
+  try {
+    const candidate = crypto
+      .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+      .toString("hex");
+    const expected = Buffer.from(hash, "hex");
+    const actual = Buffer.from(candidate, "hex");
+    if (expected.length !== actual.length) return { valid: false, needsRehash: false };
+    const valid = crypto.timingSafeEqual(expected, actual);
+    // If the legacy hash matched, signal that the caller should rehash with scrypt.
+    return { valid, needsRehash: valid };
+  } catch {
+    return { valid: false, needsRehash: false };
+  }
+}
+
+/**
+ * Boolean-only wrapper for callers that don't care about rehashing
+ * (e.g. security-question answer verification).
+ */
+export function verifyPassword(password: string, stored: string): boolean {
+  return verifyPasswordWithStatus(password, stored).valid;
+}
+
+// Precomputed dummy hash used to equalize timing when the account doesn't exist.
+// Uses the current (scrypt) format so its CPU cost matches the fast path.
+const DUMMY_HASH = (() => {
+  const salt = crypto.randomBytes(32).toString("hex");
+  const derived = scryptHash("dummy-password-never-matches", salt);
+  return `scrypt$${salt}$${derived}`;
+})();
+
+function isKnownHashFormat(stored: string): boolean {
+  return stored.startsWith("scrypt$") || stored.includes(":");
+}
+
+/**
+ * Verify a password, always running the KDF even when `stored` is null/empty.
+ * Prevents timing-based account enumeration by ensuring the request spends
+ * roughly the same CPU time whether or not the account exists.
+ */
+export function verifyPasswordSafeWithStatus(
+  password: string,
+  stored: string | null | undefined,
+): PasswordVerifyResult {
+  const target = stored && isKnownHashFormat(stored) ? stored : DUMMY_HASH;
+  const result = verifyPasswordWithStatus(password, target);
+  return stored ? result : { valid: false, needsRehash: false };
+}
+
+/** Boolean-only wrapper preserved for existing callers. */
+export function verifyPasswordSafe(password: string, stored: string | null | undefined): boolean {
+  return verifyPasswordSafeWithStatus(password, stored).valid;
 }
 
 // --- JWT ---

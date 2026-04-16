@@ -38,7 +38,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
 
   if (goals.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(18,38,63,0.14)] p-6 text-center text-sm text-[var(--ink-muted)]">
+      <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-sm text-[var(--ink-muted)]">
         <p className="text-2xl mb-2">🎯</p>
         <p>No goals set yet. Goals appear here after the student talks to Sage or adds them manually.</p>
       </div>
@@ -105,7 +105,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
         </div>
 
         {hasChildren && !isCollapsed && (
-          <div className="ml-4 mt-1 space-y-1.5 border-l-2 border-[rgba(18,38,63,0.08)] pl-3">
+          <div className="ml-4 mt-1 space-y-1.5 border-l-2 border-[var(--border)] pl-3">
             {goal.children
               .sort((a, b) => levelOrder.indexOf(a.level) - levelOrder.indexOf(b.level))
               .map(child => renderGoalNode(child as GoalData & { children: GoalData[] }, depth + 1))}

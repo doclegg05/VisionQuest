@@ -232,7 +232,7 @@ export default function OutcomesReport() {
                 <a
                   key={student.id}
                   href={`/teacher/students/${student.id}`}
-                  className="block theme-card-subtle rounded-lg p-4 transition-colors hover:border-[rgba(18,38,63,0.18)]"
+                  className="block theme-card-subtle rounded-lg p-4 transition-colors hover:border-[var(--border)]"
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>

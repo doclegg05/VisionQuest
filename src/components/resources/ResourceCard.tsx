@@ -77,7 +77,7 @@ export default function ResourceCard({
             Required
           </span>
         )}
-        <span className="rounded-full bg-[rgba(16,37,62,0.06)] px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
+        <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
           {audienceLabel}
         </span>
       </div>

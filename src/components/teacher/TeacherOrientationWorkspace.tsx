@@ -241,7 +241,7 @@ export default function TeacherOrientationWorkspace() {
             <div className="flex flex-wrap gap-2 lg:justify-end">
               <Link
                 href={`/teacher/students/${selectedStudent.id}`}
-                className="rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Open record
               </Link>
@@ -253,7 +253,7 @@ export default function TeacherOrientationWorkspace() {
               </Link>
               <Link
                 href={`/teacher/students/${selectedStudent.id}#goal-plans`}
-                className="rounded-full border border-[rgba(18,38,63,0.1)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Goals
               </Link>
@@ -262,7 +262,7 @@ export default function TeacherOrientationWorkspace() {
         </div>
 
         {selectedStudent ? (
-          <div className="mt-4 rounded-2xl border border-[rgba(18,38,63,0.08)] bg-[rgba(16,37,62,0.03)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
             Actions in this workspace are applied to{" "}
             <span className="font-semibold text-[var(--ink-strong)]">
               {selectedStudent.displayName}

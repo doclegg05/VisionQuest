@@ -273,7 +273,7 @@ export default function OrientationWizard() {
 
       {/* PDF Viewer / Instructor-led placeholder */}
       {step.type === "instructor-led" ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] py-16 gap-3">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] py-16 gap-3">
           <p className="text-base font-medium text-[var(--ink-strong)]">{step.stepTitle}</p>
           {step.stepDescription && (
             <p className="text-sm text-[var(--ink-muted)] text-center max-w-md">{step.stepDescription}</p>
@@ -283,7 +283,7 @@ export default function OrientationWizard() {
           </p>
         </div>
       ) : step.type === "no-pdf" ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] py-16">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] py-16">
           <p className="text-sm text-[var(--ink-muted)]">
             This form is not yet available digitally.
           </p>
@@ -292,7 +292,7 @@ export default function OrientationWizard() {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[rgba(16,37,62,0.08)]">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
           <iframe
             key={step.form!.id}
             src={pdfUrl!}
@@ -303,7 +303,7 @@ export default function OrientationWizard() {
       )}
 
       {/* Action area */}
-      <div className="rounded-2xl border border-[rgba(16,37,62,0.08)] bg-[rgba(16,37,62,0.02)] p-5 space-y-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 space-y-4">
         {/* Mark Complete button (instructor-led type) */}
         {step.type === "instructor-led" && (
           <button

@@ -121,7 +121,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
               y1={gy}
               x2={svgWidth - paddingX}
               y2={gy}
-              stroke="rgba(18,38,63,0.07)"
+              stroke="var(--border)"
               strokeWidth={1}
               strokeDasharray="3,3"
             />
@@ -132,7 +132,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
         <polyline
           points={polylinePoints}
           fill="none"
-          stroke="rgba(18,38,63,0.18)"
+          stroke="var(--border)"
           strokeWidth={1.5}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -164,7 +164,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
               x={paddingX}
               y={svgHeight - 2}
               fontSize={9}
-              fill="rgba(18,38,63,0.45)"
+              fill="var(--ink-faint)"
               textAnchor="start"
             >
               {firstLabel}
@@ -173,7 +173,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
               x={svgWidth - paddingX}
               y={svgHeight - 2}
               fontSize={9}
-              fill="rgba(18,38,63,0.45)"
+              fill="var(--ink-faint)"
               textAnchor="end"
             >
               {lastLabel}

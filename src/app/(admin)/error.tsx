@@ -22,7 +22,7 @@ export default function AdminError({
         </button>
         <a
           href="/admin"
-          className="rounded-xl border border-[rgba(18,38,63,0.15)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+          className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
         >
           Go to Admin
         </a>

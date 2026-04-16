@@ -102,7 +102,7 @@ export default function ForgotPasswordPage() {
             Use an email link or answer the classroom recovery questions tied to your account.
           </p>
 
-          <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-[rgba(16,37,62,0.06)] p-1.5">
+          <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--surface-muted)] p-1.5">
             <button
               type="button"
               onClick={() => {
@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
               }}
               className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "questions"
-                  ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
+                  ? "bg-white text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
@@ -127,7 +127,7 @@ export default function ForgotPasswordPage() {
               }}
               className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "email"
-                  ? "bg-white text-[var(--ink-strong)] shadow-[0_14px_34px_rgba(16,37,62,0.08)]"
+                  ? "bg-white text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >

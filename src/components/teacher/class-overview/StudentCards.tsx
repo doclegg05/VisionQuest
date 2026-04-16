@@ -120,7 +120,7 @@ export default function StudentCards({
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--ink-muted)]">
-              <span className="rounded-full bg-[rgba(16,37,62,0.04)] px-2.5 py-1">
+              <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-1">
                 {student.goalsCount} goals {student.hasBhag && "• BHAG ✓"}
               </span>
               {student.requirementsTotal > 0 && student.requirementsMet < student.requirementsTotal && (
@@ -140,11 +140,11 @@ export default function StudentCards({
               )}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-[rgba(18,38,63,0.08)] pt-3">
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
               <Link
                 href={links.record}
                 prefetch={false}
-                className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Record
               </Link>
@@ -158,14 +158,14 @@ export default function StudentCards({
               <Link
                 href={links.forms}
                 prefetch={false}
-                className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Forms
               </Link>
               <Link
                 href={links.goals}
                 prefetch={false}
-                className="rounded-full border border-[rgba(18,38,63,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[rgba(16,37,62,0.04)]"
+                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Goals
               </Link>

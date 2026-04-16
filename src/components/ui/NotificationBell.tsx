@@ -94,10 +94,10 @@ export default function NotificationBell() {
           ref={dialogRef}
           role="dialog"
           aria-label="Notifications"
-          className="fixed right-3 top-[4.5rem] z-[60] w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[var(--surface-raised)] shadow-[0_20px_60px_rgba(16,37,62,0.18)] md:left-[18rem] md:right-auto md:top-4"
+          className="fixed right-3 top-[4.5rem] z-[60] w-[min(20rem,calc(100vw-1.5rem))] max-w-[20rem] rounded-2xl border border-white/20 bg-[var(--surface-raised)] shadow-[var(--shadow-card-lg)] md:left-[18rem] md:right-auto md:top-4"
           style={{ maxHeight: "min(calc(100dvh - 6rem), 28rem)" }}
         >
-          <div className="flex items-center justify-between border-b border-[rgba(18,38,63,0.08)] px-4 py-3">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Notifications</h3>
             {unreadCount > 0 && (
               <button
@@ -142,14 +142,14 @@ export default function NotificationBell() {
                     key={n.id}
                     type="button"
                     onClick={handleClick}
-                    className={`w-full text-left border-b border-[rgba(18,38,63,0.05)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""} cursor-pointer hover:bg-[rgba(0,123,175,0.04)]`}
+                    className={`w-full text-left border-b border-[var(--border)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""} cursor-pointer hover:bg-[rgba(0,123,175,0.04)]`}
                   >
                     {inner}
                   </button>
                 ) : (
                   <div
                     key={n.id}
-                    className={`border-b border-[rgba(18,38,63,0.05)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""}`}
+                    className={`border-b border-[var(--border)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""}`}
                   >
                     {inner}
                   </div>

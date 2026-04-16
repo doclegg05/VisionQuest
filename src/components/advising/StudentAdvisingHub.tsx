@@ -154,12 +154,12 @@ export default function StudentAdvisingHub({
         </div>
 
         {bookableAdvisors.length === 0 ? (
-          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
             Your teachers haven&apos;t published bookable office hours yet. Check back soon or message staff directly.
           </div>
         ) : (
           <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
-            <div className="space-y-3 rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-4">
+            <div className="space-y-3 rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
@@ -281,7 +281,7 @@ export default function StudentAdvisingHub({
           </div>
 
           {upcomingAppointments.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               No upcoming advising appointments are on your calendar right now.
             </div>
           ) : (
@@ -289,7 +289,7 @@ export default function StudentAdvisingHub({
               {upcomingAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="rounded-[1.2rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-4"
+                  className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -301,7 +301,7 @@ export default function StudentAdvisingHub({
                         With {appointment.advisorName}
                       </p>
                     </div>
-                    <span className="max-w-full whitespace-normal rounded-full bg-[rgba(16,37,62,0.08)] px-3 py-1 text-center text-xs leading-4 font-semibold text-[var(--ink-strong)]">
+                    <span className="max-w-full whitespace-normal rounded-full bg-[var(--surface-muted)] px-3 py-1 text-center text-xs leading-4 font-semibold text-[var(--ink-strong)]">
                       {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                     </span>
                   </div>
@@ -343,7 +343,7 @@ export default function StudentAdvisingHub({
           </div>
 
           {alerts.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               You&apos;re caught up. New alerts will show up here when a follow-up becomes overdue.
             </div>
           ) : (
@@ -376,13 +376,13 @@ export default function StudentAdvisingHub({
                 Complete these actions to stay on track with your advisor.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(16,37,62,0.08)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {openTasks.length} open
             </span>
           </div>
 
           {tasks.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[rgba(18,38,63,0.14)] p-4 text-sm text-[var(--ink-muted)]">
+            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               No follow-up tasks have been assigned yet.
             </div>
           ) : (
@@ -399,7 +399,7 @@ export default function StudentAdvisingHub({
                     className={`rounded-[1.2rem] border p-4 ${
                       isCompleted
                         ? "border-[var(--accent-green)]/20 bg-[var(--badge-success-bg)]"
-                        : "border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)]"
+                        : "border-[var(--border)] bg-[var(--surface-raised)]"
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -433,7 +433,7 @@ export default function StudentAdvisingHub({
                         className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
                             ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-                            : "bg-[var(--ink-strong)] text-white hover:bg-[rgba(16,37,62,0.9)]"
+                            : "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         {isPending && updatingTaskId === task.id
@@ -471,7 +471,7 @@ export default function StudentAdvisingHub({
               ) : (
                 <div className="mt-2 space-y-2">
                   {pastAppointments.slice(0, 5).map((appointment) => (
-                    <div key={appointment.id} className="rounded-[1rem] border border-[rgba(18,38,63,0.1)] bg-[var(--surface-raised)] p-3">
+                    <div key={appointment.id} className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
                         <span className="text-xs text-[var(--ink-muted)]">
