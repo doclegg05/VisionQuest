@@ -34,7 +34,7 @@ export const POST = withAdminAuth(async () => {
   }
 
   const health = await checkOllamaHealth(url, {
-    timeoutMs: 30_000,
+    timeoutMs: 300_000,
     model,
     authConfig: {
       authMode: resolveLocalAiAuthMode(authModeRaw),
