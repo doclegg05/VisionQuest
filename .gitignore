@@ -59,6 +59,10 @@ next-env.d.ts
 # Claude Code — personal overrides (gitignored per best practices)
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Root-level credential screenshots (never commit)
+/*.png
 
 # Generated artifacts (screenshots, audit reports)
 /artifacts/
