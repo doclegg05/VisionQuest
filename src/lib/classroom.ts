@@ -10,6 +10,20 @@ export const NON_ARCHIVED_ENROLLMENT_STATUSES = [
 
 export const MAX_ACTIVE_CLASSES_PER_TEACHER = 2;
 
+/**
+ * Roles allowed to view/manage students and classes regardless of direct
+ * instructor assignment. Coordinator inherits admin's cross-class read scope
+ * (Phase 1) — write scopes for coordinator are wired in Phase 5.
+ *
+ * CDC is intentionally NOT included: their read-across-region scope is
+ * narrower and ships with their dashboard in a later phase.
+ */
+export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin", "coordinator"];
+
+export function canManageAnyClass(role: string): boolean {
+  return STAFF_CAN_MANAGE_ANY.includes(role);
+}
+
 export function normalizeClassCode(value: string) {
   return value
     .trim()
@@ -38,7 +52,9 @@ export function buildManagedStudentWhere(
     ...(includeInactiveAccounts ? {} : { isActive: true }),
   };
 
-  if (session.role === "admin" && !classId) {
+  const canManageAny = canManageAnyClass(session.role);
+
+  if (canManageAny && !classId) {
     return baseWhere;
   }
 
@@ -48,7 +64,7 @@ export function buildManagedStudentWhere(
       some: {
         ...(includeArchivedEnrollments ? {} : { status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] } }),
         ...(classId ? { classId } : {}),
-        ...(session.role === "admin"
+        ...(canManageAny
           ? {}
           : {
               class: {
@@ -63,10 +79,11 @@ export function buildManagedStudentWhere(
 }
 
 export async function assertStaffCanManageClass(session: Session, classId: string) {
+  const canManageAny = canManageAnyClass(session.role);
   const managedClass = await prisma.spokesClass.findFirst({
     where: {
       id: classId,
-      ...(session.role === "admin"
+      ...(canManageAny
         ? {}
         : {
             instructors: {
@@ -167,7 +184,7 @@ export async function listManagedClasses(session: Session, options: { includeArc
   return prisma.spokesClass.findMany({
     where: {
       ...(includeArchived ? {} : { status: { not: "archived" } }),
-      ...(session.role === "admin"
+      ...(canManageAnyClass(session.role)
         ? {}
         : {
             instructors: {
