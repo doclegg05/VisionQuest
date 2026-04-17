@@ -465,6 +465,7 @@ model SpokesClass {
   name        String
   code        String    @unique
   status      String    @default("active")
+  programType String    @default("spokes")
   description String?   @db.Text
   startDate   DateTime? @db.Date
   endDate     DateTime? @db.Date
@@ -480,6 +481,7 @@ model SpokesClass {
   requirements ClassRequirement[]
 
   @@index([status, name])
+  @@index([programType])
   @@schema("visionquest")
 }
 
