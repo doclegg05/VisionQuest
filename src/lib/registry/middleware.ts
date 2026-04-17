@@ -33,6 +33,7 @@ type RegistryHandler = (
  */
 export function withRegistry(toolId: string, handler: RegistryHandler) {
   return async (req: NextRequest, ctx: RouteContext) => {
+    let session: Session | null = null;
     try {
       const tool = getTool(toolId);
       if (!tool) {
@@ -49,7 +50,7 @@ export function withRegistry(toolId: string, handler: RegistryHandler) {
         );
       }
 
-      const session = await getSession();
+      session = await getSession();
       if (!session) {
         return NextResponse.json(
           { error: "Unauthorized", code: "UNAUTHORIZED" },
@@ -103,11 +104,22 @@ export function withRegistry(toolId: string, handler: RegistryHandler) {
           { status: err.statusCode },
         );
       }
-      logger.error("Unhandled error in registry middleware", { error: String(err), toolId });
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 },
-      );
+      const errDetails =
+        err instanceof Error
+          ? { message: err.message, stack: err.stack, name: err.name }
+          : { message: String(err) };
+      logger.error("Unhandled error in registry middleware", {
+        toolId,
+        ...errDetails,
+      });
+      // Surface the error message to admins so they can read it in the UI
+      // without digging through Render logs. Non-admins still get a generic
+      // 500 so we don't leak internals.
+      const body =
+        session?.role === "admin"
+          ? { error: `Internal server error: ${errDetails.message}`, code: "INTERNAL_ERROR" }
+          : { error: "Internal server error" };
+      return NextResponse.json(body, { status: 500 });
     }
   };
 }

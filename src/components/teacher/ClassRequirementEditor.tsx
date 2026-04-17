@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CERTIFICATIONS } from "@/lib/spokes/certifications";
-import { PLATFORMS } from "@/lib/spokes/platforms";
 
 interface Requirement {
   id: string;
@@ -31,21 +30,16 @@ const STATUS_OPTIONS = [
   { value: "not_applicable", label: "N/A", color: "bg-[var(--surface-soft)] text-[var(--ink-muted)] border-[var(--border)]" },
 ];
 
-// Build catalog of items that can be added as requirements
-const CATALOG = [
-  ...CERTIFICATIONS.map((c) => ({
-    itemType: "certification" as const,
-    itemId: c.id,
-    title: c.shortName,
-    description: c.description,
-  })),
-  ...PLATFORMS.map((p) => ({
-    itemType: "course" as const,
-    itemId: p.id,
-    title: p.name,
-    description: p.description,
-  })),
-];
+// Build catalog of items that can be added as requirements.
+// Platforms (LMS systems) are intentionally excluded — they're how students
+// access courses, not courses themselves. Several platforms also duplicated
+// certifications (e.g. "Bring Your A Game" platform vs BYAG certification).
+const CATALOG = CERTIFICATIONS.map((c) => ({
+  itemType: "certification" as const,
+  itemId: c.id,
+  title: c.shortName,
+  description: c.description,
+}));
 
 export default function ClassRequirementEditor({ classId }: ClassRequirementEditorProps) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);

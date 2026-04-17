@@ -99,9 +99,24 @@ export default function DocumentBrowser({
     return () => { cancelled = true; };
   }, [category, platformId, certificationId, searchQuery, fetchKey]);
 
+  // Collapse exact duplicates (same title, size, and category) to a single row.
+  // Admins have uploaded the same file more than once in several categories;
+  // this hides the duplicates without deleting the underlying rows.
+  const uniqueDocuments = useMemo(() => {
+    const seen = new Set<string>();
+    const result: DocumentInfo[] = [];
+    for (const d of documents) {
+      const key = `${d.category}|${d.title}|${d.sizeBytes ?? "?"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(d);
+    }
+    return result;
+  }, [documents]);
+
   // Client-side filtering for array category props and category tab selection
   const filtered = useMemo(() => {
-    let result = documents;
+    let result = uniqueDocuments;
     if (Array.isArray(category)) {
       result = result.filter((d) => category.includes(d.category));
     }
@@ -109,7 +124,7 @@ export default function DocumentBrowser({
       result = result.filter((d) => d.category === selectedCategory);
     }
     return result;
-  }, [documents, selectedCategory, category]);
+  }, [uniqueDocuments, selectedCategory, category]);
 
   // Group by category for section rendering
   const grouped = useMemo(() => {
@@ -125,11 +140,11 @@ export default function DocumentBrowser({
   // Available categories — use only categories that actually have documents after filtering
   const availableCategories = useMemo(() => {
     const source = Array.isArray(category)
-      ? documents.filter((d) => category.includes(d.category))
-      : documents;
+      ? uniqueDocuments.filter((d) => category.includes(d.category))
+      : uniqueDocuments;
     const cats = new Set(source.map((d) => d.category));
     return [...cats].sort();
-  }, [documents, category]);
+  }, [uniqueDocuments, category]);
 
   return (
     <div className="space-y-6">
@@ -168,12 +183,12 @@ export default function DocumentBrowser({
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
             }`}
           >
-            All ({Array.isArray(category) ? documents.filter((d) => category.includes(d.category)).length : documents.length})
+            All ({Array.isArray(category) ? uniqueDocuments.filter((d) => category.includes(d.category)).length : uniqueDocuments.length})
           </button>
           {availableCategories.map((cat) => {
             const meta = DOC_CATEGORIES[cat];
             if (!meta) return null;
-            const count = documents.filter((d) => d.category === cat).length;
+            const count = uniqueDocuments.filter((d) => d.category === cat).length;
             return (
               <button
                 key={cat}
@@ -277,7 +292,7 @@ function CategorySection({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-lg text-[var(--ink-strong)]">{label}</h2>
-            <span className="rounded-full bg-[var(--ink-strong)] px-2.5 py-0.5 text-xs font-semibold text-white">
+            <span className="rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-xs font-semibold text-white">
               {count}
             </span>
           </div>

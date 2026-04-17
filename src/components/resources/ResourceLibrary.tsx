@@ -189,7 +189,7 @@ function CategorySection({
             <h2 className="font-display text-lg text-[var(--ink-strong)]">
               {label}
             </h2>
-            <span className="rounded-full bg-[var(--ink-strong)] px-2.5 py-0.5 text-xs font-semibold text-white">
+            <span className="rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-xs font-semibold text-white">
               {count}
             </span>
           </div>

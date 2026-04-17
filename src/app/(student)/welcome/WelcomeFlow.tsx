@@ -220,7 +220,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                 href="/chat"
                 className="group flex items-start gap-4 rounded-[1.5rem] border-2 border-[var(--accent-strong)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--ink-strong)] text-2xl text-white">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
                   💬
                 </span>
                 <div>
@@ -234,7 +234,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                 href="/orientation"
                 className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--ink-strong)] text-2xl text-white">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
                   📋
                 </span>
                 <div>
@@ -248,7 +248,7 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                 href="/dashboard"
                 className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--ink-strong)] text-2xl text-white">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
                   📊
                 </span>
                 <div>
