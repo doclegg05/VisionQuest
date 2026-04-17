@@ -9,6 +9,7 @@ import {
 } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { isProgramType, type ProgramType } from "@/lib/program-type";
 
 function parseOptionalDate(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -100,6 +101,16 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
   const startDate = parseOptionalDate(body.startDate);
   const endDate = parseOptionalDate(body.endDate);
 
+  let programType: ProgramType = "spokes";
+  if (body.programType !== undefined) {
+    if (typeof body.programType !== "string" || !isProgramType(body.programType)) {
+      throw badRequest(
+        "programType must be one of: spokes, adult_ed, ietp.",
+      );
+    }
+    programType = body.programType;
+  }
+
   if (!name) {
     throw badRequest("Class name is required.");
   }
@@ -133,6 +144,7 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     data: {
       name,
       code,
+      programType,
       description: description || null,
       startDate,
       endDate,
@@ -148,6 +160,7 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
       name: true,
       code: true,
       status: true,
+      programType: true,
     },
   });
 
@@ -160,6 +173,7 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     summary: `Created class "${createdClass.name}".`,
     metadata: {
       code: createdClass.code,
+      programType: createdClass.programType,
       instructorCount: instructorIds.length,
     },
   });

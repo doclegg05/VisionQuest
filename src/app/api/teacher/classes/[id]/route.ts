@@ -8,6 +8,7 @@ import {
 } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { isProgramType } from "@/lib/program-type";
 
 function parseOptionalDate(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -121,6 +122,16 @@ export const PATCH = withTeacherAuth(async (
         : typeof body.description === "string"
           ? body.description.trim()
           : undefined;
+
+    let nextProgramType: string | undefined;
+    if (body.programType !== undefined) {
+      if (typeof body.programType !== "string" || !isProgramType(body.programType)) {
+        throw badRequest(
+          "programType must be one of: spokes, adult_ed, ietp.",
+        );
+      }
+      nextProgramType = body.programType;
+    }
     const instructorIds = Array.isArray(body.instructorIds)
       ? normalizeInstructorIds(body.instructorIds.filter(
           (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
@@ -173,6 +184,7 @@ export const PATCH = withTeacherAuth(async (
           name: nextName,
           code: nextCode,
           status: nextStatus,
+          ...(nextProgramType !== undefined ? { programType: nextProgramType } : {}),
           description,
           archivedAt: nextStatus === "archived" ? new Date() : null,
           startDate: body.startDate !== undefined ? parseOptionalDate(body.startDate) : undefined,
