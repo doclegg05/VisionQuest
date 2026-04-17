@@ -24,18 +24,12 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     prevDisabledRef.current = disabled;
   }, [disabled]);
 
-  // Open palette only when the FIRST char is "/" and there's no space yet.
-  // Derived synchronously — no effect needed.
-  const shouldPaletteOpen = message.startsWith("/") && !message.includes(" ");
-  if (paletteOpen !== shouldPaletteOpen) {
-    setPaletteOpen(shouldPaletteOpen);
-  }
-
   const handleSubmit = useCallback(() => {
     const trimmed = message.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setMessage("");
+    setPaletteOpen(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.focus();
@@ -62,6 +56,12 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
         el.style.height = Math.min(scrollHeight, 160) + "px";
       });
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const next = e.target.value;
+    setMessage(next);
+    setPaletteOpen(next.startsWith("/") && !next.includes(" "));
   };
 
   const handleSelectCommand = useCallback(
@@ -94,7 +94,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
           <textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
             placeholder={role === "student" ? "Type your message... (try /goal)" : "Type your message... (try /)"}
