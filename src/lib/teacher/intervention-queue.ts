@@ -50,7 +50,7 @@ export interface InterventionQueueStudentRecord {
   }>;
   resumeData: { id: string } | null;
   publicCredentialPage: { isPublic: boolean } | null;
-  classEnrollments: Array<{
+  classEnrollments?: Array<{
     enrolledAt: Date;
     status: string;
     class: { programType: string };
@@ -177,9 +177,9 @@ export function buildInterventionQueueEntry(input: {
     readinessScore: readiness.readiness.score,
   };
 
+  const enrollments = student.classEnrollments ?? [];
   const activeEnrollment =
-    student.classEnrollments.find((enrollment) => enrollment.status === "active") ??
-    student.classEnrollments[0];
+    enrollments.find((enrollment) => enrollment.status === "active") ?? enrollments[0];
   const programType = normalizeProgramType(activeEnrollment?.class.programType);
 
   return {
