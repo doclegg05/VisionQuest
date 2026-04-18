@@ -22,12 +22,14 @@ import NotificationBell from "./NotificationBell";
 import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 const STAFF_ITEMS: NavItem[] = [
+  { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/teacher", label: "Students", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
+  { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
 ];
 
@@ -156,6 +158,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       ...secondaryItems.map((i) => i.href),
       "/settings",
       "/chat",
+      "/teacher/chat",
+      "/admin/chat",
     ]),
   );
   const isActive = (href: string): boolean => {
@@ -459,7 +463,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       </aside>
 
       {/* Floating Sage button + mini chat */}
-      {pathname !== "/chat" && (
+      {pathname !== "/chat" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && (
         <>
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
