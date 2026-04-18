@@ -13,6 +13,8 @@ import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota } from "@/lib/llm-usage";
+import { prisma } from "@/lib/db";
+import { getStudentProgramType, type ProgramType } from "@/lib/program-type";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -92,6 +94,22 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Save user message
   await saveMessage(conversation.id, session.id, "user", userMessage);
 
+  // Fetch program context once for students — reused by both the system
+  // prompt and the post-response handler.
+  let studentProgramType: ProgramType | null = null;
+  let studentClassroomConfirmedAt: Date | null = null;
+  if (!isTeacher) {
+    const [programType, studentRecord] = await Promise.all([
+      getStudentProgramType(session.id),
+      prisma.student.findUnique({
+        where: { id: session.id },
+        select: { classroomConfirmedAt: true },
+      }),
+    ]);
+    studentProgramType = programType;
+    studentClassroomConfirmedAt = studentRecord?.classroomConfirmedAt ?? null;
+  }
+
   // Build system prompt — teacher gets a streamlined path
   let systemPrompt: string;
 
@@ -111,6 +129,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       promptContext.priorConversationContext +
       buildSystemPrompt(conversation.stage as ConversationStage, {
         studentName: session.displayName,
+        programType: studentProgramType,
+        classroomConfirmedAt: studentClassroomConfirmedAt,
         bhag: promptContext.goalsByLevel["bhag"],
         monthly: promptContext.goalsByLevel["monthly"],
         weekly: promptContext.goalsByLevel["weekly"],
@@ -212,6 +232,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             fullResponse,
             studentId: session.id,
             allMessages,
+            userMessage,
+            programType: studentProgramType,
+            classroomConfirmedAt: studentClassroomConfirmedAt,
           }).catch((err) => logger.error("Post-response error", { error: String(err) }));
         }
 

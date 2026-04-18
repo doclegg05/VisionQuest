@@ -6,6 +6,7 @@ import { extractGoals } from "@/lib/sage/goal-extractor";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
 import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
+import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import {
   recordWeeklyReview,
   recordMonthlyReview,
@@ -14,6 +15,7 @@ import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { generateConversationTitle } from "./conversation";
+import type { ProgramType } from "@/lib/program-type";
 
 // ─── Main post-response handler ─────────────────────────────────────────────
 
@@ -24,6 +26,12 @@ interface PostResponseParams {
   fullResponse: string;
   studentId: string;
   allMessages: { role: "user" | "model"; content: string }[];
+  /** Most recent user turn — needed by the classroom-confirmation detector. */
+  userMessage: string;
+  /** Student's active program; null only for legacy callers. */
+  programType: ProgramType | null;
+  /** Null means classroom confirmation has not happened yet. */
+  classroomConfirmedAt: Date | null;
 }
 
 /**
@@ -45,8 +53,28 @@ export async function handlePostResponse({
   fullResponse,
   studentId,
   allMessages,
+  userMessage,
+  programType,
+  classroomConfirmedAt,
 }: PostResponseParams): Promise<void> {
   const provider = await getProvider(studentId);
+
+  // Fire-and-forget classroom-confirmation extractor. Only runs until the
+  // student has confirmed their classroom; after that the onboarding prompt
+  // stops asking and this extractor has nothing to look for.
+  if (!classroomConfirmedAt) {
+    void detectAndRecordClassroomConfirmation(
+      provider,
+      studentId,
+      userMessage,
+      fullResponse,
+    ).catch((err) =>
+      logger.error("Classroom confirmation extractor failed", {
+        studentId,
+        error: String(err),
+      }),
+    );
+  }
   // 0. Discovery extraction (runs instead of goal extraction during discovery)
   if (conversationStage === "discovery") {
     try {
@@ -130,11 +158,12 @@ export async function handlePostResponse({
     return;
   }
 
-  // 1. Extract goals
+  // 1. Extract goals (program-aware framing via PROGRAM_HEADERS)
   const extracted = await extractGoals(
     provider,
     [...allMessages, { role: "model" as const, content: fullResponse }],
     conversationStage,
+    programType,
   );
 
   // 2. Create new goal records
