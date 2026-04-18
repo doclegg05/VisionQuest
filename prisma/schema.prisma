@@ -10,24 +10,25 @@ datasource db {
 }
 
 model Student {
-  id             String   @id @default(cuid())
-  studentId      String   @unique
-  displayName    String
-  passwordHash   String?
-  email          String?  @unique
-  authProvider   String?
-  geminiApiKey   String?
-  credlyUsername String?
-  role           String    @default("student")
-  isActive       Boolean   @default(true)
-  sessionVersion Int       @default(0)
-  mfaSecret      String?   // TOTP secret, encrypted with AES-256-GCM
-  mfaEnabled     Boolean   @default(false)
-  mfaBackupCodes    String[]  @default([]) // SHA-256 hashes of one-time recovery codes
-  mfaVerifiedAt     DateTime? // When MFA was last verified this session
-  mfaLastUsedCounter Int?     // Last accepted TOTP counter — prevents replay within 90s window
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  studentId            String    @unique
+  displayName          String
+  passwordHash         String?
+  email                String?   @unique
+  authProvider         String?
+  geminiApiKey         String?
+  credlyUsername       String?
+  role                 String    @default("student")
+  isActive             Boolean   @default(true)
+  sessionVersion       Int       @default(0)
+  mfaSecret            String? // TOTP secret, encrypted with AES-256-GCM
+  mfaEnabled           Boolean   @default(false)
+  mfaBackupCodes       String[]  @default([]) // SHA-256 hashes of one-time recovery codes
+  mfaVerifiedAt        DateTime? // When MFA was last verified this session
+  mfaLastUsedCounter   Int? // Last accepted TOTP counter — prevents replay within 90s window
+  classroomConfirmedAt DateTime? // Set once Sage has confirmed the student is in the right classroom
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   conversations           Conversation[]
   messages                Message[]
@@ -78,9 +79,9 @@ model Student {
 model NotificationPreference {
   id          String   @id @default(cuid())
   studentId   String
-  channel     String   // "email" | "sms"
+  channel     String // "email" | "sms"
   enabled     Boolean  @default(true)
-  destination String?  // phone number or email override (null = use student's default)
+  destination String? // phone number or email override (null = use student's default)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -137,7 +138,7 @@ model Goal {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  pathwayId     String?
+  pathwayId String?
 
   student       Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
   confirmer     Student?           @relation("GoalConfirmer", fields: [confirmedBy], references: [id])
@@ -852,9 +853,9 @@ model ProgramDocument {
 
   // --- Sage AI Context ---
   // If true, this document's description is injected into Sage's knowledge base
-  usedBySage      Boolean @default(false)
+  usedBySage      Boolean   @default(false)
   // Short text summary Sage can read (avoids loading full PDF into prompt)
-  sageContextNote String? @db.Text
+  sageContextNote String?   @db.Text
   fileModifiedAt  DateTime? // Filesystem mtime at ingestion — for change detection
 
   // --- Metadata ---
@@ -1046,7 +1047,7 @@ model SageSnippet {
 model CoachingArc {
   id         String   @id @default(cuid())
   studentId  String
-  arcType    String   // "standard_6week"
+  arcType    String // "standard_6week"
   weekNumber Int      @default(1)
   milestones Json     @default("[]")
   status     String   @default("active") // "active" | "completed" | "paused"
@@ -1078,26 +1079,26 @@ model JobClassConfig {
 }
 
 model JobListing {
-  id             String    @id @default(cuid())
-  title          String
-  company        String
-  location       String
-  salary         String?
-  salaryMin      Float?
-  description    String    @db.Text
-  url            String
-  source         String
-  sourceType     String
-  sourceId       String    @unique
-  clusters       String[]  @default([])
-  status         String    @default("active")
-  expiresAt      DateTime?
-  scrapeBatchId  String
-  classConfigId  String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  title         String
+  company       String
+  location      String
+  salary        String?
+  salaryMin     Float?
+  description   String    @db.Text
+  url           String
+  source        String
+  sourceType    String
+  sourceId      String    @unique
+  clusters      String[]  @default([])
+  status        String    @default("active")
+  expiresAt     DateTime?
+  scrapeBatchId String
+  classConfigId String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  classConfig     JobClassConfig   @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
+  classConfig     JobClassConfig    @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
   savedByStudents StudentSavedJob[]
 
   @@index([classConfigId, status])
@@ -1168,7 +1169,7 @@ model Pathway {
 model ClassRequirement {
   id          String   @id @default(cuid())
   classId     String
-  itemType    String   // "certification" | "form" | "orientation" | "course"
+  itemType    String // "certification" | "form" | "orientation" | "course"
   itemId      String
   title       String
   status      String   @default("required") // "required" | "optional" | "not_applicable"
