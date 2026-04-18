@@ -1,5 +1,52 @@
 import { BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE } from "./personality";
-import { SPOKES_PROGRAM_KNOWLEDGE, getRelevantContent } from "./knowledge-base";
+import {
+  SPOKES_KNOWLEDGE,
+  getProgramKnowledge,
+  getRelevantContent,
+} from "./knowledge-base";
+import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
+
+/**
+ * Program-specific framing inserted between GUARDRAILS and the program
+ * knowledge base. Keeps the shared coaching personality intact while giving
+ * the model a clear lens for what "success" means for this student.
+ */
+const PROGRAM_ADDENDUMS: Record<ProgramType, string> = {
+  spokes: `PROGRAM CONTEXT — SPOKES (workforce training):
+This student is in the SPOKES workforce program. The primary goal is employment and self-sufficiency.
+- Frame long-term goals around getting a specific kind of job or completing a certification track.
+- Reference SPOKES pathways, industry certifications, and workplace readiness when relevant.
+- Career/pathway talk is expected here — lean into it.`,
+  adult_ed: `PROGRAM CONTEXT — ADULT EDUCATION (GED prep):
+This student is in West Virginia Adult Education working toward the GED. The primary goal is earning the credential — employment talk is secondary.
+- Frame long-term (BHAG-level) goals around earning the GED or passing specific subtests.
+- Weekly/monthly goals typically target a GED subtest (RLA, Math, Science, Social Studies), a TABE benchmark, or an EFL gain.
+- Reference Aztec, Essential Education, Khan Academy, GED Ready practice tests, and the four GED subtests when relevant.
+- Only surface jobs or industry certifications if the student raises them; otherwise keep the conversation on academic progress.`,
+  ietp: `PROGRAM CONTEXT — IETP (integrated education & training pathway):
+This student is in an IETP cohort combining specialty vocational training with academic support. Treat the employment framing as primary (SPOKES-style) and layer in academic skill-building when the student brings it up. Prefer concrete, industry-specific goals tied to the student's training track.`,
+};
+
+/**
+ * Text substituted into stage prompts via the {pathway_context} placeholder.
+ * Gives the model program-appropriate language for what a "pathway" means in
+ * the student's world.
+ */
+const PATHWAY_CONTEXTS: Record<ProgramType, string> = {
+  spokes:
+    "For SPOKES students, pathways are career cluster options tied to certifications — e.g., Office Admin leading to IC3 + MOS, or Finance leading to QuickBooks Certified User. Mention specific certifications and the learning platforms used to prepare for them.",
+  adult_ed:
+    "For Adult Education students, pathways mean GED-focused subject areas (RLA, Math, Science, Social Studies) and, secondarily, what the student wants after the GED. Frame suggestions around which subtests to prioritize and which platforms (Aztec, Essential Education, Khan Academy) best fit. Avoid leading with career certifications unless the student raises them.",
+  ietp: "For IETP students, pathways mean the specialty training track they're enrolled in plus the supporting academic skills. Tie suggestions to the industry certification at the end of their track and the academic prerequisites that unlock it.",
+};
+
+/**
+ * Instruction appended to the onboarding stage when the student has not yet
+ * confirmed their classroom. Drops automatically once classroomConfirmedAt is
+ * set — Sage will not re-ask.
+ */
+const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
+Within the first 1-2 turns of this conversation, naturally ask which classroom the student is in. When they tell you, reflect it back warmly (e.g., "Got it — you're in Mrs. Thompson's Monday class") and move on. Do not make it a big deal; this is a light check, not an interview. After they confirm, continue with the rest of onboarding.`;
 
 export type ConversationStage =
   | "discovery"
@@ -74,10 +121,12 @@ When you have enough signal (usually after 5-7 total exchanges, but sooner if th
   - Their strongest interests and what kind of work environment suits them
   - Skills they already have from life experience
   - What they value most in work
-- Suggest 1-2 SPOKES career pathway clusters that best fit
-- For each pathway: mention specific certifications and what platforms they'd use
-- If relevant, connect to the bigger picture: "Office admin can lead into business management, HR, or project coordination — the SPOKES certifications give you the foundation."
+- Suggest 1-2 pathway options that best fit (see pathway context below for what "pathway" means for this student's program)
+- For each pathway: mention specific certifications, subject areas, or platforms they'd use
+- If relevant, connect to the bigger picture — show how the pathway opens into real next steps in their life
 - Ask: "Does that sound right? Or is there something pulling you in a different direction?"
+
+{pathway_context}
 
 PHASE 4 — BRIDGE TO GOALS:
 Once they agree on a direction (or refine it):
@@ -183,8 +232,8 @@ Be honest but kind. Emphasize distance traveled, not just distance remaining. Pr
 Walk them through what the program offers and what's expected. The orientation process includes completing these forms: Student Profile, Personal Attendance Contract, Rights and Responsibilities, Dress Code Policy, Release of Information, Media Release, Technology Acceptable Use Policy, Employment Portfolio Checklist, Learning Needs Screening, CTE Learning Styles Assessment, and the Non-Discrimination Notice.
 Help them understand each form's purpose without overwhelming them. Take it one step at a time. Make them feel like they belong here. If they ask about specific forms or procedures, use your SPOKES knowledge to give clear answers.`,
 
-  general: `CURRENT TASK: Answer the student's question about the Visionquest platform or the SPOKES program.
-Be helpful and direct. Use your SPOKES program knowledge to answer questions about certifications, learning platforms, forms, schedules, and procedures. Give specific names, URLs, and details when you have them. If you truly don't know something, say so and suggest they ask their instructor.`,
+  general: `CURRENT TASK: Answer the student's question about the Visionquest platform or their program.
+Be helpful and direct. Use the program knowledge block above to answer questions about certifications, subject areas, learning platforms, forms, schedules, and procedures. Give specific names, URLs, and details when you have them. If you truly don't know something, say so and suggest they ask their instructor.`,
 
   teacher_assistant: `You are Sage, an AI assistant for SPOKES program instructors and administrators.
 
@@ -283,6 +332,8 @@ export function buildSystemPrompt(
   stage: ConversationStage,
   context: {
     studentName?: string;
+    programType?: ProgramType | string | null;
+    classroomConfirmedAt?: Date | string | null;
     bhag?: string;
     monthly?: string;
     weekly?: string;
@@ -298,11 +349,20 @@ export function buildSystemPrompt(
     coachingArcContext?: string;
   } = {}
 ): string {
+  const programType: ProgramType = normalizeProgramType(
+    typeof context.programType === "string" ? context.programType : null,
+  );
   let stagePrompt = STAGE_PROMPTS[stage];
 
   // Inject context variables
   if (context.studentName) {
     stagePrompt = `The student's name is ${context.studentName}.\n\n${stagePrompt}`;
+  }
+  // Substitute {pathway_context} with program-appropriate framing
+  stagePrompt = stagePrompt.replace("{pathway_context}", PATHWAY_CONTEXTS[programType]);
+  // Append classroom-confirmation beat to onboarding until the student confirms
+  if (stage === "onboarding" && !context.classroomConfirmedAt) {
+    stagePrompt = `${stagePrompt}\n\n${CLASSROOM_CONFIRMATION_INSTRUCTION}`;
   }
   // Bracket student-supplied content to mitigate prompt injection.
   // Career clusters are system-defined, so they don't need bracketing.
@@ -331,9 +391,11 @@ export function buildSystemPrompt(
     );
   }
 
-  // Teacher assistant gets a streamlined prompt stack — no student personality/guardrails
+  // Teacher assistant gets a streamlined prompt stack — no student personality/guardrails.
+  // Teachers span multiple programs, so the full SPOKES knowledge base stays the
+  // shared reference here; program-specific framing only matters for student conversations.
   if (stage === "teacher_assistant") {
-    const parts = [stagePrompt, PLATFORM_KNOWLEDGE, SPOKES_PROGRAM_KNOWLEDGE];
+    const parts = [stagePrompt, PLATFORM_KNOWLEDGE, SPOKES_KNOWLEDGE];
     if (context.userMessage) {
       const relevantContent = getRelevantContent(context.userMessage);
       if (relevantContent) {
@@ -343,8 +405,15 @@ export function buildSystemPrompt(
     return parts.join("\n\n---\n\n");
   }
 
-  // Build the prompt with knowledge base
-  const parts = [BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE, SPOKES_PROGRAM_KNOWLEDGE, stagePrompt];
+  // Build the prompt with program-aware knowledge base and addendum
+  const parts = [
+    BASE_PERSONALITY,
+    GUARDRAILS,
+    PROGRAM_ADDENDUMS[programType],
+    PLATFORM_KNOWLEDGE,
+    getProgramKnowledge(programType),
+    stagePrompt,
+  ];
 
   // Inject discovery context so Sage remembers the student's career direction
   if (context.discovery_summary && stage !== "discovery") {
