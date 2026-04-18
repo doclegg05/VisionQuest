@@ -177,15 +177,9 @@ export function buildInterventionQueueEntry(input: {
     readinessScore: readiness.readiness.score,
   };
 
-<<<<<<< HEAD
   const enrollments = student.classEnrollments ?? [];
   const activeEnrollment =
     enrollments.find((enrollment) => enrollment.status === "active") ?? enrollments[0];
-=======
-  const activeEnrollment =
-    student.classEnrollments.find((enrollment) => enrollment.status === "active") ??
-    student.classEnrollments[0];
->>>>>>> 6bbae53 (feat(api): programType + classId filter on teacher dashboard data)
   const programType = normalizeProgramType(activeEnrollment?.class.programType);
 
   return {
