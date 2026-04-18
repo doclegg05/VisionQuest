@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import ProgramBadge from "@/components/ui/ProgramBadge";
+import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
 
 interface InstructorOption {
@@ -16,6 +18,7 @@ interface ClassSummary {
   name: string;
   code: string;
   status: string;
+  programType: string;
   description: string | null;
   startDate: string | null;
   endDate: string | null;
@@ -44,6 +47,7 @@ interface ClassDetail {
   name: string;
   code: string;
   status: string;
+  programType: string;
   description: string | null;
   startDate: string | null;
   endDate: string | null;
@@ -499,7 +503,10 @@ export default function ClassRosterManager() {
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-display text-2xl text-[var(--ink-strong)]">{classDetail.name}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-display text-2xl text-[var(--ink-strong)]">{classDetail.name}</h3>
+                      <ProgramBadge programType={normalizeProgramType(classDetail.programType)} />
+                    </div>
                     <p className="mt-2 text-sm text-[var(--ink-muted)]">
                       {classDetail.code} • {classDetail.status}
                     </p>

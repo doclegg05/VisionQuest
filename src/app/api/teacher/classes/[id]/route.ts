@@ -31,6 +31,7 @@ export const GET = withTeacherAuth(async (
       name: true,
       code: true,
       status: true,
+      programType: true,
       description: true,
       startDate: true,
       endDate: true,

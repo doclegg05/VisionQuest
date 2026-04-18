@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Warning,
   Target,
@@ -14,6 +15,7 @@ import {
   BookOpenText,
 } from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
+import ProgramBadge from "@/components/ui/ProgramBadge";
 import {
   type InterventionQueueResponse as QueueResponse,
   type QueueStudent,
@@ -378,9 +380,12 @@ function StudentRow({
 
       {/* Name + reason */}
       <Link href={`/teacher/students/${student.studentId}`} className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
-          {student.name}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
+            {student.name}
+          </p>
+          <ProgramBadge programType={student.programType} size="sm" />
+        </div>
         <p className="truncate text-xs text-[var(--ink-muted)]">{reason}</p>
       </Link>
 
@@ -474,22 +479,28 @@ export default function InterventionQueuePanel({
   const [taskTarget, setTaskTarget] = useState<{ studentId: string; name: string } | null>(null);
   const [noteTarget, setNoteTarget] = useState<{ studentId: string; name: string } | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<{ studentId: string; name: string } | null>(null);
+  const searchParams = useSearchParams();
+  const classId = searchParams.get("classId")?.trim() || "";
 
   const fetchQueue = useCallback(async () => {
     try {
-      const data = await api.get<QueueResponse>("/api/teacher/intervention-queue");
+      const url = classId
+        ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classId)}`
+        : "/api/teacher/intervention-queue";
+      const data = await api.get<QueueResponse>(url);
       setQueue(data.queue);
     } catch {
       setError("Failed to load intervention queue.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [classId]);
 
   useEffect(() => {
-    if (initialQueue !== undefined) return;
+    if (initialQueue !== undefined && !classId) return;
+    setLoading(true);
     void fetchQueue();
-  }, [initialQueue, fetchQueue]);
+  }, [initialQueue, fetchQueue, classId]);
 
   return (
     <section className="surface-section p-5">

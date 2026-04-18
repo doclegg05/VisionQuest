@@ -32,6 +32,7 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
       name: true,
       code: true,
       status: true,
+      programType: true,
       description: true,
       startDate: true,
       endDate: true,

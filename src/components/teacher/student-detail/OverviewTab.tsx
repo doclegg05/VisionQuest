@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ProgramBadge from "@/components/ui/ProgramBadge";
 import ReadinessScore from "@/components/ui/ReadinessScore";
 import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import type {
@@ -71,7 +72,10 @@ export default function OverviewTab({
       <div className="theme-card rounded-xl p-5">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h2 className="text-xl font-bold text-[var(--ink-strong)]">{student.displayName}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl font-bold text-[var(--ink-strong)]">{student.displayName}</h2>
+              <ProgramBadge programType={student.programType} />
+            </div>
             <p className="text-sm text-[var(--ink-muted)]">
               ID: {student.studentId} {student.email && `\u2022 ${student.email}`}
             </p>
