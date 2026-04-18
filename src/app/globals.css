@@ -64,6 +64,14 @@
   --urgency-medium-bg: rgba(0, 93, 138, 0.12);
   --urgency-medium-text: #004d73;
 
+  /* Program badges (teacher) — bg/text pairs hit WCAG AA 4.5:1 on --surface-raised */
+  --program-spokes-bg: rgba(15, 154, 146, 0.12);
+  --program-spokes-text: #0a6e6a;
+  --program-ae-bg: rgba(109, 40, 217, 0.12);
+  --program-ae-text: #5b21b6;
+  --program-ietp-bg: rgba(234, 88, 12, 0.12);
+  --program-ietp-text: #c2410c;
+
   /* Legacy aliases */
   --background: var(--surface-base);
   --foreground: var(--ink-strong);
@@ -146,6 +154,14 @@
   --urgency-high-text: #e0c06a;
   --urgency-medium-bg: rgba(56, 168, 216, 0.15);
   --urgency-medium-text: #38a8d8;
+
+  /* Program badges — dark mode; brighter tints for low-luminance surfaces */
+  --program-spokes-bg: rgba(15, 154, 146, 0.18);
+  --program-spokes-text: #5cd0c6;
+  --program-ae-bg: rgba(167, 139, 250, 0.18);
+  --program-ae-text: #c4b5fd;
+  --program-ietp-bg: rgba(251, 146, 60, 0.18);
+  --program-ietp-text: #fdba74;
 
   /* Chat surfaces — dark mode */
   --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
