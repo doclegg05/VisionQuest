@@ -3,6 +3,7 @@ import {
   GOAL_RESOURCE_TYPE_LABELS,
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
+import { type ProgramType } from "@/lib/program-type";
 
 export interface StudentTabProps {
   studentId: string;
@@ -228,6 +229,7 @@ export interface StudentData {
     email: string | null;
     createdAt: string;
     isActive: boolean;
+    programType: ProgramType;
   };
   progression: {
     xp: number;

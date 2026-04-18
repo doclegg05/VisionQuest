@@ -12,6 +12,7 @@ import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
 import { parseState } from "@/lib/progression/engine";
 import { FORMS } from "@/lib/spokes/forms";
+import { normalizeProgramType } from "@/lib/program-type";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 
 // GET — individual student detail for teacher view
@@ -28,6 +29,14 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       email: true,
       isActive: true,
       createdAt: true,
+      classEnrollments: {
+        select: {
+          enrolledAt: true,
+          status: true,
+          class: { select: { programType: true } },
+        },
+        orderBy: { enrolledAt: "desc" },
+      },
       progression: { select: { state: true } },
       goals: {
         select: {
@@ -379,6 +388,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     evidenceEntries: goalEvidence,
   }));
 
+  const activeEnrollment =
+    student.classEnrollments.find((enrollment) => enrollment.status === "active") ??
+    student.classEnrollments[0];
+  const programType = normalizeProgramType(activeEnrollment?.class.programType);
+
   return NextResponse.json({
     student: {
       id: student.id,
@@ -387,6 +401,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       email: student.email,
       isActive: student.isActive,
       createdAt: student.createdAt,
+      programType,
     },
     progression,
     readinessScore: readinessResult.score,

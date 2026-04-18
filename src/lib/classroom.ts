@@ -199,6 +199,7 @@ export async function listManagedClasses(session: Session, options: { includeArc
       name: true,
       code: true,
       status: true,
+      programType: true,
       startDate: true,
       endDate: true,
     },
