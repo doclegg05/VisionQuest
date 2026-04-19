@@ -12,6 +12,8 @@ import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
+import { determineStage } from "@/lib/sage/system-prompts";
 
 interface Message {
   id: string;
@@ -45,8 +47,16 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const [incompleteMessageId, setIncompleteMessageId] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [conversationRefreshKey, setConversationRefreshKey] = useState(0);
+  /**
+   * Optimistic greeting shown immediately on a new conversation before SSE
+   * returns the first real token. Cleared when real content arrives or when
+   * the user sends a second message before SSE completes.
+   */
+  const [optimisticGreeting, setOptimisticGreeting] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestPollIdRef = useRef(0);
+  /** Tracks whether the warmup fetch has fired this session. */
+  const warmupFiredRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -99,12 +109,47 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     void loadActiveConversation();
   }, [loadConversationById]);
 
+  /**
+   * B1 — Warmup fetch.
+   * Fires once on mount when there is no active conversation so the backend
+   * can warm the base-context cache before the student sends their first
+   * message. Fire-and-forget: errors are silently discarded and we never
+   * block render or chat interaction waiting for it.
+   */
+  useEffect(() => {
+    if (warmupFiredRef.current || conversationId) return;
+    warmupFiredRef.current = true;
+    fetch("/api/chat/warmup", { credentials: "include" }).catch(() => {
+      // Intentionally ignored — warmup is best-effort.
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Derives the current ConversationStage from the student's goal list.
+   * Mirrors the logic in `determineStage()` from system-prompts.ts so
+   * the optimistic greeting matches what the backend will compute.
+   * Falls back to "discovery" (the most common new-conversation case).
+   */
+  const deriveStageFromGoals = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/goals");
+      if (!res.ok) return "discovery" as const;
+      const data = await res.json();
+      const goals: { level: string }[] = data.goals ?? [];
+      return determineStage(goals);
+    } catch {
+      return "discovery" as const;
+    }
+  }, []);
+
   const startNewChat = () => {
     setConversationId(null);
     setMessages([]);
     setStreamingContent("");
     setIncompleteMessageId(null);
     setChatError(null);
+    setOptimisticGreeting(null);
     setShowSidebar(false);
   };
 
@@ -157,6 +202,30 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       let prevGoalCount = 0;
       setChatError(null);
 
+      // B2: Hoist the loading state so the TypingIndicator renders immediately
+      // on send, before the goals pre-fetch or any network call.
+      const userMsg: Message = {
+        id: `temp-${Date.now()}`,
+        role: "user",
+        content: text,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setIsLoading(true);
+      setStreamingContent("");
+
+      // B4: If this is the first message of a new conversation (no conversationId
+      // and no prior messages), show an optimistic greeting immediately while SSE
+      // is in flight. Discard it if the user sends a second message before SSE
+      // arrives (handled by checking messages.length in the SSE reader below).
+      const isFirstMessage = !conversationId && messages.length === 0;
+      if (isFirstMessage) {
+        // Derive stage asynchronously — don't await here so rendering isn't blocked.
+        // The greeting will appear as soon as the stage resolves (typically <200ms).
+        void deriveStageFromGoals().then((stage) => {
+          setOptimisticGreeting(STAGE_OPENERS[stage]);
+        });
+      }
+
       try {
         const goalsRes = await apiFetch("/api/goals");
         if (goalsRes.ok) {
@@ -166,15 +235,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       } catch {
         // Ignore goal count failures.
       }
-
-      const userMsg: Message = {
-        id: `temp-${Date.now()}`,
-        role: "user",
-        content: text,
-      };
-      setMessages((prev) => [...prev, userMsg]);
-      setIsLoading(true);
-      setStreamingContent("");
 
       try {
         const stageParam = searchParams.get("stage") ?? defaultStage;
@@ -225,6 +285,10 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                 }
                 if (data.error) throw new Error(data.error);
                 if (data.text) {
+                  // B4: First real token clears the optimistic greeting.
+                  if (!fullContent) {
+                    setOptimisticGreeting(null);
+                  }
                   fullContent += data.text;
                   setStreamingContent(fullContent);
                 }
@@ -274,9 +338,12 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         ]);
       } finally {
         setIsLoading(false);
+        // B4: Ensure optimistic greeting is always cleared when streaming ends,
+        // including on error paths.
+        setOptimisticGreeting(null);
       }
     },
-    [conversationId, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage]
+    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage]
   );
 
   // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
@@ -372,11 +439,19 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
               </div>
             ))}
 
+            {/* B4: Optimistic greeting — visible from send until first SSE text chunk */}
+            {optimisticGreeting && !streamingContent && (
+              <div>
+                <MessageBubble role="assistant" content={optimisticGreeting} isStreaming />
+                <p className="ml-14 mt-1 text-[11px] text-[var(--ink-muted)]">sending…</p>
+              </div>
+            )}
+
             {streamingContent && (
               <MessageBubble role="assistant" content={streamingContent} isStreaming />
             )}
 
-            {isLoading && !streamingContent && <TypingIndicator />}
+            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator />}
 
             <div ref={messagesEndRef} />
           </div>
