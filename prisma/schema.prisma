@@ -71,6 +71,10 @@ model Student {
   savedJobs               StudentSavedJob[]
   llmCallLogs             LlmCallLog[]
   createdPathways         Pathway[]                @relation("PathwayCreator")
+  createdFormTemplates    FormTemplate[]           @relation("CreatedFormTemplates")
+  createdFormAssignments  FormAssignment[]         @relation("CreatedFormAssignments")
+  formResponses           FormResponse[]           @relation("FormResponses")
+  reviewedFormResponses   FormResponse[]           @relation("ReviewedFormResponses")
 
   @@schema("visionquest")
 }
@@ -817,6 +821,75 @@ model FormSubmission {
 
   @@unique([studentId, formId])
   @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// Structured Forms (Phase 4)
+// JSON-schema-backed templates with typed field definitions, assignable to
+// classes or individual students, filled out via the student portal, reviewed
+// by teachers, and exported to CSV for grant reporting.
+// Coexists with the PDF FormSubmission pipeline above — both tracks remain.
+// =============================================================================
+
+model FormTemplate {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?  @db.Text
+  programTypes String[] @default([])
+  schema       Json
+  status       String   @default("active")
+  isOfficial   Boolean  @default(false)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy   Student?         @relation("CreatedFormTemplates", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments FormAssignment[]
+  responses   FormResponse[]
+
+  @@index([status, title])
+  @@schema("visionquest")
+}
+
+model FormAssignment {
+  id                    String    @id @default(cuid())
+  templateId            String
+  assignedById          String?
+  scope                 String
+  targetId              String
+  dueAt                 DateTime?
+  requiredForCompletion Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+
+  template   FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  assignedBy Student?     @relation("CreatedFormAssignments", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([scope, targetId])
+  @@index([templateId])
+  @@schema("visionquest")
+}
+
+model FormResponse {
+  id            String    @id @default(cuid())
+  templateId    String
+  studentId     String
+  answers       Json
+  status        String    @default("draft")
+  submittedAt   DateTime?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewerNotes String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  template   FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  student    Student      @relation("FormResponses", fields: [studentId], references: [id], onDelete: Cascade)
+  reviewedBy Student?     @relation("ReviewedFormResponses", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([templateId, studentId])
+  @@index([studentId, status])
+  @@index([templateId, status])
   @@schema("visionquest")
 }
 
