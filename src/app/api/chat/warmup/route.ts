@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { withRegistry } from "@/lib/registry/middleware";
 import { rateLimit } from "@/lib/rate-limit";
 import { getBaseStudentPromptContext } from "@/lib/chat/context";
