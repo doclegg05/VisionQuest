@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { CommandPalette } from "./CommandPalette";
 import { type ChatRole } from "@/lib/chat/commands";
 
@@ -14,8 +15,10 @@ interface ChatInputProps {
 export default function ChatInput({ onSend, disabled, compact, role = "student" }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevDisabledRef = useRef(disabled);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (prevDisabledRef.current && !disabled) {
@@ -84,6 +87,18 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     <div className={`border-t border-[var(--chat-input-border)] bg-[var(--chat-input-bg)] backdrop-blur ${compact ? "p-2" : "p-4"}`}>
       <div className={`flex items-end gap-2 ${compact ? "" : "mx-auto max-w-4xl gap-3"}`}>
         <div className="relative flex-1" aria-expanded={paletteOpen}>
+          {/* Focus glow — decorative halo behind textarea */}
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 rounded-[1.1rem]"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, var(--accent-green) 0%, var(--accent-blue) 50%, transparent 75%)",
+              filter: "blur(24px)",
+            }}
+            animate={{ opacity: focused && !reduce ? 0.25 : 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          />
           <CommandPalette
             open={paletteOpen && !disabled}
             input={message}
@@ -97,23 +112,27 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={role === "student" ? "Type your message... (try /goal)" : "Type your message... (try /)"}
             disabled={disabled}
             rows={1}
             aria-label="Message to Sage"
             aria-autocomplete={paletteOpen ? "list" : undefined}
-            className={`textarea-field w-full resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] overflow-y-auto ${compact ? "min-h-[42px] px-3 py-2 text-sm" : "min-h-[54px] px-4 py-3 text-base"}`}
+            className={`textarea-field relative w-full resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] overflow-y-auto ${compact ? "min-h-[42px] px-3 py-2 text-sm" : "min-h-[54px] px-4 py-3 text-base"}`}
           />
         </div>
-        <button
+        <motion.button
           onClick={handleSubmit}
           disabled={disabled || !message.trim()}
           aria-label="Send message"
           type="button"
+          whileTap={reduce || disabled || !message.trim() ? undefined : { scale: 0.92 }}
+          transition={{ type: "spring", stiffness: 500, damping: 25 }}
           className={`primary-button text-sm disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "px-3 py-2.5" : "px-5 py-3.5"}`}
         >
           Send
-        </button>
+        </motion.button>
       </div>
     </div>
   );

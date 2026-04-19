@@ -9,6 +9,8 @@ import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { StarterChips } from "./StarterChips";
+import type { ChatRole } from "@/lib/chat/commands";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 
 interface Message {
@@ -26,7 +28,12 @@ async function getErrorMessage(res: Response) {
   }
 }
 
-function ChatWindowInner() {
+interface ChatWindowInnerProps {
+  role: ChatRole;
+  defaultStage?: string;
+}
+
+function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const searchParams = useSearchParams();
   const { checkProgression } = useProgression();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -170,7 +177,7 @@ function ChatWindowInner() {
       setStreamingContent("");
 
       try {
-        const stageParam = searchParams.get("stage") ?? undefined;
+        const stageParam = searchParams.get("stage") ?? defaultStage;
         const res = await apiFetch("/api/chat/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -269,7 +276,7 @@ function ChatWindowInner() {
         setIsLoading(false);
       }
     },
-    [conversationId, pollForGoals, refreshConversationList, checkProgression, searchParams]
+    [conversationId, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage]
   );
 
   // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
@@ -337,6 +344,9 @@ function ChatWindowInner() {
                 <p className="mt-3 text-sm leading-6">
                   Send a message to start talking with Sage about your goals, next steps, or what feels stuck.
                 </p>
+                <div className="mt-8">
+                  <StarterChips role={role} onSelect={(prefill) => handleSend(prefill)} />
+                </div>
               </div>
             )}
 
@@ -391,7 +401,7 @@ function ChatWindowInner() {
           </div>
         )}
 
-        <ChatInput onSend={handleSend} disabled={isLoading} />
+        <ChatInput onSend={handleSend} disabled={isLoading} role={role} />
       </div>
 
       {showSidebar && (
@@ -404,10 +414,15 @@ function ChatWindowInner() {
   );
 }
 
-export default function ChatWindow() {
+interface ChatWindowProps {
+  role?: ChatRole;
+  defaultStage?: string;
+}
+
+export default function ChatWindow({ role = "student", defaultStage }: ChatWindowProps = {}) {
   return (
     <Suspense>
-      <ChatWindowInner />
+      <ChatWindowInner role={role} defaultStage={defaultStage} />
     </Suspense>
   );
 }
