@@ -1,10 +1,13 @@
 /**
- * Condensed SPOKES program knowledge base for Sage's system prompt.
- * This gives Sage always-available knowledge about the program without
- * needing to retrieve from external sources.
+ * Condensed program knowledge bases for Sage's system prompt.
+ * Gives Sage always-available knowledge about each program without
+ * needing to retrieve from external sources. Selection is driven by
+ * the student's active-enrollment ProgramType (see src/lib/program-type.ts).
  */
 
-export const SPOKES_PROGRAM_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
+import type { ProgramType } from "@/lib/program-type";
+
+export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
 You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
 
 WHAT IS SPOKES?
@@ -120,6 +123,96 @@ ADMINISTRATOR RESOURCES:
 - Personnel Confidentiality Agreement
 - Administrative Guide (PY25)
 - Request for Training form (Wufoo)`;
+
+export const ADULT_ED_KNOWLEDGE = `ADULT EDUCATION PROGRAM KNOWLEDGE BASE
+You have detailed knowledge of the West Virginia Adult Education GED-prep program. Use this to answer specific questions.
+
+WHAT IS ADULT EDUCATION?
+West Virginia Adult Education (WV AE) helps adults earn their High School Equivalency (HSE) — the GED — and build the academic foundation to move into further training, college, or employment. The primary goal is credential attainment (the GED), not job placement. Career and workforce conversations are secondary and only surface when the student brings them up.
+
+THE GED TEST:
+The GED has four subtests. A student passes by scoring at or above 145 on each. All four are required to earn the credential; students can retake individual subtests without redoing the whole exam.
+1. Reasoning Through Language Arts (RLA) — reading comprehension, language conventions, extended response (essay). 150 minutes.
+2. Mathematical Reasoning — quantitative + algebraic problem solving, on-screen calculator for part 2. 115 minutes.
+3. Science — life, physical, and earth/space science; data/graph interpretation. 90 minutes.
+4. Social Studies — civics/government, US history, economics, geography. 70 minutes.
+
+Score bands per subtest:
+- Below Passing: <145 (not awarded)
+- Passing / High School Equivalency: 145–164
+- College Ready: 165–174 (may satisfy some college placement requirements)
+- College Ready + Credit: 175–200 (may earn college credit at participating institutions)
+
+PLACEMENT & PROGRESS TRACKING — TABE 11/12:
+TABE (Tests of Adult Basic Education) is the standard placement and progress instrument for WV AE. Every new student takes TABE Locator, then the appropriate level.
+- Level E (Easy) — ~ABE 2.0–3.9 grade equivalent
+- Level M (Medium) — ~ABE 4.0–5.9
+- Level D (Difficult) — ~ABE 6.0–8.9
+- Level A (Advanced) — ~ABE 9.0–12.9 (GED-ready range)
+Subjects: Reading, Language, Math (Computation + Applied). Score reports feed the student's Individual Learning Plan.
+
+NRS EDUCATIONAL FUNCTIONING LEVELS (EFLs):
+WV AE reports progress through six NRS EFLs. Advancing one EFL is the headline outcome.
+- EFL 1 — Beginning ABE Literacy (GE 0.0–1.9)
+- EFL 2 — Beginning Basic Education (GE 2.0–3.9)
+- EFL 3 — Low Intermediate Basic Education (GE 4.0–5.9)
+- EFL 4 — High Intermediate Basic Education (GE 6.0–8.9)
+- EFL 5 — Low Adult Secondary Education (GE 9.0–10.9)
+- EFL 6 — High Adult Secondary Education (GE 11.0–12.9) — GED-ready
+
+LEARNING PLATFORMS (GED-focused):
+1. Aztec Software — WV AE's primary adaptive courseware for GED/HSE prep across all four subjects. Student-facing dashboards and teacher guides.
+2. Essential Education (essentialed.com/start/wvde) — GED Academy + Essential Skills, aligned to the 2014/current GED series.
+3. Khan Academy (khanacademy.org) — free math and academic content; often paired with Aztec/Essential for additional math/writing practice.
+4. Edgenuity (auth.edgenuity.com/Login/Login/Student) — HSE courseware and credit recovery.
+5. GED.com — the official testing portal; where students register for, schedule, and take each subtest.
+6. Burlington English / USA Learns — for English Language Learners on a path to the GED.
+
+PROGRAM STRUCTURE & TYPICAL STUDENT JOURNEY:
+- Intake → TABE Locator + full TABE → Individual Learning Plan (ILP) with subject priorities and subtest targets.
+- Instruction is open-entry / open-exit and adapts to the student's subtests remaining and EFL.
+- Progress is measured by (a) EFL gain on re-tested TABE, (b) subtest passes on GED Ready practice tests, (c) actual GED subtest passes, and (d) earning the full credential.
+- Typical BHAG framing for an AE student: "Earn my GED" (or "pass the last two subtests," "move from EFL 3 to EFL 4").
+- Monthly/weekly goals typically target a specific subtest or TABE benchmark (e.g., "pass GED Ready for Math," "raise TABE Reading one EFL," "finish Aztec Algebra I unit").
+
+POST-GED PATHWAYS (mention only if the student raises career/next-step):
+- College enrollment (many WV community & technical colleges waive placement with 165+ GED scores)
+- Workforce programs (including SPOKES for TANF/SNAP-eligible adults)
+- Registered Apprenticeship / industry certifications
+- Direct employment
+
+KEY FORMS & COMPLIANCE (WV AE):
+- Student Intake Packet — demographics, goal-setting, FERPA, data release
+- Individual Learning Plan (ILP) — subject focus, target scores, review cadence
+- TABE Score Report — placement baseline + post-test progress
+- GED Ready practice-test results — gate to registering for the official subtest
+- Student Attendance Record — WIOA reportable hours`;
+
+// IETP Phase 2 placeholder — specialty career/industry training. Inherits SPOKES
+// framing for now (employment-focused); refine once real IETP cohorts exist.
+export const IETP_KNOWLEDGE = SPOKES_KNOWLEDGE;
+
+/**
+ * Returns the right program-knowledge block for the student's active program.
+ * Unknown values fall through to SPOKES to match normalizeProgramType's default.
+ */
+export function getProgramKnowledge(programType: ProgramType): string {
+  switch (programType) {
+    case "adult_ed":
+      return ADULT_ED_KNOWLEDGE;
+    case "ietp":
+      return IETP_KNOWLEDGE;
+    case "spokes":
+    default:
+      return SPOKES_KNOWLEDGE;
+  }
+}
+
+/**
+ * @deprecated Use SPOKES_KNOWLEDGE or getProgramKnowledge(programType).
+ * Kept for one release cycle so any out-of-tree consumers don't break.
+ */
+export const SPOKES_PROGRAM_KNOWLEDGE = SPOKES_KNOWLEDGE;
 
 /**
  * Topic-specific detailed content that gets injected when relevant.

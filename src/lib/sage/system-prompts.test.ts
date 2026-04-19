@@ -155,3 +155,90 @@ describe("buildSystemPrompt", () => {
     assert.ok(!prompt.includes("DETAILED REFERENCE"));
   });
 });
+
+describe("buildSystemPrompt — program awareness", () => {
+  it("injects SPOKES addendum when programType is spokes", () => {
+    const prompt = buildSystemPrompt("onboarding", { programType: "spokes", classroomConfirmedAt: new Date() });
+    assert.match(prompt, /PROGRAM CONTEXT — SPOKES \(workforce training\)/);
+    assert.ok(!prompt.includes("PROGRAM CONTEXT — ADULT EDUCATION"));
+  });
+
+  it("injects Adult Education addendum when programType is adult_ed", () => {
+    const prompt = buildSystemPrompt("onboarding", { programType: "adult_ed", classroomConfirmedAt: new Date() });
+    assert.match(prompt, /PROGRAM CONTEXT — ADULT EDUCATION \(GED prep\)/);
+    assert.match(prompt, /ADULT EDUCATION PROGRAM KNOWLEDGE BASE/);
+    assert.ok(!prompt.includes("PROGRAM CONTEXT — SPOKES"));
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+  });
+
+  it("IETP falls back to SPOKES knowledge base but uses IETP addendum", () => {
+    const prompt = buildSystemPrompt("onboarding", { programType: "ietp", classroomConfirmedAt: new Date() });
+    assert.match(prompt, /PROGRAM CONTEXT — IETP/);
+    // Phase 2 placeholder: IETP inherits SPOKES knowledge base
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+  });
+
+  it("defaults to SPOKES when no programType is provided", () => {
+    const prompt = buildSystemPrompt("onboarding", { classroomConfirmedAt: new Date() });
+    assert.match(prompt, /PROGRAM CONTEXT — SPOKES \(workforce training\)/);
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+  });
+
+  it("defaults to SPOKES when programType is an unknown string", () => {
+    const prompt = buildSystemPrompt("onboarding", {
+      programType: "mystery_program",
+      classroomConfirmedAt: new Date(),
+    });
+    assert.match(prompt, /PROGRAM CONTEXT — SPOKES \(workforce training\)/);
+  });
+
+  it("substitutes {pathway_context} with AE-specific framing for adult_ed", () => {
+    const prompt = buildSystemPrompt("discovery", {
+      programType: "adult_ed",
+      career_clusters: "ignored",
+    });
+    assert.match(prompt, /For Adult Education students, pathways mean GED-focused/);
+    assert.ok(!prompt.includes("{pathway_context}"));
+  });
+
+  it("substitutes {pathway_context} with SPOKES framing by default", () => {
+    const prompt = buildSystemPrompt("discovery", { career_clusters: "ignored" });
+    assert.match(prompt, /For SPOKES students, pathways are career cluster options/);
+    assert.ok(!prompt.includes("{pathway_context}"));
+  });
+
+  it("injects classroom-confirmation instruction in onboarding when classroomConfirmedAt is null", () => {
+    const prompt = buildSystemPrompt("onboarding", {
+      programType: "spokes",
+      classroomConfirmedAt: null,
+    });
+    assert.match(prompt, /CLASSROOM CONFIRMATION \(one-time onboarding beat\)/);
+  });
+
+  it("omits classroom-confirmation instruction once classroomConfirmedAt is set", () => {
+    const prompt = buildSystemPrompt("onboarding", {
+      programType: "spokes",
+      classroomConfirmedAt: new Date("2026-04-17T10:00:00Z"),
+    });
+    assert.ok(!prompt.includes("CLASSROOM CONFIRMATION"));
+  });
+
+  it("omits classroom-confirmation instruction for non-onboarding stages", () => {
+    const prompt = buildSystemPrompt("monthly", {
+      programType: "spokes",
+      classroomConfirmedAt: null,
+      bhag: "Land an office-admin role",
+    });
+    assert.ok(!prompt.includes("CLASSROOM CONFIRMATION"));
+  });
+
+  it("teacher_assistant ignores programType and keeps full SPOKES knowledge", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", {
+      programType: "adult_ed",
+      userMessage: "IC3 question",
+    });
+    // Teachers span programs — no program addendum, full SPOKES knowledge.
+    assert.ok(!prompt.includes("PROGRAM CONTEXT —"));
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+  });
+});
