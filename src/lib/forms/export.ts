@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { FieldDef, FormTemplateSchema } from "@/lib/forms/schema";
 
 export interface ExportableResponse {
