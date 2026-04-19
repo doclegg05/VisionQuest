@@ -206,8 +206,20 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }
         }
 
-        // Save assistant message
-        await saveMessage(conversation.id, session.id, "assistant", fullResponse);
+        // Save assistant message (truncate to avoid unbounded DB writes if the
+        // model goes off the rails — 40k chars ≈ 10k tokens, generous ceiling).
+        const MAX_ASSISTANT_CHARS = 40_000;
+        const persisted = fullResponse.length > MAX_ASSISTANT_CHARS
+          ? fullResponse.slice(0, MAX_ASSISTANT_CHARS) + "\n[…truncated by server — response exceeded length cap]"
+          : fullResponse;
+        if (persisted.length !== fullResponse.length) {
+          logger.warn("Assistant message truncated before persist", {
+            conversationId: conversation.id,
+            original: fullResponse.length,
+            persisted: persisted.length,
+          });
+        }
+        await saveMessage(conversation.id, session.id, "assistant", persisted);
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
         void maybeUpdateSummary(conversation.id, session.id).catch((err) =>

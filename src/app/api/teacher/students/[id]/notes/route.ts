@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
+const MAX_NOTE_CHARS = 10_000;
 
 export const POST = withTeacherAuth(async (
   session,
@@ -21,6 +22,13 @@ export const POST = withTeacherAuth(async (
 
   if (!note) {
     return NextResponse.json({ error: "Note text is required." }, { status: 400 });
+  }
+
+  if (note.length > MAX_NOTE_CHARS) {
+    return NextResponse.json(
+      { error: `Note text must be ${MAX_NOTE_CHARS.toLocaleString()} characters or fewer.` },
+      { status: 400 },
+    );
   }
 
   if (!isNoteCategory(category)) {
@@ -144,6 +152,12 @@ export const PATCH = withTeacherAuth(async (
     const trimmed = body.body.trim();
     if (!trimmed) {
       return NextResponse.json({ error: "Note text cannot be empty." }, { status: 400 });
+    }
+    if (trimmed.length > MAX_NOTE_CHARS) {
+      return NextResponse.json(
+        { error: `Note text must be ${MAX_NOTE_CHARS.toLocaleString()} characters or fewer.` },
+        { status: 400 },
+      );
     }
     updates.body = trimmed;
   }

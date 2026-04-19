@@ -147,6 +147,8 @@ model Goal {
   resourceLinks GoalResourceLink[]
   pathway       Pathway?           @relation(fields: [pathwayId], references: [id], onDelete: SetNull)
 
+  @@index([studentId, status])
+  @@index([confirmedBy])
   @@schema("visionquest")
 }
 
@@ -400,6 +402,7 @@ model CertRequirement {
   certification Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
   template      CertTemplate  @relation(fields: [templateId], references: [id])
 
+  @@index([certificationId])
   @@schema("visionquest")
 }
 
@@ -1119,6 +1122,7 @@ model StudentSavedJob {
   jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, jobListingId])
+  @@index([jobListingId])
   @@schema("visionquest")
 }
 
@@ -1163,6 +1167,8 @@ model Pathway {
   goals   Goal[]
   creator Student? @relation("PathwayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
+  @@index([active])
+  @@index([createdBy])
   @@schema("visionquest")
 }
 
