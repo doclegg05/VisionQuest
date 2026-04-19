@@ -16,7 +16,10 @@ const STORAGE_ACCESS_KEY = process.env.STORAGE_ACCESS_KEY || "";
 const STORAGE_SECRET_KEY = process.env.STORAGE_SECRET_KEY || "";
 const HAS_STORAGE_CONFIG = Boolean(STORAGE_ENDPOINT && STORAGE_BUCKET && STORAGE_ACCESS_KEY && STORAGE_SECRET_KEY);
 
-// Legacy R2 support — if R2 vars are set but new vars aren't, use R2
+// Cloudflare R2 — active secondary backend. Used in Render prod, local dev,
+// and other envs where R2_* vars are configured. `STORAGE_*` (Supabase Storage)
+// is preferred when set; R2 is selected when only the R2_* vars are present.
+// Do not delete: this branch is live, not legacy.
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
 const R2_BUCKET = process.env.R2_BUCKET_NAME || "";
 const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY || "";
