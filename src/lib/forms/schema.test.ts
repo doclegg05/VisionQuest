@@ -192,12 +192,9 @@ describe("validateAnswersAgainstSchema", () => {
   });
 
   it("rejects attachment without fileId", () => {
+    const bogus = { name: "A", program: "spokes", doc: { notFile: "x" } as unknown as { fileId: string } };
     assert.throws(() =>
-      validateAnswersAgainstSchema(
-        schema,
-        { name: "A", program: "spokes", doc: { notFile: "x" } },
-        { partial: true },
-      ),
+      validateAnswersAgainstSchema(schema, bogus, { partial: true }),
     );
   });
 });
