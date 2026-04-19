@@ -5,7 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withAuth } from "@/lib/api-error";
 import { parseBody, apiKeySchema } from "@/lib/schemas";
-import { GEMINI_MODEL } from "@/lib/gemini";
+import { GeminiProvider } from "@/lib/ai/gemini-provider";
 
 export const GET = withAuth(async (session) => {
   const student = await prisma.student.findUnique({
@@ -57,7 +57,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
   try {
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const testAI = new GoogleGenerativeAI(apiKey);
-    const model = testAI.getGenerativeModel({ model: GEMINI_MODEL });
+    const model = testAI.getGenerativeModel({ model: GeminiProvider.modelName });
     await model.generateContent("Say hi in one word.");
   } catch {
     return Response.json(
