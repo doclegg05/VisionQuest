@@ -6,6 +6,22 @@
  * what Sage will actually say. On first real SSE text chunk the optimistic bubble
  * is replaced with the live streamed content.
  *
+ * DRIFT PREVENTION — two layers keep this map exhaustive:
+ *
+ *   1. Compile-time: `satisfies Record<ConversationStage, string>` means `tsc`
+ *      will error immediately if a key is missing or misspelled, with a clear
+ *      "Property '…' is missing in type" message.
+ *
+ *   2. Runtime test (`stage-openers.test.ts`): iterates over
+ *      `ALL_CONVERSATION_STAGES` (the const array that the type is derived from)
+ *      so the test automatically covers any stage added to system-prompts.ts.
+ *
+ * TO ADD A NEW STAGE:
+ *   1. Append the literal string to `ALL_CONVERSATION_STAGES` in
+ *      `src/lib/sage/system-prompts.ts`.
+ *   2. Add a matching key + opener string to STAGE_OPENERS below.
+ *      (tsc will tell you if you forget step 2.)
+ *
  * Rules:
  * - No placeholder tokens (e.g. {name}) that would appear raw in the UI.
  * - Plain language, 6th-grade reading level, consistent with brand voice.
@@ -14,7 +30,7 @@
 
 import type { ConversationStage } from "@/lib/sage/system-prompts";
 
-export const STAGE_OPENERS: Record<ConversationStage, string> = {
+export const STAGE_OPENERS = {
   /** Phase 1 warm-up from the discovery stage prompt */
   discovery:
     "Hey! I'm Sage, your personal guide here at VisionQuest. What should I call you?",
@@ -69,4 +85,4 @@ export const STAGE_OPENERS: Record<ConversationStage, string> = {
   /** Career profile review stage */
   career_profile_review:
     "Hey! You've got your Career Profile results back. Let's look at them together and figure out what they mean for you.",
-};
+} satisfies Record<ConversationStage, string>;

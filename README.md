@@ -123,6 +123,10 @@ See [`/.env.example`](/Users/brittlegg/visionquest/.env.example) for the authori
 - `NEXT_PUBLIC_SENTRY_DSN`
 - `LOG_LEVEL`
 
+## Development
+
+- `npm run cleanup:worktrees` — Reap stale worktrees left by parallel Claude Code agent runs.
+
 ## Common Commands
 
 ### App lifecycle

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+console.info("cron.fired", { job: "job-processor", at: new Date().toISOString() });
 
 function required(name) {
   const value = process.env[name];

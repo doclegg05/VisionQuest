@@ -20,7 +20,8 @@
     "db:seed": "node scripts/seed-data.mjs",
     "db:seed-documents": "node scripts/seed-documents.mjs",
     "seed:sage-context": "node scripts/seed-sage-context.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "cleanup:worktrees": "git worktree list --porcelain | awk '/^worktree / && $2 ~ /\\.claude\\/worktrees\\/agent-/ {print $2}' | xargs -I {} git worktree remove --force {} 2>/dev/null || true"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",
