@@ -7,6 +7,7 @@ import {
   normalizeEmail,
   setSessionCookie,
   signMfaSessionToken,
+  setMfaSessionCookie,
 } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
@@ -80,10 +81,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  // If MFA is enabled, return a partial response with a short-lived token
-  // instead of issuing the full session cookie.
+  // If MFA is enabled, set the short-lived MFA challenge cookie and return a
+  // partial response. The cookie is httpOnly + scoped to /api/auth/mfa, so it
+  // cannot be stolen via pre-session XSS and only travels to challenge routes.
   if (student.mfaEnabled) {
     const mfaSessionToken = signMfaSessionToken(student.id, student.role, student.sessionVersion);
+    await setMfaSessionCookie(mfaSessionToken);
 
     await logAuditEvent({
       actorId: student.id,
@@ -97,7 +100,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     return NextResponse.json({
       requiresMfa: true,
-      mfaSessionToken,
     });
   }
 

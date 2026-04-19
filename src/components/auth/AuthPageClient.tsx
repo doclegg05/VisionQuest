@@ -36,7 +36,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
   const [mfaToken, setMfaToken] = useState("");
-  const [mfaSessionToken, setMfaSessionToken] = useState<string | null>(null);
+  // MFA challenge now uses an httpOnly cookie; this flag only tracks whether
+  // the login step returned `requiresMfa: true` so the UI can flip modes.
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaMessage, setMfaMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -77,8 +79,8 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
         return;
       }
 
-      if (data.requiresMfa && data.mfaSessionToken) {
-        setMfaSessionToken(data.mfaSessionToken);
+      if (data.requiresMfa) {
+        setMfaRequired(true);
         setMfaToken("");
         setMfaMessage("Password accepted. Enter your 6-digit authenticator code or a saved backup code to finish signing in.");
         return;
@@ -94,7 +96,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
   const handleMfaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mfaSessionToken) return;
+    if (!mfaRequired) return;
 
     setError("");
     setLoading(true);
@@ -104,9 +106,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
       const res = await fetch("/api/auth/mfa/challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // MFA session token rides in an httpOnly cookie set at login time.
         body: JSON.stringify({
           token: mfaToken,
-          mfaSessionToken,
         }),
       });
 
@@ -203,10 +205,10 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             <div className="mb-7 sm:mb-8">
               <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
               <h2 className="mt-3 font-display text-3xl text-[var(--ink-strong)]">
-                {mfaSessionToken ? "Two-step verification" : "Welcome back"}
+                {mfaRequired ? "Two-step verification" : "Welcome back"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-                {mfaSessionToken
+                {mfaRequired
                   ? "Enter the 6-digit code from your authenticator app or one of your saved backup codes."
                   : "Sign in with your username or email and password."}
               </p>
@@ -221,7 +223,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </div>
             )}
 
-            {mfaSessionToken ? (
+            {mfaRequired ? (
               <form onSubmit={handleMfaSubmit} className="space-y-4" aria-label="MFA sign in">
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                   Signing in as <span className="font-semibold text-[var(--ink-strong)]">{studentId}</span>.
@@ -265,7 +267,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    setMfaSessionToken(null);
+                    setMfaRequired(false);
                     setMfaToken("");
                     setMfaMessage("");
                     setError("");
@@ -326,7 +328,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </form>
             )}
 
-            {!mfaSessionToken && googleAuthEnabled ? (
+            {!mfaRequired && googleAuthEnabled ? (
               <>
                 <div className="my-5 flex items-center gap-3">
                   <div className="h-px flex-1 bg-[var(--border)]" />
@@ -349,7 +351,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   Sign in with Google
                 </a>
               </>
-            ) : !mfaSessionToken ? (
+            ) : !mfaRequired ? (
               <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                 Google sign-in is not enabled in this environment. Use the sign-in form above.
               </div>

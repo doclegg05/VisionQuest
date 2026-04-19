@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { verifyMfaSessionToken, setSessionCookie } from "@/lib/auth";
+import {
+  verifyMfaSessionToken,
+  setSessionCookie,
+  getMfaSessionToken,
+  clearMfaSessionCookie,
+} from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -10,7 +15,9 @@ import { consumeBackupCode, verifyTotp } from "@/lib/mfa";
 
 const mfaChallengeSchema = z.object({
   token: z.string().min(6, "MFA code is required.").max(32, "MFA code is too long."),
-  mfaSessionToken: z.string().min(1, "MFA session token is required."),
+  // Backwards-compat: old clients may still post the token in body. New
+  // clients rely on the httpOnly cookie set at login time.
+  mfaSessionToken: z.string().optional(),
 });
 
 /**
@@ -36,8 +43,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const body = await parseBody(req, mfaChallengeSchema);
 
+  // Prefer the httpOnly cookie set at login. Fall back to the body-posted
+  // token so older clients keep working during rollout.
+  const cookieToken = await getMfaSessionToken();
+  const mfaSessionToken = cookieToken ?? body.mfaSessionToken;
+
+  if (!mfaSessionToken) {
+    return NextResponse.json(
+      { error: "MFA session expired or invalid. Please log in again." },
+      { status: 401 },
+    );
+  }
+
   // Verify the MFA session token (short-lived JWT from password auth step)
-  const claims = verifyMfaSessionToken(body.mfaSessionToken);
+  const claims = verifyMfaSessionToken(mfaSessionToken);
   if (!claims) {
     return NextResponse.json(
       { error: "MFA session expired or invalid. Please log in again." },
@@ -108,6 +127,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   });
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);
+  // Single-use cookie — clear once the real session is issued.
+  await clearMfaSessionCookie();
 
   await logAuditEvent({
     actorId: student.id,

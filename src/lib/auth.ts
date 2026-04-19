@@ -6,7 +6,9 @@ import { cached, invalidatePrefix } from "./cache";
 
 const TOKEN_TTL = "7d";
 const MFA_TOKEN_TTL = "5m";
+const MFA_COOKIE_MAX_AGE_S = 5 * 60;
 const COOKIE_NAME = "vq-session";
+const MFA_COOKIE_NAME = "vq-mfa-challenge";
 
 interface SessionClaims {
   sub: string;
@@ -226,6 +228,34 @@ export function invalidateSessionCache(studentId: string) {
 export async function clearSession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
+}
+
+// --- MFA challenge cookie helpers ---
+//
+// The MFA session token is stored in a short-lived httpOnly cookie instead
+// of returned in the login JSON body. This prevents pre-session XSS on the
+// login page from exfiltrating it. Cookie is path-scoped to /api/auth/mfa
+// so it only travels to the challenge route.
+
+export async function setMfaSessionCookie(token: string): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(MFA_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: MFA_COOKIE_MAX_AGE_S, // matches MFA_TOKEN_TTL JWT expiry
+    path: "/api/auth/mfa",
+  });
+}
+
+export async function getMfaSessionToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(MFA_COOKIE_NAME)?.value ?? null;
+}
+
+export async function clearMfaSessionCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(MFA_COOKIE_NAME);
 }
 
 // --- Normalize student ID ---
