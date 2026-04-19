@@ -12,6 +12,20 @@ export const PROGRAM_TYPES: readonly ProgramType[] = [
   "ietp",
 ] as const;
 
+/** Short labels for program badges and compact UI surfaces. */
+export const PROGRAM_LABELS: Record<ProgramType, string> = {
+  spokes: "SPOKES",
+  adult_ed: "AE",
+  ietp: "IETP",
+};
+
+/** Full program names for aria-labels, tooltips, and long-form contexts. */
+export const PROGRAM_FULL_NAMES: Record<ProgramType, string> = {
+  spokes: "SPOKES",
+  adult_ed: "Adult Education",
+  ietp: "IETP",
+};
+
 export function isProgramType(value: string): value is ProgramType {
   return (PROGRAM_TYPES as readonly string[]).includes(value);
 }

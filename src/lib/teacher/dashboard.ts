@@ -18,12 +18,14 @@ import {
 } from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import { buildInterventionQueueEntry } from "@/lib/teacher/intervention-queue";
 
 export interface QueueStudent {
   studentId: string;
   name: string;
   email: string | null;
+  programType: ProgramType;
   urgencyScore: number;
   signals: {
     stalledGoalCount: number;
@@ -48,6 +50,7 @@ export interface StudentOverview {
   id: string;
   studentId: string;
   displayName: string;
+  programType: ProgramType;
   createdAt: string;
   lastActive: string;
   xp: number;
@@ -77,6 +80,7 @@ export interface ManagedClassOption {
   name: string;
   code: string;
   status: string;
+  programType: ProgramType;
 }
 
 export interface DashboardAlert {
@@ -227,6 +231,14 @@ export async function getInterventionQueue(
       },
       resumeData: { select: { id: true } },
       publicCredentialPage: { select: { isPublic: true } },
+      classEnrollments: {
+        select: {
+          enrolledAt: true,
+          status: true,
+          class: { select: { programType: true } },
+        },
+        orderBy: { enrolledAt: "desc" },
+      },
     },
   });
 
@@ -340,6 +352,14 @@ export async function getTeacherDashboardPage(
         orderBy: { updatedAt: "desc" },
         take: 1,
       },
+      classEnrollments: {
+        select: {
+          enrolledAt: true,
+          status: true,
+          class: { select: { programType: true } },
+        },
+        orderBy: { enrolledAt: "desc" },
+      },
     },
     orderBy: { displayName: "asc" },
     skip: (page - 1) * limit,
@@ -430,10 +450,16 @@ export async function getTeacherDashboardPage(
         student.eventRegistrations[0]?.updatedAt,
       ) || student.createdAt;
 
+    const activeEnrollment =
+      student.classEnrollments.find((enrollment) => enrollment.status === "active") ??
+      student.classEnrollments[0];
+    const programType = normalizeProgramType(activeEnrollment?.class.programType);
+
     return {
       id: student.id,
       studentId: student.studentId,
       displayName: student.displayName,
+      programType,
       createdAt: student.createdAt.toISOString(),
       isActive: student.isActive,
       lastActive: lastActiveAt.toISOString(),
@@ -603,8 +629,16 @@ export async function getTeacherDashboardPage(
     },
   );
 
+  const classOptions: ManagedClassOption[] = classes.map((item) => ({
+    id: item.id,
+    name: item.name,
+    code: item.code,
+    status: item.status,
+    programType: normalizeProgramType(item.programType),
+  }));
+
   return {
-    classes,
+    classes: classOptions,
     currentClassId: requestedClassId || null,
     students: overview,
     alerts: alerts.map(serializeDashboardAlert),
@@ -623,10 +657,13 @@ export async function getTeacherDashboardPage(
   };
 }
 
-export async function getTeacherHomeData(session: Session) {
+export async function getTeacherHomeData(
+  session: Session,
+  options: { classId?: string } = {},
+) {
   const [overview, queue] = await Promise.all([
-    getTeacherDashboardPage(session, { page: 1, limit: 50 }),
-    getInterventionQueue(session),
+    getTeacherDashboardPage(session, { page: 1, limit: 50, classId: options.classId }),
+    getInterventionQueue(session, { classId: options.classId }),
   ]);
 
   return { overview, queue };

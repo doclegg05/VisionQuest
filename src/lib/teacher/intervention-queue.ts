@@ -1,6 +1,7 @@
 import { computeUrgencyScore, type StudentSignals } from "@/lib/intervention-scoring";
 import { isGoalStale } from "@/lib/stale-goal-rules";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
+import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 
 export interface InterventionQueueStudentRecord {
   id: string;
@@ -49,12 +50,18 @@ export interface InterventionQueueStudentRecord {
   }>;
   resumeData: { id: string } | null;
   publicCredentialPage: { isPublic: boolean } | null;
+  classEnrollments?: Array<{
+    enrolledAt: Date;
+    status: string;
+    class: { programType: string };
+  }>;
 }
 
 export interface InterventionQueueEntry {
   studentId: string;
   name: string;
   email: string | null;
+  programType: ProgramType;
   urgencyScore: number;
   signals: StudentSignals;
 }
@@ -170,10 +177,16 @@ export function buildInterventionQueueEntry(input: {
     readinessScore: readiness.readiness.score,
   };
 
+  const enrollments = student.classEnrollments ?? [];
+  const activeEnrollment =
+    enrollments.find((enrollment) => enrollment.status === "active") ?? enrollments[0];
+  const programType = normalizeProgramType(activeEnrollment?.class.programType);
+
   return {
     studentId: student.id,
     name: student.displayName,
     email: student.email,
+    programType,
     urgencyScore: computeUrgencyScore(signals),
     signals,
   };
