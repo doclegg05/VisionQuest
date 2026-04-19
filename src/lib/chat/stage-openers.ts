@@ -62,6 +62,10 @@ export const STAGE_OPENERS: Record<ConversationStage, string> = {
   teacher_assistant:
     "Hi! I'm Sage. I'm here to help with program knowledge, student advising, and day-to-day tasks. What do you need?",
 
+  /** Admin assistant — addressed to program administrators, not students */
+  admin_assistant:
+    "Hi! I'm Sage. I can help with program usage, outcomes, reports, and policy lookups. What are you looking into?",
+
   /** Career profile review stage */
   career_profile_review:
     "Hey! You've got your Career Profile results back. Let's look at them together and figure out what they mean for you.",

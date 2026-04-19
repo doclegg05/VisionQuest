@@ -13,13 +13,13 @@ import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
  * (~60 tokens) — keyword-triggered getRelevantContent() still fires on every
  * message and injects topic detail on demand.
  *
- * Note: "admin_assistant" is reserved for a future stage (pending PR merge)
- * and will be added here once it lands in the ConversationStage union.
+ * Teachers and admins span multiple programs and need full knowledge access.
  */
 const KNOWLEDGE_HEAVY_STAGES = new Set<ConversationStage>([
   "orientation",
   "general",
   "teacher_assistant",
+  "admin_assistant",
 ]);
 
 /**

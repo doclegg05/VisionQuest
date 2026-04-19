@@ -20,6 +20,7 @@ const ALL_STAGES: ConversationStage[] = [
   "orientation",
   "general",
   "teacher_assistant",
+  "admin_assistant",
   "career_profile_review",
 ];
 
