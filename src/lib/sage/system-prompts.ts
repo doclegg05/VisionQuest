@@ -1,10 +1,26 @@
 import { BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE } from "./personality";
 import {
+  SPOKES_BRIEF,
   SPOKES_KNOWLEDGE,
   getProgramKnowledge,
   getRelevantContent,
 } from "./knowledge-base";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
+
+/**
+ * Stages that need the full program knowledge base (~5,000 tokens of
+ * certification/platform/form detail). All other stages receive SPOKES_BRIEF
+ * (~60 tokens) — keyword-triggered getRelevantContent() still fires on every
+ * message and injects topic detail on demand.
+ *
+ * Note: "admin_assistant" is reserved for a future stage (pending PR merge)
+ * and will be added here once it lands in the ConversationStage union.
+ */
+const KNOWLEDGE_HEAVY_STAGES = new Set<ConversationStage>([
+  "orientation",
+  "general",
+  "teacher_assistant",
+]);
 
 /**
  * Program-specific framing inserted between GUARDRAILS and the program
@@ -437,13 +453,20 @@ export function buildSystemPrompt(
     return parts.join("\n\n---\n\n");
   }
 
-  // Build the prompt with program-aware knowledge base and addendum
+  // Build the prompt with program-aware knowledge base and addendum.
+  // Knowledge-heavy stages (orientation, general) get the full ~5k-token block.
+  // All other stages get SPOKES_BRIEF (~60 tokens) — getRelevantContent() still
+  // fires on every message to inject topic detail on keyword match.
+  const programKnowledge = KNOWLEDGE_HEAVY_STAGES.has(stage)
+    ? getProgramKnowledge(programType)
+    : SPOKES_BRIEF;
+
   const parts = [
     BASE_PERSONALITY,
     GUARDRAILS,
     PROGRAM_ADDENDUMS[programType],
     PLATFORM_KNOWLEDGE,
-    getProgramKnowledge(programType),
+    programKnowledge,
     stagePrompt,
   ];
 
