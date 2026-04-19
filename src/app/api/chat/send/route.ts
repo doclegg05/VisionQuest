@@ -167,7 +167,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // Log assembled prompt size for before/after comparison in Render logs.
   // Remove in a follow-up PR once baseline data is collected.
-  console.info("sage.prompt.size", systemPrompt.length);
+  logger.info("sage.prompt.size", { size: systemPrompt.length });
 
   // Format message history for Gemini, using compacted context when available
   const conversationContext = await getConversationContext(conversation.id);

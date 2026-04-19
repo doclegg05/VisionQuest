@@ -62,6 +62,22 @@ export async function detectAndRecordClassroomConfirmation(
   sageReply: string,
 ): Promise<ClassroomConfirmationResult> {
   try {
+    // Short-circuit if an open classroom alert already exists for this student.
+    // Prevents wasted LLM calls (and DoS/cost surface) when a student keeps
+    // chatting after a mismatch was already flagged — a teacher needs to
+    // resolve the alert before we re-run detection.
+    const existingAlert = await prisma.studentAlert.findFirst({
+      where: {
+        studentId,
+        status: "open",
+        type: { in: ["classroom_mismatch", "classroom_intake_pending"] },
+      },
+      select: { id: true },
+    });
+    if (existingAlert) {
+      return { confirmed: false, mismatch: false, noSignal: true };
+    }
+
     const signal = await extractSignal(provider, userMessage, sageReply);
 
     if (!signal.confirmed || signal.confidence < CONFIDENCE_THRESHOLD) {

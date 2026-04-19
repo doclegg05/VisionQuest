@@ -51,6 +51,23 @@ describe("isSafeAiProviderUrl", () => {
     assert.ok(!isSafeAiProviderUrl("http://192.168.1.25:11434"));
     assert.ok(!isSafeAiProviderUrl("http://169.254.169.254/latest/meta-data"));
   });
+
+  it("rejects IPv6 private/link-local/unique-local ranges", () => {
+    // Unique-local fc00::/7 — should be blocked
+    assert.ok(!isSafeAiProviderUrl("http://[fc00::1]/"));
+    assert.ok(!isSafeAiProviderUrl("http://[fd00::1234]/"));
+    // Link-local fe80::/10 — should be blocked
+    assert.ok(!isSafeAiProviderUrl("http://[fe80::1]/"));
+    // IPv4-mapped private: ::ffff:10.0.0.1 — should be blocked
+    assert.ok(!isSafeAiProviderUrl("http://[::ffff:10.0.0.1]/"));
+    // IPv4-mapped loopback: ::ffff:127.0.0.1 — blocked (only unwrapped ::1/127.0.0.1 are allowed)
+    assert.ok(!isSafeAiProviderUrl("http://[::ffff:127.0.0.1]/"));
+  });
+
+  it("rejects 100.64.0.0/10 CGNAT range", () => {
+    assert.ok(!isSafeAiProviderUrl("http://100.64.0.1/"));
+    assert.ok(!isSafeAiProviderUrl("http://100.127.255.254/"));
+  });
 });
 
 describe("checkLength", () => {

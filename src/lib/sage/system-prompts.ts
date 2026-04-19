@@ -61,6 +61,19 @@ const PATHWAY_CONTEXTS: Record<ProgramType, string> = {
  * confirmed their classroom. Drops automatically once classroomConfirmedAt is
  * set — Sage will not re-ask.
  */
+/**
+ * Strip our bracket-delimiter tokens from untrusted input so a student
+ * cannot forge `[STUDENT_GOAL_END]` (or similar) inside their displayName /
+ * discovery-summary / pathway context and break out of the bracketed zone.
+ * The model still sees the original punctuation — only the magic tokens die.
+ */
+function sanitizeForPrompt(value: string): string {
+  return value.replace(
+    /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC)_(START|END)\s*\]/gi,
+    "",
+  );
+}
+
 const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
 Within the first 1-2 turns of this conversation, naturally ask which classroom the student is in. When they tell you, reflect it back warmly (e.g., "Got it — you're in Mrs. Thompson's Monday class") and move on. Do not make it a big deal; this is a light check, not an interview. After they confirm, continue with the rest of onboarding.`;
 
@@ -404,7 +417,9 @@ export function buildSystemPrompt(
 
   // Inject context variables
   if (context.studentName) {
-    stagePrompt = `The student's name is ${context.studentName}.\n\n${stagePrompt}`;
+    // Bracket studentName to mitigate prompt injection via displayName.
+    // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
+    stagePrompt = `The student's name is [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
   }
   // Substitute {pathway_context} with program-appropriate framing
   stagePrompt = stagePrompt.replace("{pathway_context}", PATHWAY_CONTEXTS[programType]);
@@ -470,24 +485,28 @@ export function buildSystemPrompt(
     stagePrompt,
   ];
 
-  // Inject discovery context so Sage remembers the student's career direction
+  // Inject discovery context so Sage remembers the student's career direction.
+  // Summary is LLM-generated from student turns — bracket + sanitize so it
+  // cannot escape into an instruction zone.
   if (context.discovery_summary && stage !== "discovery") {
     parts.push(
-      `CAREER DISCOVERY CONTEXT (from the student's earlier career exploration conversation):\n${context.discovery_summary}\nUse this context to connect their goals and activities back to their chosen career direction. Reference their pathway when it's relevant and motivating.`,
+      `CAREER DISCOVERY CONTEXT (from the student's earlier career exploration conversation):\n[DISCOVERY_START]\n${sanitizeForPrompt(context.discovery_summary)}\n[DISCOVERY_END]\nUse this context to connect their goals and activities back to their chosen career direction. Reference their pathway when it's relevant and motivating.`,
     );
   }
 
   // Inject skill gap context for goal-setting stages
   const goalSettingStages: ConversationStage[] = ["bhag", "monthly", "weekly", "daily"];
   if (context.skillGapContext && goalSettingStages.includes(stage)) {
-    parts.push(context.skillGapContext);
+    parts.push(
+      `[SKILL_GAP_START]\n${sanitizeForPrompt(context.skillGapContext)}\n[SKILL_GAP_END]`,
+    );
   }
 
   // Inject pathway context for action-oriented stages
   const pathwayStages: ConversationStage[] = ["daily", "weekly", "tasks"];
   if (context.pathwayContext && pathwayStages.includes(stage)) {
     parts.push(
-      `STUDENT LEARNING PATHWAY:\n${context.pathwayContext}\nWhen discussing what to work on today or this week, connect suggestions to their current pathway step. Celebrate progress on completed steps.`,
+      `STUDENT LEARNING PATHWAY:\n[PATHWAY_START]\n${sanitizeForPrompt(context.pathwayContext)}\n[PATHWAY_END]\nWhen discussing what to work on today or this week, connect suggestions to their current pathway step. Celebrate progress on completed steps.`,
     );
   }
 
@@ -501,9 +520,12 @@ export function buildSystemPrompt(
     );
   }
 
-  // Inject coaching arc context — overarching narrative for all stages
+  // Inject coaching arc context — overarching narrative for all stages.
+  // Bracketed because the narrative is assembled from student turns.
   if (context.coachingArcContext) {
-    parts.push(context.coachingArcContext);
+    parts.push(
+      `[COACHING_ARC_START]\n${sanitizeForPrompt(context.coachingArcContext)}\n[COACHING_ARC_END]`,
+    );
   }
 
   // Inject topic-specific content based on what the student is asking about

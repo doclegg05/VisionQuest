@@ -6,13 +6,14 @@ import type { AIProvider } from "@/lib/ai";
 const mockEnrollmentFindFirst = mock.fn() as any;
 const mockStudentUpdate = mock.fn() as any;
 const mockAlertUpsert = mock.fn() as any;
+const mockAlertFindFirst = mock.fn() as any;
 
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
       studentClassEnrollment: { findFirst: mockEnrollmentFindFirst },
       student: { update: mockStudentUpdate },
-      studentAlert: { upsert: mockAlertUpsert },
+      studentAlert: { upsert: mockAlertUpsert, findFirst: mockAlertFindFirst },
     },
   },
 });
@@ -52,6 +53,35 @@ describe("detectAndRecordClassroomConfirmation", { skip: SKIP_IN_CI }, () => {
     mockEnrollmentFindFirst.mock.resetCalls();
     mockStudentUpdate.mock.resetCalls();
     mockAlertUpsert.mock.resetCalls();
+    mockAlertFindFirst.mock.resetCalls();
+    // Default: no open classroom alert exists (cooldown not engaged).
+    mockAlertFindFirst.mock.mockImplementation(async () => null);
+  });
+
+  it("short-circuits (no LLM call, no DB writes) when an open classroom alert already exists", async () => {
+    mockAlertFindFirst.mock.mockImplementationOnce(async () => ({ id: "alert-1" }));
+    let llmCallCount = 0;
+    const provider: AIProvider = {
+      name: "mock",
+      generateResponse: async () => "",
+      generateStructuredResponse: async () => {
+        llmCallCount++;
+        return "{}";
+      },
+      streamResponse: async function* () {},
+    } as unknown as AIProvider;
+
+    const result = await detectAndRecordClassroomConfirmation(
+      provider,
+      "student-1",
+      "I'm in Mrs. Jackson's class",
+      "Which classroom?",
+    );
+
+    assert.equal(result.noSignal, true);
+    assert.equal(llmCallCount, 0, "LLM should not be called when cooldown is engaged");
+    assert.equal(mockStudentUpdate.mock.callCount(), 0);
+    assert.equal(mockAlertUpsert.mock.callCount(), 0);
   });
 
   it("sets classroomConfirmedAt when the student names their enrolled classroom", async () => {

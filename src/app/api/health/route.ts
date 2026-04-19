@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getMissingRequiredTables } from "@/lib/health";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Health check failed", error);
+    logger.error("Health check failed", { error: String(error) });
     return NextResponse.json(
       {
         status: "unhealthy",
