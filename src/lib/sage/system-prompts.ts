@@ -77,21 +77,34 @@ function sanitizeForPrompt(value: string): string {
 const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
 Within the first 1-2 turns of this conversation, naturally ask which classroom the student is in. When they tell you, reflect it back warmly (e.g., "Got it — you're in Mrs. Thompson's Monday class") and move on. Do not make it a big deal; this is a light check, not an interview. After they confirm, continue with the rest of onboarding.`;
 
-export type ConversationStage =
-  | "discovery"
-  | "onboarding"
-  | "bhag"
-  | "monthly"
-  | "weekly"
-  | "daily"
-  | "tasks"
-  | "checkin"
-  | "review"
-  | "orientation"
-  | "general"
-  | "teacher_assistant"
-  | "admin_assistant"
-  | "career_profile_review";
+/**
+ * Single source of truth for all conversation stages.
+ *
+ * The type is derived from this array so the two can never drift:
+ *   ConversationStage = typeof ALL_CONVERSATION_STAGES[number]
+ *
+ * To add a new stage: append its string literal here. The compiler will then
+ * flag every exhaustive Record<ConversationStage, …> that needs an entry,
+ * including STAGE_OPENERS in `src/lib/chat/stage-openers.ts`.
+ */
+export const ALL_CONVERSATION_STAGES = [
+  "discovery",
+  "onboarding",
+  "bhag",
+  "monthly",
+  "weekly",
+  "daily",
+  "tasks",
+  "checkin",
+  "review",
+  "orientation",
+  "general",
+  "teacher_assistant",
+  "admin_assistant",
+  "career_profile_review",
+] as const;
+
+export type ConversationStage = (typeof ALL_CONVERSATION_STAGES)[number];
 
 const STAGE_PROMPTS: Record<ConversationStage, string> = {
   discovery: `CURRENT TASK: Career Discovery — conversational career assessment with a new student.

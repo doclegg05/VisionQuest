@@ -1,28 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { STAGE_OPENERS } from "./stage-openers";
-import type { ConversationStage } from "@/lib/sage/system-prompts";
+import { ALL_CONVERSATION_STAGES } from "@/lib/sage/system-prompts";
 
 /**
- * All ConversationStage values — mirrors the union in system-prompts.ts so the
- * test fails if a stage is added there but not covered in STAGE_OPENERS.
+ * Derived directly from ALL_CONVERSATION_STAGES — the const array that the
+ * ConversationStage type is built from in system-prompts.ts.
+ *
+ * There is no separate hardcoded list here. When a new stage is appended to
+ * ALL_CONVERSATION_STAGES, these tests automatically cover it, so a missing
+ * STAGE_OPENERS entry will fail at both compile-time (tsc) and test-time.
  */
-const ALL_STAGES: ConversationStage[] = [
-  "discovery",
-  "onboarding",
-  "bhag",
-  "monthly",
-  "weekly",
-  "daily",
-  "tasks",
-  "checkin",
-  "review",
-  "orientation",
-  "general",
-  "teacher_assistant",
-  "admin_assistant",
-  "career_profile_review",
-];
+const ALL_STAGES = ALL_CONVERSATION_STAGES;
 
 /** Regex for unfilled placeholder tokens like {name} or {bhag}. */
 const PLACEHOLDER_RE = /\{[a-z_]+\}/;
