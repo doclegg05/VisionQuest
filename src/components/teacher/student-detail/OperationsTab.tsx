@@ -79,6 +79,12 @@ interface OperationsTabProps {
   onNoteFormChange: (updater: (current: NoteFormValues) => NoteFormValues) => void;
   savingNote: boolean;
   onCreateNote: (event: FormEvent<HTMLFormElement>) => void;
+  /**
+   * Phase 6 tab reorg: Coach tab wants the coaching surfaces only,
+   * Admin tab wants the PDF submitted forms only. Default "all"
+   * preserves legacy callers.
+   */
+  scope?: "all" | "coaching" | "submittedForms";
 }
 
 export default function OperationsTab({
@@ -102,6 +108,7 @@ export default function OperationsTab({
   onNoteFormChange,
   savingNote,
   onCreateNote,
+  scope = "all",
 }: OperationsTabProps) {
   const {
     student,
@@ -111,12 +118,17 @@ export default function OperationsTab({
     notes,
   } = data;
 
+  const showSubmittedForms = scope === "all" || scope === "submittedForms";
+  const showCoachingSections = scope === "all" || scope === "coaching";
+
   return (
     <div className="space-y-6">
-      {/* Structured Forms (Phase 4) — data-reportable forms, separate from PDF uploads below */}
-      <StructuredFormsSection studentId={student.id} />
+      {showCoachingSections && (
+        /* Structured Forms (Phase 4) — data-reportable forms, separate from PDF uploads below */
+        <StructuredFormsSection studentId={student.id} />
+      )}
 
-      {/* Submitted Forms */}
+      {showSubmittedForms && (
       <div id="submitted-forms" className="theme-card rounded-xl p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -206,7 +218,10 @@ export default function OperationsTab({
           </div>
         )}
       </div>
+      )}
 
+      {showCoachingSections && (
+      <>
       {/* Appointments & Tasks Grid */}
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Appointments */}
@@ -607,6 +622,8 @@ export default function OperationsTab({
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

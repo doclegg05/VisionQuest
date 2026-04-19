@@ -2,37 +2,68 @@
 
 import { useState } from "react";
 import {
-  UserCircle,
-  Target,
+  ChatCircleText,
   ChartLineUp,
-  Clipboard,
+  Gear,
 } from "@phosphor-icons/react";
 
-type TabKey = "overview" | "goals" | "progress" | "operations";
+import { useAnchorTabSwitch } from "./useAnchorTabSwitch";
+
+export type StudentDetailTabKey = "coach" | "progress" | "admin";
 
 interface TabDef {
-  key: TabKey;
+  key: StudentDetailTabKey;
   label: string;
-  icon: typeof UserCircle;
+  icon: typeof ChatCircleText;
 }
 
 const TABS: TabDef[] = [
-  { key: "overview", label: "Overview", icon: UserCircle },
-  { key: "goals", label: "Goals & Plan", icon: Target },
+  { key: "coach", label: "Coach", icon: ChatCircleText },
   { key: "progress", label: "Progress", icon: ChartLineUp },
-  { key: "operations", label: "Operations", icon: Clipboard },
+  { key: "admin", label: "Admin", icon: Gear },
 ];
+
+/**
+ * Maps DOM anchor ids used across StudentDetail to their owning tab.
+ * Keep this list small and accurate — anything missing falls through
+ * to a silent no-op, so broken cross-tab links will just look like
+ * scroll-not-working rather than jumping to the wrong tab.
+ */
+const ANCHOR_TO_TAB: Record<string, StudentDetailTabKey> = {
+  // Coach tab anchors
+  "goal-evidence": "coach",
+  "review-queue": "coach",
+  "case-notes": "coach",
+  "follow-up-tasks": "coach",
+  "appointments": "coach",
+  "alerts": "coach",
+  "goals-plan": "coach",
+  // Progress tab anchors
+  "orientation": "progress",
+  "certification-review": "progress",
+  "portfolio": "progress",
+  "files": "progress",
+  "conversations": "progress",
+  "career-discovery": "progress",
+  // Admin tab anchors
+  "submitted-forms": "admin",
+  "account-actions": "admin",
+};
 
 interface StudentDetailTabsProps {
   studentId: string;
   studentName: string;
-  children: Record<TabKey, React.ReactNode>;
+  children: Record<StudentDetailTabKey, React.ReactNode>;
 }
 
-export default function StudentDetailTabs({
-  children,
-}: StudentDetailTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+export default function StudentDetailTabs({ children }: StudentDetailTabsProps) {
+  const [activeTab, setActiveTab] = useState<StudentDetailTabKey>("coach");
+
+  useAnchorTabSwitch({
+    anchorToTab: ANCHOR_TO_TAB,
+    activeTab,
+    setTab: setActiveTab,
+  });
 
   return (
     <div>
