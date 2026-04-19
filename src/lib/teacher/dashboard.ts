@@ -316,9 +316,20 @@ export async function getTeacherDashboardPage(
           },
         },
       },
-      portfolioItems: { select: { id: true, updatedAt: true } },
+      // Fetch only the most-recent entry for each — we need the latest
+      // updatedAt/uploadedAt for lastActive, counts come from _count.
+      portfolioItems: {
+        select: { updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
       resumeData: { select: { id: true } },
-      files: { select: { id: true, uploadedAt: true } },
+      files: {
+        select: { uploadedAt: true },
+        orderBy: { uploadedAt: "desc" },
+        take: 1,
+      },
+      _count: { select: { portfolioItems: true, files: true } },
       formSubmissions: {
         select: { id: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
@@ -430,7 +441,7 @@ export async function getTeacherDashboardPage(
         completedGoalLevels,
         bhagCompleted,
         certificationsEarned: certDone,
-        portfolioItemCount: student.portfolioItems.length,
+        portfolioItemCount: student._count.portfolioItems,
         resumeCreated: !!student.resumeData,
         portfolioShared,
         longestStreak,
@@ -476,9 +487,9 @@ export async function getTeacherDashboardPage(
       certPendingVerify,
       openAlertCount: student.alerts.length,
       nextAppointmentAt: student.appointments[0]?.startsAt.toISOString() ?? null,
-      portfolioItems: student.portfolioItems.length,
+      portfolioItems: student._count.portfolioItems,
       hasResume: !!student.resumeData,
-      filesCount: student.files.length,
+      filesCount: student._count.files,
       readinessScore: readiness.score,
       requirementsMet: complianceMap.get(student.id)?.requiredMet ?? 0,
       requirementsTotal: complianceMap.get(student.id)?.requiredCount ?? 0,
