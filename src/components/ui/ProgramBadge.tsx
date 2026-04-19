@@ -1,4 +1,5 @@
-import { Briefcase, GraduationCap, Wrench, type Icon } from "@phosphor-icons/react";
+import { Briefcase, GraduationCap, Wrench } from "@phosphor-icons/react/dist/ssr";
+import type { Icon } from "@phosphor-icons/react";
 
 import {
   PROGRAM_FULL_NAMES,
