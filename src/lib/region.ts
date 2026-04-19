@@ -1,5 +1,3 @@
-import "server-only";
-
 import { prisma } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
 

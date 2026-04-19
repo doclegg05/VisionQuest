@@ -1,5 +1,3 @@
-import "server-only";
-
 import { prisma } from "@/lib/db";
 import { classIdsInRegion } from "@/lib/region";
 

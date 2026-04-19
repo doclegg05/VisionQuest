@@ -28,6 +28,10 @@ const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
 ];
 
+const COORDINATOR_ITEMS: NavItem[] = [
+  { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
+];
+
 const ADMIN_ITEMS: NavItem[] = [
   { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
@@ -73,8 +77,10 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
-        ? [...ADMIN_ITEMS, ...STAFF_ITEMS]
-        : STAFF_ITEMS;
+        ? [...ADMIN_ITEMS, ...COORDINATOR_ITEMS, ...STAFF_ITEMS]
+        : role === "coordinator"
+          ? COORDINATOR_ITEMS
+          : STAFF_ITEMS;
 
   // Secondary nav items (student only)
   const secondaryItems =
