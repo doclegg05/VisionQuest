@@ -112,6 +112,20 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     programType = body.programType;
   }
 
+  let regionId: string | null = null;
+  if (body.regionId !== undefined && body.regionId !== null) {
+    if (typeof body.regionId !== "string" || !body.regionId.trim()) {
+      throw badRequest("regionId must be a non-empty string.");
+    }
+    const region = await prisma.region.findUnique({
+      where: { id: body.regionId },
+      select: { id: true, status: true },
+    });
+    if (!region) throw badRequest("regionId does not match any region.");
+    if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
+    regionId = region.id;
+  }
+
   if (!name) {
     throw badRequest("Class name is required.");
   }
@@ -146,6 +160,7 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
       name,
       code,
       programType,
+      regionId,
       description: description || null,
       startDate,
       endDate,
@@ -162,6 +177,7 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
       code: true,
       status: true,
       programType: true,
+      regionId: true,
     },
   });
 

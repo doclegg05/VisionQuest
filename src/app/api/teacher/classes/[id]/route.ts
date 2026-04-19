@@ -133,6 +133,23 @@ export const PATCH = withTeacherAuth(async (
       }
       nextProgramType = body.programType;
     }
+
+    let nextRegionId: string | null | undefined;
+    if (body.regionId !== undefined) {
+      if (body.regionId === null) {
+        nextRegionId = null;
+      } else if (typeof body.regionId === "string" && body.regionId.trim()) {
+        const region = await prisma.region.findUnique({
+          where: { id: body.regionId },
+          select: { id: true, status: true },
+        });
+        if (!region) throw badRequest("regionId does not match any region.");
+        if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
+        nextRegionId = region.id;
+      } else {
+        throw badRequest("regionId must be a non-empty string or null.");
+      }
+    }
     const instructorIds = Array.isArray(body.instructorIds)
       ? normalizeInstructorIds(body.instructorIds.filter(
           (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
@@ -186,6 +203,7 @@ export const PATCH = withTeacherAuth(async (
           code: nextCode,
           status: nextStatus,
           ...(nextProgramType !== undefined ? { programType: nextProgramType } : {}),
+          ...(nextRegionId !== undefined ? { regionId: nextRegionId } : {}),
           description,
           archivedAt: nextStatus === "archived" ? new Date() : null,
           startDate: body.startDate !== undefined ? parseOptionalDate(body.startDate) : undefined,
