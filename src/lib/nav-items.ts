@@ -9,11 +9,13 @@ import {
   ImageSquare,
   FolderOpen,
   ClipboardText,
+  ChatCircle,
 } from "@phosphor-icons/react";
 import type { NavItem, NavPhase } from "./nav-progression";
 
 export const STUDENT_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: House, phase: 1 },
+  { href: "/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/orientation", label: "Orientation", icon: ClipboardText, phase: 1 },
   { href: "/goals", label: "Goals", icon: Target, phase: 1 },
   { href: "/learning", label: "Learning", icon: BookOpen, phase: 1 },

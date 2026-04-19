@@ -29,6 +29,13 @@ interface OverviewTabProps {
   onArchive: () => void;
   archiveResult: { storageKey: string; fileCount: number } | null;
   archiveError: string | null;
+  /**
+   * Phase 6 tab reorg: the Coach tab composes OverviewTab and hides the
+   * admin controls (password reset, deactivate, archive). Those move to
+   * the dedicated Admin tab. Keep prop optional so direct renders behave
+   * as before.
+   */
+  hideAdminControls?: boolean;
 }
 
 export default function OverviewTab({
@@ -49,6 +56,7 @@ export default function OverviewTab({
   onArchive,
   archiveResult,
   archiveError,
+  hideAdminControls = false,
 }: OverviewTabProps) {
   const {
     student,
@@ -95,14 +103,16 @@ export default function OverviewTab({
               >
                 Preview Dashboard
               </Link>
-              <button
-                onClick={onToggleResetPw}
-                className="text-xs text-blue-600 hover:text-blue-800"
-              >
-                Reset Password
-              </button>
+              {!hideAdminControls && (
+                <button
+                  onClick={onToggleResetPw}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Reset Password
+                </button>
+              )}
             </div>
-            {showResetPw && (
+            {!hideAdminControls && showResetPw && (
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <label htmlFor="reset-password-input" className="text-xs text-[var(--ink-muted)]">
                   New password:
@@ -129,7 +139,7 @@ export default function OverviewTab({
               </div>
             )}
 
-            {/* Account Status */}
+            {/* Account Status — always visible across Coach + Admin tabs */}
             <div className="mt-4 flex items-center gap-3">
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
                 student.isActive
@@ -146,6 +156,8 @@ export default function OverviewTab({
               )}
             </div>
 
+            {hideAdminControls ? null : (
+            <>
             {/* Deactivate/Reactivate */}
             <div className="mt-3 flex flex-wrap gap-2">
               {!confirmDeactivate ? (
@@ -212,6 +224,8 @@ export default function OverviewTab({
             )}
             {archiveError && (
               <p className="mt-2 text-xs text-red-500">{archiveError}</p>
+            )}
+            </>
             )}
           </div>
 

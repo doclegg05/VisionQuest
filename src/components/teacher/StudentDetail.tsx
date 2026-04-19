@@ -417,34 +417,58 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         studentName={data.student.displayName}
       >
         {{
-          overview: (
-            <OverviewTab
-              data={data}
-              moodEntries={moodEntries}
-              dateFormatter={dateFormatter}
-              showResetPw={showResetPw}
-              onToggleResetPw={() => setShowResetPw((prev) => !prev)}
-              newPassword={newPassword}
-              onNewPasswordChange={setNewPassword}
-              resetStatus={resetStatus}
-              onResetPassword={handleResetPassword}
-              confirmDeactivate={confirmDeactivate}
-              onSetConfirmDeactivate={setConfirmDeactivate}
-              deactivating={deactivating}
-              onToggleStudentStatus={toggleStudentStatus}
-              archiving={archiving}
-              onArchive={handleArchive}
-              archiveResult={archiveResult}
-              archiveError={archiveError}
-            />
-          ),
-          goals: (
-            <GoalsPlanTab
-              data={data}
-              dateFormatter={dateFormatter}
-              onChanged={loadData}
-              onGoalAction={handleGoalAction}
-            />
+          coach: (
+            <div className="space-y-6">
+              <OverviewTab
+                data={data}
+                moodEntries={moodEntries}
+                dateFormatter={dateFormatter}
+                showResetPw={showResetPw}
+                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
+                newPassword={newPassword}
+                onNewPasswordChange={setNewPassword}
+                resetStatus={resetStatus}
+                onResetPassword={handleResetPassword}
+                confirmDeactivate={confirmDeactivate}
+                onSetConfirmDeactivate={setConfirmDeactivate}
+                deactivating={deactivating}
+                onToggleStudentStatus={toggleStudentStatus}
+                archiving={archiving}
+                onArchive={handleArchive}
+                archiveResult={archiveResult}
+                archiveError={archiveError}
+                hideAdminControls
+              />
+              <GoalsPlanTab
+                data={data}
+                dateFormatter={dateFormatter}
+                onChanged={loadData}
+                onGoalAction={handleGoalAction}
+              />
+              <OperationsTab
+                data={data}
+                dateFormatter={dateFormatter}
+                reviewingFormId={reviewingFormId}
+                onReviewForm={handleReviewForm}
+                appointmentForm={appointmentForm}
+                onAppointmentFormChange={setAppointmentForm}
+                savingAppointment={savingAppointment}
+                onCreateAppointment={handleCreateAppointment}
+                updatingAppointmentId={updatingAppointmentId}
+                onAppointmentStatusChange={handleAppointmentStatusChange}
+                taskForm={taskForm}
+                onTaskFormChange={setTaskForm}
+                savingTask={savingTask}
+                onCreateTask={handleCreateTask}
+                updatingTaskId={updatingTaskId}
+                onTaskStatusChange={handleTaskStatusChange}
+                noteForm={noteForm}
+                onNoteFormChange={setNoteForm}
+                savingNote={savingNote}
+                onCreateNote={handleCreateNote}
+                scope="coaching"
+              />
+            </div>
           ),
           progress: (
             <ProgressTab
@@ -456,29 +480,51 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               onShowAllConversations={() => setShowAllConversations(true)}
             />
           ),
-          operations: (
-            <OperationsTab
-              data={data}
-              dateFormatter={dateFormatter}
-              reviewingFormId={reviewingFormId}
-              onReviewForm={handleReviewForm}
-              appointmentForm={appointmentForm}
-              onAppointmentFormChange={setAppointmentForm}
-              savingAppointment={savingAppointment}
-              onCreateAppointment={handleCreateAppointment}
-              updatingAppointmentId={updatingAppointmentId}
-              onAppointmentStatusChange={handleAppointmentStatusChange}
-              taskForm={taskForm}
-              onTaskFormChange={setTaskForm}
-              savingTask={savingTask}
-              onCreateTask={handleCreateTask}
-              updatingTaskId={updatingTaskId}
-              onTaskStatusChange={handleTaskStatusChange}
-              noteForm={noteForm}
-              onNoteFormChange={setNoteForm}
-              savingNote={savingNote}
-              onCreateNote={handleCreateNote}
-            />
+          admin: (
+            <div id="account-actions" className="space-y-6">
+              <OverviewTab
+                data={data}
+                moodEntries={moodEntries}
+                dateFormatter={dateFormatter}
+                showResetPw={showResetPw}
+                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
+                newPassword={newPassword}
+                onNewPasswordChange={setNewPassword}
+                resetStatus={resetStatus}
+                onResetPassword={handleResetPassword}
+                confirmDeactivate={confirmDeactivate}
+                onSetConfirmDeactivate={setConfirmDeactivate}
+                deactivating={deactivating}
+                onToggleStudentStatus={toggleStudentStatus}
+                archiving={archiving}
+                onArchive={handleArchive}
+                archiveResult={archiveResult}
+                archiveError={archiveError}
+              />
+              <OperationsTab
+                data={data}
+                dateFormatter={dateFormatter}
+                reviewingFormId={reviewingFormId}
+                onReviewForm={handleReviewForm}
+                appointmentForm={appointmentForm}
+                onAppointmentFormChange={setAppointmentForm}
+                savingAppointment={savingAppointment}
+                onCreateAppointment={handleCreateAppointment}
+                updatingAppointmentId={updatingAppointmentId}
+                onAppointmentStatusChange={handleAppointmentStatusChange}
+                taskForm={taskForm}
+                onTaskFormChange={setTaskForm}
+                savingTask={savingTask}
+                onCreateTask={handleCreateTask}
+                updatingTaskId={updatingTaskId}
+                onTaskStatusChange={handleTaskStatusChange}
+                noteForm={noteForm}
+                onNoteFormChange={setNoteForm}
+                savingNote={savingNote}
+                onCreateNote={handleCreateNote}
+                scope="submittedForms"
+              />
+            </div>
           ),
         }}
       </StudentDetailTabs>

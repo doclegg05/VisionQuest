@@ -1,3 +1,4 @@
+import CareerDnaCallout from "@/components/career/CareerDnaCallout";
 import CareerHub from "@/components/career/CareerHub";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
@@ -42,12 +43,13 @@ export default async function CareerPage() {
   ]);
 
   return (
-    <div className="page-shell">
+    <div className="page-shell space-y-5">
       <PageIntro
         eyebrow="Career"
         title="Career"
         description="Keep jobs, applications, and career events in one place so your search stays visible and actionable."
       />
+      <CareerDnaCallout studentId={session.id} />
       <CareerHub
         opportunities={opportunities.map((opportunity) => ({
           ...opportunity,

@@ -2,8 +2,10 @@ import { getSession } from "@/lib/auth";
 import ClassContextSwitcher from "@/components/teacher/ClassContextSwitcher";
 import ClassOverview from "@/components/teacher/ClassOverview";
 import InterventionQueuePanel from "@/components/teacher/InterventionQueuePanel";
+import TodayRoster from "@/components/teacher/TodayRoster";
 import PageIntro from "@/components/ui/PageIntro";
 import { getTeacherHomeData } from "@/lib/teacher/dashboard";
+import { getTodayRoster } from "@/lib/teacher/today";
 
 interface TeacherDashboardProps {
   searchParams: Promise<{ classId?: string | string[] }>;
@@ -20,7 +22,10 @@ export default async function TeacherDashboard({ searchParams }: TeacherDashboar
   const rawClassId = Array.isArray(params.classId) ? params.classId[0] : params.classId;
   const classId = rawClassId?.trim() || undefined;
 
-  const data = await getTeacherHomeData(session, { classId });
+  const [data, todayRoster] = await Promise.all([
+    getTeacherHomeData(session, { classId }),
+    getTodayRoster(session, { classId }),
+  ]);
 
   return (
     <div className="page-shell">
@@ -32,6 +37,7 @@ export default async function TeacherDashboard({ searchParams }: TeacherDashboar
         />
         <ClassContextSwitcher />
       </div>
+      <TodayRoster roster={todayRoster} />
       <InterventionQueuePanel initialQueue={data.queue.queue} />
       <ClassOverview initialData={data.overview} />
     </div>
