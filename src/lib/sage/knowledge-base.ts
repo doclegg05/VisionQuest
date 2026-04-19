@@ -5,6 +5,14 @@
  * the student's active-enrollment ProgramType (see src/lib/program-type.ts).
  */
 
+/**
+ * Three-sentence summary of the SPOKES program for use in stages that do
+ * not require the full knowledge base (check-in, goal-setting, etc.).
+ * Keeps Sage oriented without injecting ~5,000 tokens of certification detail.
+ * The full block is still available via getRelevantContent() keyword matching.
+ */
+export const SPOKES_BRIEF = `SPOKES PROGRAM OVERVIEW (brief): SPOKES (Skills, Preparation, Opportunities, Knowledge, Employment, Success) is a West Virginia workforce training program for adults receiving TANF/SNAP benefits, focused on employment and self-sufficiency. Students can earn industry certifications including IC3 Digital Literacy, Microsoft Office Specialist, QuickBooks, ACT WorkKeys, and more through platforms like GMetrix, Essential Education, and Khan Academy. If you need detailed certification requirements, platform setup steps, or program forms, just ask — full program details are available.`;
+
 import type { ProgramType } from "@/lib/program-type";
 
 export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE

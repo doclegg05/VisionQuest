@@ -177,6 +177,18 @@ export const TOOLS: readonly ToolDefinition[] = [
     tags: ["chat"],
   },
   {
+    id: "sage.warmup",
+    namespace: "sage",
+    name: "Sage Context Warmup",
+    description: "Pre-warm the student base-context cache so the first Sage message is fast",
+    endpoint: { method: "GET", path: "/api/chat/warmup" },
+    requiredRoles: ["student"],
+    auditLevel: "none",
+    rateLimit: { maxPerHour: 60 },
+    enabled: true,
+    tags: ["chat", "performance"],
+  },
+  {
     id: "sage.goal_extraction",
     namespace: "sage",
     name: "Goal Extraction",

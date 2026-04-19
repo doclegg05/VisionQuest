@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildSystemPrompt, determineStage } from "./system-prompts";
+import { SPOKES_BRIEF } from "./knowledge-base";
 
 describe("determineStage", () => {
   it("returns discovery when no goals and no completed discovery", () => {
@@ -166,13 +167,30 @@ describe("buildSystemPrompt — program awareness", () => {
   it("injects Adult Education addendum when programType is adult_ed", () => {
     const prompt = buildSystemPrompt("onboarding", { programType: "adult_ed", classroomConfirmedAt: new Date() });
     assert.match(prompt, /PROGRAM CONTEXT — ADULT EDUCATION \(GED prep\)/);
-    assert.match(prompt, /ADULT EDUCATION PROGRAM KNOWLEDGE BASE/);
     assert.ok(!prompt.includes("PROGRAM CONTEXT — SPOKES"));
+    // onboarding is not a knowledge-heavy stage — SPOKES_BRIEF is used instead
+    // of the full knowledge block. Use the general stage to test full AE knowledge.
+    assert.ok(!prompt.includes("ADULT EDUCATION PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("general stage injects Adult Education full knowledge block for adult_ed", () => {
+    const prompt = buildSystemPrompt("general", { programType: "adult_ed" });
+    assert.match(prompt, /ADULT EDUCATION PROGRAM KNOWLEDGE BASE/);
     assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
   });
 
   it("IETP falls back to SPOKES knowledge base but uses IETP addendum", () => {
     const prompt = buildSystemPrompt("onboarding", { programType: "ietp", classroomConfirmedAt: new Date() });
+    assert.match(prompt, /PROGRAM CONTEXT — IETP/);
+    // onboarding is not a knowledge-heavy stage — SPOKES_BRIEF is used.
+    // Use orientation or general stage to exercise the full IETP knowledge block.
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("orientation stage IETP falls back to SPOKES knowledge base", () => {
+    const prompt = buildSystemPrompt("orientation", { programType: "ietp" });
     assert.match(prompt, /PROGRAM CONTEXT — IETP/);
     // Phase 2 placeholder: IETP inherits SPOKES knowledge base
     assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
@@ -180,6 +198,14 @@ describe("buildSystemPrompt — program awareness", () => {
 
   it("defaults to SPOKES when no programType is provided", () => {
     const prompt = buildSystemPrompt("onboarding", { classroomConfirmedAt: new Date() });
+    assert.match(prompt, /PROGRAM CONTEXT — SPOKES \(workforce training\)/);
+    // onboarding uses SPOKES_BRIEF, not the full knowledge block
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("orientation stage defaults to full SPOKES knowledge when no programType provided", () => {
+    const prompt = buildSystemPrompt("orientation");
     assert.match(prompt, /PROGRAM CONTEXT — SPOKES \(workforce training\)/);
     assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
   });
@@ -240,5 +266,104 @@ describe("buildSystemPrompt — program awareness", () => {
     // Teachers span programs — no program addendum, full SPOKES knowledge.
     assert.ok(!prompt.includes("PROGRAM CONTEXT —"));
     assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+  });
+});
+
+describe("buildSystemPrompt — stage-gated knowledge injection", () => {
+  it("orientation stage includes full SPOKES knowledge block", () => {
+    const prompt = buildSystemPrompt("orientation");
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+    assert.ok(!prompt.includes(SPOKES_BRIEF));
+  });
+
+  it("general stage includes full SPOKES knowledge block", () => {
+    const prompt = buildSystemPrompt("general");
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+    assert.ok(!prompt.includes(SPOKES_BRIEF));
+  });
+
+  it("teacher_assistant stage includes full SPOKES knowledge block", () => {
+    const prompt = buildSystemPrompt("teacher_assistant");
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+    assert.ok(!prompt.includes(SPOKES_BRIEF));
+  });
+
+  it("checkin stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("checkin");
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("bhag stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("bhag");
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("monthly stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("monthly", { bhag: "Get a job" });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("weekly stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("weekly", {
+      bhag: "Get a job",
+      monthly: "Apply to 3 places",
+    });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("daily stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("daily", {
+      bhag: "Get a job",
+      monthly: "Apply to 3 places",
+      weekly: "Update resume",
+    });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("tasks stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("tasks", { daily: "Finish resume" });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("review stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("review");
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("discovery stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("discovery", { career_clusters: "test" });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("onboarding stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("onboarding", { classroomConfirmedAt: new Date() });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("career_profile_review stage uses SPOKES_BRIEF instead of full knowledge block", () => {
+    const prompt = buildSystemPrompt("career_profile_review");
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+  });
+
+  it("getRelevantContent still fires for checkin — keyword match injects topic detail", () => {
+    // When a student asks about IC3 during a check-in, getRelevantContent
+    // injects the detailed block even though the stage uses SPOKES_BRIEF.
+    const prompt = buildSystemPrompt("checkin", {
+      userMessage: "How do I set up GMetrix for IC3?",
+    });
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(brief\)/);
+    // getRelevantContent should have injected IC3 or GMetrix detail
+    assert.match(prompt, /DETAILED REFERENCE/);
   });
 });

@@ -16,8 +16,8 @@ import {
 } from "@/lib/learning-pathway";
 import { type ConversationStage } from "@/lib/sage/system-prompts";
 
-const BASE_CONTEXT_TTL_SECONDS = 30;
-const SUPPLEMENTAL_CONTEXT_TTL_SECONDS = 120;
+const BASE_CONTEXT_TTL_SECONDS = 300;
+const SUPPLEMENTAL_CONTEXT_TTL_SECONDS = 600;
 
 const SKILL_GAP_STAGES = new Set<ConversationStage>([
   "bhag",
