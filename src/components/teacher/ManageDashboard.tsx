@@ -18,8 +18,10 @@ import PathwayManager from "./PathwayManager";
 import AiConfigPanel from "./AiConfigPanel";
 import AiProviderPanel from "./AiProviderPanel";
 import MonthlyKpiDashboard from "./MonthlyKpiDashboard";
+import FormTemplatesList from "./forms/FormTemplatesList";
+import FormResponsesReview from "./forms/FormResponsesReview";
 
-type Tab = "orientation" | "learning" | "career" | "reports" | "ai";
+type Tab = "orientation" | "learning" | "career" | "forms" | "reports" | "ai";
 
 interface ManageDashboardProps {
   canViewAudit: boolean;
@@ -30,6 +32,7 @@ const BASE_TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: "orientation", label: "Orientation", icon: "🧭" },
   { key: "learning", label: "Learning", icon: "📚" },
   { key: "career", label: "Career", icon: "💼" },
+  { key: "forms", label: "Forms", icon: "📝" },
   { key: "reports", label: "Reports", icon: "📊" },
 ];
 const AI_TAB = { key: "ai" as Tab, label: "AI", icon: "🤖" };
@@ -112,6 +115,19 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
           <section>
             <SectionHeading>Job Board</SectionHeading>
             <JobConfigSection />
+          </section>
+        </div>
+      )}
+
+      {tab === "forms" && (
+        <div className="space-y-8">
+          <section>
+            <SectionHeading>Templates</SectionHeading>
+            <FormTemplatesList />
+          </section>
+          <section>
+            <SectionHeading>Responses</SectionHeading>
+            <FormResponsesReview />
           </section>
         </div>
       )}

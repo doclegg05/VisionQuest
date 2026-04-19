@@ -1,4 +1,5 @@
 import { type FormEvent } from "react";
+import StructuredFormsSection from "./StructuredFormsSection";
 import type {
   StudentData,
   AppointmentData,
@@ -103,6 +104,7 @@ export default function OperationsTab({
   onCreateNote,
 }: OperationsTabProps) {
   const {
+    student,
     formSubmissions,
     appointments,
     tasks,
@@ -111,6 +113,9 @@ export default function OperationsTab({
 
   return (
     <div className="space-y-6">
+      {/* Structured Forms (Phase 4) — data-reportable forms, separate from PDF uploads below */}
+      <StructuredFormsSection studentId={student.id} />
+
       {/* Submitted Forms */}
       <div id="submitted-forms" className="theme-card rounded-xl p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">

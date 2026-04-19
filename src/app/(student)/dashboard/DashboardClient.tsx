@@ -14,6 +14,7 @@ import {
   Certificate,
 } from "@phosphor-icons/react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import AssignedFormsCard from "@/components/student/AssignedFormsCard";
 
 interface DashboardClientProps {
   studentName: string;
@@ -283,6 +284,11 @@ export default function DashboardClient({
             </div>
           )}
         </div>
+      </AnimatedSection>
+
+      {/* ── Section 3b: Paperwork (Phase 4 Forms Hub) ── */}
+      <AnimatedSection delay={0.30}>
+        <AssignedFormsCard />
       </AnimatedSection>
 
       {/* ── Section 4: Advising ── */}
