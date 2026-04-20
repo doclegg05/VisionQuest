@@ -13,6 +13,10 @@ const permissionCache = new Map<
   string,
   { permissions: Set<string>; expiresAt: number }
 >();
+const permissionSeedCache = new Map<
+  string,
+  { hasPermissionMappings: boolean; expiresAt: number }
+>();
 let rolePermissionSeedState:
   | { hasAssignments: boolean; expiresAt: number }
   | null = null;
@@ -35,6 +39,31 @@ async function hasSeededRolePermissions(): Promise<boolean> {
     expiresAt: Date.now() + CACHE_TTL_MS,
   };
   return hasAssignments;
+}
+
+async function hasSeededPermissionMappings(permissionKey: string): Promise<boolean> {
+  const cached = permissionSeedCache.get(permissionKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.hasPermissionMappings;
+  }
+
+  const permission = await prisma.permission.findUnique({
+    where: { key: permissionKey },
+    select: {
+      id: true,
+      roles: {
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+
+  const hasPermissionMappings = Boolean(permission && permission.roles.length > 0);
+  permissionSeedCache.set(permissionKey, {
+    hasPermissionMappings,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+  return hasPermissionMappings;
 }
 
 /**
@@ -91,6 +120,15 @@ export async function resolvePermission(
       return { allowed: false, source: "fallback" };
     }
 
+    // Some environments have partial RBAC data during rollout: a handful of
+    // RolePermission rows exist, but the specific registry permission has not
+    // been seeded yet. In that case we fall back to the tool's static roles
+    // instead of treating the missing permission as an intentional deny.
+    const hasPermissionMappings = await hasSeededPermissionMappings(permissionKey);
+    if (!hasPermissionMappings) {
+      return { allowed: false, source: "fallback" };
+    }
+
     const permissions = await getPermissionsForRole(roleName);
     return {
       allowed: permissions.has(permissionKey),
@@ -106,5 +144,6 @@ export async function resolvePermission(
  */
 export function clearPermissionCache(): void {
   permissionCache.clear();
+  permissionSeedCache.clear();
   rolePermissionSeedState = null;
 }

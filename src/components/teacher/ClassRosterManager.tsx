@@ -64,9 +64,27 @@ interface ClassDetailResponse {
   class: ClassDetail;
 }
 
+interface ApiErrorResponse {
+  error?: string;
+}
+
 function formatWhen(value: string | null) {
   if (!value) return "Not set";
   return new Date(value).toLocaleDateString();
+}
+
+async function getResponseError(response: Response, fallback: string) {
+  const payload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+
+  if (response.status === 401) {
+    return "Your session expired. Please sign in again.";
+  }
+
+  if (response.status === 403) {
+    return payload?.error || "Your account does not have access to class management yet.";
+  }
+
+  return payload?.error || fallback;
 }
 
 export default function ClassRosterManager() {
@@ -108,14 +126,10 @@ export default function ClassRosterManager() {
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes${adminMode ? "?includeArchived=true" : ""}`);
-      if (response.status === 401 || response.status === 403) {
-        window.location.reload();
-        return;
+      if (!response.ok) {
+        throw new Error(await getResponseError(response, "Could not load classes."));
       }
       const payload = (await response.json()) as ClassesResponse;
-      if (!response.ok) {
-        throw new Error((payload as { error?: string }).error || "Could not load classes.");
-      }
 
       setClasses(payload.classes || []);
       setAvailableInstructors(payload.availableInstructors || []);
@@ -148,14 +162,10 @@ export default function ClassRosterManager() {
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes/${classId}`);
-      if (response.status === 401 || response.status === 403) {
-        window.location.reload();
-        return;
+      if (!response.ok) {
+        throw new Error(await getResponseError(response, "Could not load class details."));
       }
       const payload = (await response.json()) as ClassDetailResponse;
-      if (!response.ok) {
-        throw new Error((payload as { error?: string }).error || "Could not load class details.");
-      }
 
       setClassDetail(payload.class);
       setClassName(payload.class.name);
