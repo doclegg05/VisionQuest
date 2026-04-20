@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { Manrope, Sora } from "next/font/google";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { getThemeFromCookie, THEME_COOKIE } from "@/lib/theme";
@@ -35,14 +35,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const headerStore = await headers();
-  const nonce = headerStore.get("x-csp-nonce") ?? "";
   const cookieStore = await cookies();
   const theme = getThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
 
   return (
-    <html lang="en" nonce={nonce} data-theme={theme}>
-      <body className={`${manrope.variable} ${sora.variable} antialiased`} nonce={nonce}>
+    <html lang="en" data-theme={theme}>
+      <body className={`${manrope.variable} ${sora.variable} antialiased`}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]
