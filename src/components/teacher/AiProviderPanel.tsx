@@ -1,11 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type ProviderType = "local" | "cloud";
 type LocalAuthMode = "none" | "bearer" | "cloudflare_service_token";
 
+interface ApiErrorResponse {
+  error?: string;
+}
+
 export default function AiProviderPanel() {
+  const router = useRouter();
   const [provider, setProvider] = useState<ProviderType>("cloud");
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("gemma4:26b");
@@ -25,27 +31,63 @@ export default function AiProviderPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/ai-provider")
-      .then((res) => {
-        if (res.status === 401 || res.status === 403) {
-          window.location.reload();
-          return null;
+    let cancelled = false;
+
+    async function loadProviderConfig() {
+      try {
+        const res = await fetch("/api/admin/ai-provider");
+        const data = (await res.json().catch(() => null)) as
+          | (ApiErrorResponse & {
+              provider?: ProviderType;
+              url?: string;
+              model?: string;
+              authMode?: LocalAuthMode;
+              hasApiKey?: boolean;
+              hasCloudflareAccessClientId?: boolean;
+              hasCloudflareAccessClientSecret?: boolean;
+            })
+          | null;
+
+        if (res.status === 401) {
+          router.replace("/");
+          return;
         }
-        return res.json();
-      })
-      .then((data) => {
-        if (!data) return;
-        setProvider(data.provider);
-        setUrl(data.url);
-        setModel(data.model);
+
+        if (res.status === 403) {
+          if (!cancelled) {
+            setError(data?.error || "Your account does not have access to AI provider settings.");
+          }
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Could not load AI provider configuration.");
+        }
+
+        if (cancelled || !data) return;
+        setProvider(data.provider ?? "cloud");
+        setUrl(data.url ?? "");
+        setModel(data.model ?? "gemma4:26b");
         setAuthMode(data.authMode || "none");
         setHasBearerToken(Boolean(data.hasApiKey));
         setHasCloudflareClientId(Boolean(data.hasCloudflareAccessClientId));
         setHasCloudflareClientSecret(Boolean(data.hasCloudflareAccessClientSecret));
-      })
-      .catch(() => setError("Could not load AI provider configuration."))
-      .finally(() => setLoading(false));
-  }, []);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load AI provider configuration.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadProviderConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   function resetMessages() {
     setError("");

@@ -1,10 +1,16 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type ConfigStatus = "connected" | "no_key" | "invalid_key";
 
+interface ApiErrorResponse {
+  error?: string;
+}
+
 export default function AiConfigPanel() {
+  const router = useRouter();
   const [status, setStatus] = useState<ConfigStatus>("no_key");
   const [keyHint, setKeyHint] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -17,24 +23,57 @@ export default function AiConfigPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/ai-config")
-      .then((res) => {
-        if (res.status === 401 || res.status === 403) {
-          window.location.reload();
-          return null;
+    let cancelled = false;
+
+    async function loadConfig() {
+      try {
+        const res = await fetch("/api/admin/ai-config");
+        const data = (await res.json().catch(() => null)) as
+          | (ApiErrorResponse & {
+              status?: ConfigStatus;
+              keyHint?: string | null;
+              updatedAt?: string | null;
+              envKeyConfigured?: boolean;
+            })
+          | null;
+
+        if (res.status === 401) {
+          router.replace("/");
+          return;
         }
-        return res.json();
-      })
-      .then((data) => {
-        if (!data) return;
-        setStatus(data.status);
-        setKeyHint(data.keyHint);
-        setUpdatedAt(data.updatedAt);
-        setEnvKeyConfigured(data.envKeyConfigured);
-      })
-      .catch(() => setError("Could not load AI configuration."))
-      .finally(() => setLoading(false));
-  }, []);
+
+        if (res.status === 403) {
+          if (!cancelled) {
+            setError(data?.error || "Your account does not have access to AI configuration.");
+          }
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Could not load AI configuration.");
+        }
+
+        if (cancelled || !data) return;
+        setStatus(data.status ?? "no_key");
+        setKeyHint(data.keyHint ?? null);
+        setUpdatedAt(data.updatedAt ?? null);
+        setEnvKeyConfigured(Boolean(data.envKeyConfigured));
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load AI configuration.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function handleSave() {
     setSaving(true);
