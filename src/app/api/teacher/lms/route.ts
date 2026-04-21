@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
@@ -53,7 +54,7 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
     return NextResponse.json({ error: "Invalid URL. Only http and https URLs are allowed." }, { status: 400 });
   }
 
-  const data: Record<string, unknown> = {};
+  const data: Prisma.LmsLinkUpdateInput = {};
   if (title !== undefined) data.title = title;
   if (description !== undefined) data.description = description;
   if (url !== undefined) data.url = url;

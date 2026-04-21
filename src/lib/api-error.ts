@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSession } from "./auth";
 import { logger } from "./logger";
+import { withRlsContext, type RlsContext } from "./rls-context";
+
+function rlsContextFor(session: Session): RlsContext {
+  const role = session.role === "admin" || session.role === "teacher" ? session.role : "student";
+  return {
+    userId: session.id,
+    role,
+    // For students, studentId == Student.id (row ownership key).
+    // For staff, empty string — teacher policies branch on `current_role`
+    // and join through SpokesClassInstructor instead of direct ownership.
+    studentId: role === "student" ? session.id : "",
+  };
+}
 
 /**
  * Structured API error with HTTP status code.
@@ -111,7 +124,8 @@ export function withAuth<
   return withErrorHandler(async (...args: Args) => {
     const session = await getSession();
     if (!session) throw unauthorized();
-    return handler(session as Session, ...args);
+    const typedSession = session as Session;
+    return withRlsContext(rlsContextFor(typedSession), () => handler(typedSession, ...args));
   });
 }
 
@@ -134,7 +148,8 @@ export function withTeacherAuth<
     const session = await getSession();
     if (!session) throw unauthorized();
     if (!isStaffRole(session.role)) throw forbidden();
-    return handler(session as Session, ...args);
+    const typedSession = session as Session;
+    return withRlsContext(rlsContextFor(typedSession), () => handler(typedSession, ...args));
   });
 }
 
@@ -147,6 +162,7 @@ export function withAdminAuth<
     const session = await getSession();
     if (!session) throw unauthorized();
     if (session.role !== "admin") throw forbidden();
-    return handler(session as Session, ...args);
+    const typedSession = session as Session;
+    return withRlsContext(rlsContextFor(typedSession), () => handler(typedSession, ...args));
   });
 }

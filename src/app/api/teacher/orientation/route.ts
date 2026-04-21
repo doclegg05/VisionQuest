@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { withTeacherAuth } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
@@ -43,7 +44,7 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
   const { id, label, description, required, sortOrder } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  const data: Record<string, unknown> = {};
+  const data: Prisma.OrientationItemUpdateInput = {};
   if (label !== undefined) data.label = label;
   if (description !== undefined) data.description = description;
   if (required !== undefined) data.required = required;
