@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { logger } from "./logger";
 
@@ -83,33 +84,53 @@ export async function enqueueJobWithCooldown({
   return enqueueJob({ type, payload, dedupeKey });
 }
 
+interface ClaimedJob {
+  id: string;
+  type: string;
+  payload: string;
+  attempts: number;
+}
+
+/**
+ * Atomically claim up to `limit` pending jobs using FOR UPDATE SKIP LOCKED.
+ * Exported for test seams — production callers should use processJobs().
+ *
+ * Semantics:
+ *   - Concurrent workers never see the same row (SKIP LOCKED bypasses locked
+ *     rows instead of waiting), so each job is claimed by exactly one caller.
+ *   - `attempts` is incremented atomically. The returned value is post-
+ *     increment (1-indexed attempt number for this run).
+ *   - The `attempts < 3` gate lives in SQL, so failure handlers must not
+ *     re-check it — just decide failed vs pending based on the post-increment.
+ */
+export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
+  return prisma.$queryRaw<ClaimedJob[]>(Prisma.sql`
+    UPDATE visionquest."BackgroundJob"
+    SET status = 'processing',
+        "startedAt" = NOW(),
+        attempts = attempts + 1
+    WHERE id IN (
+      SELECT id FROM visionquest."BackgroundJob"
+      WHERE status = 'pending' AND attempts < 3
+      ORDER BY "createdAt" ASC
+      LIMIT ${limit}
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, type, payload, attempts
+  `);
+}
+
 /**
  * Process pending jobs. Call this from a cron endpoint or inline after enqueuing.
- * Returns the number of jobs processed.
+ * Returns the number of jobs processed successfully.
  */
 export async function processJobs(limit = 10): Promise<number> {
+  const claimed = await claimPendingJobs(limit);
+  if (claimed.length === 0) return 0;
+
   let processed = 0;
 
-  for (let i = 0; i < limit; i++) {
-    // Atomically claim one pending job: the update's where clause re-checks
-    // status so a concurrent worker that claimed it first will cause this
-    // update to match zero rows and we simply move on.
-    const claimed = await prisma.$transaction(async (tx) => {
-      const job = await tx.backgroundJob.findFirst({
-        where: { status: "pending", attempts: { lt: 3 } },
-        orderBy: { createdAt: "asc" },
-      });
-      if (!job) return null;
-      return tx.backgroundJob.update({
-        where: { id: job.id, status: "pending" },
-        data: { status: "processing", attempts: job.attempts + 1, startedAt: new Date() },
-      });
-    });
-
-    if (!claimed) break;
-
-    const job = claimed;
-
+  for (const job of claimed) {
     try {
       const handler = JOB_HANDLERS[job.type];
       if (!handler) {
@@ -131,12 +152,12 @@ export async function processJobs(limit = 10): Promise<number> {
       processed++;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts + 1, error: errorMsg });
+      logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorMsg });
 
       await prisma.backgroundJob.update({
         where: { id: job.id },
         data: {
-          status: job.attempts + 1 >= 3 ? "failed" : "pending",
+          status: job.attempts >= 3 ? "failed" : "pending",
           error: errorMsg,
         },
       });
