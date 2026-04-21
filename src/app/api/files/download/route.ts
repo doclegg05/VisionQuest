@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { downloadFile } from "@/lib/storage";
+import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { isStaffRole, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 
@@ -23,20 +23,26 @@ export const GET = withAuth(async (session, req: Request) => {
     await assertStaffCanManageStudent(session, file.studentId);
   }
 
-  const result = await downloadFile(file.storageKey);
-  if (!result) return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
-
   // Sanitize filename for Content-Disposition header (RFC 6266)
   const safeFilename = file.filename
     .replace(/[^a-zA-Z0-9._\- ]/g, "_")
     .replace(/"+/g, "")
     .replace(/\.+$/, "")
     .slice(0, 200);
+  const disposition = `inline; filename="${safeFilename}"`;
+
+  const presigned = await getPresignedDownloadUrl(file.storageKey, {
+    contentDisposition: disposition,
+  });
+  if (presigned) return NextResponse.redirect(presigned, 302);
+
+  const result = await downloadFile(file.storageKey);
+  if (!result) return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {
       "Content-Type": result.mimeType,
-      "Content-Disposition": `inline; filename="${safeFilename}"`,
+      "Content-Disposition": disposition,
     },
   });
 });

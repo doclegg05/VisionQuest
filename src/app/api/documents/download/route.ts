@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { downloadFile } from "@/lib/storage";
+import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   withErrorHandler,
@@ -54,11 +54,6 @@ export const GET = withErrorHandler(async (req: Request) => {
     throw notFound("Document not found");
   }
 
-  const result = await downloadFile(doc.storageKey);
-  if (!result) {
-    throw notFound("File not found in storage. Contact your instructor.");
-  }
-
   // Derive a safe filename from the title + original extension
   const lastSegment = doc.storageKey.split("/").pop() ?? "";
   const ext = lastSegment.includes(".") ? lastSegment.split(".").pop()! : "pdf";
@@ -79,6 +74,17 @@ export const GET = withErrorHandler(async (req: Request) => {
       xp: 3,
       mutate: (state) => recordDocumentView(state, id),
     }).catch(() => {});
+  }
+
+  const presigned = await getPresignedDownloadUrl(doc.storageKey, {
+    contentType: doc.mimeType || undefined,
+    contentDisposition: disposition,
+  });
+  if (presigned) return NextResponse.redirect(presigned, 302);
+
+  const result = await downloadFile(doc.storageKey);
+  if (!result) {
+    throw notFound("File not found in storage. Contact your instructor.");
   }
 
   return new NextResponse(new Uint8Array(result.buffer), {

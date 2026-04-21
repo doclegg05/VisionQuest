@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { downloadFile } from "@/lib/storage";
+import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { canViewForm, FORMS, getFormById } from "@/lib/spokes/forms";
 
 export async function GET(req: Request) {
@@ -57,6 +57,18 @@ export async function GET(req: Request) {
     );
   }
 
+  const safeDisplayName = (form.fileName || form.title)
+    .replace(/[^a-zA-Z0-9._\- ]/g, "_")
+    .slice(0, 200);
+  const disposition = mode === "download"
+    ? `attachment; filename="${safeDisplayName}"`
+    : `inline; filename="${safeDisplayName}"`;
+
+  const presigned = await getPresignedDownloadUrl(form.storageKey, {
+    contentDisposition: disposition,
+  });
+  if (presigned) return NextResponse.redirect(presigned, 302);
+
   const result = await downloadFile(form.storageKey);
   if (!result) {
     return NextResponse.json(
@@ -68,13 +80,6 @@ export async function GET(req: Request) {
       { status: 404 },
     );
   }
-
-  const safeDisplayName = (form.fileName || form.title)
-    .replace(/[^a-zA-Z0-9._\- ]/g, "_")
-    .slice(0, 200);
-  const disposition = mode === "download"
-    ? `attachment; filename="${safeDisplayName}"`
-    : `inline; filename="${safeDisplayName}"`;
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {

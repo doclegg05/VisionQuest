@@ -55,6 +55,10 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
+      # Phase 2: set to "true" to enable S3 presigned download URLs.
+      # See docs/plans/presigned-urls-runbook.md.
+      - key: USE_PRESIGNED_URLS
+        sync: false
 # Cron jobs moved to Supabase pg_cron in Phase 1 of the Supabase optimization.
 # See prisma/migrations/20260421000000_add_pg_cron_jobs and
 # docs/plans/pg-cron-setup-runbook.md. The scripts/run-*.mjs files are kept

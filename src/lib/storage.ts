@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import { Readable } from "stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "uploads");
@@ -277,6 +278,46 @@ export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer
 
     throw error;
   }
+}
+
+interface PresignedDownloadOptions {
+  /** Seconds before the URL expires. Defaults to 3600 (1 hour). */
+  expiresIn?: number;
+  /** Override the response Content-Type (e.g. force "application/pdf"). */
+  contentType?: string;
+  /** Full Content-Disposition header to set on the response (e.g. `inline; filename="..."`). */
+  contentDisposition?: string;
+}
+
+/**
+ * Generate a presigned GET URL for a storage object.
+ *
+ * Returns `null` when:
+ *   - The USE_PRESIGNED_URLS feature flag is not "true", OR
+ *   - Object storage is not configured (local dev without Supabase/R2 creds)
+ *
+ * Callers should check for null and fall back to `downloadFile()` (which
+ * handles the local-disk + bundled-content paths).
+ *
+ * Phase 2 of docs/plans/supabase-optimization.md.
+ */
+export async function getPresignedDownloadUrl(
+  storageKey: string,
+  options: PresignedDownloadOptions = {},
+): Promise<string | null> {
+  if (process.env.USE_PRESIGNED_URLS !== "true") return null;
+  if (!s3Client || !BUCKET) return null;
+
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: storageKey,
+    ResponseContentType: options.contentType,
+    ResponseContentDisposition: options.contentDisposition,
+  });
+
+  return getSignedUrl(s3Client, command, {
+    expiresIn: options.expiresIn ?? 3600,
+  });
 }
 
 /**
