@@ -55,54 +55,7 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
-  - type: cron
-    name: visionquest-appointment-reminders
-    runtime: node
-    schedule: "0 * * * *"
-    buildCommand: "true"
-    startCommand: node scripts/run-appointment-reminders.mjs
-    envVars:
-      - key: APP_BASE_URL
-        fromService:
-          type: web
-          name: visionquest
-          envVarKey: APP_BASE_URL
-      - key: CRON_SECRET
-        fromService:
-          type: web
-          name: visionquest
-          envVarKey: CRON_SECRET
-  - type: cron
-    name: visionquest-job-processor
-    runtime: node
-    schedule: "*/10 * * * *"
-    buildCommand: "true"
-    startCommand: node scripts/run-job-processor.mjs
-    envVars:
-      - key: APP_BASE_URL
-        fromService:
-          type: web
-          name: visionquest
-          envVarKey: APP_BASE_URL
-      - key: CRON_SECRET
-        fromService:
-          type: web
-          name: visionquest
-          envVarKey: CRON_SECRET
-  - type: cron
-    name: visionquest-daily-coaching
-    runtime: node
-    schedule: "0 13 * * *"
-    buildCommand: "true"
-    startCommand: node scripts/run-daily-coaching.mjs
-    envVars:
-      - key: APP_BASE_URL
-        fromService:
-          type: web
-          name: visionquest
-          envVarKey: APP_BASE_URL
-      - key: CRON_SECRET
-        fromService:
-          type: web
-          name: visionquest
-          envVarKey: CRON_SECRET
+# Cron jobs moved to Supabase pg_cron in Phase 1 of the Supabase optimization.
+# See prisma/migrations/20260421000000_add_pg_cron_jobs and
+# docs/plans/pg-cron-setup-runbook.md. The scripts/run-*.mjs files are kept
+# as manual-trigger fallbacks.

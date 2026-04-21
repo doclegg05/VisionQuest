@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// DEPRECATED as of Phase 1 (pg_cron migration). The scheduled run is now
+// handled by the `job-processor` job in Supabase pg_cron. This script is
+// kept as a manual trigger for debugging and as a rollback fallback.
+// See docs/plans/pg-cron-setup-runbook.md.
 
 function required(name) {
   const value = process.env[name];
