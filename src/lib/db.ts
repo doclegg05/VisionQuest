@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { getRlsContext } from "./rls-context";
+import { getRlsContext, type RlsContext } from "./rls-context";
+import { rlsContextFromHeaders } from "./rls-headers";
 
 /**
  * Connection pool configuration.
@@ -63,6 +64,37 @@ applyPoolDefaults();
  * absence of context will fail-closed (no rows visible) which is the
  * correct default for unauthenticated access paths.
  */
+async function tryLoadContextFromHeaders(): Promise<RlsContext | null> {
+  // `next/headers` throws when called outside a request scope (scripts,
+  // migrations, tests). Treat any failure as "no context" and let the
+  // caller fall through to an unwrapped query.
+  try {
+    const { headers } = await import("next/headers");
+    const store = await headers();
+    return rlsContextFromHeaders(store);
+  } catch {
+    return null;
+  }
+}
+
+function runWithContext(
+  client: PrismaClient,
+  ctx: RlsContext,
+  args: unknown,
+  query: (args: unknown) => Promise<unknown>,
+): Promise<unknown> {
+  const { userId, role, studentId } = ctx;
+  return (async () => {
+    const results = await client.$transaction([
+      client.$executeRaw`SELECT set_config('app.current_user_id', ${userId}, true)`,
+      client.$executeRaw`SELECT set_config('app.current_role', ${role}, true)`,
+      client.$executeRaw`SELECT set_config('app.current_student_id', ${studentId}, true)`,
+      query(args) as unknown as Prisma.PrismaPromise<unknown>,
+    ]);
+    return results[results.length - 1];
+  })();
+}
+
 const rlsExtension = Prisma.defineExtension((client) =>
   client.$extends({
     name: "rls-context",
@@ -73,19 +105,30 @@ const rlsExtension = Prisma.defineExtension((client) =>
         // under vq_app once Slice C lands; currently a no-op under postgres).
         if (process.env.RLS_CONTEXT_INJECTION !== "true") return query(args);
 
-        const ctx = getRlsContext();
-        if (!ctx) return query(args);
+        // Fast path: API routes go through `withAuth`, which seeds ALS via
+        // `withRlsContext` before ever touching Prisma. No extra awaits.
+        const alsCtx = getRlsContext();
+        if (alsCtx) {
+          return runWithContext(
+            client as unknown as PrismaClient,
+            alsCtx,
+            args,
+            query as (args: unknown) => Promise<unknown>,
+          );
+        }
 
-        const { userId, role, studentId } = ctx;
-
+        // Slow path (Slice B): server components that never hit `withAuth`.
+        // The middleware (src/proxy.ts) decoded the session JWT and set
+        // `x-vq-*` request headers; we hydrate context from them here.
         return (async () => {
-          const results = await client.$transaction([
-            client.$executeRaw`SELECT set_config('app.current_user_id', ${userId}, true)`,
-            client.$executeRaw`SELECT set_config('app.current_role', ${role}, true)`,
-            client.$executeRaw`SELECT set_config('app.current_student_id', ${studentId}, true)`,
-            query(args),
-          ]);
-          return results[results.length - 1];
+          const headerCtx = await tryLoadContextFromHeaders();
+          if (!headerCtx) return query(args);
+          return runWithContext(
+            client as unknown as PrismaClient,
+            headerCtx,
+            args,
+            query as (args: unknown) => Promise<unknown>,
+          );
         })();
       },
     },

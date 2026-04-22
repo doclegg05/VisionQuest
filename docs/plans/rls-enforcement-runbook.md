@@ -68,37 +68,66 @@ If impact is under 20ms P50, proceed to Slice B.
 
 ---
 
-## Slice B — Server component coverage (next)
+## Slice B — Server component coverage
 
-**Status:** not started.
+**Status:** shipped (2026-04-22).
 
-### What's missing in Slice A
+### What was missing in Slice A
 
 `withAuth` wrappers only cover API routes. Server components call
 `getSession()` directly and hit Prisma, so their queries have NO RLS
 context. Codex review #6 flagged this as a HIGH gap.
 
-### Plan
+### Original plan premise was wrong
 
-1. Add `src/middleware.ts` (or `src/proxy.ts` if the project has one —
-   currently it does, for CSP). The middleware reads the session from
-   the request cookie and populates `withRlsContext` for the entire
-   request lifetime.
-2. The context must be propagated through `AsyncLocalStorage`, which
-   survives the transition from middleware to server components in
-   Next.js as long as the middleware hands off via `NextResponse.next()`
-   inside the `withRlsContext` callback (Next.js runs subsequent handlers
-   within the same async context).
-3. `withAuth` at the route level becomes a belt-and-suspenders re-wrap
-   (cheap — same context just re-runs the ALS callback).
+The earlier draft of this runbook claimed that `AsyncLocalStorage` set
+inside `NextResponse.next()` would survive into server components. It
+does not. Middleware and the downstream handler run in separate
+execution contexts; the `storage.run()` callback returns before the
+framework invokes the route/page renderer. ALS is only reliable when
+entered inside the same call stack that runs Prisma — that's what
+`withAuth` already does for API routes.
 
-### Risks
+### Actual design (request-header transport)
 
-- Next.js edge runtime does not support `AsyncLocalStorage`. Ensure the
-  middleware is node-runtime only.
-- Cold start: middleware adds ~1 DB hit to fetch session. Mitigate by
-  storing role in the JWT claim (already there — `session.role`) and
-  skipping DB lookup when JWT is valid.
+The middleware decodes the session JWT and mutates the forwarded
+request headers via `NextResponse.next({ request: { headers } })`. The
+Prisma extension prefers ALS context but falls back to reading those
+headers via `next/headers` when ALS is empty.
+
+Concrete pieces:
+
+- `src/lib/session-token.ts` — thin JWT module that middleware can
+  import without pulling Prisma via `./db`.
+- `src/lib/rls-headers.ts` — shared constants (`x-vq-user-id`,
+  `x-vq-role`, `x-vq-student-id`) plus pure mappers
+  (`rlsHeadersFromClaims`, `rlsContextFromHeaders`).
+- `src/proxy.ts` — strips any inbound `x-vq-*` headers (defense against
+  a crafted request spoofing context), then verifies the `vq-session`
+  cookie and sets fresh headers. Pinned to `runtime: 'nodejs'` because
+  `jsonwebtoken` needs Node crypto.
+- `src/lib/db.ts` — extension keeps the ALS fast path fully synchronous;
+  the header fallback is only awaited when ALS is empty, and
+  `next/headers` failures (scripts, migrations, tests) fall through to
+  an unwrapped query.
+
+### Known limitations / accepted trade-offs
+
+- The middleware derives role from the JWT claim without a DB check. A
+  stale JWT (user was demoted) will inject the old role for server
+  components that query Prisma without first calling `getSession()`.
+  `getSession()` itself always re-validates against `sessionVersion`,
+  so API routes wrapped by `withAuth` are unaffected. App-layer `where`
+  clauses still apply as defense in depth.
+- Node runtime only. Edge runtime would fail on both `jsonwebtoken`
+  and `AsyncLocalStorage`.
+
+### Blocker before dry-run
+
+`next build` currently fails with `node:async_hooks` leaking into the
+client chunker (via `src/lib/program-type.ts`). This predates Slice B
+and must be fixed before `RLS_CONTEXT_INJECTION=true` can be enabled
+in prod.
 
 ---
 

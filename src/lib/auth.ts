@@ -1,38 +1,21 @@
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 import { cached, invalidatePrefix } from "./cache";
+import {
+  signToken as signSessionToken,
+  verifyToken as verifySessionToken,
+  signMfaSessionToken as signMfa,
+  verifyMfaSessionToken as verifyMfa,
+  type SessionClaims,
+  type MfaSessionClaims,
+} from "./session-token";
 
-const TOKEN_TTL = "7d";
-const MFA_TOKEN_TTL = "5m";
 const MFA_COOKIE_MAX_AGE_S = 5 * 60;
 const COOKIE_NAME = "vq-session";
 const MFA_COOKIE_NAME = "vq-mfa-challenge";
 
-interface SessionClaims {
-  sub: string;
-  role: string;
-  sv: number;
-}
-
-interface MfaSessionClaims {
-  sub: string;
-  role: string;
-  sv: number;
-  purpose: "mfa_challenge";
-}
-
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET environment variable is required");
-  }
-  if (secret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters");
-  }
-  return secret;
-}
+export type { SessionClaims, MfaSessionClaims };
 
 // --- Password hashing ---
 //
@@ -157,27 +140,11 @@ export function verifyPasswordSafe(password: string, stored: string | null | und
   return verifyPasswordSafeWithStatus(password, stored).valid;
 }
 
-// --- JWT ---
+// --- JWT (re-exported from ./session-token so middleware can import the
+// verifier without pulling Prisma via this module) ---
 
-export function signToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), { expiresIn: TOKEN_TTL, algorithm: "HS256" });
-}
-
-export function verifyToken(token: string): SessionClaims | null {
-  try {
-    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<SessionClaims>;
-    if (
-      typeof payload.sub !== "string" ||
-      typeof payload.role !== "string" ||
-      typeof payload.sv !== "number"
-    ) {
-      return null;
-    }
-    return payload as SessionClaims;
-  } catch {
-    return null;
-  }
-}
+export const signToken = signSessionToken;
+export const verifyToken = verifySessionToken;
 
 // --- Session helpers ---
 
@@ -270,35 +237,5 @@ export function normalizeEmail(raw: string): string {
 
 // --- MFA session tokens ---
 
-/**
- * Sign a short-lived JWT (5 minutes) that proves password authentication succeeded
- * but MFA verification is still required.
- */
-export function signMfaSessionToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign(
-    { sub: studentId, role, sv: sessionVersion, purpose: "mfa_challenge" },
-    getJwtSecret(),
-    { expiresIn: MFA_TOKEN_TTL, algorithm: "HS256" },
-  );
-}
-
-/**
- * Verify and decode a MFA session token. Returns null if expired, invalid, or
- * not a MFA-purpose token.
- */
-export function verifyMfaSessionToken(token: string): MfaSessionClaims | null {
-  try {
-    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<MfaSessionClaims>;
-    if (
-      typeof payload.sub !== "string" ||
-      typeof payload.role !== "string" ||
-      typeof payload.sv !== "number" ||
-      payload.purpose !== "mfa_challenge"
-    ) {
-      return null;
-    }
-    return payload as MfaSessionClaims;
-  } catch {
-    return null;
-  }
-}
+export const signMfaSessionToken = signMfa;
+export const verifyMfaSessionToken = verifyMfa;
