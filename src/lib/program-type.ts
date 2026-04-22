@@ -1,6 +1,11 @@
-import { prisma } from "@/lib/db";
-
 /**
+ * Pure type/label helpers for program classification.
+ *
+ * This module is imported by client components. Do not add anything here
+ * that imports Prisma, `next/headers`, or other server-only modules —
+ * Turbopack will refuse to chunk those for the browser. The DB-backed
+ * helper lives in `./program-type-server.ts`.
+ *
  * Which program a class/student belongs to.
  * Derived from the student's active enrollment, never denormalized on Student.
  */
@@ -41,18 +46,3 @@ export function normalizeProgramType(
   return raw && isProgramType(raw) ? raw : "spokes";
 }
 
-/**
- * Returns the student's current program type based on their most-recent
- * active enrollment. Falls back to "spokes" if the student has no active
- * enrollment (brand-new account, pre-orientation).
- */
-export async function getStudentProgramType(
-  studentId: string,
-): Promise<ProgramType> {
-  const enrollment = await prisma.studentClassEnrollment.findFirst({
-    where: { studentId, status: "active" },
-    orderBy: { enrolledAt: "desc" },
-    select: { class: { select: { programType: true } } },
-  });
-  return normalizeProgramType(enrollment?.class.programType);
-}

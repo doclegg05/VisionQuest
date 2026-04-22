@@ -77,7 +77,7 @@ mock.module("@/lib/classroom", {
   },
 });
 
-mock.module("@/lib/program-type", {
+mock.module("@/lib/program-type-server", {
   namedExports: {
     getStudentProgramType: mockGetStudentProgramType,
   },

@@ -1,7 +1,7 @@
 import { getProvider } from "@/lib/ai";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
-import { getDocumentContext } from "@/lib/sage/knowledge-base";
+import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
@@ -14,7 +14,8 @@ import { getStudentPromptContext } from "@/lib/chat/context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota } from "@/lib/llm-usage";
 import { prisma } from "@/lib/db";
-import { getStudentProgramType, type ProgramType } from "@/lib/program-type";
+import { type ProgramType } from "@/lib/program-type";
+import { getStudentProgramType } from "@/lib/program-type-server";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 

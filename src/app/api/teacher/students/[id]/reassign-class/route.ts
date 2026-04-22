@@ -10,7 +10,8 @@ import {
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
 import { canManageAnyClass } from "@/lib/classroom";
-import { getStudentProgramType, type ProgramType } from "@/lib/program-type";
+import { type ProgramType } from "@/lib/program-type";
+import { getStudentProgramType } from "@/lib/program-type-server";
 
 // POST /api/teacher/students/:id/reassign-class
 // Admin or coordinator only. Archives the student's current active enrollment
