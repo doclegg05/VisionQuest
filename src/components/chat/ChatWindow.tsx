@@ -378,6 +378,11 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         <ConversationList
           onSelect={loadConversationById}
           onNewChat={startNewChat}
+          onDelete={(deletedId) => {
+            if (deletedId === conversationId) {
+              startNewChat();
+            }
+          }}
           activeId={conversationId}
           refreshKey={conversationRefreshKey}
         />

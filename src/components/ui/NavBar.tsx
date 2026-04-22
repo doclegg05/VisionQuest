@@ -77,7 +77,13 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
-        ? [...ADMIN_ITEMS, ...COORDINATOR_ITEMS, ...STAFF_ITEMS]
+        // Admin sees their own Sage (/admin/chat). Drop the teacher Sage
+        // from STAFF_ITEMS so the sidebar doesn't show "Sage" twice.
+        ? [
+            ...ADMIN_ITEMS,
+            ...COORDINATOR_ITEMS,
+            ...STAFF_ITEMS.filter((item) => item.href !== "/teacher/chat"),
+          ]
         : role === "coordinator"
           ? COORDINATOR_ITEMS
           : STAFF_ITEMS;
