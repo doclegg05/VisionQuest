@@ -175,24 +175,55 @@ on tables but `postgres` bypasses them.
 
 ---
 
-## Policy coverage gaps (Codex #8)
+## Policy coverage — actual prod state (discovered 2026-04-22)
 
-The existing policies (migrations 20260403060000 and 20260415000000) cover
-the main student-data tables but may miss:
+The earlier version of this runbook assumed policies from migration
+`20260403060000_rls_remaining_tables` were in place, with coverage gaps
+for a handful of tables added later. **That assumption was wrong.**
 
-- `CertRequirement` (via `Certification.studentId` — policy via JOIN)
-- `AdvisorAvailability` (teacher-owned)
-- `Opportunity` (teacher-owned)
-- `CareerEvent` (teacher-owned)
-- `PasswordResetToken` (student-owned)
-- `SecurityQuestionAnswer` (student-owned)
-- SPOKES tables (`SpokesRecord`, `SpokesChecklistProgress`,
-  `SpokesModuleProgress`, `SpokesEmploymentFollowUp`) need JOINs through
-  `StudentClassEnrollment`
+Audited prod via `pg_policies` on 2026-04-22 during Slice B dry-run:
 
-Before Slice C: audit `pg_policies` vs the full table list and add
-missing policies. The second RLS migration (`20260415000000`) enables
-RLS on ALL remaining tables with no policies, which is fail-closed under
-`vq_app` — safer default but will DENY any legitimate access until
-policies are added. Plan on a gap-filling migration before the connection
-swap.
+```sql
+SELECT tablename, COUNT(*) FROM pg_policies
+WHERE schemaname = 'visionquest' GROUP BY tablename;
+-- []  (zero policies on any table)
+```
+
+Root cause: migration `20260403060000_rls_remaining_tables` rolled back
+on its first apply attempt (2026-04-03 21:28) because it referenced the
+`vq_app` role before that role existed. The role wasn't created until
+migration `20260421020000_add_rls_role_and_helpers` two weeks later.
+The April 3 migration was never re-applied after `migrate resolve
+--rolled-back`, so **prod has RLS enabled on every table but zero
+policies granting access**.
+
+Current prod state:
+- ✅ RLS enabled on all tables (from `20260415000000`)
+- ✅ `vq_app` role exists
+- ✅ `managed_student_ids()` function exists
+- ❌ Zero policies
+
+Implication: flipping `DATABASE_URL` to `vq_app` today would make every
+query return zero rows. Fail-closed is correct behavior, but the app is
+unusable until policies land.
+
+## Slice C pre-requisites (re-scoped)
+
+1. **Policy recovery migration.** Port `20260403060000_rls_remaining_tables`
+   to the current schema and regenerate it as a new migration. Tables
+   added since 2026-04-03 (forms hub, coordinator permissions, grant
+   tracking, program types, etc.) need coverage.
+2. **RLS integration tests** (`src/lib/rls.test.ts`). Exercise:
+   - Student A cannot see Student B's data under `vq_app`
+   - Teacher sees only managed students
+   - Admin sees everything
+   - No context → zero rows
+   - `prismaAdmin` bypasses all of the above
+3. **Staging validation.** Run the live app against `vq_app` credentials
+   in a staging DB. Smoke all major flows (student dashboard, teacher
+   dashboard, admin, Sage chat).
+4. **Rollback dry-run.** Confirm that flipping `DATABASE_URL` back to
+   `postgres` credentials on Render restores access without code change.
+
+Only after all four are green does the Slice C deploy procedure make
+sense.
