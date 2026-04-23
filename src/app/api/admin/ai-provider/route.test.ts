@@ -249,14 +249,13 @@ describe("admin AI provider routes", () => {
     assert.equal(mockCheckOllamaHealth.mock.callCount(), 1);
     const call = mockCheckOllamaHealth.mock.calls[0];
     assert.equal(call.arguments[0], "https://llm.example.com");
-    assert.deepEqual(call.arguments[1], {
-      model: "gemma4:latest",
-      authConfig: {
-        authMode: "cloudflare_service_token",
-        apiKey: null,
-        cloudflareAccessClientId: "client-id",
-        cloudflareAccessClientSecret: "client-secret",
-      },
+    assert.equal((call.arguments[1] as { timeoutMs?: number }).timeoutMs, 300000);
+    assert.deepEqual((call.arguments[1] as { model: string; authConfig: unknown }).authConfig, {
+      authMode: "cloudflare_service_token",
+      apiKey: null,
+      cloudflareAccessClientId: "client-id",
+      cloudflareAccessClientSecret: "client-secret",
     });
+    assert.equal((call.arguments[1] as { model?: string }).model, "gemma4:latest");
   });
 });

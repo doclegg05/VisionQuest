@@ -14,6 +14,8 @@ const mockLogAuditEvent = mock.fn() as any;
 const mockRateLimit = mock.fn() as any;
 const mockVerifyMfaSessionToken = mock.fn() as any;
 const mockSetSessionCookie = mock.fn() as any;
+const mockGetMfaSessionToken = mock.fn() as any;
+const mockClearMfaSessionCookie = mock.fn() as any;
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -97,6 +99,8 @@ mock.module("@/lib/auth", {
   namedExports: {
     verifyMfaSessionToken: mockVerifyMfaSessionToken,
     setSessionCookie: mockSetSessionCookie,
+    getMfaSessionToken: mockGetMfaSessionToken,
+    clearMfaSessionCookie: mockClearMfaSessionCookie,
   },
 });
 
@@ -126,6 +130,8 @@ describe("MFA backup code routes", () => {
     mockRateLimit.mock.resetCalls();
     mockVerifyMfaSessionToken.mock.resetCalls();
     mockSetSessionCookie.mock.resetCalls();
+    mockGetMfaSessionToken.mock.resetCalls();
+    mockClearMfaSessionCookie.mock.resetCalls();
 
     mockVerifyTotp.mock.mockImplementation(() => ({ valid: true, counter: 1 }));
     mockGenerateBackupCodes.mock.mockImplementation(() => ["deadbeef", "cafebabe"]);
@@ -142,6 +148,8 @@ describe("MFA backup code routes", () => {
       purpose: "mfa_challenge",
     }));
     mockSetSessionCookie.mock.mockImplementation(async () => undefined);
+    mockGetMfaSessionToken.mock.mockImplementation(async () => null);
+    mockClearMfaSessionCookie.mock.mockImplementation(async () => undefined);
     mockUpdate.mock.mockImplementation(async () => undefined);
   });
 
@@ -204,6 +212,7 @@ describe("MFA backup code routes", () => {
     assert.deepEqual(mockUpdate.mock.calls[0]?.arguments[0]?.data?.mfaBackupCodes, [
       "hash:cafebabe",
     ]);
+    assert.equal(mockClearMfaSessionCookie.mock.callCount(), 1);
   });
 
   it("rejects invalid backup codes", async () => {
