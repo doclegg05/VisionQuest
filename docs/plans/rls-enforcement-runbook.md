@@ -209,21 +209,41 @@ unusable until policies land.
 
 ## Slice C pre-requisites (re-scoped)
 
-1. **Policy recovery migration.** Port `20260403060000_rls_remaining_tables`
-   to the current schema and regenerate it as a new migration. Tables
-   added since 2026-04-03 (forms hub, coordinator permissions, grant
-   tracking, program types, etc.) need coverage.
-2. **RLS integration tests** (`src/lib/rls.test.ts`). Exercise:
-   - Student A cannot see Student B's data under `vq_app`
-   - Teacher sees only managed students
+1. **Policy recovery migration.** ✅ Shipped 2026-04-23 as
+   `20260423120000_rls_policy_recovery`. Covers all 67 visionquest
+   models with 78 policies, enables RLS on the six tables added after
+   the April 15 blanket migration (Forms Hub + Region/Grant tracking).
+   Uses `DROP POLICY IF EXISTS` for idempotency. Coordinator-first-class
+   access is deferred to Slice D (see `rlsHeadersFromClaims` gap in
+   the migration header).
+2. **Enable-RLS gap fix.** ✅ Shipped 2026-04-23 as
+   `20260423130000_enable_rls_missing_tables`. Turns RLS on for 29
+   Prisma tables that fell through the gap between the rolled-back
+   April 3 and April 15 migrations (CaseNote, Certification, FileUpload,
+   SpokesRecord, StudentClassEnrollment, etc.), plus three phantom
+   tables from the closed pgvector PR #20 (ContentChunk, EmbeddingJob,
+   SourceDocument) which fail-closed with no policy. Discovered during
+   integration-test validation — CaseNote fixture was visible with no
+   RLS context because RLS wasn't actually on.
+3. **RLS integration tests.** ✅ `src/lib/rls.test.ts` — 13/13 passing
+   as of 2026-04-23 against prod with RLS_TEST_ENABLED=true. Uses
+   `GRANT vq_app TO postgres` to let the test harness `SET LOCAL ROLE`
+   inside transactions; runtime app behavior unchanged. Covers:
+   - Student A cannot see Student B's Conversations/Goals/Students
+   - Student cannot see CaseNotes at all (teacher-only policy)
+   - Student cannot insert rows for other students (WITH CHECK denies)
+   - Teacher sees managed students; does NOT see unmanaged
    - Admin sees everything
-   - No context → zero rows
-   - `prismaAdmin` bypasses all of the above
-3. **Staging validation.** Run the live app against `vq_app` credentials
-   in a staging DB. Smoke all major flows (student dashboard, teacher
-   dashboard, admin, Sage chat).
-4. **Rollback dry-run.** Confirm that flipping `DATABASE_URL` back to
-   `postgres` credentials on Render restores access without code change.
+   - No context → zero rows (fail-closed)
+   - postgres bypass still works (simulates `prismaAdmin`)
+4. **Staging validation.** Deferred — VisionQuest has a single DB and
+   is pre-student (Alpha). User elected to validate against prod directly.
+   Policies are dormant (app connects as `postgres` → bypasses RLS) until
+   the connection swap in Slice C, so no student-facing risk.
+5. **Rollback dry-run.** Still pending for Slice C: confirm that flipping
+   `DATABASE_URL` back to `postgres` credentials on Render restores access
+   without code change.
 
-Only after all four are green does the Slice C deploy procedure make
-sense.
+Slice C itself — the `DATABASE_URL` connection-role swap from `postgres`
+to `vq_app` — is now the only remaining step. Everything upstream is
+verified working.
