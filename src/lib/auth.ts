@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
-import { prisma } from "./db";
+import { prismaAdmin } from "./db";
 import { cached, invalidatePrefix } from "./cache";
 import {
   signToken as signSessionToken,
@@ -172,7 +172,7 @@ export async function getSession() {
   // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
   const cacheKey = `session:${claims.sub}:${claims.sv}`;
   const student = await cached(cacheKey, 10, () =>
-    prisma.student.findUnique({
+    prismaAdmin.student.findUnique({
       where: { id: claims.sub },
       select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true, isActive: true },
     }),

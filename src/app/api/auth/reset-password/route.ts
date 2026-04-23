@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPasswordResetToken } from "@/lib/password-reset";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";

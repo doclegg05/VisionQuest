@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { isGoalStale, type GoalForStalenessCheck } from "@/lib/stale-goal-rules";
 import { logger } from "@/lib/logger";
 

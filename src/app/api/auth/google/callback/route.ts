@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { setSessionCookie, normalizeEmail } from "@/lib/auth";
 import crypto from "crypto";
 import { logAuditEvent } from "@/lib/audit";

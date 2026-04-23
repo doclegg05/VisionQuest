@@ -1,4 +1,4 @@
-import { prisma } from "./db";
+import { prismaAdmin as prisma } from "./db";
 
 interface AuditEventInput {
   actorId?: string | null;

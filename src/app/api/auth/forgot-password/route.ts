@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { generatePasswordResetToken } from "@/lib/password-reset";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/email";

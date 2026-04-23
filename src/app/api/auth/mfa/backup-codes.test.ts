@@ -63,6 +63,12 @@ mock.module("@/lib/db", {
         update: mockUpdate,
       },
     },
+    prismaAdmin: {
+      student: {
+        findUnique: mockFindUnique,
+        update: mockUpdate,
+      },
+    },
   },
 });
 

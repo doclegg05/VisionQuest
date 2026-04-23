@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { processJobs, registerJobHandler } from "@/lib/jobs";
 
 type UpdateArgs = Parameters<typeof prisma.backgroundJob.update>[0];

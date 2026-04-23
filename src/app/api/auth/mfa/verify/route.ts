@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";

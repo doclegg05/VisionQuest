@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendMultiChannelNotification } from "@/lib/notifications";
 import { gatherDailyPromptContext } from "@/lib/sage/daily-prompt-data";

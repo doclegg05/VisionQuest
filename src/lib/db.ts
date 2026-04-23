@@ -136,32 +136,55 @@ const rlsExtension = Prisma.defineExtension((client) =>
 );
 
 const globalForPrisma = globalThis as unknown as {
+  prismaApp?: PrismaClient;
   prismaAdmin?: PrismaClient;
 };
 
-function buildAdminClient(): PrismaClient {
+function buildAppClient(): PrismaClient {
   return new PrismaClient();
 }
 
+/**
+ * The admin client deliberately uses a separate PrismaClient bound to
+ * ADMIN_DATABASE_URL when set (Slice C — points at the unrestricted
+ * `postgres` role). It falls back to DATABASE_URL for envs where the
+ * swap hasn't happened yet, in which case both clients hit the same
+ * connection and behave identically at the DB level.
+ */
+function buildAdminClient(): PrismaClient {
+  const adminUrl = process.env.ADMIN_DATABASE_URL;
+  if (adminUrl && adminUrl !== process.env.DATABASE_URL) {
+    return new PrismaClient({ datasources: { db: { url: adminUrl } } });
+  }
+  return new PrismaClient();
+}
+
+const appClient: PrismaClient = globalForPrisma.prismaApp ?? buildAppClient();
 const adminClient: PrismaClient = globalForPrisma.prismaAdmin ?? buildAdminClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prismaAdmin = adminClient;
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prismaApp = appClient;
+  globalForPrisma.prismaAdmin = adminClient;
+}
 
 /**
  * App-layer Prisma client. When RLS_CONTEXT_INJECTION=true AND an RLS
  * context is active (populated by withAuth), every query wraps in a
  * transaction that sets the `app.current_*` GUCs. Otherwise queries pass
  * through unwrapped.
+ *
+ * After Slice C, DATABASE_URL points at the `vq_app` role (no RLS
+ * bypass); un-contextualized queries fail-closed.
  */
-export const prisma = adminClient.$extends(rlsExtension);
+export const prisma = appClient.$extends(rlsExtension);
 
 /**
- * Admin Prisma client — same connection as `prisma` but never injects RLS
- * context. Use from cron endpoints, background job processors, and other
+ * Admin Prisma client — uses ADMIN_DATABASE_URL (postgres credentials)
+ * after Slice C. Never injects RLS context. Use from pre-auth routes
+ * (login, register, password reset), cron endpoints, public pages, and
  * internal flows that must bypass policies.
  *
- * Until Slice C switches the app connection to `vq_app`, `prisma` and
- * `prismaAdmin` are functionally equivalent at the DB level (both run as
- * `postgres` which bypasses RLS). Callers should still use the right one
- * now so the eventual swap is a pure config change.
+ * Before Slice C (ADMIN_DATABASE_URL unset), this falls back to the
+ * same DATABASE_URL as `prisma`, so callers get identical behavior
+ * today and the eventual swap is a pure env-var change.
  */
 export const prismaAdmin: PrismaClient = adminClient;

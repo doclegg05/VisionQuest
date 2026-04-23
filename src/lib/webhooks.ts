@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { prisma } from "./db";
+import { prismaAdmin as prisma } from "./db";
 import { cached, invalidatePrefix } from "./cache";
 import { logger } from "./logger";
 

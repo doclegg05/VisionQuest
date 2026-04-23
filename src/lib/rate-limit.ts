@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "./db";
+import { prismaAdmin as prisma } from "./db";
 
 const MAX_RETRIES = 3;
 

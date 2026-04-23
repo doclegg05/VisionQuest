@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
 
 export const GET = withTeacherAuth(async (session) => {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { logger } from "@/lib/logger";
 

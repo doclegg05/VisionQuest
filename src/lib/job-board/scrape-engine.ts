@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
 import type { JobSourceAdapter, NormalizedJob } from "./types";
