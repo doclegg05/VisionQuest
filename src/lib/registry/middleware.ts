@@ -4,7 +4,8 @@ import type { Session } from "@/lib/api-error";
 import { getTool } from "@/lib/registry";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
-import { ApiError } from "@/lib/api-error";
+import { ApiError, rlsContextFor } from "@/lib/api-error";
+import { withRlsContext } from "@/lib/rls-context";
 import { resolvePermission } from "@/lib/rbac";
 import type { ToolDefinition } from "@/lib/registry/types";
 
@@ -96,7 +97,16 @@ export function withRegistry(toolId: string, handler: RegistryHandler) {
         });
       }
 
-      return await handler(session, req, ctx, tool);
+      // Run the handler inside `withRlsContext` so Prisma queries execute
+      // with the right `app.current_role` / `app.user_id` GUCs under vq_app.
+      // Without this the registry routes fall through to the db.ts
+      // header-hydration slow path — which works, but relies on the proxy
+      // setting headers correctly for every request path. Setting ALS here
+      // is both faster and more resilient. (Same fix shape as withAuth.)
+      const typedSession = session;
+      return await withRlsContext(rlsContextFor(typedSession), () =>
+        handler(typedSession, req, ctx, tool),
+      );
     } catch (err) {
       if (err instanceof ApiError) {
         return NextResponse.json(

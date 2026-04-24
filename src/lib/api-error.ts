@@ -3,7 +3,13 @@ import { getSession } from "./auth";
 import { logger } from "./logger";
 import { withRlsContext, type RlsContext } from "./rls-context";
 
-function rlsContextFor(session: Session): RlsContext {
+/**
+ * Translate a Session into the RLS context shape expected by
+ * `withRlsContext` — the canonical mapping used by every auth wrapper in
+ * the codebase. Exported so adjacent wrappers (withRegistry,
+ * withCoordinatorAuth) can share the exact same logic and stay in sync.
+ */
+export function rlsContextFor(session: Session): RlsContext {
   const role = session.role === "admin" || session.role === "teacher" ? session.role : "student";
   return {
     userId: session.id,

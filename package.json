@@ -20,7 +20,8 @@
     "db:seed": "node scripts/seed-data.mjs",
     "db:seed-documents": "node scripts/seed-documents.mjs",
     "seed:sage-context": "node scripts/seed-sage-context.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "audit:api-auth": "node scripts/audit-api-auth.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",
