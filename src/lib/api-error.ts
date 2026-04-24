@@ -66,13 +66,23 @@ function errorResponse(status: number, message: string, code?: string) {
 }
 
 /**
- * Wraps a Next.js route handler with standardized error handling.
+ * Wraps a Next.js route handler with standardized error handling only —
+ * NO session, NO RLS context. Use this strictly for endpoints that are
+ * supposed to run unauthenticated: login, register, forgot-password,
+ * csp-report, internal cron, etc.
  *
- * Usage:
- *   export const GET = withErrorHandler(async (req) => {
- *     const session = await getSession();
- *     if (!session) throw unauthorized();
- *     // ... return NextResponse.json(...)
+ * If your route needs `session`, use `withAuth` / `withTeacherAuth`.
+ * Pairing `withErrorHandler` with a manual `getSession()` call skips
+ * `withRlsContext` — under `vq_app` every subsequent Prisma query then
+ * sees an empty role/userId and silently returns no rows. This class of
+ * bug wrecked the document library on 2026-04-24 (commits 3493026,
+ * 0cb9876).
+ *
+ * Usage (unauth endpoint):
+ *   export const POST = withErrorHandler(async (req) => {
+ *     const body = await req.json();
+ *     // no getSession() here; this is a public endpoint
+ *     return NextResponse.json(...);
  *   });
  */
 export function withErrorHandler<

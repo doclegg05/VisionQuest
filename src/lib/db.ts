@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { getRlsContext, type RlsContext } from "./rls-context";
 import { rlsContextFromHeaders } from "./rls-headers";
+import { logger } from "./logger";
 
 /**
  * Connection pool configuration.
@@ -77,6 +78,25 @@ async function tryLoadContextFromHeaders(): Promise<RlsContext | null> {
   }
 }
 
+/**
+ * Fire a dev-only warning when a Prisma query runs with no RLS context.
+ * Under `vq_app` this path returns silently filtered results (rows that
+ * don't match the ever-empty GUC predicates), which is the same class of
+ * bug as the Library 404s we chased on 2026-04-24. Production is silenced
+ * because legitimate anonymous paths (e.g. pre-login reads) would otherwise
+ * spam logs; in dev the noise is the feature. Set
+ * `DISABLE_RLS_CONTEXT_WARN=true` to silence for scripts/migrations.
+ */
+function warnMissingRlsContext(model: string | undefined, operation: string): void {
+  if (process.env.NODE_ENV === "production") return;
+  if (process.env.DISABLE_RLS_CONTEXT_WARN === "true") return;
+  logger.warn("prisma query ran with no RLS context", {
+    model: model ?? "(unknown)",
+    operation,
+    hint: "API routes should use withAuth/withTeacherAuth (not withErrorHandler + getSession). Server components need the proxy to attach session headers (/api/* and /app routes).",
+  });
+}
+
 function runWithContext(
   client: PrismaClient,
   ctx: RlsContext,
@@ -103,7 +123,7 @@ const rlsExtension = Prisma.defineExtension((client) =>
   client.$extends({
     name: "rls-context",
     query: {
-      $allOperations({ args, query }) {
+      $allOperations({ args, query, operation, model }) {
         // Gated per-call so the flag can be toggled at runtime without
         // rebuilding the client. No context = unwrapped query (fail-closed
         // under vq_app once Slice C lands; currently a no-op under postgres).
@@ -126,7 +146,19 @@ const rlsExtension = Prisma.defineExtension((client) =>
         // `x-vq-*` request headers; we hydrate context from them here.
         return (async () => {
           const headerCtx = await tryLoadContextFromHeaders();
-          if (!headerCtx) return query(args);
+          if (!headerCtx) {
+            // Neither ALS nor request headers produced an RLS context. Under
+            // `vq_app` this means the query runs with empty GUCs — RLS
+            // policies that key off the session silently reject every row.
+            // Legitimate cases: migrations, one-off scripts, anonymous
+            // pre-login requests. Illegitimate case: an API route using
+            // `withErrorHandler` + manual `getSession()` instead of
+            // `withAuth` (see fix(rls) commit 0cb9876). Log a dev-only
+            // warning with the model + operation so the footgun surfaces
+            // immediately next time.
+            warnMissingRlsContext(model, operation);
+            return query(args);
+          }
           return runWithContext(
             client as unknown as PrismaClient,
             headerCtx,
