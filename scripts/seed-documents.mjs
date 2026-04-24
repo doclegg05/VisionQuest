@@ -192,6 +192,26 @@ function getStorageKey(relPath) {
   return `${prefix}/${rest}`;
 }
 
+/**
+ * Fail fast if a storageKey matches any shape that the CHECK constraint
+ * `program_document_storage_key_shape` on ProgramDocument would reject.
+ * Keeps the seed script honest across edits — a misconfigured FOLDER_MAP
+ * or a stray path would otherwise bubble up as a Postgres error mid-upsert.
+ */
+function assertValidStorageKey(storageKey) {
+  const broken =
+    storageKey.startsWith("docs-upload/") ||
+    storageKey.startsWith("presentation/") ||
+    storageKey === "_inventory.txt" ||
+    (storageKey.startsWith("teachers/") && !storageKey.startsWith("teachers/guides/")) ||
+    (storageKey.startsWith("students/") && !storageKey.startsWith("students/resources/"));
+  if (broken) {
+    throw new Error(
+      `Refusing to seed broken storageKey "${storageKey}". Check FOLDER_MAP and path-building logic.`,
+    );
+  }
+}
+
 /** Determine ProgramDocCategory from the relative path */
 function getCategory(relPath) {
   const lower = relPath.toLowerCase();
@@ -305,6 +325,7 @@ async function main() {
 
     const storageKey = getStorageKey(relPath);
     if (!storageKey) continue;
+    assertValidStorageKey(storageKey);
 
     const category = getCategory(relPath);
     const audience = getAudience(relPath);
