@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { getProvider } from "@/lib/ai";
+import { resolveAiProvider } from "@/lib/ai";
+import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
@@ -10,6 +11,7 @@ import { logger } from "@/lib/logger";
  * For new conversations: fetches goals, determines stage, deactivates old goal convos.
  */
 const ALLOWED_REQUESTED_STAGES = new Set([
+  "discovery",
   "career_profile_review",
 ]);
 
@@ -249,11 +251,46 @@ export async function maybeUpdateSummary(
     ? `Here is the existing conversation summary:\n${existingSummary}\n\nHere are the new messages to incorporate:\n${newText}\n\nUpdate the summary to include the key points from the new messages. Keep it concise (2-3 paragraphs max). Focus on: goals discussed, decisions made, progress reported, and emotional state.`
     : `Summarize this coaching conversation. Focus on: goals discussed, decisions made, progress reported, and emotional state. Keep it concise (2-3 paragraphs max).\n\n${newText}`;
 
-  const provider = await getProvider(studentId);
+  const provider = await resolveAiProvider({
+    studentId,
+    task: "conversation_summary",
+    sensitivity: "student_record",
+  });
+  const providerClass = getProviderClass(provider.name);
+  await logAiAuditEvent({
+    actorId: studentId,
+    actorRole: "student",
+    route: "background:chat/summary",
+    task: "conversation_summary",
+    sensitivity: "student_record",
+    policyDecision: "local_only",
+    status: "routed",
+    targetId: conversationId,
+    providerName: provider.name,
+    providerClass,
+    allowCloud: false,
+    inputChars: summaryPrompt.length,
+    reason: "Conversation summaries use student conversation content and are local-only by policy.",
+  });
   const updatedSummary = await provider.generateResponse(
     COMPACTION_SYSTEM_PROMPT,
     [{ role: "user", content: summaryPrompt }],
   );
+  await logAiAuditEvent({
+    actorId: studentId,
+    actorRole: "student",
+    route: "background:chat/summary",
+    task: "conversation_summary",
+    sensitivity: "student_record",
+    policyDecision: "local_only",
+    status: "completed",
+    targetId: conversationId,
+    providerName: provider.name,
+    providerClass,
+    allowCloud: false,
+    inputChars: summaryPrompt.length,
+    outputChars: updatedSummary.length,
+  });
 
   const lastMessageId =
     messagesToSummarize[messagesToSummarize.length - 1].id;

@@ -1,7 +1,9 @@
-import { getProvider } from "@/lib/ai";
+import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
+import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
+import { getDirectFormAnswer, getFormContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
@@ -19,22 +21,104 @@ import { getStudentProgramType } from "@/lib/program-type-server";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
+function createSseResponse(
+  conversationId: string,
+  text: string,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ conversationId })}\n\n`),
+      );
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
+      );
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ done: true, conversationId })}\n\n`),
+      );
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
 export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
   const conversationId = body.conversationId || null;
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
+  const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
+  const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
+  const directFormAnswer = getDirectFormAnswer(userMessage);
 
-  // Resolve AI provider first — guardrails depend on whether it's cloud or local
-  let provider;
+  if (directFormAnswer) {
+    const conversation = isTeacher
+      ? await getOrCreateTeacherConversation(session.id, conversationId)
+      : await getOrCreateConversation(session.id, conversationId, requestedStage);
+
+    await saveMessage(conversation.id, session.id, "user", userMessage);
+    await saveMessage(conversation.id, session.id, "assistant", directFormAnswer);
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/chat/send",
+      task: "public_form_lookup",
+      sensitivity: "public_program",
+      policyDecision: "direct_no_model",
+      status: "direct",
+      targetId: conversation.id,
+      providerName: null,
+      providerClass: "none",
+      allowCloud: true,
+      inputChars: userMessage.length,
+      outputChars: directFormAnswer.length,
+      reason: "Matched a public blank-form request in the deterministic SPOKES form registry.",
+    });
+
+    return createSseResponse(conversation.id, directFormAnswer);
+  }
+
+  // Resolve AI provider first — guardrails depend on whether it's cloud or local.
+  // Student-record and staff-entered chat are local-only; public form lookup
+  // bypasses this route above.
+  let provider: AIProvider;
   try {
-    provider = await getProvider(session.id);
+    provider = await resolveAiProvider({
+      studentId: session.id,
+      task: chatTask,
+      sensitivity: chatSensitivity,
+    });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
     const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
 
     logger.error("AI provider initialization failed", { error: errorMsg, studentId: session.id });
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/chat/send",
+      task: chatTask,
+      sensitivity: chatSensitivity,
+      policyDecision: "blocked",
+      status: "blocked",
+      targetId: conversationId,
+      providerName: null,
+      providerClass: "none",
+      allowCloud: false,
+      inputChars: userMessage.length,
+      reason: errorMsg,
+      errorCode: isOffline ? "LOCAL_AI_UNAVAILABLE" : "AI_PROVIDER_UNAVAILABLE",
+    });
 
     return new Response(
       JSON.stringify({
@@ -45,6 +129,24 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
+  const promptTier = getPromptTier(provider);
+  const providerClass = getProviderClass(provider.name);
+  await logAiAuditEvent({
+    actorId: session.id,
+    actorRole: session.role,
+    route: "/api/chat/send",
+    task: chatTask,
+    sensitivity: chatSensitivity,
+    policyDecision: "local_only",
+    status: "routed",
+    targetId: conversationId,
+    providerName: provider.name,
+    providerClass,
+    promptTier,
+    allowCloud: false,
+    inputChars: userMessage.length,
+    reason: "Student-record and staff-entered Sage chat are local-only by policy.",
+  });
 
   // All token/rate guardrails only apply to cloud providers (local models have no API cost)
   const isCloudProvider = provider.name === "gemini";
@@ -91,6 +193,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const conversation = isTeacher
     ? await getOrCreateTeacherConversation(session.id, conversationId)
     : await getOrCreateConversation(session.id, conversationId, requestedStage);
+  const conversationStage = conversation.stage as ConversationStage;
 
   // Save user message
   await saveMessage(conversation.id, session.id, "user", userMessage);
@@ -118,17 +221,18 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     systemPrompt = buildSystemPrompt("teacher_assistant", {
       studentName: session.displayName,
       userMessage,
-    });
+    }, promptTier);
   } else {
     const promptContext = await getStudentPromptContext(
       session.id,
       conversation.id,
-      conversation.stage as ConversationStage,
+      conversationStage,
+      promptTier === "compact" ? 1 : 3,
     );
 
     systemPrompt =
       promptContext.priorConversationContext +
-      buildSystemPrompt(conversation.stage as ConversationStage, {
+      buildSystemPrompt(conversationStage, {
         studentName: session.displayName,
         programType: studentProgramType,
         classroomConfirmedAt: studentClassroomConfirmedAt,
@@ -140,7 +244,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         student_status_summary: promptContext.studentStatusSummary,
         userMessage,
         career_clusters:
-          conversation.stage === "discovery"
+          conversationStage === "discovery"
             ? formatClustersForPrompt()
             : undefined,
         discovery_summary: promptContext.discoverySummary,
@@ -148,13 +252,22 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         skillGapContext: promptContext.skillGapContext,
         pathwayContext: promptContext.pathwayContext,
         coachingArcContext: promptContext.coachingArcContext,
-      });
+      }, promptTier);
   }
 
   // Inject document-based context from ProgramDocument (RAG layer)
-  const documentContext = await getDocumentContext(userMessage, isTeacher ? "staff" : "student");
+  const documentContext = await getDocumentContext(
+    userMessage,
+    isTeacher ? "staff" : "student",
+    3,
+    promptTier === "compact" ? 2000 : 6000,
+  );
   if (documentContext) {
     systemPrompt += documentContext;
+  }
+  const formContext = getFormContext(userMessage);
+  if (formContext) {
+    systemPrompt += formContext;
   }
 
   // 80% daily warning — inject into system prompt so Sage mentions it naturally
@@ -171,7 +284,17 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   logger.info("sage.prompt.size", { size: systemPrompt.length });
 
   // Format message history for Gemini, using compacted context when available
-  const conversationContext = await getConversationContext(conversation.id);
+  const maxRecentMessages =
+    promptTier === "compact"
+      ? conversationStage === "discovery" ||
+        conversationStage === "career_profile_review"
+        ? 12
+        : 6
+      : 20;
+  const conversationContext = await getConversationContext(
+    conversation.id,
+    maxRecentMessages,
+  );
   const allMessages = [
     ...conversationContext.messages,
     { role: "user" as const, content: userMessage },
@@ -221,6 +344,25 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           });
         }
         await saveMessage(conversation.id, session.id, "assistant", persisted);
+        await logAiAuditEvent({
+          actorId: session.id,
+          actorRole: session.role,
+          route: "/api/chat/send",
+          task: chatTask,
+          sensitivity: chatSensitivity,
+          policyDecision: "local_only",
+          status: "completed",
+          targetId: conversation.id,
+          providerName: provider.name,
+          providerClass,
+          promptTier,
+          allowCloud: false,
+          inputChars: userMessage.length,
+          outputChars: persisted.length,
+          metadata: {
+            conversationStage,
+          },
+        });
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
         void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
@@ -261,6 +403,27 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         const msg = error instanceof Error ? error.message : String(error);
         const cause = error instanceof Error && error.cause ? String(error.cause) : undefined;
         logger.error("Stream error", { error: msg, cause, provider: provider.name });
+        await logAiAuditEvent({
+          actorId: session.id,
+          actorRole: session.role,
+          route: "/api/chat/send",
+          task: chatTask,
+          sensitivity: chatSensitivity,
+          policyDecision: "local_only",
+          status: "failed",
+          targetId: conversation.id,
+          providerName: provider.name,
+          providerClass,
+          promptTier,
+          allowCloud: false,
+          inputChars: userMessage.length,
+          outputChars: fullResponse.length,
+          reason: msg,
+          errorCode: "AI_STREAM_FAILED",
+          metadata: {
+            conversationStage,
+          },
+        });
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` })}\n\n`));
         controller.close();
       }

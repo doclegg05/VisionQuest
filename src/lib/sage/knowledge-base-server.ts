@@ -145,6 +145,7 @@ export async function getDocumentContext(
   userMessage: string,
   callerRole: CallerRole = "student",
   maxResults: number = 3,
+  tokenBudgetChars: number = TOKEN_BUDGET_CHARS,
 ): Promise<string> {
   const messageLower = userMessage.toLowerCase();
 
@@ -180,7 +181,7 @@ export async function getDocumentContext(
 
   // Enforce token budget — drop lowest-scoring entries until under budget
   let totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
-  while (totalChars > TOKEN_BUDGET_CHARS && combined.length > 1) {
+  while (totalChars > tokenBudgetChars && combined.length > 1) {
     combined = combined.slice(0, -1);
     totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
   }

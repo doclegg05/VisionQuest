@@ -6,6 +6,11 @@ import {
   FORMS,
   hasDownloadableFormDocument,
 } from "./forms";
+import {
+  findRelevantForms,
+  getDirectFormAnswer,
+  getFormContext,
+} from "@/lib/sage/knowledge-base";
 
 describe("FORMS", () => {
   it("has unique ids", () => {
@@ -30,5 +35,30 @@ describe("FORMS", () => {
     );
 
     assert.ok(missingDigitalForms.some((form) => form.id === "learning-styles"));
+  });
+
+  it("finds deterministic links for specific form requests", () => {
+    const matches = findRelevantForms("Can you pull the Student Profile form?");
+
+    assert.equal(matches[0].form.id, "student-profile");
+    assert.equal(
+      matches[0].url,
+      "/api/forms/download?formId=student-profile&mode=view",
+    );
+  });
+
+  it("builds a direct answer for blank form lookup without model help", () => {
+    const answer = getDirectFormAnswer("I need the attendance contract PDF");
+
+    assert.ok(answer);
+    assert.match(answer, /\[Personal Attendance Contract\]/);
+    assert.match(answer, /\/api\/forms\/download\?formId=attendance-contract&mode=view/);
+  });
+
+  it("builds prompt context with exact form URLs", () => {
+    const context = getFormContext("Where is the DFA-TS-12 form?");
+
+    assert.match(context, /FORM LINKS/);
+    assert.match(context, /\/api\/forms\/download\?formId=dfa-ts-12&mode=view/);
   });
 });

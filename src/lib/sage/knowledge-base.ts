@@ -13,7 +13,26 @@
  */
 export const SPOKES_BRIEF = `SPOKES PROGRAM OVERVIEW (brief): SPOKES (Skills, Preparation, Opportunities, Knowledge, Employment, Success) is a West Virginia workforce training program for adults receiving TANF/SNAP benefits, focused on employment and self-sufficiency. Students can earn industry certifications including IC3 Digital Literacy, Microsoft Office Specialist, QuickBooks, ACT WorkKeys, and more through platforms like GMetrix, Essential Education, and Khan Academy. If you need detailed certification requirements, platform setup steps, or program forms, just ask — full program details are available.`;
 
+export const COMPACT_SPOKES_KNOWLEDGE = `SPOKES PROGRAM OVERVIEW (compact): SPOKES is a West Virginia workforce training program for adults receiving TANF/SNAP benefits through WV Works. The goal is employment, self-sufficiency, and the Ready to Work Certificate.
+
+Certifications and credentials include IC3 Digital Literacy, Microsoft Office Specialist, Adobe Certified Associate, Intuit/QuickBooks, ACT WorkKeys NCRC, IT Specialist Cybersecurity, Customer Service, AI Foundations, Professional Communications, Computer Essentials, Work Essentials, Money Essentials, Burlington English, and Bring Your A Game.
+
+Platforms include GMetrix/LearnKey, Edgenuity, Khan Academy, Essential Education, Burlington English, USA Learns, Aztec, CSMlearn, Bring Your A Game, and SkillPath. The program usually runs 4-10 weeks, 20-35 hours/week, with rolling enrollment and a 4-week SPOKES Cycle.`;
+
+export const COMPACT_ADULT_ED_KNOWLEDGE = `ADULT EDUCATION PROGRAM OVERVIEW (compact): West Virginia Adult Education helps adults earn the GED and build academic skills needed for further training, college, or work.
+
+The GED has four subtests: Reasoning Through Language Arts, Mathematical Reasoning, Science, and Social Studies. Passing score is 145 per subtest. TABE 11/12 is used for placement and progress tracking through NRS educational functioning levels.
+
+Common platforms include Aztec, Essential Education, Khan Academy, Edgenuity, GED.com, Burlington English, and USA Learns. Keep coaching focused on credential progress unless the student raises career or workforce next steps.`;
+
 import type { ProgramType } from "@/lib/program-type";
+import {
+  buildFormDownloadUrl,
+  FORM_CATEGORIES,
+  FORMS,
+  hasDownloadableFormDocument,
+  type SpokesForm,
+} from "@/lib/spokes/forms";
 
 export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
 You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
@@ -213,6 +232,18 @@ export function getProgramKnowledge(programType: ProgramType): string {
     case "spokes":
     default:
       return SPOKES_KNOWLEDGE;
+  }
+}
+
+export function getCompactProgramKnowledge(programType: ProgramType): string {
+  switch (programType) {
+    case "adult_ed":
+      return COMPACT_ADULT_ED_KNOWLEDGE;
+    case "ietp":
+      return COMPACT_SPOKES_KNOWLEDGE;
+    case "spokes":
+    default:
+      return COMPACT_SPOKES_KNOWLEDGE;
   }
 }
 
@@ -468,7 +499,7 @@ export const TOPIC_KEYWORDS: Record<string, string[]> = {
  * Returns empty string if no topics match (Sage uses base knowledge).
  * Limits to top 3 most relevant topics to avoid context bloat.
  */
-export function getRelevantContent(userMessage: string): string {
+export function getRelevantContent(userMessage: string, maxTopics: number = 3): string {
   const messageLower = userMessage.toLowerCase();
   const matches: { topic: string; score: number }[] = [];
 
@@ -486,9 +517,9 @@ export function getRelevantContent(userMessage: string): string {
 
   if (matches.length === 0) return "";
 
-  // Sort by relevance score, take top 3
+  // Sort by relevance score, take top matches
   matches.sort((a, b) => b.score - a.score);
-  const topMatches = matches.slice(0, 3);
+  const topMatches = matches.slice(0, maxTopics);
 
   const content = topMatches
     .map((m) => TOPIC_CONTENT[m.topic])
@@ -496,4 +527,112 @@ export function getRelevantContent(userMessage: string): string {
     .join("\n\n---\n\n");
 
   return content ? `\n\nDETAILED REFERENCE (use this to give specific, accurate answers):\n${content}` : "";
+}
+
+export interface FormLinkMatch {
+  form: SpokesForm;
+  url: string;
+  score: number;
+}
+
+const FORM_INTENT_WORDS =
+  /\b(form|forms|document|documents|pdf|packet|paperwork|download|open|view|link|fill|fillable|pull|find|get|need|where)\b/i;
+const FORM_MATCH_STOPWORDS = new Set([
+  "document",
+  "fillable",
+  "form",
+  "forms",
+]);
+
+function formSearchText(form: SpokesForm): string {
+  return [
+    form.id.replace(/-/g, " "),
+    form.title,
+    form.description,
+    FORM_CATEGORIES[form.category].label,
+    form.fileName.replace(/[_-]/g, " "),
+  ].join(" ");
+}
+
+function scoreForm(form: SpokesForm, messageLower: string): number {
+  let score = 0;
+  const idPhrase = form.id.replace(/-/g, " ").toLowerCase();
+  const titleLower = form.title.toLowerCase();
+  const categoryLabel = FORM_CATEGORIES[form.category].label.toLowerCase();
+  const compactMessage = messageLower.replace(/[^a-z0-9]/g, "");
+  const compactId = form.id.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const compactTitle = titleLower.replace(/[^a-z0-9]/g, "");
+
+  if (messageLower.includes(idPhrase)) score += idPhrase.length * 2;
+  if (messageLower.includes(titleLower)) score += titleLower.length * 2;
+  if (compactId && compactMessage.includes(compactId)) score += compactId.length * 3;
+  if (compactTitle && compactMessage.includes(compactTitle)) {
+    score += compactTitle.length * 2;
+  }
+  if (messageLower.includes(categoryLabel)) score += categoryLabel.length;
+
+  for (const word of formSearchText(form).toLowerCase().split(/\s+/)) {
+    const normalized = word.replace(/[^a-z0-9]/g, "");
+    if (
+      normalized.length >= 4 &&
+      !FORM_MATCH_STOPWORDS.has(normalized) &&
+      messageLower.includes(normalized)
+    ) {
+      score += normalized.length;
+    }
+  }
+
+  return score;
+}
+
+export function findRelevantForms(
+  userMessage: string,
+  maxResults: number = 3,
+): FormLinkMatch[] {
+  const messageLower = userMessage.toLowerCase();
+  return FORMS
+    .filter(hasDownloadableFormDocument)
+    .map((form) => ({
+      form,
+      url: buildFormDownloadUrl(form, "view"),
+      score: scoreForm(form, messageLower),
+    }))
+    .filter((match) => match.score >= 6)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, maxResults);
+}
+
+function formatFormTags(form: SpokesForm): string {
+  const tags = [
+    form.fillable ? "fillable" : null,
+    form.requiresSignature ? "signature required" : null,
+  ].filter(Boolean);
+  return tags.length > 0 ? ` (${tags.join(", ")})` : "";
+}
+
+export function getFormContext(userMessage: string): string {
+  const matches = findRelevantForms(userMessage);
+  if (matches.length === 0) return "";
+
+  const lines = matches.map(
+    ({ form, url }) => `- **${form.title}**${formatFormTags(form)}: ${url}`,
+  );
+  return `\n\nFORM LINKS (provide these exact URLs when relevant; do not make up form links):\n${lines.join("\n")}`;
+}
+
+export function getDirectFormAnswer(userMessage: string): string | null {
+  if (!FORM_INTENT_WORDS.test(userMessage)) return null;
+
+  const matches = findRelevantForms(userMessage);
+  if (matches.length === 0) return null;
+
+  const lines = matches.map(
+    ({ form, url }) => `- [${form.title}](${url})${formatFormTags(form)}`,
+  );
+  const lead =
+    matches.length === 1
+      ? "I found the form:"
+      : "I found these forms:";
+
+  return `${lead}\n\n${lines.join("\n")}\n\nIf this is not the one you meant, tell me the form name and I will look again.`;
 }

@@ -65,6 +65,7 @@ export class OllamaProvider implements AIProvider {
    * 5 minutes allows for slow prompt evaluation on CPU hardware.
    */
   private static readonly STREAM_FIRST_BYTE_TIMEOUT_MS = 300_000;
+  private static readonly NUM_CTX = 4096;
 
   constructor(
     baseUrl: string,
@@ -185,11 +186,13 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: false,
+        num_ctx: OllamaProvider.NUM_CTX,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
+        options: { num_ctx: OllamaProvider.NUM_CTX },
         keep_alive: "10m",
       },
     );
@@ -217,11 +220,13 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: true,
+        num_ctx: OllamaProvider.NUM_CTX,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: true,
+        options: { num_ctx: OllamaProvider.NUM_CTX },
         keep_alive: "10m",
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
@@ -314,12 +319,14 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         response_format: { type: "json_object" },
+        num_ctx: OllamaProvider.NUM_CTX,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
         format: "json",
+        options: { num_ctx: OllamaProvider.NUM_CTX },
         keep_alive: "10m",
       },
     );

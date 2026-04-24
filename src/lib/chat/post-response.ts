@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { getProvider } from "@/lib/ai";
+import { resolveAiProvider } from "@/lib/ai";
+import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
 import { GOAL_PLANNING_STATUSES, isGoalLevel, type GoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
@@ -57,7 +58,27 @@ export async function handlePostResponse({
   programType,
   classroomConfirmedAt,
 }: PostResponseParams): Promise<void> {
-  const provider = await getProvider(studentId);
+  const provider = await resolveAiProvider({
+    studentId,
+    task: "sage_post_response",
+    sensitivity: "student_record",
+  });
+  const providerClass = getProviderClass(provider.name);
+  await logAiAuditEvent({
+    actorId: studentId,
+    actorRole: "student",
+    route: "background:chat/post-response",
+    task: "sage_post_response",
+    sensitivity: "student_record",
+    policyDecision: "local_only",
+    status: "routed",
+    targetId: conversationId,
+    providerName: provider.name,
+    providerClass,
+    allowCloud: false,
+    inputChars: userMessage.length + fullResponse.length,
+    reason: "Post-response extraction uses student conversation content and is local-only by policy.",
+  });
 
   // Fire-and-forget classroom-confirmation extractor. Only runs until the
   // student has confirmed their classroom; after that the onboarding prompt
@@ -155,6 +176,20 @@ export async function handlePostResponse({
     }
 
     // Rolling summary compaction is now handled by maybeUpdateSummary in the route
+    await logAiAuditEvent({
+      actorId: studentId,
+      actorRole: "student",
+      route: "background:chat/post-response",
+      task: "sage_post_response",
+      sensitivity: "student_record",
+      policyDecision: "local_only",
+      status: "completed",
+      targetId: conversationId,
+      providerName: provider.name,
+      providerClass,
+      allowCloud: false,
+      inputChars: userMessage.length + fullResponse.length,
+    });
     return;
   }
 
@@ -271,4 +306,18 @@ export async function handlePostResponse({
   }
 
   // Summary compaction is now handled by maybeUpdateSummary in the route
+  await logAiAuditEvent({
+    actorId: studentId,
+    actorRole: "student",
+    route: "background:chat/post-response",
+    task: "sage_post_response",
+    sensitivity: "student_record",
+    policyDecision: "local_only",
+    status: "completed",
+    targetId: conversationId,
+    providerName: provider.name,
+    providerClass,
+    allowCloud: false,
+    inputChars: userMessage.length + fullResponse.length,
+  });
 }

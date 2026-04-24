@@ -3,7 +3,8 @@ import { withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
-import { getProvider } from "@/lib/ai";
+import { resolveAiProvider, type AIProvider } from "@/lib/ai";
+import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
 import { logger } from "@/lib/logger";
 import {
   parseStoredResumeData,
@@ -22,7 +23,51 @@ export const POST = withAuth(async (session, req: Request) => {
   }
 
   const body = await parseBody(req, resumeAssistRequestSchema);
-  const provider = await getProvider(session.id);
+  let provider: AIProvider;
+  try {
+    provider = await resolveAiProvider({
+      studentId: session.id,
+      task: "resume_assist",
+      sensitivity: "student_record",
+    });
+  } catch (error) {
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/resume/assist",
+      task: "resume_assist",
+      sensitivity: "student_record",
+      policyDecision: "blocked",
+      status: "blocked",
+      targetId: session.id,
+      providerName: null,
+      providerClass: "none",
+      allowCloud: false,
+      inputChars: body.prompt.length,
+      reason: error instanceof Error ? error.message : String(error),
+      errorCode: "LOCAL_AI_UNAVAILABLE",
+    });
+    return NextResponse.json(
+      { error: "Sage resume drafting is offline until the local AI server is available." },
+      { status: 503 },
+    );
+  }
+  const providerClass = getProviderClass(provider.name);
+  await logAiAuditEvent({
+    actorId: session.id,
+    actorRole: session.role,
+    route: "/api/resume/assist",
+    task: "resume_assist",
+    sensitivity: "student_record",
+    policyDecision: "local_only",
+    status: "routed",
+    targetId: session.id,
+    providerName: provider.name,
+    providerClass,
+    allowCloud: false,
+    inputChars: body.prompt.length,
+    reason: "Resume drafting uses student records and is local-only by policy.",
+  });
 
   const [student, goals, portfolioItems, certifications, storedResume] = await Promise.all([
     prisma.student.findUnique({
@@ -83,11 +128,43 @@ export const POST = withAuth(async (session, req: Request) => {
       certifications: certificationEntries,
     });
 
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/resume/assist",
+      task: "resume_assist",
+      sensitivity: "student_record",
+      policyDecision: "local_only",
+      status: "completed",
+      targetId: session.id,
+      providerName: provider.name,
+      providerClass,
+      allowCloud: false,
+      inputChars: body.prompt.length,
+      outputChars: JSON.stringify(result).length,
+    });
+
     return NextResponse.json(result);
   } catch (error) {
     logger.error("Resume assist failed", {
       studentId: session.id,
       error: String(error),
+    });
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/resume/assist",
+      task: "resume_assist",
+      sensitivity: "student_record",
+      policyDecision: "local_only",
+      status: "failed",
+      targetId: session.id,
+      providerName: provider.name,
+      providerClass,
+      allowCloud: false,
+      inputChars: body.prompt.length,
+      reason: error instanceof Error ? error.message : String(error),
+      errorCode: "RESUME_ASSIST_FAILED",
     });
     throw badRequest("Sage could not draft the resume right now. Please try again.");
   }

@@ -35,6 +35,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
       const body = JSON.parse((call.arguments[1] as RequestInit).body as string);
       assert.equal(body.model, "gemma4:26b");
       assert.equal(body.stream, false);
+      assert.equal(body.num_ctx, 4096);
       assert.deepEqual(body.messages[0], { role: "system", content: "Be helpful." });
       assert.deepEqual(body.messages[1], { role: "user", content: "Hi" });
     });
@@ -112,6 +113,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
       assert.equal(nativeBody.format, "json");
+      assert.deepEqual(nativeBody.options, { num_ctx: 4096 });
     });
   });
 
@@ -149,6 +151,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.equal(body.stream, true);
+      assert.equal(body.num_ctx, 4096);
     });
 
     it("falls back to native streamed chat when the OpenAI path returns 404", async () => {

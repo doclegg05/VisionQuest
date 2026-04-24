@@ -29,6 +29,36 @@ export interface AIProvider {
 
 export type AIProviderType = "cloud" | "local";
 export type LocalAIAuthMode = "none" | "bearer" | "cloudflare_service_token";
+export type PromptTier = "full" | "compact";
+
+export type AiTask =
+  | "legacy"
+  | "sage_student_chat"
+  | "sage_staff_chat"
+  | "sage_post_response"
+  | "conversation_summary"
+  | "resume_assist"
+  | "resume_extract"
+  | "public_form_lookup"
+  | "public_program_help";
+
+export type DataSensitivity =
+  | "configured"
+  | "student_record"
+  | "staff_entered"
+  | "public_program"
+  | "system";
+
+export interface AIProviderRequest {
+  studentId: string;
+  task: AiTask;
+  sensitivity: DataSensitivity;
+  /**
+   * Public, non-student tasks may prefer the cloud provider for latency.
+   * Sensitive tasks ignore this and remain local-only.
+   */
+  preferCloud?: boolean;
+}
 
 export interface LocalAIAuthConfig {
   authMode: LocalAIAuthMode;

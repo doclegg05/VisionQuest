@@ -189,9 +189,10 @@ export async function getBaseStudentPromptContext(
   studentId: string,
   conversationId: string,
   stage: ConversationStage,
+  priorSummaryLimit: number = 3,
 ): Promise<BaseStudentPromptContext> {
   return cached(
-    `chat:base-context:${studentId}:${conversationId}:${stage}`,
+    `chat:base-context:${studentId}:${conversationId}:${stage}:${priorSummaryLimit}`,
     BASE_CONTEXT_TTL_SECONDS,
     async () => {
       const [
@@ -251,7 +252,7 @@ export async function getBaseStudentPromptContext(
             summary: { not: null },
           },
           orderBy: { updatedAt: "desc" },
-          take: 3,
+          take: priorSummaryLimit,
           select: { summary: true, module: true, updatedAt: true },
         }),
       ]);
@@ -303,11 +304,13 @@ export async function getStudentPromptContext(
   studentId: string,
   conversationId: string,
   stage: ConversationStage,
+  priorSummaryLimit: number = 3,
 ): Promise<StudentPromptContext> {
   const baseContext = await getBaseStudentPromptContext(
     studentId,
     conversationId,
     stage,
+    priorSummaryLimit,
   );
 
   const [skillGapContext, pathwayContext, coachingArcContext] =

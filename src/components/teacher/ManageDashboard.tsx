@@ -17,6 +17,7 @@ import { JobConfigSection } from "./JobConfigSection";
 import PathwayManager from "./PathwayManager";
 import AiConfigPanel from "./AiConfigPanel";
 import AiProviderPanel from "./AiProviderPanel";
+import AiSafetyReportPanel from "./AiSafetyReportPanel";
 import MonthlyKpiDashboard from "./MonthlyKpiDashboard";
 import FormTemplatesList from "./forms/FormTemplatesList";
 import FormResponsesReview from "./forms/FormResponsesReview";
@@ -165,6 +166,10 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
 
       {tab === "ai" && canViewAiConfig && (
         <div className="space-y-8">
+          <section>
+            <SectionHeading>AI Safety Audit</SectionHeading>
+            <AiSafetyReportPanel />
+          </section>
           <section>
             <SectionHeading>AI Provider</SectionHeading>
             <AiProviderPanel />

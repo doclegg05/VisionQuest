@@ -20,6 +20,8 @@ mock.module("@/lib/chat/api-key", {
 
 // Dynamic imports must happen after mock.module but inside before() to avoid TLA
 let getProvider: Awaited<typeof import("../provider")>["getProvider"];
+let resolveAiProvider: Awaited<typeof import("../provider")>["resolveAiProvider"];
+let getPromptTier: Awaited<typeof import("../provider")>["getPromptTier"];
 let OllamaProvider: Awaited<typeof import("../ollama-provider")>["OllamaProvider"];
 let GeminiProvider: Awaited<typeof import("../gemini-provider")>["GeminiProvider"];
 
@@ -28,6 +30,8 @@ before(async () => {
   const ollamaMod = await import("../ollama-provider");
   const geminiMod = await import("../gemini-provider");
   getProvider = providerMod.getProvider;
+  resolveAiProvider = providerMod.resolveAiProvider;
+  getPromptTier = providerMod.getPromptTier;
   OllamaProvider = ollamaMod.OllamaProvider;
   GeminiProvider = geminiMod.GeminiProvider;
 });
@@ -114,5 +118,49 @@ describe("getProvider", () => {
       getProvider("student-123"),
       /Local AI server URL is invalid/,
     );
+  });
+
+  it("forces student-record tasks to local even when the global provider is cloud", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "cloud";
+      if (key === "ai_provider_url") return "https://llm.example.com";
+      if (key === "ai_provider_model") return "gemma4:26b";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "sage_student_chat",
+      sensitivity: "student_record",
+    });
+
+    assert.ok(provider instanceof OllamaProvider);
+    assert.equal(mockResolveKey.mock.callCount(), 0);
+  });
+
+  it("keeps public tasks on the configured provider by default", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "cloud";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+    mockResolveKey.mock.mockImplementationOnce(async () => "test-gemini-key");
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "public_program_help",
+      sensitivity: "public_program",
+    });
+
+    assert.ok(provider instanceof GeminiProvider);
+  });
+
+  it("maps providers to prompt tiers", async () => {
+    assert.equal(
+      getPromptTier(new OllamaProvider("http://localhost:11434", "gemma4:26b")),
+      "compact",
+    );
+    assert.equal(getPromptTier(new GeminiProvider("test-gemini-key")), "full");
   });
 });

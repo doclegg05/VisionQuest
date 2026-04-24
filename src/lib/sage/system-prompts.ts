@@ -1,11 +1,19 @@
-import { BASE_PERSONALITY, GUARDRAILS, PLATFORM_KNOWLEDGE } from "./personality";
 import {
+  BASE_PERSONALITY,
+  COMPACT_PERSONALITY,
+  GUARDRAILS,
+  PLATFORM_KNOWLEDGE,
+} from "./personality";
+import {
+  COMPACT_SPOKES_KNOWLEDGE,
   SPOKES_BRIEF,
   SPOKES_KNOWLEDGE,
+  getCompactProgramKnowledge,
   getProgramKnowledge,
   getRelevantContent,
 } from "./knowledge-base";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
+import type { PromptTier } from "@/lib/ai";
 
 /**
  * Stages that need the full program knowledge base (~5,000 tokens of
@@ -389,6 +397,43 @@ TONE GUIDELINES:
 Remember: one question at a time, reflect before advising, affirm effort and self-awareness.`,
 };
 
+const COMPACT_STAGE_PROMPTS: Partial<Record<ConversationStage, string>> = {
+  discovery: `CURRENT TASK: Career Discovery - help a new student identify interests, strengths, work values, life constraints, and a possible pathway.
+
+Flow: warm up, explore, reflect patterns, suggest 1-2 pathways, then bridge to goal-setting. Ask one question at a time and reflect before the next question.
+
+Probe naturally for hands-on work, problem-solving, creativity, helping others, leadership, organization, prior work or caregiving experience, schedule/transportation needs, and what matters in a job. Do not mention RIASEC or Holland codes to the student.
+
+Fast-track if the student already names a clear direction. Confirm the pathway, name any useful existing strengths, and move toward goals.
+
+{pathway_context}
+
+{career_clusters}`,
+
+  teacher_assistant: `You are Sage, an AI assistant for SPOKES instructors.
+
+Help with three things:
+- Program knowledge: forms, procedures, certifications, platforms, timelines, and policies.
+- Student advising: when student context is provided, suggest next steps and intervention language without replacing instructor judgment.
+- Operations: draft clear messages, lesson ideas, notes, and practical workflow support.
+
+Tone: professional, direct, evidence-informed. Boundaries: do not expose student data without context, do not contradict policy, and flag anything uncertain for instructor verification.`,
+
+  admin_assistant: `You are Sage, an AI assistant for SPOKES administrators.
+
+Help with program operations, usage patterns, reports, policy-sensitive questions, and outcome analysis. Be concise, data-literate, candid, and action-oriented.
+
+Do not expose student-level data unless it is explicitly provided in the current context. Support administrative judgment; do not replace it.`,
+
+  career_profile_review: `CURRENT TASK: Career Profile Review - help the student understand and act on their Career DNA results.
+
+Use the provided profile context. Highlight 1-2 strengths or patterns, ask what stood out, explain results in plain language, connect them to likely pathways or certifications, and invite one next goal.
+
+{career_profile_context}
+
+Tone: warm, specific, affirming. Do not treat the profile like a fixed box.`,
+};
+
 export function buildSystemPrompt(
   stage: ConversationStage,
   context: {
@@ -408,12 +453,17 @@ export function buildSystemPrompt(
     skillGapContext?: string;
     pathwayContext?: string;
     coachingArcContext?: string;
-  } = {}
+  } = {},
+  tier: PromptTier = "full",
 ): string {
   const programType: ProgramType = normalizeProgramType(
     typeof context.programType === "string" ? context.programType : null,
   );
-  let stagePrompt = STAGE_PROMPTS[stage];
+  const isCompact = tier === "compact";
+  let stagePrompt =
+    isCompact && COMPACT_STAGE_PROMPTS[stage]
+      ? COMPACT_STAGE_PROMPTS[stage]
+      : STAGE_PROMPTS[stage];
 
   // Inject context variables
   if (context.studentName) {
@@ -458,9 +508,14 @@ export function buildSystemPrompt(
   // Both roles span multiple programs, so the full SPOKES knowledge base stays the
   // shared reference here; program-specific framing only matters for student conversations.
   if (stage === "teacher_assistant" || stage === "admin_assistant") {
-    const parts = [stagePrompt, PLATFORM_KNOWLEDGE, SPOKES_KNOWLEDGE];
+    const parts = isCompact
+      ? [stagePrompt, COMPACT_SPOKES_KNOWLEDGE]
+      : [stagePrompt, PLATFORM_KNOWLEDGE, SPOKES_KNOWLEDGE];
     if (context.userMessage) {
-      const relevantContent = getRelevantContent(context.userMessage);
+      const relevantContent = getRelevantContent(
+        context.userMessage,
+        isCompact ? 1 : 3,
+      );
       if (relevantContent) {
         parts.push(relevantContent);
       }
@@ -472,18 +527,27 @@ export function buildSystemPrompt(
   // Knowledge-heavy stages (orientation, general) get the full ~5k-token block.
   // All other stages get SPOKES_BRIEF (~60 tokens) — getRelevantContent() still
   // fires on every message to inject topic detail on keyword match.
-  const programKnowledge = KNOWLEDGE_HEAVY_STAGES.has(stage)
-    ? getProgramKnowledge(programType)
-    : SPOKES_BRIEF;
+  const programKnowledge = isCompact
+    ? getCompactProgramKnowledge(programType)
+    : KNOWLEDGE_HEAVY_STAGES.has(stage)
+      ? getProgramKnowledge(programType)
+      : SPOKES_BRIEF;
 
-  const parts = [
-    BASE_PERSONALITY,
-    GUARDRAILS,
-    PROGRAM_ADDENDUMS[programType],
-    PLATFORM_KNOWLEDGE,
-    programKnowledge,
-    stagePrompt,
-  ];
+  const parts = isCompact
+    ? [
+        COMPACT_PERSONALITY,
+        PROGRAM_ADDENDUMS[programType],
+        programKnowledge,
+        stagePrompt,
+      ]
+    : [
+        BASE_PERSONALITY,
+        GUARDRAILS,
+        PROGRAM_ADDENDUMS[programType],
+        PLATFORM_KNOWLEDGE,
+        programKnowledge,
+        stagePrompt,
+      ];
 
   // Inject discovery context so Sage remembers the student's career direction.
   // Summary is LLM-generated from student turns — bracket + sanitize so it
@@ -530,7 +594,10 @@ export function buildSystemPrompt(
 
   // Inject topic-specific content based on what the student is asking about
   if (context.userMessage) {
-    const relevantContent = getRelevantContent(context.userMessage);
+    const relevantContent = getRelevantContent(
+      context.userMessage,
+      isCompact ? 1 : 3,
+    );
     if (relevantContent) {
       parts.push(relevantContent);
     }

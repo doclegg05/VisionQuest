@@ -380,4 +380,33 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     // getRelevantContent should have injected IC3 or GMetrix detail
     assert.match(prompt, /DETAILED REFERENCE/);
   });
+
+  it("compact tier uses compact Sage content instead of the full prompt stack", () => {
+    const prompt = buildSystemPrompt(
+      "discovery",
+      {
+        studentName: "Jordan",
+        career_clusters: "SPOKES CAREER PATHWAYS:\nOffice & Admin",
+      },
+      "compact",
+    );
+
+    assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(compact\)/);
+    assert.match(prompt, /CURRENT TASK: Career Discovery/);
+    assert.match(prompt, /SPOKES CAREER PATHWAYS:/);
+    assert.ok(!prompt.includes("MOTIVATIONAL INTERVIEWING PRINCIPLES"));
+    assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+  });
+
+  it("compact tier limits topic injection to one detailed reference", () => {
+    const prompt = buildSystemPrompt(
+      "general",
+      { userMessage: "Tell me about IC3, GMetrix, WorkKeys, and the portfolio." },
+      "compact",
+    );
+
+    const detailedSections = prompt.match(/---/g) ?? [];
+    assert.match(prompt, /DETAILED REFERENCE/);
+    assert.ok(detailedSections.length < 8);
+  });
 });
