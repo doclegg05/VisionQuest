@@ -326,6 +326,11 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         href: `/teacher/students/${studentRecordId}#orientation-review`,
         label: "Open orientation",
       };
+    case "profile_birthdate_missing":
+      return {
+        href: `/teacher/students/${studentRecordId}#spokes-profile`,
+        label: "Add birthdate",
+      };
     default:
       return {
         href: `/teacher/students/${studentRecordId}`,

@@ -45,6 +45,7 @@ export interface AlertInputs {
     }[];
     lastConversationAt?: Date | null;
     orientationComplete?: boolean;
+    birthDate?: Date | null;
     requirementCompliance?: {
       requiredCount: number;
       requiredMet: number;
@@ -308,6 +309,26 @@ export function buildStudentAlertDescriptors({
         sourceId: signals.studentId,
       });
     }
+  }
+
+  // Profile: birthdate missing after orientation completion. SPOKES
+  // reports age to DoHS, so a finished orientation with no birthdate on
+  // file is a reporting gap — flag it so staff can follow up.
+  if (
+    signals?.studentId &&
+    signals.orientationComplete === true &&
+    (signals.birthDate === null || signals.birthDate === undefined)
+  ) {
+    alerts.push({
+      alertKey: `profile_birthdate_missing:${signals.studentId}`,
+      type: "profile_birthdate_missing",
+      severity: "medium",
+      title: "Birthdate is missing",
+      summary:
+        "This student finished orientation but hasn't added a birthdate. SPOKES needs it for DoHS enrollment reporting.",
+      sourceType: "student",
+      sourceId: signals.studentId,
+    });
   }
 
   // Class requirement compliance

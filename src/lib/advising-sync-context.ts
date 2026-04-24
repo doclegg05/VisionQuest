@@ -111,6 +111,9 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             updatedAt: true,
           },
         },
+        spokesRecord: {
+          select: { birthDate: true },
+        },
         files: {
           select: { uploadedAt: true },
           orderBy: { uploadedAt: "desc" },
@@ -206,6 +209,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             "orientation_not_started",
             "orientation_overdue",
             "motivation_declining",
+            "profile_birthdate_missing",
             "requirement_noncompliant",
             ...ALL_INACTIVITY_ALERT_TYPES,
           ],

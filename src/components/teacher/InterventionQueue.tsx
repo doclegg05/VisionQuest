@@ -103,6 +103,7 @@ const CONSOLIDATION_GROUPS: Record<string, { label: string; groupCategory: strin
   overdue_task:                    { label: "overdue tasks",                     groupCategory: "Tasks" },
   missed_appointment:              { label: "missed appointments",               groupCategory: "Advising" },
   certification_stalled:           { label: "certifications stalled",            groupCategory: "Certifications" },
+  profile_birthdate_missing:       { label: "birthdates missing",                groupCategory: "Profile" },
 };
 
 interface ConsolidatedItem {

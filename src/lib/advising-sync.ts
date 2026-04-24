@@ -132,6 +132,7 @@ export function buildStudentAlertSyncPlan({
           })),
           lastConversationAt: studentSignals.conversations[0]?.updatedAt || null,
           orientationComplete: progressionState?.orientationComplete || false,
+          birthDate: studentSignals.spokesRecord?.birthDate ?? null,
           requirementCompliance: compliance
             ? {
                 requiredCount: compliance.requiredCount,
