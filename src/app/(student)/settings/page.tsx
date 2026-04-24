@@ -31,6 +31,12 @@ export default function SettingsPage() {
   const [notifStatus, setNotifStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [notifError, setNotifError] = useState("");
 
+  // Profile state (student-only)
+  const [birthDate, setBirthDate] = useState("");
+  const [savedBirthDate, setSavedBirthDate] = useState<string | null>(null);
+  const [profileStatus, setProfileStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [profileError, setProfileError] = useState("");
+
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -61,10 +67,18 @@ export default function SettingsPage() {
         }
 
         if (role !== "teacher" && role !== "admin") {
-          const recoveryRes = await fetch("/api/settings/security-questions");
+          const [recoveryRes, profileRes] = await Promise.all([
+            fetch("/api/settings/security-questions"),
+            fetch("/api/settings/profile"),
+          ]);
           const recoveryData = await recoveryRes.json();
           if (recoveryRes.ok) {
             setRecoveryConfigured(Boolean(recoveryData.configured));
+          }
+          if (profileRes.ok) {
+            const profileData = (await profileRes.json()) as { birthDate: string | null };
+            setBirthDate(profileData.birthDate ?? "");
+            setSavedBirthDate(profileData.birthDate);
           }
         }
       } catch {
@@ -150,6 +164,34 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveBirthdate = async () => {
+    setProfileStatus("saving");
+    setProfileError("");
+
+    try {
+      const res = await fetch("/api/settings/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ birthDate: birthDate || null }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setProfileStatus("error");
+        setProfileError(data.error || "We could not save your birthdate.");
+        return;
+      }
+
+      const data = (await res.json()) as { birthDate: string | null };
+      setSavedBirthDate(data.birthDate);
+      setProfileStatus("success");
+      setTimeout(() => setProfileStatus("idle"), 3000);
+    } catch {
+      setProfileStatus("error");
+      setProfileError("We could not contact the server. Please try again.");
+    }
+  };
+
   const handleSaveRecovery = async () => {
     setRecoveryStatus("saving");
     setRecoveryError("");
@@ -193,6 +235,61 @@ export default function SettingsPage() {
       {(sessionRole === "teacher" || sessionRole === "admin") && (
         <div className="mb-6">
           <StaffMfaPanel />
+        </div>
+      )}
+
+      {sessionRole !== "teacher" && sessionRole !== "admin" && (
+        <div className="surface-section mb-6 p-6">
+          <div className="mb-4">
+            <p className="page-eyebrow text-[var(--ink-muted)]">Profile</p>
+            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal info</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+              Your birthdate helps your teacher report enrollment accurately to DoHS.
+              It&apos;s only shared with SPOKES program staff.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1">
+              <label
+                htmlFor="birthdate-input"
+                className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]"
+              >
+                Birthdate
+              </label>
+              <input
+                id="birthdate-input"
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="field w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveBirthdate}
+              disabled={
+                profileStatus === "saving" ||
+                // Disable when there's nothing to save (empty + nothing stored,
+                // or value equals what's already on file).
+                (!birthDate && !savedBirthDate) ||
+                birthDate === (savedBirthDate ?? "")
+              }
+              className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {profileStatus === "saving" ? "Saving..." : "Save"}
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            {profileStatus === "success" && (
+              <p className="text-sm text-[var(--success)]">Birthdate saved.</p>
+            )}
+            {profileStatus === "error" && (
+              <p className="text-sm text-[var(--error)]">{profileError}</p>
+            )}
+          </div>
         </div>
       )}
 
