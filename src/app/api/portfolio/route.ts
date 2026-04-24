@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidUrl } from "@/lib/validation";
-import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { recordPortfolioItem } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
@@ -23,10 +22,7 @@ const portfolioUpdateSchema = portfolioCreateSchema.partial().extend({
 });
 
 // GET — list student's portfolio items
-export const GET = withErrorHandler(async () => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session) => {
   const items = await prisma.portfolioItem.findMany({
     where: { studentId: session.id },
     orderBy: [{ type: "asc" }, { sortOrder: "asc" }],
@@ -36,10 +32,7 @@ export const GET = withErrorHandler(async () => {
 });
 
 // POST — create a portfolio item
-export const POST = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const POST = withAuth(async (session, req: Request) => {
   const { title, description, type, fileId, url } = await parseBody(req, portfolioCreateSchema);
   if (url && !isValidUrl(url)) {
     throw badRequest("Invalid URL. Only http and https URLs are allowed");
@@ -90,10 +83,7 @@ export const POST = withErrorHandler(async (req: Request) => {
 });
 
 // PUT — update a portfolio item
-export const PUT = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const PUT = withAuth(async (session, req: Request) => {
   const { id, title, description, type, fileId, url } = await parseBody(req, portfolioUpdateSchema);
 
   const existing = await prisma.portfolioItem.findFirst({
@@ -124,10 +114,7 @@ export const PUT = withErrorHandler(async (req: Request) => {
 });
 
 // DELETE — remove a portfolio item
-export const DELETE = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const DELETE = withAuth(async (session, req: Request) => {
   const { id } = await req.json();
   if (!id) throw badRequest("id is required");
 

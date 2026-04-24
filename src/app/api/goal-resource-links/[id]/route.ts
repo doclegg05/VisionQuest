@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
-import { getSession } from "@/lib/auth";
-import { badRequest, forbidden, isStaffRole, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
+import { badRequest, forbidden, isStaffRole, notFound, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
@@ -21,13 +20,11 @@ async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-export const PATCH = withErrorHandler(async (
+export const PATCH = withAuth(async (
+  session,
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
   const { id } = await params;
   const body = await readJsonBody(req);
   const link = await prisma.goalResourceLink.findFirst({

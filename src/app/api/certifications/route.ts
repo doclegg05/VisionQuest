@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { syncStudentAlerts } from "@/lib/advising";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getCertificationProgress, validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
-import { withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
@@ -19,10 +18,7 @@ const certUpdateSchema = z.object({
 });
 
 // GET — get student's certification with requirements
-export const GET = withErrorHandler(async () => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session) => {
   // Get all templates
   const templates = await prisma.certTemplate.findMany({
     where: { certType: "ready-to-work" },
@@ -109,10 +105,7 @@ export const GET = withErrorHandler(async () => {
 });
 
 // POST — mark a requirement as completed (self-report)
-export const POST = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const POST = withAuth(async (session, req: Request) => {
   const { requirementId, completed, fileId, notes } = await parseBody(req, certUpdateSchema);
 
   // Verify the requirement belongs to this student's certification

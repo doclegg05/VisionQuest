@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { withErrorHandler, unauthorized, badRequest } from "@/lib/api-error";
+import { withAuth, badRequest } from "@/lib/api-error";
 
 const preferencesSchema = z.object({
   email: z
@@ -22,10 +21,7 @@ const preferencesSchema = z.object({
 });
 
 // GET — return the student's current notification preferences
-export const GET = withErrorHandler(async () => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session) => {
   const prefs = await prisma.notificationPreference.findMany({
     where: { studentId: session.id },
     select: { channel: true, enabled: true, destination: true },
@@ -45,10 +41,7 @@ export const GET = withErrorHandler(async () => {
 });
 
 // PUT — upsert email and/or SMS preferences
-export const PUT = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const PUT = withAuth(async (session, req: Request) => {
   const body: unknown = await req.json();
   const parsed = preferencesSchema.safeParse(body);
   if (!parsed.success) {

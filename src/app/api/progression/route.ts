@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { getXpProgress, getAchievementsWithDefs, recordDailyCheckin, checkReadinessAchievements } from "@/lib/progression/engine";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { awardEvent, getRecentEvents } from "@/lib/progression/events";
-import { withErrorHandler, unauthorized } from "@/lib/api-error";
+import { withAuth } from "@/lib/api-error";
 
-export const GET = withErrorHandler(async () => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session) => {
   // Daily check-in: award XP if the student hasn't checked in today
   const today = new Date().toISOString().slice(0, 10);
   await awardEvent({

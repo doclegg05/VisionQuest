@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
-import { forbidden, isStaffRole, notFound, unauthorized, withErrorHandler } from "@/lib/api-error";
-import { getSession } from "@/lib/auth";
+import { forbidden, isStaffRole, notFound, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
 
-export const GET = withErrorHandler(async (
+export const GET = withAuth(async (
+  session,
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
   const { id } = await params;
   const goal = await prisma.goal.findFirst({
     where: { id },

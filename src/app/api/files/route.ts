@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/storage";
 import { logger } from "@/lib/logger";
-import { ApiError, withErrorHandler, unauthorized, badRequest, notFound } from "@/lib/api-error";
+import { ApiError, withAuth, badRequest, notFound } from "@/lib/api-error";
 
 // GET — list student's files
-export const GET = withErrorHandler(async () => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session) => {
   const files = await prisma.fileUpload.findMany({
     where: { studentId: session.id },
     orderBy: { uploadedAt: "desc" },
@@ -19,10 +15,7 @@ export const GET = withErrorHandler(async () => {
 });
 
 // POST — upload a file
-export const POST = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const POST = withAuth(async (session, req: Request) => {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const category = (formData.get("category") as string) || "general";
@@ -57,10 +50,7 @@ export const POST = withErrorHandler(async (req: Request) => {
 });
 
 // DELETE — delete a file
-export const DELETE = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const DELETE = withAuth(async (session, req: Request) => {
   const { id } = await req.json();
   if (!id) throw badRequest("id is required");
 

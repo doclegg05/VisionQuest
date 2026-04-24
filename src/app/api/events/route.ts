@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { withErrorHandler, unauthorized } from "@/lib/api-error";
+import { withAuth } from "@/lib/api-error";
 
-export const GET = withErrorHandler(async () => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session) => {
   const events = await prisma.careerEvent.findMany({
     where: { status: { not: "archived" } },
     include: {
