@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
+import CoordinatorRegionMap from "./CoordinatorRegionMap";
 import FormRollupList from "./FormRollupList";
 import GrantProgressPanel from "./GrantProgressPanel";
 import InstructorGrid from "./InstructorGrid";
@@ -81,6 +82,12 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
 
   return (
     <>
+      <CoordinatorRegionMap
+        regions={regions}
+        activeRegionId={regionId}
+        onSelect={setRegionId}
+      />
+
       <div className="flex items-end justify-between gap-3 flex-wrap">
         {regions.length > 1 && (
           <label className="inline-flex items-center gap-2">
