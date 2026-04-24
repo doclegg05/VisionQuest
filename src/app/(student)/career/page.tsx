@@ -47,7 +47,7 @@ export default async function CareerPage() {
       <PageIntro
         eyebrow="Career"
         title="Career"
-        description="Keep jobs, applications, and career events in one place so your search stays visible and actionable."
+        description="Keep your Career DNA, jobs, applications, and career events in one place so your next step stays visible."
       />
       <CareerDnaCallout studentId={session.id} />
       <CareerHub
