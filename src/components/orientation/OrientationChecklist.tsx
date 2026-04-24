@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import OrientationFormDetail from "./OrientationFormDetail";
+import BirthdatePromptModal from "./BirthdatePromptModal";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { getOrientationStepDetail } from "@/lib/orientation-step-resources";
 
@@ -50,6 +51,27 @@ export default function OrientationChecklist({
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
+  const [showBirthdatePrompt, setShowBirthdatePrompt] = useState(false);
+
+  // Only the student themselves should ever see the birthdate prompt — when
+  // staff complete orientation on behalf of a student, they already capture
+  // birthdate through the teacher workspace (SpokesStudentWorkspace).
+  const isSelfView = !targetStudentId;
+
+  // Fetch the student's birthdate status to know whether to prompt on
+  // completion. Only runs on self-view so we never touch another student's
+  // record from the checklist.
+  const maybePromptForBirthdate = useCallback(async () => {
+    if (!isSelfView) return;
+    try {
+      const res = await fetch("/api/settings/profile");
+      if (!res.ok) return;
+      const data = (await res.json()) as { birthDate: string | null };
+      if (!data.birthDate) setShowBirthdatePrompt(true);
+    } catch {
+      // Network hiccup — non-critical, student can add via Settings later.
+    }
+  }, [isSelfView]);
 
   const fetchFormStatuses = useCallback(() => {
     const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
@@ -122,6 +144,11 @@ export default function OrientationChecklist({
               if (!targetStudentId) {
                 setTimeout(() => checkProgression(), 500);
               }
+              // Student just finished their own orientation. Ask for a
+              // birthdate if we don't have one on file — it's required
+              // downstream for DoHS age reporting. Staff-view completions
+              // are gated out inside maybePromptForBirthdate.
+              void maybePromptForBirthdate();
             })
             .catch((err) => {
               console.error("Failed to record orientation completion", err instanceof Error ? err.message : "Unknown error");
@@ -320,6 +347,12 @@ export default function OrientationChecklist({
           <p className="text-xs text-green-700 mt-0.5">You&apos;re all set to get started with SPOKES.</p>
         </div>
       )}
+
+      <BirthdatePromptModal
+        open={showBirthdatePrompt}
+        onClose={() => setShowBirthdatePrompt(false)}
+        onSaved={() => setShowBirthdatePrompt(false)}
+      />
     </div>
   );
 }
