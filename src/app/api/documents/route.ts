@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { rateLimit } from "@/lib/rate-limit";
 import {
-  withErrorHandler,
-  unauthorized,
+  withAuth,
   badRequest,
   rateLimited,
   isStaffRole,
@@ -26,10 +24,7 @@ const VALID_CATEGORIES = new Set([
  * certificationId, and/or text search. Audience-filtered by role:
  * students see STUDENT + BOTH; teachers see everything.
  */
-export const GET = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session, req: Request) => {
   // 120 requests per minute per user
   const rl = await rateLimit(`docs:${session.id}`, 120, 60 * 1000);
   if (!rl.success) throw rateLimited();

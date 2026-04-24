@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
 import { rateLimit } from "@/lib/rate-limit";
 import {
-  withErrorHandler,
-  unauthorized,
+  withAuth,
   badRequest,
   notFound,
   rateLimited,
@@ -21,12 +19,11 @@ import { recordDocumentView } from "@/lib/progression/engine";
  * - mode=view  (default) → Content-Disposition: inline  (opens in browser, printable)
  * - mode=download        → Content-Disposition: attachment (forces save dialog)
  *
- * Audience check: students cannot access TEACHER-only documents.
+ * Audience check is enforced by RLS (`program_document_read` policy) —
+ * students can't read TEACHER-only rows even by ID. `withAuth` wires the
+ * session into `app.current_role` / `app.user_id` before Prisma runs.
  */
-export const GET = withErrorHandler(async (req: Request) => {
-  const session = await getSession();
-  if (!session) throw unauthorized();
-
+export const GET = withAuth(async (session, req: Request) => {
   // 30 downloads per minute per user
   const rl = await rateLimit(`docs-dl:${session.id}`, 30, 60 * 1000);
   if (!rl.success) throw rateLimited();

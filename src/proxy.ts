@@ -66,7 +66,10 @@ export function proxy(request: NextRequest) {
     // stream through our own origin, never a cross-origin presigned URL.
     "frame-src 'self'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    // 'self' (not 'none') because the library's iframe previewer loads
+    // /api/documents/download?mode=view as a same-origin frame. 'none'
+    // would refuse framing even for our own origin and blocks the preview.
+    "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
     "report-uri /api/csp-report",
