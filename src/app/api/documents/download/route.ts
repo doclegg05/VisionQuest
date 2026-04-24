@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
+import { downloadFile } from "@/lib/storage";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   withErrorHandler,
@@ -76,12 +76,13 @@ export const GET = withErrorHandler(async (req: Request) => {
     }).catch(() => {});
   }
 
-  const presigned = await getPresignedDownloadUrl(doc.storageKey, {
-    contentType: doc.mimeType || undefined,
-    contentDisposition: disposition,
-  });
-  if (presigned) return NextResponse.redirect(presigned, 302);
-
+  // Stream from our own origin for both view (iframe needs same-origin to
+  // clear frame-src CSP) and download (presigned redirects started failing
+  // post-Slice-C; same-origin streaming is robust and avoids depending on
+  // Supabase's outbound CSP/X-Frame-Options). For typical program-document
+  // PDFs (<5MB) the extra Render bandwidth is negligible. `downloadFile`
+  // transparently falls back to local disk / bundled content when Supabase
+  // Storage isn't configured, matching the prior behavior.
   const result = await downloadFile(doc.storageKey);
   if (!result) {
     throw notFound("File not found in storage. Contact your instructor.");

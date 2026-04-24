@@ -61,7 +61,10 @@ export function proxy(request: NextRequest) {
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",
     "connect-src 'self' https://generativelanguage.googleapis.com https://*.ingest.sentry.io",
-    "frame-src 'none'",
+    // frame-src 'self' so the Library's same-origin PDF preview iframe
+    // (sourced from /api/documents/download?mode=view) can render. Files
+    // stream through our own origin, never a cross-origin presigned URL.
+    "frame-src 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
