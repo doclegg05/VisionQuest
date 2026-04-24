@@ -89,3 +89,6 @@ COMPETITIVE_ANALYSIS_2026.md
 COMPETITIVE_LANDSCAPE.md
 IMPROVEMENT_BENCHMARK_REPORT.md
 KPI_FRAMEWORK.md
+
+# Local backup from cleanup-broken-documents.mjs
+broken-documents-backup-*.json
