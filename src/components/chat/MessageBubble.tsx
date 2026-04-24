@@ -24,10 +24,16 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
       <div
         className={`max-w-[82%] rounded-[1.4rem] px-4 py-3 text-[15px] leading-7 shadow-[var(--shadow-card-lg)]
           ${isUser
-            ? "rounded-br-md bg-[var(--chat-bubble-user-bg)] text-white"
+            ? "rounded-br-md text-white"
             : "rounded-bl-md border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] text-[var(--ink-strong)]"
           }
           ${isStreaming ? "animate-pulse" : ""}`}
+        // --chat-bubble-user-bg is a gradient; Tailwind's bg-[var(--x)]
+        // compiles to background-color which can't render gradients
+        // (causing the bubble to fall back to transparent in light mode
+        // and hide the white text). Inline `background` shorthand
+        // accepts gradients cleanly in both themes.
+        style={isUser ? { background: "var(--chat-bubble-user-bg)" } : undefined}
       >
         <p className="whitespace-pre-wrap break-words">{content}</p>
       </div>

@@ -35,8 +35,18 @@ interface ChatWindowInnerProps {
   defaultStage?: string;
 }
 
+const REQUESTED_STAGE_OPENERS = {
+  discovery: STAGE_OPENERS.discovery,
+  career_profile_review: STAGE_OPENERS.career_profile_review,
+} as const;
+
 function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const searchParams = useSearchParams();
+  const requestedStage = searchParams.get("stage");
+  const requestedStageOpener =
+    requestedStage && Object.prototype.hasOwnProperty.call(REQUESTED_STAGE_OPENERS, requestedStage)
+      ? REQUESTED_STAGE_OPENERS[requestedStage as keyof typeof REQUESTED_STAGE_OPENERS]
+      : null;
   const { checkProgression } = useProgression();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,6 +103,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
   useEffect(() => {
     async function loadActiveConversation() {
+      if (requestedStageOpener) return;
+
       try {
         const res = await apiFetch("/api/chat/conversations");
         if (!res.ok) return;
@@ -107,7 +119,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     }
 
     void loadActiveConversation();
-  }, [loadConversationById]);
+  }, [loadConversationById, requestedStageOpener]);
 
   /**
    * B1 — Warmup fetch.
@@ -219,11 +231,15 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       // arrives (handled by checking messages.length in the SSE reader below).
       const isFirstMessage = !conversationId && messages.length === 0;
       if (isFirstMessage) {
-        // Derive stage asynchronously — don't await here so rendering isn't blocked.
-        // The greeting will appear as soon as the stage resolves (typically <200ms).
-        void deriveStageFromGoals().then((stage) => {
-          setOptimisticGreeting(STAGE_OPENERS[stage]);
-        });
+        if (requestedStageOpener) {
+          setOptimisticGreeting(requestedStageOpener);
+        } else {
+          // Derive stage asynchronously — don't await here so rendering isn't blocked.
+          // The greeting will appear as soon as the stage resolves (typically <200ms).
+          void deriveStageFromGoals().then((stage) => {
+            setOptimisticGreeting(STAGE_OPENERS[stage]);
+          });
+        }
       }
 
       try {
@@ -343,7 +359,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setOptimisticGreeting(null);
       }
     },
-    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage]
+    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener]
   );
 
   // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
@@ -388,7 +404,10 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[var(--chat-area-bg)]">
+      <div
+        className="flex min-w-0 flex-1 flex-col"
+        style={{ background: "var(--chat-area-bg)" }}
+      >
         <div className="md:hidden flex items-center gap-3 border-b border-[var(--chat-input-border)] bg-[var(--chat-header-bg)] px-4 py-3 backdrop-blur">
           <button
             onClick={() => setShowSidebar(!showSidebar)}
