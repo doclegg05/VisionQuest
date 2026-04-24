@@ -79,21 +79,37 @@ async function tryLoadContextFromHeaders(): Promise<RlsContext | null> {
 }
 
 /**
- * Fire a dev-only warning when a Prisma query runs with no RLS context.
- * Under `vq_app` this path returns silently filtered results (rows that
- * don't match the ever-empty GUC predicates), which is the same class of
- * bug as the Library 404s we chased on 2026-04-24. Production is silenced
- * because legitimate anonymous paths (e.g. pre-login reads) would otherwise
- * spam logs; in dev the noise is the feature. Set
- * `DISABLE_RLS_CONTEXT_WARN=true` to silence for scripts/migrations.
+ * Signal when a Prisma query runs with no RLS context. Under `vq_app`
+ * this path returns silently filtered results (rows that don't match
+ * the ever-empty GUC predicates) — the same class of bug as the Library
+ * 404s we chased on 2026-04-24.
+ *
+ * Three modes, chosen in order:
+ *   - Production: silent. Legitimate anonymous paths would otherwise
+ *     spam logs.
+ *   - `RLS_CONTEXT_STRICT=true`: throw an Error. Intended for CI and
+ *     any environment that wants hard enforcement. A caught exception
+ *     is infinitely louder than a swallowed empty-result set.
+ *   - Otherwise: `logger.warn`. Dev default; the noise is the feature.
+ *
+ * `DISABLE_RLS_CONTEXT_WARN=true` silences warn mode for scripts and
+ * one-off migrations that legitimately bypass ALS.
  */
 function warnMissingRlsContext(model: string | undefined, operation: string): void {
   if (process.env.NODE_ENV === "production") return;
+  const modelLabel = model ?? "(unknown)";
+  const hint =
+    "API routes should use withAuth/withTeacherAuth (not withErrorHandler + getSession). Server components need the proxy to attach session headers (/api/* and /app routes).";
+  if (process.env.RLS_CONTEXT_STRICT === "true") {
+    throw new Error(
+      `prisma.${modelLabel}.${operation} ran with no RLS context. ${hint}`,
+    );
+  }
   if (process.env.DISABLE_RLS_CONTEXT_WARN === "true") return;
   logger.warn("prisma query ran with no RLS context", {
-    model: model ?? "(unknown)",
+    model: modelLabel,
     operation,
-    hint: "API routes should use withAuth/withTeacherAuth (not withErrorHandler + getSession). Server components need the proxy to attach session headers (/api/* and /app routes).",
+    hint,
   });
 }
 
