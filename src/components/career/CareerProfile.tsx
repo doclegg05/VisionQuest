@@ -208,7 +208,10 @@ function SkillsSection({ skills }: { skills: TransferableSkill[] }) {
         {Object.entries(grouped).map(([category, items]) => (
           <div key={category}>
             <span
-              className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${CATEGORY_COLORS[category] ?? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"}`}
+              className={[
+                "inline-block rounded-full px-2.5 py-0.5 text-xs font-bold capitalize",
+                CATEGORY_COLORS[category] ?? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
+              ].join(" ")}
             >
               {category}
             </span>
@@ -266,7 +269,7 @@ function ValuesSection({ values }: { values: WorkValue[] }) {
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                 <div
-                  className={`h-full rounded-full bg-[var(--primary)] ${IMPORTANCE_WIDTH[v.importance]}`}
+                  className={["h-full rounded-full bg-[var(--primary)]", IMPORTANCE_WIDTH[v.importance]].join(" ")}
                 />
               </div>
             </div>

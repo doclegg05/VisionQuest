@@ -284,9 +284,12 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         </div>
       ) : (
         <div
-          className={`mt-2 overflow-hidden rounded-[1rem] border border-white/70 bg-[var(--surface-raised)] p-2 shadow-[2px_4px_10px_rgba(0,0,0,0.14)] ${
-            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,0,0,0.18)]" : ""
-          }`}
+          className={[
+            "mt-2 overflow-hidden rounded-[1rem] border border-white/70 bg-[var(--surface-raised)] p-2 shadow-[2px_4px_10px_rgba(0,0,0,0.14)]",
+            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,0,0,0.18)]" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           {item.fileId ? (
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[0.85rem] bg-[var(--surface-interactive)]">

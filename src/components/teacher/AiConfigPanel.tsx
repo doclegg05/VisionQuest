@@ -187,8 +187,8 @@ export default function AiConfigPanel() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-[var(--ink-muted)]">
-            The platform Gemini API key powers Sage for all students. Students can optionally
-            override this with a personal key in their settings.
+            The platform Gemini API key is available for approved cloud tasks. Student-record
+            Sage work stays on the local AI route by default.
           </p>
           {updatedAt && (
             <p className="mt-1 text-xs text-[var(--ink-muted)]">

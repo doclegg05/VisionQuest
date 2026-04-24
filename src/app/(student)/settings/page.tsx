@@ -291,7 +291,17 @@ export default function SettingsPage() {
             type="button"
             className="flex items-center gap-3 text-left"
           >
-            <span className={`grid h-9 w-9 place-items-center rounded-2xl bg-[var(--surface-muted)] text-[var(--ink-strong)] transition-transform ${showTutorial ? "rotate-90" : ""}`}>
+            <span
+              className={[
+                "grid h-9 w-9 place-items-center rounded-2xl",
+                "bg-[var(--surface-muted)]",
+                "text-[var(--ink-strong)]",
+                "transition-transform",
+                showTutorial ? "rotate-90" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
               ▶
             </span>
             <div>

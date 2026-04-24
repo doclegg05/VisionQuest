@@ -287,7 +287,12 @@ function StudentAccordion({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`shrink-0 text-[var(--ink-muted)] transition-transform ${isOpen ? "rotate-90" : ""}`}
+          className={[
+            "shrink-0 text-[var(--ink-muted)] transition-transform",
+            isOpen ? "rotate-90" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <path d="m9 18 6-6-6-6" />
         </svg>

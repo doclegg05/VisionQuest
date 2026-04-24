@@ -197,9 +197,10 @@ export default function CertTracker() {
         {data.requirements.map((req) => (
           <div
             key={req.templateId}
-            className={`bg-[var(--surface-raised)] rounded-xl border p-4 ${
-              req.completed ? "border-green-200" : "border-[var(--border)]"
-            }`}
+            className={[
+              "bg-[var(--surface-raised)] rounded-xl border p-4",
+              req.completed ? "border-green-200" : "border-[var(--border)]",
+            ].join(" ")}
           >
             <div className="flex items-start gap-3">
               <input
@@ -210,7 +211,9 @@ export default function CertTracker() {
                 className="mt-0.5 h-4 w-4 rounded border-[var(--border-strong)] text-green-600 focus:ring-green-500"
               />
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${req.completed ? "text-green-800" : "text-[var(--ink-strong)]"}`}>
+                <p
+                  className={["text-sm font-medium", req.completed ? "text-green-800" : "text-[var(--ink-strong)]"].join(" ")}
+                >
                   {req.label}
                   {req.required && <span className="ml-1 text-xs text-red-400 font-normal">*</span>}
                 </p>

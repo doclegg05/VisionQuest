@@ -330,13 +330,14 @@ export default function OrientationManager() {
                 onDragLeave={handleDragLeave}
                 onDrop={() => handleDrop(item.id)}
                 onDragEnd={handleDragEnd}
-                className={`bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition-all ${
+                className={[
+                  "bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition-all",
                   dragOverId === item.id
                     ? "border-blue-400 bg-blue-50 scale-[1.01]"
                     : dragId === item.id
                       ? "opacity-50 border-[var(--border)]"
-                      : "border-[var(--border)] hover:border-[var(--border-strong)]"
-                }`}
+                      : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                ].join(" ")}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                   <span className="mt-1 text-[var(--ink-faint)] text-sm select-none" aria-hidden="true">&#x2630;</span>

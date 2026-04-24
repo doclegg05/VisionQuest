@@ -522,7 +522,11 @@ export default function ResumeBuilder() {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Display name
             </label>
-            <input value={displayName} readOnly className={`${INPUT_CLASS} bg-[var(--surface-soft)] text-[var(--ink-muted)]`} />
+            <input
+              value={displayName}
+              readOnly
+              className={[INPUT_CLASS, "bg-[var(--surface-soft)]", "text-[var(--ink-muted)]"].join(" ")}
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">

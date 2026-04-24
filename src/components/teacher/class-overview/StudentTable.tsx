@@ -119,7 +119,12 @@ export default function StudentTable({
                 return (
                   <tr
                     key={student.id}
-                    className={`border-b border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors${!student.isActive ? " opacity-50" : ""}`}
+                    className={[
+                      "border-b border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors",
+                      !student.isActive ? "opacity-50" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     <td className="px-4 py-3">
                       <Link href={links.record} prefetch={false} className="block min-w-0 hover:text-blue-600">

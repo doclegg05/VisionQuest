@@ -43,7 +43,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`font-display font-bold text-[var(--ink-strong)] ${dims.text}`}>{score}%</span>
+          <span className={["font-display font-bold text-[var(--ink-strong)]", dims.text].join(" ")}>{score}%</span>
           {size === "md" && <span className="text-[9px] text-[var(--ink-muted)] uppercase tracking-wider">Ready</span>}
         </div>
       </div>

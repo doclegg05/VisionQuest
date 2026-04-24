@@ -84,8 +84,13 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
   );
 
   return (
-    <div className={`border-t border-[var(--chat-input-border)] bg-[var(--chat-input-bg)] backdrop-blur ${compact ? "p-2" : "p-4"}`}>
-      <div className={`flex items-end gap-2 ${compact ? "" : "mx-auto max-w-4xl gap-3"}`}>
+    <div
+      className={[
+        "border-t border-[var(--chat-input-border)] bg-[var(--chat-input-bg)] backdrop-blur",
+        compact ? "p-2" : "p-4",
+      ].join(" ")}
+    >
+      <div className={["flex items-end gap-2", compact ? "" : "mx-auto max-w-4xl gap-3"].filter(Boolean).join(" ")}>
         <div className="relative flex-1" aria-expanded={paletteOpen}>
           {/* Focus glow — decorative halo behind textarea */}
           <motion.div
@@ -119,7 +124,12 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             rows={1}
             aria-label="Message to Sage"
             aria-autocomplete={paletteOpen ? "list" : undefined}
-            className={`textarea-field relative w-full resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] overflow-y-auto ${compact ? "min-h-[42px] px-3 py-2 text-sm" : "min-h-[54px] px-4 py-3 text-base"}`}
+            className={[
+              "textarea-field relative w-full resize-none focus:outline-none focus:ring-2",
+              "focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed",
+              "disabled:bg-[var(--surface-muted)] overflow-y-auto",
+              compact ? "min-h-[42px] px-3 py-2 text-sm" : "min-h-[54px] px-4 py-3 text-base",
+            ].join(" ")}
           />
         </div>
         <motion.button

@@ -168,9 +168,10 @@ export default function PathwayManager() {
           {pathways.map((p) => (
             <div
               key={p.id}
-              className={`bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3 ${
-                p.active ? "border-[var(--border)]" : "border-[var(--border)] opacity-60"
-              }`}
+              className={[
+                "bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3",
+                p.active ? "border-[var(--border)]" : "border-[var(--border)] opacity-60",
+              ].join(" ")}
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--ink-strong)]">

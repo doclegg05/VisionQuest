@@ -10,7 +10,12 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       onClick={toggleTheme}
       type="button"
-      className={`rounded-full border border-[var(--border)] p-2 transition-colors hover:bg-[var(--surface-overlay)] ${className}`}
+      className={[
+        "rounded-full border border-[var(--border)] p-2 transition-colors hover:bg-[var(--surface-overlay)]",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
     >
       {theme === "dark" ? (

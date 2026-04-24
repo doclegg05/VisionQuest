@@ -75,7 +75,7 @@ export function JobCard({
       )}
 
       {/* Job info */}
-      <h3 className={`font-semibold text-[var(--text-primary)] ${compact ? "text-sm" : "text-base"} leading-tight`}>
+      <h3 className={["font-semibold text-[var(--text-primary)]", compact ? "text-sm" : "text-base", "leading-tight"].join(" ")}>
         {title}
       </h3>
       <div className="flex items-center gap-1 text-sm text-[var(--text-secondary)] mt-1">

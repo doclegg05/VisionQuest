@@ -115,12 +115,15 @@ export default function ConversationList({
             return (
               <div
                 key={conv.id}
-                className={`group relative mb-2 rounded-[1.15rem] border transition-colors
-                  ${isActive
+                className={[
+                  "group relative mb-2 rounded-[1.15rem] border transition-colors",
+                  isActive
                     ? "border-white/40 bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.08)]"
-                    : "border-white/8 bg-[var(--surface-raised)]/6 text-white/82 hover:bg-[var(--surface-raised)]/10"
-                  }
-                  ${isDeleting ? "opacity-50" : ""}`}
+                    : "border-white/8 bg-[var(--surface-raised)]/6 text-white/82 hover:bg-[var(--surface-raised)]/10",
+                  isDeleting ? "opacity-50" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <button
                   onClick={() => onSelect(conv.id)}
@@ -129,19 +132,27 @@ export default function ConversationList({
                   className="w-full px-4 py-3.5 text-left"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <span className={`min-w-0 flex-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                      isActive ? "text-[var(--accent-strong)]" : "text-white/75"
-                    }`}>
+                    <span
+                      className={[
+                        "min-w-0 flex-1 text-xs font-semibold uppercase tracking-[0.18em]",
+                        isActive ? "text-[var(--accent-strong)]" : "text-white/75",
+                      ].join(" ")}
+                    >
                       {STAGE_LABELS[conv.stage] || conv.stage}
                     </span>
                     {conv.active && (
                       <span className={`h-2.5 w-2.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-emerald-400"}`} />
                     )}
                   </div>
-                  <p className={`mt-2 line-clamp-2 break-words pr-7 text-sm font-medium leading-5 ${isActive ? "text-[var(--ink-strong)]" : "text-white"}`}>
+                  <p
+                    className={[
+                      "mt-2 line-clamp-2 break-words pr-7 text-sm font-medium leading-5",
+                      isActive ? "text-[var(--ink-strong)]" : "text-white",
+                    ].join(" ")}
+                  >
                     {conv.title || "New conversation"}
                   </p>
-                  <p className={`mt-1 text-xs ${isActive ? "text-[var(--ink-muted)]" : "text-white/65"}`}>
+                  <p className={["mt-1 text-xs", isActive ? "text-[var(--ink-muted)]" : "text-white/65"].join(" ")}>
                     {new Date(conv.updatedAt).toLocaleDateString()}
                   </p>
                 </button>

@@ -282,7 +282,14 @@ export default function OrientationChecklist({
                       </div>
 
                       {hasDetails && (
-                        <span className={`text-[var(--ink-muted)] shrink-0 ml-1 text-xs transition-transform ${expandedItem === item.id ? "rotate-90" : ""}`}>
+                        <span
+                          className={[
+                            "text-[var(--ink-muted)] shrink-0 ml-1 text-xs transition-transform",
+                            expandedItem === item.id ? "rotate-90" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
                           ▶
                         </span>
                       )}
