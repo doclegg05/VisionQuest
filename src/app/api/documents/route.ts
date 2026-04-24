@@ -40,6 +40,12 @@ export const GET = withErrorHandler(async (req: Request) => {
   const certificationId = searchParams.get("certificationId");
   const search = searchParams.get("search")?.trim().slice(0, 100);
 
+  // Pagination — bounded so no caller can request tens of thousands of rows.
+  const rawLimit = parseInt(searchParams.get("limit") ?? "50", 10);
+  const rawOffset = parseInt(searchParams.get("offset") ?? "0", 10);
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 200) : 50;
+  const offset = Number.isFinite(rawOffset) ? Math.max(rawOffset, 0) : 0;
+
   if (category && !VALID_CATEGORIES.has(category)) throw badRequest("Invalid category");
 
   const isStaff = isStaffRole(session.role);
@@ -61,26 +67,32 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // Normalize search for cache key to prevent cache fragmentation
   const normalizedSearch = search?.toLowerCase() || "";
-  const cacheKey = `docs:${isStaff ? "staff" : "student"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${normalizedSearch}`;
+  const cacheKey = `docs:${isStaff ? "staff" : "student"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${normalizedSearch}:${limit}:${offset}`;
 
-  const documents = await cached(cacheKey, 120, () =>
-    prisma.programDocument.findMany({
-      where,
-      orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { title: "asc" }],
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        mimeType: true,
-        sizeBytes: true,
-        category: true,
-        audience: true,
-        platformId: true,
-        certificationId: true,
-        sortOrder: true,
-      },
-    }),
-  );
+  const payload = await cached(cacheKey, 120, async () => {
+    const [documents, total] = await Promise.all([
+      prisma.programDocument.findMany({
+        where,
+        orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { title: "asc" }],
+        skip: offset,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          mimeType: true,
+          sizeBytes: true,
+          category: true,
+          audience: true,
+          platformId: true,
+          certificationId: true,
+          sortOrder: true,
+        },
+      }),
+      prisma.programDocument.count({ where }),
+    ]);
+    return { documents, total };
+  });
 
-  return NextResponse.json({ documents });
+  return NextResponse.json({ ...payload, limit, offset });
 });

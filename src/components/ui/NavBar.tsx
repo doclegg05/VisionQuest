@@ -15,6 +15,7 @@ import {
   DotsThreeOutline,
   UserCircle,
   SignOut,
+  Books,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
@@ -25,6 +26,7 @@ const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/teacher", label: "Students", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
+  { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
 ];
 
@@ -35,6 +37,7 @@ const COORDINATOR_ITEMS: NavItem[] = [
 const ADMIN_ITEMS: NavItem[] = [
   { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
+  { href: "/admin/library", label: "Library", icon: Books, phase: 1 },
 ];
 
 interface NavBarProps {
