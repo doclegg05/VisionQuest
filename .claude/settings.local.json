@@ -25,7 +25,9 @@
       "Bash(notebooklm artifact:*)",
       "Bash(notebooklm download:*)",
       "Bash(while read:*)",
-      "Bash(do sed:*)"
+      "Bash(do sed:*)",
+      "PowerShell(Get-ScheduledTask *)",
+      "PowerShell(Start-ScheduledTask *)"
     ]
   }
 }

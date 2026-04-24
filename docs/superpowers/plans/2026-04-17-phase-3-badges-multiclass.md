@@ -32,7 +32,7 @@
 | `buildManagedStudentWhere` already accepts `{ classId }` option | `src/lib/classroom.ts:26-62` |
 | `InterventionQueuePanel` currently fetches cross-class, no filter | `src/components/teacher/InterventionQueuePanel.tsx` (no class-filter code path) |
 | StudentDetail tabs render student header | `src/components/teacher/student-detail/OverviewTab.tsx:74` |
-| Existing urgency pills use `bg-[var(...)] text-[var(...)]` tokens | `InterventionQueuePanel.tsx:24-28` |
+| Existing urgency pills use CSS-variable-backed background and text color tokens | `InterventionQueuePanel.tsx:24-28` |
 | NavBar has staff sidebar section where a global switcher could live | `src/components/ui/NavBar.tsx:24-75` |
 | Phase 1 adds `SpokesClass.programType` — badges read this field | `docs/superpowers/plans/2026-04-17-phase-1-schema.md` |
 
