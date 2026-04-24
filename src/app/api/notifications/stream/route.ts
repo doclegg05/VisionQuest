@@ -1,6 +1,6 @@
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { addConnection } from "@/lib/notifications";
+import { withAuth } from "@/lib/api-error";
 
 const HEARTBEAT_INTERVAL = 30_000; // 30 seconds
 const MAX_REPLAY_NOTIFICATIONS = 20;
@@ -17,12 +17,7 @@ const MAX_CONNECTS_PER_MINUTE = 10;
  * any notifications created after that ID, so clients don't miss events
  * during brief disconnections (e.g., Render dyno restart).
  */
-export async function GET(req: Request) {
-  const session = await getSession();
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-  }
-
+export const GET = withAuth(async (session, req: Request) => {
   // Rate limit connection attempts per user
   const now = Date.now();
   const bucket = connectionAttempts.get(session.id);
@@ -81,7 +76,7 @@ export async function GET(req: Request) {
       Connection: "keep-alive",
     },
   });
-}
+});
 
 /**
  * On reconnect, send any notifications created after the client's last-seen ID.

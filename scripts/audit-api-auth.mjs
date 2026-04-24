@@ -32,25 +32,28 @@ const MODE = process.argv.includes("--markdown")
     ? "json"
     : "human";
 
-const HTTP_VERBS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
-
-// Regex that captures the wrapper immediately after `export const VERB =`
-// Examples matched:
-//   export const GET = withAuth(async (session) => { ... })
-//   export const POST = withTeacherAuth(async (session, req) => { ... })
-//   export const DELETE = withErrorHandler(async (req) => { ... })
-//   export const GET = async (req) => { ... }                (bare — WARN)
+// Capture each exported HTTP handler + its wrapper. Two shapes exist:
+//   export const GET = withAuth(async (session) => { ... })   → wrapper: withAuth
+//   export const GET = async (req) => { ... }                 → wrapper: null (bare)
+//   export async function GET(req) { ... }                    → wrapper: null (bare)
 function findHandlers(src) {
   const handlers = [];
-  const re = /export\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s*=\s*(\w+)?\s*\(?/g;
+
+  // Shape 1: `export const VERB = wrapper(...)` or `export const VERB = async ...`
+  const constRe = /export\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s*=\s*(\w+)?\s*\(?/g;
   let m;
-  while ((m = re.exec(src)) !== null) {
+  while ((m = constRe.exec(src)) !== null) {
     const [, verb, next] = m;
-    // If `next` is `async` or `function`, it's a bare handler; otherwise it's
-    // the wrapper identifier.
     const wrapper = next === "async" || next === "function" ? null : next ?? null;
     handlers.push({ verb, wrapper });
   }
+
+  // Shape 2: `export async function VERB(...)` or `export function VERB(...)`
+  const fnRe = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s*\(/g;
+  while ((m = fnRe.exec(src)) !== null) {
+    handlers.push({ verb: m[1], wrapper: null });
+  }
+
   return handlers;
 }
 
@@ -66,21 +69,58 @@ const OK_WRAPPERS = new Set([
 // Wrappers that are legitimate for unauthenticated endpoints only.
 const UNAUTH_WRAPPERS = new Set(["withErrorHandler", "withRegistryPublic"]);
 
+// `prisma` (not `prismaAdmin`) from @/lib/db → RLS-scoped client. That
+// import is the one that needs RLS context set before queries run.
+// Must exclude the `prismaAdmin as prisma` alias form (used by auth/cron
+// routes to bypass RLS intentionally) — those aren't footguns.
+function importsAppPrismaClient(src) {
+  const m = src.match(/import\s+\{([^}]*)\}\s+from\s+["']@\/lib\/db["']/);
+  if (!m) return false;
+  const specifiers = m[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // Look for a specifier that ends up bound to the local name `prisma`.
+  for (const spec of specifiers) {
+    const match = spec.match(/^(\w+)(?:\s+as\s+(\w+))?$/);
+    if (!match) continue;
+    const [, imported, alias] = match;
+    const local = alias ?? imported;
+    if (local === "prisma" && imported === "prisma") return true;
+  }
+  return false;
+}
+
 function classify(src, handler) {
   const w = handler.wrapper;
+  const importsAppPrisma = importsAppPrismaClient(src);
+  const callsGetSession = /\bgetSession\(\)/.test(src);
+
   if (OK_WRAPPERS.has(w)) return { level: "OK", note: w };
-  if (UNAUTH_WRAPPERS.has(w)) {
-    const usesPrisma = /from ["']@\/lib\/db["']/.test(src) && /\bprisma\./.test(src);
-    const callsGetSession = /\bgetSession\(\)/.test(src);
-    if (usesPrisma && callsGetSession) {
+
+  if (UNAUTH_WRAPPERS.has(w) || w === null) {
+    const wrapperLabel = w ?? "bare";
+    if (importsAppPrisma && callsGetSession) {
       return {
         level: "FOOTGUN",
-        note: `${w} + getSession() + prisma — RLS context never set`,
+        note: `${wrapperLabel} + getSession() + prisma — RLS context never set (use withAuth)`,
       };
     }
-    return { level: "NOTE", note: `${w} (no prisma + no session)` };
+    if (importsAppPrisma) {
+      return {
+        level: "WARN",
+        note: `${wrapperLabel} imports RLS-scoped prisma without withAuth — verify context is set elsewhere`,
+      };
+    }
+    if (w === null) {
+      return {
+        level: "NOTE",
+        note: "bare handler — no RLS-scoped prisma (typically prismaAdmin/bearer-auth/unauth)",
+      };
+    }
+    return { level: "NOTE", note: `${w} (no RLS-scoped prisma + session combo)` };
   }
-  if (w === null) return { level: "WARN", note: "bare handler, no wrapper" };
+
   // Unknown wrapper — could be a project-local helper; flag as NOTE.
   return { level: "NOTE", note: `unknown wrapper: ${w}` };
 }

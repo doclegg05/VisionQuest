@@ -14,6 +14,11 @@ jobs:
       JWT_SECRET: "ci-test-secret-not-real-at-all-32"
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
+      # RLS footgun enforcement — any Prisma query that runs without an RLS
+      # context will throw, surfacing the bug fixed in 0cb9876/355d735.
+      # See src/lib/db.ts#warnMissingRlsContext for the three-mode ladder.
+      RLS_CONTEXT_INJECTION: "true"
+      RLS_CONTEXT_STRICT: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +39,11 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Audit API auth wrappers
+        # Static scan of every route file; exits 1 on any FOOTGUN finding
+        # (withErrorHandler + getSession() + prisma — the 2026-04-24 bug).
+        run: npm run audit:api-auth
 
       - name: Typecheck
         run: npm run typecheck
