@@ -85,10 +85,14 @@ function runWithContext(
 ): Promise<unknown> {
   const { userId, role, studentId } = ctx;
   return (async () => {
+    // Combine the three set_config calls into a single SELECT so the
+    // transaction round-trips only twice (set_configs + query) instead of
+    // four times. `is_local=true` requires a transaction, which
+    // $transaction([...]) provides. Every set_config(text, text, boolean)
+    // is independent — calling them as a comma-separated SELECT list runs
+    // them all in one statement.
     const results = await client.$transaction([
-      client.$executeRaw`SELECT set_config('app.current_user_id', ${userId}, true)`,
-      client.$executeRaw`SELECT set_config('app.current_role', ${role}, true)`,
-      client.$executeRaw`SELECT set_config('app.current_student_id', ${studentId}, true)`,
+      client.$executeRaw`SELECT set_config('app.current_user_id', ${userId}, true), set_config('app.current_role', ${role}, true), set_config('app.current_student_id', ${studentId}, true)`,
       query(args) as unknown as Prisma.PrismaPromise<unknown>,
     ]);
     return results[results.length - 1];
