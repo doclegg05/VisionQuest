@@ -40,27 +40,21 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     return NextResponse.json({ error: "Valid type required (image, note, goal)." }, { status: 400 });
   }
 
-  // Validate fileId ownership if provided
-  if (fileId) {
-    const file = await prisma.fileUpload.findFirst({
-      where: { id: fileId, studentId: session.id },
-    });
-    if (!file) return NextResponse.json({ error: "File not found." }, { status: 404 });
-  }
-
-  // Validate goalId ownership if provided
-  if (goalId) {
-    const goal = await prisma.goal.findFirst({
-      where: { id: goalId, studentId: session.id },
-    });
-    if (!goal) return NextResponse.json({ error: "Goal not found." }, { status: 404 });
-  }
-
-  // Get max zIndex
-  const maxZ = await prisma.visionBoardItem.aggregate({
-    where: { studentId: session.id },
-    _max: { zIndex: true },
-  });
+  // file/goal validation and maxZ are independent — run together.
+  const [file, goal, maxZ] = await Promise.all([
+    fileId
+      ? prisma.fileUpload.findFirst({ where: { id: fileId, studentId: session.id } })
+      : Promise.resolve(null),
+    goalId
+      ? prisma.goal.findFirst({ where: { id: goalId, studentId: session.id } })
+      : Promise.resolve(null),
+    prisma.visionBoardItem.aggregate({
+      where: { studentId: session.id },
+      _max: { zIndex: true },
+    }),
+  ]);
+  if (fileId && !file) return NextResponse.json({ error: "File not found." }, { status: 404 });
+  if (goalId && !goal) return NextResponse.json({ error: "Goal not found." }, { status: 404 });
 
   // Random rotation between -3 and +3 degrees
   const rotation = Math.round((Math.random() * 6 - 3) * 10) / 10;

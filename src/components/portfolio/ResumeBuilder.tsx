@@ -10,7 +10,6 @@ import {
   type ResumeEducation,
   type ResumeExperience,
 } from "@/lib/resume";
-import { generateResumePdf } from "@/lib/resume-pdf";
 
 interface ResumeAssistResponse {
   resume: ResumeContent;
@@ -259,6 +258,9 @@ export default function ResumeBuilder() {
     setExportingPdf(true);
 
     try {
+      // Lazy-load the PDF generator (and jspdf transitively) only on click,
+      // so the ~150 KB+ jspdf bundle stays out of the initial page JS.
+      const { generateResumePdf } = await import("@/lib/resume-pdf");
       const blob = await generateResumePdf(displayName || "Resume", resume);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");

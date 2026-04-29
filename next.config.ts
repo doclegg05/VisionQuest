@@ -8,6 +8,31 @@ const isWindows = process.platform === "win32";
 
 const nextConfig: NextConfig = {
   output: isWindows ? undefined : "standalone",
+  // Pin the trace root to this directory so Next/Turbopack don't walk
+  // upward and pull random parent-directory files into the NFT.
+  outputFileTracingRoot: repoRoot,
+  // Exclude project artifacts that the standalone server doesn't need
+  // at runtime. Without this, every API route's NFT pulls in ~1,800
+  // markdown/PDF/script files (verified via .nft.json inspection on
+  // 2026-04-29: archive route had AGENTS.md, docs/**, PDFs, .py files).
+  outputFileTracingExcludes: {
+    "*": [
+      "**/*.md",
+      "docs/**",
+      "docs-upload/**",
+      "uploads/**",
+      "artifacts/**",
+      "playwright-report/**",
+      "test-results/**",
+      "e2e/**",
+      "scripts/**",
+      "**/*.py",
+      "**/*.pdf",
+      "broken-documents-backup-*.json",
+      "next.config.ts",
+      "next.config.js",
+    ],
+  },
   turbopack: {
     root: repoRoot,
   },

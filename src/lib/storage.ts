@@ -6,8 +6,12 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
-const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "uploads");
-const BUNDLED_UPLOAD_DIR = path.join(process.cwd(), "docs-upload");
+// turbopackIgnore comments below tell Turbopack not to trace these paths
+// statically. Without them the recursive fs.readdir() in findInContentDir()
+// causes the entire project tree to be pulled into the standalone NFT,
+// inflating the server bundle. These dirs are runtime artifacts, not deps.
+const LOCAL_UPLOAD_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads");
+const BUNDLED_UPLOAD_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), "docs-upload");
 
 // Supabase Storage S3-compatible config
 const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT || "";
@@ -110,7 +114,7 @@ export async function downloadBundledFile(
   }
 }
 
-const CONTENT_DIR = path.join(process.cwd(), "content");
+const CONTENT_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), "content");
 
 function normalizeForMatch(filename: string): string {
   const ext = path.extname(filename).toLowerCase();

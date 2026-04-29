@@ -69,13 +69,16 @@ export const DELETE = withTeacherAuth(async (session, req: Request) => {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  const item = await prisma.orientationItem.findUnique({
-    where: { id },
-    select: { id: true, label: true },
-  });
-
-  // Delete progress records first
-  await prisma.orientationProgress.deleteMany({ where: { itemId: id } });
+  // findUnique (for audit log) is independent of deleteMany — run together.
+  const [item] = await Promise.all([
+    prisma.orientationItem.findUnique({
+      where: { id },
+      select: { id: true, label: true },
+    }),
+    // Delete progress records first (FK constraint requires this before
+    // deleting the parent OrientationItem below).
+    prisma.orientationProgress.deleteMany({ where: { itemId: id } }),
+  ]);
   await prisma.orientationItem.delete({ where: { id } });
 
   await logAuditEvent({

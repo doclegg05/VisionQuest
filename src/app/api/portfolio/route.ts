@@ -37,18 +37,20 @@ export const POST = withAuth(async (session, req: Request) => {
   if (url && !isValidUrl(url)) {
     throw badRequest("Invalid URL. Only http and https URLs are allowed");
   }
-  if (fileId) {
-    const file = await prisma.fileUpload.findFirst({
-      where: { id: fileId, studentId: session.id },
-      select: { id: true },
-    });
-    if (!file) throw notFound("Attached file was not found");
-  }
-
-  const maxOrder = await prisma.portfolioItem.aggregate({
-    where: { studentId: session.id },
-    _max: { sortOrder: true },
-  });
+  // file ownership check and maxOrder are independent — run together.
+  const [file, maxOrder] = await Promise.all([
+    fileId
+      ? prisma.fileUpload.findFirst({
+          where: { id: fileId, studentId: session.id },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    prisma.portfolioItem.aggregate({
+      where: { studentId: session.id },
+      _max: { sortOrder: true },
+    }),
+  ]);
+  if (fileId && !file) throw notFound("Attached file was not found");
 
   const item = await prisma.portfolioItem.create({
     data: {
@@ -86,20 +88,21 @@ export const POST = withAuth(async (session, req: Request) => {
 export const PUT = withAuth(async (session, req: Request) => {
   const { id, title, description, type, fileId, url } = await parseBody(req, portfolioUpdateSchema);
 
-  const existing = await prisma.portfolioItem.findFirst({
-    where: { id, studentId: session.id },
-  });
+  // existing portfolio item and file ownership check are independent.
+  const [existing, file] = await Promise.all([
+    prisma.portfolioItem.findFirst({ where: { id, studentId: session.id } }),
+    fileId
+      ? prisma.fileUpload.findFirst({
+          where: { id: fileId, studentId: session.id },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
   if (!existing) throw notFound("Not found");
   if (url && !isValidUrl(url)) {
     throw badRequest("Invalid URL. Only http and https URLs are allowed");
   }
-  if (fileId) {
-    const file = await prisma.fileUpload.findFirst({
-      where: { id: fileId, studentId: session.id },
-      select: { id: true },
-    });
-    if (!file) throw notFound("Attached file was not found");
-  }
+  if (fileId && !file) throw notFound("Attached file was not found");
 
   const data: Record<string, unknown> = {};
   if (title !== undefined) data.title = title;

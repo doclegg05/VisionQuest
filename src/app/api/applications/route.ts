@@ -83,39 +83,35 @@ export const POST = withAuth(async (session, req: Request) => {
     return NextResponse.json({ error: "Application status is invalid." }, { status: 400 });
   }
 
-  const opportunity = await prisma.opportunity.findUnique({
-    where: { id: opportunityId },
-    select: { id: true, title: true },
-  });
+  // opportunity, resume-file ownership, and existing-application lookups
+  // are independent — run together.
+  const [opportunity, file, existingApplication] = await Promise.all([
+    prisma.opportunity.findUnique({
+      where: { id: opportunityId },
+      select: { id: true, title: true },
+    }),
+    resumeFileId
+      ? prisma.fileUpload.findFirst({
+          where: { id: resumeFileId, studentId: session.id },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    prisma.application.findUnique({
+      where: {
+        studentId_opportunityId: {
+          studentId: session.id,
+          opportunityId,
+        },
+      },
+      select: { id: true, resumeFileId: true },
+    }),
+  ]);
   if (!opportunity) {
     return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
   }
-
-  if (resumeFileId) {
-    const file = await prisma.fileUpload.findFirst({
-      where: {
-        id: resumeFileId,
-        studentId: session.id,
-      },
-      select: { id: true },
-    });
-    if (!file) {
-      return NextResponse.json({ error: "Resume file not found." }, { status: 400 });
-    }
+  if (resumeFileId && !file) {
+    return NextResponse.json({ error: "Resume file not found." }, { status: 400 });
   }
-
-  const existingApplication = await prisma.application.findUnique({
-    where: {
-      studentId_opportunityId: {
-        studentId: session.id,
-        opportunityId,
-      },
-    },
-    select: {
-      id: true,
-      resumeFileId: true,
-    },
-  });
 
   const application = await prisma.application.upsert({
     where: {

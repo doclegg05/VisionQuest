@@ -19,26 +19,27 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       includeInactiveAccounts: true,
     });
 
-    // Get all certifications with student info
-    const certs = await prisma.certification.findMany({
-      where: {
-        studentId: { in: managedStudentIds },
-      },
-      include: {
-        student: { select: { id: true, displayName: true, studentId: true } },
-        requirements: true,
-      },
-    });
-
-    const templates = await prisma.certTemplate.findMany({
-      where: { certType: "ready-to-work" },
-      select: {
-        id: true,
-        required: true,
-        needsFile: true,
-        needsVerify: true,
-      },
-    });
+    // certs and templates queries are independent — run in parallel.
+    const [certs, templates] = await Promise.all([
+      prisma.certification.findMany({
+        where: {
+          studentId: { in: managedStudentIds },
+        },
+        include: {
+          student: { select: { id: true, displayName: true, studentId: true } },
+          requirements: true,
+        },
+      }),
+      prisma.certTemplate.findMany({
+        where: { certType: "ready-to-work" },
+        select: {
+          id: true,
+          required: true,
+          needsFile: true,
+          needsVerify: true,
+        },
+      }),
+    ]);
 
     const studentProgress = certs.map((cert) => {
       const { done, total } = getCertificationProgress(templates, cert.requirements);

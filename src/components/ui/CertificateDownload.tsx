@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { generateCertificatePDF } from "@/lib/certificate-generator";
 
 interface CertificateDownloadProps {
   studentName: string;
@@ -21,6 +20,9 @@ export default function CertificateDownload({
   async function handleDownload() {
     setGenerating(true);
     try {
+      // Lazy-load the PDF generator (and jspdf transitively) only on click,
+      // so the ~150 KB+ jspdf bundle stays out of the initial page JS.
+      const { generateCertificatePDF } = await import("@/lib/certificate-generator");
       const blob = await generateCertificatePDF({
         studentName,
         certificateType,
