@@ -67,6 +67,7 @@ model Student {
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
   moodEntries             MoodEntry[]
+  sageInsights            SageInsight[]
   notificationPreferences NotificationPreference[]
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
@@ -130,6 +131,35 @@ model Message {
   @@index([studentId])
   // Chat-history load: where conversationId order by createdAt asc.
   @@index([conversationId, createdAt])
+  @@schema("visionquest")
+}
+
+/// Structured Sage memory about a student. Sage writes free-form
+/// observations here; staff and the student can read, dismiss, or
+/// (Tier B) edit them. Forms the "memory plane" of the closed-loop
+/// Sage architecture — see docs/plans/2026-04-29-sage-closed-loop.md.
+model SageInsight {
+  id                   String    @id @default(cuid())
+  studentId            String
+  // "goal" | "barrier" | "strength" | "context" | "concern"
+  category             String
+  content              String    @db.Text
+  // Traceability — which Sage turn produced this insight.
+  sourceMessageId      String?
+  sourceConversationId String?
+  // 0–1 if Sage scored its own confidence in the observation.
+  confidence           Float?
+  // "active" | "dismissed" | "edited"
+  status               String    @default("active")
+  editedBy             String?
+  dismissedBy          String?
+  dismissedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, status, createdAt(sort: Desc)])
   @@schema("visionquest")
 }
 
