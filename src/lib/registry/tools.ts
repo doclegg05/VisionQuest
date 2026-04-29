@@ -264,6 +264,21 @@ export const TOOLS: readonly ToolDefinition[] = [
     tags: ["ai", "resume", "extraction"],
   },
   {
+    id: "sage.propose_goal",
+    namespace: "sage",
+    name: "Propose Goal",
+    description:
+      "Sage drafts a Goal record with status='proposed' awaiting student confirmation. Closed-loop step 4/10 (docs/plans/2026-04-29-sage-closed-loop.md).",
+    endpoint: { method: "POST", path: "/api/sage/tools/propose-goal" },
+    requiredRoles: ["student"],
+    tokenBudget: 1500,
+    auditLevel: "full",
+    rateLimit: { maxPerHour: 30 },
+    enabled: true,
+    requiresContext: ["conversation", "goals"],
+    tags: ["ai", "goals", "tool"],
+  },
+  {
     id: "sage.snippets_list",
     namespace: "sage",
     name: "Sage Snippets List",
