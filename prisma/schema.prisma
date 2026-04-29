@@ -110,6 +110,8 @@ model Conversation {
   student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   messages Message[]
 
+  // Conversation list per student, most-recent-first.
+  @@index([studentId, active, updatedAt(sort: Desc)])
   @@schema("visionquest")
 }
 
@@ -126,6 +128,8 @@ model Message {
   student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
+  // Chat-history load: where conversationId order by createdAt asc.
+  @@index([conversationId, createdAt])
   @@schema("visionquest")
 }
 
@@ -441,6 +445,8 @@ model PortfolioItem {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  // Portfolio list per student, ordered by type/sortOrder.
+  @@index([studentId, type, sortOrder])
   @@schema("visionquest")
 }
 
@@ -466,6 +472,9 @@ model FileUpload {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  // FK lookups by studentId, plus the resume-generated cleanup query in
+  // src/app/api/applications/route.ts which filters by studentId+category.
+  @@index([studentId, category])
   @@schema("visionquest")
 }
 
@@ -1369,8 +1378,8 @@ model RegionCoordinator {
 model GrantGoal {
   id          String   @id @default(cuid())
   regionId    String
-  programType String   // "spokes" | "adult_ed" | "ietp" | "all"
-  metric      String   // enrollments | certifications | placements | ged_earned | custom
+  programType String // "spokes" | "adult_ed" | "ietp" | "all"
+  metric      String // enrollments | certifications | placements | ged_earned | custom
   targetValue Float
   periodStart DateTime
   periodEnd   DateTime

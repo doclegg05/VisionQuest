@@ -6,9 +6,9 @@
 - Route groups: `(student)`, `(teacher)`, `(admin)` — each has its own layout
 
 ## Navigation (Post-Simplification)
-- Student: Dashboard, Chat, Goals, Learning (merged Courses+Certs), Career (merged Jobs+Events), Orientation, Portfolio, Appointments, Settings
+- Student: Dashboard, Chat, Goals, Learning (merged Courses+Certs), Career (merged Jobs+Events), Orientation, Portfolio, Appointments, Settings, **Vision Board, Files, Resources** (retained per 2026-04-01 product decision — see `docs/PRODUCT_DECISIONS.md`)
 - Teacher: Dashboard, Classes, Student Detail
-- Removed from active scope: Vision Board, Files, Resources, SPOKES page
+- Out of active scope: SPOKES page (deprecated in favor of integrated SPOKES tab on Student Detail)
 
 ## Component Conventions
 - Named exports for components: `export function GoalCard() {}`
