@@ -127,9 +127,14 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
    * can warm the base-context cache before the student sends their first
    * message. Fire-and-forget: errors are silently discarded and we never
    * block render or chat interaction waiting for it.
+   *
+   * Skipped for non-student roles: the endpoint primes a per-student cache
+   * and rejects teacher/admin sessions with 403, so calling it would just
+   * generate log noise without warming anything useful.
    */
   useEffect(() => {
     if (warmupFiredRef.current || conversationId) return;
+    if (role !== "student") return;
     warmupFiredRef.current = true;
     fetch("/api/chat/warmup", { credentials: "include" }).catch(() => {
       // Intentionally ignored — warmup is best-effort.
