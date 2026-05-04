@@ -31,6 +31,45 @@ interface NativeChatResponse {
 
 type OllamaApiMode = "unknown" | "openai" | "native";
 
+class LocalAiStreamError extends Error {
+  readonly switchToNative: boolean;
+
+  constructor(message: string, options: { switchToNative?: boolean } = {}) {
+    super(message);
+    this.name = "LocalAiStreamError";
+    this.switchToNative = options.switchToNative ?? false;
+  }
+}
+
+const STREAM_STARTUP_RETRY_DELAYS_MS = [0, 1_000, 3_000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function payloadErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || !("error" in payload)) {
+    return null;
+  }
+
+  const error = (payload as { error?: unknown }).error;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "Local AI returned an error.";
+}
+
+function isRetryableStartupError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /Relay:|ECONNREFUSED|fetch failed|socket hang up|terminated|aborted|timed out|timeout|Local AI stream failed \((?:502|503|504|520|522|523|524)\)|Ollama returned (?:502|503|504|520|522|523|524)/i.test(message);
+}
+
+function shouldSwitchToNative(message: string): boolean {
+  return /Ollama returned 404|Local AI stream failed \(404\)/i.test(message);
+}
+
 function toOpenAIMessages(
   systemPrompt: string,
   messages: ChatMessage[],
@@ -207,7 +246,7 @@ export class OllamaProvider implements AIProvider {
       : (data as NativeChatResponse).message?.content ?? "";
   }
 
-  async *streamResponse(
+  private async *streamResponseOnce(
     systemPrompt: string,
     messages: ChatMessage[],
   ): AsyncGenerator<string> {
@@ -233,7 +272,10 @@ export class OllamaProvider implements AIProvider {
     );
 
     if (!response.ok) {
-      throw new Error(`Local AI stream failed (${response.status})`);
+      const message = `Local AI stream failed (${response.status})`;
+      throw new LocalAiStreamError(message, {
+        switchToNative: shouldSwitchToNative(message),
+      });
     }
 
     if (!response.body) throw new Error("Ollama returned empty stream body");
@@ -264,6 +306,12 @@ export class OllamaProvider implements AIProvider {
           } catch {
             continue;
           }
+          const upstreamError = payloadErrorMessage(parsed);
+          if (upstreamError) {
+            throw new LocalAiStreamError(upstreamError, {
+              switchToNative: shouldSwitchToNative(upstreamError),
+            });
+          }
           const content = parsed.choices?.[0]?.delta?.content;
           if (content) yield content;
           continue;
@@ -275,12 +323,17 @@ export class OllamaProvider implements AIProvider {
         } catch {
           continue;
         }
+        const upstreamError = payloadErrorMessage(parsed);
+        if (upstreamError) {
+          throw new LocalAiStreamError(upstreamError);
+        }
         const content = parsed.message?.content;
         if (content) yield content;
         if (parsed.done) return;
       }
     }
 
+    buffer += decoder.decode();
     const finalChunk = buffer.trim();
     if (!finalChunk) return;
 
@@ -289,23 +342,77 @@ export class OllamaProvider implements AIProvider {
       const payload = finalChunk.slice(6);
       if (payload === "[DONE]") return;
 
+      let parsed: OpenAIStreamChunk;
       try {
-        const parsed = JSON.parse(payload) as OpenAIStreamChunk;
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) yield content;
+        parsed = JSON.parse(payload) as OpenAIStreamChunk;
       } catch {
         return;
       }
+      const upstreamError = payloadErrorMessage(parsed);
+      if (upstreamError) {
+        throw new LocalAiStreamError(upstreamError, {
+          switchToNative: shouldSwitchToNative(upstreamError),
+        });
+      }
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (content) yield content;
       return;
     }
 
+    let parsed: NativeChatResponse;
     try {
-      const parsed = JSON.parse(finalChunk) as NativeChatResponse;
-      const content = parsed.message?.content;
-      if (content) yield content;
+      parsed = JSON.parse(finalChunk) as NativeChatResponse;
     } catch {
       return;
     }
+    const upstreamError = payloadErrorMessage(parsed);
+    if (upstreamError) {
+      throw new LocalAiStreamError(upstreamError);
+    }
+    const content = parsed.message?.content;
+    if (content) yield content;
+  }
+
+  async *streamResponse(
+    systemPrompt: string,
+    messages: ChatMessage[],
+  ): AsyncGenerator<string> {
+    let lastError: unknown = null;
+    let yieldedAny = false;
+
+    for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
+      let yieldedThisAttempt = false;
+      try {
+        for await (const chunk of this.streamResponseOnce(systemPrompt, messages)) {
+          yieldedAny = true;
+          yieldedThisAttempt = true;
+          yield chunk;
+        }
+
+        if (yieldedThisAttempt) return;
+        throw new LocalAiStreamError("Local AI stream ended without content.");
+      } catch (error) {
+        lastError = error;
+        if (error instanceof LocalAiStreamError && error.switchToNative) {
+          this.apiMode = "native";
+        }
+
+        const canRetry =
+          !yieldedAny &&
+          attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
+          (
+            (error instanceof LocalAiStreamError && error.switchToNative) ||
+            isRetryableStartupError(error)
+          );
+
+        if (!canRetry) throw error;
+
+        const delay = STREAM_STARTUP_RETRY_DELAYS_MS[attempt];
+        if (delay > 0) await sleep(delay);
+      }
+    }
+
+    if (lastError) throw lastError;
   }
 
   async generateStructuredResponse(

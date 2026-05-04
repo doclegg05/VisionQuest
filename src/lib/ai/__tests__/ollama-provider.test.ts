@@ -199,6 +199,110 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.deepEqual(result, ["Hello", " world"]);
       assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
     });
+
+    it("retries a relay startup error before any tokens are yielded", async () => {
+      const encoder = new TextEncoder();
+      let fetchCount = 0;
+
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode(": heartbeat\n\n"));
+                controller.enqueue(
+                  encoder.encode(
+                    'data: {"error":"Relay: connect ECONNREFUSED 127.0.0.1:11434"}\n\n',
+                  ),
+                );
+                controller.close();
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  "data: " +
+                    JSON.stringify({ choices: [{ delta: { content: "Recovered" } }] }) +
+                    "\n\n",
+                ),
+              );
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        );
+      });
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Recovered"]);
+      assert.equal(fetchCount, 2);
+    });
+
+    it("switches to native streaming when the relay hides an OpenAI-path 404 inside the stream", async () => {
+      const encoder = new TextEncoder();
+      let fetchCount = 0;
+
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode(": heartbeat\n\n"));
+                controller.enqueue(
+                  encoder.encode('data: {"error":"Ollama returned 404"}\n\n'),
+                );
+                controller.close();
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  JSON.stringify({ message: { content: "Native" }, done: false }) +
+                    "\n",
+                ),
+              );
+              controller.enqueue(
+                encoder.encode(JSON.stringify({ message: { content: "" }, done: true }) + "\n"),
+              );
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        );
+      });
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Native"]);
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+      assert.equal(fetchCount, 2);
+    });
   });
 
   describe("message role mapping", () => {

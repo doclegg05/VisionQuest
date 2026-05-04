@@ -11,6 +11,7 @@ import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
+import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/system-prompts";
@@ -279,6 +280,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         let fullContent = "";
         let streamCompleted = false;
         let refreshedConversationList = false;
+        let sseBuffer = "";
 
         const maybeRefreshConversations = (nextId?: string) => {
           if (!refreshedConversationList && nextId && nextId !== conversationId) {
@@ -287,41 +289,49 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           }
         };
 
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
-
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.conversationId && !data.done) {
-                  setConversationId(data.conversationId);
-                  maybeRefreshConversations(data.conversationId);
-                }
-                if (data.error) throw new Error(data.error);
-                if (data.text) {
-                  // B4: First real token clears the optimistic greeting.
-                  if (!fullContent) {
-                    setOptimisticGreeting(null);
-                  }
-                  fullContent += data.text;
-                  setStreamingContent(fullContent);
-                }
-                if (data.done) {
-                  setConversationId(data.conversationId);
-                  maybeRefreshConversations(data.conversationId);
-                  streamCompleted = true;
-                }
-              } catch {
-                // Skip malformed JSON.
-              }
+        const applyStreamEvent = (data: ChatSseEvent) => {
+          if (data.error) throw new Error(data.error);
+          if (data.conversationId && !data.done) {
+            setConversationId(data.conversationId);
+            maybeRefreshConversations(data.conversationId);
+          }
+          if (data.text) {
+            // B4: First real token clears the optimistic greeting.
+            if (!fullContent) {
+              setOptimisticGreeting(null);
             }
+            fullContent += data.text;
+            setStreamingContent(fullContent);
+          }
+          if (data.done) {
+            setConversationId(data.conversationId ?? conversationId);
+            maybeRefreshConversations(data.conversationId);
+            streamCompleted = true;
+          }
+        };
+
+        if (!reader) {
+          throw new Error("Sage returned no response stream. Please try again.");
+        }
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const parsed = parseChatSseChunk(chunk, sseBuffer);
+          sseBuffer = parsed.buffer;
+          for (const data of parsed.events) {
+            applyStreamEvent(data);
+          }
+        }
+
+        const finalChunk = decoder.decode();
+        if (finalChunk || sseBuffer.trim()) {
+          const parsed = parseChatSseChunk(`${finalChunk}\n\n`, sseBuffer);
+          sseBuffer = parsed.buffer;
+          for (const data of parsed.events) {
+            applyStreamEvent(data);
           }
         }
 

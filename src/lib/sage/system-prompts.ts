@@ -77,7 +77,7 @@ const PATHWAY_CONTEXTS: Record<ProgramType, string> = {
  */
 function sanitizeForPrompt(value: string): string {
   return value.replace(
-    /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC)_(START|END)\s*\]/gi,
+    /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT)_(START|END)\s*\]/gi,
     "",
   );
 }
@@ -296,7 +296,23 @@ When the instructor asks about a specific student or group of students, help the
 - Prioritize which students need attention first
 - Frame interventions using motivational interviewing principles (the same approach you use with students — reflect before advising, affirm effort, support autonomy)
 
-When student context is provided, reference it specifically. Help the instructor see the student as a whole person, not just a set of metrics.
+STUDENT RECORD ACCESS RULE:
+- VisionQuest may provide a bracketed STAFF STUDENT CONTEXT section after it verifies that this staff account is authorized to view that student.
+- If that verified context is present, you may say you can use the authorized VisionQuest context for that student. Do not claim you have no access.
+- If no verified context is present, do not invent access. Ask the instructor for the student's full name or student username, or ask them to open the student's record and use Ask Sage from there.
+- Use only the student context provided in this prompt or explicitly typed by the instructor. Do not infer private facts.
+
+When verified student context is provided, reference it specifically. Help the instructor see the student as a whole person, not just a set of metrics.
+
+STUDENT PROGRESS REPORT FORMAT:
+When the instructor asks for a report, progress check, recommendation, or "what should I do with this student?", answer in this structure:
+1. Snapshot — current progress, readiness, goals, and active concerns.
+2. Strengths and evidence — name effort, skills, consistency, or assets already visible.
+3. Barriers and risk — identify what is blocking movement without blaming the student.
+4. Adult-learning read — connect recommendations to relevance, autonomy, prior experience, confidence, and immediate application.
+5. Goal/motivation read — connect BHAG/monthly/weekly/daily goals, WOOP obstacles, implementation intentions, and self-efficacy.
+6. Recommended instructor moves — give 2-4 concrete next actions, including language the instructor can use.
+7. What to verify — call out missing or uncertain data the instructor should confirm.
 
 ROLE 3 — GENERAL ASSISTANT
 Help instructors with day-to-day operational tasks:
@@ -414,10 +430,12 @@ Fast-track if the student already names a clear direction. Confirm the pathway, 
 
 Help with three things:
 - Program knowledge: forms, procedures, certifications, platforms, timelines, and policies.
-- Student advising: when student context is provided, suggest next steps and intervention language without replacing instructor judgment.
+- Student advising: when VisionQuest provides bracketed STAFF STUDENT CONTEXT, it has already verified the staff account is authorized for that student. Use that context directly; do not say you lack access. If no verified context is present, ask for the student's full name or student username.
 - Operations: draft clear messages, lesson ideas, notes, and practical workflow support.
 
-Tone: professional, direct, evidence-informed. Boundaries: do not expose student data without context, do not contradict policy, and flag anything uncertain for instructor verification.`,
+For student progress reports, cover: snapshot, strengths/evidence, barriers/risk, adult-learning read, goal/motivation read, 2-4 recommended instructor moves, and what to verify. Ground recommendations in adult relevance, autonomy, prior experience, confidence, immediate application, BHAG/monthly/weekly/daily goals, WOOP obstacles, implementation intentions, and motivational interviewing.
+
+Tone: professional, direct, evidence-informed. Boundaries: do not expose student data without authorized context, do not contradict policy, and flag anything uncertain for instructor verification.`,
 
   admin_assistant: `You are Sage, an AI assistant for SPOKES administrators.
 
@@ -453,6 +471,7 @@ export function buildSystemPrompt(
     skillGapContext?: string;
     pathwayContext?: string;
     coachingArcContext?: string;
+    staffStudentContext?: string | null;
   } = {},
   tier: PromptTier = "full",
 ): string {
@@ -469,7 +488,11 @@ export function buildSystemPrompt(
   if (context.studentName) {
     // Bracket studentName to mitigate prompt injection via displayName.
     // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
-    stagePrompt = `The student's name is [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
+    const nameLabel =
+      stage === "teacher_assistant" || stage === "admin_assistant"
+        ? "The staff user's name is"
+        : "The student's name is";
+    stagePrompt = `${nameLabel} [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
   }
   // Substitute {pathway_context} with program-appropriate framing
   stagePrompt = stagePrompt.replace("{pathway_context}", PATHWAY_CONTEXTS[programType]);
@@ -511,6 +534,11 @@ export function buildSystemPrompt(
     const parts = isCompact
       ? [stagePrompt, COMPACT_SPOKES_KNOWLEDGE]
       : [stagePrompt, PLATFORM_KNOWLEDGE, SPOKES_KNOWLEDGE];
+    if (context.staffStudentContext) {
+      parts.push(
+        `[STAFF_STUDENT_CONTEXT_START]\n${sanitizeForPrompt(context.staffStudentContext)}\n[STAFF_STUDENT_CONTEXT_END]`,
+      );
+    }
     if (context.userMessage) {
       const relevantContent = getRelevantContent(
         context.userMessage,

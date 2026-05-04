@@ -99,6 +99,13 @@ test("chatSendSchema accepts message with conversationId", () => {
   assert.equal(result.data.conversationId, cuid);
 });
 
+test("chatSendSchema accepts staff targetStudentId context", () => {
+  const cuid = "cm1234567890abcdefghijklm";
+  const result = chatSendSchema.safeParse({ message: "Report on this student", targetStudentId: cuid });
+  assert.ok(result.success);
+  assert.equal(result.data.targetStudentId, cuid);
+});
+
 test("chatSendSchema rejects empty message", () => {
   const result = chatSendSchema.safeParse({ message: "" });
   assert.ok(!result.success);

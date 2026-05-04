@@ -13,6 +13,7 @@ import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
+import { buildStaffStudentContext } from "@/lib/sage/staff-student-context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota } from "@/lib/llm-usage";
 import { prisma } from "@/lib/db";
@@ -198,6 +199,23 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Save user message
   await saveMessage(conversation.id, session.id, "user", userMessage);
 
+  let staffStudentContext: string | null = null;
+  let staffStudentTargetId: string | null = null;
+  let staffStudentContextResolution: "none" | "resolved" | "ambiguous" | "not_found" = "none";
+  if (isTeacher) {
+    const priorUserMessages = (conversation.messages ?? [])
+      .filter((message) => message.role === "user")
+      .map((message) => message.content);
+    const contextResult = await buildStaffStudentContext(session, {
+      userMessage,
+      priorUserMessages,
+      targetStudentId: body.targetStudentId,
+    });
+    staffStudentContext = contextResult.context;
+    staffStudentTargetId = contextResult.targetStudentId;
+    staffStudentContextResolution = contextResult.resolution;
+  }
+
   // Fetch program context once for students — reused by both the system
   // prompt and the post-response handler.
   let studentProgramType: ProgramType | null = null;
@@ -221,6 +239,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     systemPrompt = buildSystemPrompt("teacher_assistant", {
       studentName: session.displayName,
       userMessage,
+      staffStudentContext,
     }, promptTier);
   } else {
     const promptContext = await getStudentPromptContext(
@@ -361,6 +380,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           outputChars: persisted.length,
           metadata: {
             conversationStage,
+            staffStudentContextResolution,
+            staffStudentTargetId,
           },
         });
 
@@ -422,6 +443,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           errorCode: "AI_STREAM_FAILED",
           metadata: {
             conversationStage,
+            staffStudentContextResolution,
+            staffStudentTargetId,
           },
         });
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` })}\n\n`));
