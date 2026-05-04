@@ -119,6 +119,7 @@ export default function ClassRosterManager() {
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentEmail, setNewStudentEmail] = useState("");
   const [newStudentPassword, setNewStudentPassword] = useState("");
+  const [createStudentError, setCreateStudentError] = useState("");
   const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
 
   async function loadClasses(preferredClassId?: string) {
@@ -194,9 +195,30 @@ export default function ClassRosterManager() {
   async function createStudent() {
     if (!selectedClassId) return;
 
+    const trimmedName = newStudentName.trim();
+    const trimmedUsername = newStudentUsername.trim();
+    const trimmedPassword = newStudentPassword.trim();
+    const trimmedEmail = newStudentEmail.trim();
+
+    if (!trimmedName) {
+      setCreateStudentError("Name is required.");
+      return;
+    }
+
+    if (trimmedUsername.length < 3) {
+      setCreateStudentError("Username must be at least 3 characters.");
+      return;
+    }
+
+    if (trimmedPassword.length < 8) {
+      setCreateStudentError("Password must be at least 8 characters.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setMessage("");
+    setCreateStudentError("");
     setCreatedCredentials(null);
 
     try {
@@ -204,10 +226,10 @@ export default function ClassRosterManager() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: newStudentUsername,
-          displayName: newStudentName,
-          email: newStudentEmail || undefined,
-          password: newStudentPassword,
+          studentId: trimmedUsername,
+          displayName: trimmedName,
+          email: trimmedEmail || undefined,
+          password: trimmedPassword,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -215,8 +237,8 @@ export default function ClassRosterManager() {
         throw new Error(payload?.error || "Could not create the student account.");
       }
 
-      setCreatedCredentials({ username: newStudentUsername, password: newStudentPassword });
-      setMessage(`Account created for ${newStudentName}.`);
+      setCreatedCredentials({ username: trimmedUsername, password: trimmedPassword });
+      setMessage(`Account created for ${trimmedName}.`);
       setNewStudentUsername("");
       setNewStudentName("");
       setNewStudentEmail("");
@@ -224,7 +246,7 @@ export default function ClassRosterManager() {
       await loadClassDetail(selectedClassId);
       await loadClasses(selectedClassId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the student account.");
+      setCreateStudentError(err instanceof Error ? err.message : "Could not create the student account.");
     } finally {
       setSaving(false);
     }
@@ -607,39 +629,60 @@ export default function ClassRosterManager() {
                 <div className="mt-3 space-y-3">
                   <input
                     value={newStudentName}
-                    onChange={(event) => setNewStudentName(event.target.value)}
+                    onChange={(event) => {
+                      setNewStudentName(event.target.value);
+                      setCreateStudentError("");
+                    }}
                     placeholder="Name"
                     className="field px-4 py-3 text-sm"
                   />
                   <input
                     value={newStudentUsername}
-                    onChange={(event) => setNewStudentUsername(event.target.value)}
+                    onChange={(event) => {
+                      setNewStudentUsername(event.target.value);
+                      setCreateStudentError("");
+                    }}
                     placeholder="Username"
                     className="field px-4 py-3 text-sm"
                   />
                   <input
                     value={newStudentEmail}
-                    onChange={(event) => setNewStudentEmail(event.target.value)}
+                    onChange={(event) => {
+                      setNewStudentEmail(event.target.value);
+                      setCreateStudentError("");
+                    }}
                     placeholder="Email (optional)"
                     type="email"
                     className="field px-4 py-3 text-sm"
                   />
                   <input
                     value={newStudentPassword}
-                    onChange={(event) => setNewStudentPassword(event.target.value)}
+                    onChange={(event) => {
+                      setNewStudentPassword(event.target.value);
+                      setCreateStudentError("");
+                    }}
                     placeholder="Password"
                     type="text"
                     autoComplete="off"
+                    aria-describedby="new-student-password-help"
                     className="field px-4 py-3 text-sm"
                   />
+                  <p id="new-student-password-help" className="text-xs text-[var(--ink-muted)]">
+                    Use at least 8 characters.
+                  </p>
                   <button
                     type="button"
                     onClick={() => void createStudent()}
                     disabled={saving || classDetail.status === "archived"}
                     className="primary-button w-full px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Create Account
+                    {saving ? "Creating..." : "Create Account"}
                   </button>
+                  {createStudentError ? (
+                    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {createStudentError}
+                    </div>
+                  ) : null}
                   {createdCredentials ? (
                     <div className="rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-3 text-sm text-[var(--ink-strong)]">
                       <p className="font-semibold">Account created — share these credentials:</p>
