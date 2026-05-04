@@ -2,6 +2,7 @@ export interface ChatSseEvent {
   conversationId?: string;
   done?: boolean;
   error?: string;
+  heartbeat?: boolean;
   quotaWarning?: string;
   text?: string;
 }
@@ -42,4 +43,12 @@ export function parseChatSseChunk(
     .filter((event): event is ChatSseEvent => event !== null);
 
   return { buffer, events };
+}
+
+export function formatChatSseEvent(event: ChatSseEvent): string {
+  return `data: ${JSON.stringify(event)}\n\n`;
+}
+
+export function formatChatSseComment(comment: string): string {
+  return `: ${comment.replace(/[\r\n]+/g, " ").trim()}\n\n`;
 }

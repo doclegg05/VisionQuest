@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseChatSseChunk } from "./sse";
+import { formatChatSseComment, formatChatSseEvent, parseChatSseChunk } from "./sse";
 
 describe("parseChatSseChunk", () => {
   it("buffers partial data events until the full event arrives", () => {
@@ -24,6 +24,16 @@ describe("parseChatSseChunk", () => {
     assert.deepEqual(result.events, [
       { error: "Relay: connect ECONNREFUSED 127.0.0.1:11434" },
     ]);
+    assert.equal(result.buffer, "");
+  });
+
+  it("ignores SSE keep-alive comments", () => {
+    const result = parseChatSseChunk(
+      `${formatChatSseComment("keep-alive")}${formatChatSseEvent({ text: "ready" })}`,
+      "",
+    );
+
+    assert.deepEqual(result.events, [{ text: "ready" }]);
     assert.equal(result.buffer, "");
   });
 });

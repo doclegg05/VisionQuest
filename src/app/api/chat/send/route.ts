@@ -13,6 +13,7 @@ import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
+import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
 import { buildStaffStudentContext } from "@/lib/sage/staff-student-context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota } from "@/lib/llm-usage";
@@ -22,6 +23,15 @@ import { getStudentProgramType } from "@/lib/program-type-server";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
+const CHAT_SSE_HEARTBEAT_MS = 15_000;
+
+class ChatSseClientClosedError extends Error {
+  constructor() {
+    super("Client disconnected before Sage completed streaming.");
+    this.name = "ChatSseClientClosedError";
+  }
+}
+
 function createSseResponse(
   conversationId: string,
   text: string,
@@ -30,13 +40,13 @@ function createSseResponse(
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ conversationId })}\n\n`),
+        encoder.encode(formatChatSseEvent({ conversationId })),
       );
       controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
+        encoder.encode(formatChatSseEvent({ text })),
       );
       controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ done: true, conversationId })}\n\n`),
+        encoder.encode(formatChatSseEvent({ done: true, conversationId })),
       );
       controller.close();
     },
@@ -331,21 +341,74 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   const stream = new ReadableStream({
     async start(controller) {
+      let streamClosed = false;
+      let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+      const enqueueSse = (payload: string, label: string): boolean => {
+        if (streamClosed) return false;
+        try {
+          controller.enqueue(encoder.encode(payload));
+          return true;
+        } catch (error) {
+          streamClosed = true;
+          logger.warn("Chat SSE stream closed before enqueue", {
+            conversationId: conversation.id,
+            label,
+            error: String(error),
+          });
+          return false;
+        }
+      };
+
+      const sendEvent = (event: Parameters<typeof formatChatSseEvent>[0], label: string): void => {
+        if (!enqueueSse(formatChatSseEvent(event), label)) {
+          throw new ChatSseClientClosedError();
+        }
+      };
+
+      const stopHeartbeat = () => {
+        if (heartbeatTimer) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+      };
+
+      const closeStream = () => {
+        stopHeartbeat();
+        if (streamClosed) return;
+        try {
+          controller.close();
+        } catch (error) {
+          logger.warn("Chat SSE stream was already closed", {
+            conversationId: conversation.id,
+            error: String(error),
+          });
+        } finally {
+          streamClosed = true;
+        }
+      };
+
+      heartbeatTimer = setInterval(() => {
+        if (!enqueueSse(formatChatSseComment("keep-alive"), "heartbeat")) {
+          stopHeartbeat();
+        }
+      }, CHAT_SSE_HEARTBEAT_MS);
+
       try {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ conversationId: conversation.id })}\n\n`));
+        sendEvent({ conversationId: conversation.id }, "conversationId");
 
         // Send soft-cap warning as an SSE event before the AI response
         if (quota.warning) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ quotaWarning: quota.warning })}\n\n`));
+          sendEvent({ quotaWarning: quota.warning }, "quotaWarning");
         }
 
         if (useNonStreaming) {
           fullResponse = await provider.generateResponse(systemPrompt, allMessages);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: fullResponse })}\n\n`));
+          sendEvent({ text: fullResponse }, "text");
         } else {
           for await (const chunk of provider.streamResponse(systemPrompt, allMessages)) {
             fullResponse += chunk;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+            sendEvent({ text: chunk }, "text");
           }
         }
 
@@ -418,12 +481,19 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }).catch((err) => logger.error("Post-response error", { error: String(err) }));
         }
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversation.id })}\n\n`));
-        controller.close();
+        sendEvent({ done: true, conversationId: conversation.id }, "done");
+        closeStream();
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         const cause = error instanceof Error && error.cause ? String(error.cause) : undefined;
-        logger.error("Stream error", { error: msg, cause, provider: provider.name });
+        const clientClosed = error instanceof ChatSseClientClosedError || streamClosed;
+        const errorCode = clientClosed ? "CLIENT_STREAM_CLOSED" : "AI_STREAM_FAILED";
+        const logPayload = { error: msg, cause, provider: provider.name };
+        if (clientClosed) {
+          logger.warn("Chat SSE client disconnected", logPayload);
+        } else {
+          logger.error("Stream error", logPayload);
+        }
         await logAiAuditEvent({
           actorId: session.id,
           actorRole: session.role,
@@ -440,15 +510,21 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           inputChars: userMessage.length,
           outputChars: fullResponse.length,
           reason: msg,
-          errorCode: "AI_STREAM_FAILED",
+          errorCode,
           metadata: {
             conversationStage,
             staffStudentContextResolution,
             staffStudentTargetId,
           },
         });
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` })}\n\n`));
-        controller.close();
+        if (!clientClosed) {
+          try {
+            sendEvent({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` }, "error");
+          } catch {
+            // The client went away while we were reporting the original error.
+          }
+        }
+        closeStream();
       }
     },
   });
