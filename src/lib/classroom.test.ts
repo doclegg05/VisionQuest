@@ -32,7 +32,7 @@ test("buildManagedStudentWhere returns unrestricted admin access when no class i
   });
 });
 
-test("buildManagedStudentWhere scopes teachers to their class roster", () => {
+test("buildManagedStudentWhere lets teachers filter by class without assignment narrowing", () => {
   const where = buildManagedStudentWhere(
     {
       id: "teacher-1",
@@ -49,11 +49,6 @@ test("buildManagedStudentWhere scopes teachers to their class roster", () => {
       some: {
         status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
         classId: "class-1",
-        class: {
-          instructors: {
-            some: { instructorId: "teacher-1" },
-          },
-        },
       },
     },
   });
@@ -114,14 +109,14 @@ test("buildManagedStudentWhere does NOT grant CDC unrestricted access", () => {
   });
 });
 
-test("STAFF_CAN_MANAGE_ANY contains exactly admin and coordinator", () => {
-  assert.deepEqual([...STAFF_CAN_MANAGE_ANY], ["admin", "coordinator"]);
+test("STAFF_CAN_MANAGE_ANY contains staff roles with cross-class access", () => {
+  assert.deepEqual([...STAFF_CAN_MANAGE_ANY], ["admin", "teacher", "coordinator"]);
 });
 
-test("canManageAnyClass returns true for admin and coordinator only", () => {
+test("canManageAnyClass returns true for instructor/admin staff roles", () => {
   assert.equal(canManageAnyClass("admin"), true);
+  assert.equal(canManageAnyClass("teacher"), true);
   assert.equal(canManageAnyClass("coordinator"), true);
-  assert.equal(canManageAnyClass("teacher"), false);
   assert.equal(canManageAnyClass("cdc"), false);
   assert.equal(canManageAnyClass("student"), false);
   assert.equal(canManageAnyClass(""), false);

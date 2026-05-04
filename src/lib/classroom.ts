@@ -12,13 +12,14 @@ export const MAX_ACTIVE_CLASSES_PER_TEACHER = 2;
 
 /**
  * Roles allowed to view/manage students and classes regardless of direct
- * instructor assignment. Coordinator inherits admin's cross-class read scope
- * (Phase 1) — write scopes for coordinator are wired in Phase 5.
+ * instructor assignment. VisionQuest is a single SPOKES staff workspace:
+ * instructors/admins need the same operational access to student profiles,
+ * classes, and intervention surfaces.
  *
  * CDC is intentionally NOT included: their read-across-region scope is
  * narrower and ships with their dashboard in a later phase.
  */
-export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin", "coordinator"];
+export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin", "teacher", "coordinator"];
 
 export function canManageAnyClass(role: string): boolean {
   return STAFF_CAN_MANAGE_ANY.includes(role);
