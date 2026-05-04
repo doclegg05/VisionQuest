@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import StudentDetail from "@/components/teacher/StudentDetail";
 import { getSession } from "@/lib/auth";
 import { isStaffRole } from "@/lib/api-error";
-import { assertStaffCanManageStudent } from "@/lib/classroom";
 
 export default async function StudentDetailPage({
   params,
@@ -13,11 +12,9 @@ export default async function StudentDetailPage({
   const session = await getSession();
   if (!session || !isStaffRole(session.role)) redirect("/");
 
-  const managedStudent = await assertStaffCanManageStudent(session, id);
-
   return (
     <div className="page-shell">
-      <StudentDetail studentId={managedStudent.id} />
+      <StudentDetail studentId={id} />
     </div>
   );
 }
