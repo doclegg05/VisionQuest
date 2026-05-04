@@ -78,6 +78,15 @@ export function buildManagedStudentWhere(
   };
 }
 
+export function buildStudentIdentifierWhere(identifier: string) {
+  return {
+    OR: [
+      { id: identifier },
+      { studentId: identifier },
+    ],
+  };
+}
+
 export async function assertStaffCanManageClass(session: Session, classId: string) {
   const canManageAny = canManageAnyClass(session.role);
   const managedClass = await prisma.spokesClass.findFirst({
@@ -156,11 +165,13 @@ export async function assertTeacherAssignmentLimit(
   }
 }
 
-export async function assertStaffCanManageStudent(session: Session, studentId: string) {
+export async function assertStaffCanManageStudent(session: Session, studentIdentifier: string) {
   const managedStudent = await prisma.student.findFirst({
     where: {
-      id: studentId,
-      ...buildManagedStudentWhere(session, { includeArchivedEnrollments: false }),
+      AND: [
+        buildStudentIdentifierWhere(studentIdentifier),
+        buildManagedStudentWhere(session, { includeArchivedEnrollments: false }),
+      ],
     },
     select: {
       id: true,

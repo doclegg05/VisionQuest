@@ -21,8 +21,9 @@ export default async function StudentDashboardPreview({
   const session = await getSession();
   if (!session || !isStaffRole(session.role)) redirect("/");
 
-  const { id: studentId } = await params;
-  const managedStudent = await assertStaffCanManageStudent(session, studentId);
+  const { id: studentIdentifier } = await params;
+  const managedStudent = await assertStaffCanManageStudent(session, studentIdentifier);
+  const studentId = managedStudent.id;
 
   const now = new Date();
   const [goalCount, nextAppointment, tasks, alertCount, readinessData, incompleteOrientationItems] = await Promise.all([

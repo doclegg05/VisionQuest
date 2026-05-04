@@ -4,6 +4,7 @@ import {
   NON_ARCHIVED_ENROLLMENT_STATUSES,
   STAFF_CAN_MANAGE_ANY,
   buildManagedStudentWhere,
+  buildStudentIdentifierWhere,
   canManageAnyClass,
   normalizeClassCode,
 } from "./classroom";
@@ -55,6 +56,15 @@ test("buildManagedStudentWhere scopes teachers to their class roster", () => {
         },
       },
     },
+  });
+});
+
+test("buildStudentIdentifierWhere accepts internal id or visible username", () => {
+  assert.deepEqual(buildStudentIdentifierWhere("britt"), {
+    OR: [
+      { id: "britt" },
+      { studentId: "britt" },
+    ],
   });
 });
 

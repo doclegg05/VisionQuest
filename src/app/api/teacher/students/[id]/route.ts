@@ -18,10 +18,11 @@ import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-dat
 // GET — individual student detail for teacher view
 export const GET = withRegistry("admin.student_detail", async (session, _req, ctx, _tool) => {
   const { id } = await ctx.params;
-  await assertStaffCanManageStudent(session, id);
+  const managedStudent = await assertStaffCanManageStudent(session, id);
+  const studentId = managedStudent.id;
 
   const student = await prisma.student.findUnique({
-    where: { id },
+    where: { id: studentId },
     select: {
       id: true,
       studentId: true,
@@ -316,7 +317,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           },
         })
       : Promise.resolve([]),
-    fetchStudentReadinessData(id),
+    fetchStudentReadinessData(studentId),
   ]);
   const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
