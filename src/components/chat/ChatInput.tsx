@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Command, PaperPlaneTilt, Sparkle } from "@phosphor-icons/react";
+import { Command, PaperPlaneTilt, Plus, Sparkle } from "@phosphor-icons/react";
 import { CommandPalette } from "./CommandPalette";
 import { type ChatRole } from "@/lib/chat/commands";
 
@@ -17,7 +17,10 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
   const [message, setMessage] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDisabledRef = useRef(disabled);
   const reduce = useReducedMotion();
 
@@ -33,6 +36,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setMessage("");
+    setUploadStatus(null);
     setPaletteOpen(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -99,6 +103,49 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     });
   }, [disabled]);
 
+  const handleFileButton = useCallback(() => {
+    if (disabled || uploading) return;
+    fileInputRef.current?.click();
+  }, [disabled, uploading]);
+
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file || disabled) return;
+
+      setUploading(true);
+      setUploadStatus(`Uploading ${file.name}...`);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("category", "sage-chat");
+        const res = await fetch("/api/files", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.error || "Could not upload that file.");
+        }
+
+        const filename = data?.file?.filename || file.name;
+        setUploadStatus(`${filename} uploaded to Files.`);
+        setMessage((current) => {
+          const note = `I uploaded "${filename}" to my Files.`;
+          return current.trim().length > 0 ? `${current}\n\n${note}` : note;
+        });
+        requestAnimationFrame(() => textareaRef.current?.focus());
+      } catch (error) {
+        setUploadStatus(error instanceof Error ? error.message : "Could not upload that file.");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [disabled],
+  );
+
   const hasMessage = message.trim().length > 0;
 
   return (
@@ -109,6 +156,14 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
       ].join(" ")}
     >
       <div className={compact ? "" : "mx-auto max-w-4xl"}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileChange}
+          aria-hidden="true"
+          tabIndex={-1}
+        />
         <div
           className={[
             "relative flex flex-col overflow-visible rounded-[1.75rem] border bg-[var(--surface-raised)] shadow-[0_18px_48px_rgba(7,23,43,0.12)]",
@@ -170,6 +225,22 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
 
           <div className={["flex items-center gap-2", compact ? "px-2 pb-2" : "px-3 pb-3"].join(" ")}>
             <button
+              onClick={handleFileButton}
+              disabled={disabled || uploading}
+              type="button"
+              title="Upload file"
+              className={[
+                "grid shrink-0 place-items-center rounded-full border border-[var(--border)] text-[var(--ink-muted)]",
+                "transition-colors hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                compact ? "h-8 w-8" : "h-9 w-9",
+              ].join(" ")}
+              aria-label="Upload file"
+            >
+              <Plus size={compact ? 17 : 19} weight="bold" />
+            </button>
+
+            <button
               onClick={handleCommandButton}
               disabled={disabled}
               type="button"
@@ -187,7 +258,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             </button>
 
             <p className="min-w-0 flex-1 truncate text-xs text-[var(--ink-muted)]">
-              {compact ? "Enter sends" : "Press Enter to send. Shift+Enter adds a line."}
+              {uploadStatus || (compact ? "Enter sends" : "Press Enter to send. Shift+Enter adds a line.")}
             </p>
 
             <motion.button

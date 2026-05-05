@@ -12,13 +12,13 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} role="group" aria-label={`${isUser ? "Your" : "Sage's"} message`}>
       <div
-        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl text-sm font-bold shadow-[var(--shadow-card)]
+        className={`flex h-10 flex-shrink-0 items-center justify-center rounded-2xl px-3 text-sm font-bold shadow-[var(--shadow-card)]
           ${isUser
-            ? "bg-[var(--chat-bubble-user-avatar)] text-white"
+            ? "w-10 bg-[var(--chat-bubble-user-avatar)] text-white"
             : "bg-[linear-gradient(135deg,rgba(249,115,22,0.18),var(--chat-bubble-assistant-bg))] text-[var(--accent-strong)]"
           }`}
       >
-        {isUser ? "You" : "S"}
+        {isUser ? "You" : "Sage"}
       </div>
 
       <div
