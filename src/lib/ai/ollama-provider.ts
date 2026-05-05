@@ -156,7 +156,16 @@ export class OllamaProvider implements AIProvider {
    * 5 minutes allows for slow prompt evaluation on CPU hardware.
    */
   private static readonly STREAM_FIRST_BYTE_TIMEOUT_MS = 300_000;
-  private static readonly NUM_CTX = 4096;
+
+  /**
+   * Default KV-cache window size when no SystemConfig override is set.
+   * Bumped from 4096 to 8192 to give multi-turn agent transcripts (text +
+   * tool_calls + tool results across hops) more headroom before clipping.
+   * Most modern open-weights chat models support 32K-128K context, so
+   * 8K is conservative; admins can override via `ai_provider_num_ctx`.
+   */
+  static readonly DEFAULT_NUM_CTX = 8192;
+  private readonly numCtx: number;
 
   constructor(
     baseUrl: string,
@@ -180,6 +189,14 @@ export class OllamaProvider implements AIProvider {
             cloudflareAccessClientSecret:
               authConfigOrApiKey?.cloudflareAccessClientSecret ?? null,
           };
+    const explicitNumCtx =
+      typeof authConfigOrApiKey === "object" && authConfigOrApiKey !== null
+        ? authConfigOrApiKey.numCtx
+        : undefined;
+    this.numCtx =
+      typeof explicitNumCtx === "number" && explicitNumCtx > 0
+        ? explicitNumCtx
+        : OllamaProvider.DEFAULT_NUM_CTX;
   }
 
   private get headers(): Record<string, string> {
@@ -277,13 +294,13 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: false,
-        num_ctx: OllamaProvider.NUM_CTX,
+        num_ctx: this.numCtx,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
-        options: { num_ctx: OllamaProvider.NUM_CTX },
+        options: { num_ctx: this.numCtx },
         keep_alive: "10m",
       },
     );
@@ -311,13 +328,13 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: true,
-        num_ctx: OllamaProvider.NUM_CTX,
+        num_ctx: this.numCtx,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: true,
-        options: { num_ctx: OllamaProvider.NUM_CTX },
+        options: { num_ctx: this.numCtx },
         keep_alive: "10m",
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
@@ -592,14 +609,14 @@ export class OllamaProvider implements AIProvider {
       messages: conversation,
       stream: true,
       tools: ollamaTools,
-      num_ctx: OllamaProvider.NUM_CTX,
+      num_ctx: this.numCtx,
     };
     const nativeBody = {
       model: this.model,
       messages: conversation,
       stream: true,
       tools: ollamaTools,
-      options: { num_ctx: OllamaProvider.NUM_CTX },
+      options: { num_ctx: this.numCtx },
       keep_alive: "10m",
     };
 
@@ -715,14 +732,14 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         response_format: { type: "json_object" },
-        num_ctx: OllamaProvider.NUM_CTX,
+        num_ctx: this.numCtx,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
         format: "json",
-        options: { num_ctx: OllamaProvider.NUM_CTX },
+        options: { num_ctx: this.numCtx },
         keep_alive: "10m",
       },
     );

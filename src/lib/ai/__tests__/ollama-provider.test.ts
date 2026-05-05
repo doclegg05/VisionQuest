@@ -35,7 +35,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
       const body = JSON.parse((call.arguments[1] as RequestInit).body as string);
       assert.equal(body.model, "gemma4:26b");
       assert.equal(body.stream, false);
-      assert.equal(body.num_ctx, 4096);
+      assert.equal(body.num_ctx, 8192);
       assert.deepEqual(body.messages[0], { role: "system", content: "Be helpful." });
       assert.deepEqual(body.messages[1], { role: "user", content: "Hi" });
     });
@@ -113,7 +113,41 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
       assert.equal(nativeBody.format, "json");
-      assert.deepEqual(nativeBody.options, { num_ctx: 4096 });
+      assert.deepEqual(nativeBody.options, { num_ctx: 8192 });
+    });
+  });
+
+  describe("num_ctx override", () => {
+    it("uses an explicit numCtx in OpenAI-mode requests when provided", async () => {
+      const customProvider = new OllamaProvider(
+        "http://localhost:11434",
+        "gemma4:26b",
+        { authMode: "none", numCtx: 32768 },
+      );
+
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({ choices: [{ message: { content: "ok" } }] }),
+      );
+
+      await customProvider.generateResponse("sys", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(body.num_ctx, 32768);
+    });
+
+    it("falls back to the default 8192 when no override is provided", () => {
+      const defaultProvider = new OllamaProvider(
+        "http://localhost:11434",
+        "gemma4:26b",
+      );
+      // Static default exposed for clarity / future verification.
+      assert.equal(OllamaProvider.DEFAULT_NUM_CTX, 8192);
+      // No public getter — assert via behavior in subsequent tests.
+      assert.ok(defaultProvider);
     });
   });
 
@@ -151,7 +185,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.equal(body.stream, true);
-      assert.equal(body.num_ctx, 4096);
+      assert.equal(body.num_ctx, 8192);
     });
 
     it("falls back to native streamed chat when the OpenAI path returns 404", async () => {

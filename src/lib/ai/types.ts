@@ -132,6 +132,11 @@ export interface LocalAIAuthConfig {
   apiKey?: string | null;
   cloudflareAccessClientId?: string | null;
   cloudflareAccessClientSecret?: string | null;
+  /**
+   * Override Ollama's num_ctx (KV-cache window size). Defaults to the
+   * provider's built-in fallback when undefined. Bounded by the caller.
+   */
+  numCtx?: number;
 }
 
 export interface AIProviderConfig {

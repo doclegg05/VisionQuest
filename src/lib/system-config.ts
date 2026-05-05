@@ -11,6 +11,9 @@ export const SYSTEM_CONFIG_KEYS = [
   "ai_provider_api_key",
   "ai_provider_cloudflare_access_client_id",
   "ai_provider_cloudflare_access_client_secret",
+  // Optional integer override for Ollama's num_ctx (KV-cache window size).
+  // Unset → provider default (8192). Bounds enforced at read time.
+  "ai_provider_num_ctx",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

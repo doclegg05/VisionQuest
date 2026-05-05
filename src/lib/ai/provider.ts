@@ -24,11 +24,26 @@ async function getCloudProvider(studentId: string): Promise<AIProvider> {
   return new GeminiProvider(apiKey);
 }
 
+// Bounds for the Ollama num_ctx override. 1024 is the floor for any
+// useful conversation; 131072 matches the largest context window
+// supported by current open-weights models (Llama 3.x, Qwen 2.5).
+const NUM_CTX_MIN = 1024;
+const NUM_CTX_MAX = 131072;
+
+function parseNumCtxOverride(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return undefined;
+  if (parsed < NUM_CTX_MIN || parsed > NUM_CTX_MAX) return undefined;
+  return parsed;
+}
+
 async function getLocalProvider(): Promise<AIProvider> {
   const [
     url,
     model,
     authModeRaw,
+    numCtxRaw,
     apiKey,
     cloudflareAccessClientId,
     cloudflareAccessClientSecret,
@@ -36,6 +51,7 @@ async function getLocalProvider(): Promise<AIProvider> {
     getPlainConfigValue("ai_provider_url"),
     getPlainConfigValue("ai_provider_model"),
     getPlainConfigValue("ai_provider_auth_mode"),
+    getPlainConfigValue("ai_provider_num_ctx"),
     getConfigValue("ai_provider_api_key"),
     getConfigValue("ai_provider_cloudflare_access_client_id"),
     getConfigValue("ai_provider_cloudflare_access_client_secret"),
@@ -55,6 +71,7 @@ async function getLocalProvider(): Promise<AIProvider> {
     apiKey,
     cloudflareAccessClientId,
     cloudflareAccessClientSecret,
+    numCtx: parseNumCtxOverride(numCtxRaw),
   });
 }
 
