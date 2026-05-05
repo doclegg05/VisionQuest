@@ -32,8 +32,33 @@ interface ModuleTemplate {
   id: string;
   label: string;
   description: string | null;
+  category: string;
   required: boolean;
   active: boolean;
+}
+
+const MODULE_CATEGORY_META: Record<string, { label: string; order: number }> = {
+  "career-readiness": { label: "Career Readiness", order: 0 },
+  ncrc: { label: "Career Readiness Certificate (NCRC)", order: 1 },
+  "customer-service": { label: "Customer Service", order: 2 },
+  "computer-essentials": { label: "Computer Essentials", order: 3 },
+  ic3: { label: "IC3 Digital Literacy", order: 4 },
+  "mos-2016": { label: "Microsoft Office Specialist — 2016", order: 5 },
+  "mos-2019": { label: "Microsoft Office Specialist — 2019", order: 6 },
+  "office-365": { label: "Microsoft Office 365", order: 7 },
+  intuit: { label: "Intuit (QuickBooks, Bookkeeping)", order: 8 },
+  adobe: { label: "Adobe Certified Professional", order: 9 },
+  "it-cybersecurity": { label: "IT, Cybersecurity & Networking", order: 10 },
+  "critical-career-skills": { label: "Critical Career Skills", order: 11 },
+  "work-essentials": { label: "Work & Money Essentials", order: 12 },
+  "health-safety": { label: "Health & Safety", order: 13 },
+  "wv-specific": { label: "WV-Specific Programs", order: 14 },
+  "life-employability": { label: "Life & Employability Skills", order: 15 },
+  general: { label: "Other Modules", order: 99 },
+};
+
+function categoryMeta(key: string) {
+  return MODULE_CATEGORY_META[key] ?? { label: key, order: 999 };
 }
 
 interface ModuleProgress {
@@ -163,6 +188,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   const [savingChecklistId, setSavingChecklistId] = useState<string | null>(null);
   const [savingModuleId, setSavingModuleId] = useState<string | null>(null);
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [profileForm, setProfileForm] = useState({
     firstName: "",
     lastName: "",
@@ -293,6 +319,24 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   }
 
   async function toggleChecklist(templateId: string, completed: boolean) {
+    const previousData = data;
+    if (previousData) {
+      const optimisticProgress: ChecklistProgress = {
+        id: previousData.record.checklistProgress.find((p) => p.templateId === templateId)?.id ?? `optimistic-${templateId}`,
+        templateId,
+        completed,
+        completedAt: completed ? new Date().toISOString() : null,
+        notes: previousData.record.checklistProgress.find((p) => p.templateId === templateId)?.notes ?? null,
+      };
+      const nextProgress = previousData.record.checklistProgress.some((p) => p.templateId === templateId)
+        ? previousData.record.checklistProgress.map((p) => (p.templateId === templateId ? optimisticProgress : p))
+        : [...previousData.record.checklistProgress, optimisticProgress];
+      setData({
+        ...previousData,
+        record: { ...previousData.record, checklistProgress: nextProgress },
+      });
+    }
+
     setSavingChecklistId(templateId);
     try {
       const response = await fetch(`/api/teacher/students/${studentId}/spokes/checklist`, {
@@ -305,9 +349,34 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         throw new Error(getErrorMessage(payload, "Could not update checklist item."));
       }
 
+      const serverProgress: ChecklistProgress | null =
+        payload && typeof payload === "object" && "progress" in payload && payload.progress
+          ? {
+              id: payload.progress.id,
+              templateId: payload.progress.templateId,
+              completed: payload.progress.completed,
+              completedAt: payload.progress.completedAt,
+              notes: payload.progress.notes ?? null,
+            }
+          : null;
+
+      if (serverProgress) {
+        setData((current) => {
+          if (!current) return current;
+          const exists = current.record.checklistProgress.some((p) => p.templateId === templateId);
+          const reconciled = exists
+            ? current.record.checklistProgress.map((p) => (p.templateId === templateId ? serverProgress : p))
+            : [...current.record.checklistProgress, serverProgress];
+          return {
+            ...current,
+            record: { ...current.record, checklistProgress: reconciled },
+          };
+        });
+      }
+
       setMessage(completed ? "Checklist item completed." : "Checklist item reopened.");
-      await loadData();
     } catch (err) {
+      if (previousData) setData(previousData);
       setMessage(err instanceof Error ? err.message : "Could not update checklist item.");
     } finally {
       setSavingChecklistId(null);
@@ -455,7 +524,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 key={template.id}
                 className={`flex items-start gap-3 rounded-xl border p-3 transition-colors ${
                   completed
-                    ? "border-emerald-200 bg-emerald-50/80"
+                    ? "border-[var(--border-strong)] bg-[var(--badge-success-bg)]"
                     : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >
@@ -645,62 +714,135 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
 
         <section className="surface-section p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Modules</p>
-          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Required SPOKES modules</h2>
+          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Certifications & SPOKES modules</h2>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            Click a category to expand. Mark each certification complete with the date earned.
+          </p>
           <div className="mt-5 space-y-3">
-            {payload.moduleTemplates.map((template) => {
-              const progress = payload.record.moduleProgress.find((item) => item.templateId === template.id);
+            {(() => {
+              const grouped = new Map<string, ModuleTemplate[]>();
+              for (const template of payload.moduleTemplates) {
+                const key = template.category || "general";
+                const list = grouped.get(key) ?? [];
+                list.push(template);
+                grouped.set(key, list);
+              }
+              const sortedCategories = Array.from(grouped.keys()).sort(
+                (a, b) => categoryMeta(a).order - categoryMeta(b).order
+              );
 
-              return (
-                <div key={template.id} className="rounded-[1rem] border border-[var(--border)] p-4">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
-                      {template.description ? (
-                        <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">{template.description}</p>
-                      ) : null}
-                    </div>
-                    {progress ? (
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Completed {formatDateInput(progress.completedAt)}
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
-                        Not completed
-                      </span>
-                    )}
-                  </div>
+              return sortedCategories.map((categoryKey) => {
+                const meta = categoryMeta(categoryKey);
+                const templates = grouped.get(categoryKey) ?? [];
+                const completedCount = templates.filter((template) =>
+                  payload.record.moduleProgress.some((item) => item.templateId === template.id)
+                ).length;
+                const isCollapsed = collapsedCategories.has(categoryKey);
 
-                  <div className="mt-3 flex items-center gap-2 flex-wrap">
-                    <input
-                      type="date"
-                      value={moduleDates[template.id] || todayInputValue()}
-                      onChange={(event) =>
-                        setModuleDates((current) => ({ ...current, [template.id]: event.target.value }))
-                      }
-                      className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                    />
+                return (
+                  <div
+                    key={categoryKey}
+                    className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]"
+                  >
                     <button
                       type="button"
-                      onClick={() => void saveModule(template.id)}
-                      disabled={savingModuleId === template.id}
-                      className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                      onClick={() =>
+                        setCollapsedCategories((current) => {
+                          const next = new Set(current);
+                          if (next.has(categoryKey)) next.delete(categoryKey);
+                          else next.add(categoryKey);
+                          return next;
+                        })
+                      }
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-interactive)]"
+                      aria-expanded={!isCollapsed}
                     >
-                      {progress ? "Update completion" : "Mark complete"}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-block transition-transform ${isCollapsed ? "" : "rotate-90"} text-[var(--ink-muted)]`}
+                          aria-hidden="true"
+                        >
+                          ▶
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--ink-strong)]">{meta.label}</span>
+                      </div>
+                      <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+                        {completedCount} / {templates.length}
+                      </span>
                     </button>
-                    {progress ? (
-                      <button
-                        type="button"
-                        onClick={() => void removeModule(template.id)}
-                        disabled={savingModuleId === template.id}
-                        className="rounded-xl border border-rose-200 px-4 py-2 text-sm text-rose-800 transition hover:bg-rose-50 disabled:opacity-60"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
+
+                    {isCollapsed ? null : (
+                      <div className="space-y-3 border-t border-[var(--border)] p-4">
+                        {templates.map((template) => {
+                          const progress = payload.record.moduleProgress.find(
+                            (item) => item.templateId === template.id
+                          );
+
+                          return (
+                            <div
+                              key={template.id}
+                              className="rounded-[0.85rem] border border-[var(--border)] bg-[var(--surface-base)] p-4"
+                            >
+                              <div className="flex items-start justify-between gap-3 flex-wrap">
+                                <div>
+                                  <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
+                                  {template.description ? (
+                                    <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+                                      {template.description}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                {progress ? (
+                                  <span className="rounded-full bg-[var(--badge-success-bg)] px-3 py-1 text-xs font-semibold text-[var(--badge-success-text)]">
+                                    Completed {formatDateInput(progress.completedAt)}
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
+                                    Not completed
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <input
+                                  type="date"
+                                  value={moduleDates[template.id] || todayInputValue()}
+                                  onChange={(event) =>
+                                    setModuleDates((current) => ({
+                                      ...current,
+                                      [template.id]: event.target.value,
+                                    }))
+                                  }
+                                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => void saveModule(template.id)}
+                                  disabled={savingModuleId === template.id}
+                                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                                >
+                                  {progress ? "Update completion" : "Mark complete"}
+                                </button>
+                                {progress ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void removeModule(template.id)}
+                                    disabled={savingModuleId === template.id}
+                                    className="rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-2 text-sm text-[var(--urgency-critical-text)] transition hover:brightness-110 disabled:opacity-60"
+                                  >
+                                    Remove
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
 
             {payload.moduleTemplates.length === 0 ? (
               <p className="text-sm text-[var(--ink-muted)]">No SPOKES modules configured yet.</p>

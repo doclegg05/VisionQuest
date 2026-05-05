@@ -366,6 +366,7 @@ model SpokesModuleTemplate {
   id          String   @id @default(cuid())
   label       String
   description String?  @db.Text
+  category    String   @default("general")
   sortOrder   Int      @default(0)
   required    Boolean  @default(true)
   active      Boolean  @default(true)
@@ -374,6 +375,7 @@ model SpokesModuleTemplate {
 
   progress SpokesModuleProgress[]
 
+  @@index([category, sortOrder])
   @@index([sortOrder])
   @@schema("visionquest")
 }

@@ -98,19 +98,169 @@ const SPOKES_CHECKLIST = [
   { label: "Recommended referrals documented", category: "program_file", sortOrder: 8, required: false },
 ];
 
-// ---------- SPOKES Module Templates ----------
+// ---------- SPOKES Module Templates (Certifications) ----------
+// Mirrors the WVAdultEd Professional Development Portal certificate catalog.
+// Categories drive the grouped UI on the teacher SPOKES tab. SortOrder controls
+// row order within each category. Required defaults to true per program intent —
+// every offered certificate is a tracked credential a student may earn.
 
 const SPOKES_MODULES = [
-  { label: "IC3 Digital Literacy", description: "Internet and Computing Core Certification.", sortOrder: 0, required: true },
-  { label: "Microsoft Office Specialist", description: "MOS certification in Word, Excel, or PowerPoint.", sortOrder: 1, required: false },
-  { label: "Adobe Certified Professional", description: "Adobe Creative Cloud certification.", sortOrder: 2, required: false },
-  { label: "Intuit QuickBooks", description: "QuickBooks certification for accounting fundamentals.", sortOrder: 3, required: false },
-  { label: "Cybersecurity IT Specialist", description: "Certiport IT Specialist certification in cybersecurity.", sortOrder: 4, required: false },
-  { label: "TTCE Part 1", description: "Technology and Career Education — Part 1.", sortOrder: 5, required: false },
-  { label: "TTCE Part 2", description: "Technology and Career Education — Part 2.", sortOrder: 6, required: false },
-  { label: "ACT WorkKeys", description: "National Career Readiness Certificate assessment.", sortOrder: 7, required: true },
-  { label: "Life & Employability Skills", description: "SPOKES life and employability skills curriculum.", sortOrder: 8, required: true },
-  { label: "Customer Service Module", description: "Customer service skills and certification.", sortOrder: 9, required: false },
+  // =========================================================================
+  // Career Readiness — completion / participation certificates
+  // =========================================================================
+  { category: "career-readiness", label: "Ready-to-Work Certificate", description: "Career Readiness foundational completion certificate.", sortOrder: 0, required: true },
+  { category: "career-readiness", label: "Achievement Certificate", description: "Recognition of academic / program achievement.", sortOrder: 1, required: true },
+  { category: "career-readiness", label: "Participation Certificate", description: "Recognition of program participation.", sortOrder: 2, required: true },
+
+  // =========================================================================
+  // Career Readiness Certificate (ACT WorkKeys NCRC tiers)
+  // =========================================================================
+  { category: "ncrc", label: "Career Readiness Certificate — Platinum", description: "ACT WorkKeys NCRC, Platinum level.", sortOrder: 10, required: true },
+  { category: "ncrc", label: "Career Readiness Certificate — Gold", description: "ACT WorkKeys NCRC, Gold level.", sortOrder: 11, required: true },
+  { category: "ncrc", label: "Career Readiness Certificate — Silver", description: "ACT WorkKeys NCRC, Silver level.", sortOrder: 12, required: true },
+  { category: "ncrc", label: "Career Readiness Certificate — Bronze", description: "ACT WorkKeys NCRC, Bronze level.", sortOrder: 13, required: true },
+
+  // =========================================================================
+  // Customer Service
+  // =========================================================================
+  { category: "customer-service", label: "TTCE Part 1", description: "Through the Customer's Eyes — Part 1.", sortOrder: 30, required: true },
+  { category: "customer-service", label: "TTCE Part 2", description: "Through the Customer's Eyes — Part 2.", sortOrder: 31, required: true },
+  { category: "customer-service", label: "CSM Certificate of High Performance", description: "Customer Service Management — High Performance certificate.", sortOrder: 32, required: true },
+  { category: "customer-service", label: "CSM Career Strategies", description: "Customer Service Management — Career Strategies certificate.", sortOrder: 33, required: true },
+
+  // =========================================================================
+  // Computer Essentials (tiered)
+  // =========================================================================
+  { category: "computer-essentials", label: "Computer Essentials Certificate — Platinum", description: "Computer Essentials overall certificate, Platinum tier.", sortOrder: 50, required: true },
+  { category: "computer-essentials", label: "Computer Essentials Certificate — Gold", description: "Computer Essentials overall certificate, Gold tier.", sortOrder: 51, required: true },
+  { category: "computer-essentials", label: "Computer Essentials Certificate — Silver", description: "Computer Essentials overall certificate, Silver tier.", sortOrder: 52, required: true },
+  { category: "computer-essentials", label: "Computer Essentials Certificate — Bronze", description: "Computer Essentials overall certificate, Bronze tier.", sortOrder: 53, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Computing Fundamentals — Platinum", description: "Computing Fundamentals subsection, Platinum tier.", sortOrder: 54, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Computing Fundamentals — Gold", description: "Computing Fundamentals subsection, Gold tier.", sortOrder: 55, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Computing Fundamentals — Silver", description: "Computing Fundamentals subsection, Silver tier.", sortOrder: 56, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Computing Fundamentals — Bronze", description: "Computing Fundamentals subsection, Bronze tier.", sortOrder: 57, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Key Applications — Platinum", description: "Key Applications subsection, Platinum tier.", sortOrder: 58, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Key Applications — Gold", description: "Key Applications subsection, Gold tier.", sortOrder: 59, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Key Applications — Silver", description: "Key Applications subsection, Silver tier.", sortOrder: 60, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Key Applications — Bronze", description: "Key Applications subsection, Bronze tier.", sortOrder: 61, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Living Online — Platinum", description: "Living Online subsection, Platinum tier.", sortOrder: 62, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Living Online — Gold", description: "Living Online subsection, Gold tier.", sortOrder: 63, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Living Online — Silver", description: "Living Online subsection, Silver tier.", sortOrder: 64, required: true },
+  { category: "computer-essentials", label: "Computer Essentials: Living Online — Bronze", description: "Living Online subsection, Bronze tier.", sortOrder: 65, required: true },
+
+  // =========================================================================
+  // IC3 Digital Literacy — GS5 + GS6
+  // =========================================================================
+  { category: "ic3", label: "IC3 GS5 — Computing Fundamentals", description: "IC3 GS5 Credential, Computing Fundamentals exam.", sortOrder: 70, required: true },
+  { category: "ic3", label: "IC3 GS5 — Key Applications", description: "IC3 GS5 Credential, Key Applications exam.", sortOrder: 71, required: true },
+  { category: "ic3", label: "IC3 GS5 — Living Online", description: "IC3 GS5 Credential, Living Online exam.", sortOrder: 72, required: true },
+  { category: "ic3", label: "IC3 GS5 Certified", description: "IC3 GS5 — Full certification (all 3 exams passed).", sortOrder: 73, required: true },
+  { category: "ic3", label: "IC3 GS6 — Level 1 Exam", description: "IC3 GS6 Credential, Level 1 exam.", sortOrder: 75, required: true },
+  { category: "ic3", label: "IC3 GS6 — Level 2 Exam", description: "IC3 GS6 Credential, Level 2 exam.", sortOrder: 76, required: true },
+  { category: "ic3", label: "IC3 GS6 — Level 3 Exam", description: "IC3 GS6 Credential, Level 3 exam.", sortOrder: 77, required: true },
+  { category: "ic3", label: "IC3 GS6 Certified", description: "IC3 GS6 — Full certification (all 3 exams passed).", sortOrder: 78, required: true },
+
+  // =========================================================================
+  // Microsoft Office Specialist — 2016
+  // =========================================================================
+  { category: "mos-2016", label: "MOS 2016 Specialist — Word", description: "Microsoft Office Specialist 2016 — Word.", sortOrder: 80, required: true },
+  { category: "mos-2016", label: "MOS 2016 Specialist — Excel", description: "Microsoft Office Specialist 2016 — Excel.", sortOrder: 81, required: true },
+  { category: "mos-2016", label: "MOS 2016 Specialist — PowerPoint", description: "Microsoft Office Specialist 2016 — PowerPoint.", sortOrder: 82, required: true },
+  { category: "mos-2016", label: "MOS 2016 Specialist — Outlook", description: "Microsoft Office Specialist 2016 — Outlook.", sortOrder: 83, required: true },
+  { category: "mos-2016", label: "MOS 2016 Specialist — Access", description: "Microsoft Office Specialist 2016 — Access.", sortOrder: 84, required: true },
+  { category: "mos-2016", label: "MOS 2016 Expert — Word", description: "Microsoft Office Expert 2016 — Word.", sortOrder: 85, required: true },
+  { category: "mos-2016", label: "MOS 2016 Expert — Excel", description: "Microsoft Office Expert 2016 — Excel.", sortOrder: 86, required: true },
+  { category: "mos-2016", label: "MOS 2016 Master", description: "Microsoft Office 2016 Master certification.", sortOrder: 87, required: true },
+
+  // =========================================================================
+  // Microsoft Office Specialist — 2019
+  // =========================================================================
+  { category: "mos-2019", label: "MOS 2019 Associate — Word", description: "Microsoft Office Associate 2019 — Word.", sortOrder: 90, required: true },
+  { category: "mos-2019", label: "MOS 2019 Associate — Excel", description: "Microsoft Office Associate 2019 — Excel.", sortOrder: 91, required: true },
+  { category: "mos-2019", label: "MOS 2019 Associate — PowerPoint", description: "Microsoft Office Associate 2019 — PowerPoint.", sortOrder: 92, required: true },
+  { category: "mos-2019", label: "MOS 2019 Associate — Outlook", description: "Microsoft Office Associate 2019 — Outlook.", sortOrder: 93, required: true },
+  { category: "mos-2019", label: "MOS 2019 Specialist Associate (Earned Certificate)", description: "MOS 2019 Specialist — Associate-tier earned certificate.", sortOrder: 94, required: true },
+  { category: "mos-2019", label: "MOS 2019 Expert — Access", description: "Microsoft Office Expert 2019 — Access.", sortOrder: 95, required: true },
+  { category: "mos-2019", label: "MOS 2019 Expert — Word", description: "Microsoft Office Expert 2019 — Word.", sortOrder: 96, required: true },
+  { category: "mos-2019", label: "MOS 2019 Expert — Excel", description: "Microsoft Office Expert 2019 — Excel.", sortOrder: 97, required: true },
+  { category: "mos-2019", label: "MOS 2019 Specialist Expert (Earned Certificate)", description: "MOS 2019 Specialist — Expert-tier earned certificate.", sortOrder: 98, required: true },
+
+  // =========================================================================
+  // Microsoft Office 365
+  // =========================================================================
+  { category: "office-365", label: "Office 365 Associate — Word", description: "Microsoft Office 365 Associate — Word.", sortOrder: 100, required: true },
+  { category: "office-365", label: "Office 365 Associate — Excel", description: "Microsoft Office 365 Associate — Excel.", sortOrder: 101, required: true },
+  { category: "office-365", label: "Office 365 Associate — PowerPoint", description: "Microsoft Office 365 Associate — PowerPoint.", sortOrder: 102, required: true },
+  { category: "office-365", label: "Office 365 Specialist Associate (Earned Certificate)", description: "Office 365 Specialist — Associate-tier earned certificate.", sortOrder: 103, required: true },
+  { category: "office-365", label: "Office 365 Expert — Access", description: "Microsoft Office 365 Expert — Access.", sortOrder: 104, required: true },
+  { category: "office-365", label: "Office 365 Expert — Word", description: "Microsoft Office 365 Expert — Word.", sortOrder: 105, required: true },
+  { category: "office-365", label: "Office 365 Expert — Excel", description: "Microsoft Office 365 Expert — Excel.", sortOrder: 106, required: true },
+  { category: "office-365", label: "Office 365 Specialist Expert (Earned Certificate)", description: "Office 365 Specialist — Expert-tier earned certificate.", sortOrder: 107, required: true },
+
+  // =========================================================================
+  // Intuit
+  // =========================================================================
+  { category: "intuit", label: "Intuit QuickBooks Online", description: "Intuit Certification — QuickBooks Online.", sortOrder: 120, required: true },
+  { category: "intuit", label: "Intuit QuickBooks Desktop", description: "Intuit Certification — QuickBooks Desktop.", sortOrder: 121, required: true },
+  { category: "intuit", label: "Intuit Bookkeeping", description: "Intuit Certification — Professional Bookkeeping.", sortOrder: 122, required: true },
+  { category: "intuit", label: "Intuit Design for Delight", description: "Intuit Certification — Design for Delight Innovator.", sortOrder: 123, required: true },
+  { category: "intuit", label: "Intuit Personal Finance", description: "Intuit Certification — Personal Finance.", sortOrder: 124, required: true },
+
+  // =========================================================================
+  // Adobe Certified Professional
+  // =========================================================================
+  { category: "adobe", label: "Adobe Certified Professional — Photoshop", description: "Adobe Creative Cloud — Photoshop.", sortOrder: 140, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — Animate", description: "Adobe Creative Cloud — Animate.", sortOrder: 141, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — Dreamweaver", description: "Adobe Creative Cloud — Dreamweaver.", sortOrder: 142, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — After Effects", description: "Adobe Creative Cloud — After Effects.", sortOrder: 143, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — Premiere Pro", description: "Adobe Creative Cloud — Premiere Pro.", sortOrder: 144, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — Illustrator", description: "Adobe Creative Cloud — Illustrator.", sortOrder: 145, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — InDesign", description: "Adobe Creative Cloud — InDesign.", sortOrder: 146, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — Acrobat Pro", description: "Adobe Creative Cloud — Acrobat Pro.", sortOrder: 147, required: true },
+  { category: "adobe", label: "Adobe Certified Professional — Express", description: "Adobe Creative Cloud — Express.", sortOrder: 148, required: true },
+  { category: "adobe", label: "Adobe Specialty — Professional Visual Design", description: "Adobe Specialty Credential — Professional Visual Design.", sortOrder: 149, required: true },
+  { category: "adobe", label: "Adobe Specialty — Professional Video Design", description: "Adobe Specialty Credential — Professional Video Design.", sortOrder: 150, required: true },
+  { category: "adobe", label: "Adobe Specialty — Professional Web Design", description: "Adobe Specialty Credential — Professional Web Design.", sortOrder: 151, required: true },
+
+  // =========================================================================
+  // Information Technology / Cybersecurity / Networking
+  // =========================================================================
+  { category: "it-cybersecurity", label: "IT Specialist — Cybersecurity", description: "Certiport IT Specialist — Cybersecurity.", sortOrder: 170, required: true },
+  { category: "it-cybersecurity", label: "CISCO Support Tech", description: "Cisco Networking Academy — Support Technician.", sortOrder: 171, required: true },
+
+  // =========================================================================
+  // Critical Career Skills
+  // =========================================================================
+  { category: "critical-career-skills", label: "Generative AI Foundations", description: "Critical Career Skills — Generative AI Foundations.", sortOrder: 190, required: true },
+  { category: "critical-career-skills", label: "Professional Communication", description: "Critical Career Skills — Professional Communication.", sortOrder: 191, required: true },
+
+  // =========================================================================
+  // Work / Money Essentials
+  // =========================================================================
+  { category: "work-essentials", label: "Work Essentials — Job Seeking", description: "Work Essentials — Job Seeking module.", sortOrder: 200, required: true },
+  { category: "work-essentials", label: "Work Essentials — Job Ready", description: "Work Essentials — Job Ready module.", sortOrder: 201, required: true },
+  { category: "work-essentials", label: "Work Essentials — Job Keeping", description: "Work Essentials — Job Keeping module.", sortOrder: 202, required: true },
+  { category: "work-essentials", label: "Work Essentials — All 3 Complete", description: "Work Essentials — All three modules completed.", sortOrder: 203, required: true },
+  { category: "work-essentials", label: "Money Essentials", description: "Money Essentials Certificate.", sortOrder: 204, required: true },
+
+  // =========================================================================
+  // Health & Safety
+  // =========================================================================
+  { category: "health-safety", label: "Non-Medical CPR", description: "CPR / 1st Aid — Non-Medical CPR.", sortOrder: 210, required: true },
+  { category: "health-safety", label: "Healthcare CPR", description: "CPR / 1st Aid — Healthcare provider CPR.", sortOrder: 211, required: true },
+  { category: "health-safety", label: "Bloodborne Pathogens Certification", description: "Workplace Health & Safety — Bloodborne Pathogens.", sortOrder: 212, required: true },
+  { category: "health-safety", label: "Food Handler Card", description: "Health & Safety — Food Handler card.", sortOrder: 213, required: true },
+
+  // =========================================================================
+  // WV-Specific
+  // =========================================================================
+  { category: "wv-specific", label: "WV Tourism Works Certificate", description: "WV-specific — Tourism Works program certificate.", sortOrder: 230, required: true },
+  { category: "wv-specific", label: "WV Welcome Certificate", description: "WV-specific — WV Welcome certificate.", sortOrder: 231, required: true },
+
+  // =========================================================================
+  // Life & Employability Skills (curriculum)
+  // =========================================================================
+  { category: "life-employability", label: "Life & Employability Skills", description: "SPOKES life and employability skills curriculum.", sortOrder: 250, required: true },
 ];
 
 // ---------- Seed logic ----------
@@ -151,7 +301,13 @@ async function seed() {
   for (const mod of SPOKES_MODULES) {
     await prisma.spokesModuleTemplate.upsert({
       where: { id: `seed-spk-mod-${mod.sortOrder}` },
-      update: { label: mod.label, description: mod.description, sortOrder: mod.sortOrder, required: mod.required },
+      update: {
+        label: mod.label,
+        description: mod.description,
+        category: mod.category,
+        sortOrder: mod.sortOrder,
+        required: mod.required,
+      },
       create: { id: `seed-spk-mod-${mod.sortOrder}`, ...mod },
     });
   }
