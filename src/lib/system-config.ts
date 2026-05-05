@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prismaAdmin } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { cached, invalidatePrefix } from "@/lib/cache";
 
@@ -26,7 +26,7 @@ const CACHE_TTL = 60; // seconds
  */
 export async function getConfigValue(key: SystemConfigKey): Promise<string | null> {
   const row = await cached(`sysconfig:${key}`, CACHE_TTL, () =>
-    prisma.systemConfig.findUnique({
+    prismaAdmin.systemConfig.findUnique({
       where: { key },
       select: { value: true },
     }),
@@ -51,7 +51,7 @@ export async function setConfigValue(
 ): Promise<void> {
   const encrypted = encrypt(plaintext);
 
-  await prisma.systemConfig.upsert({
+  await prismaAdmin.systemConfig.upsert({
     where: { key },
     update: { value: encrypted, updatedBy },
     create: { key, value: encrypted, updatedBy },
@@ -64,7 +64,7 @@ export async function setConfigValue(
  * Remove a config value.
  */
 export async function deleteConfigValue(key: SystemConfigKey): Promise<void> {
-  await prisma.systemConfig.deleteMany({ where: { key } });
+  await prismaAdmin.systemConfig.deleteMany({ where: { key } });
   invalidatePrefix(`sysconfig:${key}`);
 }
 
@@ -74,7 +74,7 @@ export async function deleteConfigValue(key: SystemConfigKey): Promise<void> {
  */
 export async function getPlainConfigValue(key: SystemConfigKey): Promise<string | null> {
   const row = await cached(`sysconfig:${key}`, CACHE_TTL, () =>
-    prisma.systemConfig.findUnique({
+    prismaAdmin.systemConfig.findUnique({
       where: { key },
       select: { value: true },
     }),
@@ -91,7 +91,7 @@ export async function setPlainConfigValue(
   value: string,
   updatedBy: string,
 ): Promise<void> {
-  await prisma.systemConfig.upsert({
+  await prismaAdmin.systemConfig.upsert({
     where: { key },
     update: { value, updatedBy },
     create: { key, value, updatedBy },
