@@ -14,6 +14,17 @@ import { DEFAULT_LOCAL_AI_AUTH_MODE, resolveLocalAiAuthMode } from "@/lib/ai";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import { z } from "zod";
 
+const NUM_CTX_MIN = 1024;
+const NUM_CTX_MAX = 131072;
+
+// Accept either an integer in range or null (sent to clear the override).
+const numCtxField = z
+  .union([
+    z.number().int().min(NUM_CTX_MIN).max(NUM_CTX_MAX),
+    z.literal(null),
+  ])
+  .optional();
+
 const providerSchema = z.object({
   provider: z.enum(["local", "cloud"]),
   url: z.string().url().optional(),
@@ -22,6 +33,7 @@ const providerSchema = z.object({
   apiKey: z.string().max(500).optional(),
   cloudflareAccessClientId: z.string().max(500).optional(),
   cloudflareAccessClientSecret: z.string().max(500).optional(),
+  numCtx: numCtxField,
 });
 
 export const GET = withAdminAuth(async () => {
@@ -30,6 +42,7 @@ export const GET = withAdminAuth(async () => {
     url,
     model,
     authMode,
+    numCtx,
     apiKey,
     cloudflareAccessClientId,
     cloudflareAccessClientSecret,
@@ -38,16 +51,28 @@ export const GET = withAdminAuth(async () => {
     getPlainConfigValue("ai_provider_url"),
     getPlainConfigValue("ai_provider_model"),
     getPlainConfigValue("ai_provider_auth_mode"),
+    getPlainConfigValue("ai_provider_num_ctx"),
     getConfigValue("ai_provider_api_key"),
     getConfigValue("ai_provider_cloudflare_access_client_id"),
     getConfigValue("ai_provider_cloudflare_access_client_secret"),
   ]);
+
+  const parsedNumCtx = numCtx ? Number.parseInt(numCtx, 10) : null;
+  const validNumCtx =
+    parsedNumCtx !== null &&
+    Number.isFinite(parsedNumCtx) &&
+    parsedNumCtx >= NUM_CTX_MIN &&
+    parsedNumCtx <= NUM_CTX_MAX
+      ? parsedNumCtx
+      : null;
 
   return NextResponse.json({
     provider: provider || "cloud",
     url: url || "",
     model: model || "gemma4:26b",
     authMode: resolveLocalAiAuthMode(authMode),
+    numCtx: validNumCtx,
+    numCtxBounds: { min: NUM_CTX_MIN, max: NUM_CTX_MAX, default: 8192 },
     hasApiKey: !!apiKey,
     hasCloudflareAccessClientId: !!cloudflareAccessClientId,
     hasCloudflareAccessClientSecret: !!cloudflareAccessClientSecret,
@@ -99,6 +124,18 @@ export const PUT = withAdminAuth(async (session, req: NextRequest) => {
       await setConfigValue(
         "ai_provider_cloudflare_access_client_secret",
         body.cloudflareAccessClientSecret,
+        session.id,
+      );
+    }
+  }
+
+  if (body.numCtx !== undefined) {
+    if (body.numCtx === null) {
+      await deleteConfigValue("ai_provider_num_ctx");
+    } else {
+      await setPlainConfigValue(
+        "ai_provider_num_ctx",
+        String(body.numCtx),
         session.id,
       );
     }

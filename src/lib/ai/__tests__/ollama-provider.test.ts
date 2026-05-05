@@ -635,5 +635,133 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.equal(last?.kind, "done");
       assert.equal(last?.reason, "max_hops");
     });
+
+    it("handles native /api/chat tool calls when the OpenAI path returns 404", async () => {
+      // Hop 1 (native): text + tool_calls in one final chunk.
+      const nativeHop1Chunks = [
+        JSON.stringify({
+          message: { content: "Looking it up." },
+          done: false,
+        }) + "\n",
+        JSON.stringify({
+          message: {
+            content: "",
+            tool_calls: [
+              {
+                function: { name: "lookup_thing", arguments: { id: "xyz" } },
+              },
+            ],
+          },
+          done: true,
+        }) + "\n",
+      ];
+      // Hop 2 (native): plain text reply, no tool calls.
+      const nativeHop2Chunks = [
+        JSON.stringify({
+          message: { content: "Found it." },
+          done: true,
+        }) + "\n",
+      ];
+
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        // First call: OpenAI path 404 → forces native-mode fallback.
+        if (fetchCount === 1) {
+          return new Response("Not Found", { status: 404 });
+        }
+        // Subsequent calls: native /api/chat with our streamed chunks.
+        const stream = fetchCount === 2 ? nativeHop1Chunks : nativeHop2Chunks;
+        return new Response(streamFromChunks(stream), { status: 200 });
+      });
+
+      const onToolCall = mock.fn(async () => ({
+        response: { found: true },
+        summary: "Done.",
+        status: "success" as const,
+      }));
+
+      const events: Array<{ kind: string; [k: string]: unknown }> = [];
+      for await (const event of provider.streamWithTools(
+        "sys",
+        [{ role: "user", content: "Find xyz." }],
+        tools,
+        onToolCall,
+      )) {
+        events.push(event as { kind: string });
+      }
+
+      // First call hit OpenAI path; second hit native /api/chat.
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+
+      // Tool was invoked exactly once with parsed args.
+      assert.equal(onToolCall.mock.callCount(), 1);
+      const tcEvent = events.find((e) => e.kind === "tool_call");
+      assert.ok(tcEvent, "expected a tool_call event");
+      assert.equal((tcEvent as { name: string }).name, "lookup_thing");
+      assert.deepEqual((tcEvent as { args: unknown }).args, { id: "xyz" });
+
+      // Native mode forwards tools in the request body alongside other options.
+      const nativeBody = JSON.parse(
+        (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(nativeBody.tools[0].function.name, "lookup_thing");
+      assert.equal(nativeBody.options.num_ctx, 8192);
+
+      // Combined text across both hops should land in the user-visible stream.
+      const finalText = events
+        .filter((e) => e.kind === "text")
+        .map((e) => (e as { text: string }).text)
+        .join("");
+      assert.equal(finalText, "Looking it up.Found it.");
+    });
+
+    it("parses native tool_call arguments whether they arrive as a JSON string or an object", async () => {
+      // Native mode sometimes ships arguments as a parsed object; sometimes as a string.
+      const stringArgsChunks = [
+        JSON.stringify({
+          message: {
+            content: "",
+            tool_calls: [
+              {
+                function: { name: "lookup_thing", arguments: '{"id":"abc"}' },
+              },
+            ],
+          },
+          done: true,
+        }) + "\n",
+      ];
+      const finalReplyChunks = [
+        JSON.stringify({ message: { content: "ok" }, done: true }) + "\n",
+      ];
+
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
+        const stream = fetchCount === 2 ? stringArgsChunks : finalReplyChunks;
+        return new Response(streamFromChunks(stream), { status: 200 });
+      });
+
+      const captured: Array<{ name: string; args: Record<string, unknown> }> = [];
+      const onToolCall = mock.fn(async (call: { name: string; args: Record<string, unknown> }) => {
+        captured.push(call);
+        return { response: {}, summary: "ok", status: "success" as const };
+      });
+
+      const events: Array<{ kind: string }> = [];
+      for await (const event of provider.streamWithTools(
+        "sys",
+        [{ role: "user", content: "Find abc." }],
+        tools,
+        onToolCall,
+      )) {
+        events.push(event as { kind: string });
+      }
+
+      assert.equal(captured.length, 1);
+      assert.deepEqual(captured[0].args, { id: "abc" });
+    });
   });
 });

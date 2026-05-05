@@ -10,12 +10,22 @@ interface ApiErrorResponse {
   error?: string;
 }
 
+interface NumCtxBounds {
+  min: number;
+  max: number;
+  default: number;
+}
+
+const DEFAULT_NUM_CTX_BOUNDS: NumCtxBounds = { min: 1024, max: 131072, default: 8192 };
+
 export default function AiProviderPanel() {
   const router = useRouter();
   const [provider, setProvider] = useState<ProviderType>("cloud");
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("gemma4:26b");
   const [authMode, setAuthMode] = useState<LocalAuthMode>("none");
+  const [numCtxInput, setNumCtxInput] = useState(""); // empty string = use default
+  const [numCtxBounds, setNumCtxBounds] = useState<NumCtxBounds>(DEFAULT_NUM_CTX_BOUNDS);
   const [bearerToken, setBearerToken] = useState("");
   const [cloudflareClientId, setCloudflareClientId] = useState("");
   const [cloudflareClientSecret, setCloudflareClientSecret] = useState("");
@@ -42,6 +52,8 @@ export default function AiProviderPanel() {
               url?: string;
               model?: string;
               authMode?: LocalAuthMode;
+              numCtx?: number | null;
+              numCtxBounds?: NumCtxBounds;
               hasApiKey?: boolean;
               hasCloudflareAccessClientId?: boolean;
               hasCloudflareAccessClientSecret?: boolean;
@@ -69,6 +81,8 @@ export default function AiProviderPanel() {
         setUrl(data.url ?? "");
         setModel(data.model ?? "gemma4:26b");
         setAuthMode(data.authMode || "none");
+        setNumCtxInput(typeof data.numCtx === "number" ? String(data.numCtx) : "");
+        if (data.numCtxBounds) setNumCtxBounds(data.numCtxBounds);
         setHasBearerToken(Boolean(data.hasApiKey));
         setHasCloudflareClientId(Boolean(data.hasCloudflareAccessClientId));
         setHasCloudflareClientSecret(Boolean(data.hasCloudflareAccessClientSecret));
@@ -98,12 +112,35 @@ export default function AiProviderPanel() {
     setSaving(true);
     resetMessages();
 
-    const body: Record<string, string | undefined> = {
+    const body: Record<string, string | number | null | undefined> = {
       provider,
       url: url || undefined,
       model: model || undefined,
       authMode: provider === "local" ? authMode : undefined,
     };
+
+    // numCtx: empty string → null (clear override), valid integer → set,
+    // invalid value → surface validation error and skip the save.
+    if (provider === "local") {
+      const trimmed = numCtxInput.trim();
+      if (trimmed === "") {
+        body.numCtx = null;
+      } else {
+        const parsed = Number.parseInt(trimmed, 10);
+        if (
+          !Number.isFinite(parsed) ||
+          parsed < numCtxBounds.min ||
+          parsed > numCtxBounds.max
+        ) {
+          setError(
+            `Context window must be between ${numCtxBounds.min} and ${numCtxBounds.max}.`,
+          );
+          setSaving(false);
+          return;
+        }
+        body.numCtx = parsed;
+      }
+    }
 
     if (bearerToken) {
       body.apiKey = bearerToken;
@@ -291,6 +328,33 @@ export default function AiProviderPanel() {
               placeholder="gemma4:26b"
               className="field w-full px-4 py-3 text-sm"
             />
+          </div>
+
+          <div>
+            <label htmlFor="ollama-num-ctx" className="mb-1 block text-sm font-medium text-[var(--ink-strong)]">
+              Context window (num_ctx)
+            </label>
+            <input
+              id="ollama-num-ctx"
+              type="number"
+              inputMode="numeric"
+              min={numCtxBounds.min}
+              max={numCtxBounds.max}
+              step={1024}
+              value={numCtxInput}
+              onChange={(e) => {
+                setNumCtxInput(e.target.value);
+                resetMessages();
+              }}
+              placeholder={`Default ${numCtxBounds.default}`}
+              className="field w-full px-4 py-3 text-sm"
+            />
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              KV-cache window size sent to Ollama on every request. Leave empty to use the default
+              ({numCtxBounds.default}). Bump higher when you run a model with a larger native context
+              and want headroom for longer agent transcripts. Bounds: {numCtxBounds.min}–{numCtxBounds.max}.
+              Larger values consume more VRAM per concurrent request.
+            </p>
           </div>
 
           <div>
