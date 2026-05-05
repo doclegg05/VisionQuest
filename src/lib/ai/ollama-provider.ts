@@ -1,9 +1,58 @@
+import { randomUUID } from "crypto";
 import { buildLocalAiHeaders, DEFAULT_LOCAL_AI_AUTH_MODE } from "./local-auth";
-import type { AIProvider, ChatMessage, LocalAIAuthConfig } from "./types";
+import type {
+  AIProvider,
+  ChatMessage,
+  LocalAIAuthConfig,
+  ToolCallHandler,
+  ToolDeclaration,
+  ToolStreamEvent,
+  ToolStreamOptions,
+} from "./types";
 
 interface OpenAIMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** Present on assistant turns that called one or more tools. */
+  tool_calls?: OpenAIToolCallMessage[];
+  /** Present on tool-result turns; references the assistant tool_call id. */
+  tool_call_id?: string;
+  /** Optional name field for tool-role messages. */
+  name?: string;
+}
+
+interface OpenAIToolCallMessage {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string; // stringified JSON
+  };
+}
+
+/** Streaming delta for tool calls (OpenAI-compat format). */
+interface OpenAIStreamToolCallDelta {
+  index: number;
+  id?: string;
+  type?: "function";
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
+/** Tool call shape returned by Ollama's native /api/chat (non-streaming-style). */
+interface NativeToolCall {
+  function: {
+    name: string;
+    arguments: Record<string, unknown> | string;
+  };
+}
+
+interface AccumulatedToolCall {
+  id: string;
+  name: string;
+  arguments: string; // accumulated JSON string
 }
 
 interface OpenAIChatResponse {
@@ -18,13 +67,16 @@ interface OpenAIStreamChunk {
   choices?: Array<{
     delta?: {
       content?: string;
+      tool_calls?: OpenAIStreamToolCallDelta[];
     };
+    finish_reason?: string | null;
   }>;
 }
 
 interface NativeChatResponse {
   message?: {
     content?: string;
+    tool_calls?: NativeToolCall[];
   };
   done?: boolean;
 }
@@ -415,6 +467,232 @@ export class OllamaProvider implements AIProvider {
     if (lastError) throw lastError;
   }
 
+  /**
+   * Streaming completion with function-calling support.
+   *
+   * Drives a multi-hop tool-call loop:
+   *   1. Stream a turn from Ollama with the tools array attached.
+   *   2. Yield text chunks as they arrive.
+   *   3. After the stream ends, inspect for tool_calls.
+   *   4. If tool calls exist: execute via onToolCall, push assistant +
+   *      tool messages onto the conversation, and stream the next hop.
+   *   5. If no tool calls: emit done(complete) and return.
+   *
+   * Supports both API modes the rest of the provider already handles —
+   * OpenAI-compat at /v1/chat/completions and native at /api/chat.
+   * Both Ollama paths support tool calling natively.
+   */
+  async *streamWithTools(
+    systemPrompt: string,
+    messages: ChatMessage[],
+    tools: ToolDeclaration[],
+    onToolCall: ToolCallHandler,
+    options?: ToolStreamOptions,
+  ): AsyncGenerator<ToolStreamEvent> {
+    if (messages.length === 0) throw new Error("messages array must not be empty");
+    const maxHops = Math.max(1, options?.maxHops ?? 5);
+
+    // No tools registered → degrade to plain streaming.
+    if (tools.length === 0) {
+      for await (const text of this.streamResponse(systemPrompt, messages)) {
+        yield { kind: "text", text };
+      }
+      yield { kind: "done", reason: "complete" };
+      return;
+    }
+
+    const ollamaTools = tools.map(toOllamaTool);
+    const conversation: OpenAIMessage[] = toOpenAIMessages(systemPrompt, messages);
+
+    for (let hop = 0; hop < maxHops; hop++) {
+      // Stream one hop. The inner generator yields text strings as they
+      // arrive and returns a final summary with collected tool calls.
+      const hopGen = this.streamHopOnce(conversation, ollamaTools);
+      const accumulatedText: string[] = [];
+      let hopResult: HopResult;
+
+      while (true) {
+        const next = await hopGen.next();
+        if (next.done) {
+          hopResult = next.value;
+          break;
+        }
+        accumulatedText.push(next.value);
+        yield { kind: "text", text: next.value };
+      }
+
+      if (hopResult.toolCalls.length === 0) {
+        yield { kind: "done", reason: "complete" };
+        return;
+      }
+
+      // Push the assistant message (text + tool_calls) so the model can
+      // reason about its own prior turn on the next hop.
+      conversation.push({
+        role: "assistant",
+        content: accumulatedText.join(""),
+        tool_calls: hopResult.toolCalls.map((call) => ({
+          id: call.id,
+          type: "function" as const,
+          function: { name: call.name, arguments: call.arguments },
+        })),
+      });
+
+      // Execute every tool call, surfacing events to the caller and
+      // appending tool-role responses so the next hop can use them.
+      for (const call of hopResult.toolCalls) {
+        const args = parseToolArguments(call.arguments);
+        yield { kind: "tool_call", callId: call.id, name: call.name, args };
+
+        const handlerResult = await onToolCall({ name: call.name, args });
+
+        yield {
+          kind: "tool_result",
+          callId: call.id,
+          name: call.name,
+          status: handlerResult.status,
+          summary: handlerResult.summary,
+          response: handlerResult.response,
+        };
+
+        conversation.push({
+          role: "tool",
+          tool_call_id: call.id,
+          name: call.name,
+          content: serializeToolResponseContent(handlerResult.response, handlerResult.summary),
+        });
+      }
+    }
+
+    yield { kind: "done", reason: "max_hops" };
+  }
+
+  /**
+   * Stream a single hop with tools attached. Yields text deltas and
+   * returns the accumulated tool-call list. Switches between OpenAI
+   * and native API modes the same way streamResponseOnce does.
+   */
+  private async *streamHopOnce(
+    conversation: OpenAIMessage[],
+    ollamaTools: OllamaToolPayload[],
+  ): AsyncGenerator<string, HopResult> {
+    const openAIBody = {
+      model: this.model,
+      messages: conversation,
+      stream: true,
+      tools: ollamaTools,
+      num_ctx: OllamaProvider.NUM_CTX,
+    };
+    const nativeBody = {
+      model: this.model,
+      messages: conversation,
+      stream: true,
+      tools: ollamaTools,
+      options: { num_ctx: OllamaProvider.NUM_CTX },
+      keep_alive: "10m",
+    };
+
+    const { mode, response } = await this.postChat(
+      openAIBody,
+      nativeBody,
+      OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Local AI tool stream failed (${response.status})`);
+    }
+    if (!response.body) throw new Error("Ollama returned empty stream body");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const toolCalls = new Map<number, AccumulatedToolCall>();
+    // Native mode doesn't have a stable index per call; use insertion order.
+    let nativeIndex = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (mode === "openai") {
+          if (!trimmed.startsWith("data: ")) continue;
+          const payload = trimmed.slice(6);
+          if (payload === "[DONE]") {
+            return { toolCalls: Array.from(toolCalls.values()) };
+          }
+
+          let parsed: OpenAIStreamChunk;
+          try {
+            parsed = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+          const upstreamError = payloadErrorMessage(parsed);
+          if (upstreamError) {
+            throw new Error(upstreamError);
+          }
+
+          const choice = parsed.choices?.[0];
+          const text = choice?.delta?.content;
+          if (text) yield text;
+
+          const callDeltas = choice?.delta?.tool_calls;
+          if (callDeltas) {
+            for (const delta of callDeltas) {
+              accumulateOpenAIToolCall(toolCalls, delta);
+            }
+          }
+          continue;
+        }
+
+        // Native mode: each line is a complete JSON object.
+        let parsed: NativeChatResponse;
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          continue;
+        }
+        const upstreamError = payloadErrorMessage(parsed);
+        if (upstreamError) throw new Error(upstreamError);
+
+        const text = parsed.message?.content;
+        if (text) yield text;
+
+        const calls = parsed.message?.tool_calls;
+        if (calls) {
+          for (const call of calls) {
+            const id = `native-${nativeIndex++}-${randomUUID().slice(0, 8)}`;
+            const argString =
+              typeof call.function.arguments === "string"
+                ? call.function.arguments
+                : JSON.stringify(call.function.arguments ?? {});
+            toolCalls.set(toolCalls.size, {
+              id,
+              name: call.function.name,
+              arguments: argString,
+            });
+          }
+        }
+
+        if (parsed.done) {
+          return { toolCalls: Array.from(toolCalls.values()) };
+        }
+      }
+    }
+
+    // Drain any final partial line.
+    buffer += decoder.decode();
+    return { toolCalls: Array.from(toolCalls.values()) };
+  }
+
   async generateStructuredResponse(
     systemPrompt: string,
     messages: ChatMessage[],
@@ -447,4 +725,77 @@ export class OllamaProvider implements AIProvider {
       ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
       : (data as NativeChatResponse).message?.content ?? "";
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tool-calling helpers
+// ---------------------------------------------------------------------------
+
+interface OllamaToolPayload {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: ToolDeclaration["parameters"];
+  };
+}
+
+interface HopResult {
+  toolCalls: AccumulatedToolCall[];
+}
+
+function toOllamaTool(tool: ToolDeclaration): OllamaToolPayload {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    },
+  };
+}
+
+/**
+ * OpenAI-compatible streaming sends tool calls as deltas. Each delta has
+ * an `index` identifying which call it belongs to, and may include any
+ * combination of `id`, `function.name`, and incremental
+ * `function.arguments` fragments. We accumulate by index until the
+ * stream completes, then parse the final argument string.
+ */
+function accumulateOpenAIToolCall(
+  acc: Map<number, AccumulatedToolCall>,
+  delta: OpenAIStreamToolCallDelta,
+): void {
+  const idx = delta.index;
+  const existing = acc.get(idx);
+  if (!existing) {
+    acc.set(idx, {
+      id: delta.id ?? randomUUID(),
+      name: delta.function?.name ?? "",
+      arguments: delta.function?.arguments ?? "",
+    });
+    return;
+  }
+  if (delta.id && !existing.id) existing.id = delta.id;
+  if (delta.function?.name && !existing.name) existing.name = delta.function.name;
+  if (delta.function?.arguments) existing.arguments += delta.function.arguments;
+}
+
+function parseToolArguments(raw: string): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function serializeToolResponseContent(response: unknown, summary: string): string {
+  if (typeof response === "string") return response;
+  const enriched =
+    response && typeof response === "object" && !Array.isArray(response)
+      ? { ...(response as Record<string, unknown>), _summary: summary }
+      : { result: response, _summary: summary };
+  return JSON.stringify(enriched);
 }
