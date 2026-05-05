@@ -218,7 +218,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             aria-autocomplete={paletteOpen ? "list" : undefined}
             className={[
               "custom-scrollbar relative w-full resize-none border-0 bg-transparent text-[var(--ink-strong)] placeholder:text-[var(--ink-muted)]",
-              "focus:outline-none focus:ring-0 disabled:cursor-not-allowed overflow-y-auto",
+              "focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed overflow-y-auto",
               compact ? "min-h-[42px] px-3 pb-1 pt-3 text-sm" : "min-h-[72px] px-4 py-3 text-base leading-6",
             ].join(" ")}
           />
