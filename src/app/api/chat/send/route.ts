@@ -20,10 +20,16 @@ import { checkTokenQuota } from "@/lib/llm-usage";
 import { prisma } from "@/lib/db";
 import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
+import { runAgentTurn } from "@/lib/sage/agent/loop";
+import { executeSlashCommand } from "@/lib/sage/agent/executor";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
 const CHAT_SSE_HEARTBEAT_MS = 15_000;
+
+function isAgentEnabled(): boolean {
+  return process.env.SAGE_AGENT_ENABLED === "true";
+}
 
 class ChatSseClientClosedError extends Error {
   constructor() {
@@ -402,7 +408,109 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           sendEvent({ quotaWarning: quota.warning }, "quotaWarning");
         }
 
-        if (useNonStreaming) {
+        const agentMode = isAgentEnabled();
+
+        // Slash-command fast path: invoke the tool directly without going
+        // through the model. Skipped unless the feature flag is on.
+        if (agentMode && userMessage.startsWith("/")) {
+          const slashOutcome = await executeSlashCommand(
+            userMessage,
+            session,
+            conversation.id,
+            staffStudentTargetId ?? undefined,
+          );
+          if (slashOutcome) {
+            const { record } = slashOutcome;
+            sendEvent(
+              {
+                type: "tool_call",
+                callId: record.callId,
+                tool: record.tool,
+                args: record.args,
+                status: "pending",
+              },
+              "tool_call",
+            );
+            sendEvent(
+              {
+                type: "tool_result",
+                callId: record.callId,
+                status: record.result.status,
+                summary: record.result.summary,
+                data: record.result.data,
+              },
+              "tool_result",
+            );
+            if (record.result.action) {
+              sendEvent(
+                {
+                  type: "action",
+                  action: record.result.action.action,
+                  target: record.result.action.target,
+                  label: record.result.action.label,
+                  meta: record.result.action.meta,
+                },
+                "action",
+              );
+            }
+            fullResponse = record.result.summary;
+            // Surface the summary as a regular text event so the chat
+            // transcript reads naturally even if the UI ignores the
+            // tool_result event.
+            sendEvent({ type: "text", text: record.result.summary }, "text");
+          }
+        } else if (agentMode) {
+          // Agent loop — model may emit tool calls mid-turn.
+          const agentEvents = runAgentTurn({
+            provider,
+            systemPrompt,
+            messages: allMessages,
+            session,
+            conversationId: conversation.id,
+            targetStudentId: staffStudentTargetId ?? undefined,
+          });
+          for await (const event of agentEvents) {
+            if (event.type === "text") {
+              fullResponse += event.text;
+              sendEvent({ type: "text", text: event.text }, "text");
+            } else if (event.type === "tool_call") {
+              sendEvent(
+                {
+                  type: "tool_call",
+                  callId: event.callId,
+                  tool: event.tool,
+                  args: event.args,
+                  status: "pending",
+                },
+                "tool_call",
+              );
+            } else if (event.type === "tool_result") {
+              sendEvent(
+                {
+                  type: "tool_result",
+                  callId: event.callId,
+                  status: event.status,
+                  summary: event.summary,
+                  data: event.data,
+                },
+                "tool_result",
+              );
+            } else if (event.type === "action") {
+              sendEvent(
+                {
+                  type: "action",
+                  action: event.action,
+                  target: event.target,
+                  label: event.label,
+                  meta: event.meta,
+                },
+                "action",
+              );
+            }
+            // agent_stop events are internal — chat route drives done/error
+            // via the surrounding try/catch + sendEvent({ done: true }) below.
+          }
+        } else if (useNonStreaming) {
           fullResponse = await provider.generateResponse(systemPrompt, allMessages);
           sendEvent({ text: fullResponse }, "text");
         } else {

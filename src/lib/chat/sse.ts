@@ -1,3 +1,11 @@
+/**
+ * Server-sent event shape emitted by the chat route. Existing fields
+ * (conversationId, done, error, text, heartbeat, quotaWarning) stay
+ * untyped for backward compatibility. Agent-mode events use the `type`
+ * discriminator so the UI can switch on it cleanly.
+ *
+ * See docs/superpowers/specs/2026-05-05-sage-agent-protocol.md.
+ */
 export interface ChatSseEvent {
   conversationId?: string;
   done?: boolean;
@@ -5,6 +13,39 @@ export interface ChatSseEvent {
   heartbeat?: boolean;
   quotaWarning?: string;
   text?: string;
+
+  // Agent-mode events (Sage as site administrator).
+  type?:
+    | "text"
+    | "tool_call"
+    | "tool_result"
+    | "action"
+    | "attachment_ack";
+
+  // tool_call
+  callId?: string;
+  tool?: string;
+  args?: Record<string, unknown>;
+
+  // tool_result
+  status?: "success" | "error" | "pending";
+  summary?: string;
+  data?: unknown;
+
+  // action
+  action?: "navigate" | "open_form" | "open_resource" | "highlight";
+  target?: string;
+  label?: string;
+  meta?: Record<string, unknown>;
+
+  // attachment_ack
+  attachmentId?: string;
+  classification?: {
+    kind: string;
+    confidence: number;
+    detectedFields?: Record<string, string>;
+  };
+  storagePath?: string;
 }
 
 export interface ChatSseParseResult {

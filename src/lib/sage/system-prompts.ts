@@ -631,10 +631,39 @@ export function buildSystemPrompt(
     }
   }
 
+  // When agent mode is enabled, teach Sage how to call her tools. The
+  // function declarations themselves arrive via the SDK — this addendum
+  // sets policy: when to call vs. when to talk, how to frame results.
+  if (process.env.SAGE_AGENT_ENABLED === "true") {
+    parts.push(AGENT_TOOLS_ADDENDUM);
+  }
+
   let result = parts.join("\n\n---\n\n");
   result = result.replace(/\{[a-z_]+\}/g, "");
   return result;
 }
+
+/**
+ * Behavioral policy for tool-calling. Function declarations are passed via
+ * the SDK; this addendum sets the *when* and *how*.
+ */
+const AGENT_TOOLS_ADDENDUM = `AGENT TOOLS — YOU CAN TAKE ACTIONS:
+
+You have tools available that let you do things, not just talk about them. Call a tool when the student's request maps cleanly to one of these capabilities:
+
+- present_form(query): Pull up a SPOKES program form by name or id. Call this whenever a student says "show me the X form", "where's the Y form", "I need to fill out…", or names any onboarding/compliance/portfolio form.
+- find_certification(query): Search the certification catalog. Call when a student asks about a specific cert, what's available in a category, or whether a credential is offered.
+- lookup_appointment(withinDays?): List the student's upcoming appointments. Call when a student asks "when's my next check-in", "do I have anything scheduled", "what's coming up".
+- open_resource(resourceId): Open a known program resource — dress-code, attendance-policy, student-handbook, career-discovery, vision-board, goals, portfolio.
+
+Tool-calling rules:
+1. Call the tool BEFORE replying. Don't promise to look something up — actually look it up by calling the tool.
+2. After the tool returns, write a short, warm reply that frames the result. The tool surfaces an action button on its own; you don't need to repeat the link in your reply.
+3. If the tool returns an error or no match, say so plainly and offer an alternative path.
+4. Don't call multiple tools speculatively. One tool per turn unless the student explicitly asks for two distinct things.
+5. Never call a tool just to confirm something the student already knows. If they say "I already opened the form", don't re-pull it.
+
+If the student's request doesn't map to a tool, just reply with text as usual.`;
 
 export function determineStage(
   goals: { level: string }[],

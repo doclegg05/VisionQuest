@@ -25,7 +25,74 @@ export interface AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
   ): Promise<string>;
+
+  /**
+   * Streaming completion with function-calling support. Provider drives the
+   * tool-call loop internally — the caller supplies an `onToolCall` callback
+   * that runs the tool server-side and returns the result. Provider yields
+   * neutral events the agent loop can translate into SSE.
+   *
+   * Optional. Providers that haven't implemented it should leave undefined;
+   * the agent loop will fall back to plain `streamResponse`.
+   */
+  streamWithTools?(
+    systemPrompt: string,
+    messages: ChatMessage[],
+    tools: ToolDeclaration[],
+    onToolCall: ToolCallHandler,
+    options?: ToolStreamOptions,
+  ): AsyncGenerator<ToolStreamEvent>;
 }
+
+/** Provider-neutral tool declaration. Mirrors Gemini's FunctionDeclaration. */
+export interface ToolDeclaration {
+  name: string;
+  description: string;
+  parameters: {
+    type: "object";
+    properties: Record<string, ToolParameterSchema>;
+    required?: string[];
+  };
+}
+
+export interface ToolParameterSchema {
+  type: "string" | "number" | "integer" | "boolean" | "array" | "object";
+  description?: string;
+  enum?: ReadonlyArray<string>;
+  items?: ToolParameterSchema;
+}
+
+export interface ToolStreamOptions {
+  /** Hard cap on round-trip tool calls. Default 5. */
+  maxHops?: number;
+}
+
+/**
+ * Caller-supplied callback that actually runs the tool. Should return the
+ * structured result that gets fed back to the model.
+ */
+export type ToolCallHandler = (call: {
+  name: string;
+  args: Record<string, unknown>;
+}) => Promise<{ response: unknown; summary: string; status: "success" | "error" }>;
+
+export type ToolStreamEvent =
+  | { kind: "text"; text: string }
+  | {
+      kind: "tool_call";
+      callId: string;
+      name: string;
+      args: Record<string, unknown>;
+    }
+  | {
+      kind: "tool_result";
+      callId: string;
+      name: string;
+      status: "success" | "error";
+      summary: string;
+      response: unknown;
+    }
+  | { kind: "done"; reason: "complete" | "max_hops" };
 
 export type AIProviderType = "cloud" | "local";
 export type LocalAIAuthMode = "none" | "bearer" | "cloudflare_service_token";

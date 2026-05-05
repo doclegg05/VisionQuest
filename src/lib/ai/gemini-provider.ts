@@ -1,5 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { AIProvider, ChatMessage } from "./types";
+import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration, type Part, type Schema, type Tool } from "@google/generative-ai";
+import { randomUUID } from "crypto";
+import type {
+  AIProvider,
+  ChatMessage,
+  ToolCallHandler,
+  ToolDeclaration,
+  ToolParameterSchema,
+  ToolStreamEvent,
+  ToolStreamOptions,
+} from "./types";
 
 const DEFAULT_MODEL = "gemini-2.5-flash-lite";
 const MODEL = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
@@ -89,4 +98,141 @@ export class GeminiProvider implements AIProvider {
     const result = await chat.sendMessage(lastMessage.content);
     return result.response.text();
   }
+
+  async *streamWithTools(
+    systemPrompt: string,
+    messages: ChatMessage[],
+    tools: ToolDeclaration[],
+    onToolCall: ToolCallHandler,
+    options?: ToolStreamOptions,
+  ): AsyncGenerator<ToolStreamEvent> {
+    if (messages.length === 0) throw new Error("messages array must not be empty");
+    const maxHops = Math.max(1, options?.maxHops ?? 5);
+
+    const genAI = new GoogleGenerativeAI(this.apiKey);
+    const geminiTools: Tool[] = tools.length
+      ? [{ functionDeclarations: tools.map(toGeminiFunctionDeclaration) }]
+      : [];
+
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      systemInstruction: systemPrompt,
+      ...(geminiTools.length ? { tools: geminiTools } : {}),
+    });
+
+    const chat = model.startChat({
+      history: messages.slice(0, -1).map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      })),
+      ...(geminiTools.length ? { tools: geminiTools } : {}),
+    });
+
+    let nextParts: string | Part[] = messages[messages.length - 1].content;
+
+    for (let hop = 0; hop < maxHops; hop++) {
+      const result = await chat.sendMessageStream(nextParts);
+
+      // Stream text as it arrives.
+      for await (const chunk of result.stream) {
+        const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+        for (const part of parts) {
+          if (typeof part.text === "string" && part.text.length > 0) {
+            yield { kind: "text", text: part.text };
+          }
+        }
+      }
+
+      // After the stream completes, inspect for function calls.
+      const finalResponse = await result.response;
+      const calls = finalResponse.functionCalls() ?? [];
+
+      if (calls.length === 0) {
+        yield { kind: "done", reason: "complete" };
+        return;
+      }
+
+      // Execute each call and collect responses for the next hop.
+      const responseParts: Part[] = [];
+      for (const call of calls) {
+        const callId = randomUUID();
+        const args = (call.args as Record<string, unknown>) ?? {};
+        yield { kind: "tool_call", callId, name: call.name, args };
+
+        const handlerResult = await onToolCall({ name: call.name, args });
+
+        yield {
+          kind: "tool_result",
+          callId,
+          name: call.name,
+          status: handlerResult.status,
+          summary: handlerResult.summary,
+          response: handlerResult.response,
+        };
+
+        responseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: serializeFunctionResponse(handlerResult.response, handlerResult.summary),
+          },
+        });
+      }
+
+      nextParts = responseParts;
+    }
+
+    yield { kind: "done", reason: "max_hops" };
+  }
+}
+
+function toGeminiFunctionDeclaration(tool: ToolDeclaration): FunctionDeclaration {
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: Object.fromEntries(
+        Object.entries(tool.parameters.properties).map(([key, schema]) => [
+          key,
+          toGeminiSchema(schema),
+        ]),
+      ),
+      required: tool.parameters.required ?? [],
+    },
+  };
+}
+
+// Gemini's Schema is a discriminated union with literal `type` values
+// per variant. We build the same shape at runtime but TypeScript can't
+// narrow through Object.fromEntries, so cast at the seam.
+function toGeminiSchema(schema: ToolParameterSchema): Schema {
+  const base: Record<string, unknown> = { type: schemaTypeFor(schema.type) };
+  if (schema.description) base.description = schema.description;
+  if (schema.enum) base.enum = [...schema.enum];
+  if (schema.items) base.items = toGeminiSchema(schema.items);
+  return base as unknown as Schema;
+}
+
+function schemaTypeFor(type: ToolParameterSchema["type"]): SchemaType {
+  switch (type) {
+    case "string":
+      return SchemaType.STRING;
+    case "number":
+      return SchemaType.NUMBER;
+    case "integer":
+      return SchemaType.INTEGER;
+    case "boolean":
+      return SchemaType.BOOLEAN;
+    case "array":
+      return SchemaType.ARRAY;
+    case "object":
+      return SchemaType.OBJECT;
+  }
+}
+
+function serializeFunctionResponse(response: unknown, summary: string): Record<string, unknown> {
+  if (response && typeof response === "object" && !Array.isArray(response)) {
+    return { ...(response as Record<string, unknown>), _summary: summary };
+  }
+  return { result: response, _summary: summary };
 }
