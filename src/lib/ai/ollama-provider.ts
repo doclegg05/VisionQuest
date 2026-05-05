@@ -538,27 +538,38 @@ export class OllamaProvider implements AIProvider {
         })),
       });
 
-      // Execute every tool call, surfacing events to the caller and
-      // appending tool-role responses so the next hop can use them.
-      for (const call of hopResult.toolCalls) {
-        const args = parseToolArguments(call.arguments);
-        yield { kind: "tool_call", callId: call.id, name: call.name, args };
+      // Yield tool_call events synchronously so the UI can paint
+      // pending pills immediately (preserves model-emitted order).
+      const calls = hopResult.toolCalls.map((call) => ({
+        id: call.id,
+        name: call.name,
+        args: parseToolArguments(call.arguments),
+      }));
+      for (const c of calls) {
+        yield { kind: "tool_call", callId: c.id, name: c.name, args: c.args };
+      }
 
-        const handlerResult = await onToolCall({ name: call.name, args });
+      // Run all handlers in parallel. Single-call hops are unchanged;
+      // multi-call hops collapse from sum(durations) to max(durations).
+      const handlerResults = await Promise.all(
+        calls.map((c) => onToolCall({ name: c.name, args: c.args })),
+      );
 
+      for (let i = 0; i < calls.length; i++) {
+        const c = calls[i];
+        const handlerResult = handlerResults[i];
         yield {
           kind: "tool_result",
-          callId: call.id,
-          name: call.name,
+          callId: c.id,
+          name: c.name,
           status: handlerResult.status,
           summary: handlerResult.summary,
           response: handlerResult.response,
         };
-
         conversation.push({
           role: "tool",
-          tool_call_id: call.id,
-          name: call.name,
+          tool_call_id: c.id,
+          name: c.name,
           content: serializeToolResponseContent(handlerResult.response, handlerResult.summary),
         });
       }

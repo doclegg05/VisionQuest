@@ -152,27 +152,40 @@ export class GeminiProvider implements AIProvider {
         return;
       }
 
-      // Execute each call and collect responses for the next hop.
+      // Yield tool_call events synchronously (in the order the model
+      // emitted them) so the UI can paint pending pills immediately.
+      const enriched = calls.map((call) => ({
+        callId: randomUUID(),
+        name: call.name,
+        args: (call.args as Record<string, unknown>) ?? {},
+      }));
+      for (const c of enriched) {
+        yield { kind: "tool_call", callId: c.callId, name: c.name, args: c.args };
+      }
+
+      // Run all handlers in parallel. For a single-call hop this is
+      // identical to sequential; when the model emits 2+ calls (e.g.,
+      // "show me my goals AND my appointments") the wall-clock cost
+      // collapses from sum(durations) to max(durations).
+      const handlerResults = await Promise.all(
+        enriched.map((c) => onToolCall({ name: c.name, args: c.args })),
+      );
+
       const responseParts: Part[] = [];
-      for (const call of calls) {
-        const callId = randomUUID();
-        const args = (call.args as Record<string, unknown>) ?? {};
-        yield { kind: "tool_call", callId, name: call.name, args };
-
-        const handlerResult = await onToolCall({ name: call.name, args });
-
+      for (let i = 0; i < enriched.length; i++) {
+        const c = enriched[i];
+        const handlerResult = handlerResults[i];
         yield {
           kind: "tool_result",
-          callId,
-          name: call.name,
+          callId: c.callId,
+          name: c.name,
           status: handlerResult.status,
           summary: handlerResult.summary,
           response: handlerResult.response,
         };
-
         responseParts.push({
           functionResponse: {
-            name: call.name,
+            name: c.name,
             response: serializeFunctionResponse(handlerResult.response, handlerResult.summary),
           },
         });

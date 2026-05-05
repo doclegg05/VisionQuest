@@ -222,6 +222,18 @@ async function collectFiles(dir: string, prefix: string = ""): Promise<string[]>
   return files;
 }
 
+/**
+ * Ingest program documents from the docs-upload tree into Sage's RAG index.
+ *
+ * FERPA boundary: this pipeline is for **non-PII program documents only**
+ * (handbooks, certification guides, dress-code policies, etc.). It uses
+ * the cloud Gemini provider for summary generation, which is allowed
+ * here because the inputs must not contain student records. The
+ * containsPII() guard below scans extracted text and skips any file
+ * that trips the heuristic — but it is a safety net, not a license to
+ * point this pipeline at student data. Keep docs-upload restricted to
+ * program-level content.
+ */
 export async function syncSageDocuments(
   options: SyncOptions = {},
 ): Promise<SyncResult> {

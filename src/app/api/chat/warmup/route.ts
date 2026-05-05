@@ -4,6 +4,8 @@ import { getBaseStudentPromptContext } from "@/lib/chat/context";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { getProvider } from "@/lib/ai";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /api/chat/warmup
@@ -11,6 +13,13 @@ import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
  * Pre-warms the student base-context cache so the first Sage message
  * does not pay the cold-cache DB round-trip cost. Called by the chat
  * page on mount — fire-and-forget, never blocks render.
+ *
+ * Also fires a tiny model-warmth ping when the configured provider is
+ * local (Ollama). Ollama unloads models from VRAM after `keep_alive`
+ * expires (10 minutes by default in our requests). The ping keeps the
+ * model resident so the next real Sage turn skips the 1-3 second
+ * cold-load penalty. Cloud providers have no equivalent cold-start, so
+ * the ping is a no-op for Gemini.
  *
  * Returns 204 on success (cache populated or already warm).
  * Returns 429 when called more than once per 60 seconds per student.
@@ -44,5 +53,36 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
   // conversationId "none" matches the key used in send/route.ts for new conversations.
   await getBaseStudentPromptContext(session.id, "none", stage);
 
+  // Fire-and-forget: keep the local model warm in VRAM. Time-bounded so
+  // a stuck Ollama can't hold up the response, swallow errors so a
+  // warmup failure never surfaces to the chat UI.
+  void pingLocalModelIfApplicable(session.id).catch((err) => {
+    logger.warn("warmup model ping failed", { err: String(err) });
+  });
+
   return new Response(null, { status: 204 });
 });
+
+const WARMUP_PING_TIMEOUT_MS = 5_000;
+
+async function pingLocalModelIfApplicable(studentId: string): Promise<void> {
+  const provider = await getProvider(studentId);
+  if (provider.name !== "ollama") return;
+
+  // Tiny one-token request. Cost is dominated by the model-load step on
+  // cold start; once warm, generation is sub-100ms.
+  const ping = provider.generateResponse(
+    "You are a warmup probe. Reply with only the word OK.",
+    [{ role: "user", content: "ping" }],
+  );
+
+  await Promise.race([
+    ping,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("warmup ping timeout")),
+        WARMUP_PING_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+}
