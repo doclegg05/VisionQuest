@@ -155,8 +155,8 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             message.tone === "success"
-              ? "border-emerald-200 bg-emerald-50/80 text-emerald-700"
-              : "border-rose-200 bg-rose-50/80 text-rose-800"
+              ? "border-[var(--border-strong)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
+              : "border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]"
           }`}
         >
           {message.text}

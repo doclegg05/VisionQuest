@@ -109,7 +109,7 @@ export default function GoalPathwayAssigner({
         {unmatchedGoals.map((goal) => (
           <div
             key={goal.id}
-            className="rounded-lg border border-amber-200 bg-amber-50/50 p-3"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-high-bg)] p-3"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -214,7 +214,7 @@ function PathwaySuggestionPanel({
             {suggestions.suggestions.map((s) => (
               <div
                 key={s.pathwayId}
-                className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50/50 px-3 py-2"
+                className="flex items-center justify-between rounded-lg border border-[var(--border-strong)] bg-[var(--badge-success-bg)] px-3 py-2"
               >
                 <div>
                   <p className="text-sm font-medium text-[var(--ink-strong)]">{s.label}</p>

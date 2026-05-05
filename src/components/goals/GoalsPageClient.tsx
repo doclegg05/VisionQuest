@@ -33,11 +33,11 @@ interface GoalsPageClientProps {
 }
 
 const LEVEL_STYLES: Record<GoalLevel, string> = {
-  bhag: "border-amber-300 bg-amber-50/70",
-  monthly: "border-sky-300 bg-sky-50/70",
-  weekly: "border-emerald-300 bg-emerald-50/70",
-  daily: "border-yellow-300 bg-yellow-50/75",
-  task: "border-violet-300 bg-violet-50/70",
+  bhag: "border-[var(--border-strong)] bg-[var(--urgency-high-bg)]",
+  monthly: "border-[var(--border-strong)] bg-[var(--urgency-medium-bg)]",
+  weekly: "border-[var(--border-strong)] bg-[var(--badge-success-bg)]",
+  daily: "border-[var(--border-strong)] bg-[var(--urgency-high-bg)]",
+  task: "border-[var(--border-strong)] bg-[var(--surface-interactive)]",
 };
 
 const STATUS_STYLES: Record<GoalStatus, string> = {
@@ -294,8 +294,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         <div
           className={`surface-section p-4 text-sm ${
             message.tone === "success"
-              ? "border border-emerald-200 bg-emerald-50/80 text-emerald-700"
-              : "border border-rose-200 bg-rose-50/80 text-rose-800"
+              ? "border border-[var(--border-strong)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
+              : "border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]"
           }`}
         >
           {message.text}

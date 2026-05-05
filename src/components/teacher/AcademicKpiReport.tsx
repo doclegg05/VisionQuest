@@ -130,11 +130,11 @@ function ResourcePipelineSection({ data, totalStudents }: { data: ResourcePipeli
         </div>
       </div>
 
-      <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50/80 p-4">
-        <p className="text-sm font-semibold text-teal-800">
+      <div className="mt-3 rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
+        <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">
           {data.studentsWithAnyEvidence} of {totalStudents} students
         </p>
-        <p className="mt-1 text-xs text-teal-700">
+        <p className="mt-1 text-xs text-[var(--urgency-medium-text)]">
           have submitted evidence on at least one assigned resource ({data.studentsWithAnyEvidencePct}%)
         </p>
       </div>
@@ -218,21 +218,21 @@ function ReadinessDistributionSection({ data }: { data: ReadinessDistributionKpi
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <div className="rounded-lg border border-sky-200 bg-sky-50/80 p-4">
-            <p className="text-sm font-semibold text-sky-800">Median score</p>
-            <p className="mt-2 text-2xl font-bold text-sky-900">
+          <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
+            <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">Median score</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
               {data.medianScore !== null ? data.medianScore : "\u2014"}
             </p>
           </div>
-          <div className="rounded-lg border border-teal-200 bg-teal-50/80 p-4">
-            <p className="text-sm font-semibold text-teal-800">Score &ge; 50</p>
-            <p className="mt-2 text-2xl font-bold text-teal-900">{data.studentsAbove50}</p>
-            <p className="mt-1 text-xs text-teal-700">{data.studentsAbove50Pct}% of students</p>
+          <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
+            <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">Score &ge; 50</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.studentsAbove50}</p>
+            <p className="mt-1 text-xs text-[var(--urgency-medium-text)]">{data.studentsAbove50Pct}% of students</p>
           </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
-            <p className="text-sm font-semibold text-emerald-800">Score &ge; 75</p>
-            <p className="mt-2 text-2xl font-bold text-emerald-900">{data.studentsAbove75}</p>
-            <p className="mt-1 text-xs text-emerald-700">{data.studentsAbove75Pct}% of students</p>
+          <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--badge-success-bg)] p-4">
+            <p className="text-sm font-semibold text-[var(--badge-success-text)]">Score &ge; 75</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.studentsAbove75}</p>
+            <p className="mt-1 text-xs text-[var(--badge-success-text)]">{data.studentsAbove75Pct}% of students</p>
           </div>
         </div>
       </div>

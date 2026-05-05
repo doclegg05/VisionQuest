@@ -342,7 +342,7 @@ function StudentAccordion({
               <div
                 key={c.key}
                 className={`mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[0.85rem] border px-3 py-2.5 ${
-                  isHigh ? "border-red-200 bg-red-50/80" : "border-[var(--border)] bg-[var(--surface-raised)]"
+                  isHigh ? "border-[var(--border-strong)] bg-[var(--urgency-critical-bg)]" : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >
                 <div className="min-w-0 flex-1">

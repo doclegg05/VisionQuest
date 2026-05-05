@@ -128,27 +128,27 @@ export default function SpokesReport() {
               <p className="text-sm font-semibold text-[var(--ink-strong)]">Referred</p>
               <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.referred}</p>
             </div>
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
-              <p className="text-sm font-semibold text-emerald-700">Completed</p>
-              <p className="mt-2 text-2xl font-bold text-emerald-900">{data.summary.completed}</p>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--badge-success-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--badge-success-text)]">Completed</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.completed}</p>
             </div>
-            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
-              <p className="text-sm font-semibold text-amber-800">Exited</p>
-              <p className="mt-2 text-2xl font-bold text-amber-900">{data.summary.exited}</p>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-high-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-high-text)]">Exited</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.exited}</p>
             </div>
-            <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-4">
-              <p className="text-sm font-semibold text-rose-800">Non-completers</p>
-              <p className="mt-2 text-2xl font-bold text-rose-900">{data.summary.nonCompleters}</p>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-critical-text)]">Non-completers</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.nonCompleters}</p>
             </div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-cyan-200 bg-cyan-50/80 p-4">
-              <p className="text-sm font-semibold text-cyan-700">WV Family Survey offered</p>
-              <p className="mt-2 text-2xl font-bold text-cyan-900">{data.summary.familySurveyOffered}</p>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">WV Family Survey offered</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.familySurveyOffered}</p>
             </div>
-            <div className="rounded-lg border border-violet-200 bg-violet-50/80 p-4">
-              <p className="text-sm font-semibold text-violet-700">Post-secondary entered</p>
-              <p className="mt-2 text-2xl font-bold text-violet-900">{data.summary.postSecondaryEntered}</p>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface-interactive)] p-4">
+              <p className="text-sm font-semibold text-[var(--ink-strong)]">Post-secondary entered</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.postSecondaryEntered}</p>
             </div>
           </div>
         </div>

@@ -235,9 +235,9 @@ export default function OverviewTab({
               <p className="text-lg font-bold text-blue-600">Lv {progression.level}</p>
               <p className="text-xs text-[var(--ink-faint)]">{progression.xp} XP</p>
             </div>
-            {progression.streaks.daily.current > 0 && (
+            {(progression.streaks?.daily?.current ?? 0) > 0 && (
               <div>
-                <p className="text-lg font-bold text-orange-500">{"\uD83D\uDD25"} {progression.streaks.daily.current}</p>
+                <p className="text-lg font-bold text-orange-500">{"\uD83D\uDD25"} {progression.streaks?.daily?.current ?? 0}</p>
                 <p className="text-xs text-[var(--ink-faint)]">Day Streak</p>
               </div>
             )}
@@ -265,19 +265,19 @@ export default function OverviewTab({
 
       {/* Alerts */}
       {alerts.length > 0 && (
-        <div className="bg-[var(--surface-raised)] rounded-xl border border-amber-200 p-5">
+        <div className="theme-card rounded-xl p-5">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Open Advising Alerts</h3>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+            <span className="rounded-full bg-[var(--urgency-high-bg)] px-3 py-1 text-xs font-semibold text-[var(--urgency-high-text)]">
               {alerts.length} active
             </span>
           </div>
           <div className="mt-4 space-y-3">
             {alerts.map((alert: AlertData) => (
-              <div key={alert.id} className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+              <div key={alert.id} className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-high-bg)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                  <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
+                  <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--urgency-high-text)]">
                     {alert.severity}
                   </span>
                 </div>

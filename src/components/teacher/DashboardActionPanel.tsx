@@ -316,8 +316,8 @@ export default function DashboardActionPanel({
         <div
           className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
             message.tone === "success"
-              ? "border-emerald-200 bg-emerald-50/80 text-emerald-700"
-              : "border-rose-200 bg-rose-50/80 text-rose-800"
+              ? "border-[var(--border-strong)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
+              : "border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]"
           }`}
         >
           {message.text}
@@ -329,7 +329,7 @@ export default function DashboardActionPanel({
       ) : null}
 
       {contextError ? (
-        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-800">
+        <div className="mt-4 rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-3 text-sm text-[var(--urgency-critical-text)]">
           {contextError}
         </div>
       ) : null}

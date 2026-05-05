@@ -92,7 +92,7 @@ export default function StudentSpokesHub({
                 key={template.id}
                 className={`rounded-xl border p-3 ${
                   progress?.completed
-                    ? "border-emerald-200 bg-emerald-50/80"
+                    ? "border-[var(--border-strong)] bg-[var(--badge-success-bg)]"
                     : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >

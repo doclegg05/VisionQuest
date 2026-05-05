@@ -80,6 +80,12 @@ export default function GoalTree({ goals }: GoalTreeProps) {
     };
     const isCollapsed = collapsed.has(goal.id);
     const hasChildren = goal.children.length > 0;
+    const isLightTintedRow = goal.level !== "task";
+    const eyebrowTextClass = isLightTintedRow ? "text-slate-700" : "text-[var(--ink-muted)]";
+    const bodyTextClass = isLightTintedRow ? "text-slate-900" : "text-[var(--ink-strong)]";
+    const toggleTextClass = isLightTintedRow
+      ? "text-slate-700 hover:text-slate-900"
+      : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]";
 
     return (
       <div key={goal.id} style={{ marginLeft: `${depth * 1.5}rem` }}>
@@ -89,14 +95,14 @@ export default function GoalTree({ goals }: GoalTreeProps) {
               {hasChildren && (
                 <button
                   onClick={() => toggleCollapse(goal.id)}
-                  className="shrink-0 text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors"
+                  className={`shrink-0 text-xs transition-colors ${toggleTextClass}`}
                 >
                   <span className={`inline-block transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▶</span>
                 </button>
               )}
               <span className="shrink-0">{config.icon}</span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">{config.label}</span>
-              <p className="text-sm text-[var(--ink-strong)]">{goal.content}</p>
+              <span className={`text-xs font-semibold uppercase tracking-wider shrink-0 ${eyebrowTextClass}`}>{config.label}</span>
+              <p className={`text-sm ${bodyTextClass}`}>{goal.content}</p>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
               {status.label}

@@ -97,8 +97,8 @@ export default function GoalsPlanTab({
                     key={item.key}
                     className={`rounded-lg border p-4 ${
                       item.severity === "high"
-                        ? "border-rose-200 bg-rose-50/70"
-                        : "border-amber-200 bg-amber-50/70"
+                        ? "border-[var(--border-strong)] bg-[var(--urgency-critical-bg)]"
+                        : "border-[var(--border-strong)] bg-[var(--urgency-high-bg)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -117,7 +117,11 @@ export default function GoalsPlanTab({
                           {item.detectedAt ? ` \u2022 ${dateFormatter.format(new Date(item.detectedAt))}` : ""}
                         </p>
                       </div>
-                      <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-strong)]">
+                      <span className={`rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${
+                        item.severity === "high"
+                          ? "text-[var(--urgency-critical-text)]"
+                          : "text-[var(--urgency-high-text)]"
+                      }`}>
                         {item.severity}
                       </span>
                     </div>

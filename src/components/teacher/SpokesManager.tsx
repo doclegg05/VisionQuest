@@ -361,7 +361,7 @@ export default function SpokesManager() {
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-800">
+        <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-3 text-sm text-[var(--urgency-critical-text)]">
           {error}
         </div>
       ) : null}

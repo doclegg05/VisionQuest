@@ -182,29 +182,29 @@ export default function OutcomesReport() {
           <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">What needs follow-through</h3>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
-              <p className="text-sm font-semibold text-amber-800">Open alerts</p>
-              <p className="mt-2 text-2xl font-bold text-amber-900">{data.summary.openAlerts}</p>
-              <p className="mt-1 text-xs text-amber-800">
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-high-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-high-text)]">Open alerts</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.openAlerts}</p>
+              <p className="mt-1 text-xs text-[var(--urgency-high-text)]">
                 {data.summary.highSeverityAlerts} high-severity issues
               </p>
             </div>
-            <div className="rounded-lg border border-rose-200 bg-rose-50/70 p-4">
-              <p className="text-sm font-semibold text-rose-800">Overdue tasks</p>
-              <p className="mt-2 text-2xl font-bold text-rose-900">{data.summary.overdueTasks}</p>
-              <p className="mt-1 text-xs text-rose-800">
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-critical-text)]">Overdue tasks</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.overdueTasks}</p>
+              <p className="mt-1 text-xs text-[var(--urgency-critical-text)]">
                 {data.summary.openTasks} total open follow-ups
               </p>
             </div>
-            <div className="rounded-lg border border-sky-200 bg-sky-50/80 p-4">
-              <p className="text-sm font-semibold text-sky-800">Upcoming appointments</p>
-              <p className="mt-2 text-2xl font-bold text-sky-900">{data.summary.upcomingAppointments7d}</p>
-              <p className="mt-1 text-xs text-sky-800">Scheduled in the next 7 days</p>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">Upcoming appointments</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.upcomingAppointments7d}</p>
+              <p className="mt-1 text-xs text-[var(--urgency-medium-text)]">Scheduled in the next 7 days</p>
             </div>
-            <div className="rounded-lg border border-teal-200 bg-teal-50/80 p-4">
-              <p className="text-sm font-semibold text-teal-800">Career momentum gaps</p>
-              <p className="mt-2 text-2xl font-bold text-teal-900">{data.summary.studentsWithoutCareerMomentum}</p>
-              <p className="mt-1 text-xs text-teal-800">
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
+              <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">Career momentum gaps</p>
+              <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.studentsWithoutCareerMomentum}</p>
+              <p className="mt-1 text-xs text-[var(--urgency-medium-text)]">
                 Students without an event registration or active application
               </p>
             </div>

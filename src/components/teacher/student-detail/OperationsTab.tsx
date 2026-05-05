@@ -506,7 +506,7 @@ export default function OperationsTab({
                   key={task.id}
                   className={`rounded-lg border p-4 ${
                     task.status === "completed"
-                      ? "border-emerald-200 bg-emerald-50/70"
+                      ? "border-[var(--border-strong)] bg-[var(--badge-success-bg)]"
                       : "border-[var(--border)] bg-[var(--surface-raised)]"
                   }`}
                 >

@@ -113,7 +113,7 @@ export default function DetailedQueues({
                     return (
                       <div
                         key={alert.id}
-                        className="block rounded-[1rem] border border-amber-200 bg-amber-50/80 p-4 transition-colors hover:border-amber-300"
+                        className="block rounded-[1rem] border border-[var(--border-strong)] bg-[var(--urgency-high-bg)] p-4 transition-colors hover:border-[var(--border-strong)]"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -201,8 +201,8 @@ export default function DetailedQueues({
                         key={item.id}
                         className={`block rounded-[1rem] border p-4 transition-colors ${
                           item.severity === "high"
-                            ? "border-rose-200 bg-rose-50/80 hover:border-rose-300"
-                            : "border-amber-200 bg-amber-50/80 hover:border-amber-300"
+                            ? "border-[var(--border-strong)] bg-[var(--urgency-critical-bg)]"
+                            : "border-[var(--border-strong)] bg-[var(--urgency-high-bg)]"
                         }`}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
