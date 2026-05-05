@@ -169,7 +169,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             "relative flex flex-col overflow-visible rounded-[1.75rem] border bg-[var(--surface-raised)] shadow-[0_18px_48px_rgba(7,23,43,0.12)]",
             "transition-colors duration-200",
             focused
-              ? "border-[var(--accent-strong)]/70"
+              ? "border-[var(--chat-input-border)] shadow-[0_18px_48px_rgba(7,23,43,0.16)]"
               : "border-[var(--chat-input-border)]",
             disabled ? "opacity-75" : "",
             compact ? "rounded-[1.25rem]" : "",
