@@ -10,7 +10,6 @@ import {
   FolderOpen,
   ClipboardText,
   ChatCircle,
-  Books,
 } from "@phosphor-icons/react";
 import type { NavItem, NavPhase } from "./nav-progression";
 
@@ -26,7 +25,6 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
 ];
 
 export const STUDENT_SECONDARY_NAV: NavItem[] = [
-  { href: "/library", label: "Library", icon: Books, phase: 1 },
   { href: "/vision-board", label: "Vision Board", icon: ImageSquare, phase: 1 },
   { href: "/files", label: "Files", icon: FolderOpen, phase: 1 },
   { href: "/resources", label: "Resources", icon: Newspaper, phase: 1 },

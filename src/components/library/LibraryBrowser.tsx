@@ -5,10 +5,9 @@ import { MagnifyingGlass, Download, Eye, X, FileText, FilePdf, FileImage, File }
 import { api } from "@/lib/api";
 
 /**
- * Shared document library browser. Mounted by role-specific page wrappers
- * (/library for students, /teacher/library, /admin/library). The API enforces
- * audience scoping — students never see TEACHER-only rows — so the client
- * can render whatever the server returns without per-role branching.
+ * Shared document library browser. Mounted by staff page wrappers
+ * (/teacher/library, /admin/library). The API enforces audience scoping,
+ * so the client can render whatever the server returns without per-role branching.
  *
  * Best-practice checklist applied here:
  * - Debounced search (500ms) → avoids thrashing the server on every keystroke.
