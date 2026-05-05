@@ -31,6 +31,25 @@ function isAgentEnabled(): boolean {
   return process.env.SAGE_AGENT_ENABLED === "true";
 }
 
+const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|bye|goodbye|cya)[!.,?]*$/i;
+
+/**
+ * Detects messages that don't benefit from RAG retrieval — short pleasantries,
+ * acknowledgements, single-word replies. Skipping RAG on these saves the
+ * embedding lookup + ~6,000 chars of prompt bloat per turn.
+ */
+function isTrivialMessage(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed.length === 0) return true;
+  if (trimmed.length <= 4) return true;
+  if (TRIVIAL_PATTERN.test(trimmed)) return true;
+  // Short messages with no question words and few tokens are usually
+  // continuations of prior context — Sage's history covers them.
+  const tokens = trimmed.split(/\s+/);
+  if (tokens.length <= 3 && !/[?]/.test(trimmed)) return true;
+  return false;
+}
+
 class ChatSseClientClosedError extends Error {
   constructor() {
     super("Client disconnected before Sage completed streaming.");
@@ -290,19 +309,25 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       }, promptTier);
   }
 
-  // Inject document-based context from ProgramDocument (RAG layer)
-  const documentContext = await getDocumentContext(
-    userMessage,
-    isTeacher ? "staff" : "student",
-    3,
-    promptTier === "compact" ? 2000 : 6000,
-  );
-  if (documentContext) {
-    systemPrompt += documentContext;
-  }
-  const formContext = getFormContext(userMessage);
-  if (formContext) {
-    systemPrompt += formContext;
+  // Inject document-based context from ProgramDocument (RAG layer).
+  // Skip RAG for trivial messages — short pleasantries don't benefit from
+  // ~6,000 chars of program docs and the round-trip just delays first token.
+  // In agent mode, Sage can call `lookup_program_info` if she needs specifics.
+  const trivialMessage = isTrivialMessage(userMessage);
+  if (!trivialMessage) {
+    const documentContext = await getDocumentContext(
+      userMessage,
+      isTeacher ? "staff" : "student",
+      3,
+      promptTier === "compact" ? 2000 : 6000,
+    );
+    if (documentContext) {
+      systemPrompt += documentContext;
+    }
+    const formContext = getFormContext(userMessage);
+    if (formContext) {
+      systemPrompt += formContext;
+    }
   }
 
   // 80% daily warning — inject into system prompt so Sage mentions it naturally

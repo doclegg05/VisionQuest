@@ -12,8 +12,11 @@
 
 import { prisma } from "@/lib/db";
 import { FORMS } from "@/lib/spokes/forms";
+import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
 import { logger } from "@/lib/logger";
 import type { AgentTool, AgentToolResult } from "./types";
+
+const PROGRAM_INFO_TOPICS = Object.keys(TOPIC_CONTENT) as ReadonlyArray<string>;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -363,6 +366,48 @@ const openResource: AgentTool = {
 };
 
 // -----------------------------------------------------------------------------
+// lookup_program_info
+// -----------------------------------------------------------------------------
+
+const lookupProgramInfo: AgentTool = {
+  name: "lookup_program_info",
+  description:
+    "Retrieve detailed program knowledge for a specific topic on demand. Call this when you need specifics that aren't in your brief overview — certification details, platform setup steps, onboarding requirements, etc.",
+  parameters: {
+    type: "object",
+    properties: {
+      topic: {
+        type: "string",
+        description:
+          "The topic key. Pick from the available list shown in your system prompt.",
+        enum: PROGRAM_INFO_TOPICS,
+      },
+    },
+    required: ["topic"],
+  },
+  // No slash command — this is model-driven, not user-invoked.
+  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  enabled: true,
+  async execute(args): Promise<AgentToolResult> {
+    const topic = String(args.topic ?? "").trim();
+    const content = TOPIC_CONTENT[topic];
+    if (!content) {
+      return {
+        status: "error",
+        summary: `Unknown program topic "${topic}". Pick one from the available list.`,
+        modelHint: `Available topics: ${PROGRAM_INFO_TOPICS.join(", ")}.`,
+      };
+    }
+    return {
+      status: "success",
+      summary: `Loaded program details for "${topic}".`,
+      data: { topic, content },
+      modelHint: content,
+    };
+  },
+};
+
+// -----------------------------------------------------------------------------
 // classify_attachment
 // -----------------------------------------------------------------------------
 
@@ -405,6 +450,7 @@ const ALL_TOOLS: AgentTool[] = [
   findCertification,
   lookupAppointment,
   openResource,
+  lookupProgramInfo,
   classifyAttachment,
 ];
 

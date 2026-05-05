@@ -239,6 +239,26 @@ The chat-component switch on `event.type`, accumulates `text` chunks for streami
 
 ---
 
+## 6.5. UI performance hooks (Codex action items)
+
+Two quick-win calls the chat UI should make to keep Sage feeling snappy:
+
+1. **Pre-warm on chat mount.** When the chat surface first mounts (route enter, modal open, etc.), fire `GET /api/chat/warmup`. It primes the student's base-context cache so the first Sage message doesn't pay the cold-cache DB round-trip. The endpoint is rate-limited to 1/60s per student, returns 204 fast, and is safe to call fire-and-forget.
+
+   ```ts
+   useEffect(() => {
+     fetch('/api/chat/warmup').catch(() => {/* warmup is best-effort */});
+   }, []);
+   ```
+
+2. **Fetch the slash-command palette once** at chat mount and cache it in component state. The list is small and rarely changes.
+
+   ```ts
+   useEffect(() => {
+     fetch('/api/chat/slash-commands').then(r => r.json()).then(setCommands);
+   }, []);
+   ```
+
 ## 7. Open questions (need product input)
 
 These don't block backend implementation but will shape Phase 2+:

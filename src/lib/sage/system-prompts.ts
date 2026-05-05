@@ -8,6 +8,7 @@ import {
   COMPACT_SPOKES_KNOWLEDGE,
   SPOKES_BRIEF,
   SPOKES_KNOWLEDGE,
+  TOPIC_CONTENT,
   getCompactProgramKnowledge,
   getProgramKnowledge,
   getRelevantContent,
@@ -552,14 +553,24 @@ export function buildSystemPrompt(
   }
 
   // Build the prompt with program-aware knowledge base and addendum.
-  // Knowledge-heavy stages (orientation, general) get the full ~5k-token block.
-  // All other stages get SPOKES_BRIEF (~60 tokens) — getRelevantContent() still
-  // fires on every message to inject topic detail on keyword match.
+  // Knowledge-heavy stages (orientation, general) normally get the full
+  // ~5k-token block. When agent mode is enabled and the program supports
+  // topic lookup (SPOKES today), swap the dump for a 250-token index plus
+  // a `lookup_program_info` tool — Sage retrieves detail on demand instead
+  // of carrying it on every turn.
+  const agentLazyKnowledgeAvailable =
+    process.env.SAGE_AGENT_ENABLED === "true" &&
+    !isCompact &&
+    KNOWLEDGE_HEAVY_STAGES.has(stage) &&
+    (programType === "spokes" || programType === "ietp");
+
   const programKnowledge = isCompact
     ? getCompactProgramKnowledge(programType)
-    : KNOWLEDGE_HEAVY_STAGES.has(stage)
-      ? getProgramKnowledge(programType)
-      : SPOKES_BRIEF;
+    : agentLazyKnowledgeAvailable
+      ? buildLazyProgramIndex(programType)
+      : KNOWLEDGE_HEAVY_STAGES.has(stage)
+        ? getProgramKnowledge(programType)
+        : SPOKES_BRIEF;
 
   const parts = isCompact
     ? [
@@ -644,6 +655,27 @@ export function buildSystemPrompt(
 }
 
 /**
+ * Lazy index injected into the system prompt when agent mode is enabled.
+ * Replaces the full ~1,700-token program knowledge dump with a topic
+ * directory. Sage retrieves specific topics via `lookup_program_info(topic)`
+ * only when she actually needs them.
+ */
+function buildLazyProgramIndex(programType: ProgramType): string {
+  const topics = Object.keys(TOPIC_CONTENT);
+  if (topics.length === 0 || (programType !== "spokes" && programType !== "ietp")) {
+    return SPOKES_BRIEF;
+  }
+  return [
+    SPOKES_BRIEF,
+    "",
+    "PROGRAM TOPIC INDEX — call `lookup_program_info(topic)` to retrieve full detail on any of these:",
+    topics.map((t) => `  • ${t}`).join("\n"),
+    "",
+    "Don't recite knowledge you haven't loaded. If a student's question needs specifics from one of these topics, call the tool first, then answer using the returned content.",
+  ].join("\n");
+}
+
+/**
  * Behavioral policy for tool-calling. Function declarations are passed via
  * the SDK; this addendum sets the *when* and *how*.
  */
@@ -655,6 +687,7 @@ You have tools available that let you do things, not just talk about them. Call 
 - find_certification(query): Search the certification catalog. Call when a student asks about a specific cert, what's available in a category, or whether a credential is offered.
 - lookup_appointment(withinDays?): List the student's upcoming appointments. Call when a student asks "when's my next check-in", "do I have anything scheduled", "what's coming up".
 - open_resource(resourceId): Open a known program resource — dress-code, attendance-policy, student-handbook, career-discovery, vision-board, goals, portfolio.
+- lookup_program_info(topic): Retrieve detailed knowledge on a specific topic from the index in your program context. Call this BEFORE answering any question that needs specifics about certifications (IC3, MOS, WorkKeys, Intuit, Adobe, etc.), platforms (GMetrix, Edgenuity, Essential Education, etc.), onboarding steps, DoHS forms, Ready-to-Work requirements, or admin resources. Don't guess — load the topic and quote from it.
 
 Tool-calling rules:
 1. Call the tool BEFORE replying. Don't promise to look something up — actually look it up by calling the tool.
