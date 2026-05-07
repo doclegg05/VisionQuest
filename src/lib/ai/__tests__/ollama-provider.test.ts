@@ -337,6 +337,91 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
       assert.equal(fetchCount, 2);
     });
+
+    it("switches to native streaming when the OpenAI-compatible stream ends without text", async () => {
+      const encoder = new TextEncoder();
+      let fetchCount = 0;
+
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  JSON.stringify({ message: { content: "Native fallback" }, done: false }) +
+                    "\n",
+                ),
+              );
+              controller.enqueue(
+                encoder.encode(JSON.stringify({ message: { content: "" }, done: true }) + "\n"),
+              );
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        );
+      });
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Native fallback"]);
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+      assert.equal(fetchCount, 2);
+    });
+
+    it("accepts native-shaped chunks returned from the OpenAI-compatible stream path", async () => {
+      const encoder = new TextEncoder();
+
+      mockFetch.mock.mockImplementationOnce(async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  JSON.stringify({ message: { content: "Relay native" }, done: false }) +
+                    "\n",
+                ),
+              );
+              controller.enqueue(
+                encoder.encode(JSON.stringify({ message: { content: "" }, done: true }) + "\n"),
+              );
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Relay native"]);
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.callCount(), 1);
+    });
   });
 
   describe("message role mapping", () => {

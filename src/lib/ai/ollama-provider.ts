@@ -69,6 +69,10 @@ interface OpenAIStreamChunk {
       content?: string;
       tool_calls?: OpenAIStreamToolCallDelta[];
     };
+    message?: {
+      content?: string;
+    };
+    text?: string;
     finish_reason?: string | null;
   }>;
 }
@@ -120,6 +124,23 @@ function isRetryableStartupError(error: unknown): boolean {
 
 function shouldSwitchToNative(message: string): boolean {
   return /Ollama returned 404|Local AI stream failed \(404\)/i.test(message);
+}
+
+function streamChunkContent(parsed: OpenAIStreamChunk): string | undefined {
+  const choice = parsed.choices?.[0];
+  return choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
+}
+
+function parseNativeChatPayload(payload: string): NativeChatResponse | null {
+  let parsed: NativeChatResponse;
+  try {
+    parsed = JSON.parse(payload) as NativeChatResponse;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  if (!("message" in parsed) && !("done" in parsed)) return null;
+  return parsed;
 }
 
 function toOpenAIMessages(
@@ -351,6 +372,7 @@ export class OllamaProvider implements AIProvider {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let yieldedContent = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -365,9 +387,29 @@ export class OllamaProvider implements AIProvider {
         if (!trimmed) continue;
 
         if (mode === "openai") {
-          if (!trimmed.startsWith("data: ")) continue;
+          if (!trimmed.startsWith("data: ")) {
+            const nativeParsed = parseNativeChatPayload(trimmed);
+            if (!nativeParsed) continue;
+            const upstreamError = payloadErrorMessage(nativeParsed);
+            if (upstreamError) throw new LocalAiStreamError(upstreamError);
+            const content = nativeParsed.message?.content;
+            if (content) {
+              yieldedContent = true;
+              yield content;
+            }
+            if (nativeParsed.done) return;
+            continue;
+          }
           const payload = trimmed.slice(6);
-          if (payload === "[DONE]") return;
+          if (payload === "[DONE]") {
+            if (!yieldedContent) {
+              throw new LocalAiStreamError(
+                "OpenAI-compatible local AI stream ended without content.",
+                { switchToNative: true },
+              );
+            }
+            return;
+          }
 
           let parsed: OpenAIStreamChunk;
           try {
@@ -381,8 +423,11 @@ export class OllamaProvider implements AIProvider {
               switchToNative: shouldSwitchToNative(upstreamError),
             });
           }
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) yield content;
+          const content = streamChunkContent(parsed);
+          if (content) {
+            yieldedContent = true;
+            yield content;
+          }
           continue;
         }
 
@@ -397,24 +442,65 @@ export class OllamaProvider implements AIProvider {
           throw new LocalAiStreamError(upstreamError);
         }
         const content = parsed.message?.content;
-        if (content) yield content;
+        if (content) {
+          yieldedContent = true;
+          yield content;
+        }
         if (parsed.done) return;
       }
     }
 
     buffer += decoder.decode();
     const finalChunk = buffer.trim();
-    if (!finalChunk) return;
+    if (!finalChunk) {
+      if (mode === "openai" && !yieldedContent) {
+        throw new LocalAiStreamError(
+          "OpenAI-compatible local AI stream ended without content.",
+          { switchToNative: true },
+        );
+      }
+      return;
+    }
 
     if (mode === "openai") {
-      if (!finalChunk.startsWith("data: ")) return;
+      if (!finalChunk.startsWith("data: ")) {
+        const nativeParsed = parseNativeChatPayload(finalChunk);
+        if (!nativeParsed) {
+          if (!yieldedContent) {
+            throw new LocalAiStreamError(
+              "OpenAI-compatible local AI stream ended without content.",
+              { switchToNative: true },
+            );
+          }
+          return;
+        }
+        const upstreamError = payloadErrorMessage(nativeParsed);
+        if (upstreamError) throw new LocalAiStreamError(upstreamError);
+        const content = nativeParsed.message?.content;
+        if (content) yield content;
+        return;
+      }
       const payload = finalChunk.slice(6);
-      if (payload === "[DONE]") return;
+      if (payload === "[DONE]") {
+        if (!yieldedContent) {
+          throw new LocalAiStreamError(
+            "OpenAI-compatible local AI stream ended without content.",
+            { switchToNative: true },
+          );
+        }
+        return;
+      }
 
       let parsed: OpenAIStreamChunk;
       try {
         parsed = JSON.parse(payload) as OpenAIStreamChunk;
       } catch {
+        if (!yieldedContent) {
+          throw new LocalAiStreamError(
+            "OpenAI-compatible local AI stream ended without content.",
+            { switchToNative: true },
+          );
+        }
         return;
       }
       const upstreamError = payloadErrorMessage(parsed);
@@ -423,8 +509,14 @@ export class OllamaProvider implements AIProvider {
           switchToNative: shouldSwitchToNative(upstreamError),
         });
       }
-      const content = parsed.choices?.[0]?.delta?.content;
+      const content = streamChunkContent(parsed);
       if (content) yield content;
+      if (!content && !yieldedContent) {
+        throw new LocalAiStreamError(
+          "OpenAI-compatible local AI stream ended without content.",
+          { switchToNative: true },
+        );
+      }
       return;
     }
 
