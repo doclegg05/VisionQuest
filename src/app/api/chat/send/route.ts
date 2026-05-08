@@ -652,7 +652,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         });
         if (!clientClosed) {
           try {
-            sendEvent({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` }, "error");
+            sendEvent({ error: "Sage is temporarily unavailable. Please try again." }, "error");
           } catch {
             // The client went away while we were reporting the original error.
           }
