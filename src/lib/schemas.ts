@@ -39,7 +39,7 @@ export const createStudentSchema = z.object({
   studentId: z.string().min(3, "Username must be at least 3 characters.").max(50, "Username must be 50 characters or fewer."),
   displayName: z.string().min(1, "Name is required.").max(100, "Name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long.").optional().or(z.literal("")),
-  password: z.string().min(8, "Password must be at least 8 characters.").max(200, "Password must be 200 characters or fewer."),
+  password: z.string().min(12, "Password must be at least 12 characters.").max(200, "Password must be 200 characters or fewer."),
 });
 
 // ─── Teacher Registration Schema ────────────────────────────────────────────
@@ -48,7 +48,7 @@ export const registerTeacherSchema = z.object({
   teacherKey: z.string().min(1, "Teacher key is required."),
   displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
-  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
+  password: z.string().min(12, "Password must be at least 12 characters.").max(128, "Password must be 128 characters or fewer."),
 });
 
 // ─── Staff Registration Schema ──────────────────────────────────────────────
@@ -58,14 +58,14 @@ export const registerStaffSchema = z.object({
   role: z.enum(["teacher", "admin"], { message: "Role must be teacher or admin." }),
   displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
-  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
+  password: z.string().min(12, "Password must be at least 12 characters.").max(128, "Password must be 128 characters or fewer."),
 });
 
 // ─── Password Reset Schema ─────────────────────────────────────────────────
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required."),
-  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password must be 128 characters or fewer."),
+  password: z.string().min(12, "Password must be at least 12 characters.").max(128, "Password must be 128 characters or fewer."),
 });
 
 // ─── Forgot Password Schema ───────────────────────────────────────────────
@@ -78,7 +78,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordQuestionsSchema = z.object({
   login: z.string().min(1, "Enter the email address or student ID for your account.").max(200, "Login is too long."),
-  password: z.string().min(8, "Password must be at least 8 characters.").max(200, "Password must be 200 characters or fewer."),
+  password: z.string().min(12, "Password must be at least 12 characters.").max(200, "Password must be 200 characters or fewer."),
   securityQuestions: z.record(z.string(), z.string()),
 });
 

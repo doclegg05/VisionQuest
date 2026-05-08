@@ -8,7 +8,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
 
 const teacherResetPasswordSchema = z.object({
-  newPassword: z.string().min(6, "Password must be at least 6 characters").max(200, "Password must be 200 characters or fewer"),
+  newPassword: z.string().min(12, "Password must be at least 12 characters").max(200, "Password must be 200 characters or fewer"),
 });
 
 // POST — reset a student's password

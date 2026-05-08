@@ -36,7 +36,7 @@ test("createStudentSchema accepts valid input", () => {
   const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane Doe",
-    password: "secure123",
+    password: "secure-pass-123",
   });
   assert.ok(result.success);
 });
@@ -46,7 +46,7 @@ test("createStudentSchema accepts optional email", () => {
     studentId: "jdoe",
     displayName: "Jane Doe",
     email: "jane@example.com",
-    password: "secure123",
+    password: "secure-pass-123",
   });
   assert.ok(result.success);
 });
@@ -55,27 +55,27 @@ test("createStudentSchema requires username min 3 chars", () => {
   const result = createStudentSchema.safeParse({
     studentId: "ab",
     displayName: "Jane",
-    password: "secure123",
+    password: "secure-pass-123",
   });
   assert.ok(!result.success);
   assert.ok(result.error.issues[0].message.includes("3 characters"));
 });
 
-test("createStudentSchema requires password min 8 chars", () => {
+test("createStudentSchema requires password min 12 chars", () => {
   const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane",
-    password: "1234567",
+    password: "short-11chr",
   });
   assert.ok(!result.success);
-  assert.ok(result.error.issues[0].message.includes("8 characters"));
+  assert.ok(result.error.issues[0].message.includes("12 characters"));
 });
 
 test("createStudentSchema allows empty string for email", () => {
   const result = createStudentSchema.safeParse({
     studentId: "jdoe",
     displayName: "Jane",
-    password: "secure123",
+    password: "secure-pass-123",
     email: "",
   });
   assert.ok(result.success);
