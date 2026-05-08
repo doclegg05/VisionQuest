@@ -14,7 +14,10 @@ import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, g
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
-import { buildStaffStudentContext } from "@/lib/sage/staff-student-context";
+import {
+  buildStaffStudentContext,
+  shouldAttemptStaffStudentContext,
+} from "@/lib/sage/staff-student-context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota } from "@/lib/llm-usage";
 import { prisma } from "@/lib/db";
@@ -93,6 +96,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const conversationId = body.conversationId || null;
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
+  const isAdmin = session.role === "admin";
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
   const directFormAnswer = getDirectFormAnswer(userMessage);
@@ -237,10 +241,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   let staffStudentContext: string | null = null;
   let staffStudentTargetId: string | null = null;
   let staffStudentContextResolution: "none" | "resolved" | "ambiguous" | "not_found" = "none";
-  if (isTeacher) {
-    const priorUserMessages = (conversation.messages ?? [])
-      .filter((message) => message.role === "user")
-      .map((message) => message.content);
+  const priorUserMessages = isTeacher
+    ? (conversation.messages ?? [])
+        .filter((message) => message.role === "user")
+        .map((message) => message.content)
+    : [];
+  const shouldBuildStaffStudentContext =
+    isTeacher &&
+    (Boolean(body.targetStudentId) ||
+      (!isAdmin && shouldAttemptStaffStudentContext(userMessage, priorUserMessages)));
+  if (shouldBuildStaffStudentContext) {
     const contextResult = await buildStaffStudentContext(session, {
       userMessage,
       priorUserMessages,
@@ -271,7 +281,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   let systemPrompt: string;
 
   if (isTeacher) {
-    systemPrompt = buildSystemPrompt("teacher_assistant", {
+    const staffStage = isAdmin ? "admin_assistant" : "teacher_assistant";
+    systemPrompt = buildSystemPrompt(staffStage, {
       studentName: session.displayName,
       userMessage,
       staffStudentContext,
