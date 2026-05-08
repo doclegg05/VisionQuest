@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { withTeacherAuth, badRequest, notFound } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { parseBody } from "@/lib/schemas";
+
+const alertActionSchema = z.object({
+  action: z.enum(["snooze", "resolve", "dismiss", "reopen"], {
+    message: "Invalid action. Must be: snooze, resolve, dismiss, or reopen",
+  }),
+  hours: z.number().int().min(1).max(168).optional(),
+});
 
 /**
  * PATCH /api/teacher/alerts/:id
@@ -18,8 +27,7 @@ export const PATCH = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> },
 ) => {
   const { id } = await params;
-  const body = await _req.json();
-  const action = body.action as string;
+  const { action, hours } = await parseBody(_req, alertActionSchema);
 
   const alert = await prisma.studentAlert.findUnique({
     where: { id },
@@ -35,8 +43,8 @@ export const PATCH = withTeacherAuth(async (
 
   switch (action) {
     case "snooze": {
-      const hours = Math.min(Math.max(parseInt(body.hours) || 24, 1), 168); // 1h to 7 days
-      const snoozedUntil = new Date(now.getTime() + hours * 60 * 60 * 1000);
+      const snoozeHours = hours ?? 24; // default 24h, schema enforces 1-168 range
+      const snoozedUntil = new Date(now.getTime() + snoozeHours * 60 * 60 * 1000);
       await prisma.studentAlert.update({
         where: { id },
         data: { status: "snoozed", snoozedUntil, snoozedBy: session.id },
@@ -68,7 +76,10 @@ export const PATCH = withTeacherAuth(async (
       return NextResponse.json({ status: "open" });
     }
 
-    default:
-      throw badRequest("Invalid action. Must be: snooze, resolve, dismiss, or reopen");
+    default: {
+      // Unreachable — Zod enum narrows action above. Kept as exhaustiveness guard.
+      const _exhaustive: never = action;
+      throw badRequest(`Invalid action: ${String(_exhaustive)}`);
+    }
   }
 });
