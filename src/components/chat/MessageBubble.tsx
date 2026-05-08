@@ -1,5 +1,7 @@
 "use client";
 
+import { useReducedMotion } from "framer-motion";
+
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
@@ -8,6 +10,7 @@ interface MessageBubbleProps {
 
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
   const isUser = role === "user";
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} role="group" aria-label={`${isUser ? "Your" : "Sage's"} message`}>
@@ -27,7 +30,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             ? "rounded-br-md text-white"
             : "rounded-bl-md border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] text-[var(--ink-strong)]"
           }
-          ${isStreaming ? "animate-pulse" : ""}`}
+          ${isStreaming && !shouldReduceMotion ? "animate-pulse" : ""}`}
         // --chat-bubble-user-bg is a gradient; Tailwind's bg-[var(--x)]
         // compiles to background-color which can't render gradients
         // (causing the bubble to fall back to transparent in light mode
@@ -35,7 +38,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
         // accepts gradients cleanly in both themes.
         style={isUser ? { background: "var(--chat-bubble-user-bg)" } : undefined}
       >
-        <p className="whitespace-pre-wrap break-words">{content}</p>
+        <p className="whitespace-pre-wrap break-words">{content}{isStreaming && shouldReduceMotion ? "▍" : ""}</p>
       </div>
     </div>
   );
