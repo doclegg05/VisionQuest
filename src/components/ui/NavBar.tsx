@@ -263,8 +263,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const active = isActive(item.href);
             return (
               <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
-                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
+                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -277,8 +277,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const active = isActive(item.href);
             return (
               <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
-                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
+                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -294,7 +294,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-[#37b550] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
               <ChatCircle size={22} weight="fill" />
             </div>
-            <span className={`text-xs font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>Sage</span>
+            <span className={`text-xs font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>Sage</span>
           </Link>
 
           {/* Tab 4: Learning */}
@@ -304,8 +304,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const active = isActive(item.href);
             return (
               <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
-                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>{item.label}</span>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
+                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -321,8 +321,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             aria-haspopup="dialog"
             aria-label="More navigation options"
           >
-            <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"} />
-            <span className={`text-xs font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-faint)]"}`}>More</span>
+            <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
+            <span className={`text-xs font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>More</span>
             {isMoreActive && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
           </button>
         </div>
