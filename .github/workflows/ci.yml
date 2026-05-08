@@ -40,6 +40,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Lint server-only guard (db imports must include `import "server-only"`)
+        # `npm run lint` already chains this in warn mode; this step makes the
+        # output discoverable as its own CI line. Flip the script (or this
+        # step) to lint:server-only:strict once Bundle #1 / PR #41 lands the
+        # guard on every src/lib/** module.
+        run: npm run lint:server-only
+
       - name: Audit API auth wrappers
         # Static scan of every route file; exits 1 on any FOOTGUN finding
         # (withErrorHandler + getSession() + prisma — the 2026-04-24 bug).
