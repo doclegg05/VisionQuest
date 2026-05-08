@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { clientLogger } from "@/lib/client-logger";
 import ChatInput from "./ChatInput";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
@@ -93,7 +94,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setChatError(null);
       }
     } catch (err) {
-      console.error("Failed to load conversation:", err instanceof Error ? err.message : "Unknown error");
+      clientLogger.error(err, { op: "chat.loadConversation" });
     }
     setShowSidebar(false);
   }, []);
@@ -115,7 +116,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           await loadConversationById(active.id);
         }
       } catch (err) {
-        console.error("Failed to load conversations:", err instanceof Error ? err.message : "Unknown error");
+        clientLogger.error(err, { op: "chat.loadActiveConversation" });
       }
     }
 
@@ -354,7 +355,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         // Check for XP/achievement/level changes
         setTimeout(() => checkProgression(), 2000);
       } catch (err) {
-        console.error("Send error:", err instanceof Error ? err.message : "Unknown error");
+        clientLogger.error(err, { op: "chat.send" });
         const message = err instanceof Error ? err.message : "Sorry, I had trouble responding. Please try again.";
         setChatError(message);
         setMessages((prev) => [

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WEEKDAY_OPTIONS, formatMinutesLabel } from "@/lib/advising-ui";
+import { clientLogger } from "@/lib/client-logger";
 
 interface AvailabilityBlock {
   id: string;
@@ -51,7 +52,7 @@ export default function AdvisingManager() {
       setScheduledAppointments(payload.scheduledAppointments || 0);
       setError(null);
     } catch (err) {
-      console.error("Failed to load advising settings:", err instanceof Error ? err.message : "Unknown error");
+      clientLogger.error(err, { op: "advising.loadSettings" });
       setError(err instanceof Error ? err.message : "Failed to load availability.");
     } finally {
       setLoading(false);

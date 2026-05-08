@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import CertificateDownload from "@/components/ui/CertificateDownload";
+import { clientLogger } from "@/lib/client-logger";
 
 interface CertRequirement {
   id: string | null;
@@ -50,7 +51,7 @@ export default function CertTracker() {
         setError(null);
       }
     } catch (err) {
-      console.error("Failed to load certification:", err instanceof Error ? err.message : "Unknown error");
+      clientLogger.error(err, { op: "cert.load" });
       setError("Failed to load. Please try again.");
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ export default function CertTracker() {
       setError(null);
       fetchCert();
     } catch (err) {
-      console.error("Failed to toggle requirement:", err instanceof Error ? err.message : "Unknown error");
+      clientLogger.error(err, { op: "cert.toggleRequirement" });
       setError("Could not update this requirement.");
     } finally {
       setToggling(null);
@@ -116,7 +117,7 @@ export default function CertTracker() {
         setError(data?.error || "Could not upload this file.");
       }
     } catch (err) {
-      console.error("Failed to upload file:", err instanceof Error ? err.message : "Unknown error");
+      clientLogger.error(err, { op: "cert.uploadFile" });
       setError("Could not upload this file.");
     } finally {
       setUploading(null);
