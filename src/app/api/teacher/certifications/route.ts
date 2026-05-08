@@ -1,13 +1,46 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { syncStudentAlerts } from "@/lib/advising";
-import { withTeacherAuth } from "@/lib/api-error";
+import { withTeacherAuth, badRequest } from "@/lib/api-error";
 import { assertStaffCanManageStudent, listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
-import { isValidUrl } from "@/lib/validation";
+import { isValidUrl, MAX_LENGTHS } from "@/lib/validation";
 import { getCertificationProgress } from "@/lib/certifications";
 import { logAuditEvent } from "@/lib/audit";
 import { recomputeCertificationStatus, recomputeCertificationStatusesForType } from "@/lib/certification-service";
+import { parseBody } from "@/lib/schemas";
+
+// URL field accepts empty string / null / undefined for "clear" semantics; isValidUrl()
+// is still used downstream to enforce http/https. Keeping that two-step matches existing behavior.
+const certTemplateCreateSchema = z.object({
+  label: z.string().min(1, "label is required").max(MAX_LENGTHS.label),
+  description: z.string().max(MAX_LENGTHS.description).nullish(),
+  url: z.string().max(MAX_LENGTHS.url).nullish(),
+  required: z.boolean().optional(),
+  needsFile: z.boolean().optional(),
+  needsVerify: z.boolean().optional(),
+});
+
+const certRequirementVerifySchema = z.object({
+  requirementId: z.string().cuid("Invalid requirement ID."),
+  verified: z.boolean().optional(),
+});
+
+const certTemplateUpdateSchema = z.object({
+  id: z.string().cuid("Invalid template ID."),
+  label: z.string().min(1).max(MAX_LENGTHS.label).optional(),
+  description: z.string().max(MAX_LENGTHS.description).nullish(),
+  url: z.string().max(MAX_LENGTHS.url).nullish(),
+  required: z.boolean().optional(),
+  needsFile: z.boolean().optional(),
+  needsVerify: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+const certTemplateDeleteSchema = z.object({
+  id: z.string().cuid("Invalid template ID."),
+});
 
 // GET — list cert templates or all student cert progress
 export const GET = withTeacherAuth(async (session, req: Request) => {
@@ -71,8 +104,10 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
 
 // POST — create a cert template
 export const POST = withTeacherAuth(async (session, req: Request) => {
-  const { label, description, url, required, needsFile, needsVerify } = await req.json();
-  if (!label) return NextResponse.json({ error: "label is required" }, { status: 400 });
+  const { label, description, url, required, needsFile, needsVerify } = await parseBody(
+    req,
+    certTemplateCreateSchema,
+  );
   if (url && !isValidUrl(url)) {
     return NextResponse.json({ error: "Invalid URL. Only http and https URLs are allowed." }, { status: 400 });
   }
@@ -122,11 +157,25 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
 
 // PUT — update a template or verify a student requirement
 export const PUT = withTeacherAuth(async (session, req: Request) => {
-  const body = await req.json();
+  // PUT serves two shapes; peek at the raw body to dispatch, then validate
+  // each branch with its own schema so the wrong fields cannot leak through.
+  let raw: { requirementId?: unknown };
+  try {
+    raw = (await req.json()) as { requirementId?: unknown };
+  } catch {
+    throw badRequest("Invalid JSON body.");
+  }
 
   // Verify a student's requirement
-  if (body.requirementId) {
-    const { requirementId, verified } = body;
+  if (raw.requirementId) {
+    const verifyParsed = certRequirementVerifySchema.safeParse(raw);
+    if (!verifyParsed.success) {
+      return NextResponse.json(
+        { error: verifyParsed.error.issues[0]?.message ?? "Invalid request body." },
+        { status: 400 },
+      );
+    }
+    const { requirementId, verified } = verifyParsed.data;
     const requirement = await prisma.certRequirement.findUnique({
       where: { id: requirementId },
       include: {
@@ -185,8 +234,14 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
   }
 
   // Update a template
-  const { id, label, description, url, required, needsFile, needsVerify, sortOrder } = body;
-  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  const updateParsed = certTemplateUpdateSchema.safeParse(raw);
+  if (!updateParsed.success) {
+    return NextResponse.json(
+      { error: updateParsed.error.issues[0]?.message ?? "Invalid request body." },
+      { status: 400 },
+    );
+  }
+  const { id, label, description, url, required, needsFile, needsVerify, sortOrder } = updateParsed.data;
   if (url !== undefined && url !== null && url !== "" && !isValidUrl(url)) {
     return NextResponse.json({ error: "Invalid URL. Only http and https URLs are allowed." }, { status: 400 });
   }
@@ -217,8 +272,7 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
 
 // DELETE — remove a cert template
 export const DELETE = withTeacherAuth(async (session, req: Request) => {
-  const { id } = await req.json();
-  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  const { id } = await parseBody(req, certTemplateDeleteSchema);
 
   const template = await prisma.certTemplate.findUnique({
     where: { id },
