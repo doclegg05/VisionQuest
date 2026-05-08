@@ -1,3 +1,5 @@
+import "server-only";
+
 import { buildManagedStudentWhere, assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { type Session } from "@/lib/api-error";

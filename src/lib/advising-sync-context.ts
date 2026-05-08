@@ -1,3 +1,5 @@
+import "server-only";
+
 import { checkStudentCompliance } from "./class-requirement-compliance";
 import { prisma } from "./db";
 import { ALL_INACTIVITY_ALERT_TYPES } from "./inactivity";
