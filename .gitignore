@@ -100,3 +100,6 @@ broken-documents-backup-*.json
 # Project Autopilot — local automation, not part of the product
 /project-autopilot/
 /VisionQuest_Claude_Automation_Files/
+
+# Playwright local test fixtures (generated per run by globalSetup)
+/e2e/.test-user.json
