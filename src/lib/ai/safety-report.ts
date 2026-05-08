@@ -198,6 +198,10 @@ export async function generateAiSafetyReport(
       },
       select: { action: true, metadata: true },
       orderBy: { createdAt: "desc" },
+      // Cap to prevent unbounded scans as the audit log grows. The report
+      // categorizes events into counters; sampling the most recent 1000
+      // events per period is sufficient for the supervisor summary.
+      take: 1000,
     }),
     prisma.auditLog.findMany({
       where: {
@@ -208,6 +212,8 @@ export async function generateAiSafetyReport(
         ],
       },
       select: { id: true },
+      // Cap to prevent unbounded scans; only used for a `configChanges` count.
+      take: 1000,
     }),
   ]);
 
