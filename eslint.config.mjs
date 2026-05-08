@@ -41,6 +41,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // c8 coverage report (generated)
+    "coverage/**",
   ]),
 ]);
 
