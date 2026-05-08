@@ -47,6 +47,12 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
 });
 
 // PUT — update an LMS link
+//
+// Ownership: non-admin teachers may only mutate links they created. Admins
+// bypass the check (also the only role able to maintain legacy rows where
+// `createdBy` is null, e.g. seeded data predating the column). Returns 404
+// when no row matches the scoped predicate so we don't leak existence to
+// non-owners. See code review finding 2026-05-08 (Sprint 1 Bundle #5 / Task B).
 export const PUT = withTeacherAuth(async (session, req: Request) => {
   const { id, title, description, url, category, icon, sortOrder } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -62,31 +68,56 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
   if (icon !== undefined) data.icon = icon;
   if (sortOrder !== undefined) data.sortOrder = sortOrder;
 
-  const link = await prisma.lmsLink.update({ where: { id }, data });
+  const isAdmin = session.role === "admin";
+  const where: Prisma.LmsLinkWhereInput = isAdmin
+    ? { id }
+    : { id, createdBy: session.id };
+
+  const result = await prisma.lmsLink.updateMany({ where, data });
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  }
+
+  const link = await prisma.lmsLink.findUnique({ where: { id } });
 
   await logAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     action: "teacher.lms.update",
     targetType: "lms_link",
-    targetId: link.id,
-    summary: `Updated learning resource "${link.title}".`,
+    targetId: id,
+    summary: link ? `Updated learning resource "${link.title}".` : "Updated a learning resource.",
   });
 
   return NextResponse.json({ link });
 });
 
 // DELETE — remove an LMS link
+//
+// Ownership: same rules as PUT — non-admin teachers may only delete their own
+// links; admins bypass. See code review finding 2026-05-08 (Sprint 1 Bundle
+// #5 / Task B).
 export const DELETE = withTeacherAuth(async (session, req: Request) => {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  const link = await prisma.lmsLink.findUnique({
-    where: { id },
+  const isAdmin = session.role === "admin";
+  const where: Prisma.LmsLinkWhereInput = isAdmin
+    ? { id }
+    : { id, createdBy: session.id };
+
+  // Snapshot title for the audit log before deletion. Only fetch what the
+  // current actor is permitted to mutate so we don't leak the existence of
+  // links owned by other teachers.
+  const link = await prisma.lmsLink.findFirst({
+    where,
     select: { id: true, title: true },
   });
 
-  await prisma.lmsLink.delete({ where: { id } });
+  const result = await prisma.lmsLink.deleteMany({ where });
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  }
 
   await logAuditEvent({
     actorId: session.id,
