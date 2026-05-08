@@ -13,6 +13,16 @@ function countDaysSince(value: Date, now: Date) {
 }
 
 export async function getTeacherOutcomeReport(studentIds?: string[]) {
+  // Guard against the silent fallthrough where an empty `studentIds` array
+  // (caller has zero managed students) collapsed to `null` and exposed every
+  // student in the system. Callers must pass `undefined` to opt into the
+  // "all students" report and a non-empty array to scope it.
+  if (Array.isArray(studentIds) && studentIds.length === 0) {
+    throw new Error(
+      "getTeacherOutcomeReport: scopedStudentIds must be a non-empty array or undefined",
+    );
+  }
+
   const now = new Date();
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
