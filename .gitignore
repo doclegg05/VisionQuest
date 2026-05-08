@@ -83,6 +83,10 @@ _old_MEMORY.md
 # Test artifacts
 playwright-report/
 test-results/
+.playwright-mcp/
+
+# Local runtime workspaces (audit logs, uploads, scratch dirs)
+local_*/
 
 # Analysis report artifacts (root-level)
 COMPETITIVE_ANALYSIS_2026.md
