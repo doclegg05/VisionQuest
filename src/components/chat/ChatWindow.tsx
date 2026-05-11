@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowSquareOut, CheckCircle, Clock, WarningCircle, Wrench } from "@phosphor-icons/react";
+import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
 import ConversationList from "./ConversationList";
@@ -561,9 +561,10 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             type="button"
+            aria-label={showSidebar ? "Hide conversations" : "Show conversations"}
             className="rounded-2xl border border-[var(--border)] px-3 py-2 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
           >
-            ☰
+            <List aria-hidden="true" size={20} weight="bold" />
           </button>
           <span className="text-sm font-semibold text-[var(--ink-strong)]">Chat with Sage</span>
         </div>
@@ -580,7 +581,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                     align="center"
                   />
                 </div>
-                <p className="font-display text-[clamp(1.9rem,6vw,3rem)] text-[var(--ink-strong)]">Welcome to VisionQuest</p>
+                <p className="font-display text-3xl text-[var(--ink-strong)] sm:text-4xl">Welcome to VisionQuest</p>
                 <p className="mt-3 text-sm leading-6">
                   Send a message to start talking with Sage about your goals, next steps, or what feels stuck.
                 </p>
