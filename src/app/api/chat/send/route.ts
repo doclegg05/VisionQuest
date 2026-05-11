@@ -325,6 +325,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // ~6,000 chars of program docs and the round-trip just delays first token.
   // In agent mode, Sage can call `lookup_program_info` if she needs specifics.
   const trivialMessage = isTrivialMessage(userMessage);
+  let documentContextChars = 0;
+  let formContextChars = 0;
   if (!trivialMessage) {
     const documentContext = await getDocumentContext(
       userMessage,
@@ -333,10 +335,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       promptTier === "compact" ? 2000 : 6000,
     );
     if (documentContext) {
+      documentContextChars = documentContext.length;
       systemPrompt += documentContext;
     }
     const formContext = getFormContext(userMessage);
     if (formContext) {
+      formContextChars = formContext.length;
       systemPrompt += formContext;
     }
   }
@@ -352,7 +356,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // Log assembled prompt size for before/after comparison in Render logs.
   // Remove in a follow-up PR once baseline data is collected.
-  logger.info("sage.prompt.size", { size: systemPrompt.length });
+  logger.info("sage.prompt.size", {
+    size: systemPrompt.length,
+    promptTier,
+    provider: provider.name,
+    stage: conversationStage,
+    role: session.role,
+    ragSkipped: trivialMessage,
+    documentContextChars,
+    formContextChars,
+  });
 
   // Format message history for Gemini, using compacted context when available
   const maxRecentMessages =
