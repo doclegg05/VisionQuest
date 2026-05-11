@@ -26,8 +26,10 @@ const LEVEL_CONFIG: Record<string, { label: string; icon: string; color: string;
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  proposed: { label: "Proposed", className: "bg-indigo-100 text-indigo-700" },
   active: { label: "Active", className: "bg-emerald-100 text-emerald-700" },
   in_progress: { label: "In Progress", className: "bg-sky-100 text-sky-700" },
+  confirmed: { label: "Confirmed", className: "bg-teal-100 text-teal-700" },
   blocked: { label: "Blocked", className: "bg-amber-100 text-amber-800" },
   completed: { label: "Done", className: "bg-violet-100 text-violet-700" },
   abandoned: { label: "Dropped", className: "bg-[var(--surface-interactive)] text-[var(--ink-muted)]" },

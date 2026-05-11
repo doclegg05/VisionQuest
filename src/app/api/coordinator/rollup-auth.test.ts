@@ -8,6 +8,7 @@ const mockCoordinatorHasRegion = mock.fn() as any;
 const mockGetRegionRollup = mock.fn() as any;
 const mockListInstructorMetrics = mock.fn() as any;
 const mockCountUnregioned = mock.fn() as any;
+const mockClassIdsInRegion = mock.fn() as any;
 
 let currentSession = mockTeacherSession({ role: "coordinator" });
 
@@ -50,6 +51,7 @@ mock.module("@/lib/region", {
   namedExports: {
     coordinatorHasRegion: mockCoordinatorHasRegion,
     countUnregionedClasses: mockCountUnregioned,
+    classIdsInRegion: mockClassIdsInRegion,
   },
 });
 
@@ -82,6 +84,7 @@ describe("GET /api/coordinator/rollup/[regionId] — authorization", () => {
     mockGetRegionRollup.mock.resetCalls();
     mockListInstructorMetrics.mock.resetCalls();
     mockCountUnregioned.mock.resetCalls();
+    mockClassIdsInRegion.mock.resetCalls();
 
     currentSession = mockTeacherSession({ role: "coordinator" });
 
@@ -89,6 +92,7 @@ describe("GET /api/coordinator/rollup/[regionId] — authorization", () => {
     mockCoordinatorHasRegion.mock.mockImplementation(async () => true);
     mockListInstructorMetrics.mock.mockImplementation(async () => []);
     mockCountUnregioned.mock.mockImplementation(async () => 0);
+    mockClassIdsInRegion.mock.mockImplementation(async () => []);
     mockGetRegionRollup.mock.mockImplementation(async () => ({
       regionId: "rgn1",
       regionName: "North",

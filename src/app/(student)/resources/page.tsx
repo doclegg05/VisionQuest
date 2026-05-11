@@ -1,5 +1,6 @@
 import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
 import ResourceLibrary from "@/components/resources/ResourceLibrary";
+import AskSageLink from "@/components/sage/AskSageLink";
 import PageIntro from "@/components/ui/PageIntro";
 import DocumentBrowser from "@/components/documents/DocumentBrowser";
 import { getSession } from "@/lib/auth";
@@ -25,6 +26,12 @@ export default async function ResourcesPage() {
         goalPlans={goalPlans}
         resourceTypes={["form", "document", "orientation", "portfolio_task"]}
         emptyMessage="Once your goals are in place, matching forms, documents, and next-step resources will show up here."
+        emptyAction={
+          <AskSageLink
+            prompt="Help me figure out which form, document, or portfolio step I should handle next for my current goals."
+            label="Ask Sage what document I need"
+          />
+        }
       />
       <div className="surface-section p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

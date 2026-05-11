@@ -23,6 +23,8 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: SAGE_AGENT_ENABLED
+        value: "false"
       - key: STORAGE_ENDPOINT
         sync: false
       - key: STORAGE_REGION

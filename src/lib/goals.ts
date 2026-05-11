@@ -10,6 +10,7 @@ export const GOAL_LEVEL_META: Record<GoalLevel, { label: string; icon: string }>
 };
 
 export const GOAL_STATUSES = [
+  "proposed",
   "active",
   "in_progress",
   "confirmed",
@@ -28,6 +29,7 @@ export const GOAL_PLANNING_STATUSES = [
 ] as const satisfies readonly GoalStatus[];
 
 export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
+  proposed: "Proposed",
   active: "Active",
   in_progress: "In Progress",
   confirmed: "Confirmed",

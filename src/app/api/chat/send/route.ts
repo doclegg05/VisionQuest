@@ -447,7 +447,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         const agentMode = isAgentEnabled();
 
         // Slash-command fast path: invoke the tool directly without going
-        // through the model. Skipped unless the feature flag is on.
+        // through the model when it maps to a registered tool. Unknown slash
+        // prompts fall through to the regular agent loop so legacy coaching
+        // prompts like "/goal" still get a real response.
+        let handledSlashCommand = false;
         if (agentMode && userMessage.startsWith("/")) {
           const slashOutcome = await executeSlashCommand(
             userMessage,
@@ -456,6 +459,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             staffStudentTargetId ?? undefined,
           );
           if (slashOutcome) {
+            handledSlashCommand = true;
             const { record } = slashOutcome;
             sendEvent(
               {
@@ -495,6 +499,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             // tool_result event.
             sendEvent({ type: "text", text: record.result.summary }, "text");
           }
+        }
+
+        if (handledSlashCommand) {
+          // Tool summary has already been emitted as the assistant response.
         } else if (agentMode) {
           // Agent loop — model may emit tool calls mid-turn.
           const agentEvents = runAgentTurn({
@@ -569,7 +577,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             persisted: persisted.length,
           });
         }
-        await saveMessage(conversation.id, session.id, "assistant", persisted);
+        const assistantMessage = await saveMessage(conversation.id, session.id, "assistant", persisted);
         await logAiAuditEvent({
           actorId: session.id,
           actorRole: session.role,
@@ -617,6 +625,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             conversationTitle: conversation.title,
             conversationStage: conversation.stage,
             fullResponse,
+            sourceMessageId: assistantMessage.id,
             studentId: session.id,
             allMessages,
             userMessage,

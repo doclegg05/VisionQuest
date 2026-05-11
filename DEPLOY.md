@@ -178,6 +178,7 @@ If you do not use the blueprint:
 | `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `GOOGLE_REDIRECT_URI` | Google OAuth callback URL |
 | `GEMINI_MODEL` | Override default Gemini model |
+| `SAGE_AGENT_ENABLED` | Enable Sage tool calls and server-driven slash commands |
 | `SMTP_HOST` | Password reset mail |
 | `SMTP_PORT` | Password reset mail |
 | `SMTP_USER` | Password reset mail |

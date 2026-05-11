@@ -7,6 +7,7 @@ import OpportunitiesHub from "@/components/career/OpportunitiesHub";
 import { JobFilters } from "@/components/jobs/JobFilters";
 import { JobList } from "@/components/jobs/JobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 interface OpportunityItem {
   id: string;
@@ -160,12 +161,22 @@ export default function CareerHub({
           <div className="mt-6 space-y-6">
             {!jobsData.hasDiscovery && (
               <div className="surface-section rounded-xl border-l-4 border-[var(--warning)] p-4">
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  Complete your career assessment to get personalized job recommendations.
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Chat with Sage about your interests and skills to unlock matched jobs.
-                </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      Start career discovery to unlock personalized job matches.
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                      Sage can ask about your interests, strengths, schedule, and work values, then turn that into better recommendations.
+                    </p>
+                  </div>
+                  <AskSageLink
+                    prompt="Help me complete career discovery. Ask about my interests, strengths, work values, schedule needs, and job preferences."
+                    label="Start with Sage"
+                    variant="button"
+                    className="shrink-0"
+                  />
+                </div>
               </div>
             )}
 

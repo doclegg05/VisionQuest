@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 interface PortfolioItem {
   id: string;
@@ -157,9 +158,27 @@ export default function PortfolioGrid() {
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
 
       {items.length === 0 && !showForm ? (
-        <div className="text-center text-[var(--ink-faint)] py-8">
-          <p className="text-4xl mb-3">💼</p>
-          <p className="text-sm">Your portfolio is empty. Add your first item!</p>
+        <div className="surface-section px-5 py-10 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Portfolio starter
+          </p>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Add one proof item</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
+            Start with something you may need later: a resume, certificate, project, award, or work sample.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="primary-button px-4 py-2.5 text-sm"
+            >
+              Add first item
+            </button>
+            <AskSageLink
+              prompt="Help me decide the first proof item I should add to my portfolio based on my goals and experience."
+              label="Ask Sage what to add"
+            />
+          </div>
         </div>
       ) : (
         Object.entries(grouped).map(([type, typeItems]) => (
@@ -347,7 +366,7 @@ export default function PortfolioGrid() {
             <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>
           )}
         </div>
-      ) : (
+      ) : items.length > 0 ? (
         <button
           type="button"
           onClick={() => setShowForm(true)}
@@ -355,7 +374,7 @@ export default function PortfolioGrid() {
         >
           <span className="text-lg">+</span> Add Portfolio Item
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
