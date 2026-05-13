@@ -62,7 +62,7 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
   return new Response(null, { status: 204 });
 });
 
-const WARMUP_PING_TIMEOUT_MS = 5_000;
+const WARMUP_PING_TIMEOUT_MS = 30_000;
 
 async function pingLocalModelIfApplicable(studentId: string): Promise<void> {
   const provider = await resolveAiProvider({

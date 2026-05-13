@@ -89,11 +89,16 @@ type OllamaApiMode = "unknown" | "openai" | "native";
 
 class LocalAiStreamError extends Error {
   readonly switchToNative: boolean;
+  readonly retryable: boolean;
 
-  constructor(message: string, options: { switchToNative?: boolean } = {}) {
+  constructor(
+    message: string,
+    options: { switchToNative?: boolean; retryable?: boolean } = {},
+  ) {
     super(message);
     this.name = "LocalAiStreamError";
     this.switchToNative = options.switchToNative ?? false;
+    this.retryable = options.retryable ?? true;
   }
 }
 
@@ -183,6 +188,17 @@ export class OllamaProvider implements AIProvider {
    * 5 minutes allows for slow prompt evaluation on CPU hardware.
    */
   private static readonly STREAM_FIRST_BYTE_TIMEOUT_MS = 300_000;
+
+  /**
+   * Time allowed for the first real model payload after the relay opens the
+   * stream. Relay heartbeats arrive immediately, so a first-byte timeout alone
+   * does not catch a stuck CPU model. Keep this below classroom patience and
+   * well below the relay's 5-minute upstream timeout.
+   */
+  private static readonly FIRST_CONTENT_TIMEOUT_MS = 45_000;
+
+  private static readonly DEFAULT_MAX_OUTPUT_TOKENS = 768;
+  private static readonly STRUCTURED_MAX_OUTPUT_TOKENS = 512;
 
   /**
    * Default KV-cache window size when no SystemConfig override is set.
@@ -323,13 +339,17 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: false,
+        max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
-        options: { num_ctx: this.numCtx },
+        options: {
+          num_ctx: this.numCtx,
+          num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+        },
         keep_alive: "10m",
       },
     );
@@ -357,13 +377,17 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         messages: openAIMessages,
         stream: true,
+        max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: true,
-        options: { num_ctx: this.numCtx },
+        options: {
+          num_ctx: this.numCtx,
+          num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+        },
         keep_alive: "10m",
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
@@ -381,9 +405,14 @@ export class OllamaProvider implements AIProvider {
     const decoder = new TextDecoder();
     let buffer = "";
     let yieldedContent = false;
+    const firstContentDeadlineAt =
+      Date.now() + OllamaProvider.FIRST_CONTENT_TIMEOUT_MS;
 
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await this.readStreamChunk(
+        reader,
+        yieldedContent ? null : firstContentDeadlineAt,
+      );
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -569,6 +598,7 @@ export class OllamaProvider implements AIProvider {
         const canRetry =
           !yieldedAny &&
           attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
+          (!(error instanceof LocalAiStreamError) || error.retryable) &&
           (
             (error instanceof LocalAiStreamError && error.switchToNative) ||
             isRetryableStartupError(error)
@@ -582,6 +612,48 @@ export class OllamaProvider implements AIProvider {
     }
 
     if (lastError) throw lastError;
+  }
+
+  private async readStreamChunk(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    firstContentDeadlineAt: number | null,
+  ): Promise<ReadableStreamReadResult<Uint8Array>> {
+    if (firstContentDeadlineAt === null) {
+      return reader.read();
+    }
+
+    const remainingMs = firstContentDeadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      await reader.cancel("Local AI first content timeout").catch(() => undefined);
+      throw new LocalAiStreamError(
+        `Local AI did not produce a first content token within ${Math.round(
+          OllamaProvider.FIRST_CONTENT_TIMEOUT_MS / 1000,
+        )} seconds.`,
+        { retryable: false },
+      );
+    }
+
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      return await Promise.race([
+        reader.read(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(async () => {
+            await reader.cancel("Local AI first content timeout").catch(() => undefined);
+            reject(
+              new LocalAiStreamError(
+                `Local AI did not produce a first content token within ${Math.round(
+                  OllamaProvider.FIRST_CONTENT_TIMEOUT_MS / 1000,
+                )} seconds.`,
+                { retryable: false },
+              ),
+            );
+          }, remainingMs);
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   private async *streamHopWithStartupRetry(
@@ -610,6 +682,7 @@ export class OllamaProvider implements AIProvider {
         const canRetry =
           !yieldedAny &&
           attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
+          (!(error instanceof LocalAiStreamError) || error.retryable) &&
           (
             (error instanceof LocalAiStreamError && error.switchToNative) ||
             isRetryableStartupError(error)
@@ -751,6 +824,7 @@ export class OllamaProvider implements AIProvider {
       messages: conversation,
       stream: true,
       tools: ollamaTools,
+      max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
       num_ctx: this.numCtx,
     };
     const nativeBody = {
@@ -758,7 +832,10 @@ export class OllamaProvider implements AIProvider {
       messages: conversation,
       stream: true,
       tools: ollamaTools,
-      options: { num_ctx: this.numCtx },
+      options: {
+        num_ctx: this.numCtx,
+        num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+      },
       keep_alive: "10m",
     };
 
@@ -782,9 +859,15 @@ export class OllamaProvider implements AIProvider {
     const toolCalls = new Map<number, AccumulatedToolCall>();
     // Native mode doesn't have a stable index per call; use insertion order.
     let nativeIndex = 0;
+    let receivedModelPayload = false;
+    const firstContentDeadlineAt =
+      Date.now() + OllamaProvider.FIRST_CONTENT_TIMEOUT_MS;
 
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await this.readStreamChunk(
+        reader,
+        receivedModelPayload ? null : firstContentDeadlineAt,
+      );
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -817,10 +900,14 @@ export class OllamaProvider implements AIProvider {
 
           const choice = parsed.choices?.[0];
           const text = choice?.delta?.content;
-          if (text) yield text;
+          if (text) {
+            receivedModelPayload = true;
+            yield text;
+          }
 
           const callDeltas = choice?.delta?.tool_calls;
           if (callDeltas) {
+            receivedModelPayload = true;
             for (const delta of callDeltas) {
               accumulateOpenAIToolCall(toolCalls, delta);
             }
@@ -839,10 +926,14 @@ export class OllamaProvider implements AIProvider {
         if (upstreamError) throw new LocalAiStreamError(upstreamError);
 
         const text = parsed.message?.content;
-        if (text) yield text;
+        if (text) {
+          receivedModelPayload = true;
+          yield text;
+        }
 
         const calls = parsed.message?.tool_calls;
         if (calls) {
+          receivedModelPayload = true;
           for (const call of calls) {
             const id = `native-${nativeIndex++}-${randomUUID().slice(0, 8)}`;
             const argString =
@@ -879,6 +970,7 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         response_format: { type: "json_object" },
+        max_tokens: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
       },
       {
@@ -886,7 +978,10 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         format: "json",
-        options: { num_ctx: this.numCtx },
+        options: {
+          num_ctx: this.numCtx,
+          num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+        },
         keep_alive: "10m",
       },
     );

@@ -53,6 +53,17 @@ function isTrivialMessage(message: string): boolean {
   return false;
 }
 
+function getDirectSmallTalkAnswer(message: string): string | null {
+  const normalized = message.trim().toLowerCase().replace(/[!.,?]+$/g, "");
+  if (/^(hi|hello|hey|yo|hi sage|hello sage|hey sage)$/.test(normalized)) {
+    return "Hi, I'm here. Tell me what you want to work on, and I'll help you choose the next step.";
+  }
+  if (/^(thanks|thank you|thx|ty|thanks sage|thank you sage)$/.test(normalized)) {
+    return "You're welcome. Send me the next thing you want help with when you're ready.";
+  }
+  return null;
+}
+
 function formatStreamErrorForClient(message: string, cause?: string): string {
   const raw = cause ? `${message} ${cause}` : message;
   const localAiUnavailable =
@@ -112,6 +123,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
   const directFormAnswer = getDirectFormAnswer(userMessage);
+  const directSmallTalkAnswer = getDirectSmallTalkAnswer(userMessage);
 
   if (directFormAnswer) {
     const conversation = isTeacher
@@ -138,6 +150,34 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     });
 
     return createSseResponse(conversation.id, directFormAnswer);
+  }
+
+  if (directSmallTalkAnswer) {
+    const conversation = isTeacher
+      ? await getOrCreateTeacherConversation(session.id, conversationId)
+      : await getOrCreateConversation(session.id, conversationId, requestedStage);
+
+    await saveMessage(conversation.id, session.id, "user", userMessage);
+    await saveMessage(conversation.id, session.id, "assistant", directSmallTalkAnswer);
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/chat/send",
+      task: chatTask,
+      sensitivity: chatSensitivity,
+      policyDecision: "direct_no_model",
+      status: "direct",
+      targetId: conversation.id,
+      providerName: null,
+      providerClass: "none",
+      promptTier: null,
+      allowCloud: false,
+      inputChars: userMessage.length,
+      outputChars: directSmallTalkAnswer.length,
+      reason: "Matched a safe greeting/thanks message that does not need a local model call.",
+    });
+
+    return createSseResponse(conversation.id, directSmallTalkAnswer);
   }
 
   // Resolve AI provider first — guardrails depend on whether it's cloud or local.

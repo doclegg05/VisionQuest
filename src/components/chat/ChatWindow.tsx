@@ -308,7 +308,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
   const handleSend = useCallback(
     async (text: string) => {
-      let prevGoalCount = 0;
       setChatError(null);
 
       // B2: Hoist the loading state so the TypingIndicator renders immediately
@@ -340,15 +339,13 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         }
       }
 
-      try {
-        const goalsRes = await apiFetch("/api/goals");
-        if (goalsRes.ok) {
+      const prevGoalCountPromise = apiFetch("/api/goals")
+        .then(async (goalsRes) => {
+          if (!goalsRes.ok) return 0;
           const goalsData = await goalsRes.json();
-          prevGoalCount = goalsData.goals.length;
-        }
-      } catch {
-        // Ignore goal count failures.
-      }
+          return Array.isArray(goalsData.goals) ? goalsData.goals.length : 0;
+        })
+        .catch(() => 0);
 
       try {
         const stageParam = searchParams.get("stage") ?? defaultStage;
@@ -478,6 +475,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingContent("");
         setStreamingEvents([]);
+        const prevGoalCount = await prevGoalCountPromise;
         pollForGoals(prevGoalCount);
         // Check for XP/achievement/level changes
         setTimeout(() => checkProgression(), 2000);

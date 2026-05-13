@@ -113,7 +113,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
       assert.equal(nativeBody.format, "json");
-      assert.deepEqual(nativeBody.options, { num_ctx: 8192 });
+      assert.deepEqual(nativeBody.options, { num_ctx: 8192, num_predict: 512 });
     });
   });
 
