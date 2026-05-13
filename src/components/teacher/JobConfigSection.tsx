@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
+import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
 
 interface ClassOption {
   id: string;
@@ -19,12 +20,6 @@ interface JobConfig {
   lastScrapedAt: string | null;
 }
 
-const SOURCE_OPTIONS = [
-  { value: "jsearch", label: "JSearch (RapidAPI)" },
-  { value: "usajobs", label: "USAJobs (Federal)" },
-  { value: "adzuna", label: "Adzuna" },
-];
-
 const RADIUS_OPTIONS = [10, 25, 50];
 
 export function JobConfigSection() {
@@ -39,7 +34,7 @@ export function JobConfigSection() {
   // Form state
   const [region, setRegion] = useState("");
   const [radius, setRadius] = useState(25);
-  const [sources, setSources] = useState<string[]>(["jsearch"]);
+  const [sources, setSources] = useState<string[]>([...DEFAULT_JOB_SOURCES]);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Fetch classes on mount
@@ -79,7 +74,7 @@ export function JobConfigSection() {
         } else {
           setRegion("");
           setRadius(25);
-          setSources(["jsearch"]);
+          setSources([...DEFAULT_JOB_SOURCES]);
           setAutoRefresh(true);
         }
       }
@@ -217,7 +212,7 @@ export function JobConfigSection() {
                 Job Sources
               </label>
               <div className="flex flex-wrap gap-2">
-                {SOURCE_OPTIONS.map((opt) => (
+                {JOB_SOURCE_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => toggleSource(opt.value)}

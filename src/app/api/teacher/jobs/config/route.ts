@@ -3,8 +3,7 @@ import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
-
-const VALID_SOURCES = ["jsearch", "usajobs", "adzuna"];
+import { DEFAULT_JOB_SOURCES, VALID_JOB_SOURCES, isValidJobSource } from "@/lib/job-board/source-options";
 
 /**
  * GET /api/teacher/jobs/config?classId=xxx
@@ -63,9 +62,9 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
   await assertStaffCanManageClass(session, classId);
 
   // Validate sources
-  const validatedSources = (sources ?? ["jsearch"]).filter((s) => VALID_SOURCES.includes(s));
+  const validatedSources = (sources ?? [...DEFAULT_JOB_SOURCES]).filter(isValidJobSource);
   if (validatedSources.length === 0) {
-    throw badRequest(`At least one valid source required. Options: ${VALID_SOURCES.join(", ")}`);
+    throw badRequest(`At least one valid source required. Options: ${VALID_JOB_SOURCES.join(", ")}`);
   }
 
   const config = await prisma.jobClassConfig.upsert({

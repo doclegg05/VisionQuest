@@ -5,9 +5,23 @@ import type { JobSourceAdapter, NormalizedJob } from "./types";
 import { jsearchAdapter } from "./adapters/jsearch";
 import { usajobsAdapter } from "./adapters/usajobs";
 import { adzunaAdapter } from "./adapters/adzuna";
+import { remotiveAdapter } from "./adapters/remotive";
+import { remoteOkAdapter } from "./adapters/remoteok";
+import { weWorkRemotelyAdapter } from "./adapters/weworkremotely";
+import { arbeitnowAdapter } from "./adapters/arbeitnow";
+import { ashbyAdapter, greenhouseAdapter, leverAdapter } from "./adapters/ats";
+import { smartRecruitersAdapter } from "./adapters/smartrecruiters";
 
 /** All registered adapters */
 const ALL_ADAPTERS: JobSourceAdapter[] = [
+  remotiveAdapter,
+  remoteOkAdapter,
+  weWorkRemotelyAdapter,
+  arbeitnowAdapter,
+  greenhouseAdapter,
+  leverAdapter,
+  ashbyAdapter,
+  smartRecruitersAdapter,
   jsearchAdapter,
   usajobsAdapter,
   adzunaAdapter,
