@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-05-13T14:59:45.036Z",
+  "filters": {
+    "categories": [
+      "ORIENTATION"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ],
+    "quality": [
+      "good"
+    ],
+    "limit": null
+  },
+  "activatedCount": 5,
+  "activatedIds": [
+    "cmmyy9z1k0000eadkqsl45f7y",
+    "cmmyy9zg10001eadk7g53hx7i",
+    "cmmyyb87w0037eadk81iobqie",
+    "cmmyyb9di003aeadkem94x1dz",
+    "cmmyybb0r003eeadk08dd0vjs"
+  ],
+  "documents": [
+    {
+      "id": "cmmyy9z1k0000eadkqsl45f7y",
+      "title": "Authorization for Release of Information to External Agencies v1",
+      "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "category": "ORIENTATION",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 245
+    },
+    {
+      "id": "cmmyy9zg10001eadk7g53hx7i",
+      "title": "Authorization for Release of Strictly Confidential Information v1",
+      "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+      "category": "ORIENTATION",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 265
+    },
+    {
+      "id": "cmmyyb87w0037eadk81iobqie",
+      "title": "Media Release Form FY26 Fillable",
+      "storageKey": "orientation/Media_Release_Form_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 221
+    },
+    {
+      "id": "cmmyyb9di003aeadkem94x1dz",
+      "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 267
+    },
+    {
+      "id": "cmmyybb0r003eeadk08dd0vjs",
+      "title": "WVAdultEd Tech Accept Use Fillable",
+      "storageKey": "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 262
+    }
+  ],
+  "rollbackCommand": "node scripts/sage-rag-activate.mjs --rollback=.planning/sage-rag/activation-2026-05-13T14-59-45-035Z.json --apply --confirm=rollback-sage-rag"
+}
