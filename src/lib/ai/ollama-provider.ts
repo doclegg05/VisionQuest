@@ -119,11 +119,17 @@ function payloadErrorMessage(payload: unknown): string | null {
 
 function isRetryableStartupError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /Relay:|ECONNREFUSED|fetch failed|socket hang up|terminated|aborted|timed out|timeout|Local AI stream failed \((?:502|503|504|520|522|523|524)\)|Ollama returned (?:502|503|504|520|522|523|524)/i.test(message);
+  return /Relay:|ECONNREFUSED|fetch failed|socket hang up|terminated|aborted|timed out|timeout|Local AI (?:tool )?stream failed \((?:502|503|504|520|522|523|524|525|526|527|530)\)|Ollama returned (?:502|503|504|520|522|523|524|525|526|527|530)/i.test(message);
 }
 
 function shouldSwitchToNative(message: string): boolean {
-  return /Ollama returned 404|Local AI stream failed \(404\)/i.test(message);
+  return /Ollama returned (?:404|502|503|504|520|522|523|524|525|526|527|530)|Local AI (?:tool )?stream failed \((?:404|502|503|504|520|522|523|524|525|526|527|530)\)/i.test(message);
+}
+
+function shouldTryNativeAfterOpenAiStatus(status: number): boolean {
+  return [404, 502, 503, 504, 520, 522, 523, 524, 525, 526, 527, 530].includes(
+    status,
+  );
 }
 
 function streamChunkContent(parsed: OpenAIStreamChunk): string | undefined {
@@ -291,10 +297,12 @@ export class OllamaProvider implements AIProvider {
     }
 
     const openAIResponse = await this.postOpenAIChat(openAIBody, timeoutMs);
-    if (openAIResponse.status !== 404) {
-      if (openAIResponse.ok) {
-        this.apiMode = "openai";
-      }
+    if (openAIResponse.ok) {
+      this.apiMode = "openai";
+      return { mode: "openai", response: openAIResponse };
+    }
+
+    if (!shouldTryNativeAfterOpenAiStatus(openAIResponse.status)) {
       return { mode: "openai", response: openAIResponse };
     }
 
@@ -576,6 +584,48 @@ export class OllamaProvider implements AIProvider {
     if (lastError) throw lastError;
   }
 
+  private async *streamHopWithStartupRetry(
+    conversation: OpenAIMessage[],
+    ollamaTools: OllamaToolPayload[],
+  ): AsyncGenerator<string, HopResult> {
+    let lastError: unknown = null;
+    let yieldedAny = false;
+
+    for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
+      const hopGen = this.streamHopOnce(conversation, ollamaTools);
+
+      try {
+        while (true) {
+          const next = await hopGen.next();
+          if (next.done) return next.value;
+          yieldedAny = true;
+          yield next.value;
+        }
+      } catch (error) {
+        lastError = error;
+        if (error instanceof LocalAiStreamError && error.switchToNative) {
+          this.apiMode = "native";
+        }
+
+        const canRetry =
+          !yieldedAny &&
+          attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
+          (
+            (error instanceof LocalAiStreamError && error.switchToNative) ||
+            isRetryableStartupError(error)
+          );
+
+        if (!canRetry) throw error;
+
+        const delay = STREAM_STARTUP_RETRY_DELAYS_MS[attempt];
+        if (delay > 0) await sleep(delay);
+      }
+    }
+
+    if (lastError) throw lastError;
+    return { toolCalls: [] };
+  }
+
   /**
    * Streaming completion with function-calling support.
    *
@@ -616,7 +666,7 @@ export class OllamaProvider implements AIProvider {
     for (let hop = 0; hop < maxHops; hop++) {
       // Stream one hop. The inner generator yields text strings as they
       // arrive and returns a final summary with collected tool calls.
-      const hopGen = this.streamHopOnce(conversation, ollamaTools);
+      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools);
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
@@ -719,7 +769,10 @@ export class OllamaProvider implements AIProvider {
     );
 
     if (!response.ok) {
-      throw new Error(`Local AI tool stream failed (${response.status})`);
+      const message = `Local AI tool stream failed (${response.status})`;
+      throw new LocalAiStreamError(message, {
+        switchToNative: shouldSwitchToNative(message),
+      });
     }
     if (!response.body) throw new Error("Ollama returned empty stream body");
 
@@ -757,7 +810,9 @@ export class OllamaProvider implements AIProvider {
           }
           const upstreamError = payloadErrorMessage(parsed);
           if (upstreamError) {
-            throw new Error(upstreamError);
+            throw new LocalAiStreamError(upstreamError, {
+              switchToNative: shouldSwitchToNative(upstreamError),
+            });
           }
 
           const choice = parsed.choices?.[0];
@@ -781,7 +836,7 @@ export class OllamaProvider implements AIProvider {
           continue;
         }
         const upstreamError = payloadErrorMessage(parsed);
-        if (upstreamError) throw new Error(upstreamError);
+        if (upstreamError) throw new LocalAiStreamError(upstreamError);
 
         const text = parsed.message?.content;
         if (text) yield text;

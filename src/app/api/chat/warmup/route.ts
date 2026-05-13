@@ -4,7 +4,7 @@ import { getBaseStudentPromptContext } from "@/lib/chat/context";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { getProvider } from "@/lib/ai";
+import { resolveAiProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 /**
@@ -14,12 +14,11 @@ import { logger } from "@/lib/logger";
  * does not pay the cold-cache DB round-trip cost. Called by the chat
  * page on mount — fire-and-forget, never blocks render.
  *
- * Also fires a tiny model-warmth ping when the configured provider is
- * local (Ollama). Ollama unloads models from VRAM after `keep_alive`
- * expires (10 minutes by default in our requests). The ping keeps the
- * model resident so the next real Sage turn skips the 1-3 second
- * cold-load penalty. Cloud providers have no equivalent cold-start, so
- * the ping is a no-op for Gemini.
+ * Also fires a tiny model-warmth ping against the same local-only provider
+ * policy used by student chat. Ollama unloads models from VRAM after
+ * `keep_alive` expires (10 minutes by default in our requests). The ping
+ * keeps the model resident and catches broken local-AI config before the
+ * student's first real Sage turn.
  *
  * Returns 204 on success (cache populated or already warm).
  * Returns 429 when called more than once per 60 seconds per student.
@@ -66,7 +65,11 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
 const WARMUP_PING_TIMEOUT_MS = 5_000;
 
 async function pingLocalModelIfApplicable(studentId: string): Promise<void> {
-  const provider = await getProvider(studentId);
+  const provider = await resolveAiProvider({
+    studentId,
+    task: "sage_student_chat",
+    sensitivity: "student_record",
+  });
   if (provider.name !== "ollama") return;
 
   // Tiny one-token request. Cost is dominated by the model-load step on

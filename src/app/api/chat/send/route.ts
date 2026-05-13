@@ -53,6 +53,18 @@ function isTrivialMessage(message: string): boolean {
   return false;
 }
 
+function formatStreamErrorForClient(message: string, cause?: string): string {
+  const raw = cause ? `${message} ${cause}` : message;
+  const localAiUnavailable =
+    /Local AI|Ollama|Relay:|Cloudflare Access service token|Bad Gateway|gateway|timed out|timeout|\b(?:502|503|504|520|522|523|524|525|526|527|530)\b/i.test(raw);
+
+  if (localAiUnavailable) {
+    return "Sage is offline right now because the local AI server is not reachable. Please try again in a few minutes or tell staff to check the local AI service.";
+  }
+
+  return `AI streaming failed: ${message}${cause ? ` (${cause})` : ""}`;
+}
+
 class ChatSseClientClosedError extends Error {
   constructor() {
     super("Client disconnected before Sage completed streaming.");
@@ -685,7 +697,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         });
         if (!clientClosed) {
           try {
-            sendEvent({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` }, "error");
+            sendEvent({ error: formatStreamErrorForClient(msg, cause) }, "error");
           } catch {
             // The client went away while we were reporting the original error.
           }
