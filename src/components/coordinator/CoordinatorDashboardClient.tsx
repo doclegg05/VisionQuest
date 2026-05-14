@@ -54,6 +54,63 @@ interface RollupResponse {
     classCount: number;
   }>;
   unregionedClasses: number;
+  sageEffectiveness: {
+    totalProposed: number;
+    pending: number;
+    confirmed: number;
+    dismissed: number;
+    confirmationRate: number;
+    confirmedWithin14Days: number;
+    confirmationRateWithin14Days: number;
+    averageDaysToConfirmation: number | null;
+    periodStart: string;
+    periodEnd: string;
+  };
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function SageEffectivenessCard({ metrics }: { metrics: RollupResponse["sageEffectiveness"] }) {
+  return (
+    <section className="theme-card rounded-xl p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Sage Goal Follow-Through</h2>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            Proposed goals accepted by students or staff during this reporting period.
+          </p>
+        </div>
+        <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+          {formatPercent(metrics.confirmationRateWithin14Days)} within 14 days
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        {[
+          ["Proposed", metrics.totalProposed],
+          ["Confirmed", metrics.confirmed],
+          ["Pending", metrics.pending],
+          ["Dismissed", metrics.dismissed],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+            <p className="text-2xl font-bold text-[var(--ink-strong)]">{value}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              {label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-xs text-[var(--ink-muted)]">
+        Overall acceptance: {formatPercent(metrics.confirmationRate)}
+        {metrics.averageDaysToConfirmation !== null
+          ? ` • average ${metrics.averageDaysToConfirmation.toFixed(1)} days to confirm`
+          : ""}
+      </p>
+    </section>
+  );
 }
 
 export default function CoordinatorDashboardClient({ regions }: { regions: RegionOption[] }) {
@@ -128,6 +185,7 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
       ) : data ? (
         <div className="space-y-5">
           <RegionRollupCard rollup={data.rollup} />
+          <SageEffectivenessCard metrics={data.sageEffectiveness} />
           <GrantProgressPanel goals={data.rollup.grantGoals} regionId={regionId} onChange={() => loadRollup(regionId)} />
           <InstructorGrid metrics={data.instructorMetrics} />
           <FormRollupList />

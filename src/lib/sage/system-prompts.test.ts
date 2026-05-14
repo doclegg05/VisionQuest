@@ -485,4 +485,20 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     assert.match(prompt, /DETAILED REFERENCE/);
     assert.ok(detailedSections.length < 8);
   });
+
+  it("agent mode swaps heavy full prompts for a lazy topic index on knowledge-heavy stages", () => {
+    const previous = process.env.SAGE_AGENT_ENABLED;
+    process.env.SAGE_AGENT_ENABLED = "true";
+    try {
+      const prompt = buildSystemPrompt("orientation", { programType: "spokes" }, "full");
+
+      assert.match(prompt, /PROGRAM TOPIC INDEX/);
+      assert.match(prompt, /lookup_program_info\(topic\)/);
+      assert.match(prompt, /AGENT TOOLS/);
+      assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
+    } finally {
+      if (previous === undefined) delete process.env.SAGE_AGENT_ENABLED;
+      else process.env.SAGE_AGENT_ENABLED = previous;
+    }
+  });
 });

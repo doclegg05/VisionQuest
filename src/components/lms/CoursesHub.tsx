@@ -6,6 +6,7 @@ import { PLATFORM_CATEGORIES } from "@/lib/spokes/platforms";
 import PlatformFilter from "./PlatformFilter";
 import PlatformCategorySection from "./PlatformCategorySection";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 const ALL_CATEGORIES = Object.keys(PLATFORM_CATEGORIES) as PlatformCategory[];
 
@@ -106,10 +107,19 @@ export default function CoursesHub() {
   if (platforms.length === 0) {
     return (
       <div className="surface-section p-8 text-center">
-        <p className="text-4xl mb-3">📚</p>
-        <p className="text-sm text-[var(--ink-muted)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+          Learning setup
+        </p>
+        <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No platforms yet</h3>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
           No learning platforms available yet.
         </p>
+        <div className="mt-4 flex justify-center">
+          <AskSageLink
+            prompt="Help me figure out what learning step I can take while my training platforms are being set up."
+            label="Ask Sage for a backup step"
+          />
+        </div>
       </div>
     );
   }
@@ -133,9 +143,19 @@ export default function CoursesHub() {
 
       {grouped.length === 0 ? (
         <div className="surface-section p-8 text-center">
-          <p className="text-sm text-[var(--ink-muted)]">
+          <p className="text-sm leading-6 text-[var(--ink-muted)]">
             No platforms match your current filter.
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory("all");
+              setShowGoalMatch(false);
+            }}
+            className="mt-4 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+          >
+            Show all platforms
+          </button>
         </div>
       ) : (
         <div className="space-y-8">

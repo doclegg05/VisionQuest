@@ -1,0 +1,246 @@
+[
+  {
+    "id": "orientation-overview",
+    "question": "What forms do I need to complete for orientation?",
+    "expectedTerms": ["orientation", "student profile", "rights", "responsibilities", "dress code"],
+    "expectedStorageKeys": ["orientation/SPOKES Checklist for Student Orientation.pdf"],
+    "acceptableStorageKeys": [
+      "orientation/New Student Welcome Letter.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf",
+      "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+      "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+      "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+      "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+      "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+      "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+      "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "orientation/Media_Release_Form_FY26_Fillable.pdf"
+    ]
+  },
+  {
+    "id": "rights-responsibilities",
+    "question": "Where can I find my SPOKES rights and responsibilities?",
+    "expectedTerms": ["rights", "responsibilities"],
+    "expectedStorageKeys": ["orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ]
+  },
+  {
+    "id": "dress-code",
+    "question": "What is the SPOKES dress code?",
+    "expectedTerms": ["dress code"],
+    "expectedStorageKeys": ["orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ]
+  },
+  {
+    "id": "acceptable-use",
+    "question": "What technology acceptable use form do I need?",
+    "expectedTerms": ["acceptable use", "technology"],
+    "expectedStorageKeys": ["orientation/WVAdultEd_Technology_Acceptable_Use.pdf"],
+    "acceptableStorageKeys": [
+      "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+      "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+      "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ]
+  },
+  {
+    "id": "dohs-release",
+    "question": "What is the DoHS release of information form?",
+    "expectedTerms": ["dohs", "release", "information"],
+    "expectedStorageKeys": ["orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "forms/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ]
+  },
+  {
+    "id": "student-profile",
+    "question": "How do I complete my student profile form?",
+    "expectedTerms": ["student profile"],
+    "expectedStorageKeys": ["orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ]
+  },
+  {
+    "id": "portfolio-checklist",
+    "question": "What goes in my employment portfolio?",
+    "expectedTerms": ["portfolio", "employment"],
+    "expectedStorageKeys": [
+      "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "students/resources/Student Portfolio Checklist.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "students/resources/Student Portfolio Checklist.pdf"
+    ]
+  },
+  {
+    "id": "ready-to-work",
+    "question": "What is the Ready to Work certificate?",
+    "expectedTerms": ["ready to work", "certificate"],
+    "expectedStorageKeys": [
+      "lms/Ready to Work/Ready to Work Certficate.pdf",
+      "lms/Ready to Work/ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre-requisite).pdf"
+    ],
+    "acceptableStorageKeys": [
+      "lms/Ready to Work/Ready to Work Certficate.pdf",
+      "lms/Ready to Work/ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre-requisite).pdf",
+      "forms/Ready to Work Certification Attendance Verification Form.pdf",
+      "lms/Ready to Work/Certificate of Achievement.pdf",
+      "lms/Ready to Work/Certificate of Participation.pdf",
+      "lms/Ready to Work/Checklist for Documentation of Benchmarks Certificate of Ready to Work.pdf"
+    ]
+  },
+  {
+    "id": "ic3",
+    "question": "Tell me about the IC3 certification.",
+    "expectedTerms": ["ic3", "certification"],
+    "expectedStorageKeys": ["lms/certifications/program-info/IC3 Module Descriptor.pdf"],
+    "acceptableStorageKeys": [
+      "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+      "lms/GMetrix and LearnKey/IC3/IC3_Digital_Literacy_Master_Certification.png",
+      "lms/GMetrix and LearnKey/IC3/IC3_GS6_Level_1_Certificate.png",
+      "lms/GMetrix and LearnKey/IC3/IC3_GS6_Level_2_Certificate.png",
+      "lms/GMetrix and LearnKey/IC3/IC3_GS6_Level_3_Certificate.png"
+    ]
+  },
+  {
+    "id": "mos",
+    "question": "What is Microsoft Office Specialist certification?",
+    "expectedTerms": ["microsoft office", "mos", "specialist"],
+    "expectedStorageKeys": ["lms/certifications/program-info/MOS Module Descriptor.pdf"],
+    "acceptableStorageKeys": [
+      "lms/certifications/program-info/MOS Module Descriptor.pdf",
+      "lms/GMetrix and LearnKey/Microsoft Office Specialist (MOS)/Microsoft Office (MOS) Certificate.pdf"
+    ]
+  },
+  {
+    "id": "quickbooks",
+    "question": "Can I work on QuickBooks certification in SPOKES?",
+    "expectedTerms": ["quickbooks", "intuit"],
+    "expectedStorageKeys": ["lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf"],
+    "acceptableStorageKeys": [
+      "lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf",
+      "lms/GMetrix and LearnKey/Intuit/Instuit Quickbooks Certificate.pdf",
+      "lms/GMetrix and LearnKey/Intuit/Intuit_QuickBooks_Certified_User_Certificate.jpg"
+    ]
+  },
+  {
+    "id": "bring-your-a-game",
+    "question": "What is Bring Your A Game to Work?",
+    "expectedTerms": ["bring your a game"],
+    "expectedStorageKeys": ["lms/Bring Your A Game to Work/Bring_Your_A_Game_to_Work_Presentation_Outline.pdf"],
+    "acceptableStorageKeys": [
+      "lms/Bring Your A Game to Work/Bring_Your_A_Game_to_Work_Presentation_Outline.pdf",
+      "lms/Bring Your A Game to Work/Bring Your A Game to Work Detailed Instructions for Administering Online Exams.pdf",
+      "lms/Bring Your A Game to Work/Multimedia_Resource_Guide.pdf",
+      "lms/Bring Your A Game to Work/Certificate_of_Work_Ethic_Proficiency.JPG"
+    ]
+  },
+  {
+    "id": "burlington",
+    "question": "How do I use Burlington English?",
+    "expectedTerms": ["burlington english"],
+    "expectedStorageKeys": [
+      "lms/Burlington English/Setting Up Burlington English Account.pdf",
+      "lms/Burlington English/02_Accessing_BE_1.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "lms/Burlington English/Setting Up Burlington English Account.pdf",
+      "lms/Burlington English/02_Accessing_BE_1.pdf"
+    ]
+  },
+  {
+    "id": "aztec",
+    "question": "How do I use Aztec for classwork?",
+    "expectedTerms": ["aztec"],
+    "expectedStorageKeys": [
+      "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+      "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+      "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf",
+      "lms/Aztec/Aztecs_Continuum_of_Learning_Chart_1.png"
+    ]
+  },
+  {
+    "id": "essential-education",
+    "question": "What is Essential Education used for?",
+    "expectedTerms": ["essential education"],
+    "expectedStorageKeys": [
+      "lms/Essential Education/Computer Essentials Certificate.pdf",
+      "lms/Essential Education/Work Essentials.png"
+    ],
+    "acceptableStorageKeys": [
+      "lms/Essential Education/Computer Essentials Certificate.pdf",
+      "lms/Essential Education/Work Essentials.png",
+      "lms/Essential Education/Money Essentials Certification.png"
+    ]
+  },
+  {
+    "id": "khan-academy",
+    "question": "Can Khan Academy help me study?",
+    "expectedTerms": ["khan academy"],
+    "expectedStorageKeys": [
+      "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+      "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+      "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+    ]
+  },
+  {
+    "id": "learning-express",
+    "question": "What is Learning Express Library?",
+    "expectedTerms": ["learning express"],
+    "expectedStorageKeys": ["lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"],
+    "acceptableStorageKeys": [
+      "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"
+    ]
+  },
+  {
+    "id": "usa-learns",
+    "question": "Can USA Learns help me with English?",
+    "expectedTerms": ["usa learns"],
+    "expectedStorageKeys": ["lms/USA Learns/USA Learns Student Activity Report.pdf"],
+    "acceptableStorageKeys": [
+      "lms/USA Learns/USA Learns Student Activity Report.pdf"
+    ]
+  },
+  {
+    "id": "wv-works-timesheet",
+    "question": "Which WV Works or TANF timesheet form do I need?",
+    "expectedTerms": ["wv works", "tanf", "timesheet"],
+    "expectedStorageKeys": ["forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+      "forms/DFA-TS-12_Rev_-2-24.pdf",
+      "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+      "forms/DFA-WVW-25_Rev_6-24.pdf"
+    ]
+  },
+  {
+    "id": "support-services",
+    "question": "Where can I learn about support services?",
+    "expectedTerms": ["support services"],
+    "expectedStorageKeys": ["forms/Support_Services_Fact_Sheet_Rev_6-22.pdf"],
+    "acceptableStorageKeys": [
+      "forms/Support_Services_Fact_Sheet_Rev_6-22.pdf",
+      "forms/Dental_Services_2025_through_WV_Works.pdf"
+    ]
+  }
+]

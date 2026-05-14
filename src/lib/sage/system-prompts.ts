@@ -461,6 +461,18 @@ Use the provided profile context. Highlight 1-2 strengths or patterns, ask what 
 Tone: warm, specific, affirming. Do not treat the profile like a fixed box.`,
 };
 
+interface PromptSection {
+  name: string;
+  content: string;
+}
+
+function joinPromptSections(sections: PromptSection[]): string {
+  return sections
+    .filter((section) => section.content.trim().length > 0)
+    .map((section) => section.content)
+    .join("\n\n---\n\n");
+}
+
 export function buildSystemPrompt(
   stage: ConversationStage,
   context: {
@@ -540,13 +552,21 @@ export function buildSystemPrompt(
   // Both roles span multiple programs, so the full SPOKES knowledge base stays the
   // shared reference here; program-specific framing only matters for student conversations.
   if (stage === "teacher_assistant" || stage === "admin_assistant") {
-    const parts = isCompact
-      ? [stagePrompt, COMPACT_SPOKES_KNOWLEDGE]
-      : [stagePrompt, PLATFORM_KNOWLEDGE, SPOKES_KNOWLEDGE];
+    const parts: PromptSection[] = isCompact
+      ? [
+          { name: "procedural", content: stagePrompt },
+          { name: "semantic.program", content: COMPACT_SPOKES_KNOWLEDGE },
+        ]
+      : [
+          { name: "procedural", content: stagePrompt },
+          { name: "semantic.platform", content: PLATFORM_KNOWLEDGE },
+          { name: "semantic.program", content: SPOKES_KNOWLEDGE },
+        ];
     if (context.staffStudentContext) {
-      parts.push(
-        `[STAFF_STUDENT_CONTEXT_START]\n${sanitizeForPrompt(context.staffStudentContext)}\n[STAFF_STUDENT_CONTEXT_END]`,
-      );
+      parts.push({
+        name: "state.staff_student",
+        content: `[STAFF_STUDENT_CONTEXT_START]\n${sanitizeForPrompt(context.staffStudentContext)}\n[STAFF_STUDENT_CONTEXT_END]`,
+      });
     }
     if (context.userMessage) {
       const relevantContent = getRelevantContent(
@@ -554,10 +574,10 @@ export function buildSystemPrompt(
         isCompact ? 1 : 3,
       );
       if (relevantContent) {
-        parts.push(relevantContent);
+        parts.push({ name: "semantic.relevant_topic", content: relevantContent });
       }
     }
-    return parts.join("\n\n---\n\n");
+    return joinPromptSections(parts);
   }
 
   // Build the prompt with program-aware knowledge base and addendum.
@@ -580,63 +600,68 @@ export function buildSystemPrompt(
         ? getProgramKnowledge(programType)
         : SPOKES_BRIEF;
 
-  const parts = isCompact
+  const parts: PromptSection[] = isCompact
     ? [
-        COMPACT_PERSONALITY,
-        PROGRAM_ADDENDUMS[programType],
-        programKnowledge,
-        stagePrompt,
+        { name: "surface", content: COMPACT_PERSONALITY },
+        { name: "state.program", content: PROGRAM_ADDENDUMS[programType] },
+        { name: "semantic.program", content: programKnowledge },
+        { name: "procedural", content: stagePrompt },
       ]
     : [
-        BASE_PERSONALITY,
-        GUARDRAILS,
-        PROGRAM_ADDENDUMS[programType],
-        PLATFORM_KNOWLEDGE,
-        programKnowledge,
-        stagePrompt,
+        { name: "surface", content: BASE_PERSONALITY },
+        { name: "safety", content: GUARDRAILS },
+        { name: "state.program", content: PROGRAM_ADDENDUMS[programType] },
+        { name: "semantic.platform", content: PLATFORM_KNOWLEDGE },
+        { name: "semantic.program", content: programKnowledge },
+        { name: "procedural", content: stagePrompt },
       ];
 
   // Inject discovery context so Sage remembers the student's career direction.
   // Summary is LLM-generated from student turns — bracket + sanitize so it
   // cannot escape into an instruction zone.
   if (context.discovery_summary && stage !== "discovery") {
-    parts.push(
-      `CAREER DISCOVERY CONTEXT (from the student's earlier career exploration conversation):\n[DISCOVERY_START]\n${sanitizeForPrompt(context.discovery_summary)}\n[DISCOVERY_END]\nUse this context to connect their goals and activities back to their chosen career direction. Reference their pathway when it's relevant and motivating.`,
-    );
+    parts.push({
+      name: "episodic.discovery",
+      content: `CAREER DISCOVERY CONTEXT (from the student's earlier career exploration conversation):\n[DISCOVERY_START]\n${sanitizeForPrompt(context.discovery_summary)}\n[DISCOVERY_END]\nUse this context to connect their goals and activities back to their chosen career direction. Reference their pathway when it's relevant and motivating.`,
+    });
   }
 
   // Inject skill gap context for goal-setting stages
   const goalSettingStages: ConversationStage[] = ["bhag", "monthly", "weekly", "daily"];
   if (context.skillGapContext && goalSettingStages.includes(stage)) {
-    parts.push(
-      `[SKILL_GAP_START]\n${sanitizeForPrompt(context.skillGapContext)}\n[SKILL_GAP_END]`,
-    );
+    parts.push({
+      name: "state.skill_gap",
+      content: `[SKILL_GAP_START]\n${sanitizeForPrompt(context.skillGapContext)}\n[SKILL_GAP_END]`,
+    });
   }
 
   // Inject pathway context for action-oriented stages
   const pathwayStages: ConversationStage[] = ["daily", "weekly", "tasks"];
   if (context.pathwayContext && pathwayStages.includes(stage)) {
-    parts.push(
-      `STUDENT LEARNING PATHWAY:\n[PATHWAY_START]\n${sanitizeForPrompt(context.pathwayContext)}\n[PATHWAY_END]\nWhen discussing what to work on today or this week, connect suggestions to their current pathway step. Celebrate progress on completed steps.`,
-    );
+    parts.push({
+      name: "state.pathway",
+      content: `STUDENT LEARNING PATHWAY:\n[PATHWAY_START]\n${sanitizeForPrompt(context.pathwayContext)}\n[PATHWAY_END]\nWhen discussing what to work on today or this week, connect suggestions to their current pathway step. Celebrate progress on completed steps.`,
+    });
   }
 
   if (context.student_status_summary) {
-    parts.push(
-      [
+    parts.push({
+      name: "state.platform_status",
+      content: [
         "VERIFIED STUDENT PLATFORM STATUS:",
         context.student_status_summary,
         "Treat this status as factual website state. Do not say a form or orientation step is complete unless it appears complete here. If the student asks about next steps, paperwork, readiness, or the conversation is in onboarding/orientation, use the exact missing items in your reply. If a form is awaiting instructor review, explain that it has been submitted and is pending review. If a form needs revision, tell the student it still needs attention before moving on.",
       ].join("\n"),
-    );
+    });
   }
 
   // Inject coaching arc context — overarching narrative for all stages.
   // Bracketed because the narrative is assembled from student turns.
   if (context.coachingArcContext) {
-    parts.push(
-      `[COACHING_ARC_START]\n${sanitizeForPrompt(context.coachingArcContext)}\n[COACHING_ARC_END]`,
-    );
+    parts.push({
+      name: "episodic.coaching_arc",
+      content: `[COACHING_ARC_START]\n${sanitizeForPrompt(context.coachingArcContext)}\n[COACHING_ARC_END]`,
+    });
   }
 
   // Inject topic-specific content based on what the student is asking about
@@ -646,7 +671,7 @@ export function buildSystemPrompt(
       isCompact ? 1 : 3,
     );
     if (relevantContent) {
-      parts.push(relevantContent);
+      parts.push({ name: "semantic.relevant_topic", content: relevantContent });
     }
   }
 
@@ -654,10 +679,10 @@ export function buildSystemPrompt(
   // function declarations themselves arrive via the SDK — this addendum
   // sets policy: when to call vs. when to talk, how to frame results.
   if (process.env.SAGE_AGENT_ENABLED === "true") {
-    parts.push(AGENT_TOOLS_ADDENDUM);
+    parts.push({ name: "action.tools", content: AGENT_TOOLS_ADDENDUM });
   }
 
-  let result = parts.join("\n\n---\n\n");
+  let result = joinPromptSections(parts);
   result = result.replace(/\{[a-z_]+\}/g, "");
   return result;
 }

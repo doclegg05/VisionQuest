@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import AskSageLink from "@/components/sage/AskSageLink";
 import type { LearningPathway as LearningPathwayData } from "@/lib/learning-pathway";
 
 interface LearningPathwayProps {
@@ -184,13 +184,12 @@ export function LearningPathwayEmpty() {
       <p className="mt-3 text-sm text-[var(--ink-muted)]">
         Complete your career discovery with Sage to see your personalized learning pathway.
       </p>
-      <Link
-        href="/chat"
-        prefetch={false}
-        className="primary-button mt-4 inline-block px-5 py-2.5 text-sm"
-      >
-        Chat with Sage
-      </Link>
+      <AskSageLink
+        prompt="Help me complete career discovery so VisionQuest can build a learning pathway that fits my goals."
+        label="Start with Sage"
+        variant="button"
+        className="mt-4"
+      />
     </div>
   );
 }

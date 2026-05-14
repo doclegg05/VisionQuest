@@ -5,12 +5,15 @@ import {
   getPlainConfigValue,
   setPlainConfigValue,
   setConfigValue,
-  getConfigValue,
 } from "@/lib/system-config";
 import { logAuditEvent } from "@/lib/audit";
 import { badRequest } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
-import { DEFAULT_LOCAL_AI_AUTH_MODE, resolveLocalAiAuthMode } from "@/lib/ai";
+import {
+  DEFAULT_LOCAL_AI_AUTH_MODE,
+  readLocalAiProviderConfig,
+  resolveLocalAiAuthMode,
+} from "@/lib/ai";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import { z } from "zod";
 
@@ -37,27 +40,14 @@ const providerSchema = z.object({
 });
 
 export const GET = withAdminAuth(async () => {
-  const [
-    provider,
-    url,
-    model,
-    authMode,
-    numCtx,
-    apiKey,
-    cloudflareAccessClientId,
-    cloudflareAccessClientSecret,
-  ] = await Promise.all([
+  const [provider, localConfig] = await Promise.all([
     getPlainConfigValue("ai_provider"),
-    getPlainConfigValue("ai_provider_url"),
-    getPlainConfigValue("ai_provider_model"),
-    getPlainConfigValue("ai_provider_auth_mode"),
-    getPlainConfigValue("ai_provider_num_ctx"),
-    getConfigValue("ai_provider_api_key"),
-    getConfigValue("ai_provider_cloudflare_access_client_id"),
-    getConfigValue("ai_provider_cloudflare_access_client_secret"),
+    readLocalAiProviderConfig(),
   ]);
 
-  const parsedNumCtx = numCtx ? Number.parseInt(numCtx, 10) : null;
+  const parsedNumCtx = localConfig.numCtxRaw
+    ? Number.parseInt(localConfig.numCtxRaw, 10)
+    : null;
   const validNumCtx =
     parsedNumCtx !== null &&
     Number.isFinite(parsedNumCtx) &&
@@ -68,25 +58,64 @@ export const GET = withAdminAuth(async () => {
 
   return NextResponse.json({
     provider: provider || "cloud",
-    url: url || "",
-    model: model || "gemma4:26b",
-    authMode: resolveLocalAiAuthMode(authMode),
+    url: localConfig.url || "",
+    model: localConfig.model || "gemma4:26b",
+    authMode: localConfig.authMode,
     numCtx: validNumCtx,
     numCtxBounds: { min: NUM_CTX_MIN, max: NUM_CTX_MAX, default: 8192 },
-    hasApiKey: !!apiKey,
-    hasCloudflareAccessClientId: !!cloudflareAccessClientId,
-    hasCloudflareAccessClientSecret: !!cloudflareAccessClientSecret,
+    hasApiKey: !!localConfig.apiKey,
+    hasCloudflareAccessClientId: !!localConfig.cloudflareAccessClientId,
+    hasCloudflareAccessClientSecret: !!localConfig.cloudflareAccessClientSecret,
   });
 });
 
 export const PUT = withAdminAuth(async (session, req: NextRequest) => {
   const body = await parseBody(req, providerSchema);
   const authMode = resolveLocalAiAuthMode(body.authMode);
+  const existingLocalConfig = await readLocalAiProviderConfig();
 
   if (body.url !== undefined && !isSafeAiProviderUrl(body.url)) {
     throw badRequest(
       "Invalid local AI server URL. Use localhost/127.0.0.1/::1 or a public http/https endpoint.",
     );
+  }
+
+  if (body.provider === "local") {
+    const finalApiKey =
+      body.apiKey !== undefined
+        ? body.apiKey.trim() ||
+          (existingLocalConfig.apiKeySource === "env"
+            ? existingLocalConfig.apiKey
+            : null)
+        : existingLocalConfig.apiKey;
+    const finalCloudflareAccessClientId =
+      body.cloudflareAccessClientId !== undefined
+        ? body.cloudflareAccessClientId.trim() ||
+          (existingLocalConfig.cloudflareAccessClientIdSource === "env"
+            ? existingLocalConfig.cloudflareAccessClientId
+            : null)
+        : existingLocalConfig.cloudflareAccessClientId;
+    const finalCloudflareAccessClientSecret =
+      body.cloudflareAccessClientSecret !== undefined
+        ? body.cloudflareAccessClientSecret.trim() ||
+          (existingLocalConfig.cloudflareAccessClientSecretSource === "env"
+            ? existingLocalConfig.cloudflareAccessClientSecret
+            : null)
+        : existingLocalConfig.cloudflareAccessClientSecret;
+
+    if (authMode === "bearer" && !finalApiKey) {
+      throw badRequest(
+        "Bearer token authentication is selected, but no bearer token is configured.",
+      );
+    }
+    if (
+      authMode === "cloudflare_service_token" &&
+      (!finalCloudflareAccessClientId || !finalCloudflareAccessClientSecret)
+    ) {
+      throw badRequest(
+        "Cloudflare service token authentication is selected, but both client ID and client secret are required.",
+      );
+    }
   }
 
   await setPlainConfigValue("ai_provider", body.provider, session.id);

@@ -111,6 +111,7 @@ See [`/.env.example`](/Users/brittlegg/visionquest/.env.example) for the authori
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REDIRECT_URI`
 - `GEMINI_MODEL`
+- `SAGE_AGENT_ENABLED` for Sage tool calls and server-driven slash commands
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`

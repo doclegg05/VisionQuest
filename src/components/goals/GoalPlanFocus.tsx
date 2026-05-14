@@ -4,6 +4,7 @@ import {
   type GoalPlanEntry,
   type GoalResourceType,
 } from "@/lib/goal-resource-links";
+import type { ReactNode } from "react";
 import {
   GOAL_LEVEL_META,
   goalCountsTowardPlan,
@@ -18,6 +19,7 @@ interface GoalPlanFocusProps {
   goalPlans: GoalPlanEntry[];
   resourceTypes: GoalResourceType[];
   emptyMessage: string;
+  emptyAction?: ReactNode;
 }
 
 function formatDueDate(value: string | Date | null) {
@@ -36,6 +38,7 @@ export default function GoalPlanFocus({
   goalPlans,
   resourceTypes,
   emptyMessage,
+  emptyAction,
 }: GoalPlanFocusProps) {
   const goalById = new Map(goals.map((goal) => [goal.id, goal]));
   const typeSet = new Set(resourceTypes);
@@ -66,7 +69,10 @@ export default function GoalPlanFocus({
       </div>
 
       {filteredPlans.length === 0 ? (
-        <p className="mt-5 text-sm text-[var(--ink-muted)]">{emptyMessage}</p>
+        <div className="mt-5 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4">
+          <p className="text-sm leading-6 text-[var(--ink-muted)]">{emptyMessage}</p>
+          {emptyAction ? <div className="mt-3 flex flex-wrap gap-2">{emptyAction}</div> : null}
+        </div>
       ) : (
         <div className="mt-5 space-y-4">
           {filteredPlans.map((plan) => {

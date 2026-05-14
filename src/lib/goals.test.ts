@@ -27,10 +27,12 @@ describe("goal helpers", () => {
     for (const status of GOAL_PLANNING_STATUSES) {
       assert.equal(goalCountsTowardPlan(status), true);
     }
+    assert.equal(goalCountsTowardPlan("proposed"), false);
     assert.equal(goalCountsTowardPlan("abandoned"), false);
   });
 
   it("returns a readable label for known statuses", () => {
+    assert.equal(goalStatusLabel("proposed"), "Proposed");
     assert.equal(goalStatusLabel("in_progress"), "In Progress");
     assert.equal(goalStatusLabel("blocked"), "Blocked");
   });

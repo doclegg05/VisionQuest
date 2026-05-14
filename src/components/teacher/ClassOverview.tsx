@@ -203,6 +203,7 @@ export default function ClassOverview({
       summary: alert.summary,
       severity: alert.severity,
       student: alert.student,
+      alertId: alert.id,
       goalId: alert.sourceType === "goal" ? alert.sourceId : null,
       linkId: alert.sourceType === "goal_resource_link" ? alert.sourceId : null,
     };
@@ -219,6 +220,7 @@ export default function ClassOverview({
       summary: item.summary,
       severity: item.severity,
       student: item.student,
+      alertId: item.id,
       goalId: item.sourceType === "goal" ? item.sourceId : null,
       linkId: item.sourceType === "goal_resource_link" ? item.sourceId : null,
     };
@@ -280,6 +282,7 @@ export default function ClassOverview({
             studentId: intent.studentId,
             displayName: intent.studentName,
           },
+          alertId: intent.alertId,
         })}
       />
 

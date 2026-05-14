@@ -1,6 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import {
+  ArrowSquareOut,
+  Certificate,
+  CheckCircle,
+  FileText,
+  Medal,
+  UploadSimple,
+  WarningCircle,
+  Wrench,
+} from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
+import AskSageLink from "@/components/sage/AskSageLink";
+import {
+  fileCategoryForPortfolioType,
+  normalizePortfolioItemType,
+  type PortfolioItemType,
+} from "@/lib/portfolio";
 
 interface PortfolioItem {
   id: string;
@@ -11,18 +29,58 @@ interface PortfolioItem {
   url: string | null;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  project: "🛠️",
-  cert: "📜",
-  resume: "📝",
-  award: "🏅",
+interface CertRequirement {
+  id: string | null;
+  templateId: string;
+  label: string;
+  description: string | null;
+  required: boolean;
+  needsFile: boolean;
+  needsVerify: boolean;
+  completed: boolean;
+  verifiedBy: string | null;
+  fileId: string | null;
+}
+
+interface CertData {
+  certification: { id: string; status: string } | null;
+  requirements: CertRequirement[];
+  total: number;
+  done: number;
+}
+
+interface PortfolioFormState {
+  title: string;
+  description: string;
+  type: PortfolioItemType;
+  url: string;
+  fileId: string;
+}
+
+const TYPE_META: Record<string, { icon: Icon; label: string; desc?: string }> = {
+  project: { icon: Wrench, label: "Project", desc: "Work sample or class project" },
+  certification: { icon: Certificate, label: "Certification", desc: "Industry credential or certificate" },
+  cert: { icon: Certificate, label: "Certification" },
+  resume: { icon: FileText, label: "Resume" },
+  achievement: { icon: Medal, label: "Award", desc: "Recognition or achievement" },
+  award: { icon: Medal, label: "Award" },
+  skill: { icon: CheckCircle, label: "Skill" },
+  other: { icon: FileText, label: "Document", desc: "Resume, letter, or reference" },
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  project: "Project",
-  cert: "Certification",
-  resume: "Resume",
-  award: "Award",
+const TYPE_OPTIONS: Array<{ value: PortfolioItemType; icon: Icon; label: string; desc: string }> = [
+  { value: "certification", icon: Certificate, label: "Certification", desc: "Industry credential or certificate" },
+  { value: "project", icon: Wrench, label: "Project", desc: "Work sample or class project" },
+  { value: "achievement", icon: Medal, label: "Award", desc: "Recognition or achievement" },
+  { value: "other", icon: FileText, label: "Document", desc: "Resume, letter, or reference" },
+];
+
+const EMPTY_FORM: PortfolioFormState = {
+  title: "",
+  description: "",
+  type: "project",
+  url: "",
+  fileId: "",
 };
 
 export default function PortfolioGrid() {
@@ -32,12 +90,21 @@ export default function PortfolioGrid() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [certData, setCertData] = useState<CertData | null>(null);
+  const [certLoadState, setCertLoadState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [certError, setCertError] = useState<string | null>(null);
+  const [certificationRequirementId, setCertificationRequirementId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({ title: "", description: "", type: "project", url: "", fileId: "" });
+  const [form, setForm] = useState<PortfolioFormState>(EMPTY_FORM);
 
   useEffect(() => {
     fetchItems();
   }, []);
+
+  useEffect(() => {
+    if (form.type !== "certification" || certLoadState !== "idle") return;
+    fetchCertificationData();
+  }, [form.type, certLoadState]);
 
   async function fetchItems() {
     try {
@@ -55,6 +122,25 @@ export default function PortfolioGrid() {
     }
   }
 
+  async function fetchCertificationData() {
+    setCertLoadState("loading");
+    setCertError(null);
+    try {
+      const res = await fetch("/api/certifications?ensure=false");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Could not load Ready to Work requirements.");
+      }
+      const result = await res.json();
+      setCertData(result);
+      setCertLoadState("loaded");
+    } catch (err) {
+      console.error("Failed to load certification requirements:", err instanceof Error ? err.message : "Unknown error");
+      setCertError("Could not load Ready to Work requirements.");
+      setCertLoadState("error");
+    }
+  }
+
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -68,14 +154,19 @@ export default function PortfolioGrid() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("category", "portfolio");
+      formData.append("category", fileCategoryForPortfolioType(form.type));
       const res = await fetch("/api/files", { method: "POST", body: formData });
       if (res.ok) {
         const { file: uploaded } = await res.json();
         setForm((prev) => ({ ...prev, fileId: uploaded.id }));
+        setError(null);
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || "Upload failed. Try a PDF, JPG, or PNG under 10MB.");
       }
     } catch (err) {
       console.error("Upload failed:", err instanceof Error ? err.message : "Unknown error");
+      setError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -84,8 +175,17 @@ export default function PortfolioGrid() {
 
   async function handleSave() {
     if (!form.title.trim()) return;
+    if (certificationRequirementId && !form.fileId) {
+      setError("Attach the certificate file before submitting it for Ready to Work review.");
+      return;
+    }
     const method = editingId ? "PUT" : "POST";
-    const body = editingId ? { id: editingId, ...form } : form;
+    const body = editingId
+      ? { id: editingId, ...form }
+      : {
+          ...form,
+          certificationRequirementId: form.type === "certification" ? certificationRequirementId || null : null,
+        };
 
     try {
       const res = await fetch("/api/portfolio", {
@@ -96,9 +196,17 @@ export default function PortfolioGrid() {
       if (res.ok) {
         resetForm();
         fetchItems();
+        if (form.type === "certification") {
+          setCertData(null);
+          setCertLoadState("idle");
+        }
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || "Could not save this portfolio item.");
       }
     } catch (err) {
       console.error("Failed to save:", err instanceof Error ? err.message : "Unknown error");
+      setError("Could not save this portfolio item.");
     }
   }
 
@@ -121,17 +229,35 @@ export default function PortfolioGrid() {
     setForm({
       title: item.title,
       description: item.description || "",
-      type: item.type,
+      type: normalizePortfolioItemType(item.type) || "project",
       url: item.url || "",
       fileId: item.fileId || "",
     });
+    setCertificationRequirementId("");
     setShowForm(true);
   }
 
   function resetForm() {
     setShowForm(false);
     setEditingId(null);
-    setForm({ title: "", description: "", type: "project", url: "", fileId: "" });
+    setForm(EMPTY_FORM);
+    setCertificationRequirementId("");
+    setError(null);
+  }
+
+  function chooseType(type: PortfolioItemType) {
+    setForm((prev) => ({ ...prev, type }));
+    if (type !== "certification") {
+      setCertificationRequirementId("");
+    }
+  }
+
+  function chooseCertificationRequirement(requirementId: string) {
+    setCertificationRequirementId(requirementId);
+    const requirement = certData?.requirements.find((entry) => entry.id === requirementId);
+    if (requirement && !form.title.trim()) {
+      setForm((prev) => ({ ...prev, title: requirement.label }));
+    }
   }
 
   if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading portfolio...</p>;
@@ -151,21 +277,47 @@ export default function PortfolioGrid() {
     if (!grouped[item.type]) grouped[item.type] = [];
     grouped[item.type].push(item);
   }
+  const linkableRequirements = certData?.requirements.filter((req) =>
+    req.id && (!req.completed || !req.verifiedBy || !req.fileId)
+  ) || [];
+  const selectedRequirement = linkableRequirements.find((req) => req.id === certificationRequirementId) || null;
 
   return (
     <div className="space-y-6">
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
 
       {items.length === 0 && !showForm ? (
-        <div className="text-center text-[var(--ink-faint)] py-8">
-          <p className="text-4xl mb-3">💼</p>
-          <p className="text-sm">Your portfolio is empty. Add your first item!</p>
+        <div className="surface-section px-5 py-10 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Portfolio starter
+          </p>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Add one proof item</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
+            Start with something you may need later: a resume, certificate, project, award, or work sample.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="primary-button px-4 py-2.5 text-sm"
+            >
+              Add first item
+            </button>
+            <AskSageLink
+              prompt="Help me decide the first proof item I should add to my portfolio based on my goals and experience."
+              label="Ask Sage what to add"
+            />
+          </div>
         </div>
       ) : (
         Object.entries(grouped).map(([type, typeItems]) => (
           <div key={type}>
-            <h3 className="text-xs font-semibold text-[var(--ink-muted)] uppercase tracking-wide mb-2">
-              {TYPE_ICONS[type] || "📁"} {TYPE_LABELS[type] || type} ({typeItems.length})
+            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
+              {(() => {
+                const Icon = TYPE_META[type]?.icon || FileText;
+                return <Icon size={16} weight="duotone" aria-hidden />;
+              })()}
+              {TYPE_META[type]?.label || type} ({typeItems.length})
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {typeItems.map((item) => (
@@ -212,27 +364,25 @@ export default function PortfolioGrid() {
           {/* Step 1: Type selector (visual cards) */}
           {!editingId && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { value: "cert", icon: "📜", label: "Certification", desc: "Industry credential or certificate" },
-                { value: "project", icon: "🛠️", label: "Project", desc: "Work sample or class project" },
-                { value: "award", icon: "🏅", label: "Award", desc: "Recognition or achievement" },
-                { value: "resume", icon: "📝", label: "Document", desc: "Resume, letter, or reference" },
-              ].map((opt) => (
+              {TYPE_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                return (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setForm({ ...form, type: opt.value })}
+                  onClick={() => chooseType(opt.value)}
                   className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
                     form.type === opt.value
                       ? "border-[var(--accent-strong)] bg-[rgba(42,138,60,0.06)] shadow-sm"
                       : "border-[var(--border)] hover:border-[var(--accent-secondary)]"
                   }`}
                 >
-                  <span className="text-2xl">{opt.icon}</span>
+                  <Icon size={28} weight="duotone" aria-hidden className="text-[var(--accent-secondary)]" />
                   <span className="text-sm font-semibold text-[var(--ink-strong)]">{opt.label}</span>
                   <span className="text-xs leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -245,7 +395,7 @@ export default function PortfolioGrid() {
               <input
                 id="portfolio-title"
                 type="text"
-                placeholder={form.type === "cert" ? "e.g., IC3 Digital Literacy Level 1" : "e.g., Customer Service Training Project"}
+                placeholder={form.type === "certification" ? "e.g., IC3 Digital Literacy Level 1" : "e.g., Customer Service Training Project"}
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 className="field px-4 py-3 text-sm"
@@ -287,11 +437,14 @@ export default function PortfolioGrid() {
               </p>
               {form.fileId ? (
                 <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-                  <span className="text-green-600 text-lg">✓</span>
+                  <CheckCircle size={20} weight="fill" aria-hidden className="text-green-600" />
                   <span className="flex-1 text-sm font-medium text-green-800">File attached</span>
                   <button
                     type="button"
-                    onClick={() => setForm({ ...form, fileId: "" })}
+                    onClick={() => {
+                      setForm({ ...form, fileId: "" });
+                      setCertificationRequirementId("");
+                    }}
                     className="text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     Remove
@@ -311,17 +464,87 @@ export default function PortfolioGrid() {
                     </>
                   ) : (
                     <>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
+                      <UploadSimple size={20} weight="bold" aria-hidden />
                       Click to upload a file
                     </>
                   )}
                 </button>
               )}
             </div>
+
+            {form.type === "certification" && !editingId && (
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-[var(--accent-secondary)]">
+                    <Certificate size={20} weight="duotone" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--ink-strong)]">Certification proof</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
+                      Save this in your portfolio. If it also proves a Ready to Work step, send it to your instructor here.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label htmlFor="certification-requirement" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+                    Ready to Work step <span className="text-[var(--ink-muted)]">(optional)</span>
+                  </label>
+                  <select
+                    id="certification-requirement"
+                    value={certificationRequirementId}
+                    onChange={(event) => chooseCertificationRequirement(event.target.value)}
+                    disabled={!form.fileId || certLoadState === "loading" || linkableRequirements.length === 0}
+                    className="select-field w-full px-4 py-3 text-sm disabled:opacity-60"
+                  >
+                    <option value="">
+                      {certLoadState === "loading" ? "Loading steps..." : "Portfolio only"}
+                    </option>
+                    {linkableRequirements.map((req) => (
+                      <option key={req.id || req.templateId} value={req.id || ""}>
+                        {req.label}
+                        {req.completed && req.verifiedBy ? " (verified)" : req.completed ? " (submitted)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 text-xs leading-5 text-[var(--ink-muted)] sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2">
+                    <WarningCircle size={16} weight="duotone" aria-hidden className="mt-0.5 shrink-0 text-[var(--accent-gold)]" />
+                    <span>
+                      {selectedRequirement
+                        ? selectedRequirement.needsVerify
+                          ? "This will be submitted for instructor verification."
+                          : "This will be marked complete when you save."
+                        : form.fileId
+                          ? linkableRequirements.length === 0 && certLoadState === "loaded"
+                            ? "Save it to your portfolio, or open Learning to start Ready to Work steps."
+                            : "Choose a step only if this file proves that requirement."
+                          : "Attach the file before choosing a Ready to Work step."}
+                    </span>
+                  </div>
+                  <Link
+                    href="/learning"
+                    prefetch={false}
+                    className="inline-flex items-center gap-1 font-semibold text-[var(--accent-secondary)] hover:underline"
+                  >
+                    Review steps
+                    <ArrowSquareOut size={14} weight="bold" aria-hidden />
+                  </Link>
+                </div>
+
+                {certError && (
+                  <button
+                    type="button"
+                    onClick={fetchCertificationData}
+                    className="mt-3 text-xs font-semibold text-[var(--accent-secondary)] hover:underline"
+                  >
+                    Try loading Ready to Work steps again
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -347,7 +570,7 @@ export default function PortfolioGrid() {
             <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>
           )}
         </div>
-      ) : (
+      ) : items.length > 0 ? (
         <button
           type="button"
           onClick={() => setShowForm(true)}
@@ -355,7 +578,7 @@ export default function PortfolioGrid() {
         >
           <span className="text-lg">+</span> Add Portfolio Item
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

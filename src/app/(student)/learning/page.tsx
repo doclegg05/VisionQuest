@@ -5,6 +5,7 @@ import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
 import StudentPathwayPlan from "@/components/goals/StudentPathwayPlan";
 import { LearningPathway, LearningPathwayEmpty } from "@/components/career/LearningPathway";
 import CoursesHub from "@/components/lms/CoursesHub";
+import AskSageLink from "@/components/sage/AskSageLink";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { getStudentGoalPlanData } from "@/lib/goal-plan-data";
@@ -44,7 +45,13 @@ export default async function LearningPage() {
         goals={goals}
         goalPlans={goalPlans}
         resourceTypes={["platform", "certification"]}
-        emptyMessage="Confirm your goals and this page will start surfacing the strongest training and certification matches."
+        emptyMessage="Confirm a goal first. Then this page will show training platforms and certification paths that match what you are working toward."
+        emptyAction={
+          <AskSageLink
+            prompt="Help me choose the certification or learning platform I should focus on next based on my confirmed goals."
+            label="Ask Sage what to study next"
+          />
+        }
       />
 
       <section id="platforms" className="mt-8">

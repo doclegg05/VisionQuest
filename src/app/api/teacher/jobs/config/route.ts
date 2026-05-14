@@ -3,8 +3,8 @@ import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
-
-const VALID_SOURCES = ["jsearch", "usajobs", "adzuna"];
+import { groupDuplicateJobs } from "@/lib/job-board/duplicates";
+import { DEFAULT_JOB_SOURCES, VALID_JOB_SOURCES, isValidJobSource } from "@/lib/job-board/source-options";
 
 /**
  * GET /api/teacher/jobs/config?classId=xxx
@@ -22,11 +22,12 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     where: { classId },
   });
 
-  const jobCount = config
-    ? await prisma.jobListing.count({
+  const activeListings = config
+    ? await prisma.jobListing.findMany({
         where: { classConfigId: config.id, status: "active" },
+        select: { title: true, company: true, location: true, source: true, salaryMin: true, updatedAt: true },
       })
-    : 0;
+    : [];
 
   return NextResponse.json({
     config: config
@@ -37,7 +38,8 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
           updatedAt: config.updatedAt.toISOString(),
         }
       : null,
-    activeJobCount: jobCount,
+    activeJobCount: groupDuplicateJobs(activeListings).length,
+    activeListingCount: activeListings.length,
   });
 });
 
@@ -63,9 +65,9 @@ export const PUT = withTeacherAuth(async (session: Session, req: Request) => {
   await assertStaffCanManageClass(session, classId);
 
   // Validate sources
-  const validatedSources = (sources ?? ["jsearch"]).filter((s) => VALID_SOURCES.includes(s));
+  const validatedSources = (sources ?? [...DEFAULT_JOB_SOURCES]).filter(isValidJobSource);
   if (validatedSources.length === 0) {
-    throw badRequest(`At least one valid source required. Options: ${VALID_SOURCES.join(", ")}`);
+    throw badRequest(`At least one valid source required. Options: ${VALID_JOB_SOURCES.join(", ")}`);
   }
 
   const config = await prisma.jobClassConfig.upsert({
