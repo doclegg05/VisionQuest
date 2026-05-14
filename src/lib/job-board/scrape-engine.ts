@@ -1,37 +1,16 @@
 import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
-import type { JobScrapeTrigger, JobSourceAdapter, NormalizedJob } from "./types";
-import { jsearchAdapter } from "./adapters/jsearch";
-import { usajobsAdapter } from "./adapters/usajobs";
-import { adzunaAdapter } from "./adapters/adzuna";
-import { remotiveAdapter } from "./adapters/remotive";
-import { remoteOkAdapter } from "./adapters/remoteok";
-import { weWorkRemotelyAdapter } from "./adapters/weworkremotely";
-import { arbeitnowAdapter } from "./adapters/arbeitnow";
-import { ashbyAdapter, greenhouseAdapter, leverAdapter } from "./adapters/ats";
-import { smartRecruitersAdapter } from "./adapters/smartrecruiters";
-
-/** All registered adapters */
-const ALL_ADAPTERS: JobSourceAdapter[] = [
-  remotiveAdapter,
-  remoteOkAdapter,
-  weWorkRemotelyAdapter,
-  arbeitnowAdapter,
-  greenhouseAdapter,
-  leverAdapter,
-  ashbyAdapter,
-  smartRecruitersAdapter,
-  jsearchAdapter,
-  usajobsAdapter,
-  adzunaAdapter,
-];
+import { filterQualityJobs } from "./job-quality";
+import { ALL_JOB_SOURCE_ADAPTERS } from "./adapters/registry";
+import type { JobScrapeTrigger, NormalizedJob } from "./types";
 
 interface RunScrapeOptions {
   scrapeRunId?: string;
   trigger?: JobScrapeTrigger;
   requestedById?: string | null;
   backgroundJobId?: string | null;
+  sourceAllowlist?: string[];
 }
 
 function errorMessage(error: unknown): string {
@@ -152,8 +131,9 @@ export async function runScrapeForConfig(
   const scrapeRunId = scrapeRun.id;
 
   // Filter to adapters that are both configured (env vars) and enabled (sources list)
-  const activeAdapters = ALL_ADAPTERS.filter(
-    (a) => a.isConfigured() && config.sources.includes(a.source),
+  const allowedSources = options.sourceAllowlist ? new Set(options.sourceAllowlist) : null;
+  const activeAdapters = ALL_JOB_SOURCE_ADAPTERS.filter(
+    (a) => a.isConfigured() && config.sources.includes(a.source) && (!allowedSources || allowedSources.has(a.source)),
   );
 
   await prisma.jobScrapeRun.update({
@@ -203,20 +183,22 @@ export async function runScrapeForConfig(
       }
     }
 
-    // Deduplicate by sourceId
-    const seen = new Set<string>();
-    const uniqueJobs: NormalizedJob[] = [];
-    for (const job of allJobs) {
-      if (!seen.has(job.sourceId)) {
-        seen.add(job.sourceId);
-        uniqueJobs.push(job);
-      }
+    const quality = filterQualityJobs(allJobs);
+    if (quality.rejected.length > 0) {
+      logger.info("Filtered low-quality job listings", {
+        configId,
+        rejected: quality.rejected.length,
+        reasons: quality.rejected.reduce<Record<string, number>>((counts, entry) => {
+          counts[entry.reason] = (counts[entry.reason] ?? 0) + 1;
+          return counts;
+        }, {}),
+      });
     }
 
     const upsertedBySource = new Map<string, number>();
 
     // Upsert each job
-    for (const job of uniqueJobs) {
+    for (const job of quality.jobs) {
       const clusters = matchJobToClusters(job);
 
       await prisma.jobListing.upsert({
@@ -274,6 +256,7 @@ export async function runScrapeForConfig(
         where: {
           classConfigId: configId,
           status: "active",
+          source: { in: activeAdapters.map((adapter) => adapter.source) },
           scrapeBatchId: { not: batchId },
           updatedAt: { lt: twoWeeksAgo },
         },

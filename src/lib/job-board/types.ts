@@ -62,6 +62,21 @@ export interface JobScrapeRunStatusResult {
   sourceResults: JobScrapeSourceStatusResult[];
 }
 
+export interface JobSourceHealthResult {
+  source: string;
+  label: string;
+  selected: boolean;
+  configured: boolean;
+  recentRuns: number;
+  successRate: number | null;
+  lastStatus: JobScrapeSourceStatus | null;
+  lastFetchedCount: number;
+  lastUpsertedCount: number;
+  lastError: string | null;
+  lastStartedAt: string | null;
+  lastCompletedAt: string | null;
+}
+
 export type JobMatchReasonType =
   | "location"
   | "remote"

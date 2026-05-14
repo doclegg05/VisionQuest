@@ -9,6 +9,7 @@ const mockAssertStaffCanManageClass = mock.fn() as any;
 const mockFindUnique = mock.fn() as any;
 const mockCount = mock.fn() as any;
 const mockScrapeRunFindFirst = mock.fn() as any;
+const mockScrapeRunFindMany = mock.fn() as any;
 const mockScrapeRunCreate = mock.fn() as any;
 const mockScrapeRunUpdate = mock.fn() as any;
 const mockEnqueueJob = mock.fn() as any;
@@ -59,6 +60,7 @@ mock.module("@/lib/db", {
       },
       jobScrapeRun: {
         findFirst: mockScrapeRunFindFirst,
+        findMany: mockScrapeRunFindMany,
         create: mockScrapeRunCreate,
         update: mockScrapeRunUpdate,
       },
@@ -96,6 +98,7 @@ describe("teacher job route authorization", () => {
     mockFindUnique.mock.resetCalls();
     mockCount.mock.resetCalls();
     mockScrapeRunFindFirst.mock.resetCalls();
+    mockScrapeRunFindMany.mock.resetCalls();
     mockScrapeRunCreate.mock.resetCalls();
     mockScrapeRunUpdate.mock.resetCalls();
     mockEnqueueJob.mock.resetCalls();
@@ -116,6 +119,7 @@ describe("teacher job route authorization", () => {
     }));
     mockCount.mock.mockImplementation(async () => 7);
     mockScrapeRunFindFirst.mock.mockImplementation(async () => null);
+    mockScrapeRunFindMany.mock.mockImplementation(async () => []);
     mockScrapeRunCreate.mock.mockImplementation(async () => ({
       id: "run-1",
       trigger: "manual",
@@ -203,8 +207,22 @@ describe("teacher job route authorization", () => {
     assert.equal(mockProcessJobs.mock.callCount(), 0);
   });
 
+  it("queues a retry for requested enabled sources", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1", sources: ["jsearch"] },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 200);
+    assert.equal(mockEnqueueJob.mock.callCount(), 1);
+    assert.deepEqual(mockEnqueueJob.mock.calls[0]?.arguments[0].payload.sources, ["jsearch"]);
+    assert.equal(mockEnqueueJob.mock.calls[0]?.arguments[0].dedupeKey, "scrape:config-1:jsearch");
+  });
+
   it("returns scrape status after checking class ownership", async () => {
-    mockScrapeRunFindFirst.mock.mockImplementationOnce(async () => ({
+    mockScrapeRunFindMany.mock.mockImplementationOnce(async () => [{
       id: "run-2",
       trigger: "manual",
       status: "completed",
@@ -221,8 +239,20 @@ describe("teacher job route authorization", () => {
       completedAt: new Date("2026-01-03T00:02:00.000Z"),
       createdAt: new Date("2026-01-03T00:00:00.000Z"),
       updatedAt: new Date("2026-01-03T00:02:00.000Z"),
-      sourceResults: [],
-    }));
+      sourceResults: [{
+        id: "source-1",
+        scrapeRunId: "run-2",
+        source: "jsearch",
+        status: "completed",
+        fetchedCount: 10,
+        upsertedCount: 8,
+        error: null,
+        startedAt: new Date("2026-01-03T00:01:00.000Z"),
+        completedAt: new Date("2026-01-03T00:02:00.000Z"),
+        createdAt: new Date("2026-01-03T00:01:00.000Z"),
+        updatedAt: new Date("2026-01-03T00:02:00.000Z"),
+      }],
+    }]);
 
     const req = mockRequest("/api/teacher/jobs/status", {
       searchParams: { classId: "class-1" },
@@ -234,6 +264,8 @@ describe("teacher job route authorization", () => {
     assert.equal(res.status, 200);
     assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 1);
     assert.equal(body.latestRun.status, "completed");
+    assert.equal(body.recentRuns.length, 1);
+    assert.equal(body.sourceHealth.find((source: { source: string }) => source.source === "jsearch").successRate, 100);
     assert.equal(body.activeJobCount, 7);
   });
 });
