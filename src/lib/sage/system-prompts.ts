@@ -71,16 +71,24 @@ const PATHWAY_CONTEXTS: Record<ProgramType, string> = {
  * set — Sage will not re-ask.
  */
 /**
- * Strip our bracket-delimiter tokens from untrusted input so a student
- * cannot forge `[STUDENT_GOAL_END]` (or similar) inside their displayName /
- * discovery-summary / pathway context and break out of the bracketed zone.
- * The model still sees the original punctuation — only the magic tokens die.
+ * Strip our bracket-delimiter tokens AND our XML-style wrapper tags from
+ * untrusted input so a student or staff member cannot forge
+ * `[STUDENT_GOAL_END]` (or `</staff_authored_snippet>`, etc.) inside their
+ * displayName, discovery-summary, pathway context, or staff-authored snippet
+ * and break out of the wrapped zone. The model still sees the original
+ * punctuation — only the magic tokens die.
+ *
+ * Exported so other Sage modules (e.g. `knowledge-base-server.ts`, where
+ * staff-authored snippets are injected) can apply the same defense before
+ * embedding untrusted text in the prompt.
  */
-function sanitizeForPrompt(value: string): string {
-  return value.replace(
-    /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT)_(START|END)\s*\]/gi,
-    "",
-  );
+export function sanitizeForPrompt(value: string): string {
+  return value
+    .replace(
+      /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT)_(START|END)\s*\]/gi,
+      "",
+    )
+    .replace(/<\s*\/?\s*staff_authored_snippet\s*>/gi, "");
 }
 
 const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
