@@ -23,6 +23,15 @@ interface JobConfig {
 
 const RADIUS_OPTIONS = [10, 25, 50];
 
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return typeof data.error === "string" ? data.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function JobConfigSection() {
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -35,6 +44,8 @@ export function JobConfigSection() {
   const [recentRuns, setRecentRuns] = useState<JobScrapeRunStatusResult[]>([]);
   const [sourceHealth, setSourceHealth] = useState<JobSourceHealthResult[]>([]);
   const [statusRefreshKey, setStatusRefreshKey] = useState(0);
+  const [jobBoardError, setJobBoardError] = useState<string | null>(null);
+  const [jobBoardNotice, setJobBoardNotice] = useState<string | null>(null);
 
   // Form state
   const [region, setRegion] = useState("");
@@ -90,6 +101,8 @@ export function JobConfigSection() {
           setSources([...DEFAULT_JOB_SOURCES]);
           setAutoRefresh(true);
         }
+      } else if (!cancelled) {
+        setJobBoardError(await readErrorMessage(res, "Could not load Job Scout configuration."));
       }
       if (!cancelled) setLoading(false);
     })();
@@ -109,6 +122,11 @@ export function JobConfigSection() {
         if (typeof data.activeJobCount === "number") {
           setActiveJobCount(data.activeJobCount);
         }
+        if (data.lastScrapedAt === null || typeof data.lastScrapedAt === "string") {
+          setConfig((current) => current ? { ...current, lastScrapedAt: data.lastScrapedAt } : current);
+        }
+      } else if (!cancelled) {
+        setJobBoardError(await readErrorMessage(res, "Could not load Job Scout status."));
       }
     })();
     return () => { cancelled = true; };
@@ -124,6 +142,8 @@ export function JobConfigSection() {
 
   const handleSave = async () => {
     setSaving(true);
+    setJobBoardError(null);
+    setJobBoardNotice(null);
     const res = await fetch("/api/teacher/jobs/config", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -136,13 +156,19 @@ export function JobConfigSection() {
       }),
     });
     if (res.ok) {
+      setJobBoardNotice("Job board config saved.");
       setConfigRefreshKey((k) => k + 1);
+      setStatusRefreshKey((key) => key + 1);
+    } else {
+      setJobBoardError(await readErrorMessage(res, "Could not save Job Scout configuration."));
     }
     setSaving(false);
   };
 
   const handleRefresh = async (retrySources?: string[]) => {
     setRefreshing(true);
+    setJobBoardError(null);
+    setJobBoardNotice(null);
     const res = await fetch("/api/teacher/jobs/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -154,7 +180,12 @@ export function JobConfigSection() {
     if (res.ok) {
       const data = await res.json();
       setScrapeRun(data.run ?? null);
+      if (typeof data.message === "string") {
+        setJobBoardNotice(data.message);
+      }
       setStatusRefreshKey((key) => key + 1);
+    } else {
+      setJobBoardError(await readErrorMessage(res, "Could not queue Job Scout refresh."));
     }
     setRefreshing(false);
   };
@@ -215,6 +246,18 @@ export function JobConfigSection() {
                 <ArrowClockwise size={16} className={refreshing || scrapeInProgress ? "animate-spin" : ""} />
                 {scrapeInProgress ? "Refreshing..." : refreshing ? "Queueing..." : "Refresh Now"}
               </button>
+            </div>
+          )}
+
+          {(jobBoardError || jobBoardNotice) && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                jobBoardError
+                  ? "border-[var(--error)]/40 text-[var(--error)]"
+                  : "border-[var(--border)] text-[var(--text-secondary)]"
+              }`}
+            >
+              {jobBoardError ?? jobBoardNotice}
             </div>
           )}
 

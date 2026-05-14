@@ -13,7 +13,7 @@ const mockScrapeRunFindMany = mock.fn() as any;
 const mockScrapeRunCreate = mock.fn() as any;
 const mockScrapeRunUpdate = mock.fn() as any;
 const mockEnqueueJob = mock.fn() as any;
-const mockProcessJobs = mock.fn() as any;
+const mockProcessJobById = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
 
 function makeHttpError(statusCode: number, message: string) {
@@ -71,7 +71,7 @@ mock.module("@/lib/db", {
 mock.module("@/lib/jobs", {
   namedExports: {
     enqueueJob: mockEnqueueJob,
-    processJobs: mockProcessJobs,
+    processJobById: mockProcessJobById,
     registerJobHandler: () => undefined,
   },
 });
@@ -102,7 +102,7 @@ describe("teacher job route authorization", () => {
     mockScrapeRunCreate.mock.resetCalls();
     mockScrapeRunUpdate.mock.resetCalls();
     mockEnqueueJob.mock.resetCalls();
-    mockProcessJobs.mock.resetCalls();
+    mockProcessJobById.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
 
     mockAssertStaffCanManageClass.mock.mockImplementation(async () => ({ id: "class-1" }));
@@ -159,7 +159,7 @@ describe("teacher job route authorization", () => {
       sourceResults: [],
     }));
     mockEnqueueJob.mock.mockImplementation(async () => "job-1");
-    mockProcessJobs.mock.mockImplementation(async () => undefined);
+    mockProcessJobById.mock.mockImplementation(async () => 1);
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
   });
 
@@ -204,7 +204,8 @@ describe("teacher job route authorization", () => {
     assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 1);
     assert.deepEqual(mockAssertStaffCanManageClass.mock.calls[0]?.arguments, [session, "class-1"]);
     assert.equal(mockEnqueueJob.mock.callCount(), 1);
-    assert.equal(mockProcessJobs.mock.callCount(), 0);
+    assert.equal(mockProcessJobById.mock.callCount(), 1);
+    assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-1"]);
   });
 
   it("queues a retry for requested enabled sources", async () => {
@@ -219,6 +220,43 @@ describe("teacher job route authorization", () => {
     assert.equal(mockEnqueueJob.mock.callCount(), 1);
     assert.deepEqual(mockEnqueueJob.mock.calls[0]?.arguments[0].payload.sources, ["jsearch"]);
     assert.equal(mockEnqueueJob.mock.calls[0]?.arguments[0].dedupeKey, "scrape:config-1:jsearch");
+    assert.equal(mockProcessJobById.mock.callCount(), 1);
+  });
+
+  it("re-kicks an existing queued refresh job when the teacher retries", async () => {
+    mockScrapeRunFindFirst.mock.mockImplementationOnce(async () => ({
+      id: "run-existing",
+      trigger: "manual",
+      status: "queued",
+      requestedById: session.id,
+      backgroundJobId: "job-existing",
+      totalSources: 0,
+      completedSources: 0,
+      failedSources: 0,
+      totalFetched: 0,
+      totalUpserted: 0,
+      error: null,
+      queuedAt: new Date("2026-01-03T00:00:00.000Z"),
+      startedAt: null,
+      completedAt: null,
+      createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      sourceResults: [],
+    }));
+
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.queued, false);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+    assert.equal(mockProcessJobById.mock.callCount(), 1);
+    assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-existing"]);
   });
 
   it("returns scrape status after checking class ownership", async () => {
@@ -267,5 +305,6 @@ describe("teacher job route authorization", () => {
     assert.equal(body.recentRuns.length, 1);
     assert.equal(body.sourceHealth.find((source: { source: string }) => source.source === "jsearch").successRate, 100);
     assert.equal(body.activeJobCount, 7);
+    assert.equal(body.lastScrapedAt, null);
   });
 });

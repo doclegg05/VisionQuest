@@ -20,7 +20,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
 
   const config = await prisma.jobClassConfig.findUnique({
     where: { classId },
-    select: { id: true, sources: true },
+    select: { id: true, sources: true, lastScrapedAt: true },
   });
 
   if (!config) {
@@ -29,6 +29,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
       recentRuns: [],
       sourceHealth: getJobSourceConfigurationStatus(),
       activeJobCount: 0,
+      lastScrapedAt: null,
     });
   }
 
@@ -51,5 +52,6 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     recentRuns: recentRuns.map(serializeScrapeRun),
     sourceHealth: buildSourceHealth(sourceConfig, recentRuns),
     activeJobCount,
+    lastScrapedAt: config.lastScrapedAt?.toISOString() ?? null,
   });
 });

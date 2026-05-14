@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { withTeacherAuth, badRequest, notFound, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
-import { enqueueJob } from "@/lib/jobs";
+import { enqueueJob, processJobById } from "@/lib/jobs";
 import "@/lib/jobs-registry";
 import { logAuditEvent } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 import { serializeScrapeRun } from "@/lib/job-board/scrape-status";
 import { isValidJobSource } from "@/lib/job-board/source-options";
 
@@ -14,6 +15,24 @@ import { isValidJobSource } from "@/lib/job-board/source-options";
  * Manually trigger a job scrape for a class config.
  * Body: { classId: string, sources?: string[] }
  */
+function kickOffScrapeJob(jobId: string | null, classConfigId: string) {
+  if (!jobId) return;
+
+  void processJobById(jobId)
+    .then((processed) => {
+      if (processed === 0) {
+        logger.warn("Manual job refresh was queued but not claimed", { jobId, classConfigId });
+      }
+    })
+    .catch((error) => {
+      logger.error("Manual job refresh processor failed to start", {
+        jobId,
+        classConfigId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+}
+
 export const POST = withTeacherAuth(async (session: Session, req: Request) => {
   const body = await req.json();
   const { classId, sources } = body as { classId?: string; sources?: unknown };
@@ -50,6 +69,7 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
   });
 
   if (existingRun) {
+    kickOffScrapeJob(existingRun.backgroundJobId, config.id);
     return NextResponse.json({
       queued: false,
       message: "Scrape already in progress",
@@ -94,6 +114,8 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
       ? `Manual job refresh triggered for class ${classId} sources ${sortedSourceAllowlist.join(", ")}`
       : `Manual job refresh triggered for class ${classId}`,
   });
+
+  kickOffScrapeJob(jobId, config.id);
 
   return NextResponse.json({
     queued: true,

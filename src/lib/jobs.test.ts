@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prismaAdmin as prisma } from "@/lib/db";
-import { enqueueJob, processJobs, registerJobHandler } from "@/lib/jobs";
+import { enqueueJob, processJobById, processJobs, registerJobHandler } from "@/lib/jobs";
 
 type FindFirstArgs = Parameters<typeof prisma.backgroundJob.findFirst>[0];
 type CreateArgs = Parameters<typeof prisma.backgroundJob.create>[0];
@@ -111,6 +111,30 @@ test("processJobs runs handler and marks job completed on success", async () => 
     assert.deepEqual(handlerCalledWith, { n: 1 });
     assert.equal(updateStub.calls.length, 1);
     assert.equal(updateStub.calls[0].where.id, "job-1");
+    assert.equal(updateStub.calls[0].data.status, "completed");
+  } finally {
+    restoreClaim();
+    updateStub.restore();
+  }
+});
+
+test("processJobById claims and runs one specific pending job", async () => {
+  const restoreClaim = stubQueryRaw([
+    { id: "job-specific", type: "test_specific", payload: JSON.stringify({ source: "manual" }), attempts: 1 },
+  ]);
+  const updateStub = stubBackgroundJobUpdate();
+
+  let handlerCalledWith: unknown = null;
+  registerJobHandler("test_specific", async (payload) => {
+    handlerCalledWith = payload;
+  });
+
+  try {
+    const processed = await processJobById("job-specific");
+    assert.equal(processed, 1);
+    assert.deepEqual(handlerCalledWith, { source: "manual" });
+    assert.equal(updateStub.calls.length, 1);
+    assert.equal(updateStub.calls[0].where.id, "job-specific");
     assert.equal(updateStub.calls[0].data.status, "completed");
   } finally {
     restoreClaim();
