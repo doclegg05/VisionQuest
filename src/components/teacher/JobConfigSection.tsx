@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
 import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
+import type { JobScrapeRunStatusResult, JobSourceHealthResult } from "@/lib/job-board/types";
 
 interface ClassOption {
   id: string;
@@ -22,6 +23,15 @@ interface JobConfig {
 
 const RADIUS_OPTIONS = [10, 25, 50];
 
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return typeof data.error === "string" ? data.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function JobConfigSection() {
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -30,12 +40,26 @@ export function JobConfigSection() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [scrapeRun, setScrapeRun] = useState<JobScrapeRunStatusResult | null>(null);
+  const [recentRuns, setRecentRuns] = useState<JobScrapeRunStatusResult[]>([]);
+  const [sourceHealth, setSourceHealth] = useState<JobSourceHealthResult[]>([]);
+  const [statusRefreshKey, setStatusRefreshKey] = useState(0);
+  const [jobBoardError, setJobBoardError] = useState<string | null>(null);
+  const [jobBoardNotice, setJobBoardNotice] = useState<string | null>(null);
 
   // Form state
   const [region, setRegion] = useState("");
   const [radius, setRadius] = useState(25);
   const [sources, setSources] = useState<string[]>([...DEFAULT_JOB_SOURCES]);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const scrapeInProgress = scrapeRun?.status === "queued" || scrapeRun?.status === "processing";
+  const failedSources = scrapeRun?.sourceResults
+    .filter((source) => source.status === "failed")
+    .map((source) => source.source) ?? [];
+  const selectedSourceHealth = sourceHealth.filter((source) => source.selected);
+  const selectedUnavailableSources = sourceHealth.filter(
+    (source) => sources.includes(source.source) && !source.configured,
+  );
 
   // Fetch classes on mount
   useEffect(() => {
@@ -61,7 +85,7 @@ export function JobConfigSection() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await fetch(`/api/teacher/jobs/config?classId=${selectedClassId}`);
+      const res = await fetch(`/api/teacher/jobs/config?classId=${encodeURIComponent(selectedClassId)}`);
       if (!cancelled && res.ok) {
         const data = await res.json();
         setConfig(data.config);
@@ -77,14 +101,49 @@ export function JobConfigSection() {
           setSources([...DEFAULT_JOB_SOURCES]);
           setAutoRefresh(true);
         }
+      } else if (!cancelled) {
+        setJobBoardError(await readErrorMessage(res, "Could not load Job Scout configuration."));
       }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [selectedClassId, configRefreshKey]);
 
+  useEffect(() => {
+    if (!selectedClassId) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/teacher/jobs/status?classId=${encodeURIComponent(selectedClassId)}`);
+      if (!cancelled && res.ok) {
+        const data = await res.json();
+        setScrapeRun(data.latestRun ?? null);
+        setRecentRuns(data.recentRuns ?? []);
+        setSourceHealth(data.sourceHealth ?? []);
+        if (typeof data.activeJobCount === "number") {
+          setActiveJobCount(data.activeJobCount);
+        }
+        if (data.lastScrapedAt === null || typeof data.lastScrapedAt === "string") {
+          setConfig((current) => current ? { ...current, lastScrapedAt: data.lastScrapedAt } : current);
+        }
+      } else if (!cancelled) {
+        setJobBoardError(await readErrorMessage(res, "Could not load Job Scout status."));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedClassId, statusRefreshKey]);
+
+  useEffect(() => {
+    if (!scrapeInProgress) return;
+    const timer = window.setInterval(() => {
+      setStatusRefreshKey((key) => key + 1);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [scrapeInProgress]);
+
   const handleSave = async () => {
     setSaving(true);
+    setJobBoardError(null);
+    setJobBoardNotice(null);
     const res = await fetch("/api/teacher/jobs/config", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -97,23 +156,38 @@ export function JobConfigSection() {
       }),
     });
     if (res.ok) {
+      setJobBoardNotice("Job board config saved.");
       setConfigRefreshKey((k) => k + 1);
+      setStatusRefreshKey((key) => key + 1);
+    } else {
+      setJobBoardError(await readErrorMessage(res, "Could not save Job Scout configuration."));
     }
     setSaving(false);
   };
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (retrySources?: string[]) => {
     setRefreshing(true);
-    await fetch("/api/teacher/jobs/refresh", {
+    setJobBoardError(null);
+    setJobBoardNotice(null);
+    const res = await fetch("/api/teacher/jobs/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ classId: selectedClassId }),
+      body: JSON.stringify({
+        classId: selectedClassId,
+        sources: retrySources && retrySources.length > 0 ? retrySources : undefined,
+      }),
     });
-    // Wait briefly then refresh config to show updated count
-    setTimeout(() => {
-      setConfigRefreshKey((k) => k + 1);
-      setRefreshing(false);
-    }, 3000);
+    if (res.ok) {
+      const data = await res.json();
+      setScrapeRun(data.run ?? null);
+      if (typeof data.message === "string") {
+        setJobBoardNotice(data.message);
+      }
+      setStatusRefreshKey((key) => key + 1);
+    } else {
+      setJobBoardError(await readErrorMessage(res, "Could not queue Job Scout refresh."));
+    }
+    setRefreshing(false);
   };
 
   const toggleSource = (source: string) => {
@@ -165,13 +239,151 @@ export function JobConfigSection() {
                 </p>
               </div>
               <button
-                onClick={handleRefresh}
-                disabled={refreshing}
+                onClick={() => void handleRefresh()}
+                disabled={refreshing || scrapeInProgress}
                 className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                <ArrowClockwise size={16} className={refreshing ? "animate-spin" : ""} />
-                {refreshing ? "Refreshing..." : "Refresh Now"}
+                <ArrowClockwise size={16} className={refreshing || scrapeInProgress ? "animate-spin" : ""} />
+                {scrapeInProgress ? "Refreshing..." : refreshing ? "Queueing..." : "Refresh Now"}
               </button>
+            </div>
+          )}
+
+          {(jobBoardError || jobBoardNotice) && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                jobBoardError
+                  ? "border-[var(--error)]/40 text-[var(--error)]"
+                  : "border-[var(--border)] text-[var(--text-secondary)]"
+              }`}
+            >
+              {jobBoardError ?? jobBoardNotice}
+            </div>
+          )}
+
+          {scrapeRun && (
+            <div className="surface-section rounded-xl p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                    Job Scout status: {scrapeRun.status}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    Sources {scrapeRun.completedSources}/{scrapeRun.totalSources}
+                    {scrapeRun.failedSources > 0 ? `, ${scrapeRun.failedSources} failed` : ""}
+                    {" · "}
+                    {scrapeRun.totalFetched} fetched, {scrapeRun.totalUpserted} saved
+                  </p>
+                  {scrapeRun.error && (
+                    <p className="mt-2 text-xs text-[var(--error)]">{scrapeRun.error}</p>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {scrapeRun.completedAt
+                    ? `Completed ${new Date(scrapeRun.completedAt).toLocaleString()}`
+                    : scrapeRun.startedAt
+                      ? `Started ${new Date(scrapeRun.startedAt).toLocaleString()}`
+                      : `Queued ${new Date(scrapeRun.queuedAt).toLocaleString()}`}
+                </p>
+              </div>
+              {scrapeRun.sourceResults.length > 0 && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {scrapeRun.sourceResults.map((source) => (
+                    <div
+                      key={source.id}
+                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-[var(--text-primary)]">{source.source}</span>
+                        <span className="text-xs text-[var(--text-secondary)]">{source.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {source.fetchedCount} fetched, {source.upsertedCount} saved
+                      </p>
+                      {source.error && (
+                        <p className="mt-1 text-xs text-[var(--error)]">{source.error}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {failedSources.length > 0 && !scrapeInProgress && (
+                <button
+                  type="button"
+                  onClick={() => void handleRefresh(failedSources)}
+                  disabled={refreshing}
+                  className="mt-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-elevated)] disabled:opacity-50"
+                >
+                  Retry failed sources
+                </button>
+              )}
+            </div>
+          )}
+
+          {selectedSourceHealth.length > 0 && (
+            <div className="surface-section rounded-xl p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Source health</p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Recent source reliability and configuration status.
+                  </p>
+                </div>
+                {selectedUnavailableSources.length > 0 && (
+                  <p className="text-xs text-[var(--error)]">
+                    {selectedUnavailableSources.length} selected source
+                    {selectedUnavailableSources.length === 1 ? "" : "s"} need configuration.
+                  </p>
+                )}
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                {selectedSourceHealth.map((source) => (
+                  <div
+                    key={source.source}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-medium text-[var(--text-primary)]">{source.label}</span>
+                      <span className={`text-xs ${source.configured ? "text-[var(--text-secondary)]" : "text-[var(--error)]"}`}>
+                        {source.configured ? "configured" : "missing key"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      {source.successRate === null ? "No recent runs" : `${source.successRate}% success`}
+                      {source.lastStatus ? ` · last ${source.lastStatus}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      {source.lastFetchedCount} fetched, {source.lastUpsertedCount} saved
+                    </p>
+                    {source.lastError && (
+                      <p className="mt-1 text-xs text-[var(--error)]">{source.lastError}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {recentRuns.length > 1 && (
+            <div className="surface-section rounded-xl p-4">
+              <p className="text-sm font-medium text-[var(--text-primary)]">Recent scrape history</p>
+              <div className="mt-3 space-y-2">
+                {recentRuns.slice(0, 5).map((run) => (
+                  <div
+                    key={run.id}
+                    className="flex flex-col gap-1 rounded-lg border border-[var(--border)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <p className="text-xs text-[var(--text-primary)]">
+                      {run.status} · {run.completedSources}/{run.totalSources} sources · {run.totalUpserted} saved
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {run.completedAt
+                        ? new Date(run.completedAt).toLocaleString()
+                        : new Date(run.queuedAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -213,17 +425,26 @@ export function JobConfigSection() {
               </label>
               <div className="flex flex-wrap gap-2">
                 {JOB_SOURCE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => toggleSource(opt.value)}
-                    className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
-                      sources.includes(opt.value)
-                        ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
-                        : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
+                  <div key={opt.value} className="flex flex-col gap-1">
+                    <button
+                      onClick={() => toggleSource(opt.value)}
+                      className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                        sources.includes(opt.value)
+                          ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
+                          : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                    {sourceHealth.find(
+                      (source) =>
+                        source.source === opt.value &&
+                        sources.includes(opt.value) &&
+                        !source.configured,
+                    ) && (
+                      <span className="px-1 text-xs text-[var(--error)]">Unavailable</span>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

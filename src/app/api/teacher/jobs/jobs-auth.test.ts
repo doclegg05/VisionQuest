@@ -8,8 +8,12 @@ const session = mockTeacherSession();
 const mockAssertStaffCanManageClass = mock.fn() as any;
 const mockFindUnique = mock.fn() as any;
 const mockCount = mock.fn() as any;
+const mockScrapeRunFindFirst = mock.fn() as any;
+const mockScrapeRunFindMany = mock.fn() as any;
+const mockScrapeRunCreate = mock.fn() as any;
+const mockScrapeRunUpdate = mock.fn() as any;
 const mockEnqueueJob = mock.fn() as any;
-const mockProcessJobs = mock.fn() as any;
+const mockProcessJobById = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
 
 function makeHttpError(statusCode: number, message: string) {
@@ -54,6 +58,12 @@ mock.module("@/lib/db", {
       jobListing: {
         count: mockCount,
       },
+      jobScrapeRun: {
+        findFirst: mockScrapeRunFindFirst,
+        findMany: mockScrapeRunFindMany,
+        create: mockScrapeRunCreate,
+        update: mockScrapeRunUpdate,
+      },
     },
   },
 });
@@ -61,7 +71,7 @@ mock.module("@/lib/db", {
 mock.module("@/lib/jobs", {
   namedExports: {
     enqueueJob: mockEnqueueJob,
-    processJobs: mockProcessJobs,
+    processJobById: mockProcessJobById,
     registerJobHandler: () => undefined,
   },
 });
@@ -74,10 +84,12 @@ mock.module("@/lib/audit", {
 
 let configRoute: Awaited<typeof import("./config/route")>;
 let refreshRoute: Awaited<typeof import("./refresh/route")>;
+let statusRoute: Awaited<typeof import("./status/route")>;
 
 before(async () => {
   configRoute = await import("./config/route");
   refreshRoute = await import("./refresh/route");
+  statusRoute = await import("./status/route");
 });
 
 describe("teacher job route authorization", () => {
@@ -85,8 +97,12 @@ describe("teacher job route authorization", () => {
     mockAssertStaffCanManageClass.mock.resetCalls();
     mockFindUnique.mock.resetCalls();
     mockCount.mock.resetCalls();
+    mockScrapeRunFindFirst.mock.resetCalls();
+    mockScrapeRunFindMany.mock.resetCalls();
+    mockScrapeRunCreate.mock.resetCalls();
+    mockScrapeRunUpdate.mock.resetCalls();
     mockEnqueueJob.mock.resetCalls();
-    mockProcessJobs.mock.resetCalls();
+    mockProcessJobById.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
 
     mockAssertStaffCanManageClass.mock.mockImplementation(async () => ({ id: "class-1" }));
@@ -102,8 +118,48 @@ describe("teacher job route authorization", () => {
       lastScrapedAt: null,
     }));
     mockCount.mock.mockImplementation(async () => 7);
+    mockScrapeRunFindFirst.mock.mockImplementation(async () => null);
+    mockScrapeRunFindMany.mock.mockImplementation(async () => []);
+    mockScrapeRunCreate.mock.mockImplementation(async () => ({
+      id: "run-1",
+      trigger: "manual",
+      status: "queued",
+      requestedById: session.id,
+      backgroundJobId: null,
+      totalSources: 0,
+      completedSources: 0,
+      failedSources: 0,
+      totalFetched: 0,
+      totalUpserted: 0,
+      error: null,
+      queuedAt: new Date("2026-01-03T00:00:00.000Z"),
+      startedAt: null,
+      completedAt: null,
+      createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      sourceResults: [],
+    }));
+    mockScrapeRunUpdate.mock.mockImplementation(async () => ({
+      id: "run-1",
+      trigger: "manual",
+      status: "queued",
+      requestedById: session.id,
+      backgroundJobId: "job-1",
+      totalSources: 0,
+      completedSources: 0,
+      failedSources: 0,
+      totalFetched: 0,
+      totalUpserted: 0,
+      error: null,
+      queuedAt: new Date("2026-01-03T00:00:00.000Z"),
+      startedAt: null,
+      completedAt: null,
+      createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      sourceResults: [],
+    }));
     mockEnqueueJob.mock.mockImplementation(async () => "job-1");
-    mockProcessJobs.mock.mockImplementation(async () => undefined);
+    mockProcessJobById.mock.mockImplementation(async () => 1);
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
   });
 
@@ -148,5 +204,107 @@ describe("teacher job route authorization", () => {
     assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 1);
     assert.deepEqual(mockAssertStaffCanManageClass.mock.calls[0]?.arguments, [session, "class-1"]);
     assert.equal(mockEnqueueJob.mock.callCount(), 1);
+    assert.equal(mockProcessJobById.mock.callCount(), 1);
+    assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-1"]);
+  });
+
+  it("queues a retry for requested enabled sources", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1", sources: ["jsearch"] },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 200);
+    assert.equal(mockEnqueueJob.mock.callCount(), 1);
+    assert.deepEqual(mockEnqueueJob.mock.calls[0]?.arguments[0].payload.sources, ["jsearch"]);
+    assert.equal(mockEnqueueJob.mock.calls[0]?.arguments[0].dedupeKey, "scrape:config-1:jsearch");
+    assert.equal(mockProcessJobById.mock.callCount(), 1);
+  });
+
+  it("re-kicks an existing queued refresh job when the teacher retries", async () => {
+    mockScrapeRunFindFirst.mock.mockImplementationOnce(async () => ({
+      id: "run-existing",
+      trigger: "manual",
+      status: "queued",
+      requestedById: session.id,
+      backgroundJobId: "job-existing",
+      totalSources: 0,
+      completedSources: 0,
+      failedSources: 0,
+      totalFetched: 0,
+      totalUpserted: 0,
+      error: null,
+      queuedAt: new Date("2026-01-03T00:00:00.000Z"),
+      startedAt: null,
+      completedAt: null,
+      createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      sourceResults: [],
+    }));
+
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.queued, false);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+    assert.equal(mockProcessJobById.mock.callCount(), 1);
+    assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-existing"]);
+  });
+
+  it("returns scrape status after checking class ownership", async () => {
+    mockScrapeRunFindMany.mock.mockImplementationOnce(async () => [{
+      id: "run-2",
+      trigger: "manual",
+      status: "completed",
+      requestedById: session.id,
+      backgroundJobId: "job-2",
+      totalSources: 2,
+      completedSources: 2,
+      failedSources: 0,
+      totalFetched: 10,
+      totalUpserted: 8,
+      error: null,
+      queuedAt: new Date("2026-01-03T00:00:00.000Z"),
+      startedAt: new Date("2026-01-03T00:01:00.000Z"),
+      completedAt: new Date("2026-01-03T00:02:00.000Z"),
+      createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-03T00:02:00.000Z"),
+      sourceResults: [{
+        id: "source-1",
+        scrapeRunId: "run-2",
+        source: "jsearch",
+        status: "completed",
+        fetchedCount: 10,
+        upsertedCount: 8,
+        error: null,
+        startedAt: new Date("2026-01-03T00:01:00.000Z"),
+        completedAt: new Date("2026-01-03T00:02:00.000Z"),
+        createdAt: new Date("2026-01-03T00:01:00.000Z"),
+        updatedAt: new Date("2026-01-03T00:02:00.000Z"),
+      }],
+    }]);
+
+    const req = mockRequest("/api/teacher/jobs/status", {
+      searchParams: { classId: "class-1" },
+    });
+
+    const res = await statusRoute.GET(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 1);
+    assert.equal(body.latestRun.status, "completed");
+    assert.equal(body.recentRuns.length, 1);
+    assert.equal(body.sourceHealth.find((source: { source: string }) => source.source === "jsearch").successRate, 100);
+    assert.equal(body.activeJobCount, 7);
+    assert.equal(body.lastScrapedAt, null);
   });
 });

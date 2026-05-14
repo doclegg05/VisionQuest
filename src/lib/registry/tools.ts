@@ -875,8 +875,8 @@ export const TOOLS: readonly ToolDefinition[] = [
   {
     id: "career.jobs_save",
     namespace: "career",
-    name: "Save Job",
-    description: "Bookmark a job listing for later review",
+    name: "Track Job",
+    description: "Save a job listing or update its application status and notes",
     endpoint: { method: "POST", path: "/api/jobs/save" },
     requiredRoles: ["student"],
     auditLevel: "basic",
