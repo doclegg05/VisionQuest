@@ -4,9 +4,9 @@
  *
  * Sage drafts goals with status="proposed". Students confirm or
  * dismiss them via the Goals page; staff can also confirm on the
- * student's behalf. Confirmation flips status to "active" and stamps
+ * student's behalf. Confirmation flips status to "confirmed" and stamps
  * confirmedAt/confirmedBy. The traceability fields (sourceMessageId)
- * close the loop: any "active" goal can answer "did Sage propose
+ * close the loop: any confirmed goal can answer "did Sage propose
  * this, and how long did it take to confirm?"
  *
  * Idempotency: deduped on (studentId, sourceMessageId, level). The

@@ -70,12 +70,17 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
     }
   }
 
-  // Handle confirmation: when status changes to "confirmed", set confirmedAt/By
-  if (updates.status === "confirmed") {
-    const CONFIRMABLE_FROM = ["active", "in_progress"];
-    if (!CONFIRMABLE_FROM.includes(goal.status)) {
-      throw badRequest(`Cannot confirm a goal with status '${goal.status}'. Only active or in-progress goals can be confirmed.`);
+  // Handle confirmation: proposed Sage goals and student-entered active goals
+  // both become confirmed only after a human explicitly accepts them.
+  if (updates.status === "confirmed" || ("confirm" in body && body.confirm === true)) {
+    const CONFIRMABLE_FROM = ["proposed", "active", "in_progress"];
+    const effectiveStatus = updates.status && updates.status !== "confirmed"
+      ? updates.status
+      : goal.status;
+    if (!CONFIRMABLE_FROM.includes(effectiveStatus)) {
+      throw badRequest(`Cannot confirm a goal with status '${effectiveStatus}'.`);
     }
+    updates.status = "confirmed";
     updates.confirmedAt = new Date();
     updates.confirmedBy = session.id;
   }

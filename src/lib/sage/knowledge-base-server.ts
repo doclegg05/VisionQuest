@@ -22,6 +22,61 @@ interface SageDocument {
 
 type CallerRole = "student" | "staff";
 
+function isSageRagEnabled(): boolean {
+  const value = process.env.SAGE_RAG_ENABLED;
+  if (!value) return true;
+  return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+}
+
+const GENERIC_RETRIEVAL_WORDS = new Set([
+  "about",
+  "category",
+  "certificate",
+  "certificates",
+  "certification",
+  "complete",
+  "document",
+  "documents",
+  "file",
+  "fillable",
+  "form",
+  "forms",
+  "guide",
+  "guides",
+  "information",
+  "need",
+  "needs",
+  "platform",
+  "program",
+  "related",
+  "required",
+  "student",
+  "students",
+  "submit",
+  "used",
+  "uses",
+  "using",
+  "work",
+]);
+
+function tokenizeForRetrieval(text: string, minLength: number): string[] {
+  return (
+    text
+      .toLowerCase()
+      .match(/[a-z0-9]+/g)
+      ?.filter((word) => word.length >= minLength && !GENERIC_RETRIEVAL_WORDS.has(word)) ?? []
+  );
+}
+
+function messageIncludesIdentifier(messageLower: string, identifier: string): boolean {
+  const normalizedIdentifier = identifier.toLowerCase().replace(/[-_]+/g, " ");
+  const normalizedMessage = messageLower.replace(/[-_]+/g, " ");
+  return (
+    messageLower.includes(identifier.toLowerCase()) ||
+    normalizedMessage.includes(normalizedIdentifier)
+  );
+}
+
 async function loadSageDocuments(callerRole: CallerRole): Promise<SageDocument[]> {
   const cacheKey = `sage:documents:${callerRole}`;
   // Filter by audience: students only see STUDENT + BOTH; staff see all
@@ -69,26 +124,26 @@ function scoreDocument(doc: SageDocument, messageLower: string): number {
   let score = 0;
 
   // Match title words (each word matched adds its length)
-  const titleWords = doc.title.toLowerCase().split(/\s+/);
+  const titleWords = tokenizeForRetrieval(doc.title, 3);
   for (const word of titleWords) {
-    if (word.length >= 3 && messageLower.includes(word)) {
+    if (messageLower.includes(word)) {
       score += word.length;
     }
   }
 
   // Match certificationId and platformId directly
-  if (doc.certificationId && messageLower.includes(doc.certificationId.toLowerCase())) {
+  if (doc.certificationId && messageIncludesIdentifier(messageLower, doc.certificationId)) {
     score += doc.certificationId.length * 2; // higher weight for exact ID match
   }
-  if (doc.platformId && messageLower.includes(doc.platformId.toLowerCase())) {
+  if (doc.platformId && messageIncludesIdentifier(messageLower, doc.platformId)) {
     score += doc.platformId.length * 2;
   }
 
   // Match keywords in sageContextNote (first 500 chars for better recall)
   if (doc.sageContextNote) {
-    const noteWords = doc.sageContextNote.toLowerCase().slice(0, 500).split(/\s+/);
+    const noteWords = tokenizeForRetrieval(doc.sageContextNote.slice(0, 500), 4);
     for (const word of noteWords) {
-      if (word.length >= 4 && messageLower.includes(word)) {
+      if (messageLower.includes(word)) {
         score += 1; // lower weight for note matches
       }
     }
@@ -147,6 +202,8 @@ export async function getDocumentContext(
   maxResults: number = 3,
   tokenBudgetChars: number = TOKEN_BUDGET_CHARS,
 ): Promise<string> {
+  if (!isSageRagEnabled()) return "";
+
   const messageLower = userMessage.toLowerCase();
 
   const [docs, snippets] = await Promise.all([

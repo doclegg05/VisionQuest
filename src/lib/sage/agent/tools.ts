@@ -100,7 +100,7 @@ const presentForm: AgentTool = {
       },
       action: {
         action: "open_form",
-        target: `/student/forms/${match.id}`,
+        target: `/forms/${match.id}`,
         label: `Open ${match.title}`,
       },
       modelHint: `Surfaced form "${match.title}" (${match.category}). The student now has a button to open it. Briefly tell them what the form is for and any next step.`,
@@ -267,7 +267,7 @@ const lookupAppointment: AgentTool = {
       },
       action: {
         action: "navigate",
-        target: "/student/appointments",
+        target: "/appointments",
         label: "View all appointments",
       },
       modelHint: `Upcoming: ${appointments
@@ -284,37 +284,37 @@ const lookupAppointment: AgentTool = {
 const STATIC_RESOURCES: Record<string, { label: string; href: string; summary: string }> = {
   "dress-code": {
     label: "Dress Code",
-    href: "/student/resources/dress-code",
+    href: "/resources",
     summary: "SPOKES dress-code policy and acknowledgment.",
   },
   "attendance-policy": {
     label: "Attendance Policy",
-    href: "/student/resources/attendance",
+    href: "/resources",
     summary: "Attendance expectations, lateness, and absence reporting.",
   },
   "student-handbook": {
     label: "Student Handbook",
-    href: "/student/resources/handbook",
+    href: "/resources",
     summary: "Full student handbook with policies and resources.",
   },
   "career-discovery": {
     label: "Career Discovery",
-    href: "/student/career",
+    href: "/career",
     summary: "Career discovery questionnaire and pathway recommendations.",
   },
   "vision-board": {
     label: "Vision Board",
-    href: "/student/vision-board",
+    href: "/vision-board",
     summary: "Your goal vision board.",
   },
   goals: {
     label: "Goals",
-    href: "/student/goals",
+    href: "/goals",
     summary: "Your active goals and BHAG.",
   },
   portfolio: {
     label: "Portfolio",
-    href: "/student/portfolio",
+    href: "/portfolio",
     summary: "Your employment portfolio (resume, references, samples).",
   },
 };

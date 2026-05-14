@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { withAuth, badRequest, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { checkLength } from "@/lib/validation";
 
 const VALID_STATUSES = ["saved", "applied", "interviewing", "offered", "withdrawn"];
+const APPLIED_STATUSES = new Set(["applied", "interviewing", "offered"]);
 
 /**
  * POST /api/jobs/save
@@ -28,14 +30,43 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     throw badRequest(`Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`);
   }
 
-  // Verify job exists
-  const job = await prisma.jobListing.findUnique({
-    where: { id: jobListingId },
+  const cleanNotes = typeof notes === "string" ? notes.trim() : notes;
+  if (typeof cleanNotes === "string") {
+    const notesError = checkLength(cleanNotes, "notes", "Job notes");
+    if (notesError) throw badRequest(notesError);
+  }
+
+  const enrollment = await prisma.studentClassEnrollment.findFirst({
+    where: { studentId: session.id, status: "active" },
+    select: { classId: true },
+  });
+  if (!enrollment) {
+    throw badRequest("No active class enrollment found");
+  }
+
+  // Verify the job belongs to the student's active class before tracking it.
+  const job = await prisma.jobListing.findFirst({
+    where: {
+      id: jobListingId,
+      classConfig: { classId: enrollment.classId },
+    },
     select: { id: true, title: true },
   });
   if (!job) {
     throw badRequest("Job listing not found");
   }
+
+  const existingSavedJob = await prisma.studentSavedJob.findUnique({
+    where: {
+      studentId_jobListingId: {
+        studentId: session.id,
+        jobListingId,
+      },
+    },
+    select: { appliedAt: true },
+  });
+  const shouldSetAppliedAt = APPLIED_STATUSES.has(saveStatus) && !existingSavedJob?.appliedAt;
+  const appliedAt = shouldSetAppliedAt ? new Date() : undefined;
 
   const savedJob = await prisma.studentSavedJob.upsert({
     where: {
@@ -48,11 +79,13 @@ export const POST = withAuth(async (session: Session, req: Request) => {
       studentId: session.id,
       jobListingId,
       status: saveStatus,
-      notes: notes ?? null,
+      notes: cleanNotes || null,
+      appliedAt: APPLIED_STATUSES.has(saveStatus) ? (appliedAt ?? new Date()) : null,
     },
     update: {
       status: saveStatus,
-      notes: notes !== undefined ? notes : undefined,
+      notes: notes !== undefined ? cleanNotes || null : undefined,
+      appliedAt,
     },
   });
 

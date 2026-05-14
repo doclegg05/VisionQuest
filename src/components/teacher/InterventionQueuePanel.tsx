@@ -13,9 +13,12 @@ import {
   NotePencil,
   CalendarPlus,
   BookOpenText,
+  CheckCircle,
+  Clock,
 } from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
 import ProgramBadge from "@/components/ui/ProgramBadge";
+import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import {
   type InterventionQueueResponse as QueueResponse,
   type QueueStudent,
@@ -42,6 +45,27 @@ function topReason(signals: QueueStudent["signals"]): string {
   if (!signals.orientationComplete)
     return `Orientation ${Math.round(signals.orientationProgress * 100)}%`;
   return "Low readiness";
+}
+
+function buildQueueActionIntent(student: QueueStudent): DashboardActionIntent | null {
+  const alert = student.primaryAlert;
+  if (!alert || !student.recommendedAction.kind) return null;
+  if (student.recommendedAction.kind === "assign_support" && alert.sourceType !== "goal") return null;
+
+  return {
+    kind: student.recommendedAction.kind,
+    title: alert.title,
+    summary: alert.summary,
+    severity: alert.severity,
+    student: {
+      id: student.studentId,
+      studentId: student.publicStudentId,
+      displayName: student.name,
+    },
+    alertId: alert.id,
+    goalId: alert.sourceType === "goal" ? alert.sourceId : null,
+    linkId: alert.sourceType === "goal_resource_link" ? alert.sourceId : null,
+  };
 }
 
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
@@ -354,21 +378,26 @@ function QuickAppointmentModal({
 
 function StudentRow({
   student,
+  onPrimaryAction,
+  onAlertAction,
   onQuickTask,
   onQuickNote,
   onSchedule,
 }: {
   student: QueueStudent;
+  onPrimaryAction: (student: QueueStudent) => void;
+  onAlertAction: (alertId: string, action: "resolve" | "snooze") => void;
   onQuickTask: (studentId: string, name: string) => void;
   onQuickNote: (studentId: string, name: string) => void;
   onSchedule: (studentId: string, name: string) => void;
 }) {
   const badge = urgencyBadge(student.urgencyScore);
-  const reason = topReason(student.signals);
+  const reason = student.primaryAlert?.title ?? topReason(student.signals);
   const { signals } = student;
+  const actionIntent = buildQueueActionIntent(student);
 
   return (
-    <div className="flex items-center gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)]">
+    <div className="flex flex-col gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)] lg:flex-row lg:items-center">
       {/* Avatar placeholder */}
       <Link href={`/teacher/students/${student.studentId}`} className="shrink-0">
         <UserCircle
@@ -387,6 +416,11 @@ function StudentRow({
           <ProgramBadge programType={student.programType} size="sm" />
         </div>
         <p className="truncate text-xs text-[var(--ink-muted)]">{reason}</p>
+        {student.primaryAlert?.summary ? (
+          <p className="mt-0.5 line-clamp-2 text-xs text-[var(--ink-muted)]">
+            {student.primaryAlert.summary}
+          </p>
+        ) : null}
       </Link>
 
       {/* Signal icons */}
@@ -423,7 +457,52 @@ function StudentRow({
       </div>
 
       {/* Quick actions */}
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1">
+        {actionIntent ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onPrimaryAction(student);
+            }}
+            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90"
+          >
+            {student.recommendedAction.label}
+          </button>
+        ) : (
+          <Link
+            href={student.recommendedAction.href}
+            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90"
+          >
+            {student.recommendedAction.label}
+          </Link>
+        )}
+        {student.primaryAlert ? (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                onAlertAction(student.primaryAlert!.id, "snooze");
+              }}
+              title="Snooze for 24 hours"
+              className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+            >
+              <Clock size={16} weight="regular" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                onAlertAction(student.primaryAlert!.id, "resolve");
+              }}
+              title="Mark resolved"
+              className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+            >
+              <CheckCircle size={16} weight="regular" />
+            </button>
+          </>
+        ) : null}
         <button
           onClick={(e) => {
             e.preventDefault();
@@ -479,6 +558,8 @@ export default function InterventionQueuePanel({
   const [taskTarget, setTaskTarget] = useState<{ studentId: string; name: string } | null>(null);
   const [noteTarget, setNoteTarget] = useState<{ studentId: string; name: string } | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<{ studentId: string; name: string } | null>(null);
+  const [actionIntent, setActionIntent] = useState<DashboardActionIntent | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const classId = searchParams.get("classId")?.trim() || "";
 
@@ -502,8 +583,41 @@ export default function InterventionQueuePanel({
     void fetchQueue();
   }, [initialQueue, fetchQueue, classId]);
 
+  async function handleAlertAction(alertId: string, action: "resolve" | "snooze") {
+    setActionMessage(null);
+    try {
+      await api.patch(`/api/teacher/alerts/${alertId}`, {
+        action,
+        ...(action === "snooze" ? { hours: 24 } : {}),
+      });
+      setActionMessage(action === "snooze" ? "Queue item snoozed for 24 hours." : "Queue item marked resolved.");
+      await fetchQueue();
+    } catch {
+      setActionMessage("Could not update that queue item.");
+    }
+  }
+
+  function handlePrimaryAction(student: QueueStudent) {
+    const intent = buildQueueActionIntent(student);
+    if (intent) {
+      setActionIntent(intent);
+    }
+  }
+
   return (
     <section className="surface-section p-5">
+      {actionIntent ? (
+        <div className="mb-5">
+          <DashboardActionPanel
+            intent={actionIntent}
+            onClose={() => setActionIntent(null)}
+            onChanged={async () => {
+              await fetchQueue();
+            }}
+          />
+        </div>
+      ) : null}
+
       {/* Header */}
       <div className="mb-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
@@ -517,6 +631,11 @@ export default function InterventionQueuePanel({
             {queue.length} student{queue.length !== 1 ? "s" : ""} need follow-up
           </p>
         )}
+        {actionMessage ? (
+          <p className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]">
+            {actionMessage}
+          </p>
+        ) : null}
       </div>
 
       {/* Body */}
@@ -540,6 +659,8 @@ export default function InterventionQueuePanel({
             <StudentRow
               key={student.studentId}
               student={student}
+              onPrimaryAction={handlePrimaryAction}
+              onAlertAction={(alertId, action) => void handleAlertAction(alertId, action)}
               onQuickTask={(id, name) => setTaskTarget({ studentId: id, name })}
               onQuickNote={(id, name) => setNoteTarget({ studentId: id, name })}
               onSchedule={(id, name) => setScheduleTarget({ studentId: id, name })}

@@ -46,6 +46,85 @@ function containsPhrase(text: string, phrase: string): boolean {
   return ` ${text} `.includes(` ${phrase} `);
 }
 
+const STUDENT_CONTEXT_COMMAND_PATTERN =
+  /^\/(?:student|intervention|progress|record|goals|tasks|notes|appointments?)\b/i;
+
+const STUDENT_CONTEXT_INTENT_PATTERN =
+  /\b(?:student|learner|participant|progress|readiness|intervention|at\s+risk|at-risk|goal|goals|record|profile|missing\s+forms?|orientation|certification|portfolio|appointment|case\s+note|alert)\b/i;
+
+const PRONOUN_REFERENCE_PATTERN = /\b(?:he|she|they|him|her|them|his|hers|their)\b/i;
+
+const STUDENT_REFERENCE_LEAD_PATTERN =
+  /\b(?:for|about|with|on|check|review|pull|load|look\s+up|tell\s+me\s+about)\s+([A-Za-z][A-Za-z0-9._'-]*)/g;
+
+const NON_STUDENT_REFERENCE_WORDS = new Set([
+  "class",
+  "course",
+  "forms",
+  "form",
+  "goal",
+  "goals",
+  "lesson",
+  "orientation",
+  "policy",
+  "program",
+  "report",
+  "students",
+  "student",
+  "this",
+  "today",
+  "tomorrow",
+  "week",
+]);
+
+function hasLikelyStudentReference(message: string): boolean {
+  for (const match of message.matchAll(STUDENT_REFERENCE_LEAD_PATTERN)) {
+    const candidate = match[1]?.toLowerCase();
+    if (candidate && !NON_STUDENT_REFERENCE_WORDS.has(candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Cheap preflight for staff chat. Most instructor turns are planning,
+ * drafting, or program questions and should not pay the cost of loading
+ * managed-student rosters and full verified records. Return true only when
+ * the text clearly asks for student-specific context or follows up on a
+ * prior student-specific turn.
+ */
+export function shouldAttemptStaffStudentContext(
+  currentMessage: string,
+  priorUserMessages: string[] = [],
+): boolean {
+  if (STUDENT_CONTEXT_COMMAND_PATTERN.test(currentMessage.trim())) {
+    return true;
+  }
+
+  if (
+    STUDENT_CONTEXT_INTENT_PATTERN.test(currentMessage) &&
+    hasLikelyStudentReference(currentMessage)
+  ) {
+    return true;
+  }
+
+  if (
+    PRONOUN_REFERENCE_PATTERN.test(currentMessage) &&
+    priorUserMessages.some((message) =>
+      STUDENT_CONTEXT_COMMAND_PATTERN.test(message.trim()) ||
+      (
+        STUDENT_CONTEXT_INTENT_PATTERN.test(message) &&
+        hasLikelyStudentReference(message)
+      ),
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function candidateMatchScore(candidate: StaffStudentCandidate, text: string): number {
   const normalizedText = normalizeText(text);
   if (!normalizedText) return 0;

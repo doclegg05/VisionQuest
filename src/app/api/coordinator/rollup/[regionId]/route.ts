@@ -9,6 +9,7 @@ import {
   type GrantGoalRow,
 } from "@/lib/grant-metrics";
 import { listInstructorMetricsForRegion } from "@/lib/instructor-metrics";
+import { getGoalProposalConfirmationMetrics } from "@/lib/sage/closed-loop-metrics";
 
 interface RouteContext {
   params: Promise<{ regionId: string }>;
@@ -25,10 +26,15 @@ export const GET = withCoordinatorAuth(
     const url = new URL(req.url);
     const period = resolvePeriod(url);
 
-    const [rollup, instructorMetrics, unregionedClasses] = await Promise.all([
+    const [rollup, instructorMetrics, unregionedClasses, sageEffectiveness] = await Promise.all([
       getRegionRollup(regionId, period),
       listInstructorMetricsForRegion(regionId),
       countUnregionedClasses(),
+      getGoalProposalConfirmationMetrics({
+        regionId,
+        periodStart: period.start,
+        periodEnd: period.end,
+      }),
     ]);
 
     if (!rollup) throw notFound("Region not found.");
@@ -42,6 +48,11 @@ export const GET = withCoordinatorAuth(
       },
       instructorMetrics,
       unregionedClasses,
+      sageEffectiveness: {
+        ...sageEffectiveness,
+        periodStart: sageEffectiveness.periodStart.toISOString(),
+        periodEnd: sageEffectiveness.periodEnd.toISOString(),
+      },
     });
   },
 );

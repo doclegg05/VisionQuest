@@ -72,6 +72,10 @@ export const POST = withRegistry("goals.create", async (session, req, _ctx, _too
     throw badRequest("Goal status is invalid.");
   }
 
+  if (rawStatus === "proposed") {
+    throw badRequest("Proposed goals must be created through Sage.");
+  }
+
   if (parentId) {
     const parentGoal = await prisma.goal.findFirst({
       where: { id: parentId, studentId: session.id },

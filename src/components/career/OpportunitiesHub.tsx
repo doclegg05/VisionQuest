@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 interface OpportunityItem {
   id: string;
@@ -191,8 +192,20 @@ export default function OpportunitiesHub({
       ) : null}
 
       {opportunities.length === 0 ? (
-        <div className="surface-section p-8 text-center text-[var(--ink-muted)]">
-          No opportunities are posted yet.
+        <div className="surface-section p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Opportunity pipeline
+          </p>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No posted opportunities yet</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
+            While you wait, Sage can help you get your resume, portfolio, and interview talking points ready.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <AskSageLink
+              prompt="No opportunities are posted yet. Help me prepare for applications by improving my resume, portfolio proof, and interview talking points."
+              label="Prepare with Sage"
+            />
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

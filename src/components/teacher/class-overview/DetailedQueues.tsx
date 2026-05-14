@@ -374,6 +374,7 @@ export default function DetailedQueues({
                                   summary: item.summary,
                                   severity: item.severity,
                                   student: item.student,
+                                  alertId: item.id,
                                   goalId: null,
                                   linkId: null,
                                 })

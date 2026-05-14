@@ -3,7 +3,8 @@ import { badRequest, notFound, withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
-import { isGoalStatus } from "@/lib/goals";
+import { ensureGoalLevelProgression } from "@/lib/goal-progression";
+import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
 
 export const PATCH = withTeacherAuth(async (
   session,
@@ -49,9 +50,9 @@ export const PATCH = withTeacherAuth(async (
 
   // Teacher confirmation (explicit confirm flag or status change to confirmed)
   if (updates.status === "confirmed" || ("confirm" in body && body.confirm === true)) {
-    const CONFIRMABLE_FROM = ["active", "in_progress"];
+    const CONFIRMABLE_FROM = ["proposed", "active", "in_progress"];
     const effectiveStatus = updates.status && updates.status !== "confirmed" ? updates.status : goal.status;
-    if (updates.status !== "confirmed" && !CONFIRMABLE_FROM.includes(effectiveStatus)) {
+    if (!CONFIRMABLE_FROM.includes(effectiveStatus)) {
       throw badRequest(`Cannot confirm a goal with status '${effectiveStatus}'.`);
     }
     updates.status = "confirmed";
@@ -88,5 +89,10 @@ export const PATCH = withTeacherAuth(async (
   });
 
   invalidatePrefix(`goals:${studentId}`);
+
+  if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
+    await ensureGoalLevelProgression(studentId, [updatedGoal.level]);
+  }
+
   return NextResponse.json({ goal: updatedGoal });
 });

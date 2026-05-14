@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Command, PaperPlaneTilt, Plus, Sparkle } from "@phosphor-icons/react";
 import { CommandPalette } from "./CommandPalette";
-import { type ChatRole } from "@/lib/chat/commands";
+import { type ChatRole, type SlashCommand } from "@/lib/chat/commands";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -16,6 +16,7 @@ interface ChatInputProps {
 export default function ChatInput({ onSend, disabled, compact, role = "student" }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [serverCommands, setServerCommands] = useState<SlashCommand[] | undefined>();
   const [focused, setFocused] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -30,6 +31,51 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     }
     prevDisabledRef.current = disabled;
   }, [disabled]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadServerCommands() {
+      try {
+        const res = await fetch("/api/chat/slash-commands", { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json() as {
+          agentEnabled?: boolean;
+          commands?: Array<{
+            name: string;
+            label: string;
+            description: string;
+            argHint?: string;
+            requiresArg?: boolean;
+          }>;
+        };
+        if (cancelled) return;
+        if (!data.agentEnabled || !data.commands?.length) {
+          setServerCommands(undefined);
+          return;
+        }
+        setServerCommands(
+          data.commands.map((command) => {
+            const slash = command.name.startsWith("/") ? command.name : `/${command.name}`;
+            return {
+              slash,
+              label: command.label,
+              description: command.description,
+              prefill: command.requiresArg ? `${slash} ` : slash,
+              roles: [role],
+            };
+          }),
+        );
+      } catch {
+        if (!cancelled) setServerCommands(undefined);
+      }
+    }
+
+    void loadServerCommands();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = message.trim();
@@ -166,7 +212,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
         />
         <div
           className={[
-            "relative flex flex-col overflow-visible rounded-[1.75rem] border bg-[var(--surface-raised)] shadow-[0_18px_48px_rgba(7,23,43,0.12)]",
+            "relative flex flex-col overflow-visible rounded-[1.75rem] border bg-[var(--chat-panel-bg)] shadow-[0_18px_48px_rgba(7,23,43,0.12)]",
             "transition-colors duration-200",
             focused
               ? "border-[var(--chat-input-border)] shadow-[0_18px_48px_rgba(7,23,43,0.16)]"
@@ -192,6 +238,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             open={paletteOpen && !disabled}
             input={message}
             role={role}
+            commands={serverCommands}
             onSelect={handleSelectCommand}
             onClose={() => setPaletteOpen(false)}
           />
