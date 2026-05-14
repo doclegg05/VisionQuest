@@ -2,6 +2,10 @@
 
 :root,
 [data-theme="light"] {
+  /* Tell the browser to render native form controls (select dropdowns,
+     scrollbars, etc.) using light-mode system colors. */
+  color-scheme: light;
+
   /* Brand Colors (unchanged) */
   --primary: #007baf;
   --accent: #37b550;
@@ -118,6 +122,10 @@
 }
 
 [data-theme="dark"] {
+  /* Without this, native <select> option lists render with light-mode
+     text on the dark page background — invisible text in dropdowns. */
+  color-scheme: dark;
+
   --surface-base: #0a1628;
   --surface-raised: rgba(20, 35, 56, 0.94);
   --surface-soft: rgba(15, 28, 47, 0.90);
@@ -785,8 +793,11 @@ select.theme-input::placeholder {
 }
 
 select.field option {
-  background: #fff;
-  color: #1a1a1a;
+  /* Use theme-aware colors so dropdown options stay readable in both
+     light and dark mode. color-scheme on :root usually handles this,
+     but explicit colors guard against browsers that ignore it. */
+  background: var(--surface-raised);
+  color: var(--foreground);
 }
 
 @media (min-width: 768px) {
