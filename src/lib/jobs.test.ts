@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prismaAdmin as prisma } from "@/lib/db";
-import { processJobs, registerJobHandler } from "@/lib/jobs";
+import { enqueueJob, processJobById, processJobs, registerJobHandler } from "@/lib/jobs";
 
+type FindFirstArgs = Parameters<typeof prisma.backgroundJob.findFirst>[0];
+type CreateArgs = Parameters<typeof prisma.backgroundJob.create>[0];
 type UpdateArgs = Parameters<typeof prisma.backgroundJob.update>[0];
 
 interface ClaimedRow {
@@ -37,6 +39,61 @@ function stubBackgroundJobUpdate() {
   };
 }
 
+function stubBackgroundJobFindFirst(result: unknown) {
+  const calls: FindFirstArgs[] = [];
+  const original = prisma.backgroundJob.findFirst;
+  (prisma.backgroundJob.findFirst as unknown as (args: FindFirstArgs) => Promise<unknown>) = async (
+    args: FindFirstArgs,
+  ) => {
+    calls.push(args);
+    return result;
+  };
+  return {
+    calls,
+    restore() {
+      prisma.backgroundJob.findFirst = original;
+    },
+  };
+}
+
+function stubBackgroundJobCreate() {
+  const calls: CreateArgs[] = [];
+  const original = prisma.backgroundJob.create;
+  (prisma.backgroundJob.create as unknown as (args: CreateArgs) => Promise<unknown>) = async (
+    args: CreateArgs,
+  ) => {
+    calls.push(args);
+    return { id: "created-job" };
+  };
+  return {
+    calls,
+    restore() {
+      prisma.backgroundJob.create = original;
+    },
+  };
+}
+
+test("enqueueJob persists the dedupe key on newly created jobs", async () => {
+  const findStub = stubBackgroundJobFindFirst(null);
+  const createStub = stubBackgroundJobCreate();
+
+  try {
+    const jobId = await enqueueJob({
+      type: "scrape_jobs",
+      payload: { configId: "config-1" },
+      dedupeKey: "scrape:config-1",
+    });
+
+    assert.equal(jobId, "created-job");
+    assert.equal(findStub.calls.length, 1);
+    assert.equal(createStub.calls.length, 1);
+    assert.equal(createStub.calls[0].data.dedupeKey, "scrape:config-1");
+  } finally {
+    findStub.restore();
+    createStub.restore();
+  }
+});
+
 test("processJobs runs handler and marks job completed on success", async () => {
   const restoreClaim = stubQueryRaw([
     { id: "job-1", type: "test_success", payload: JSON.stringify({ n: 1 }), attempts: 1 },
@@ -54,6 +111,30 @@ test("processJobs runs handler and marks job completed on success", async () => 
     assert.deepEqual(handlerCalledWith, { n: 1 });
     assert.equal(updateStub.calls.length, 1);
     assert.equal(updateStub.calls[0].where.id, "job-1");
+    assert.equal(updateStub.calls[0].data.status, "completed");
+  } finally {
+    restoreClaim();
+    updateStub.restore();
+  }
+});
+
+test("processJobById claims and runs one specific pending job", async () => {
+  const restoreClaim = stubQueryRaw([
+    { id: "job-specific", type: "test_specific", payload: JSON.stringify({ source: "manual" }), attempts: 1 },
+  ]);
+  const updateStub = stubBackgroundJobUpdate();
+
+  let handlerCalledWith: unknown = null;
+  registerJobHandler("test_specific", async (payload) => {
+    handlerCalledWith = payload;
+  });
+
+  try {
+    const processed = await processJobById("job-specific");
+    assert.equal(processed, 1);
+    assert.deepEqual(handlerCalledWith, { source: "manual" });
+    assert.equal(updateStub.calls.length, 1);
+    assert.equal(updateStub.calls[0].where.id, "job-specific");
     assert.equal(updateStub.calls[0].data.status, "completed");
   } finally {
     restoreClaim();

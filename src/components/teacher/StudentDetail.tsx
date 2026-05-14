@@ -3,6 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import SageInsightList from "@/components/sage/SageInsightList";
 import type {
   MoodEntryData,
   StudentData,
@@ -444,6 +445,11 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 dateFormatter={dateFormatter}
                 onChanged={loadData}
                 onGoalAction={handleGoalAction}
+              />
+              <SageInsightList
+                studentId={studentId}
+                title="Sage Coaching Notes"
+                limit={8}
               />
               <OperationsTab
                 data={data}

@@ -65,3 +65,29 @@ If asked for the best practical path, future agents should say:
 ## Bottom Line
 
 The problem is **not** that Ollama failed to run locally. The problem is that the public tunnel selected for Sage was not a reliable production path. The standing recommendation is to use **Cloudflare Tunnel on a dedicated always-on host** for VisionQuest local AI traffic.
+
+## 2026-05-13 Stream Failure Follow-Up
+
+Daily `AI_STREAM_FAILED` reports continued after the Cloudflare hostname was introduced. The production audit trail showed repeated local-provider failures through `ollama`, including `Local AI stream failed (502)`, `Local AI stream failed (530)`, missing Cloudflare Access credentials, and empty local streams.
+
+Local host checks showed the Windows services were healthy:
+
+- `VisionQuest-Ollama` running
+- `VisionQuest-OllamaRelay` running
+- `cloudflared` running
+- `localhost:11434/api/tags` returning 200
+- `localhost:11435/api/tags` returning 200
+
+The durable interpretation is:
+
+- If localhost and the relay are healthy, a production Sage failure is usually at the public Cloudflare Access/tunnel edge or in Render's service-token configuration.
+- Render must have valid Cloudflare Access service-token credentials available either through encrypted Program Setup config or through environment variables. Environment variables are preferred for production because they are not affected by database secret-encryption-key drift.
+- The app now falls back to `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` (and explicit `AI_PROVIDER_CLOUDFLARE_ACCESS_*` aliases) when encrypted config is absent or cannot decrypt.
+- The app now rejects saving a local-provider auth mode that requires missing credentials, warms the same local-only provider path used by student chat, and retries Cloudflare startup failures such as 502/530 before surfacing an offline message.
+
+Permanent fix checklist:
+
+1. Keep Ollama, the relay, and cloudflared installed as auto-starting services on the local AI host.
+2. Store Cloudflare Access service-token credentials in Render environment variables.
+3. In production, run `Program Setup -> AI Provider -> Test Connection` after any tunnel, credential, model, or encryption-key change.
+4. Treat any future `Local AI stream failed (502/530)` as a tunnel/edge/credential incident first, not as a chat UI bug.

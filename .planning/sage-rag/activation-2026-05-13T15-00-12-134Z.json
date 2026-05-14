@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-05-13T15:00:12.136Z",
+  "filters": {
+    "categories": [
+      "CERTIFICATION_INFO"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ],
+    "quality": [
+      "good"
+    ],
+    "limit": null
+  },
+  "activatedCount": 5,
+  "activatedIds": [
+    "cmmyyad9g0010eadkn7yj7a5z",
+    "cmmyyb1xg002readk8ht84xbn",
+    "cmmyyaugh0028eadk206gtc06",
+    "cmmyyaxkt002geadkeb61rbxs",
+    "cmmyyaxzj002headkukvn1eoz"
+  ],
+  "documents": [
+    {
+      "id": "cmmyyad9g0010eadkn7yj7a5z",
+      "title": "Bring Your A Game to Work Detailed Instructions for Administering Online Exams",
+      "storageKey": "lms/Bring Your A Game to Work/Bring Your A Game to Work Detailed Instructions for Administering Online Exams.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 244
+    },
+    {
+      "id": "cmmyyb1xg002readk8ht84xbn",
+      "title": "Checklist for Documentation of Benchmarks Certificate of Ready to Work",
+      "storageKey": "lms/Ready to Work/Checklist for Documentation of Benchmarks Certificate of Ready to Work.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 234
+    },
+    {
+      "id": "cmmyyaugh0028eadk206gtc06",
+      "title": "IC3 Digital Literacy Master Certification",
+      "storageKey": "lms/GMetrix and LearnKey/IC3/IC3_Digital_Literacy_Master_Certification.png",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 245
+    },
+    {
+      "id": "cmmyyaxkt002geadkeb61rbxs",
+      "title": "Intuit QuickBooks Certified User Certificate",
+      "storageKey": "lms/GMetrix and LearnKey/Intuit/Intuit_QuickBooks_Certified_User_Certificate.jpg",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 255
+    },
+    {
+      "id": "cmmyyaxzj002headkukvn1eoz",
+      "title": "Microsoft Office (MOS) Certificate",
+      "storageKey": "lms/GMetrix and LearnKey/Microsoft Office Specialist (MOS)/Microsoft Office (MOS) Certificate.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 243
+    }
+  ],
+  "rollbackCommand": "node scripts/sage-rag-activate.mjs --rollback=.planning/sage-rag/activation-2026-05-13T15-00-12-134Z.json --apply --confirm=rollback-sage-rag"
+}

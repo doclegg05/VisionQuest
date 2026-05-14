@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import AskSageLink from "@/components/sage/AskSageLink";
 import {
   GOAL_LEVEL_META,
   GOAL_LEVELS,
@@ -41,6 +42,7 @@ const LEVEL_STYLES: Record<GoalLevel, string> = {
 };
 
 const STATUS_STYLES: Record<GoalStatus, string> = {
+  proposed: "bg-indigo-100 text-indigo-700",
   active: "bg-emerald-100 text-emerald-700",
   in_progress: "bg-sky-100 text-sky-700",
   confirmed: "bg-teal-100 text-teal-700",
@@ -193,6 +195,97 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       setMessage({
         tone: "error",
         text: error instanceof Error ? error.message : "Could not save the goal.",
+      });
+    } finally {
+      setSavingGoalId(null);
+    }
+  }
+
+  async function handleConfirmGoal(goalId: string) {
+    const draft = drafts[goalId];
+    if (!draft) return;
+
+    const nextContent = draft.content.trim();
+    if (!nextContent) {
+      setMessage({ tone: "error", text: "Goal content cannot be empty." });
+      return;
+    }
+
+    setSavingGoalId(goalId);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/goals/${goalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: nextContent,
+          confirm: true,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.goal) {
+        throw new Error(payload?.error || "Could not confirm the goal.");
+      }
+
+      const updatedGoal = payload.goal as GoalRecord;
+      setGoals((current) =>
+        current.map((item) => (item.id === goalId ? updatedGoal : item)),
+      );
+      setDrafts((current) => ({
+        ...current,
+        [goalId]: {
+          content: updatedGoal.content,
+          status: updatedGoal.status,
+        },
+      }));
+      await refreshGoalPlan(updatedGoal.id);
+      setMessage({ tone: "success", text: "Goal confirmed and added to your plan." });
+      await checkProgression();
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Could not confirm the goal.",
+      });
+    } finally {
+      setSavingGoalId(null);
+    }
+  }
+
+  async function handleDismissGoal(goalId: string) {
+    setSavingGoalId(goalId);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/goals/${goalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "abandoned" }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.goal) {
+        throw new Error(payload?.error || "Could not dismiss the goal.");
+      }
+
+      const updatedGoal = payload.goal as GoalRecord;
+      setGoals((current) =>
+        current.map((item) => (item.id === goalId ? updatedGoal : item)),
+      );
+      setDrafts((current) => ({
+        ...current,
+        [goalId]: {
+          content: updatedGoal.content,
+          status: updatedGoal.status,
+        },
+      }));
+      setMessage({ tone: "success", text: "Goal dismissed." });
+      await checkProgression();
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Could not dismiss the goal.",
       });
     } finally {
       setSavingGoalId(null);
@@ -371,7 +464,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       onChange={(event) => setNewGoalStatus(event.target.value as GoalStatus)}
                       className="select-field min-w-[12rem] px-4 py-2.5 text-sm"
                     >
-                      {GOAL_STATUSES.map((status) => (
+                      {GOAL_STATUSES.filter((status) => status !== "proposed").map((status) => (
                         <option key={status} value={status}>
                           {GOAL_STATUS_LABELS[status]}
                         </option>
@@ -417,7 +510,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   return (
                     <article
                       key={goal.id}
-                      className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm"
+                      className={`rounded-[1.25rem] border bg-[var(--surface-raised)] p-4 shadow-sm ${
+                        draft.status === "proposed"
+                          ? "border-indigo-200 ring-1 ring-indigo-100"
+                          : "border-[var(--border)]"
+                      }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span
@@ -449,6 +546,33 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         className="textarea-field mt-2 resize-none px-4 py-3 text-sm"
                       />
 
+                      {draft.status === "proposed" ? (
+                        <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                          <p className="font-semibold">Sage suggested this goal.</p>
+                          <p className="mt-1">
+                            Edit the wording if needed, then confirm it when it feels like your goal.
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmGoal(goal.id)}
+                              disabled={savingGoalId === goal.id || !draft.content.trim()}
+                              className="rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {savingGoalId === goal.id ? "Saving..." : "Confirm Goal"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDismissGoal(goal.id)}
+                              disabled={savingGoalId === goal.id}
+                              className="rounded-full border border-indigo-200 bg-white px-4 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
                       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
                         <label htmlFor={`goal-status-${goal.id}`} className="text-sm text-[var(--ink-muted)]">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
@@ -468,7 +592,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                             }
                             className="select-field min-w-[12rem] px-4 py-2.5 text-sm"
                           >
-                            {GOAL_STATUSES.map((status) => (
+                            {(draft.status === "proposed"
+                              ? GOAL_STATUSES
+                              : GOAL_STATUSES.filter((status) => status !== "proposed")
+                            ).map((status) => (
                               <option key={status} value={status}>
                                 {GOAL_STATUS_LABELS[status]}
                               </option>
@@ -635,10 +762,17 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 })}
               </div>
             ) : createLevel !== level ? (
-              <p className="mt-4 text-sm italic text-[var(--ink-muted)]">
-                No {level === "task" ? "tasks" : "goals"} here yet. Add one directly or shape it
-                with Sage when you want coaching help.
-              </p>
+              <div className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                <p className="text-sm leading-6 text-[var(--ink-muted)]">
+                  No {level === "task" ? "tasks" : "goals"} here yet. Add one directly, or ask Sage to shape one with you.
+                </p>
+                <div className="mt-3">
+                  <AskSageLink
+                    prompt={`Help me create a ${GOAL_LEVEL_META[level].label.toLowerCase()} that fits my program goals and gives me one clear next step.`}
+                    label="Shape it with Sage"
+                  />
+                </div>
+              </div>
             ) : null}
           </section>
         );

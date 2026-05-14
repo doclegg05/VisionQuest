@@ -199,10 +199,10 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
         key={item.href}
         href={item.href}
         prefetch={false}
-        className={`mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-colors ${
+        className={`premium-nav-link mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
           active
-            ? "bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
-            : "text-white/90 hover:bg-[var(--surface-raised)]/10 hover:text-white"
+            ? "premium-nav-link-active bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
+            : "premium-nav-link-idle text-white/90 hover:text-white"
         }`}
         aria-current={active ? "page" : undefined}
       >
@@ -221,7 +221,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
 
   return (
     <>
-      <div className="fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl md:hidden">
+      <div className="app-mobile-topbar fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl md:hidden">
         <div className="min-w-0 flex-1">
           <BrandLockup
             href={homeHref}
@@ -250,7 +250,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       </div>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)] bg-[var(--surface-base)]/95 backdrop-blur-xl md:hidden"
+        className="app-mobile-nav fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)] bg-[var(--surface-base)]/95 backdrop-blur-xl md:hidden"
         role="navigation"
         aria-label="Main navigation"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -385,7 +385,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <aside
         // Always-dark sidebar gradient — intentional raw rgba for the navy→teal ramp.
         // eslint-disable-next-line no-restricted-syntax
-        className="fixed inset-y-4 left-4 z-40 hidden w-[17rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(7,23,43,0.96),rgba(16,37,62,0.94)_34%,rgba(8,68,80,0.92))] text-white shadow-[0_30px_90px_rgba(7,23,43,0.28)] md:flex"
+        className="app-sidebar fixed inset-y-4 left-4 z-40 hidden w-[17rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(7,23,43,0.96),rgba(16,37,62,0.94)_34%,rgba(8,68,80,0.92))] text-white shadow-[0_30px_90px_rgba(7,23,43,0.28)] md:flex"
         role="navigation"
         aria-label="Main navigation"
       >
