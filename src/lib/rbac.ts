@@ -21,6 +21,8 @@ let rolePermissionSeedState:
   | { hasAssignments: boolean; expiresAt: number }
   | null = null;
 const CACHE_TTL_MS = 60_000; // 1 minute
+type RbacPrismaClient = Pick<typeof prisma, "permission" | "rolePermission">;
+let rbacPrisma: RbacPrismaClient = prisma;
 
 export interface PermissionResolution {
   allowed: boolean;
@@ -32,7 +34,7 @@ async function hasSeededRolePermissions(): Promise<boolean> {
     return rolePermissionSeedState.hasAssignments;
   }
 
-  const count = await prisma.rolePermission.count();
+  const count = await rbacPrisma.rolePermission.count();
   const hasAssignments = count > 0;
   rolePermissionSeedState = {
     hasAssignments,
@@ -47,7 +49,7 @@ async function hasSeededPermissionMappings(permissionKey: string): Promise<boole
     return cached.hasPermissionMappings;
   }
 
-  const permission = await prisma.permission.findUnique({
+  const permission = await rbacPrisma.permission.findUnique({
     where: { key: permissionKey },
     select: {
       id: true,
@@ -78,7 +80,7 @@ export async function getPermissionsForRole(
     return cached.permissions;
   }
 
-  const rolePerms = await prisma.rolePermission.findMany({
+  const rolePerms = await rbacPrisma.rolePermission.findMany({
     where: {
       role: { name: roleName },
       granted: true,
@@ -146,4 +148,13 @@ export function clearPermissionCache(): void {
   permissionCache.clear();
   permissionSeedCache.clear();
   rolePermissionSeedState = null;
+}
+
+export function setRbacPrismaClientForTests(client: RbacPrismaClient): () => void {
+  rbacPrisma = client;
+  clearPermissionCache();
+  return () => {
+    rbacPrisma = prisma;
+    clearPermissionCache();
+  };
 }

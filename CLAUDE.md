@@ -77,6 +77,8 @@ Read when deciding what to build, cut, simplify, or automate.
 | 2026-04-01 | Goal confirmation model added | `confirmed` status, `confirmedAt`, `confirmedBy`, `lastReviewedAt` fields on Goal |
 | 2026-04-01 | Unified readiness computation | Single `fetchStudentReadinessData()` used by all 6 consumers |
 | 2026-04-01 | CSP headers with nonce-based scripts/styles | Hardened via `src/proxy.ts`; Gemini, Credly, Sentry, Google Fonts whitelisted |
+| 2026-05-07 | Phase 2 and Phase 3 outcomes tracked as GitHub milestones | Single source of truth between `docs/PRODUCT_GUIDE.md` 90-Day Outcomes and the issue tracker. Milestones #1 (Phase 2, due 2026-05-17) and #2 (Phase 3, due 2026-06-21) with tracking issues #37–#40 carry outcome-style "definition of done" so risk-scout can flag slippage |
+| 2026-05-07 | Project Autopilot installed locally | Read-only Claude Code orchestrator at `project-autopilot/` (gitignored) generates morning digests, weekly reviews, and triage sweeps over the GitHub repo. Deny list blocks all `gh` writes; agents propose, humans apply |
 
 ## Known Issues
 - ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (no sleep). Verified 2026-04-29 in `render.yaml` (`plan: starter`).

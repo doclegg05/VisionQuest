@@ -94,6 +94,10 @@ test("intervention routes map nudges and dashboard actions to the right pages", 
     href: "/teacher/students/student-1#orientation-review",
     label: "Open orientation",
   });
+  assert.deepEqual(teacherDashboardAlertAction("goal_missing_confirmed", "student-1"), {
+    href: "/teacher/students/student-1#goal-plans",
+    label: "Review goals",
+  });
   assert.deepEqual(teacherDashboardReviewAction("goal_needs_resource", "student-1"), {
     href: "/teacher/students/student-1#goal-plans",
     label: "Assign support",
@@ -101,6 +105,10 @@ test("intervention routes map nudges and dashboard actions to the right pages", 
   assert.deepEqual(teacherDashboardAlertQuickAction("orientation_form_pending_review"), {
     kind: "review_forms",
     label: "Quick review",
+  });
+  assert.deepEqual(teacherDashboardAlertQuickAction("goal_review_stale"), {
+    kind: "create_task",
+    label: "Add goal review task",
   });
   assert.deepEqual(teacherDashboardReviewQuickAction("goal_resource_stale"), {
     kind: "create_task",

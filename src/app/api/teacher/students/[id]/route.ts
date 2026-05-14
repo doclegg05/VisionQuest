@@ -13,7 +13,7 @@ import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-res
 import { parseState } from "@/lib/progression/engine";
 import { FORMS } from "@/lib/spokes/forms";
 import { normalizeProgramType } from "@/lib/program-type";
-import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 
 // GET — individual student detail for teacher view
 export const GET = withRegistry("admin.student_detail", async (session, _req, ctx, _tool) => {
@@ -298,7 +298,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     ...student.formSubmissions.map((s) => s.fileId),
     ...student.formSubmissions.map((s) => s.signatureFileId).filter(Boolean),
   ].filter(Boolean) as string[];
-  const [orientationItems, certTemplates, formFiles, readinessData] = await Promise.all([
+  const [orientationItems, certTemplates, formFiles] = await Promise.all([
     prisma.orientationItem.findMany({
       orderBy: { sortOrder: "asc" },
     }),
@@ -317,22 +317,47 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           },
         })
       : Promise.resolve([]),
-    fetchStudentReadinessData(studentId),
   ]);
   const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
 
-  // Parse progression (for xp/level/streaks/achievements display and goal-evidence building)
-  let parsedProgression = parseState(null);
-  let progression = { xp: 0, level: 1, streaks: { daily: { current: 0, longest: 0 } }, achievements: [] as string[] };
-  if (student.progression?.state) {
-    try {
-      progression = JSON.parse(student.progression.state) as typeof progression;
-      parsedProgression = parseState(student.progression.state);
-    } catch { /* ignore */ }
-  }
+  // Parse progression (for xp/level/streaks/achievements display and goal-evidence building).
+  // The persisted state uses the canonical engine shape (currentStreak/longestStreak as
+  // flat numbers); the StudentDetail view contract nests them under streaks.daily.
+  // Build the view shape from parseState rather than trusting JSON.parse output —
+  // a stored row that lacks the nested shape would otherwise crash OverviewTab on render.
+  const parsedProgression = parseState(student.progression?.state ?? null);
+  const progression = {
+    xp: parsedProgression.xp,
+    level: parsedProgression.level,
+    streaks: {
+      daily: {
+        current: parsedProgression.currentStreak,
+        longest: parsedProgression.longestStreak,
+      },
+    },
+    achievements: parsedProgression.achievements,
+  };
 
-  const readinessResult = readinessData.readiness;
+  // Derive readiness from data already loaded in the findUnique above —
+  // calling fetchStudentReadinessData here would re-fetch certifications,
+  // portfolio, resume, public page, progression, and goals (8 extra queries
+  // that exhaust the Supavisor session pool on /teacher/students/[id]).
+  const readinessSnapshot = buildReadinessSnapshot({
+    progressionState: student.progression?.state ?? null,
+    orientationCompletedCount: student.orientationProgress.filter((p) => p.completed).length,
+    orientationTotalCount: orientationItems.length,
+    bhagCompleted: student.goals.some(
+      (g) => g.level === "bhag" && g.status === "completed",
+    ),
+    certificationsEarned: student.certifications.filter(
+      (c) => c.status === "completed",
+    ).length,
+    portfolioItemCount: student.portfolioItems.length,
+    hasResume: Boolean(student.resumeData),
+    portfolioShared: Boolean(student.publicCredentialPage?.isPublic),
+  });
+  const readinessResult = readinessSnapshot.readiness;
 
   // Build conversation summaries (message stats + preview, not full transcripts)
   // messages is take:1 desc — only the newest message is loaded for the preview.

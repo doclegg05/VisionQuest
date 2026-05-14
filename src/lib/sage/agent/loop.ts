@@ -57,8 +57,15 @@ export async function* runAgentTurn(
           targetStudentId,
         });
         transcript.push(record);
+        const responsePayload = record.result.modelHint
+          ? {
+              summary: record.result.summary,
+              modelHint: record.result.modelHint,
+              data: record.result.data ?? null,
+            }
+          : record.result.data ?? { summary: record.result.summary };
         return {
-          response: record.result.data ?? { summary: record.result.summary },
+          response: responsePayload,
           summary: record.result.summary,
           status: record.result.status,
         };

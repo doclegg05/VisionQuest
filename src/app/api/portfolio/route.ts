@@ -1,20 +1,43 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { recomputeCertificationStatus } from "@/lib/certification-service";
+import { validateRequirementUpdate } from "@/lib/certifications";
 import { isValidUrl } from "@/lib/validation";
 import { withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
-import { recordPortfolioItem } from "@/lib/progression/engine";
+import {
+  PORTFOLIO_ITEM_TYPES,
+  normalizePortfolioItemType,
+  type PortfolioItemType,
+} from "@/lib/portfolio";
+import { recordCertificationEarned, recordPortfolioItem } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { syncStudentAlerts } from "@/lib/advising";
 
+const optionalCuidSchema = z.preprocess(
+  (value) => value === "" ? null : value,
+  z.string().cuid().optional().nullable(),
+);
+
+const optionalUrlSchema = z.preprocess(
+  (value) => value === "" ? null : value,
+  z.string().url().max(2000).optional().nullable(),
+);
+
+const portfolioTypeSchema = z.preprocess(
+  (value) => normalizePortfolioItemType(value),
+  z.enum(PORTFOLIO_ITEM_TYPES),
+);
+
 const portfolioCreateSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
-  type: z.enum(["project", "resume", "achievement", "skill", "certification", "other"]).optional(),
-  fileId: z.string().cuid().optional().nullable(),
-  url: z.string().url().max(2000).optional().nullable(),
+  type: portfolioTypeSchema.optional(),
+  fileId: optionalCuidSchema,
+  url: optionalUrlSchema,
+  certificationRequirementId: optionalCuidSchema,
 });
 
 const portfolioUpdateSchema = portfolioCreateSchema.partial().extend({
@@ -33,16 +56,44 @@ export const GET = withAuth(async (session) => {
 
 // POST — create a portfolio item
 export const POST = withAuth(async (session, req: Request) => {
-  const { title, description, type, fileId, url } = await parseBody(req, portfolioCreateSchema);
+  const { title, description, type, fileId, url, certificationRequirementId } =
+    await parseBody(req, portfolioCreateSchema);
+  const itemType: PortfolioItemType = type || "project";
+
   if (url && !isValidUrl(url)) {
     throw badRequest("Invalid URL. Only http and https URLs are allowed");
   }
-  // file ownership check and maxOrder are independent — run together.
-  const [file, maxOrder] = await Promise.all([
+
+  if (certificationRequirementId && itemType !== "certification") {
+    throw badRequest("Certification evidence can only be linked from a certification portfolio item.");
+  }
+  if (certificationRequirementId && !fileId) {
+    throw badRequest("Attach the certification file before submitting it for Ready to Work review.");
+  }
+
+  // file ownership, certification ownership, and maxOrder are independent — run together.
+  const [file, certificationRequirement, maxOrder] = await Promise.all([
     fileId
       ? prisma.fileUpload.findFirst({
           where: { id: fileId, studentId: session.id },
           select: { id: true },
+        })
+      : Promise.resolve(null),
+    certificationRequirementId
+      ? prisma.certRequirement.findFirst({
+          where: { id: certificationRequirementId },
+          include: {
+            certification: true,
+            template: {
+              select: {
+                id: true,
+                certType: true,
+                required: true,
+                needsFile: true,
+                needsVerify: true,
+              },
+            },
+          },
         })
       : Promise.resolve(null),
     prisma.portfolioItem.aggregate({
@@ -51,22 +102,75 @@ export const POST = withAuth(async (session, req: Request) => {
     }),
   ]);
   if (fileId && !file) throw notFound("Attached file was not found");
+  if (
+    certificationRequirementId &&
+    (!certificationRequirement || certificationRequirement.certification.studentId !== session.id)
+  ) {
+    throw notFound("Certification requirement was not found");
+  }
 
-  const item = await prisma.portfolioItem.create({
-    data: {
-      studentId: session.id,
-      title,
-      description: description || null,
-      type: type || "project",
+  if (certificationRequirement) {
+    const validationError = validateRequirementUpdate(certificationRequirement.template, {
+      templateId: certificationRequirement.templateId,
+      completed: true,
+      verifiedBy: certificationRequirement.verifiedBy,
       fileId: fileId || null,
-      url: url || null,
-      sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
-    },
+    });
+    if (validationError) throw badRequest(validationError);
+  }
+
+  const item = await prisma.$transaction(async (tx) => {
+    const created = await tx.portfolioItem.create({
+      data: {
+        studentId: session.id,
+        title,
+        description: description || null,
+        type: itemType,
+        fileId: fileId || null,
+        url: url || null,
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+      },
+    });
+
+    if (certificationRequirement) {
+      await tx.certRequirement.update({
+        where: { id: certificationRequirement.id },
+        data: {
+          completed: true,
+          completedAt: certificationRequirement.completedAt || new Date(),
+          fileId,
+        },
+      });
+    }
+
+    return created;
   });
+
+  if (certificationRequirement) {
+    const updatedCert = await recomputeCertificationStatus(
+      certificationRequirement.certificationId,
+      certificationRequirement.template.certType,
+    );
+
+    if (updatedCert.status === "completed") {
+      try {
+        await awardEvent({
+          studentId: session.id,
+          eventType: "cert_earned",
+          sourceType: "certification",
+          sourceId: certificationRequirement.certificationId,
+          xp: 100,
+          mutate: (state) => recordCertificationEarned(state),
+        });
+      } catch (err) {
+        logger.error("Failed to record certification earned", { error: String(err) });
+      }
+    }
+  }
 
   // Record portfolio progression
   try {
-    const portfolioType = (type === "resume") ? "resume" : "item";
+    const portfolioType = itemType === "resume" ? "resume" : "item";
     await awardEvent({
       studentId: session.id,
       eventType: "portfolio_item",
@@ -106,10 +210,10 @@ export const PUT = withAuth(async (session, req: Request) => {
 
   const data: Record<string, unknown> = {};
   if (title !== undefined) data.title = title;
-  if (description !== undefined) data.description = description;
+  if (description !== undefined) data.description = description || null;
   if (type !== undefined) data.type = type;
-  if (fileId !== undefined) data.fileId = fileId;
-  if (url !== undefined) data.url = url;
+  if (fileId !== undefined) data.fileId = fileId || null;
+  if (url !== undefined) data.url = url || null;
 
   const item = await prisma.portfolioItem.update({ where: { id }, data });
   await syncStudentAlerts(session.id);

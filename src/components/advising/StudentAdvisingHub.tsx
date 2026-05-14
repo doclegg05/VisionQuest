@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 interface StudentAdvisingHubProps {
   alerts: Array<{
@@ -154,8 +155,16 @@ export default function StudentAdvisingHub({
         </div>
 
         {bookableAdvisors.length === 0 ? (
-          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
-            Your teachers haven&apos;t published bookable office hours yet. Check back soon or message staff directly.
+          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[var(--border)] p-4">
+            <p className="text-sm leading-6 text-[var(--ink-muted)]">
+              Your teachers haven&apos;t published bookable office hours yet. Check back soon or message staff directly.
+            </p>
+            <div className="mt-3">
+              <AskSageLink
+                prompt="Help me prepare for advising while office hours are not available. What should I write down before I meet with staff?"
+                label="Prepare with Sage"
+              />
+            </div>
           </div>
         ) : (
           <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
@@ -382,8 +391,16 @@ export default function StudentAdvisingHub({
           </div>
 
           {tasks.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
-              No follow-up tasks have been assigned yet.
+            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4">
+              <p className="text-sm leading-6 text-[var(--ink-muted)]">
+                No follow-up tasks have been assigned yet.
+              </p>
+              <div className="mt-3">
+                <AskSageLink
+                  prompt="Help me choose one productive advising follow-up task I can do today based on my VisionQuest progress."
+                  label="Ask Sage for a next task"
+                />
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

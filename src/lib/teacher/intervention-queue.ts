@@ -2,9 +2,15 @@ import { computeUrgencyScore, type StudentSignals } from "@/lib/intervention-sco
 import { isGoalStale } from "@/lib/stale-goal-rules";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
+import {
+  teacherDashboardAlertAction,
+  teacherDashboardAlertQuickAction,
+} from "@/lib/intervention-notifications";
+import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
 
 export interface InterventionQueueStudentRecord {
   id: string;
+  studentId: string;
   displayName: string;
   email: string | null;
   createdAt: Date;
@@ -21,8 +27,14 @@ export interface InterventionQueueStudentRecord {
     completedAt: Date | null;
   }>;
   alerts: Array<{
+    id: string;
     type: string;
     severity: string;
+    title: string;
+    summary: string;
+    sourceType: string | null;
+    sourceId: string | null;
+    detectedAt: Date;
   }>;
   assignedTasks: Array<{
     id: string;
@@ -59,10 +71,26 @@ export interface InterventionQueueStudentRecord {
 
 export interface InterventionQueueEntry {
   studentId: string;
+  publicStudentId: string;
   name: string;
   email: string | null;
   programType: ProgramType;
   urgencyScore: number;
+  primaryAlert: {
+    id: string;
+    type: string;
+    severity: string;
+    title: string;
+    summary: string;
+    sourceType: string | null;
+    sourceId: string | null;
+    detectedAt: string;
+  } | null;
+  recommendedAction: {
+    kind: DashboardQuickActionKind | null;
+    label: string;
+    href: string;
+  };
   signals: StudentSignals;
 }
 
@@ -76,6 +104,80 @@ function latestDate(...values: Array<Date | null | undefined>): Date | null {
     if (!latest || value.getTime() > latest.getTime()) return value;
     return latest;
   }, null);
+}
+
+const ALERT_TYPE_PRIORITY: Record<string, number> = {
+  goal_missing_confirmed: 110,
+  goal_review_pending: 105,
+  goal_needs_resource: 100,
+  goal_missing_monthly: 95,
+  goal_review_stale: 90,
+  goal_resource_stale: 85,
+  goal_platform_stale: 80,
+  goal_stale: 75,
+  orientation_form_pending_review: 70,
+  overdue_task: 65,
+  missed_appointment: 60,
+  certification_stalled: 55,
+};
+
+function severityRank(value: string) {
+  if (value === "high") return 3;
+  if (value === "medium") return 2;
+  return 1;
+}
+
+function pickPrimaryAlert(alerts: InterventionQueueStudentRecord["alerts"]) {
+  return [...alerts].sort((left, right) => {
+    const severityGap = severityRank(right.severity) - severityRank(left.severity);
+    if (severityGap !== 0) return severityGap;
+
+    const priorityGap =
+      (ALERT_TYPE_PRIORITY[right.type] ?? 0) - (ALERT_TYPE_PRIORITY[left.type] ?? 0);
+    if (priorityGap !== 0) return priorityGap;
+
+    return right.detectedAt.getTime() - left.detectedAt.getTime();
+  })[0] ?? null;
+}
+
+function fallbackAction(studentId: string, signals: StudentSignals) {
+  if (signals.unmatchedGoalCount > 0) {
+    return {
+      kind: "assign_support" as const,
+      label: "Assign support",
+      href: `/teacher/students/${studentId}#goal-plans`,
+    };
+  }
+
+  if (signals.stalledGoalCount > 0 || signals.daysSinceLastGoalReview >= 14) {
+    return {
+      kind: "create_task" as const,
+      label: "Add goal review task",
+      href: `/teacher/students/${studentId}#goal-plans`,
+    };
+  }
+
+  if (signals.overdueTaskCount > 0 || signals.daysSinceLastLogin > 7) {
+    return {
+      kind: "create_task" as const,
+      label: "Add task",
+      href: `/teacher/students/${studentId}#tasks`,
+    };
+  }
+
+  if (!signals.orientationComplete) {
+    return {
+      kind: "create_task" as const,
+      label: "Add orientation task",
+      href: `/teacher/students/${studentId}#orientation-review`,
+    };
+  }
+
+  return {
+    kind: null,
+    label: "Open student",
+    href: `/teacher/students/${studentId}`,
+  };
 }
 
 export function buildInterventionQueueEntry(input: {
@@ -181,13 +283,35 @@ export function buildInterventionQueueEntry(input: {
   const activeEnrollment =
     enrollments.find((enrollment) => enrollment.status === "active") ?? enrollments[0];
   const programType = normalizeProgramType(activeEnrollment?.class.programType);
+  const primaryAlert = pickPrimaryAlert(student.alerts);
+  const quickAction = primaryAlert ? teacherDashboardAlertQuickAction(primaryAlert.type) : null;
+  const alertAction = primaryAlert ? teacherDashboardAlertAction(primaryAlert.type, student.id) : null;
+  const fallback = primaryAlert ? null : fallbackAction(student.id, signals);
 
   return {
     studentId: student.id,
+    publicStudentId: student.studentId,
     name: student.displayName,
     email: student.email,
     programType,
     urgencyScore: computeUrgencyScore(signals),
+    primaryAlert: primaryAlert
+      ? {
+          id: primaryAlert.id,
+          type: primaryAlert.type,
+          severity: primaryAlert.severity,
+          title: primaryAlert.title,
+          summary: primaryAlert.summary,
+          sourceType: primaryAlert.sourceType,
+          sourceId: primaryAlert.sourceId,
+          detectedAt: primaryAlert.detectedAt.toISOString(),
+        }
+      : null,
+    recommendedAction: {
+      kind: quickAction?.kind ?? fallback?.kind ?? null,
+      label: quickAction?.label ?? alertAction?.label ?? fallback?.label ?? "Open student",
+      href: alertAction?.href ?? fallback?.href ?? `/teacher/students/${student.id}`,
+    },
     signals,
   };
 }

@@ -22,6 +22,7 @@ const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string>
 const REVIEW_KIND_LABELS: Record<ReviewQueueItemData["kind"], string> = {
   goal_needs_resource: "Needs assignment",
   goal_resource_stale: "Needs follow-up",
+  goal_platform_stale: "Needs follow-through",
   goal_review_pending: "Needs review",
 };
 
@@ -229,14 +230,14 @@ export default function GoalsPlanTab({
         </div>
         <GoalTree goals={goals} />
 
-        {goals.filter(g => g.status === "active" || g.status === "in_progress").length > 0 && (
+        {goals.filter(g => g.status === "proposed" || g.status === "active" || g.status === "in_progress").length > 0 && (
           <section className="mt-4 theme-card rounded-xl p-5">
             <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
               Needs Confirmation
             </h4>
             <ul className="space-y-2">
               {goals
-                .filter(g => g.status === "active" || g.status === "in_progress")
+                .filter(g => g.status === "proposed" || g.status === "active" || g.status === "in_progress")
                 .map(goal => (
                   <li key={goal.id} className="flex items-center justify-between rounded-lg border p-3">
                     <div>

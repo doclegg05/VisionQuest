@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { withAuth, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
-import { rankJobs } from "@/lib/job-board/recommendation";
+import {
+  buildJobInteractionProfile,
+  buildStudentJobProfile,
+  parseTransferableSkillNames,
+  rankJobs,
+} from "@/lib/job-board/recommendation";
+import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
+import { parseStoredResumeData } from "@/lib/resume";
 
 /**
  * GET /api/jobs
  *
  * Returns active job listings for the student's enrolled class,
- * with recommendation scores if the student has CareerDiscovery data.
+ * with recommendation scores if the student has CareerDiscovery or resume skill data.
  *
  * Query params:
  *   cluster - filter by cluster ID
@@ -46,39 +53,80 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     where.clusters = { has: clusterFilter };
   }
 
-  const jobs = await prisma.jobListing.findMany({
+  const activeJobs = await prisma.jobListing.findMany({
     where,
     orderBy: sort === "salary"
       ? { salaryMin: "desc" }
       : { createdAt: "desc" },
-    take: 100,
+    take: 500,
   });
+  const jobs = dedupeJobsForDisplay(activeJobs)
+    .sort((a, b) => {
+      if (sort === "salary") return (b.salaryMin ?? -1) - (a.salaryMin ?? -1);
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    })
+    .slice(0, 100);
 
-  // Get student's saved jobs
-  const savedJobs = await prisma.studentSavedJob.findMany({
-    where: { studentId: session.id },
-    select: { jobListingId: true, status: true },
-  });
-  const savedMap = new Map(savedJobs.map((s) => [s.jobListingId, s.status]));
+  const [savedJobs, discovery, resumeRecord] = await Promise.all([
+    prisma.studentSavedJob.findMany({
+      where: { studentId: session.id },
+      select: {
+        jobListingId: true,
+        status: true,
+        notes: true,
+        appliedAt: true,
+        jobListing: {
+          select: {
+            clusters: true,
+            company: true,
+            source: true,
+          },
+        },
+      },
+    }),
+    prisma.careerDiscovery.findUnique({
+      where: { studentId: session.id },
+      select: { topClusters: true, hollandCode: true, transferableSkills: true },
+    }),
+    prisma.resumeData.findUnique({
+      where: { studentId: session.id },
+      select: { data: true },
+    }),
+  ]);
+  const savedMap = new Map(savedJobs.map((s) => [s.jobListingId, s]));
 
-  // Get career discovery for recommendations
-  const discovery = await prisma.careerDiscovery.findUnique({
-    where: { studentId: session.id },
-    select: { topClusters: true, hollandCode: true },
+  const resume = resumeRecord ? parseStoredResumeData(resumeRecord.data) : null;
+  const studentProfile = buildStudentJobProfile({
+    resumeSkills: resume?.skills,
+    resumeCertifications: resume?.certifications.map((cert) => cert.name),
+    resumeExperienceTitles: resume?.experience.map((item) => item.title),
+    discoverySkills: parseTransferableSkillNames(discovery?.transferableSkills),
   });
+  const interactionProfile = buildJobInteractionProfile(savedJobs);
+  const hasInteractionSignals =
+    interactionProfile.preferredClusters.length > 0 ||
+    interactionProfile.avoidedClusters.length > 0 ||
+    interactionProfile.preferredCompanies.length > 0 ||
+    interactionProfile.preferredSources.length > 0;
+  const hasPersonalization = Boolean(discovery) || studentProfile.skills.length > 0 || hasInteractionSignals;
 
   // Score and rank
-  const recommendations = rankJobs(jobs, discovery, config.region);
+  const recommendations = rankJobs(jobs, discovery, config.region, studentProfile, interactionProfile);
 
   // Build response with saved status merged in
   const jobsWithMeta = jobs.map((job) => {
     const rec = recommendations.find((r) => r.jobListingId === job.id);
+    const saved = savedMap.get(job.id);
     return {
       ...job,
-      savedStatus: savedMap.get(job.id) ?? null,
+      savedStatus: saved?.status ?? null,
+      savedNotes: saved?.notes ?? null,
+      savedAppliedAt: saved?.appliedAt?.toISOString() ?? null,
       matchScore: rec?.score ?? 0,
       matchLabel: rec?.matchLabel ?? null,
       clusterOverlap: rec?.clusterOverlap ?? [],
+      skillOverlap: rec?.skillOverlap ?? [],
+      matchReasons: rec?.matchReasons ?? [],
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
       expiresAt: job.expiresAt?.toISOString() ?? null,
@@ -86,13 +134,15 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   });
 
   // Re-sort by recommendation score if sort=recommended
-  if (sort === "recommended" && discovery) {
+  if (sort === "recommended" && hasPersonalization) {
     jobsWithMeta.sort((a, b) => b.matchScore - a.matchScore);
   }
 
   return NextResponse.json({
     jobs: jobsWithMeta,
     hasDiscovery: !!discovery,
+    hasResume: !!resumeRecord,
+    hasPersonalization,
     totalActive: jobs.length,
     totalSaved: savedJobs.length,
   });

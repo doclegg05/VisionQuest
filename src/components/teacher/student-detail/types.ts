@@ -154,7 +154,7 @@ export interface GoalEvidenceData {
 
 export interface ReviewQueueItemData {
   key: string;
-  kind: "goal_needs_resource" | "goal_resource_stale" | "goal_review_pending";
+  kind: "goal_needs_resource" | "goal_resource_stale" | "goal_platform_stale" | "goal_review_pending";
   severity: "medium" | "high";
   goalId: string;
   goalTitle: string;

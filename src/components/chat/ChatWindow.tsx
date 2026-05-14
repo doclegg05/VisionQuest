@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useReducedMotion } from "framer-motion";
+import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
 import ConversationList from "./ConversationList";
@@ -21,6 +22,19 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  events?: AgentEventItem[];
+}
+
+interface AgentEventItem {
+  id: string;
+  kind: "tool" | "action";
+  callId?: string;
+  tool?: string;
+  status?: "pending" | "success" | "error";
+  summary: string;
+  action?: ChatSseEvent["action"];
+  target?: string;
+  label?: string;
 }
 
 async function getErrorMessage(res: Response) {
@@ -42,6 +56,81 @@ const REQUESTED_STAGE_OPENERS = {
   career_profile_review: STAGE_OPENERS.career_profile_review,
 } as const;
 
+function formatToolName(tool: string | undefined): string {
+  if (!tool) return "Sage tool";
+  return tool
+    .replace(/^sage\./, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function upsertAgentEvent(events: AgentEventItem[], next: AgentEventItem) {
+  const existingIndex = next.callId
+    ? events.findIndex((event) => event.callId === next.callId && event.kind === next.kind)
+    : -1;
+  if (existingIndex >= 0) {
+    events[existingIndex] = { ...events[existingIndex], ...next };
+  } else {
+    events.push(next);
+  }
+}
+
+function AgentEventList({ events }: { events: AgentEventItem[] }) {
+  if (events.length === 0) return null;
+
+  return (
+    <div className="ml-12 mt-2 space-y-2">
+      {events.map((event) => {
+        if (event.kind === "action" && event.target) {
+          const external = /^https?:\/\//i.test(event.target);
+          return (
+            <a
+              key={event.id}
+              href={event.target}
+              target={external ? "_blank" : undefined}
+              rel={external ? "noopener noreferrer" : undefined}
+              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-semibold text-[var(--accent-strong)] shadow-sm transition-colors hover:bg-[var(--surface-interactive)]"
+            >
+              <ArrowSquareOut size={17} weight="bold" className="shrink-0" />
+              <span className="truncate">{event.label || "Open"}</span>
+            </a>
+          );
+        }
+
+        const Icon =
+          event.status === "success"
+            ? CheckCircle
+            : event.status === "error"
+              ? WarningCircle
+              : event.status === "pending"
+                ? Clock
+                : Wrench;
+        const tone =
+          event.status === "success"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+            : event.status === "error"
+              ? "border-rose-200 bg-rose-50 text-rose-800"
+              : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--ink-muted)]";
+
+        return (
+          <div
+            key={event.id}
+            className={`flex max-w-[34rem] items-start gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm ${tone}`}
+          >
+            <Icon size={16} weight="bold" className="mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-semibold text-[var(--ink-strong)]">
+                {formatToolName(event.tool)}
+              </p>
+              <p className="mt-0.5 leading-5">{event.summary}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const searchParams = useSearchParams();
   const requestedStage = searchParams.get("stage");
@@ -54,6 +143,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingEvents, setStreamingEvents] = useState<AgentEventItem[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [goalToast, setGoalToast] = useState<string | null>(null);
@@ -102,7 +192,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingContent, scrollToBottom]);
+  }, [messages, streamingContent, streamingEvents, scrollToBottom]);
 
   useEffect(() => {
     async function loadActiveConversation() {
@@ -167,6 +257,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     setConversationId(null);
     setMessages([]);
     setStreamingContent("");
+    setStreamingEvents([]);
     setIncompleteMessageId(null);
     setChatError(null);
     setOptimisticGreeting(null);
@@ -219,7 +310,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
   const handleSend = useCallback(
     async (text: string) => {
-      let prevGoalCount = 0;
       setChatError(null);
 
       // B2: Hoist the loading state so the TypingIndicator renders immediately
@@ -232,6 +322,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
       setStreamingContent("");
+      setStreamingEvents([]);
 
       // B4: If this is the first message of a new conversation (no conversationId
       // and no prior messages), show an optimistic greeting immediately while SSE
@@ -250,15 +341,13 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         }
       }
 
-      try {
-        const goalsRes = await apiFetch("/api/goals");
-        if (goalsRes.ok) {
+      const prevGoalCountPromise = apiFetch("/api/goals")
+        .then(async (goalsRes) => {
+          if (!goalsRes.ok) return 0;
           const goalsData = await goalsRes.json();
-          prevGoalCount = goalsData.goals.length;
-        }
-      } catch {
-        // Ignore goal count failures.
-      }
+          return Array.isArray(goalsData.goals) ? goalsData.goals.length : 0;
+        })
+        .catch(() => 0);
 
       try {
         const stageParam = searchParams.get("stage") ?? defaultStage;
@@ -283,6 +372,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         let streamCompleted = false;
         let refreshedConversationList = false;
         let sseBuffer = "";
+        const agentEvents: AgentEventItem[] = [];
 
         const maybeRefreshConversations = (nextId?: string) => {
           if (!refreshedConversationList && nextId && nextId !== conversationId) {
@@ -304,6 +394,39 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             }
             fullContent += data.text;
             setStreamingContent(fullContent);
+          }
+          if (data.type === "tool_call") {
+            upsertAgentEvent(agentEvents, {
+              id: data.callId ?? `tool-${agentEvents.length}`,
+              kind: "tool",
+              callId: data.callId,
+              tool: data.tool,
+              status: "pending",
+              summary: `Checking ${formatToolName(data.tool).toLowerCase()}...`,
+            });
+            setStreamingEvents([...agentEvents]);
+          }
+          if (data.type === "tool_result") {
+            upsertAgentEvent(agentEvents, {
+              id: data.callId ?? `tool-${agentEvents.length}`,
+              kind: "tool",
+              callId: data.callId,
+              tool: agentEvents.find((event) => event.callId === data.callId)?.tool,
+              status: data.status,
+              summary: data.summary || "Sage finished checking this.",
+            });
+            setStreamingEvents([...agentEvents]);
+          }
+          if (data.type === "action") {
+            agentEvents.push({
+              id: `action-${data.callId ?? agentEvents.length}-${data.target ?? data.label ?? "open"}`,
+              kind: "action",
+              action: data.action,
+              target: data.target,
+              label: data.label,
+              summary: data.label || "Open",
+            });
+            setStreamingEvents([...agentEvents]);
           }
           if (data.done) {
             setConversationId(data.conversationId ?? conversationId);
@@ -344,6 +467,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           content: !streamCompleted && fullContent
             ? `${fullContent} (Response may be incomplete)`
             : fullContent || "I didn't receive a complete response. Please try again.",
+          events: agentEvents.length > 0 ? [...agentEvents] : undefined,
         };
 
         if (!streamCompleted && fullContent) {
@@ -352,6 +476,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingContent("");
+        setStreamingEvents([]);
+        const prevGoalCount = await prevGoalCountPromise;
         pollForGoals(prevGoalCount);
         // Check for XP/achievement/level changes
         setTimeout(() => checkProgression(), 2000);
@@ -371,6 +497,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         ]);
       } finally {
         setIsLoading(false);
+        setStreamingEvents([]);
         // B4: Ensure optimistic greeting is always cleared when streaming ends,
         // including on error paths.
         setOptimisticGreeting(null);
@@ -381,23 +508,28 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
   // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
   useEffect(() => {
+    const prompt = searchParams.get("prompt")?.trim();
     const topic = searchParams.get("topic");
     const name = searchParams.get("name");
 
-    if (topic && name && messages.length === 0 && !conversationId) {
+    if (messages.length === 0 && !conversationId) {
       let autoMessage = "";
-      if (topic === "form") {
+      if (prompt) {
+        autoMessage = prompt.slice(0, 1000);
+      } else if (topic === "form" && name) {
         autoMessage = `Can you tell me about the "${name}" form? What is it for and what do I need to know about it?`;
-      } else if (topic === "cert") {
+      } else if (topic === "cert" && name) {
         autoMessage = `I'd like to learn about the ${name} certification. What does it involve and how do I get started?`;
-      } else if (topic === "platform") {
+      } else if (topic === "platform" && name) {
         autoMessage = `Can you help me understand how to use ${name}? How do I get started with it?`;
-      } else {
+      } else if (name) {
         autoMessage = `I have a question about ${name}.`;
       }
 
       // Auto-send after a brief delay to let the UI render
-      setTimeout(() => handleSend(autoMessage), 500);
+      if (autoMessage) {
+        setTimeout(() => handleSend(autoMessage), 500);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -429,9 +561,10 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             type="button"
+            aria-label={showSidebar ? "Hide conversations" : "Show conversations"}
             className="rounded-2xl border border-[var(--border)] px-3 py-2 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
           >
-            ☰
+            <List aria-hidden="true" size={20} weight="bold" />
           </button>
           <span className="text-sm font-semibold text-[var(--ink-strong)]">Chat with Sage</span>
         </div>
@@ -448,7 +581,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                     align="center"
                   />
                 </div>
-                <p className="font-display text-[clamp(1.9rem,6vw,3rem)] text-[var(--ink-strong)]">Welcome to VisionQuest</p>
+                <p className="font-display text-3xl text-[var(--ink-strong)] sm:text-4xl">Welcome to VisionQuest</p>
                 <p className="mt-3 text-sm leading-6">
                   Send a message to start talking with Sage about your goals, next steps, or what feels stuck.
                 </p>
@@ -461,6 +594,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             {messages.map((msg) => (
               <div key={msg.id}>
                 <MessageBubble role={msg.role} content={msg.content} />
+                {msg.events?.length ? <AgentEventList events={msg.events} /> : null}
                 {msg.id === incompleteMessageId && (
                   <button
                     onClick={() => {
@@ -489,7 +623,14 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             )}
 
             {streamingContent && (
-              <MessageBubble role="assistant" content={streamingContent} isStreaming />
+              <div>
+                <MessageBubble role="assistant" content={streamingContent} isStreaming />
+                <AgentEventList events={streamingEvents} />
+              </div>
+            )}
+
+            {!streamingContent && streamingEvents.length > 0 && (
+              <AgentEventList events={streamingEvents} />
             )}
 
             {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator />}

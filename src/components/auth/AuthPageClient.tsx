@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
 import BrandLockup from "@/components/ui/BrandLockup";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -23,9 +24,9 @@ const HIGHLIGHTS = [
 ];
 
 const MODULE_SPOTLIGHT = [
-  { icon: "🎯", label: "Goal mapping", copy: "From BHAG to today's next step." },
-  { icon: "📚", label: "Learning hub", copy: "Courses and certifications in one place." },
-  { icon: "💼", label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
+  { icon: Target, label: "Goal mapping", copy: "From BHAG to today's next step." },
+  { icon: Books, label: "Learning hub", copy: "Courses and certifications in one place." },
+  { icon: Briefcase, label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
 ];
 
 interface AuthPageClientProps {
@@ -137,8 +138,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   return (
     <main id="main-content" className="relative min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-7xl gap-4 lg:min-h-[calc(100vh-2rem)] lg:grid-cols-[1.15fr_0.85fr] lg:gap-6">
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(7,23,43,0.94),rgba(15,154,146,0.76)_56%,rgba(255,154,77,0.64))] p-5 text-white shadow-[0_32px_120px_rgba(7,23,43,0.25)] sm:p-7 md:p-10 lg:p-12">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(255,223,159,0.26),transparent_24%),radial-gradient(circle_at_85%_12%,rgba(255,255,255,0.14),transparent_20%)]" />
+        <section className="auth-hero-panel relative overflow-hidden rounded-[2rem] border border-white/10 p-5 text-white sm:p-7 md:p-10 lg:p-12">
           <div className="relative flex h-full flex-col">
             <div className="max-w-2xl">
               <BrandLockup
@@ -147,7 +147,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 subtitle="SPOKES Workforce Development"
                 priority
               />
-              <h1 className="mt-4 text-balance font-display text-[clamp(2.2rem,9vw,5rem)] leading-[0.94] tracking-[-0.06em]">
+              <h1 className="mt-4 text-balance font-display text-4xl leading-[1] tracking-normal sm:text-5xl md:text-6xl xl:text-7xl">
                 Build momentum, one brave step at a time.
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/80 sm:text-base sm:leading-7 md:mt-5 md:text-lg">
@@ -162,25 +162,30 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   key={highlight}
                   className="flex items-start gap-3 rounded-[1.35rem] border border-white/12 bg-[var(--surface-raised)]/10 px-3.5 py-3 sm:rounded-2xl sm:px-4"
                 >
-                  <span className="mt-0.5 text-[var(--accent-tertiary)]">✦</span>
+                  <CheckCircle
+                    aria-hidden="true"
+                    size={18}
+                    weight="fill"
+                    className="mt-0.5 shrink-0 text-[var(--accent-tertiary)]"
+                  />
                   <p>{highlight}</p>
                 </div>
               ))}
             </div>
 
             <div className="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-3">
-              {MODULE_SPOTLIGHT.map((module) => (
-                <div
-                  key={module.label}
-                  className="rounded-[1.35rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-3.5 sm:rounded-[1.4rem] sm:p-4"
-                >
-                  <div className="mb-2.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--surface-raised)]/14 text-xl sm:mb-3 sm:h-11 sm:w-11">
-                    {module.icon}
+              {MODULE_SPOTLIGHT.map((module) => {
+                const Icon = module.icon;
+                return (
+                  <div key={module.label} className="rounded-[1.35rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-3.5 sm:rounded-[1.4rem] sm:p-4">
+                    <div className="mb-2.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--surface-raised)]/14 text-xl sm:mb-3 sm:h-11 sm:w-11">
+                      <Icon aria-hidden="true" size={23} weight="duotone" />
+                    </div>
+                    <p className="font-semibold text-white">{module.label}</p>
+                    <p className="mt-1 text-sm leading-6 text-white/72">{module.copy}</p>
                   </div>
-                  <p className="font-semibold text-white">{module.label}</p>
-                  <p className="mt-1 text-sm leading-6 text-white/72">{module.copy}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="mt-6 grid gap-3 pt-6 sm:mt-auto sm:grid-cols-3 sm:pt-8">
