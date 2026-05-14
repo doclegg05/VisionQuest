@@ -269,18 +269,21 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
         )}
 
         {/* Step indicator dots */}
-        <div className="mt-8 flex justify-center gap-2">
+        <ol aria-label="Welcome progress" className="mt-8 flex items-center justify-center gap-2">
           {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-            <div
+            <li
               key={i}
+              aria-current={i === step ? "step" : undefined}
               className={`h-2 rounded-full transition-all ${
                 i === step
                   ? "w-6 bg-[var(--accent-strong)]"
                   : "w-2 bg-[var(--surface-muted)]"
               }`}
-            />
+            >
+              <span className="sr-only">Step {i + 1} of {TOTAL_STEPS}</span>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useReducedMotion } from "framer-motion";
 import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
@@ -138,6 +139,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       ? REQUESTED_STAGE_OPENERS[requestedStage as keyof typeof REQUESTED_STAGE_OPENERS]
       : null;
   const { checkProgression } = useProgression();
+  const shouldReduceMotion = useReducedMotion();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -638,7 +640,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         </div>
 
         {goalToast && (
-          <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2 animate-bounce" role="alert">
+          <div className={`absolute left-1/2 top-4 z-50 -translate-x-1/2 ${shouldReduceMotion ? "" : "animate-bounce"}`} role="alert">
             <div className="rounded-full bg-[linear-gradient(135deg,var(--accent-secondary),var(--accent))] px-5 py-2.5 text-sm font-medium text-white shadow-[0_22px_48px_rgba(15,154,146,0.24)]">
               🎯 {goalToast} +50 XP
             </div>
