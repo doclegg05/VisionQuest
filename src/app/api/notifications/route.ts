@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { markAsRead } from "@/lib/notifications";
-import { badRequest } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
+import { parseBody } from "@/lib/schemas";
+
+// `ids` is optional — when omitted, the helper marks all notifications as read.
+// Each ID is a non-empty string (existing helper does not require cuid format).
+const markReadSchema = z.object({
+  ids: z.array(z.string().min(1, "Notification ID cannot be empty.")).optional(),
+});
 
 // GET — list notifications for the current user
 export const GET = withRegistry("notifications.list", async (session, req, _ctx, _tool) => {
@@ -29,13 +36,7 @@ export const GET = withRegistry("notifications.list", async (session, req, _ctx,
 
 // POST — mark notifications as read
 export const POST = withRegistry("notifications.mark_read", async (session, req, _ctx, _tool) => {
-  const { ids } = await req.json();
-  if (ids !== undefined) {
-    if (!Array.isArray(ids) || ids.some((id: unknown) => typeof id !== "string" || id.length === 0)) {
-      throw badRequest("ids must be an array of non-empty notification ID strings");
-    }
-  }
-
+  const { ids } = await parseBody(req, markReadSchema);
   await markAsRead(session.id, ids);
   return NextResponse.json({ ok: true });
 });

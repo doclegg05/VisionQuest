@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
@@ -6,6 +7,17 @@ import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+import { parseBody } from "@/lib/schemas";
+
+// Signature is a base64 PNG data URL — body length capped to keep upstream
+// `Buffer.from(base64Data, "base64")` size bounded (existing 500_000 byte limit
+// applies post-decode). 1 MB raw cap leaves headroom for the data URL prefix.
+const formsSignSchema = z.object({
+  formId: z.string().min(1, "formId is required.").max(200),
+  signature: z.string().min(1, "signature is required.").max(1_000_000),
+  fileId: z.string().cuid("Invalid file ID.").optional(),
+  studentId: z.string().cuid("Invalid student ID.").optional(),
+});
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
   const targetStudentId = requestedStudentId?.trim() || session.id;
@@ -29,17 +41,7 @@ async function resolveTargetStudentId(session: Session, requestedStudentId?: str
  */
 export const POST = withAuth(async (session, req: NextRequest) => {
   try {
-    const body = await req.json();
-    const { formId, signature, fileId, studentId } = body as {
-      formId?: string;
-      signature?: string;
-      fileId?: string;
-      studentId?: string;
-    };
-
-    if (!formId || !signature) {
-      throw badRequest("formId and signature are required.");
-    }
+    const { formId, signature, fileId, studentId } = await parseBody(req, formsSignSchema);
 
     // Validate formId
     const formDef = FORMS.find((f) => f.id === formId);

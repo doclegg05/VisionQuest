@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { withAuth, badRequest, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
-import { checkLength } from "@/lib/validation";
+import { MAX_LENGTHS } from "@/lib/validation";
+import { parseBody } from "@/lib/schemas";
 
-const VALID_STATUSES = ["saved", "applied", "interviewing", "offered", "withdrawn"];
+const VALID_STATUSES = ["saved", "applied", "interviewing", "offered", "withdrawn"] as const;
 const APPLIED_STATUSES = new Set(["applied", "interviewing", "offered"]);
+
+const saveJobSchema = z.object({
+  jobListingId: z.string().cuid("Invalid job listing ID."),
+  status: z.enum(VALID_STATUSES).optional(),
+  notes: z.string().trim().max(MAX_LENGTHS.notes, "Job notes must be 10000 characters or fewer.").optional(),
+});
 
 /**
  * POST /api/jobs/save
@@ -14,27 +22,9 @@ const APPLIED_STATUSES = new Set(["applied", "interviewing", "offered"]);
  * Body: { jobListingId: string, status?: string, notes?: string }
  */
 export const POST = withAuth(async (session: Session, req: Request) => {
-  const body = await req.json();
-  const { jobListingId, status, notes } = body as {
-    jobListingId?: string;
-    status?: string;
-    notes?: string;
-  };
-
-  if (!jobListingId || typeof jobListingId !== "string") {
-    throw badRequest("jobListingId is required");
-  }
-
+  const { jobListingId, status, notes } = await parseBody(req, saveJobSchema);
   const saveStatus = status ?? "saved";
-  if (!VALID_STATUSES.includes(saveStatus)) {
-    throw badRequest(`Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`);
-  }
-
-  const cleanNotes = typeof notes === "string" ? notes.trim() : notes;
-  if (typeof cleanNotes === "string") {
-    const notesError = checkLength(cleanNotes, "notes", "Job notes");
-    if (notesError) throw badRequest(notesError);
-  }
+  const cleanNotes = notes;
 
   const enrollment = await prisma.studentClassEnrollment.findFirst({
     where: { studentId: session.id, status: "active" },

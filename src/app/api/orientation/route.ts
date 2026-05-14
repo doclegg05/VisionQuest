@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
 import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { parseBody } from "@/lib/schemas";
+
+const orientationToggleSchema = z.object({
+  itemId: z.string().cuid("Invalid orientation item ID."),
+  completed: z.boolean(),
+  studentId: z.string().cuid("Invalid student ID.").optional(),
+});
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
   const targetStudentId = requestedStudentId?.trim() || session.id;
@@ -51,10 +59,7 @@ export const GET = withAuth(async (session, req: Request) => {
 
 // POST — toggle an orientation item's completion
 export const POST = withAuth(async (session, req: Request) => {
-  const { itemId, completed, studentId } = await req.json();
-  if (!itemId || typeof completed !== "boolean") {
-    return NextResponse.json({ error: "itemId and completed required" }, { status: 400 });
-  }
+  const { itemId, completed, studentId } = await parseBody(req, orientationToggleSchema);
 
   const targetStudentId = await resolveTargetStudentId(session, studentId);
 
