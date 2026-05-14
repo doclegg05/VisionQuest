@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 describe("goal confirmation rules", () => {
-  const CONFIRMABLE_FROM = ["active", "in_progress"];
+  const CONFIRMABLE_FROM = ["proposed", "active", "in_progress"];
   const NOT_CONFIRMABLE_FROM = ["confirmed", "completed", "abandoned", "blocked"];
 
   function canConfirm(currentStatus: string): boolean {

@@ -113,7 +113,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
       assert.equal(nativeBody.format, "json");
-      assert.deepEqual(nativeBody.options, { num_ctx: 8192 });
+      assert.deepEqual(nativeBody.options, { num_ctx: 8192, num_predict: 512 });
     });
   });
 
@@ -268,6 +268,55 @@ describe("OllamaProvider", { concurrency: false }, () => {
                 ),
               );
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        );
+      });
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Recovered"]);
+      assert.equal(fetchCount, 2);
+    });
+
+    it("retries Cloudflare 530 startup errors before any tokens are yielded", async () => {
+      const encoder = new TextEncoder();
+      let fetchCount = 0;
+
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode(": heartbeat\n\n"));
+                controller.enqueue(encoder.encode('data: {"error":"Ollama returned 530"}\n\n'));
+                controller.close();
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  JSON.stringify({ message: { content: "Recovered" }, done: false }) +
+                    "\n",
+                ),
+              );
+              controller.enqueue(
+                encoder.encode(JSON.stringify({ message: { content: "" }, done: true }) + "\n"),
+              );
               controller.close();
             },
           }),
@@ -800,6 +849,46 @@ describe("OllamaProvider", { concurrency: false }, () => {
         .map((e) => (e as { text: string }).text)
         .join("");
       assert.equal(finalText, "Looking it up.Found it.");
+    });
+
+    it("retries tool streaming startup failures before yielding text", async () => {
+      const successChunks = [
+        JSON.stringify({ message: { content: "Recovered tools." }, done: true }) + "\n",
+      ];
+      let fetchCount = 0;
+
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1 || fetchCount === 2) {
+          return new Response("Bad Gateway", { status: 502 });
+        }
+        return new Response(streamFromChunks(successChunks), { status: 200 });
+      });
+
+      const onToolCall = mock.fn(async () => ({
+        response: {},
+        summary: "unused",
+        status: "success" as const,
+      }));
+
+      const events: Array<{ kind: string; [k: string]: unknown }> = [];
+      for await (const event of provider.streamWithTools(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        tools,
+        onToolCall,
+      )) {
+        events.push(event as { kind: string });
+      }
+
+      const text = events
+        .filter((e) => e.kind === "text")
+        .map((e) => (e as { text: string }).text)
+        .join("");
+      assert.equal(text, "Recovered tools.");
+      assert.equal(fetchCount, 3);
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+      assert.equal(onToolCall.mock.callCount(), 0);
     });
 
     it("parses native tool_call arguments whether they arrive as a JSON string or an object", async () => {

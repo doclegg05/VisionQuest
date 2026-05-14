@@ -154,10 +154,14 @@ export const STARTER_CHIPS: Record<ChatRole, StarterChip[]> = {
   ],
 };
 
-export function filterCommands(input: string, role: ChatRole): SlashCommand[] {
+export function filterCommands(
+  input: string,
+  role: ChatRole,
+  commands: readonly SlashCommand[] = COMMANDS,
+): SlashCommand[] {
   if (!input.startsWith("/")) return [];
   const needle = input.toLowerCase();
-  return COMMANDS.filter(
+  return commands.filter(
     (c) => c.roles.includes(role) && c.slash.toLowerCase().startsWith(needle),
   );
 }

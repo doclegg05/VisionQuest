@@ -3,30 +3,28 @@ import assert from "node:assert/strict";
 
 import {
   STUDENT_NAV_ITEMS,
+  STUDENT_SECONDARY_NAV,
   getVisibleNavItems,
 } from "./nav-items";
 
-describe("STUDENT_NAV_ITEMS (Phase 6: Sage promoted to primary nav)", () => {
-  it("includes Sage as a phase-1 primary nav item", () => {
-    const sage = STUDENT_NAV_ITEMS.find((item) => item.href === "/chat");
-    assert.ok(sage, "Sage entry missing from STUDENT_NAV_ITEMS");
-    assert.equal(sage?.phase, 1);
-    assert.equal(sage?.label, "Sage");
+describe("STUDENT_NAV_ITEMS", () => {
+  it("keeps Sage and Orientation out of primary student nav", () => {
+    assert.ok(!STUDENT_NAV_ITEMS.some((item) => item.href === "/chat"));
+    assert.ok(!STUDENT_NAV_ITEMS.some((item) => item.href === "/orientation"));
   });
 
-  it("puts Sage right after Home so it's the second item on the sidebar", () => {
+  it("starts with Home and Goals for the core student flow", () => {
     assert.equal(STUDENT_NAV_ITEMS[0]?.href, "/dashboard");
-    assert.equal(STUDENT_NAV_ITEMS[1]?.href, "/chat");
+    assert.equal(STUDENT_NAV_ITEMS[1]?.href, "/goals");
   });
 
-  it("exposes Sage to a brand-new phase-1 student", () => {
+  it("exposes retained features as secondary nav items", () => {
+    const hrefs = STUDENT_SECONDARY_NAV.map((item) => item.href);
+    assert.deepEqual(hrefs, ["/vision-board", "/files", "/resources"]);
+  });
+
+  it("does not expose orientation after completion because it is not a primary nav item", () => {
     const visible = getVisibleNavItems(1);
-    assert.ok(visible.some((item) => item.href === "/chat"));
-  });
-
-  it("still hides orientation for phase-1 students once marked complete", () => {
-    const visible = getVisibleNavItems(1, true);
     assert.ok(!visible.some((item) => item.href === "/orientation"));
-    assert.ok(visible.some((item) => item.href === "/chat"));
   });
 });

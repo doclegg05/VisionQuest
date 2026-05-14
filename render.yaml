@@ -23,6 +23,12 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: SAGE_AGENT_ENABLED
+        value: "false"
+      - key: CF_ACCESS_CLIENT_ID
+        sync: false
+      - key: CF_ACCESS_CLIENT_SECRET
+        sync: false
       - key: STORAGE_ENDPOINT
         sync: false
       - key: STORAGE_REGION

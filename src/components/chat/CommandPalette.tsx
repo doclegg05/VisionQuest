@@ -8,15 +8,16 @@ interface CommandPaletteProps {
   open: boolean;
   input: string;
   role: ChatRole;
+  commands?: SlashCommand[];
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
 }
 
-export function CommandPalette({ open, input, role, onSelect, onClose }: CommandPaletteProps) {
+export function CommandPalette({ open, input, role, commands, onSelect, onClose }: CommandPaletteProps) {
   const [highlightIndex, setHighlightIndex] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const matches = useMemo(() => filterCommands(input, role), [input, role]);
+  const matches = useMemo(() => filterCommands(input, role, commands), [input, role, commands]);
 
   // Reset highlight when matches change
   const safeHighlightIndex = Math.min(highlightIndex, Math.max(0, matches.length - 1));

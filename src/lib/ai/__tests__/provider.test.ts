@@ -139,6 +139,46 @@ describe("getProvider", () => {
     assert.equal(mockResolveKey.mock.callCount(), 0);
   });
 
+  it("uses Cloudflare Access credentials from environment when encrypted config is absent", async () => {
+    const previousId = process.env.CF_ACCESS_CLIENT_ID;
+    const previousSecret = process.env.CF_ACCESS_CLIENT_SECRET;
+    process.env.CF_ACCESS_CLIENT_ID = "env-client-id";
+    process.env.CF_ACCESS_CLIENT_SECRET = "env-client-secret";
+
+    try {
+      mockGetPlain.mock.mockImplementation(async (key: string) => {
+        if (key === "ai_provider") return "cloud";
+        if (key === "ai_provider_url") return "https://llm.example.com";
+        if (key === "ai_provider_model") return "gemma4:26b";
+        if (key === "ai_provider_auth_mode") return "cloudflare_service_token";
+        return null;
+      });
+      mockGetConfig.mock.mockImplementation(async () => null);
+
+      const provider = await resolveAiProvider({
+        studentId: "student-123",
+        task: "sage_student_chat",
+        sensitivity: "student_record",
+      });
+
+      assert.ok(provider instanceof OllamaProvider);
+      assert.deepEqual(
+        (provider as unknown as { authConfig: unknown }).authConfig,
+        {
+          authMode: "cloudflare_service_token",
+          apiKey: null,
+          cloudflareAccessClientId: "env-client-id",
+          cloudflareAccessClientSecret: "env-client-secret",
+        },
+      );
+    } finally {
+      if (previousId === undefined) delete process.env.CF_ACCESS_CLIENT_ID;
+      else process.env.CF_ACCESS_CLIENT_ID = previousId;
+      if (previousSecret === undefined) delete process.env.CF_ACCESS_CLIENT_SECRET;
+      else process.env.CF_ACCESS_CLIENT_SECRET = previousSecret;
+    }
+  });
+
   it("keeps public tasks on the configured provider by default", async () => {
     mockGetPlain.mock.mockImplementation(async (key: string) => {
       if (key === "ai_provider") return "cloud";

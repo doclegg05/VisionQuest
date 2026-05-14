@@ -1,6 +1,8 @@
 "use client";
 
 import { JobCard } from "./JobCard";
+import type { JobTrackingUpdate } from "./JobCard";
+import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
 
 interface ListJob {
   id: string;
@@ -11,13 +13,17 @@ interface ListJob {
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
-  savedStatus: string | null;
+  skillOverlap?: string[];
+  matchReasons?: JobMatchReason[];
+  savedStatus: SavedJobStatus | null;
+  savedNotes?: string | null;
+  savedAppliedAt?: string | null;
   url: string;
 }
 
 interface JobListProps {
   jobs: ListJob[];
-  onSave: (jobId: string) => void;
+  onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
 }
 
 export function JobList({ jobs, onSave }: JobListProps) {

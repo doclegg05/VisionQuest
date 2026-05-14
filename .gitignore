@@ -83,6 +83,10 @@ _old_MEMORY.md
 # Test artifacts
 playwright-report/
 test-results/
+.playwright-mcp/
+
+# Local runtime workspaces (audit logs, uploads, scratch dirs)
+local_*/
 
 # Analysis report artifacts (root-level)
 COMPETITIVE_ANALYSIS_2026.md
@@ -92,3 +96,7 @@ KPI_FRAMEWORK.md
 
 # Local backup from cleanup-broken-documents.mjs
 broken-documents-backup-*.json
+
+# Project Autopilot — local automation, not part of the product
+/project-autopilot/
+/VisionQuest_Claude_Automation_Files/

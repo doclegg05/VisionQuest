@@ -26,6 +26,20 @@ const mockCheckOllamaHealth = mock.fn<
     modelUsed?: string;
   }>
 >();
+const mockReadLocalAiProviderConfig = mock.fn<
+  () => Promise<{
+    url: string | null;
+    model: string | null;
+    authMode: "none" | "bearer" | "cloudflare_service_token";
+    numCtxRaw: string | null;
+    apiKey: string | null;
+    apiKeySource: "config" | "env" | null;
+    cloudflareAccessClientId: string | null;
+    cloudflareAccessClientIdSource: "config" | "env" | null;
+    cloudflareAccessClientSecret: string | null;
+    cloudflareAccessClientSecretSource: "config" | "env" | null;
+  }>
+>();
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -81,12 +95,24 @@ mock.module("@/lib/ai", {
   namedExports: {
     checkOllamaHealth: mockCheckOllamaHealth,
     DEFAULT_LOCAL_AI_AUTH_MODE: "none",
+    readLocalAiProviderConfig: mockReadLocalAiProviderConfig,
     resolveLocalAiAuthMode: (authMode?: string | null) => {
       if (authMode === "bearer" || authMode === "cloudflare_service_token") {
         return authMode;
       }
       return "none";
     },
+    toLocalAiAuthConfig: (config: {
+      authMode: "none" | "bearer" | "cloudflare_service_token";
+      apiKey: string | null;
+      cloudflareAccessClientId: string | null;
+      cloudflareAccessClientSecret: string | null;
+    }) => ({
+      authMode: config.authMode,
+      apiKey: config.apiKey,
+      cloudflareAccessClientId: config.cloudflareAccessClientId,
+      cloudflareAccessClientSecret: config.cloudflareAccessClientSecret,
+    }),
   },
 });
 
@@ -107,6 +133,7 @@ describe("admin AI provider routes", () => {
     mockGetConfigValue.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
     mockCheckOllamaHealth.mock.resetCalls();
+    mockReadLocalAiProviderConfig.mock.resetCalls();
 
     mockSetPlainConfigValue.mock.mockImplementation(async () => undefined);
     mockSetConfigValue.mock.mockImplementation(async () => undefined);
@@ -120,6 +147,34 @@ describe("admin AI provider routes", () => {
       chatValidated: true,
       modelUsed: "gemma4:26b",
     }));
+    mockReadLocalAiProviderConfig.mock.mockImplementation(async () => {
+      const [url, model, authModeRaw, numCtxRaw, apiKey, cloudflareId, cloudflareSecret] =
+        await Promise.all([
+          mockGetPlainConfigValue("ai_provider_url"),
+          mockGetPlainConfigValue("ai_provider_model"),
+          mockGetPlainConfigValue("ai_provider_auth_mode"),
+          mockGetPlainConfigValue("ai_provider_num_ctx"),
+          mockGetConfigValue("ai_provider_api_key"),
+          mockGetConfigValue("ai_provider_cloudflare_access_client_id"),
+          mockGetConfigValue("ai_provider_cloudflare_access_client_secret"),
+        ]);
+      const authMode =
+        authModeRaw === "bearer" || authModeRaw === "cloudflare_service_token"
+          ? authModeRaw
+          : "none";
+      return {
+        url,
+        model,
+        authMode,
+        numCtxRaw,
+        apiKey,
+        apiKeySource: apiKey ? "config" : null,
+        cloudflareAccessClientId: cloudflareId,
+        cloudflareAccessClientIdSource: cloudflareId ? "config" : null,
+        cloudflareAccessClientSecret: cloudflareSecret,
+        cloudflareAccessClientSecretSource: cloudflareSecret ? "config" : null,
+      };
+    });
   });
 
   it("rejects private-network AI provider URLs during save", async () => {
@@ -201,7 +256,7 @@ describe("admin AI provider routes", () => {
       method: "PUT",
       body: {
         provider: "local",
-        authMode: "bearer",
+        authMode: "none",
         apiKey: "",
         cloudflareAccessClientId: "",
         cloudflareAccessClientSecret: "",
@@ -212,6 +267,25 @@ describe("admin AI provider routes", () => {
 
     assert.equal(res.status, 200);
     assert.equal(mockDeleteConfigValue.mock.callCount(), 3);
+  });
+
+  it("rejects Cloudflare auth mode without both service-token values", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "https://llm.example.com",
+        model: "gemma4:latest",
+        authMode: "cloudflare_service_token",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 400);
+    assert.match(String(body.error), /client id and client secret/i);
+    assert.equal(mockSetPlainConfigValue.mock.callCount(), 0);
   });
 
   it("rejects unsafe stored URLs before running the health check", async () => {

@@ -47,5 +47,13 @@ registerJobHandler("snapshot_grant_kpis", async (payload) => {
 
 registerJobHandler("scrape_jobs", async (payload) => {
   const { runScrapeForConfig } = await import("./job-board/scrape-engine");
-  await runScrapeForConfig(payload.configId as string);
+  const sourceAllowlist = Array.isArray(payload.sources)
+    ? payload.sources.filter((source): source is string => typeof source === "string")
+    : undefined;
+  await runScrapeForConfig(payload.configId as string, {
+    scrapeRunId: typeof payload.scrapeRunId === "string" ? payload.scrapeRunId : undefined,
+    trigger: "manual",
+    backgroundJobId: typeof payload.backgroundJobId === "string" ? payload.backgroundJobId : undefined,
+    sourceAllowlist,
+  });
 });
