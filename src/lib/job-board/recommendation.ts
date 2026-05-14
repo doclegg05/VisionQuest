@@ -1,4 +1,5 @@
 import type { CareerDiscovery, JobListing } from "@prisma/client";
+import { getJobSourceMode } from "./source-options";
 import type { JobMatchReason, JobRecommendation } from "./types";
 
 /**
@@ -129,18 +130,30 @@ function jobLocationMatchesRegion(jobLocation: string, classRegion: string): boo
 /**
  * Classifies a job's proximity relative to the class region.
  *
- *   "local"           — onsite or hybrid AND the listed location matches the class region.
- *                       Hybrid roles count as local when the listed city is in-region because
- *                       the in-person portion will be commutable.
- *   "regional_onsite" — onsite or hybrid but the listed location does NOT match the region.
- *                       An in-person job two states away is the worst kind of false positive
- *                       for our students (no transportation), so it is penalized more than remote.
- *   "remote"          — workMode "remote", or any job whose location text contains "remote".
+ * Priority order:
+ *   1. The job's source adapter mode is authoritative when it is "local" or "remote".
+ *      Local-mode adapters (jsearch, usajobs, adzuna) pass the configured region and
+ *      radius to their upstream APIs, so anything they return is already inside the
+ *      teacher's search area. Remote-mode adapters (remotive, remoteok, weworkremotely)
+ *      only return remote roles by definition.
+ *   2. For mixed-mode adapters (arbeitnow, greenhouse, lever, ashby, smartrecruiters)
+ *      we fall back to the workMode + region text heuristic.
+ *
+ * Resulting categories:
+ *   "local"           — accessible to a student commuting from the class region.
+ *   "regional_onsite" — onsite/hybrid but outside the commutable radius. Functionally
+ *                       inaccessible without transportation.
+ *   "remote"          — workMode "remote" or remote-mode source.
  */
 export function classifyJobProximity(
-  job: Pick<ScoredJob, "location" | "workMode">,
+  job: Pick<ScoredJob, "location" | "workMode" | "source">,
   classRegion: string,
 ): JobProximity {
+  const sourceMode = job.source ? getJobSourceMode(job.source) : "mixed";
+  if (sourceMode === "local") return "local";
+  if (sourceMode === "remote") return "remote";
+
+  // Mixed-mode sources: fall back to workMode + region text match.
   if (isRemoteJob(job)) return "remote";
   return jobLocationMatchesRegion(job.location ?? "", classRegion) ? "local" : "regional_onsite";
 }
@@ -159,7 +172,7 @@ const PROXIMITY_WEIGHT_MULTIPLIERS: Record<LocalJobPriority, Record<JobProximity
 };
 
 function scoreLocation(
-  job: Pick<ScoredJob, "location" | "workMode">,
+  job: Pick<ScoredJob, "location" | "workMode" | "source">,
   classRegion: string,
   priority: LocalJobPriority,
 ): number {
@@ -171,7 +184,7 @@ function scoreLocation(
 }
 
 function locationReason(
-  job: Pick<ScoredJob, "location" | "workMode">,
+  job: Pick<ScoredJob, "location" | "workMode" | "source">,
   classRegion: string,
 ): JobMatchReason | null {
   const jobLocation = job.location;

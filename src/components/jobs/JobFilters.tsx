@@ -17,16 +17,80 @@ const SORT_OPTIONS = [
   { value: "salary", label: "Highest Salary" },
 ];
 
+export type JobProximityFilter = "local" | "remote" | "all";
+
 interface JobFiltersProps {
   cluster: string;
+  proximity: JobProximityFilter;
   sort: string;
+  localCount: number;
+  remoteCount: number;
   onClusterChange: (cluster: string) => void;
+  onProximityChange: (proximity: JobProximityFilter) => void;
   onSortChange: (sort: string) => void;
 }
 
-export function JobFilters({ cluster, sort, onClusterChange, onSortChange }: JobFiltersProps) {
+const PROXIMITY_TABS: Array<{ value: JobProximityFilter; label: string }> = [
+  { value: "local", label: "Local" },
+  { value: "remote", label: "Remote" },
+  { value: "all", label: "All" },
+];
+
+export function JobFilters({
+  cluster,
+  proximity,
+  sort,
+  localCount,
+  remoteCount,
+  onClusterChange,
+  onProximityChange,
+  onSortChange,
+}: JobFiltersProps) {
+  const countFor = (value: JobProximityFilter): number => {
+    if (value === "local") return localCount;
+    if (value === "remote") return remoteCount;
+    return localCount + remoteCount;
+  };
+
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap items-center gap-3">
+      <div
+        role="tablist"
+        aria-label="Filter jobs by location"
+        className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] p-1"
+      >
+        {PROXIMITY_TABS.map((tab) => {
+          const isSelected = proximity === tab.value;
+          const count = countFor(tab.value);
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              onClick={() => onProximityChange(tab.value)}
+              className={`flex min-w-20 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                isSelected
+                  ? "bg-[var(--primary)] text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span
+                className={`rounded-full px-1.5 text-xs ${
+                  isSelected
+                    ? "bg-white/20 text-white"
+                    : "bg-[var(--border)] text-[var(--text-secondary)]"
+                }`}
+                aria-label={`${count} ${tab.label.toLowerCase()} jobs`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <select
         value={cluster}
         onChange={(e) => onClusterChange(e.target.value)}
