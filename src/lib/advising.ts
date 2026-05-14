@@ -1,9 +1,4 @@
 import { syncInterventionNotifications } from "./advising-interventions";
-import { loadStudentAlertSyncContext } from "./advising-sync-context";
-import {
-  applyStudentAlertSyncPlan,
-  buildStudentAlertSyncPlan,
-} from "./advising-sync";
 import {
   buildBookableAdvisorSlots,
 } from "./advising-scheduling";
@@ -152,6 +147,8 @@ export async function listBookableAdvisors({
 }
 
 export async function syncStudentAlerts(studentId: string) {
+  const [{ loadStudentAlertSyncContext }, { applyStudentAlertSyncPlan, buildStudentAlertSyncPlan }] =
+    await Promise.all([import("./advising-sync-context"), import("./advising-sync")]);
   const now = new Date();
   const context = await loadStudentAlertSyncContext(studentId, now);
   const { existing } = context;
