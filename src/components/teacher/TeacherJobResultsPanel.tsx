@@ -228,7 +228,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           <option value="">All work modes</option>
           {(data?.workModeOptions ?? []).map((option) => (
             <option key={option.value} value={option.value}>
-              {option.value === "onsite" ? "Local / in person" : option.label}
+              {option.label}
             </option>
           ))}
         </select>

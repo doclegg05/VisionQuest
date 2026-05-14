@@ -18,6 +18,6 @@ describe("job work mode helpers", () => {
   it("validates and formats supported work modes", () => {
     assert.equal(isJobWorkMode("remote"), true);
     assert.equal(isJobWorkMode("physical"), false);
-    assert.equal(formatJobWorkMode("onsite"), "Local / in person");
+    assert.equal(formatJobWorkMode("onsite"), "In person");
   });
 });

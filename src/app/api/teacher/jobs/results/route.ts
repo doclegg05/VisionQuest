@@ -3,6 +3,7 @@ import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { groupDuplicateJobs } from "@/lib/job-board/duplicates";
+import { classifyJobProximity } from "@/lib/job-board/recommendation";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
 import { formatJobWorkMode, isJobWorkMode, JOB_WORK_MODE_OPTIONS } from "@/lib/job-board/work-mode";
 
@@ -47,7 +48,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
 
   const config = await prisma.jobClassConfig.findUnique({
     where: { classId },
-    select: { id: true },
+    select: { id: true, region: true, localJobPriority: true },
   });
 
   if (!config) {
@@ -62,8 +63,11 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
       page: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       totalPages: 0,
+      hiddenNonLocal: 0,
     });
   }
+
+  const localOnly = config.localJobPriority === "local_only";
 
   const query = searchText(url.searchParams.get("q") ?? "");
   const sourceFilter = url.searchParams.get("source") ?? "";
@@ -103,7 +107,18 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     .sort()
     .map((source) => ({ value: source, label: SOURCE_LABELS.get(source) ?? source }));
 
-  const filtered = groups
+  // When the class has opted into "Local only" mode, hide groups where every
+  // contributing listing classifies as non-local. This prevents Dallas-style
+  // jobs from a mixed-mode source (e.g. SmartRecruiters) from polluting the
+  // teacher's view of what students see.
+  const proximityFiltered = localOnly
+    ? groups.filter((group) =>
+        group.jobs.some((job) => classifyJobProximity(job, config.region) === "local"),
+      )
+    : groups;
+  const hiddenNonLocal = localOnly ? groups.length - proximityFiltered.length : 0;
+
+  const filtered = proximityFiltered
     .filter((group) => !sourceFilter || group.sources.includes(sourceFilter))
     .filter((group) => !clusterFilter || group.jobs.some((job) => job.clusters.includes(clusterFilter)))
     .filter((group) => !isJobWorkMode(workModeFilter) || group.jobs.some((job) => job.workMode === workModeFilter))
@@ -166,6 +181,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     filteredUnique: filtered.length,
     duplicateGroups,
     duplicateListings,
+    hiddenNonLocal,
     page: safePage,
     pageSize,
     totalPages,

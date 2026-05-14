@@ -1,7 +1,9 @@
 import type { JobWorkMode } from "./types";
 
+// Labels describe HOW work is done (in person vs remote), not WHERE.
+// Geographic locality is computed separately via classifyJobProximity().
 export const JOB_WORK_MODE_OPTIONS: Array<{ value: JobWorkMode; label: string }> = [
-  { value: "onsite", label: "Local / in person" },
+  { value: "onsite", label: "In person" },
   { value: "remote", label: "Remote" },
   { value: "hybrid", label: "Hybrid" },
 ];
@@ -26,7 +28,7 @@ export function isJobWorkMode(value: string | null | undefined): value is JobWor
 }
 
 export function formatJobWorkMode(value: JobWorkMode | string | null | undefined): string {
-  return JOB_WORK_MODE_OPTIONS.find((option) => option.value === value)?.label ?? "Local / in person";
+  return JOB_WORK_MODE_OPTIONS.find((option) => option.value === value)?.label ?? "In person";
 }
 
 export function inferJobWorkMode(input: WorkModeInput): JobWorkMode {
