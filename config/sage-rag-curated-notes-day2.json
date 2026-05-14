@@ -1,0 +1,82 @@
+[
+  {
+    "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+    "note": "SPOKES personal attendance contract for orientation. This student document explains attendance expectations, participation habits, and acknowledgement requirements when a student asks about being present, missed time, schedule accountability, or attendance paperwork."
+  },
+  {
+    "storageKey": "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+    "note": "Fillable WV Adult Education technology acceptable use agreement. This student document belongs with orientation technology rules and should answer questions about computer access, online behavior, account responsibility, and required technology acknowledgements."
+  },
+  {
+    "storageKey": "orientation/Media_Release_Form_FY26_Fillable.pdf",
+    "note": "SPOKES media release form for orientation. This student document is relevant when a student asks about permission for photos, videos, publicity, public sharing, image consent, or whether a media authorization is required."
+  },
+  {
+    "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+    "note": "Authorization form for releasing student information to outside agencies. This orientation document is relevant when a student asks about sharing records, external agency communication, consent, referrals, or who may receive program information."
+  },
+  {
+    "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+    "note": "Authorization form for strictly confidential student information. This orientation document is relevant when a student asks about sensitive records, confidential releases, privacy protections, consent boundaries, or protected information shared outside the program."
+  },
+  {
+    "storageKey": "forms/DFA-TS-12_Rev_-2-24.pdf",
+    "note": "DFA TS-12 time sheet and participation record for WV Works or TANF documentation. This student referral document should answer questions about timesheets, hours, participation reporting, caseworker paperwork, and non-fillable copies of the form."
+  },
+  {
+    "storageKey": "forms/DFA-WVW-25_Rev_6-24.pdf",
+    "note": "DFA WVW-25 referral or WV Works documentation form. This student referral document is relevant when a student asks about TANF paperwork, WV Works forms, caseworker records, participation verification, or required referral documents."
+  },
+  {
+    "storageKey": "forms/DFA_-_SSP-1_1-9-24.pdf",
+    "note": "DFA SSP-1 student referral or support program form. This document is relevant when a student asks about Department of Human Services paperwork, assistance records, eligibility documentation, or forms connected to SPOKES participation."
+  },
+  {
+    "storageKey": "forms/DFA-PRC-1_Rev-1-24.pdf",
+    "note": "DFA PRC-1 referral and program documentation form. This student referral document is relevant when a student asks about public assistance paperwork, program records, TANF or WV Works documentation, or caseworker-required forms."
+  },
+  {
+    "storageKey": "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+    "note": "Virtual student acceptable use policy for online learning. This resource is relevant when a student asks about remote class technology, internet conduct, computer access, virtual participation rules, or acceptable online behavior."
+  },
+  {
+    "storageKey": "forms/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+    "note": "DoHS release of information form stored with student resources. This document is relevant when a student asks about Department of Human Services information sharing, consent, records release, agency communication, or required release paperwork."
+  },
+  {
+    "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+    "note": "SPOKES life and employability skills rubric record for student progress evidence. This resource is relevant when a student asks how employability modules are tracked, how work habits are reviewed, or what evidence supports readiness."
+  },
+  {
+    "storageKey": "lms/Aztec/Aztecs_Continuum_of_Learning_Chart_1.png",
+    "note": "Aztec Continuum of Learning chart showing progression through Aztec levels and curriculum structure. This platform guide is relevant when a student asks where Aztec classwork fits, how lessons progress, or what learning sequence comes next."
+  },
+  {
+    "storageKey": "lms/Essential Education/Money Essentials Certification.png",
+    "note": "Essential Education Money Essentials certificate reference. This platform guide is relevant when a student asks about financial literacy lessons, money skills, budgeting content, or which Essential Education certificate supports personal finance readiness."
+  },
+  {
+    "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+    "note": "Burlington English career extensions chart for English language learning connected to workplace goals. This platform guide is relevant when a student asks how Burlington English supports jobs, career vocabulary, or work-focused language practice."
+  },
+  {
+    "storageKey": "lms/GMetrix and LearnKey/IC3/IC3_Digital_Literacy_Master_Certification.png",
+    "note": "IC3 Digital Literacy Master Certification reference for GMetrix and LearnKey. This certification document is relevant when a student asks about IC3 credential levels, digital literacy proof, computer skills certification, or completion evidence."
+  },
+  {
+    "storageKey": "lms/GMetrix and LearnKey/Intuit/Intuit_QuickBooks_Certified_User_Certificate.jpg",
+    "note": "Intuit QuickBooks Certified User certificate reference for GMetrix and LearnKey. This certification document is relevant when a student asks about QuickBooks credentials, bookkeeping skills, Intuit certification, or proof of accounting software readiness."
+  },
+  {
+    "storageKey": "lms/GMetrix and LearnKey/Microsoft Office Specialist (MOS)/Microsoft Office (MOS) Certificate.pdf",
+    "note": "Microsoft Office Specialist certificate reference for GMetrix and LearnKey. This certification document is relevant when a student asks about MOS, Microsoft Office credentials, Word or Excel certification, or proof of office technology skills."
+  },
+  {
+    "storageKey": "lms/Ready to Work/Checklist for Documentation of Benchmarks Certificate of Ready to Work.pdf",
+    "note": "Ready to Work benchmark documentation checklist. This certification document is relevant when a student asks what evidence is needed for Ready to Work completion, which benchmarks count, or how certificate requirements are documented."
+  },
+  {
+    "storageKey": "lms/Bring Your A Game to Work/Bring Your A Game to Work Detailed Instructions for Administering Online Exams.pdf",
+    "note": "Bring Your A Game to Work online exam administration instructions. This certification document is relevant when a student asks how BYAG testing works, what happens during the online exam, or how work-ethic credential assessment is administered."
+  }
+]

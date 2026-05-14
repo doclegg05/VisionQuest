@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger";
 import { logAuditEvent } from "@/lib/audit";
 import type { Session } from "@/lib/api-error";
 import { getToolByName, findToolBySlashCommand } from "./tools";
+import { validateToolArgs } from "./validation";
 import type { AgentTool, AgentToolCallRecord, AgentToolResult } from "./types";
 
 export interface ExecuteToolOptions {
@@ -47,8 +48,24 @@ export async function executeAgentTool(
     );
   }
 
+  const validation = validateToolArgs(tool, args);
+  if (!validation.ok) {
+    return errorRecord(
+      callId,
+      toolName,
+      args,
+      startedAt,
+      `Tool call rejected before execution: ${validation.error}`,
+      {
+        modelHint:
+          `Your ${toolName} tool call did not match the declared schema. ` +
+          `${validation.error} Call the tool again with only valid JSON arguments.`,
+      },
+    );
+  }
+
   try {
-    const result = await tool.execute(args, {
+    const result = await tool.execute(validation.args, {
       session,
       conversationId,
       targetStudentId,
@@ -66,7 +83,7 @@ export async function executeAgentTool(
       summary: `Sage tool "${toolName}" → ${result.status}: ${result.summary}`,
       metadata: {
         callId,
-        args,
+        args: validation.args,
         status: result.status,
         targetStudentId: targetStudentId ?? null,
         actionKind: result.action?.action ?? null,
@@ -75,7 +92,7 @@ export async function executeAgentTool(
       logger.warn("agent.executor: audit log failed", { err: String(err), toolName });
     });
 
-    return { callId, tool: toolName, args, result, startedAt, finishedAt };
+    return { callId, tool: toolName, args: validation.args, result, startedAt, finishedAt };
   } catch (err) {
     logger.error("agent.executor: tool threw", {
       toolName,
@@ -136,8 +153,13 @@ function errorRecord(
   args: Record<string, unknown>,
   startedAt: string,
   message: string,
+  options: { modelHint?: string } = {},
 ): AgentToolCallRecord {
-  const result: AgentToolResult = { status: "error", summary: message };
+  const result: AgentToolResult = {
+    status: "error",
+    summary: message,
+    ...(options.modelHint ? { modelHint: options.modelHint } : {}),
+  };
   return {
     callId,
     tool: toolName,

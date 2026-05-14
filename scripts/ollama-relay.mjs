@@ -99,7 +99,23 @@ function handleStreaming(clientReq, clientRes, requestBody) {
   clientRes.write(": heartbeat\n\n");
 
   // Now connect to Ollama (this may take 30-120s for prompt eval)
-  const upstreamReq = http.request(
+  let upstreamReq;
+  const cleanup = () => {
+    if (finished) return;
+    finished = true;
+    clearInterval(heartbeat);
+  };
+  const abortUpstream = (reason) => {
+    cleanup();
+    if (reason) {
+      console.error(`[relay] streaming closed: ${reason}`);
+    }
+    upstreamReq?.destroy();
+  };
+
+  clientRes.on("close", () => abortUpstream("client response closed"));
+
+  upstreamReq = http.request(
     {
       hostname: ollamaUrl.hostname,
       port: ollamaUrl.port || 11434,
@@ -109,8 +125,7 @@ function handleStreaming(clientReq, clientRes, requestBody) {
     },
     (upstreamRes) => {
       if (upstreamRes.statusCode !== 200) {
-        clearInterval(heartbeat);
-        finished = true;
+        cleanup();
         const errMsg = `data: ${JSON.stringify({ error: `Ollama returned ${upstreamRes.statusCode}` })}\n\n`;
         clientRes.write(errMsg);
         clientRes.end();
@@ -122,20 +137,17 @@ function handleStreaming(clientReq, clientRes, requestBody) {
         try {
           clientRes.write(chunk);
         } catch {
-          clearInterval(heartbeat);
-          finished = true;
+          abortUpstream("client write failed");
         }
       });
 
       upstreamRes.on("end", () => {
-        clearInterval(heartbeat);
-        finished = true;
+        cleanup();
         clientRes.end();
       });
 
       upstreamRes.on("error", (err) => {
-        clearInterval(heartbeat);
-        finished = true;
+        abortUpstream(`upstream stream error: ${err.message}`);
         console.error("[relay] upstream stream error:", err.message);
         clientRes.end();
       });
@@ -144,15 +156,12 @@ function handleStreaming(clientReq, clientRes, requestBody) {
 
   upstreamReq.setTimeout(300_000, () => {
     console.error("[relay] streaming upstream timeout (5min)");
-    clearInterval(heartbeat);
-    finished = true;
-    upstreamReq.destroy();
+    abortUpstream("upstream timeout");
     clientRes.end();
   });
 
   upstreamReq.on("error", (err) => {
-    clearInterval(heartbeat);
-    finished = true;
+    cleanup();
     console.error("[relay] streaming connection error:", err.message);
     try {
       clientRes.write(

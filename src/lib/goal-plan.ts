@@ -456,7 +456,7 @@ export async function buildGoalPlanEntries({
     }),
   ]);
 
-  return goals.map((goal) => {
+  return goals.filter((goal) => goalCountsTowardPlan(goal.status)).map((goal) => {
     const match = matchByGoalId.get(goal.id);
     const normalizedGoal = goal.content.toLowerCase();
     const goalLinks = links

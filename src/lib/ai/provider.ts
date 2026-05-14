@@ -1,7 +1,11 @@
-import { getPlainConfigValue, getConfigValue } from "@/lib/system-config";
+import { getPlainConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { isSafeAiProviderUrl } from "@/lib/validation";
-import { resolveLocalAiAuthMode } from "./local-auth";
+import {
+  DEFAULT_OLLAMA_MODEL,
+  readLocalAiProviderConfig,
+  toLocalAiAuthConfig,
+} from "./local-config";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
 import type {
@@ -11,8 +15,6 @@ import type {
   DataSensitivity,
   PromptTier,
 } from "./types";
-
-const DEFAULT_OLLAMA_MODEL = "gemma4:26b";
 
 async function getConfiguredProviderType(): Promise<AIProviderType> {
   const providerType = await getPlainConfigValue("ai_provider");
@@ -39,40 +41,24 @@ function parseNumCtxOverride(raw: string | null): number | undefined {
 }
 
 async function getLocalProvider(): Promise<AIProvider> {
-  const [
-    url,
-    model,
-    authModeRaw,
-    numCtxRaw,
-    apiKey,
-    cloudflareAccessClientId,
-    cloudflareAccessClientSecret,
-  ] = await Promise.all([
-    getPlainConfigValue("ai_provider_url"),
-    getPlainConfigValue("ai_provider_model"),
-    getPlainConfigValue("ai_provider_auth_mode"),
-    getPlainConfigValue("ai_provider_num_ctx"),
-    getConfigValue("ai_provider_api_key"),
-    getConfigValue("ai_provider_cloudflare_access_client_id"),
-    getConfigValue("ai_provider_cloudflare_access_client_secret"),
-  ]);
-  if (!url) {
+  const config = await readLocalAiProviderConfig();
+  if (!config.url) {
     throw new Error(
       "Local AI server URL is not configured. Set it in Program Setup > AI Provider.",
     );
   }
-  if (!isSafeAiProviderUrl(url)) {
+  if (!isSafeAiProviderUrl(config.url)) {
     throw new Error(
       "Local AI server URL is invalid. Use localhost/127.0.0.1/::1 or a public http/https endpoint.",
     );
   }
-  return new OllamaProvider(url, model || DEFAULT_OLLAMA_MODEL, {
-    authMode: resolveLocalAiAuthMode(authModeRaw),
-    apiKey,
-    cloudflareAccessClientId,
-    cloudflareAccessClientSecret,
-    numCtx: parseNumCtxOverride(numCtxRaw),
-  });
+  return new OllamaProvider(
+    config.url,
+    config.model || DEFAULT_OLLAMA_MODEL,
+    toLocalAiAuthConfig(config, {
+      numCtx: parseNumCtxOverride(config.numCtxRaw),
+    }),
+  );
 }
 
 function isLocalOnlySensitivity(sensitivity: DataSensitivity): boolean {

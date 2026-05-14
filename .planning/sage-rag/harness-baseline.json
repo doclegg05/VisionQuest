@@ -1,0 +1,268 @@
+{
+  "generatedAt": "2026-05-13T13:40:36.785Z",
+  "fixturePath": "config/sage-rag-top-questions.json",
+  "role": "student",
+  "maxResults": 3,
+  "tokenBudgetChars": 6000,
+  "passed": 0,
+  "total": 20,
+  "passRate": 0,
+  "results": [
+    {
+      "id": "orientation-overview",
+      "question": "What forms do I need to complete for orientation?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "orientation",
+        "student profile",
+        "rights",
+        "responsibilities",
+        "dress code"
+      ]
+    },
+    {
+      "id": "rights-responsibilities",
+      "question": "Where can I find my SPOKES rights and responsibilities?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "rights",
+        "responsibilities"
+      ]
+    },
+    {
+      "id": "dress-code",
+      "question": "What is the SPOKES dress code?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "dress code"
+      ]
+    },
+    {
+      "id": "acceptable-use",
+      "question": "What technology acceptable use form do I need?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "acceptable use",
+        "technology"
+      ]
+    },
+    {
+      "id": "dohs-release",
+      "question": "What is the DoHS release of information form?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "dohs",
+        "release",
+        "information"
+      ]
+    },
+    {
+      "id": "student-profile",
+      "question": "How do I complete my student profile form?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "student profile"
+      ]
+    },
+    {
+      "id": "portfolio-checklist",
+      "question": "What goes in my employment portfolio?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "portfolio",
+        "employment"
+      ]
+    },
+    {
+      "id": "ready-to-work",
+      "question": "What is the Ready to Work certificate?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "ready to work",
+        "certificate"
+      ]
+    },
+    {
+      "id": "ic3",
+      "question": "Tell me about the IC3 certification.",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "ic3",
+        "certification"
+      ]
+    },
+    {
+      "id": "mos",
+      "question": "What is Microsoft Office Specialist certification?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "microsoft office",
+        "mos",
+        "specialist"
+      ]
+    },
+    {
+      "id": "quickbooks",
+      "question": "Can I work on QuickBooks certification in SPOKES?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "quickbooks",
+        "intuit"
+      ]
+    },
+    {
+      "id": "bring-your-a-game",
+      "question": "What is Bring Your A Game to Work?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "bring your a game"
+      ]
+    },
+    {
+      "id": "burlington",
+      "question": "How do I use Burlington English?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "burlington english"
+      ]
+    },
+    {
+      "id": "aztec",
+      "question": "How do I use Aztec for classwork?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "aztec"
+      ]
+    },
+    {
+      "id": "essential-education",
+      "question": "What is Essential Education used for?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "essential education"
+      ]
+    },
+    {
+      "id": "khan-academy",
+      "question": "Can Khan Academy help me study?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "khan academy"
+      ]
+    },
+    {
+      "id": "learning-express",
+      "question": "What is Learning Express Library?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "learning express"
+      ]
+    },
+    {
+      "id": "usa-learns",
+      "question": "Can USA Learns help me with English?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "usa learns"
+      ]
+    },
+    {
+      "id": "wv-works-timesheet",
+      "question": "Which WV Works or TANF timesheet form do I need?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "wv works",
+        "tanf",
+        "timesheet"
+      ]
+    },
+    {
+      "id": "support-services",
+      "question": "Where can I learn about support services?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "passed": false,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "expectedTerms": [
+        "support services"
+      ]
+    }
+  ]
+}
