@@ -4,7 +4,8 @@ import { useState, useCallback } from "react";
 import { Briefcase } from "@phosphor-icons/react";
 import { JobCard } from "./JobCard";
 import Link from "next/link";
-import type { JobMatchReason } from "@/lib/job-board/types";
+import type { JobTrackingUpdate } from "./JobCard";
+import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
 
 interface WidgetJob {
   id: string;
@@ -17,7 +18,9 @@ interface WidgetJob {
   clusters: string[];
   skillOverlap?: string[];
   matchReasons?: JobMatchReason[];
-  savedStatus: string | null;
+  savedStatus: SavedJobStatus | null;
+  savedNotes?: string | null;
+  savedAppliedAt?: string | null;
   url: string;
 }
 
@@ -31,11 +34,11 @@ export function JobBoardWidget({ jobs, hasDiscovery }: JobBoardWidgetProps) {
     new Set(jobs.filter((j) => j.savedStatus).map((j) => j.id)),
   );
 
-  const handleSave = useCallback(async (jobId: string) => {
+  const handleSave = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobListingId: jobId }),
+      body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
     });
     if (res.ok) {
       setSavedIds((prev) => new Set([...prev, jobId]));

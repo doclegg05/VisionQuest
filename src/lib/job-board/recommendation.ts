@@ -9,6 +9,7 @@ import type { JobMatchReason, JobRecommendation } from "./types";
  *   Cluster match:      40% (overlap of job clusters with student topClusters)
  *   RIASEC alignment:   20% (job's inferred Holland codes vs student hollandCode)
  *   Skills bonus:       up to 20 extra points, capped at 100 total
+ *   Interaction signal: small boost/penalty from saved/applied/withdrawn jobs
  *
  * Students without CareerDiscovery data can still receive resume/skill-based matches.
  */
@@ -17,10 +18,23 @@ const WEIGHT_LOCATION = 40;
 const WEIGHT_CLUSTER = 40;
 const WEIGHT_RIASEC = 20;
 const WEIGHT_SKILLS = 20;
+const WEIGHT_INTERACTIONS = 12;
 const MAX_SKILL_MATCHES = 5;
 
 export interface StudentJobProfile {
   skills: string[];
+}
+
+export interface JobInteractionProfile {
+  preferredClusters: string[];
+  avoidedClusters: string[];
+  preferredCompanies: string[];
+  preferredSources: string[];
+}
+
+export interface BuildJobInteractionProfileInput {
+  status: string;
+  jobListing: Pick<JobListing, "clusters" | "company" | "source">;
 }
 
 export interface BuildStudentJobProfileInput {
@@ -31,9 +45,26 @@ export interface BuildStudentJobProfileInput {
 }
 
 type ScoredJob = Pick<JobListing, "id" | "location" | "clusters"> &
-  Partial<Pick<JobListing, "title" | "company" | "description">>;
+  Partial<Pick<JobListing, "title" | "company" | "description" | "source">>;
 
 const EMPTY_STUDENT_JOB_PROFILE: StudentJobProfile = { skills: [] };
+const EMPTY_JOB_INTERACTION_PROFILE: JobInteractionProfile = {
+  preferredClusters: [],
+  avoidedClusters: [],
+  preferredCompanies: [],
+  preferredSources: [],
+};
+
+const POSITIVE_INTERACTION_WEIGHTS: Record<string, number> = {
+  saved: 1,
+  applied: 3,
+  interviewing: 4,
+  offered: 5,
+};
+
+const NEGATIVE_INTERACTION_WEIGHTS: Record<string, number> = {
+  withdrawn: 3,
+};
 
 const SKILL_STOPWORDS = new Set([
   "a",
@@ -192,6 +223,68 @@ export function buildStudentJobProfile(input: BuildStudentJobProfileInput): Stud
   };
 }
 
+function sortedKeysByScore(scores: Map<string, number>, limit: number): string[] {
+  return [...scores.entries()]
+    .filter(([, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+export function buildJobInteractionProfile(
+  interactions: BuildJobInteractionProfileInput[],
+): JobInteractionProfile {
+  const positiveClusters = new Map<string, number>();
+  const negativeClusters = new Map<string, number>();
+  const preferredCompanies = new Map<string, number>();
+  const preferredSources = new Map<string, number>();
+
+  for (const interaction of interactions) {
+    const positiveWeight = POSITIVE_INTERACTION_WEIGHTS[interaction.status] ?? 0;
+    const negativeWeight = NEGATIVE_INTERACTION_WEIGHTS[interaction.status] ?? 0;
+
+    for (const cluster of interaction.jobListing.clusters) {
+      if (positiveWeight > 0) {
+        positiveClusters.set(cluster, (positiveClusters.get(cluster) ?? 0) + positiveWeight);
+      }
+      if (negativeWeight > 0) {
+        negativeClusters.set(cluster, (negativeClusters.get(cluster) ?? 0) + negativeWeight);
+      }
+    }
+
+    const company = normalizeSkillText(interaction.jobListing.company);
+    if (company && positiveWeight >= POSITIVE_INTERACTION_WEIGHTS.applied) {
+      preferredCompanies.set(company, (preferredCompanies.get(company) ?? 0) + positiveWeight);
+    }
+
+    const source = normalizeSkillText(interaction.jobListing.source);
+    if (source && positiveWeight >= POSITIVE_INTERACTION_WEIGHTS.applied) {
+      preferredSources.set(source, (preferredSources.get(source) ?? 0) + positiveWeight);
+    }
+  }
+
+  const preferenceScores = new Map<string, number>();
+  const avoidanceScores = new Map<string, number>();
+  const allClusters = new Set([...positiveClusters.keys(), ...negativeClusters.keys()]);
+
+  for (const cluster of allClusters) {
+    const positive = positiveClusters.get(cluster) ?? 0;
+    const negative = negativeClusters.get(cluster) ?? 0;
+    if (positive > negative) {
+      preferenceScores.set(cluster, positive - negative);
+    } else if (negative > 0) {
+      avoidanceScores.set(cluster, negative - positive);
+    }
+  }
+
+  return {
+    preferredClusters: sortedKeysByScore(preferenceScores, 6),
+    avoidedClusters: sortedKeysByScore(avoidanceScores, 6),
+    preferredCompanies: sortedKeysByScore(preferredCompanies, 5),
+    preferredSources: sortedKeysByScore(preferredSources, 5),
+  };
+}
+
 function jobSearchText(job: ScoredJob): string {
   return normalizeSkillText([
     job.title,
@@ -240,6 +333,58 @@ function scoreSkills(skillOverlap: string[]): number {
   return WEIGHT_SKILLS;
 }
 
+function hasInteractionSignals(profile: JobInteractionProfile): boolean {
+  return (
+    profile.preferredClusters.length > 0 ||
+    profile.avoidedClusters.length > 0 ||
+    profile.preferredCompanies.length > 0 ||
+    profile.preferredSources.length > 0
+  );
+}
+
+function scoreInteractions(job: ScoredJob, profile: JobInteractionProfile): {
+  score: number;
+  reasons: JobMatchReason[];
+} {
+  if (!hasInteractionSignals(profile)) return { score: 0, reasons: [] };
+
+  let score = 0;
+  const reasons: JobMatchReason[] = [];
+  const preferredCluster = job.clusters.find((cluster) => profile.preferredClusters.includes(cluster));
+  const avoidedCluster = job.clusters.find((cluster) => profile.avoidedClusters.includes(cluster));
+  const company = job.company ? normalizeSkillText(job.company) : "";
+  const source = job.source ? normalizeSkillText(job.source) : "";
+
+  if (preferredCluster) {
+    score += 8;
+    reasons.push({
+      type: "preference",
+      label: `Similar to jobs you tracked: ${CLUSTER_LABELS[preferredCluster] ?? preferredCluster}`,
+      value: preferredCluster,
+    });
+  }
+
+  if (company && profile.preferredCompanies.includes(company)) {
+    score += 4;
+    reasons.push({
+      type: "feedback",
+      label: `You have moved forward with ${job.company} before`,
+      value: company,
+    });
+  } else if (source && profile.preferredSources.includes(source)) {
+    score += 2;
+  }
+
+  if (avoidedCluster) {
+    score -= 10;
+  }
+
+  return {
+    score: Math.max(-10, Math.min(WEIGHT_INTERACTIONS, score)),
+    reasons: reasons.slice(0, 2),
+  };
+}
+
 function buildMatchReasons(input: {
   job: ScoredJob;
   discovery: Pick<CareerDiscovery, "topClusters" | "hollandCode"> | null;
@@ -247,6 +392,7 @@ function buildMatchReasons(input: {
   clusterOverlap: string[];
   skillOverlap: string[];
   riasecScore: number;
+  interactionReasons: JobMatchReason[];
 }): JobMatchReason[] {
   const reasons: JobMatchReason[] = [];
   const location = locationReason(input.job.location, input.classRegion);
@@ -276,6 +422,8 @@ function buildMatchReasons(input: {
     });
   }
 
+  reasons.push(...input.interactionReasons);
+
   return reasons.slice(0, 6);
 }
 
@@ -295,8 +443,10 @@ export function scoreJob(
   discovery: Pick<CareerDiscovery, "topClusters" | "hollandCode"> | null,
   classRegion: string,
   profile: StudentJobProfile = EMPTY_STUDENT_JOB_PROFILE,
+  interactionProfile: JobInteractionProfile = EMPTY_JOB_INTERACTION_PROFILE,
 ): JobRecommendation {
-  const hasPersonalization = Boolean(discovery) || profile.skills.length > 0;
+  const hasPersonalization =
+    Boolean(discovery) || profile.skills.length > 0 || hasInteractionSignals(interactionProfile);
   if (!hasPersonalization) {
     return emptyRecommendation(job.id);
   }
@@ -307,7 +457,11 @@ export function scoreJob(
   const riasecScore = discovery ? scoreRiasec(jobHolland, discovery.hollandCode) : 0;
   const skillOverlap = getSkillOverlap(job, profile);
   const skillScore = scoreSkills(skillOverlap);
-  const totalScore = Math.min(100, locationScore + clusterScore + riasecScore + skillScore);
+  const interactionScore = scoreInteractions(job, interactionProfile);
+  const totalScore = Math.max(
+    0,
+    Math.min(100, locationScore + clusterScore + riasecScore + skillScore + interactionScore.score),
+  );
 
   const clusterOverlap = discovery
     ? job.clusters.filter((c) => discovery.topClusters.includes(c))
@@ -319,6 +473,7 @@ export function scoreJob(
     clusterOverlap,
     skillOverlap,
     riasecScore,
+    interactionReasons: interactionScore.reasons,
   });
 
   return {
@@ -339,8 +494,9 @@ export function rankJobs(
   discovery: Pick<CareerDiscovery, "topClusters" | "hollandCode"> | null,
   classRegion: string,
   profile: StudentJobProfile = EMPTY_STUDENT_JOB_PROFILE,
+  interactionProfile: JobInteractionProfile = EMPTY_JOB_INTERACTION_PROFILE,
 ): JobRecommendation[] {
   return jobs
-    .map((job) => scoreJob(job, discovery, classRegion, profile))
+    .map((job) => scoreJob(job, discovery, classRegion, profile, interactionProfile))
     .sort((a, b) => b.score - a.score);
 }

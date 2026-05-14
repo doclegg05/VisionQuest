@@ -7,8 +7,9 @@ import OpportunitiesHub from "@/components/career/OpportunitiesHub";
 import { JobFilters } from "@/components/jobs/JobFilters";
 import { JobList } from "@/components/jobs/JobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
+import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
 import AskSageLink from "@/components/sage/AskSageLink";
-import type { JobMatchReason } from "@/lib/job-board/types";
+import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
 
 interface OpportunityItem {
   id: string;
@@ -60,7 +61,9 @@ interface JobData {
   clusters: string[];
   skillOverlap: string[];
   matchReasons: JobMatchReason[];
-  savedStatus: string | null;
+  savedStatus: SavedJobStatus | null;
+  savedNotes: string | null;
+  savedAppliedAt: string | null;
   url: string;
 }
 
@@ -110,11 +113,11 @@ export default function CareerHub({
     };
   }, [cluster, sort, refreshKey]);
 
-  const handleSaveJob = useCallback(async (jobId: string) => {
+  const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobListingId: jobId }),
+      body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
     });
     if (res.ok) {
       setRefreshKey((key) => key + 1);

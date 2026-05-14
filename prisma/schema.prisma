@@ -1283,6 +1283,7 @@ model StudentSavedJob {
   status       String   @default("saved")
   notes        String?  @db.Text
   savedAt      DateTime @default(now())
+  appliedAt    DateTime?
   updatedAt    DateTime @updatedAt
 
   student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)

@@ -1,7 +1,8 @@
 "use client";
 
 import { JobCard } from "./JobCard";
-import type { JobMatchReason } from "@/lib/job-board/types";
+import type { JobTrackingUpdate } from "./JobCard";
+import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
 
 interface RecommendedJob {
   id: string;
@@ -14,13 +15,15 @@ interface RecommendedJob {
   clusters: string[];
   skillOverlap?: string[];
   matchReasons?: JobMatchReason[];
-  savedStatus: string | null;
+  savedStatus: SavedJobStatus | null;
+  savedNotes?: string | null;
+  savedAppliedAt?: string | null;
   url: string;
 }
 
 interface JobRecommendationsProps {
   jobs: RecommendedJob[];
-  onSave: (jobId: string) => void;
+  onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
 }
 
 export function JobRecommendations({ jobs, onSave }: JobRecommendationsProps) {

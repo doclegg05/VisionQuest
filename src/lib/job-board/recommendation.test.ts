@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildJobInteractionProfile,
   buildStudentJobProfile,
   parseTransferableSkillNames,
   scoreJob,
@@ -150,6 +151,62 @@ describe("scoreJob", () => {
     assert.equal(result.score, 100);
     assert.equal(result.matchLabel, "Strong match");
   });
+
+  it("uses saved and applied job history as a preference signal", () => {
+    const interactionProfile = buildJobInteractionProfile([
+      {
+        status: "applied",
+        jobListing: {
+          clusters: ["tech-digital"],
+          company: "Acme",
+          source: "remotive",
+        },
+      },
+    ]);
+
+    const result = scoreJob(
+      {
+        id: "job-9",
+        title: "Remote Support Analyst",
+        company: "Acme",
+        location: "Other",
+        description: "Support internal systems.",
+        source: "remotive",
+        clusters: ["tech-digital"],
+      },
+      null,
+      "Charleston, WV",
+      undefined,
+      interactionProfile,
+    );
+
+    assert.equal(result.score, 12);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "preference"));
+    assert.ok(result.matchReasons.some((reason) => reason.type === "feedback"));
+  });
+
+  it("lowers jobs similar to withdrawn saved jobs", () => {
+    const interactionProfile = buildJobInteractionProfile([
+      {
+        status: "withdrawn",
+        jobListing: {
+          clusters: ["customer-service"],
+          company: "Call Center Co",
+          source: "jsearch",
+        },
+      },
+    ]);
+
+    const result = scoreJob(
+      { id: "job-10", location: "Remote", clusters: ["customer-service"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+      undefined,
+      interactionProfile,
+    );
+
+    assert.equal(result.score, 30); // Remote/location (40) - withdrawn cluster penalty (10)
+  });
 });
 
 describe("rankJobs", () => {
@@ -208,6 +265,28 @@ describe("rankJobs", () => {
 
     assert.equal(results[0].jobListingId, "skill-match");
     assert.deepEqual(results[0].skillOverlap, ["Microsoft Excel", "Scheduling", "Data Entry"]);
+  });
+
+  it("uses interaction profile to break otherwise equal recommendations", () => {
+    const jobs = [
+      { id: "saved-pattern", location: "Other", clusters: ["finance-bookkeeping"] },
+      { id: "other", location: "Other", clusters: ["customer-service"] },
+    ];
+    const interactionProfile = buildJobInteractionProfile([
+      {
+        status: "saved",
+        jobListing: {
+          clusters: ["finance-bookkeeping"],
+          company: "Bookkeeping Co",
+          source: "adzuna",
+        },
+      },
+    ]);
+
+    const results = rankJobs(jobs, null, "Charleston, WV", undefined, interactionProfile);
+
+    assert.equal(results[0].jobListingId, "saved-pattern");
+    assert.equal(results[0].score, 8);
   });
 });
 
