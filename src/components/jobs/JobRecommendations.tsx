@@ -2,13 +2,14 @@
 
 import { JobCard } from "./JobCard";
 import type { JobTrackingUpdate } from "./JobCard";
-import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 
 interface RecommendedJob {
   id: string;
   title: string;
   company: string;
   location: string;
+  workMode: JobWorkMode;
   salary: string | null;
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;

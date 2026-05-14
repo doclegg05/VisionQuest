@@ -37,6 +37,7 @@ export const remotiveAdapter: JobSourceAdapter = {
           title: job.title ?? "",
           company: job.company_name ?? "Unknown",
           location: job.candidate_required_location || "Remote",
+          workMode: "remote" as const,
           salary,
           salaryMin: parseSalaryToHourly(salary),
           description: truncateDescription(stripHtml(job.description)),

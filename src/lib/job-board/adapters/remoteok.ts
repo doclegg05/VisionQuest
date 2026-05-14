@@ -36,6 +36,7 @@ export const remoteOkAdapter: JobSourceAdapter = {
         title: job.position,
         company: job.company || "Unknown",
         location: job.location || "Remote",
+        workMode: "remote" as const,
         salary,
         salaryMin: parseSalaryToHourly(salary),
         description: truncateDescription(stripHtml(job.description)),

@@ -43,7 +43,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     }),
     prisma.jobListing.findMany({
       where: { classConfigId: config.id, status: "active" },
-      select: { title: true, company: true, location: true, source: true, salaryMin: true, updatedAt: true },
+      select: { title: true, company: true, location: true, workMode: true, source: true, salaryMin: true, updatedAt: true },
     }),
   ]);
   const latestRun = recentRuns[0] ?? null;

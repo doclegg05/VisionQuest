@@ -1,5 +1,6 @@
 import { parseSalaryToHourly } from "../salary-parser";
 import type { JobSourceAdapter, NormalizedJob } from "../types";
+import { inferJobWorkMode } from "../work-mode";
 import { fetchJson, stripHtml, textMatchesQuery, truncateDescription } from "./shared";
 
 const DEFAULT_GREENHOUSE = [
@@ -81,6 +82,13 @@ export const greenhouseAdapter: JobSourceAdapter = {
           title: job.title,
           company: board,
           location,
+          workMode: inferJobWorkMode({
+            source: "greenhouse",
+            title: job.title,
+            company: board,
+            location,
+            description: job.content,
+          }),
           salary: null,
           salaryMin: null,
           description: truncateDescription(stripHtml(job.content)),
@@ -127,6 +135,13 @@ export const leverAdapter: JobSourceAdapter = {
           title: job.text,
           company: board,
           location,
+          workMode: inferJobWorkMode({
+            source: "lever",
+            title: job.text,
+            company: board,
+            location,
+            description: job.descriptionPlain || job.description,
+          }),
           salary: null,
           salaryMin: null,
           description: truncateDescription(stripHtml(job.descriptionPlain || job.description)),
@@ -183,6 +198,14 @@ export const ashbyAdapter: JobSourceAdapter = {
           title: job.title,
           company: board,
           location,
+          workMode: inferJobWorkMode({
+            source: "ashby",
+            title: job.title,
+            company: board,
+            location,
+            description: job.descriptionPlain,
+            remote: job.isRemote,
+          }),
           salary,
           salaryMin: parseSalaryToHourly(salary),
           description: truncateDescription(stripHtml(job.descriptionPlain)),

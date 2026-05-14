@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Briefcase, BookmarkSimple, MagnifyingGlass } from "@phosphor-icons/react";
 import EventsHub from "@/components/career/EventsHub";
 import OpportunitiesHub from "@/components/career/OpportunitiesHub";
-import { JobFilters } from "@/components/jobs/JobFilters";
+import { JobFilters, type JobProximityFilter } from "@/components/jobs/JobFilters";
 import { JobList } from "@/components/jobs/JobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
 import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
 import AskSageLink from "@/components/sage/AskSageLink";
-import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 
 interface OpportunityItem {
   id: string;
@@ -55,6 +55,7 @@ interface JobData {
   title: string;
   company: string;
   location: string;
+  workMode: JobWorkMode;
   salary: string | null;
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
@@ -73,6 +74,9 @@ interface JobsResponse {
   hasResume?: boolean;
   hasPersonalization?: boolean;
   totalActive: number;
+  totalLocal: number;
+  totalRemote: number;
+  proximity: JobProximityFilter;
   totalSaved: number;
 }
 
@@ -86,6 +90,7 @@ export default function CareerHub({
   const [jobsData, setJobsData] = useState<JobsResponse | null>(null);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [cluster, setCluster] = useState("");
+  const [proximity, setProximity] = useState<JobProximityFilter>("local");
   const [sort, setSort] = useState("recommended");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -96,6 +101,7 @@ export default function CareerHub({
       setJobsLoading(true);
       const params = new URLSearchParams();
       if (cluster) params.set("cluster", cluster);
+      params.set("proximity", proximity);
       if (sort) params.set("sort", sort);
 
       const res = await fetch(`/api/jobs?${params}`);
@@ -111,7 +117,7 @@ export default function CareerHub({
     return () => {
       cancelled = true;
     };
-  }, [cluster, sort, refreshKey]);
+  }, [cluster, proximity, sort, refreshKey]);
 
   const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
@@ -193,19 +199,37 @@ export default function CareerHub({
               <JobRecommendations jobs={jobsData.jobs} onSave={handleSaveJob} />
             )}
 
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                All Jobs
+                {proximity === "local"
+                  ? "Local Jobs"
+                  : proximity === "remote"
+                    ? "Remote Jobs"
+                    : "All Jobs"}
               </h3>
               <JobFilters
                 cluster={cluster}
+                proximity={proximity}
                 sort={sort}
+                localCount={jobsData.totalLocal}
+                remoteCount={jobsData.totalRemote}
                 onClusterChange={setCluster}
+                onProximityChange={setProximity}
                 onSortChange={setSort}
               />
             </div>
 
-            <JobList jobs={jobsData.jobs} onSave={handleSaveJob} />
+            {jobsData.jobs.length === 0 ? (
+              <div className="surface-section rounded-xl p-6 text-center text-sm text-[var(--text-secondary)]">
+                {proximity === "local"
+                  ? "No local jobs found in your class search area yet. Try switching to Remote or All, or ask your teacher to widen the search radius."
+                  : proximity === "remote"
+                    ? "No remote jobs available right now. Switch to Local to see in-person roles near you."
+                    : "No jobs available right now. Check back after your teacher's next refresh."}
+              </div>
+            ) : (
+              <JobList jobs={jobsData.jobs} onSave={handleSaveJob} />
+            )}
           </div>
         )}
       </section>

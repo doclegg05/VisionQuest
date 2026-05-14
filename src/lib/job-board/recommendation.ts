@@ -1,4 +1,5 @@
 import type { CareerDiscovery, JobListing } from "@prisma/client";
+import { getJobSourceMode } from "./source-options";
 import type { JobMatchReason, JobRecommendation } from "./types";
 
 /**
@@ -45,7 +46,7 @@ export interface BuildStudentJobProfileInput {
 }
 
 type ScoredJob = Pick<JobListing, "id" | "location" | "clusters"> &
-  Partial<Pick<JobListing, "title" | "company" | "description" | "source">>;
+  Partial<Pick<JobListing, "title" | "company" | "description" | "source" | "workMode">>;
 
 const EMPTY_STUDENT_JOB_PROFILE: StudentJobProfile = { skills: [] };
 const EMPTY_JOB_INTERACTION_PROFILE: JobInteractionProfile = {
@@ -113,26 +114,92 @@ function inferJobHollandCode(clusters: string[]): string {
   return CLUSTER_RIASEC[clusters[0]] ?? "";
 }
 
-function scoreLocation(jobLocation: string, classRegion: string): number {
-  if (!jobLocation) return 0;
-  if (jobLocation.toLowerCase().includes("remote")) return WEIGHT_LOCATION;
-  if (!classRegion) return 0;
-  // Simple: check if job location contains the class region city/state
-  const regionLower = classRegion.toLowerCase().split(",")[0].trim();
-  return jobLocation.toLowerCase().includes(regionLower) ? WEIGHT_LOCATION : 0;
+export type JobProximity = "local" | "remote" | "regional_onsite";
+export type LocalJobPriority = "prefer_local" | "local_only" | "balanced";
+
+function isRemoteJob(job: Pick<ScoredJob, "location" | "workMode">): boolean {
+  return job.workMode === "remote" || job.location.toLowerCase().includes("remote");
 }
 
-function locationReason(jobLocation: string, classRegion: string): JobMatchReason | null {
+function jobLocationMatchesRegion(jobLocation: string, classRegion: string): boolean {
+  if (!classRegion) return false;
+  const regionLower = classRegion.toLowerCase().split(",")[0].trim();
+  return jobLocation.toLowerCase().includes(regionLower);
+}
+
+/**
+ * Classifies a job's proximity relative to the class region.
+ *
+ * Priority order:
+ *   1. The job's source adapter mode is authoritative when it is "local" or "remote".
+ *      Local-mode adapters (jsearch, usajobs, adzuna) pass the configured region and
+ *      radius to their upstream APIs, so anything they return is already inside the
+ *      teacher's search area. Remote-mode adapters (remotive, remoteok, weworkremotely)
+ *      only return remote roles by definition.
+ *   2. For mixed-mode adapters (arbeitnow, greenhouse, lever, ashby, smartrecruiters)
+ *      we fall back to the workMode + region text heuristic.
+ *
+ * Resulting categories:
+ *   "local"           — accessible to a student commuting from the class region.
+ *   "regional_onsite" — onsite/hybrid but outside the commutable radius. Functionally
+ *                       inaccessible without transportation.
+ *   "remote"          — workMode "remote" or remote-mode source.
+ */
+export function classifyJobProximity(
+  job: Pick<ScoredJob, "location" | "workMode" | "source">,
+  classRegion: string,
+): JobProximity {
+  const sourceMode = job.source ? getJobSourceMode(job.source) : "mixed";
+  if (sourceMode === "local") return "local";
+  if (sourceMode === "remote") return "remote";
+
+  // Mixed-mode sources: fall back to workMode + region text match.
+  if (isRemoteJob(job)) return "remote";
+  return jobLocationMatchesRegion(job.location ?? "", classRegion) ? "local" : "regional_onsite";
+}
+
+// Score multipliers per proximity, per teacher policy.
+//   "balanced" reproduces the historical behavior (location proximity = full score for any
+//     onsite-region-match or remote role; onsite-far gets nothing).
+//   "prefer_local" gives local roles the full weight and gives remote roles half credit.
+//     An onsite role outside the commutable region still scores 0 here because, for SPOKES
+//     students without transportation, it is functionally inaccessible.
+//   "local_only" zeroes out remote entirely (the API also filters remote out at query time).
+const PROXIMITY_WEIGHT_MULTIPLIERS: Record<LocalJobPriority, Record<JobProximity, number>> = {
+  prefer_local: { local: 1.0, remote: 0.5, regional_onsite: 0 },
+  local_only:   { local: 1.0, remote: 0.0, regional_onsite: 0 },
+  balanced:     { local: 1.0, remote: 1.0, regional_onsite: 0 },
+};
+
+function scoreLocation(
+  job: Pick<ScoredJob, "location" | "workMode" | "source">,
+  classRegion: string,
+  priority: LocalJobPriority,
+): number {
+  const jobLocation = job.location;
+  if (!jobLocation) return 0;
+  const proximity = classifyJobProximity(job, classRegion);
+  if (proximity === "regional_onsite" && !classRegion) return 0;
+  return Math.round(WEIGHT_LOCATION * PROXIMITY_WEIGHT_MULTIPLIERS[priority][proximity]);
+}
+
+function locationReason(
+  job: Pick<ScoredJob, "location" | "workMode" | "source">,
+  classRegion: string,
+): JobMatchReason | null {
+  const jobLocation = job.location;
   if (!jobLocation) return null;
-  if (jobLocation.toLowerCase().includes("remote")) {
+
+  const proximity = classifyJobProximity(job, classRegion);
+  if (proximity === "remote") {
     return { type: "remote", label: "Remote role", value: jobLocation };
   }
+  if (proximity === "local") {
+    return { type: "location", label: `Local — near ${classRegion}`, value: jobLocation };
+  }
+  // regional_onsite: only worth surfacing if we know the region, otherwise we can't say where
   if (!classRegion) return null;
-
-  const regionLower = classRegion.toLowerCase().split(",")[0].trim();
-  if (!jobLocation.toLowerCase().includes(regionLower)) return null;
-
-  return { type: "location", label: `Near ${classRegion}`, value: jobLocation };
+  return { type: "location", label: "Onsite (outside your region)", value: jobLocation };
 }
 
 function scoreCluster(jobClusters: string[], studentTopClusters: string[]): number {
@@ -395,7 +462,7 @@ function buildMatchReasons(input: {
   interactionReasons: JobMatchReason[];
 }): JobMatchReason[] {
   const reasons: JobMatchReason[] = [];
-  const location = locationReason(input.job.location, input.classRegion);
+  const location = locationReason(input.job, input.classRegion);
   if (location) reasons.push(location);
 
   for (const cluster of input.clusterOverlap.slice(0, 3)) {
@@ -444,6 +511,7 @@ export function scoreJob(
   classRegion: string,
   profile: StudentJobProfile = EMPTY_STUDENT_JOB_PROFILE,
   interactionProfile: JobInteractionProfile = EMPTY_JOB_INTERACTION_PROFILE,
+  priority: LocalJobPriority = "prefer_local",
 ): JobRecommendation {
   const hasPersonalization =
     Boolean(discovery) || profile.skills.length > 0 || hasInteractionSignals(interactionProfile);
@@ -451,7 +519,7 @@ export function scoreJob(
     return emptyRecommendation(job.id);
   }
 
-  const locationScore = scoreLocation(job.location, classRegion);
+  const locationScore = scoreLocation(job, classRegion, priority);
   const clusterScore = discovery ? scoreCluster(job.clusters, discovery.topClusters) : 0;
   const jobHolland = inferJobHollandCode(job.clusters);
   const riasecScore = discovery ? scoreRiasec(jobHolland, discovery.hollandCode) : 0;
@@ -495,8 +563,9 @@ export function rankJobs(
   classRegion: string,
   profile: StudentJobProfile = EMPTY_STUDENT_JOB_PROFILE,
   interactionProfile: JobInteractionProfile = EMPTY_JOB_INTERACTION_PROFILE,
+  priority: LocalJobPriority = "prefer_local",
 ): JobRecommendation[] {
   return jobs
-    .map((job) => scoreJob(job, discovery, classRegion, profile, interactionProfile))
+    .map((job) => scoreJob(job, discovery, classRegion, profile, interactionProfile, priority))
     .sort((a, b) => b.score - a.score);
 }

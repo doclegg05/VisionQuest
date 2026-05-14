@@ -29,13 +29,88 @@ describe("scoreJob", () => {
     assert.equal(result.score, 40); // Location match only
   });
 
-  it("scores remote jobs as location-compatible", () => {
+  it("scores remote jobs at half weight under the default prefer_local priority", () => {
     const result = scoreJob(
       { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
       { topClusters: [], hollandCode: null },
       "Charleston, WV",
     );
+    // prefer_local: remote = 40 * 0.5 = 20
+    assert.equal(result.score, 20);
+  });
+
+  it("scores explicit remote work mode at half weight even with broad location text", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "United States", workMode: "remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    assert.equal(result.score, 20);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
+  });
+
+  it("scores remote jobs at full weight when priority is balanced", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+      undefined,
+      undefined,
+      "balanced",
+    );
     assert.equal(result.score, 40);
+  });
+
+  it("scores remote jobs at zero when priority is local_only", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+      undefined,
+      undefined,
+      "local_only",
+    );
+    assert.equal(result.score, 0);
+  });
+
+  it("trusts the source adapter mode over location text for local sources", () => {
+    // JSearch passes the configured region + radius to its upstream API, so the
+    // job is guaranteed to be inside the search area even if the location text
+    // is just a ZIP code or a neighborhood that doesn't string-match "Charleston".
+    const result = scoreJob(
+      {
+        id: "jsearch-local",
+        location: "25309",
+        source: "jsearch",
+        clusters: ["office-admin"],
+      },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    assert.equal(result.score, 40);
+    assert.ok(
+      result.matchReasons.some((reason) => reason.label.includes("Local")),
+      "should label match reason as Local for a local-mode source",
+    );
+  });
+
+  it("classifies any job from a remote-mode source as remote regardless of location text", () => {
+    // A Remotive job listed with location "Charleston, WV" is still a remote
+    // role — that text usually reflects the recruiter's office, not where the
+    // student would work.
+    const result = scoreJob(
+      {
+        id: "remotive-misleading",
+        location: "Charleston, WV",
+        source: "remotive",
+        clusters: ["office-admin"],
+      },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    // prefer_local: remote source → 20 points, no other signal
+    assert.equal(result.score, 20);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
   });
 
   it("scores cluster match", () => {
@@ -124,8 +199,7 @@ describe("scoreJob", () => {
       profile,
     );
 
-    assert.equal(result.score, 60); // Remote/location (40) + 3 skill matches (20)
-    assert.equal(result.matchLabel, "Good match");
+    assert.equal(result.score, 40); // prefer_local: remote (20) + 3 skill matches (20)
     assert.deepEqual(result.skillOverlap, ["Customer Service", "Microsoft Excel", "Scheduling"]);
     assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
     assert.ok(result.matchReasons.some((reason) => reason.label.includes("Microsoft Excel")));
@@ -180,7 +254,8 @@ describe("scoreJob", () => {
       interactionProfile,
     );
 
-    assert.equal(result.score, 12);
+    // prefer_local: remotive source → remote proximity (20) + interaction signal (12) = 32
+    assert.equal(result.score, 32);
     assert.ok(result.matchReasons.some((reason) => reason.type === "preference"));
     assert.ok(result.matchReasons.some((reason) => reason.type === "feedback"));
   });
@@ -205,7 +280,8 @@ describe("scoreJob", () => {
       interactionProfile,
     );
 
-    assert.equal(result.score, 30); // Remote/location (40) - withdrawn cluster penalty (10)
+    // prefer_local default: remote (20) - withdrawn cluster penalty (10) = 10
+    assert.equal(result.score, 10);
   });
 });
 

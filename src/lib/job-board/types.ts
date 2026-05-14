@@ -6,6 +6,7 @@ export interface NormalizedJob {
   title: string;
   company: string;
   location: string;
+  workMode?: JobWorkMode;
   salary: string | null;
   salaryMin: number | null;
   description: string;
@@ -28,6 +29,9 @@ export interface JobSourceAdapter {
 
 /** Status values for StudentSavedJob */
 export type SavedJobStatus = "saved" | "applied" | "interviewing" | "offered" | "withdrawn";
+
+/** Work mode values for JobListing */
+export type JobWorkMode = "onsite" | "remote" | "hybrid";
 
 export type JobScrapeTrigger = "manual" | "auto";
 export type JobScrapeRunStatus = "queued" | "processing" | "completed" | "failed";

@@ -4,6 +4,7 @@ import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { groupDuplicateJobs } from "@/lib/job-board/duplicates";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
+import { formatJobWorkMode, isJobWorkMode, JOB_WORK_MODE_OPTIONS } from "@/lib/job-board/work-mode";
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 25;
@@ -67,6 +68,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
   const query = searchText(url.searchParams.get("q") ?? "");
   const sourceFilter = url.searchParams.get("source") ?? "";
   const clusterFilter = url.searchParams.get("cluster") ?? "";
+  const workModeFilter = url.searchParams.get("workMode");
   const sort = url.searchParams.get("sort") ?? "recent";
   const pageSize = Math.min(parsePositiveInt(url.searchParams.get("pageSize"), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);
   const page = parsePositiveInt(url.searchParams.get("page"), 1);
@@ -79,6 +81,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
       title: true,
       company: true,
       location: true,
+      workMode: true,
       salary: true,
       salaryMin: true,
       description: true,
@@ -103,6 +106,7 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
   const filtered = groups
     .filter((group) => !sourceFilter || group.sources.includes(sourceFilter))
     .filter((group) => !clusterFilter || group.jobs.some((job) => job.clusters.includes(clusterFilter)))
+    .filter((group) => !isJobWorkMode(workModeFilter) || group.jobs.some((job) => job.workMode === workModeFilter))
     .filter((group) => group.jobs.some((job) => jobMatchesQuery(job, query)));
 
   filtered.sort((a, b) => {
@@ -132,6 +136,8 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
         title: primary.title,
         company: primary.company,
         location: primary.location,
+        workMode: primary.workMode,
+        workModeLabel: formatJobWorkMode(primary.workMode),
         salary: primary.salary,
         salaryMin: primary.salaryMin,
         description: primary.description.length > 240
@@ -147,12 +153,14 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
         duplicateCount: group.jobs.length,
         sourceCount: group.sources.length,
         clusters: [...new Set(group.jobs.flatMap((job) => job.clusters))],
+        workModes: [...new Set(group.jobs.map((job) => job.workMode))],
         savedCount,
         createdAt: primary.createdAt.toISOString(),
         updatedAt: primary.updatedAt.toISOString(),
       };
     }),
     sourceOptions,
+    workModeOptions: JOB_WORK_MODE_OPTIONS,
     totalListings: listings.length,
     totalUnique: groups.length,
     filteredUnique: filtered.length,

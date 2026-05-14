@@ -5,13 +5,14 @@ import { Briefcase } from "@phosphor-icons/react";
 import { JobCard } from "./JobCard";
 import Link from "next/link";
 import type { JobTrackingUpdate } from "./JobCard";
-import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 
 interface WidgetJob {
   id: string;
   title: string;
   company: string;
   location: string;
+  workMode: JobWorkMode;
   salary: string | null;
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;

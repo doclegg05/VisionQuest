@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
-import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
+import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -14,6 +15,7 @@ interface JobCardProps {
   title: string;
   company: string;
   location: string;
+  workMode: JobWorkMode;
   salary: string | null;
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
@@ -56,6 +58,12 @@ const TRACKING_STATUSES: Array<{ value: SavedJobStatus; label: string }> = [
   { value: "withdrawn", label: "Withdrawn" },
 ];
 
+const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
+  onsite: "bg-emerald-500/15 text-emerald-700",
+  remote: "bg-sky-500/15 text-sky-700",
+  hybrid: "bg-amber-500/15 text-amber-700",
+};
+
 function formatStatusLabel(status: string): string {
   return TRACKING_STATUSES.find((option) => option.value === status)?.label ?? status;
 }
@@ -65,6 +73,7 @@ export function JobCard({
   title,
   company,
   location,
+  workMode,
   salary,
   matchLabel,
   clusters,
@@ -110,14 +119,20 @@ export function JobCard({
         </span>
       )}
 
-      {/* Cluster badge */}
-      {primaryCluster && (
-        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${
-          CLUSTER_COLORS[primaryCluster] ?? "bg-[var(--surface-interactive)] text-[var(--ink-faint)]"
+      <div className="mb-2 flex flex-wrap gap-1.5 pr-24">
+        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+          WORK_MODE_STYLES[workMode] ?? "bg-[var(--surface-interactive)] text-[var(--ink-faint)]"
         }`}>
-          {CLUSTER_LABELS[primaryCluster] ?? primaryCluster}
+          {formatJobWorkMode(workMode)}
         </span>
-      )}
+        {primaryCluster && (
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+            CLUSTER_COLORS[primaryCluster] ?? "bg-[var(--surface-interactive)] text-[var(--ink-faint)]"
+          }`}>
+            {CLUSTER_LABELS[primaryCluster] ?? primaryCluster}
+          </span>
+        )}
+      </div>
 
       {/* Job info */}
       <h3 className={["font-semibold text-[var(--text-primary)]", compact ? "text-sm" : "text-base", "leading-tight"].join(" ")}>

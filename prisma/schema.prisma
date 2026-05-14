@@ -1183,15 +1183,18 @@ model CoachingArc {
 }
 
 model JobClassConfig {
-  id            String    @id @default(cuid())
-  classId       String    @unique
-  region        String
-  radius        Int       @default(25)
-  sources       String[]  @default(["jsearch"])
-  autoRefresh   Boolean   @default(true)
-  lastScrapedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  classId          String    @unique
+  region           String
+  radius           Int       @default(25)
+  sources          String[]  @default(["jsearch"])
+  autoRefresh      Boolean   @default(true)
+  // prefer_local (default) | local_only | balanced
+  // Controls how local vs remote jobs are scored and filtered for students in this class.
+  localJobPriority String    @default("prefer_local")
+  lastScrapedAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   class       SpokesClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
   jobListings JobListing[]
@@ -1253,6 +1256,7 @@ model JobListing {
   title         String
   company       String
   location      String
+  workMode      String    @default("onsite")
   salary        String?
   salaryMin     Float?
   description   String    @db.Text
@@ -1272,6 +1276,7 @@ model JobListing {
   savedByStudents StudentSavedJob[]
 
   @@index([classConfigId, status])
+  @@index([classConfigId, status, workMode])
   @@index([status, createdAt])
   @@schema("visionquest")
 }
