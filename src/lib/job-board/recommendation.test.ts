@@ -29,13 +29,48 @@ describe("scoreJob", () => {
     assert.equal(result.score, 40); // Location match only
   });
 
-  it("scores remote jobs as location-compatible", () => {
+  it("scores remote jobs at half weight under the default prefer_local priority", () => {
     const result = scoreJob(
       { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
       { topClusters: [], hollandCode: null },
       "Charleston, WV",
     );
+    // prefer_local: remote = 40 * 0.5 = 20
+    assert.equal(result.score, 20);
+  });
+
+  it("scores explicit remote work mode at half weight even with broad location text", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "United States", workMode: "remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    assert.equal(result.score, 20);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
+  });
+
+  it("scores remote jobs at full weight when priority is balanced", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+      undefined,
+      undefined,
+      "balanced",
+    );
     assert.equal(result.score, 40);
+  });
+
+  it("scores remote jobs at zero when priority is local_only", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+      undefined,
+      undefined,
+      "local_only",
+    );
+    assert.equal(result.score, 0);
   });
 
   it("scores cluster match", () => {
@@ -124,8 +159,7 @@ describe("scoreJob", () => {
       profile,
     );
 
-    assert.equal(result.score, 60); // Remote/location (40) + 3 skill matches (20)
-    assert.equal(result.matchLabel, "Good match");
+    assert.equal(result.score, 40); // prefer_local: remote (20) + 3 skill matches (20)
     assert.deepEqual(result.skillOverlap, ["Customer Service", "Microsoft Excel", "Scheduling"]);
     assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
     assert.ok(result.matchReasons.some((reason) => reason.label.includes("Microsoft Excel")));
@@ -205,7 +239,8 @@ describe("scoreJob", () => {
       interactionProfile,
     );
 
-    assert.equal(result.score, 30); // Remote/location (40) - withdrawn cluster penalty (10)
+    // prefer_local default: remote (20) - withdrawn cluster penalty (10) = 10
+    assert.equal(result.score, 10);
   });
 });
 
