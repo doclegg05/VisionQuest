@@ -57,3 +57,15 @@ registerJobHandler("scrape_jobs", async (payload) => {
     sourceAllowlist,
   });
 });
+
+registerJobHandler("operation_skill", async (payload) => {
+  const { parseOperationJobPayload } = await import("./operations/jobs");
+  const { runOperationSkill } = await import("./operations/runner");
+  const operation = parseOperationJobPayload(payload);
+  await runOperationSkill(operation.skillId, operation.input, {
+    actorId: operation.actorId,
+    actorRole: operation.actorRole,
+    source: operation.source,
+    operationRunId: operation.operationRunId,
+  });
+});
