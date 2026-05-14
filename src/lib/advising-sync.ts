@@ -1,3 +1,5 @@
+import "server-only";
+
 import { buildStudentAlertDescriptors, type AlertDescriptor } from "./advising-alerts";
 import { prisma } from "./db";
 import { buildGoalEvidenceEntries, buildGoalReviewQueue } from "./goal-evidence";
