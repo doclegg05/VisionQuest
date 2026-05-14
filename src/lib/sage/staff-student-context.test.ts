@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolveStudentMention, type StaffStudentCandidate } from "./staff-student-context";
+import {
+  resolveStudentMention,
+  shouldAttemptStaffStudentContext,
+  type StaffStudentCandidate,
+} from "./staff-student-context";
 
 const candidates: StaffStudentCandidate[] = [
   { id: "stu1", displayName: "Karissa Johnson", studentId: "karissa.j" },
@@ -48,5 +52,42 @@ describe("resolveStudentMention", () => {
 
     assert.equal(result.status, "ambiguous");
     assert.equal(result.matches?.length, 2);
+  });
+});
+
+describe("shouldAttemptStaffStudentContext", () => {
+  it("skips general teacher planning messages", () => {
+    assert.equal(
+      shouldAttemptStaffStudentContext("Help me plan tomorrow's lesson about goal setting."),
+      false,
+    );
+  });
+
+  it("skips program lookup questions without a student reference", () => {
+    assert.equal(
+      shouldAttemptStaffStudentContext("Which orientation forms are required this week?"),
+      false,
+    );
+  });
+
+  it("loads context for explicit student slash commands", () => {
+    assert.equal(shouldAttemptStaffStudentContext("/student Marcus Lee"), true);
+  });
+
+  it("loads context for student-specific progress requests", () => {
+    assert.equal(
+      shouldAttemptStaffStudentContext("Can you give me a progress report for Marcus Lee?"),
+      true,
+    );
+  });
+
+  it("loads context for pronoun follow-ups after a student-specific turn", () => {
+    assert.equal(
+      shouldAttemptStaffStudentContext(
+        "What should I do next for her?",
+        ["Can you give me a progress report for Karissa Johnson?"],
+      ),
+      true,
+    );
   });
 });

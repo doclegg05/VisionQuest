@@ -188,7 +188,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       ref={panelRef}
       role="dialog"
       aria-label="Chat with Sage"
-      className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_24px_64px_rgba(7,23,43,0.22)] md:bottom-6 md:right-6"
+      className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_24px_64px_rgba(7,23,43,0.28)] md:bottom-6 md:right-6"
       style={{ maxHeight: "min(32rem, calc(100dvh - 7rem))" }}
     >
       {/* Header */}
@@ -223,7 +223,13 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-4" role="log" aria-label="Conversation with Sage" aria-live="polite">
+      <div
+        className="flex-1 overflow-y-auto px-3 py-4"
+        style={{ background: "var(--chat-area-bg)" }}
+        role="log"
+        aria-label="Conversation with Sage"
+        aria-live="polite"
+      >
         <div className="space-y-3">
           {messages.length === 0 && !isLoading && (
             <div className="py-8 text-center">

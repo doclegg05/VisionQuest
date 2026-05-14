@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 interface EventItem {
   id: string;
@@ -81,8 +82,20 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
       ) : null}
 
       {events.length === 0 ? (
-        <div className="surface-section p-8 text-center text-[var(--ink-muted)]">
-          No events are scheduled yet.
+        <div className="surface-section p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            Event readiness
+          </p>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No events scheduled yet</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
+            You can still prepare a short introduction, questions for employers, and a resume checklist.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <AskSageLink
+              prompt="No career events are scheduled yet. Help me prepare a short introduction, employer questions, and a resume checklist for the next event."
+              label="Prepare with Sage"
+            />
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

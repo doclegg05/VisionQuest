@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2026-05-13T15:00:05.402Z",
+  "filters": {
+    "categories": [
+      "LMS_PLATFORM_GUIDE"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ],
+    "quality": [
+      "good"
+    ],
+    "limit": null
+  },
+  "activatedCount": 3,
+  "activatedIds": [
+    "cmmyya82c000neadkueckga1u",
+    "cmmyyakag001ieadktr8o9z1c",
+    "cmmyyas4b0022eadkmo66g1nv"
+  ],
+  "documents": [
+    {
+      "id": "cmmyya82c000neadkueckga1u",
+      "title": "Aztecs Continuum of Learning Chart 1",
+      "storageKey": "lms/Aztec/Aztecs_Continuum_of_Learning_Chart_1.png",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 240
+    },
+    {
+      "id": "cmmyyakag001ieadktr8o9z1c",
+      "title": "BE Career Extensions Chart",
+      "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 246
+    },
+    {
+      "id": "cmmyyas4b0022eadkmo66g1nv",
+      "title": "Money Essentials Certification",
+      "storageKey": "lms/Essential Education/Money Essentials Certification.png",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 256
+    }
+  ],
+  "rollbackCommand": "node scripts/sage-rag-activate.mjs --rollback=.planning/sage-rag/activation-2026-05-13T15-00-05-400Z.json --apply --confirm=rollback-sage-rag"
+}

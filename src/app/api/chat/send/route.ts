@@ -14,7 +14,10 @@ import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, g
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
-import { buildStaffStudentContext } from "@/lib/sage/staff-student-context";
+import {
+  buildStaffStudentContext,
+  shouldAttemptStaffStudentContext,
+} from "@/lib/sage/staff-student-context";
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota } from "@/lib/llm-usage";
 import { prisma } from "@/lib/db";
@@ -48,6 +51,29 @@ function isTrivialMessage(message: string): boolean {
   const tokens = trimmed.split(/\s+/);
   if (tokens.length <= 3 && !/[?]/.test(trimmed)) return true;
   return false;
+}
+
+function getDirectSmallTalkAnswer(message: string): string | null {
+  const normalized = message.trim().toLowerCase().replace(/[!.,?]+$/g, "");
+  if (/^(hi|hello|hey|yo|hi sage|hello sage|hey sage)$/.test(normalized)) {
+    return "Hi, I'm here. Tell me what you want to work on, and I'll help you choose the next step.";
+  }
+  if (/^(thanks|thank you|thx|ty|thanks sage|thank you sage)$/.test(normalized)) {
+    return "You're welcome. Send me the next thing you want help with when you're ready.";
+  }
+  return null;
+}
+
+function formatStreamErrorForClient(message: string, cause?: string): string {
+  const raw = cause ? `${message} ${cause}` : message;
+  const localAiUnavailable =
+    /Local AI|Ollama|Relay:|Cloudflare Access service token|Bad Gateway|gateway|timed out|timeout|\b(?:502|503|504|520|522|523|524|525|526|527|530)\b/i.test(raw);
+
+  if (localAiUnavailable) {
+    return "Sage is offline right now because the local AI server is not reachable. Please try again in a few minutes or tell staff to check the local AI service.";
+  }
+
+  return `AI streaming failed: ${message}${cause ? ` (${cause})` : ""}`;
 }
 
 class ChatSseClientClosedError extends Error {
@@ -93,9 +119,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const conversationId = body.conversationId || null;
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
+  const isAdmin = session.role === "admin";
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
   const directFormAnswer = getDirectFormAnswer(userMessage);
+  const directSmallTalkAnswer = getDirectSmallTalkAnswer(userMessage);
 
   if (directFormAnswer) {
     const conversation = isTeacher
@@ -122,6 +150,34 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     });
 
     return createSseResponse(conversation.id, directFormAnswer);
+  }
+
+  if (directSmallTalkAnswer) {
+    const conversation = isTeacher
+      ? await getOrCreateTeacherConversation(session.id, conversationId)
+      : await getOrCreateConversation(session.id, conversationId, requestedStage);
+
+    await saveMessage(conversation.id, session.id, "user", userMessage);
+    await saveMessage(conversation.id, session.id, "assistant", directSmallTalkAnswer);
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/chat/send",
+      task: chatTask,
+      sensitivity: chatSensitivity,
+      policyDecision: "direct_no_model",
+      status: "direct",
+      targetId: conversation.id,
+      providerName: null,
+      providerClass: "none",
+      promptTier: null,
+      allowCloud: false,
+      inputChars: userMessage.length,
+      outputChars: directSmallTalkAnswer.length,
+      reason: "Matched a safe greeting/thanks message that does not need a local model call.",
+    });
+
+    return createSseResponse(conversation.id, directSmallTalkAnswer);
   }
 
   // Resolve AI provider first — guardrails depend on whether it's cloud or local.
@@ -237,10 +293,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   let staffStudentContext: string | null = null;
   let staffStudentTargetId: string | null = null;
   let staffStudentContextResolution: "none" | "resolved" | "ambiguous" | "not_found" = "none";
-  if (isTeacher) {
-    const priorUserMessages = (conversation.messages ?? [])
-      .filter((message) => message.role === "user")
-      .map((message) => message.content);
+  const priorUserMessages = isTeacher
+    ? (conversation.messages ?? [])
+        .filter((message) => message.role === "user")
+        .map((message) => message.content)
+    : [];
+  const shouldBuildStaffStudentContext =
+    isTeacher &&
+    (Boolean(body.targetStudentId) ||
+      (!isAdmin && shouldAttemptStaffStudentContext(userMessage, priorUserMessages)));
+  if (shouldBuildStaffStudentContext) {
     const contextResult = await buildStaffStudentContext(session, {
       userMessage,
       priorUserMessages,
@@ -271,7 +333,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   let systemPrompt: string;
 
   if (isTeacher) {
-    systemPrompt = buildSystemPrompt("teacher_assistant", {
+    const staffStage = isAdmin ? "admin_assistant" : "teacher_assistant";
+    systemPrompt = buildSystemPrompt(staffStage, {
       studentName: session.displayName,
       userMessage,
       staffStudentContext,
@@ -314,6 +377,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // ~6,000 chars of program docs and the round-trip just delays first token.
   // In agent mode, Sage can call `lookup_program_info` if she needs specifics.
   const trivialMessage = isTrivialMessage(userMessage);
+  let documentContextChars = 0;
+  let formContextChars = 0;
   if (!trivialMessage) {
     const documentContext = await getDocumentContext(
       userMessage,
@@ -322,10 +387,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       promptTier === "compact" ? 2000 : 6000,
     );
     if (documentContext) {
+      documentContextChars = documentContext.length;
       systemPrompt += documentContext;
     }
     const formContext = getFormContext(userMessage);
     if (formContext) {
+      formContextChars = formContext.length;
       systemPrompt += formContext;
     }
   }
@@ -341,7 +408,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // Log assembled prompt size for before/after comparison in Render logs.
   // Remove in a follow-up PR once baseline data is collected.
-  logger.info("sage.prompt.size", { size: systemPrompt.length });
+  logger.info("sage.prompt.size", {
+    size: systemPrompt.length,
+    promptTier,
+    provider: provider.name,
+    stage: conversationStage,
+    role: session.role,
+    ragSkipped: trivialMessage,
+    documentContextChars,
+    formContextChars,
+  });
 
   // Format message history for Gemini, using compacted context when available
   const maxRecentMessages =
@@ -436,7 +512,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         const agentMode = isAgentEnabled();
 
         // Slash-command fast path: invoke the tool directly without going
-        // through the model. Skipped unless the feature flag is on.
+        // through the model when it maps to a registered tool. Unknown slash
+        // prompts fall through to the regular agent loop so legacy coaching
+        // prompts like "/goal" still get a real response.
+        let handledSlashCommand = false;
         if (agentMode && userMessage.startsWith("/")) {
           const slashOutcome = await executeSlashCommand(
             userMessage,
@@ -445,6 +524,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             staffStudentTargetId ?? undefined,
           );
           if (slashOutcome) {
+            handledSlashCommand = true;
             const { record } = slashOutcome;
             sendEvent(
               {
@@ -484,6 +564,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             // tool_result event.
             sendEvent({ type: "text", text: record.result.summary }, "text");
           }
+        }
+
+        if (handledSlashCommand) {
+          // Tool summary has already been emitted as the assistant response.
         } else if (agentMode) {
           // Agent loop — model may emit tool calls mid-turn.
           const agentEvents = runAgentTurn({
@@ -558,7 +642,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             persisted: persisted.length,
           });
         }
-        await saveMessage(conversation.id, session.id, "assistant", persisted);
+        const assistantMessage = await saveMessage(conversation.id, session.id, "assistant", persisted);
         await logAiAuditEvent({
           actorId: session.id,
           actorRole: session.role,
@@ -606,6 +690,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             conversationTitle: conversation.title,
             conversationStage: conversation.stage,
             fullResponse,
+            sourceMessageId: assistantMessage.id,
             studentId: session.id,
             allMessages,
             userMessage,
@@ -652,7 +737,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         });
         if (!clientClosed) {
           try {
-            sendEvent({ error: `AI streaming failed: ${msg}${cause ? ` (${cause})` : ""}` }, "error");
+            sendEvent({ error: formatStreamErrorForClient(msg, cause) }, "error");
           } catch {
             // The client went away while we were reporting the original error.
           }

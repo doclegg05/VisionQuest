@@ -20,13 +20,30 @@ import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import { buildInterventionQueueEntry } from "@/lib/teacher/intervention-queue";
+import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
 
 export interface QueueStudent {
   studentId: string;
+  publicStudentId: string;
   name: string;
   email: string | null;
   programType: ProgramType;
   urgencyScore: number;
+  primaryAlert: {
+    id: string;
+    type: string;
+    severity: string;
+    title: string;
+    summary: string;
+    sourceType: string | null;
+    sourceId: string | null;
+    detectedAt: string;
+  } | null;
+  recommendedAction: {
+    kind: DashboardQuickActionKind | null;
+    label: string;
+    href: string;
+  };
   signals: {
     stalledGoalCount: number;
     highSeverityAlertCount: number;
@@ -180,6 +197,7 @@ export async function getInterventionQueue(
     }),
     select: {
       id: true,
+      studentId: true,
       displayName: true,
       email: true,
       createdAt: true,
@@ -193,7 +211,16 @@ export async function getInterventionQueue(
       },
       alerts: {
         where: { status: "open" },
-        select: { type: true, severity: true },
+        select: {
+          id: true,
+          type: true,
+          severity: true,
+          title: true,
+          summary: true,
+          sourceType: true,
+          sourceId: true,
+          detectedAt: true,
+        },
       },
       assignedTasks: {
         where: {
@@ -534,6 +561,9 @@ export async function getTeacherDashboardPage(
               "goal_resource_stale",
               "goal_review_pending",
               "goal_platform_stale",
+              "goal_missing_confirmed",
+              "goal_missing_monthly",
+              "goal_review_stale",
             ],
           },
         },

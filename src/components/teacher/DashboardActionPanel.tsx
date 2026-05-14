@@ -51,6 +51,7 @@ export interface DashboardActionIntent {
   summary: string;
   severity: string;
   student: DashboardActionStudent;
+  alertId?: string | null;
   goalId?: string | null;
   linkId?: string | null;
 }
@@ -107,6 +108,11 @@ function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiClientError) return error.message;
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+async function resolveLinkedAlert(alertId: string | null | undefined) {
+  if (!alertId) return;
+  await api.patch(`/api/teacher/alerts/${alertId}`, { action: "resolve" });
 }
 
 export default function DashboardActionPanel({
@@ -202,9 +208,10 @@ export default function DashboardActionPanel({
         status,
         notes: notes || "",
       });
+      await resolveLinkedAlert(intent.alertId);
       setMessage({
         tone: "success",
-        text: status === "approved" ? "Form approved." : "Form returned for revision.",
+        text: status === "approved" ? "Form approved and queue item resolved." : "Form returned and queue item resolved.",
       });
       await Promise.all([loadContext(), onChanged()]);
     } catch (error) {
@@ -229,7 +236,8 @@ export default function DashboardActionPanel({
         dueAt: taskForm.dueAt ? new Date(`${taskForm.dueAt}T12:00:00.000Z`).toISOString() : null,
         priority: taskForm.priority,
       });
-      setMessage({ tone: "success", text: "Follow-up task created." });
+      await resolveLinkedAlert(intent.alertId);
+      setMessage({ tone: "success", text: "Follow-up task created and queue item resolved." });
       await onChanged();
       setTaskForm(buildTaskDraft(intent));
     } catch (error) {
@@ -260,10 +268,11 @@ export default function DashboardActionPanel({
         dueAt: toDueAtPayload(draft.dueAt),
         notes: draft.notes.trim(),
       });
+      await resolveLinkedAlert(intent.alertId);
 
       setMessage({
         tone: "success",
-        text: `"${recommendation.title}" assigned to the goal plan.`,
+        text: `"${recommendation.title}" assigned and queue item resolved.`,
       });
       await Promise.all([loadContext(), onChanged()]);
     } catch (error) {

@@ -42,6 +42,8 @@ export interface AlertInputs {
       level: string;
       status: string;
       updatedAt: Date;
+      lastReviewedAt?: Date | null;
+      confirmedAt?: Date | null;
     }[];
     lastConversationAt?: Date | null;
     orientationComplete?: boolean;
@@ -165,6 +167,67 @@ export function buildStudentAlertDescriptors({
           summary: `Certification progress has not advanced since ${formatAlertDate(referenceDate)}.`,
           sourceType: "certification",
           sourceId: signals?.studentId || studentKey,
+        });
+      }
+    }
+  }
+
+  if (signals?.goals) {
+    const confirmedLongTermGoal = signals.goals.find(
+      (goal) =>
+        goal.level === "bhag" &&
+        (goal.status === "confirmed" || goal.status === "completed") &&
+        Boolean(goal.confirmedAt || goal.status === "confirmed"),
+    );
+    if (!confirmedLongTermGoal) {
+      alerts.push({
+        alertKey: `goal_missing_confirmed:${studentKey}`,
+        type: "goal_missing_confirmed",
+        severity: "high",
+        title: "Long-term goal needs confirmation",
+        summary: "This student does not have a confirmed long-term goal yet.",
+        sourceType: "student",
+        sourceId: signals.studentId || studentKey,
+      });
+    }
+
+    const monthlyGoals = signals.goals.filter(
+      (goal) =>
+        goal.level === "monthly" &&
+        (goal.status === "active" || goal.status === "in_progress" || goal.status === "confirmed"),
+    );
+    if (monthlyGoals.length === 0) {
+      alerts.push({
+        alertKey: `goal_missing_monthly:${studentKey}`,
+        type: "goal_missing_monthly",
+        severity: "medium",
+        title: "Monthly goal is missing",
+        summary: "This student needs an active monthly goal tied to their long-term direction.",
+        sourceType: "student",
+        sourceId: signals.studentId || studentKey,
+      });
+    } else {
+      const staleMonthly = monthlyGoals
+        .map((goal) => {
+          const reviewedAt = goal.lastReviewedAt ?? goal.updatedAt;
+          return {
+            goal,
+            reviewedAt,
+            daysSinceReview: (now.getTime() - reviewedAt.getTime()) / (1000 * 60 * 60 * 24),
+          };
+        })
+        .filter((item) => item.daysSinceReview >= 14)
+        .sort((left, right) => right.daysSinceReview - left.daysSinceReview)[0];
+
+      if (staleMonthly) {
+        alerts.push({
+          alertKey: `goal_review_stale:${staleMonthly.goal.id}`,
+          type: "goal_review_stale",
+          severity: staleMonthly.daysSinceReview >= 21 ? "high" : "medium",
+          title: "Monthly goal needs review",
+          summary: `Monthly goal has not been reviewed in ${Math.round(staleMonthly.daysSinceReview)} days.`,
+          sourceType: "goal",
+          sourceId: staleMonthly.goal.id,
         });
       }
     }
