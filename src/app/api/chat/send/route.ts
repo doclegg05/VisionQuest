@@ -240,13 +240,26 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     reason: "Student-record and staff-entered Sage chat are local-only by policy.",
   });
 
-  // All token/rate guardrails only apply to cloud providers (local models have no API cost)
+  // Cost/token quota and the per-role daily cap only apply to cloud providers
+  // (local models have no API cost). The hourly per-user request rate limit
+  // applies to BOTH cloud and local providers — an unauthenticated session
+  // could still DoS the local Ollama host, which is production for VisionQuest.
+  // See code review finding 2026-05-08 (Sprint 1 Bundle #5 / Task A).
   const isCloudProvider = provider.name === "gemini";
   const rateLimitsDisabled = process.env.VISIONQUEST_DISABLE_RATE_LIMITS === "true";
   let dailyRemaining: number | null = null;
 
-  if (isCloudProvider && !rateLimitsDisabled) {
-    // Hourly limit by role
+  if (!rateLimitsDisabled) {
+    // Hourly per-user request cap. Fires for every role (student, teacher,
+    // admin) because the goal is host protection, not cost control. Admin
+    // gets a higher ceiling consistent with prior cloud-only behavior, but
+    // is NOT skipped — see review finding 2026-05-08.
+    //
+    // Bound rationale: well above sustained human chat pace (~1/min) yet
+    // leaves room for legitimate bursts. Multiplied across an alpha-stage
+    // cohort it stays inside Ollama single-host throughput. Per-role caps
+    // mirror the previous cloud-only configuration (student 40, teacher 60,
+    // admin 120) so behavior is unchanged for the cloud path.
     const hourlyLimit = isTeacher ? (session.role === "admin" ? 120 : 60) : 40;
     const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
     if (!hourlyRl.success) {
@@ -256,8 +269,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       );
     }
 
-    // Daily limit by role (calendar-day, resets midnight UTC)
-    if (session.role !== "admin") {
+    // Daily limit by role (calendar-day, resets midnight UTC). Cloud-only
+    // because the daily cap exists to bound API spend, not host load.
+    if (isCloudProvider && session.role !== "admin") {
       const dailyLimit = isTeacher ? 400 : 200;
       const dailyRl = await rateLimitDaily(`chat-daily:${session.id}`, dailyLimit);
       if (!dailyRl.success) {
