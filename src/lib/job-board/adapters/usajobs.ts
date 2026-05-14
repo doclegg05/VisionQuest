@@ -1,5 +1,6 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
+import { inferJobWorkMode } from "../work-mode";
 import { logger } from "@/lib/logger";
 
 /**
@@ -77,6 +78,13 @@ export const usajobsAdapter: JobSourceAdapter = {
           title: desc.PositionTitle,
           company: desc.OrganizationName,
           location: desc.PositionLocationDisplay,
+          workMode: inferJobWorkMode({
+            source: "usajobs",
+            title: desc.PositionTitle,
+            company: desc.OrganizationName,
+            location: desc.PositionLocationDisplay,
+            description: desc.QualificationSummary,
+          }),
           salary: salaryText,
           salaryMin: parseSalaryToHourly(salaryText),
           description: desc.QualificationSummary?.slice(0, 5000) ?? "",

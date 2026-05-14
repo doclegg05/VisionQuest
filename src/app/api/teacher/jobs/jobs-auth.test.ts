@@ -29,6 +29,7 @@ function activeJob(overrides: Record<string, unknown> = {}) {
     title: "Office Assistant",
     company: "Acme",
     location: "Summersville, WV",
+    workMode: "onsite",
     salary: null,
     salaryMin: null,
     description: "Answer phones, schedule appointments, and keep office records updated.",
@@ -393,5 +394,37 @@ describe("teacher job route authorization", () => {
       officeJob.sources.map((source: { value: string }) => source.value),
       ["usajobs", "jsearch"],
     );
+    assert.deepEqual(officeJob.workModes, ["onsite"]);
+  });
+
+  it("filters teacher job results by work mode", async () => {
+    mockJobListingFindMany.mock.mockImplementationOnce(async () => [
+      activeJob({
+        id: "job-local",
+        title: "Office Assistant",
+        location: "Summersville, WV",
+        workMode: "onsite",
+      }),
+      activeJob({
+        id: "job-remote",
+        title: "Remote Administrative Assistant",
+        location: "United States",
+        workMode: "remote",
+        source: "remotive",
+        sourceId: "remotive:1",
+      }),
+    ]);
+
+    const req = mockRequest("/api/teacher/jobs/results", {
+      searchParams: { classId: "class-1", workMode: "remote" },
+    });
+
+    const res = await resultsRoute.GET(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.jobs.length, 1);
+    assert.equal(body.jobs[0].id, "job-remote");
+    assert.equal(body.jobs[0].workMode, "remote");
   });
 });

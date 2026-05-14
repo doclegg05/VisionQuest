@@ -28,6 +28,15 @@ describe("job source options", () => {
 
     assert.deepEqual([...new Set(optionValues)], optionValues);
     assert.deepEqual(VALID_JOB_SOURCES, optionValues);
+    assert.ok(JOB_SOURCE_OPTIONS.every((source) => ["local", "remote", "mixed"].includes(source.sourceMode)));
+  });
+
+  it("marks remote-first sources separately from local sources", () => {
+    const remotive = JOB_SOURCE_OPTIONS.find((source) => source.value === "remotive");
+    const jsearch = JOB_SOURCE_OPTIONS.find((source) => source.value === "jsearch");
+
+    assert.equal(remotive?.sourceMode, "remote");
+    assert.equal(jsearch?.sourceMode, "local");
   });
 
   it("rejects unknown sources", () => {

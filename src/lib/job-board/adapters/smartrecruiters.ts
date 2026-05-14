@@ -1,4 +1,5 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
+import { inferJobWorkMode } from "../work-mode";
 import { fetchJson, textMatchesQuery } from "./shared";
 
 const DEFAULT_SMARTRECRUITERS = [
@@ -29,6 +30,7 @@ interface SmartRecruitersResponse {
 
 function formatLocation(location: SmartRecruitersLocation | undefined): string {
   if (!location) return "";
+  if (location.remote && !location.fullLocation && !location.city && !location.region) return "Remote";
   return (
     location.fullLocation ||
     [location.city, location.region, location.country?.toUpperCase()].filter(Boolean).join(", ")
@@ -65,6 +67,13 @@ export const smartRecruitersAdapter: JobSourceAdapter = {
           title: posting.name,
           company: posting.company?.name || company,
           location,
+          workMode: inferJobWorkMode({
+            source: "smartrecruiters",
+            title: posting.name,
+            company: posting.company?.name || company,
+            location,
+            remote: posting.location?.remote,
+          }),
           salary: null,
           salaryMin: null,
           description: `${posting.name} - ${location}`,

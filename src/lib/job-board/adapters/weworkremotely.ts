@@ -37,6 +37,7 @@ export const weWorkRemotelyAdapter: JobSourceAdapter = {
           title: title || rawTitle,
           company,
           location: "Remote",
+          workMode: "remote" as const,
           salary: null,
           salaryMin: null,
           description: truncateDescription(description),

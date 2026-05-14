@@ -8,6 +8,8 @@ import {
   CaretRight,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
+import type { JobWorkMode } from "@/lib/job-board/types";
+import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 
 interface SourceOption {
   value: string;
@@ -19,6 +21,8 @@ interface TeacherJobResult {
   title: string;
   company: string;
   location: string;
+  workMode: JobWorkMode;
+  workModeLabel: string;
   salary: string | null;
   description: string;
   url: string;
@@ -27,6 +31,7 @@ interface TeacherJobResult {
   duplicateCount: number;
   sourceCount: number;
   clusters: string[];
+  workModes: JobWorkMode[];
   savedCount: number;
   updatedAt: string;
 }
@@ -34,6 +39,7 @@ interface TeacherJobResult {
 interface TeacherJobsResponse {
   jobs: TeacherJobResult[];
   sourceOptions: SourceOption[];
+  workModeOptions: Array<{ value: JobWorkMode; label: string }>;
   totalListings: number;
   totalUnique: number;
   filteredUnique: number;
@@ -67,6 +73,12 @@ const SORT_OPTIONS = [
   { value: "title", label: "Title" },
 ];
 
+const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
+  onsite: "bg-emerald-500/15 text-emerald-700",
+  remote: "bg-sky-500/15 text-sky-700",
+  hybrid: "bg-amber-500/15 text-amber-700",
+};
+
 function clusterLabel(cluster: string): string {
   return CLUSTER_OPTIONS.find((option) => option.value === cluster)?.label ?? cluster;
 }
@@ -89,6 +101,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("");
   const [cluster, setCluster] = useState("");
+  const [workMode, setWorkMode] = useState("");
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -110,6 +123,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
       if (query.trim()) params.set("q", query.trim());
       if (source) params.set("source", source);
       if (cluster) params.set("cluster", cluster);
+      if (workMode) params.set("workMode", workMode);
 
       const res = await fetch(`/api/teacher/jobs/results?${params}`);
       if (!cancelled && res.ok) {
@@ -123,7 +137,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
     return () => {
       cancelled = true;
     };
-  }, [classId, query, source, cluster, sort, page, refreshKey]);
+  }, [classId, query, source, cluster, workMode, sort, page, refreshKey]);
 
   const hasMergedListings = (data?.duplicateListings ?? 0) > 0;
 
@@ -158,7 +172,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(12rem,1fr)_12rem_12rem_12rem]">
+      <div className="mt-4 grid gap-2 xl:grid-cols-[minmax(12rem,1fr)_11rem_11rem_11rem_11rem]">
         <label className="relative block">
           <MagnifyingGlass
             size={15}
@@ -200,6 +214,21 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           {CLUSTER_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={workMode}
+          onChange={(event) => {
+            setWorkMode(event.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"
+        >
+          <option value="">All work modes</option>
+          {(data?.workModeOptions ?? []).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.value === "onsite" ? "Local / in person" : option.label}
             </option>
           ))}
         </select>
@@ -267,6 +296,16 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             </div>
             <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">{job.description}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
+              {job.workModes.slice(0, 3).map((mode) => (
+                <span
+                  key={mode}
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    WORK_MODE_STYLES[mode] ?? "bg-[var(--surface-elevated)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {formatJobWorkMode(mode)}
+                </span>
+              ))}
               {job.sources.slice(0, 4).map((item) => (
                 <span
                   key={item.value}

@@ -1253,6 +1253,7 @@ model JobListing {
   title         String
   company       String
   location      String
+  workMode      String    @default("onsite")
   salary        String?
   salaryMin     Float?
   description   String    @db.Text
@@ -1272,6 +1273,7 @@ model JobListing {
   savedByStudents StudentSavedJob[]
 
   @@index([classConfigId, status])
+  @@index([classConfigId, status, workMode])
   @@index([status, createdAt])
   @@schema("visionquest")
 }

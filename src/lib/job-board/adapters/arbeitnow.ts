@@ -1,4 +1,5 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
+import { inferJobWorkMode } from "../work-mode";
 import { fetchJson, stripHtml, textMatchesQuery, truncateDescription } from "./shared";
 
 interface ArbeitnowResponse {
@@ -39,6 +40,14 @@ export const arbeitnowAdapter: JobSourceAdapter = {
         title: job.title,
         company: job.company_name || "Unknown",
         location: job.location || (job.remote ? "Remote" : ""),
+        workMode: inferJobWorkMode({
+          source: "arbeitnow",
+          title: job.title,
+          company: job.company_name,
+          location: job.location,
+          description: job.description,
+          remote: job.remote,
+        }),
         salary: null,
         salaryMin: null,
         description: truncateDescription(stripHtml(job.description)),

@@ -1,5 +1,6 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
+import { inferJobWorkMode } from "../work-mode";
 import { logger } from "@/lib/logger";
 
 /**
@@ -65,6 +66,13 @@ export const adzunaAdapter: JobSourceAdapter = {
           title: r.title,
           company: r.company?.display_name ?? "Unknown",
           location: r.location?.display_name ?? "",
+          workMode: inferJobWorkMode({
+            source: "adzuna",
+            title: r.title,
+            company: r.company?.display_name,
+            location: r.location?.display_name,
+            description: r.description,
+          }),
           salary: salaryText,
           salaryMin: parseSalaryToHourly(salaryText),
           description: r.description?.slice(0, 5000) ?? "",

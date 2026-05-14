@@ -1,5 +1,6 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
+import { inferJobWorkMode } from "../work-mode";
 import { logger } from "@/lib/logger";
 
 /**
@@ -63,6 +64,13 @@ export const jsearchAdapter: JobSourceAdapter = {
           title: r.job_title,
           company: r.employer_name,
           location: [r.job_city, r.job_state].filter(Boolean).join(", "),
+          workMode: inferJobWorkMode({
+            source: "jsearch",
+            title: r.job_title,
+            company: r.employer_name,
+            location: [r.job_city, r.job_state].filter(Boolean).join(", "),
+            description: r.job_description,
+          }),
           salary: salaryText,
           salaryMin: parseSalaryToHourly(salaryText),
           description: r.job_description?.slice(0, 5000) ?? "",

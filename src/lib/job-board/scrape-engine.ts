@@ -4,6 +4,7 @@ import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
 import { groupDuplicateJobs } from "./duplicates";
 import { ALL_JOB_SOURCE_ADAPTERS } from "./adapters/registry";
+import { normalizeJobWorkMode } from "./work-mode";
 import type { JobScrapeTrigger, NormalizedJob } from "./types";
 
 interface RunScrapeOptions {
@@ -114,6 +115,7 @@ async function expireDuplicateActiveListings(configId: string): Promise<number> 
       company: true,
       location: true,
       source: true,
+      workMode: true,
       salaryMin: true,
       updatedAt: true,
       _count: { select: { savedByStudents: true } },
@@ -223,7 +225,11 @@ export async function runScrapeForConfig(
       }
     }
 
-    const quality = filterQualityJobs(allJobs);
+    const normalizedJobs = allJobs.map((job) => ({
+      ...job,
+      workMode: normalizeJobWorkMode(job.workMode, job),
+    }));
+    const quality = filterQualityJobs(normalizedJobs);
     if (quality.rejected.length > 0) {
       logger.info("Filtered low-quality job listings", {
         configId,
@@ -247,6 +253,7 @@ export async function runScrapeForConfig(
           title: job.title,
           company: job.company,
           location: job.location,
+          workMode: job.workMode,
           salary: job.salary,
           salaryMin: job.salaryMin,
           description: job.description,
@@ -263,6 +270,7 @@ export async function runScrapeForConfig(
           title: job.title,
           company: job.company,
           location: job.location,
+          workMode: job.workMode,
           salary: job.salary,
           salaryMin: job.salaryMin,
           description: job.description,

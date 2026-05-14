@@ -2,6 +2,7 @@ interface JobIdentityInput {
   title: string;
   company: string;
   location: string;
+  workMode?: string | null;
   source?: string | null;
   salaryMin?: number | null;
   updatedAt?: Date | string | null;
@@ -165,6 +166,7 @@ export function jobDuplicateKey(job: JobIdentityInput): string {
     normalizeTitle(job.title),
     normalizeCompany(job.company),
     normalizeLocation(job.location),
+    job.workMode || "unknown",
   ].join("|");
 }
 
