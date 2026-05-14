@@ -157,6 +157,70 @@ test("buildStudentAlertDescriptors flags certifications that have stalled", () =
   assert.equal(alerts[0]?.severity, "high");
 });
 
+test("buildStudentAlertDescriptors flags missing and stale goal reliability states", () => {
+  const now = new Date("2026-04-20T12:00:00.000Z");
+  const alerts = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-goals",
+      studentCreatedAt: new Date("2026-04-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-04-19T12:00:00.000Z"),
+      applicationCount: 1,
+      eventRegistrationCount: 1,
+      orientationComplete: true,
+      birthDate: new Date("2000-05-12T00:00:00.000Z"),
+      certification: null,
+      goals: [
+        {
+          id: "monthly-1",
+          level: "monthly",
+          status: "active",
+          updatedAt: new Date("2026-04-01T12:00:00.000Z"),
+          lastReviewedAt: new Date("2026-04-01T12:00:00.000Z"),
+          confirmedAt: null,
+        },
+      ],
+    },
+  });
+
+  assert.ok(alerts.some((alert) => alert.type === "goal_missing_confirmed"));
+  assert.ok(alerts.some((alert) => alert.type === "goal_review_stale"));
+});
+
+test("buildStudentAlertDescriptors flags missing monthly goal separately from confirmed direction", () => {
+  const now = new Date("2026-04-20T12:00:00.000Z");
+  const alerts = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-monthly",
+      studentCreatedAt: new Date("2026-04-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-04-19T12:00:00.000Z"),
+      applicationCount: 1,
+      eventRegistrationCount: 1,
+      orientationComplete: true,
+      birthDate: new Date("2000-05-12T00:00:00.000Z"),
+      certification: null,
+      goals: [
+        {
+          id: "bhag-1",
+          level: "bhag",
+          status: "confirmed",
+          updatedAt: new Date("2026-04-10T12:00:00.000Z"),
+          lastReviewedAt: new Date("2026-04-10T12:00:00.000Z"),
+          confirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+        },
+      ],
+    },
+  });
+
+  assert.ok(alerts.some((alert) => alert.type === "goal_missing_monthly"));
+  assert.ok(!alerts.some((alert) => alert.type === "goal_missing_confirmed"));
+});
+
 test("buildStudentAlertDescriptors adds orientation follow-up alerts from shared student status", () => {
   const now = new Date("2026-03-13T17:00:00.000Z");
   const alerts = buildStudentAlertDescriptors({

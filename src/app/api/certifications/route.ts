@@ -18,7 +18,10 @@ const certUpdateSchema = z.object({
 });
 
 // GET — get student's certification with requirements
-export const GET = withAuth(async (session) => {
+export const GET = withAuth(async (session, req: Request) => {
+  const { searchParams } = new URL(req.url);
+  const shouldEnsureCertification = searchParams.get("ensure") !== "false";
+
   // Get all templates
   const templates = await prisma.certTemplate.findMany({
     where: { certType: "ready-to-work" },
@@ -31,7 +34,7 @@ export const GET = withAuth(async (session) => {
     include: { requirements: true },
   });
 
-  if (!cert && templates.length > 0) {
+  if (!cert && templates.length > 0 && shouldEnsureCertification) {
     // Auto-create certification and requirement records from templates
     cert = await prisma.certification.create({
       data: {
@@ -62,7 +65,32 @@ export const GET = withAuth(async (session) => {
   }
 
   if (!cert) {
-    return NextResponse.json({ certification: null, templates: [], requirements: [] });
+    const requirements = templates.map((t) => ({
+      id: null,
+      templateId: t.id,
+      label: t.label,
+      description: t.description,
+      url: t.url,
+      required: t.required,
+      needsFile: t.needsFile,
+      needsVerify: t.needsVerify,
+      completed: false,
+      completedAt: null,
+      verifiedBy: null,
+      verifiedAt: null,
+      fileId: null,
+      notes: null,
+    }));
+    const { total, done } = getCertificationProgress(templates, requirements);
+
+    return NextResponse.json({
+      certification: null,
+      templates,
+      requirements,
+      total,
+      done,
+      studentName: session.displayName,
+    });
   }
 
   cert = await recomputeCertificationStatus(cert.id, cert.certType);

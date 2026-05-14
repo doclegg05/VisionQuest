@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-05-13T14:59:51.587Z",
+  "filters": {
+    "categories": [
+      "STUDENT_REFERRAL"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ],
+    "quality": [
+      "good"
+    ],
+    "limit": null
+  },
+  "activatedCount": 4,
+  "activatedIds": [
+    "cmmyya0me0004eadk3vtcfgtt",
+    "cmmyya0820003eadkqukk93mg",
+    "cmmyya1ed0006eadkl7mt1qn2",
+    "cmmyya1su0007eadkff94pv0y"
+  ],
+  "documents": [
+    {
+      "id": "cmmyya0me0004eadk3vtcfgtt",
+      "title": "DFA PRC 1 Rev 1 24",
+      "storageKey": "forms/DFA-PRC-1_Rev-1-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 227
+    },
+    {
+      "id": "cmmyya0820003eadkqukk93mg",
+      "title": "DFA SSP 1 1 9 24",
+      "storageKey": "forms/DFA_-_SSP-1_1-9-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 234
+    },
+    {
+      "id": "cmmyya1ed0006eadkl7mt1qn2",
+      "title": "DFA TS 12 Rev 2 24",
+      "storageKey": "forms/DFA-TS-12_Rev_-2-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 245
+    },
+    {
+      "id": "cmmyya1su0007eadkff94pv0y",
+      "title": "DFA WVW 25 Rev 6 24",
+      "storageKey": "forms/DFA-WVW-25_Rev_6-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 232
+    }
+  ],
+  "rollbackCommand": "node scripts/sage-rag-activate.mjs --rollback=.planning/sage-rag/activation-2026-05-13T14-59-51-586Z.json --apply --confirm=rollback-sage-rag"
+}

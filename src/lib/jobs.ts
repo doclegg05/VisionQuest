@@ -48,7 +48,7 @@ export async function enqueueJob({ type, payload, dedupeKey }: EnqueueOptions): 
     data: {
       type,
       payload: JSON.stringify(payload),
-      dedupeKey: null,
+      dedupeKey: dedupeKey ?? null,
       status: "pending",
       attempts: 0,
     },
@@ -120,12 +120,20 @@ export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
   `);
 }
 
-/**
- * Process pending jobs. Call this from a cron endpoint or inline after enqueuing.
- * Returns the number of jobs processed successfully.
- */
-export async function processJobs(limit = 10): Promise<number> {
-  const claimed = await claimPendingJobs(limit);
+export async function claimPendingJobById(jobId: string): Promise<ClaimedJob[]> {
+  return prisma.$queryRaw<ClaimedJob[]>(Prisma.sql`
+    UPDATE visionquest."BackgroundJob"
+    SET status = 'processing',
+        "startedAt" = NOW(),
+        attempts = attempts + 1
+    WHERE id = ${jobId}
+      AND status = 'pending'
+      AND attempts < 3
+    RETURNING id, type, payload, attempts
+  `);
+}
+
+async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
   if (claimed.length === 0) return 0;
 
   let processed = 0;
@@ -165,6 +173,20 @@ export async function processJobs(limit = 10): Promise<number> {
   }
 
   return processed;
+}
+
+/**
+ * Process pending jobs. Call this from a cron endpoint or inline after enqueuing.
+ * Returns the number of jobs processed successfully.
+ */
+export async function processJobs(limit = 10): Promise<number> {
+  const claimed = await claimPendingJobs(limit);
+  return processClaimedJobs(claimed);
+}
+
+export async function processJobById(jobId: string): Promise<number> {
+  const claimed = await claimPendingJobById(jobId);
+  return processClaimedJobs(claimed);
 }
 
 // ─── Job handler registry ───────────────────────────────────────────────────

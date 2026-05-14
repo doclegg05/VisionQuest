@@ -299,6 +299,13 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         href: `/teacher/students/${studentRecordId}#goal-plans`,
         label: "Assign support",
       };
+    case "goal_missing_confirmed":
+    case "goal_missing_monthly":
+    case "goal_review_stale":
+      return {
+        href: `/teacher/students/${studentRecordId}#goal-plans`,
+        label: "Review goals",
+      };
     case "goal_resource_stale":
     case "goal_platform_stale":
       return {
@@ -371,6 +378,13 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
       return {
         kind: "assign_support",
         label: "Quick assign",
+      };
+    case "goal_missing_confirmed":
+    case "goal_missing_monthly":
+    case "goal_review_stale":
+      return {
+        kind: "create_task",
+        label: "Add goal review task",
       };
     default:
       return null;

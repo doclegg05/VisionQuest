@@ -7,6 +7,9 @@ import OpportunitiesHub from "@/components/career/OpportunitiesHub";
 import { JobFilters } from "@/components/jobs/JobFilters";
 import { JobList } from "@/components/jobs/JobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
+import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
+import AskSageLink from "@/components/sage/AskSageLink";
+import type { JobMatchReason, SavedJobStatus } from "@/lib/job-board/types";
 
 interface OpportunityItem {
   id: string;
@@ -56,13 +59,19 @@ interface JobData {
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
-  savedStatus: string | null;
+  skillOverlap: string[];
+  matchReasons: JobMatchReason[];
+  savedStatus: SavedJobStatus | null;
+  savedNotes: string | null;
+  savedAppliedAt: string | null;
   url: string;
 }
 
 interface JobsResponse {
   jobs: JobData[];
   hasDiscovery: boolean;
+  hasResume?: boolean;
+  hasPersonalization?: boolean;
   totalActive: number;
   totalSaved: number;
 }
@@ -104,11 +113,11 @@ export default function CareerHub({
     };
   }, [cluster, sort, refreshKey]);
 
-  const handleSaveJob = useCallback(async (jobId: string) => {
+  const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobListingId: jobId }),
+      body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
     });
     if (res.ok) {
       setRefreshKey((key) => key + 1);
@@ -117,6 +126,7 @@ export default function CareerHub({
 
   const matchedCount =
     jobsData?.jobs.filter((job) => job.matchScore >= 50).length ?? 0;
+  const hasPersonalizedMatches = jobsData?.hasPersonalization ?? jobsData?.hasDiscovery ?? false;
 
   return (
     <div className="space-y-10">
@@ -158,18 +168,28 @@ export default function CareerHub({
 
         {!jobsLoading && jobsData && (
           <div className="mt-6 space-y-6">
-            {!jobsData.hasDiscovery && (
+            {!hasPersonalizedMatches && (
               <div className="surface-section rounded-xl border-l-4 border-[var(--warning)] p-4">
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  Complete your career assessment to get personalized job recommendations.
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Chat with Sage about your interests and skills to unlock matched jobs.
-                </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      Add career discovery or resume skills to unlock personalized job matches.
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                      Sage can use your interests, strengths, saved skills, and resume details to improve recommendations.
+                    </p>
+                  </div>
+                  <AskSageLink
+                    prompt="Help me complete career discovery. Ask about my interests, strengths, work values, schedule needs, and job preferences."
+                    label="Start with Sage"
+                    variant="button"
+                    className="shrink-0"
+                  />
+                </div>
               </div>
             )}
 
-            {jobsData.hasDiscovery && (
+            {hasPersonalizedMatches && (
               <JobRecommendations jobs={jobsData.jobs} onSave={handleSaveJob} />
             )}
 

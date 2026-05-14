@@ -129,6 +129,8 @@ export function buildStudentAlertSyncPlan({
             level: goal.level,
             status: goal.status,
             updatedAt: goal.updatedAt,
+            lastReviewedAt: goal.lastReviewedAt,
+            confirmedAt: goal.confirmedAt,
           })),
           lastConversationAt: studentSignals.conversations[0]?.updatedAt || null,
           orientationComplete: progressionState?.orientationComplete || false,

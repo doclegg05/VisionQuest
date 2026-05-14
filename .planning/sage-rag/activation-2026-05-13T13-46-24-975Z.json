@@ -1,0 +1,329 @@
+{
+  "generatedAt": "2026-05-13T13:46:24.976Z",
+  "filters": {
+    "categories": [
+      "ORIENTATION",
+      "STUDENT_RESOURCE",
+      "STUDENT_REFERRAL",
+      "DOHS_FORM",
+      "CERTIFICATION_INFO",
+      "LMS_PLATFORM_GUIDE",
+      "READY_TO_WORK",
+      "PROGRAM_POLICY"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ],
+    "quality": [
+      "good"
+    ],
+    "limit": null
+  },
+  "activatedCount": 30,
+  "activatedIds": [
+    "cmmyyb7tt0036eadkzpoj2ucf",
+    "cmnoqeb270008eadk2f5y8s6n",
+    "cmmyyb8ln0038eadke643r7ht",
+    "cmmyyb8zl0039eadkyb2luayk",
+    "cmnoqeee30009eadkj4lkripv",
+    "cmmyyba8e003ceadkm1er6sx1",
+    "cmmyybam8003deadk8lxvafj4",
+    "cmmyybbek003feadkbbddsuwa",
+    "cmmyya10e0005eadkbkncyy6k",
+    "cmmyya27a0008eadkm7k8rmlp",
+    "cmmyy9zu00002eadk0pqfmsjd",
+    "cmmyybg3q003readkc9vfs4vo",
+    "cmmyya5bc000geadkkrhe2hds",
+    "cmmyyajwh001headkrxu8cay2",
+    "cmmyyayg8002ieadkl2fv89x7",
+    "cmmyya7oc000meadk43360ps0",
+    "cmmyyarqc0021eadktmpbefmo",
+    "cmmyyayu2002jeadkfnd07tjt",
+    "cmmyya8ga000oeadkarei8d19",
+    "cmmyyaz7z002keadk6vq82g4b",
+    "cmmyyan2n001peadkosyow7hw",
+    "cmmyyb7fb0035eadkhdq61cj4",
+    "cmmyyasib0023eadkokezsjfr",
+    "cmmyyazm3002leadk2ypq97fm",
+    "cmmyyagev0018eadkg8x8zx4j",
+    "cmmyycofq006weadkdcyu58l0",
+    "cmmyycpzq0070eadk7m65olqn",
+    "cmmyycr5n0073eadkl5f8cox6",
+    "cmmyyb2pj002teadkmah3csjo",
+    "cmmyya3r9000ceadknion3ghq"
+  ],
+  "documents": [
+    {
+      "id": "cmmyyb7tt0036eadkzpoj2ucf",
+      "title": "Employment Portfolio Checklist FY26 Fillable",
+      "storageKey": "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 208
+    },
+    {
+      "id": "cmnoqeb270008eadk2f5y8s6n",
+      "title": "New Student Welcome Letter",
+      "storageKey": "orientation/New Student Welcome Letter.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 232
+    },
+    {
+      "id": "cmmyyb8ln0038eadke643r7ht",
+      "title": "SPOKES Checklist for Student Orientation",
+      "storageKey": "orientation/SPOKES Checklist for Student Orientation.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 218
+    },
+    {
+      "id": "cmmyyb8zl0039eadkyb2luayk",
+      "title": "SPOKES Dress Code Policy FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 207
+    },
+    {
+      "id": "cmnoqeee30009eadkj4lkripv",
+      "title": "SPOKES Rights and Responsibilities FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 218
+    },
+    {
+      "id": "cmmyyba8e003ceadkm1er6sx1",
+      "title": "SPOKES Student Profile FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 210
+    },
+    {
+      "id": "cmmyybam8003deadk8lxvafj4",
+      "title": "WVAdultEd DoHS Release of Information FY26 Fillable",
+      "storageKey": "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 212
+    },
+    {
+      "id": "cmmyybbek003feadkbbddsuwa",
+      "title": "WVAdultEd Technology Acceptable Use",
+      "storageKey": "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 201
+    },
+    {
+      "id": "cmmyya10e0005eadkbkncyy6k",
+      "title": "DFA TS 12 Rev 2 24 Fillable",
+      "storageKey": "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 199
+    },
+    {
+      "id": "cmmyya27a0008eadkm7k8rmlp",
+      "title": "DFA WVW 70 Rev 3 5 24 Sample",
+      "storageKey": "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 209
+    },
+    {
+      "id": "cmmyy9zu00002eadk0pqfmsjd",
+      "title": "Dental Services 2025 through WV Works",
+      "storageKey": "forms/Dental_Services_2025_through_WV_Works.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 205
+    },
+    {
+      "id": "cmmyybg3q003readkc9vfs4vo",
+      "title": "Student Portfolio Checklist",
+      "storageKey": "students/resources/Student Portfolio Checklist.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 207
+    },
+    {
+      "id": "cmmyya5bc000geadkkrhe2hds",
+      "title": "Support Services Fact Sheet Rev 6 22",
+      "storageKey": "forms/Support_Services_Fact_Sheet_Rev_6-22.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 212
+    },
+    {
+      "id": "cmmyyajwh001headkrxu8cay2",
+      "title": "02 Accessing BE 1",
+      "storageKey": "lms/Burlington English/02_Accessing_BE_1.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 193
+    },
+    {
+      "id": "cmmyyayg8002ieadkl2fv89x7",
+      "title": "Accessing the Khan Academy Activity Report",
+      "storageKey": "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 204
+    },
+    {
+      "id": "cmmyya7oc000meadk43360ps0",
+      "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+      "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 192
+    },
+    {
+      "id": "cmmyyarqc0021eadktmpbefmo",
+      "title": "Computer Essentials Certificate",
+      "storageKey": "lms/Essential Education/Computer Essentials Certificate.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 224
+    },
+    {
+      "id": "cmmyyayu2002jeadkfnd07tjt",
+      "title": "Enrolling Students in Khan Academy Courses",
+      "storageKey": "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 209
+    },
+    {
+      "id": "cmmyya8ga000oeadkarei8d19",
+      "title": "Internet Student Handout PLUS Version 9.0 1",
+      "storageKey": "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 188
+    },
+    {
+      "id": "cmmyyaz7z002keadk6vq82g4b",
+      "title": "Registering for a Free LearningExpress Library Account",
+      "storageKey": "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 204
+    },
+    {
+      "id": "cmmyyan2n001peadkosyow7hw",
+      "title": "Setting Up Burlington English Account",
+      "storageKey": "lms/Burlington English/Setting Up Burlington English Account.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 195
+    },
+    {
+      "id": "cmmyyb7fb0035eadkhdq61cj4",
+      "title": "USA Learns Student Activity Report",
+      "storageKey": "lms/USA Learns/USA Learns Student Activity Report.pdf",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 201
+    },
+    {
+      "id": "cmmyyasib0023eadkokezsjfr",
+      "title": "Work Essentials",
+      "storageKey": "lms/Essential Education/Work Essentials.png",
+      "category": "LMS_PLATFORM_GUIDE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 233
+    },
+    {
+      "id": "cmmyyazm3002leadk2ypq97fm",
+      "title": "ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre requisite)",
+      "storageKey": "lms/Ready to Work/ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre-requisite).pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 229
+    },
+    {
+      "id": "cmmyyagev0018eadkg8x8zx4j",
+      "title": "Bring Your A Game to Work Presentation Outline",
+      "storageKey": "lms/Bring Your A Game to Work/Bring_Your_A_Game_to_Work_Presentation_Outline.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 231
+    },
+    {
+      "id": "cmmyycofq006weadkdcyu58l0",
+      "title": "IC3 Module Descriptor",
+      "storageKey": "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 219
+    },
+    {
+      "id": "cmmyycpzq0070eadk7m65olqn",
+      "title": "Intuit Quickbooks Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 211
+    },
+    {
+      "id": "cmmyycr5n0073eadkl5f8cox6",
+      "title": "Microsoft Office Specialist (MOS) — Module Descriptor",
+      "storageKey": "lms/certifications/program-info/MOS Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 225
+    },
+    {
+      "id": "cmmyyb2pj002teadkmah3csjo",
+      "title": "Ready to Work Certficate",
+      "storageKey": "lms/Ready to Work/Ready to Work Certficate.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 199
+    },
+    {
+      "id": "cmmyya3r9000ceadknion3ghq",
+      "title": "Ready to Work Certification Attendance Verification Form",
+      "storageKey": "forms/Ready to Work Certification Attendance Verification Form.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 213
+    }
+  ],
+  "rollbackCommand": "node scripts/sage-rag-activate.mjs --rollback=.planning/sage-rag/activation-2026-05-13T13-46-24-975Z.json --apply --confirm=rollback-sage-rag"
+}

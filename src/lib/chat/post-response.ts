@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/db";
 import { resolveAiProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
-import { ensureGoalLevelProgression } from "@/lib/goal-progression";
-import { GOAL_PLANNING_STATUSES, isGoalLevel, type GoalLevel } from "@/lib/goals";
+import { GOAL_PLANNING_STATUSES, isGoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
+import { proposeGoal } from "@/lib/sage/propose-goal";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
 import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
@@ -14,7 +14,6 @@ import {
 } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
-import { invalidatePrefix } from "@/lib/cache";
 import { generateConversationTitle } from "./conversation";
 import type { ProgramType } from "@/lib/program-type";
 
@@ -25,6 +24,8 @@ interface PostResponseParams {
   conversationTitle: string | null;
   conversationStage: string;
   fullResponse: string;
+  /** Persisted assistant Message.id that produced any extracted proposals. */
+  sourceMessageId?: string;
   studentId: string;
   allMessages: { role: "user" | "model"; content: string }[];
   /** Most recent user turn — needed by the classroom-confirmation detector. */
@@ -41,8 +42,8 @@ interface PostResponseParams {
  *
  * Steps:
  * 1. Extract goals from conversation
- * 2. Create new goal records
- * 3. Award XP for new goals
+ * 2. Create proposed goal records for student confirmation
+ * 3. Keep progression locked until the human confirms a proposal
  * 4. Update conversation stage if stage_complete
  * 5. Award review XP for review conversations
  * 6. Generate conversation title
@@ -52,6 +53,7 @@ export async function handlePostResponse({
   conversationTitle,
   conversationStage,
   fullResponse,
+  sourceMessageId,
   studentId,
   allMessages,
   userMessage,
@@ -64,6 +66,13 @@ export async function handlePostResponse({
     sensitivity: "student_record",
   });
   const providerClass = getProviderClass(provider.name);
+  const proposalSourceMessageId = sourceMessageId ?? conversationId;
+  if (!sourceMessageId) {
+    logger.warn("Post-response handler missing sourceMessageId; falling back to conversationId for proposal traceability.", {
+      conversationId,
+    });
+  }
+
   await logAiAuditEvent({
     actorId: studentId,
     actorRole: "student",
@@ -201,13 +210,13 @@ export async function handlePostResponse({
     programType,
   );
 
-  // 2. Create new goal records
+  // 2. Create proposed goal records. Sage can suggest, but a human must
+  // confirm before a goal joins the student's plan/progression.
   const existingGoals = await prisma.goal.findMany({
-    where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
+    where: { studentId, status: { in: ["proposed", ...GOAL_PLANNING_STATUSES] } },
     select: { level: true },
   });
   const existingLevels = new Set(existingGoals.map((g) => g.level));
-  const newGoals: GoalLevel[] = [];
 
   for (const goal of extracted.goals_found) {
     const content = goal.content.trim();
@@ -217,29 +226,27 @@ export async function handlePostResponse({
 
     if (!existingLevels.has(goal.level)) {
       try {
-        await prisma.goal.create({
-          data: { studentId, level: goal.level, content, status: "active" },
+        const result = await proposeGoal({
+          studentId,
+          level: goal.level,
+          content,
+          sourceMessageId: proposalSourceMessageId,
+          conversationId,
+          invokedBy: studentId,
         });
-        newGoals.push(goal.level);
-        existingLevels.add(goal.level);
+        if (result.status === "created" || result.status === "duplicate") {
+          existingLevels.add(goal.level);
+        } else {
+          logger.warn("Goal proposal rejected", { level: goal.level, reason: result.reason });
+        }
       } catch (err) {
-        logger.error("Failed to create goal", { level: goal.level, error: String(err) });
+        logger.error("Failed to propose goal", { level: goal.level, error: String(err) });
       }
     }
   }
 
-  if (newGoals.length > 0) {
-    invalidatePrefix(`goals:${studentId}`);
-  }
-
-  // 3. Award XP for new goals
-  if (newGoals.length > 0) {
-    try {
-      await ensureGoalLevelProgression(studentId, newGoals);
-    } catch (err) {
-      logger.error("Failed to save progression for new goals", { error: String(err) });
-    }
-  }
+  // 3. No XP/progression here. Confirmation routes award goal-setting XP
+  // after the student or staff accepts the proposal.
 
   // 4. Update conversation stage if needed
   if (extracted.stage_complete) {

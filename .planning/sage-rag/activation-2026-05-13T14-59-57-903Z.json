@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2026-05-13T14:59:57.905Z",
+  "filters": {
+    "categories": [
+      "STUDENT_RESOURCE"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ],
+    "quality": [
+      "good"
+    ],
+    "limit": null
+  },
+  "activatedCount": 3,
+  "activatedIds": [
+    "cmmyybfp4003qeadktl2bytzo",
+    "cmmyya63p000ieadkx38fp1rd",
+    "cmnoqc2xh0006eadkqyc887nx"
+  ],
+  "documents": [
+    {
+      "id": "cmmyybfp4003qeadktl2bytzo",
+      "title": "SPOKES Life and Employability Module Rubric Record",
+      "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "STUDENT",
+      "noteQuality": "good",
+      "noteLength": 233
+    },
+    {
+      "id": "cmmyya63p000ieadkx38fp1rd",
+      "title": "Virtual Student Acceptable Use 2023",
+      "storageKey": "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 230
+    },
+    {
+      "id": "cmnoqc2xh0006eadkqyc887nx",
+      "title": "WVAdultEd DoHS Release of Information FY26 Fillable",
+      "storageKey": "forms/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "noteQuality": "good",
+      "noteLength": 244
+    }
+  ],
+  "rollbackCommand": "node scripts/sage-rag-activate.mjs --rollback=.planning/sage-rag/activation-2026-05-13T14-59-57-903Z.json --apply --confirm=rollback-sage-rag"
+}
