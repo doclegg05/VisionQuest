@@ -1,4 +1,5 @@
 import type { NormalizedJob } from "./types";
+import { jobDuplicateKey } from "./duplicates";
 
 const MIN_DESCRIPTION_LENGTH = 30;
 
@@ -19,12 +20,6 @@ function hasValidUrl(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-function identityKey(job: NormalizedJob): string {
-  return [job.title, job.company, job.location]
-    .map((part) => part.toLowerCase().replace(/\s+/g, " ").trim())
-    .join("|");
 }
 
 function rejectionReason(job: NormalizedJob): string | null {
@@ -56,9 +51,9 @@ export function filterQualityJobs(jobs: NormalizedJob[]): JobQualityResult {
     }
     seenSourceIds.add(job.sourceId);
 
-    const identity = identityKey(job);
+    const identity = jobDuplicateKey(job);
     if (seenIdentities.has(identity)) {
-      rejected.push({ job, reason: "duplicate title/company/location" });
+      rejected.push({ job, reason: "duplicate job posting" });
       continue;
     }
     seenIdentities.add(identity);
@@ -68,4 +63,3 @@ export function filterQualityJobs(jobs: NormalizedJob[]): JobQualityResult {
 
   return { jobs: accepted, rejected };
 }
-

@@ -3,6 +3,7 @@ import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { groupDuplicateJobs } from "@/lib/job-board/duplicates";
 import { DEFAULT_JOB_SOURCES, VALID_JOB_SOURCES, isValidJobSource } from "@/lib/job-board/source-options";
 
 /**
@@ -21,11 +22,12 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     where: { classId },
   });
 
-  const jobCount = config
-    ? await prisma.jobListing.count({
+  const activeListings = config
+    ? await prisma.jobListing.findMany({
         where: { classConfigId: config.id, status: "active" },
+        select: { title: true, company: true, location: true, source: true, salaryMin: true, updatedAt: true },
       })
-    : 0;
+    : [];
 
   return NextResponse.json({
     config: config
@@ -36,7 +38,8 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
           updatedAt: config.updatedAt.toISOString(),
         }
       : null,
-    activeJobCount: jobCount,
+    activeJobCount: groupDuplicateJobs(activeListings).length,
+    activeListingCount: activeListings.length,
   });
 });
 

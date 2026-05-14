@@ -8,6 +8,7 @@ const session = mockTeacherSession();
 const mockAssertStaffCanManageClass = mock.fn() as any;
 const mockFindUnique = mock.fn() as any;
 const mockCount = mock.fn() as any;
+const mockJobListingFindMany = mock.fn() as any;
 const mockScrapeRunFindFirst = mock.fn() as any;
 const mockScrapeRunFindMany = mock.fn() as any;
 const mockScrapeRunCreate = mock.fn() as any;
@@ -20,6 +21,27 @@ function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
   error.statusCode = statusCode;
   return error;
+}
+
+function activeJob(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "job-1",
+    title: "Office Assistant",
+    company: "Acme",
+    location: "Summersville, WV",
+    salary: null,
+    salaryMin: null,
+    description: "Answer phones, schedule appointments, and keep office records updated.",
+    url: "https://example.com/jobs/1",
+    source: "jsearch",
+    sourceType: "api",
+    sourceId: "jsearch:1",
+    clusters: ["office-admin"],
+    createdAt: new Date("2026-01-03T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+    _count: { savedByStudents: 0 },
+    ...overrides,
+  };
 }
 
 mock.module("@/lib/api-error", {
@@ -57,6 +79,7 @@ mock.module("@/lib/db", {
       },
       jobListing: {
         count: mockCount,
+        findMany: mockJobListingFindMany,
       },
       jobScrapeRun: {
         findFirst: mockScrapeRunFindFirst,
@@ -85,11 +108,13 @@ mock.module("@/lib/audit", {
 let configRoute: Awaited<typeof import("./config/route")>;
 let refreshRoute: Awaited<typeof import("./refresh/route")>;
 let statusRoute: Awaited<typeof import("./status/route")>;
+let resultsRoute: Awaited<typeof import("./results/route")>;
 
 before(async () => {
   configRoute = await import("./config/route");
   refreshRoute = await import("./refresh/route");
   statusRoute = await import("./status/route");
+  resultsRoute = await import("./results/route");
 });
 
 describe("teacher job route authorization", () => {
@@ -97,6 +122,7 @@ describe("teacher job route authorization", () => {
     mockAssertStaffCanManageClass.mock.resetCalls();
     mockFindUnique.mock.resetCalls();
     mockCount.mock.resetCalls();
+    mockJobListingFindMany.mock.resetCalls();
     mockScrapeRunFindFirst.mock.resetCalls();
     mockScrapeRunFindMany.mock.resetCalls();
     mockScrapeRunCreate.mock.resetCalls();
@@ -118,6 +144,15 @@ describe("teacher job route authorization", () => {
       lastScrapedAt: null,
     }));
     mockCount.mock.mockImplementation(async () => 7);
+    mockJobListingFindMany.mock.mockImplementation(async () => [
+      activeJob({ id: "job-1", title: "Office Assistant" }),
+      activeJob({ id: "job-2", title: "Bookkeeper" }),
+      activeJob({ id: "job-3", title: "IT Support Specialist" }),
+      activeJob({ id: "job-4", title: "Customer Service Representative" }),
+      activeJob({ id: "job-5", title: "Data Entry Clerk" }),
+      activeJob({ id: "job-6", title: "Administrative Coordinator" }),
+      activeJob({ id: "job-7", title: "Receptionist" }),
+    ]);
     mockScrapeRunFindFirst.mock.mockImplementation(async () => null);
     mockScrapeRunFindMany.mock.mockImplementation(async () => []);
     mockScrapeRunCreate.mock.mockImplementation(async () => ({
@@ -306,5 +341,57 @@ describe("teacher job route authorization", () => {
     assert.equal(body.sourceHealth.find((source: { source: string }) => source.source === "jsearch").successRate, 100);
     assert.equal(body.activeJobCount, 7);
     assert.equal(body.lastScrapedAt, null);
+  });
+
+  it("returns teacher job results grouped by duplicate posting", async () => {
+    mockJobListingFindMany.mock.mockImplementationOnce(async () => [
+      activeJob({
+        id: "job-primary",
+        title: "Office Assistant",
+        company: "Acme Inc.",
+        location: "Summersville, WV",
+        source: "usajobs",
+        sourceId: "usajobs:1",
+        salaryMin: 20,
+        _count: { savedByStudents: 1 },
+      }),
+      activeJob({
+        id: "job-duplicate",
+        title: "Office Assistant - Full Time",
+        company: "Acme",
+        location: "Summersville, West Virginia",
+        source: "jsearch",
+        sourceId: "jsearch:2",
+        url: "https://example.com/jobs/2",
+      }),
+      activeJob({
+        id: "job-distinct",
+        title: "Bookkeeper",
+        company: "Ledger Co",
+        location: "Charleston, WV",
+        source: "adzuna",
+        sourceId: "adzuna:3",
+        clusters: ["finance-bookkeeping"],
+      }),
+    ]);
+
+    const req = mockRequest("/api/teacher/jobs/results", {
+      searchParams: { classId: "class-1" },
+    });
+
+    const res = await resultsRoute.GET(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.totalListings, 3);
+    assert.equal(body.totalUnique, 2);
+    assert.equal(body.duplicateListings, 1);
+    assert.equal(body.jobs.length, 2);
+    const officeJob = body.jobs.find((job: { title: string }) => job.title === "Office Assistant");
+    assert.equal(officeJob.duplicateCount, 2);
+    assert.deepEqual(
+      officeJob.sources.map((source: { value: string }) => source.value),
+      ["usajobs", "jsearch"],
+    );
   });
 });

@@ -51,6 +51,30 @@ test("filterQualityJobs removes duplicate listings within a scrape batch", () =>
   assert.equal(result.jobs.length, 1);
   assert.deepEqual(result.rejected.map((entry) => entry.reason), [
     "duplicate source id",
-    "duplicate title/company/location",
+    "duplicate job posting",
   ]);
+});
+
+test("filterQualityJobs combines duplicate postings from different sources", () => {
+  const result = filterQualityJobs([
+    job({
+      source: "usajobs",
+      sourceId: "usajobs:1",
+      title: "Office Assistant",
+      company: "Acme Inc.",
+      location: "Summersville, WV",
+    }),
+    job({
+      source: "jsearch",
+      sourceId: "jsearch:2",
+      title: "Office Assistant - Full Time",
+      company: "Acme",
+      location: "Summersville, West Virginia",
+      url: "https://example.com/jobs/2",
+    }),
+  ]);
+
+  assert.equal(result.jobs.length, 1);
+  assert.equal(result.rejected.length, 1);
+  assert.equal(result.rejected[0].reason, "duplicate job posting");
 });
