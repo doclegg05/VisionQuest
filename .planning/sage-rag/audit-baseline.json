@@ -1,0 +1,528 @@
+{
+  "generatedAt": "2026-05-13T13:40:36.477Z",
+  "filters": {
+    "categories": [
+      "ORIENTATION",
+      "STUDENT_RESOURCE",
+      "STUDENT_REFERRAL",
+      "DOHS_FORM",
+      "CERTIFICATION_INFO",
+      "LMS_PLATFORM_GUIDE",
+      "READY_TO_WORK",
+      "PROGRAM_POLICY"
+    ],
+    "audiences": [
+      "STUDENT",
+      "BOTH"
+    ]
+  },
+  "totals": {
+    "allGroupedRows": 10,
+    "candidateDocs": 154,
+    "usedBySageCandidates": 0,
+    "goodNotes": 0,
+    "weakNotes": 132,
+    "emptyNotes": 22,
+    "goodNoteCoverage": 0
+  },
+  "byCategory": {
+    "CERTIFICATION_INFO": 78,
+    "LMS_PLATFORM_GUIDE": 36,
+    "ORIENTATION": 16,
+    "STUDENT_REFERRAL": 6,
+    "STUDENT_RESOURCE": 18
+  },
+  "byAudience": {
+    "BOTH": 139,
+    "STUDENT": 15
+  },
+  "byQuality": {
+    "empty": 22,
+    "weak": 132
+  },
+  "byCategoryAndQuality": {
+    "CERTIFICATION_INFO:empty": 19,
+    "CERTIFICATION_INFO:weak": 59,
+    "LMS_PLATFORM_GUIDE:weak": 36,
+    "ORIENTATION:empty": 1,
+    "ORIENTATION:weak": 15,
+    "STUDENT_REFERRAL:weak": 6,
+    "STUDENT_RESOURCE:empty": 2,
+    "STUDENT_RESOURCE:weak": 16
+  },
+  "activationReady": [],
+  "weakSamples": [
+    {
+      "id": "cmmyy9z1k0000eadkqsl45f7y",
+      "title": "Authorization for Release of Information to External Agencies v1",
+      "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "category": "ORIENTATION",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 88
+    },
+    {
+      "id": "cmmyy9zg10001eadk7g53hx7i",
+      "title": "Authorization for Release of Strictly Confidential Information v1",
+      "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+      "category": "ORIENTATION",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 89
+    },
+    {
+      "id": "cmnoqe8lm0007eadknwjvbwgf",
+      "title": "CTE Learning Needs Styles instrument",
+      "storageKey": "orientation/CTE Learning Needs Styles instrument.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 60
+    },
+    {
+      "id": "cmmyyb7tt0036eadkzpoj2ucf",
+      "title": "Employment Portfolio Checklist FY26 Fillable",
+      "storageKey": "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 68
+    },
+    {
+      "id": "cmmyyb87w0037eadk81iobqie",
+      "title": "Media Release Form FY26 Fillable",
+      "storageKey": "orientation/Media_Release_Form_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 56
+    },
+    {
+      "id": "cmnoqeb270008eadk2f5y8s6n",
+      "title": "New Student Welcome Letter",
+      "storageKey": "orientation/New Student Welcome Letter.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 50
+    },
+    {
+      "id": "cmmyya4x8000feadkpc1i97ti",
+      "title": "Rights and Responsibilities FY25",
+      "storageKey": "forms/Rights_and_Responsibilities_FY25.pdf",
+      "category": "ORIENTATION",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 56
+    },
+    {
+      "id": "cmmyyb8ln0038eadke643r7ht",
+      "title": "SPOKES Checklist for Student Orientation",
+      "storageKey": "orientation/SPOKES Checklist for Student Orientation.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 64
+    },
+    {
+      "id": "cmmyyb8zl0039eadkyb2luayk",
+      "title": "SPOKES Dress Code Policy FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 62
+    },
+    {
+      "id": "cmmyyb9di003aeadkem94x1dz",
+      "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 73
+    },
+    {
+      "id": "cmnoqeee30009eadkj4lkripv",
+      "title": "SPOKES Rights and Responsibilities FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 72
+    },
+    {
+      "id": "cmmyyba8e003ceadkm1er6sx1",
+      "title": "SPOKES Student Profile FY26 Fillable",
+      "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 60
+    },
+    {
+      "id": "cmmyybam8003deadk8lxvafj4",
+      "title": "WVAdultEd DoHS Release of Information FY26 Fillable",
+      "storageKey": "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 75
+    },
+    {
+      "id": "cmmyybb0r003eeadk08dd0vjs",
+      "title": "WVAdultEd Tech Accept Use Fillable",
+      "storageKey": "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 58
+    },
+    {
+      "id": "cmmyybbek003feadkbbddsuwa",
+      "title": "WVAdultEd Technology Acceptable Use",
+      "storageKey": "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 59
+    },
+    {
+      "id": "cmmyya0me0004eadk3vtcfgtt",
+      "title": "DFA PRC 1 Rev 1 24",
+      "storageKey": "forms/DFA-PRC-1_Rev-1-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 47
+    },
+    {
+      "id": "cmmyya0820003eadkqukk93mg",
+      "title": "DFA SSP 1 1 9 24",
+      "storageKey": "forms/DFA_-_SSP-1_1-9-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 45
+    },
+    {
+      "id": "cmmyya1ed0006eadkl7mt1qn2",
+      "title": "DFA TS 12 Rev 2 24",
+      "storageKey": "forms/DFA-TS-12_Rev_-2-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 47
+    },
+    {
+      "id": "cmmyya10e0005eadkbkncyy6k",
+      "title": "DFA TS 12 Rev 2 24 Fillable",
+      "storageKey": "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 56
+    },
+    {
+      "id": "cmmyya1su0007eadkff94pv0y",
+      "title": "DFA WVW 25 Rev 6 24",
+      "storageKey": "forms/DFA-WVW-25_Rev_6-24.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 48
+    },
+    {
+      "id": "cmmyya27a0008eadkm7k8rmlp",
+      "title": "DFA WVW 70 Rev 3 5 24 Sample",
+      "storageKey": "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+      "category": "STUDENT_REFERRAL",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 57
+    },
+    {
+      "id": "cmnoqbjpq0000eadkp9k909qw",
+      "title": "CTE Learning Needs Styles instrument",
+      "storageKey": "forms/CTE Learning Needs Styles instrument.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 65
+    },
+    {
+      "id": "cmmyy9zu00002eadk0pqfmsjd",
+      "title": "Dental Services 2025 through WV Works",
+      "storageKey": "forms/Dental_Services_2025_through_WV_Works.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 66
+    },
+    {
+      "id": "cmnoqbr360002eadksfsrtgf4",
+      "title": "Learning Needs Screening",
+      "storageKey": "forms/Learning Needs Screening.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 53
+    },
+    {
+      "id": "cmmyya2l80009eadkelbaocel",
+      "title": "LNS with Referral 4.24",
+      "storageKey": "forms/LNS_with_Referral_4.24.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "weak",
+      "noteLength": 51
+    }
+  ],
+  "emptySamples": [
+    {
+      "id": "cmmyyb9rp003beadk3cusdc3g",
+      "title": "SPOKES Rights and Responsibilities (Fillable)",
+      "storageKey": "orientation/SPOKES_Rights_and_Responsibilites_FY26_Fillable.pdf",
+      "category": "ORIENTATION",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyybfp4003qeadktl2bytzo",
+      "title": "SPOKES Life and Employability Module Rubric Record",
+      "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyybg3q003readkc9vfs4vo",
+      "title": "Student Portfolio Checklist",
+      "storageKey": "students/resources/Student Portfolio Checklist.pdf",
+      "category": "STUDENT_RESOURCE",
+      "audience": "STUDENT",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycn9s006teadkj7fnmw0z",
+      "title": "Adobe Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Adobe Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycnnw006ueadk9sa7rflv",
+      "title": "Critical Career Skills Generative AI Foundations Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Critical Career Skills - Generative AI Foundations Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyyco1q006veadk1ffpr0sz",
+      "title": "Critical Career Skills Professional Communications Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Critical Career Skills - Professional Communications Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycofq006weadkdcyu58l0",
+      "title": "IC3 Module Descriptor",
+      "storageKey": "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycotw006xeadk4hmvu1v1",
+      "title": "Intuit Bookkeeping Professional Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Intuit Bookkeeping Professional Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycp7u006yeadk4cenk5l3",
+      "title": "Intuit Design for Delight Innovator Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Intuit Design for Delight Innovator Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycplo006zeadkehnjj5r5",
+      "title": "Intuit Personal Finance Descriptor",
+      "storageKey": "lms/certifications/program-info/Intuit Personal Finance Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycpzq0070eadk7m65olqn",
+      "title": "Intuit Quickbooks Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycqds0071eadkehbiet52",
+      "title": "IT Specialist Cybersecurity Module Descriptor",
+      "storageKey": "lms/certifications/program-info/IT Specialist - Cybersecurity Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycqro0072eadkkg9cvftn",
+      "title": "Learning Needs Screening",
+      "storageKey": "lms/certifications/program-info/Learning Needs Screening.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycr5n0073eadkl5f8cox6",
+      "title": "Microsoft Office Specialist (MOS) — Module Descriptor",
+      "storageKey": "lms/certifications/program-info/MOS Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycrk20074eadkb6ms9wy0",
+      "title": "Recommended Referrals",
+      "storageKey": "lms/certifications/program-info/Recommended Referrals.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycry60075eadkm22ob94p",
+      "title": "Sample SPOKES 4 Weeks Customer Service Schedule",
+      "storageKey": "lms/certifications/program-info/Sample SPOKES 4 Weeks Customer Service Schedule.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycscg0076eadk4jphd25b",
+      "title": "Sample SPOKES Four Week Schedule",
+      "storageKey": "lms/certifications/program-info/Sample SPOKES Four Week Schedule.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycsqg0077eadk5ytlzvwl",
+      "title": "Sample SPOKES Schedule Class Management Options",
+      "storageKey": "lms/certifications/program-info/Sample SPOKES Schedule Class Management Options.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyyct500078eadk1hvwv188",
+      "title": "Sample TABE 13/14 Result Report for DoHS",
+      "storageKey": "lms/certifications/program-info/Sample_TABE_13_Result_to_DoHS.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyyctis0079eadkp3xpvcvh",
+      "title": "SPOKES Life & Employability Skills — Module Descriptor",
+      "storageKey": "lms/certifications/program-info/SPOKES Life and Employabilitly Skills Curriculum Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyyctwq007aeadk19ha9j0b",
+      "title": "Through the Customer's Eyes Part 1 Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Through the Customer's Eyes - Part 1 - Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    },
+    {
+      "id": "cmmyycuao007beadklsr86ejd",
+      "title": "Through the Customer's Eyes Part 2 Module Descriptor",
+      "storageKey": "lms/certifications/program-info/Through the Customer's Eyes - Part 2 - Module Descriptor.pdf",
+      "category": "CERTIFICATION_INFO",
+      "audience": "BOTH",
+      "usedBySage": false,
+      "noteQuality": "empty",
+      "noteLength": 0
+    }
+  ]
+}

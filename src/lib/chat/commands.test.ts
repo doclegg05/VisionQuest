@@ -41,6 +41,19 @@ describe("filterCommands", () => {
     const result = filterCommands("hello", "student");
     assert.deepEqual(result, []);
   });
+
+  it("can filter a server-provided command list", () => {
+    const result = filterCommands("/fo", "student", [
+      {
+        slash: "/form",
+        label: "Open a form",
+        description: "Pull up a program form",
+        prefill: "/form ",
+        roles: ["student"],
+      },
+    ]);
+    assert.deepEqual(result.map((command) => command.slash), ["/form"]);
+  });
 });
 
 describe("getStarterChips", () => {

@@ -20,6 +20,10 @@
     "db:seed": "node scripts/seed-data.mjs",
     "db:seed-documents": "node scripts/seed-documents.mjs",
     "seed:sage-context": "node scripts/seed-sage-context.mjs",
+    "sage:rag:audit": "node scripts/sage-rag-audit.mjs",
+    "sage:rag:notes": "node scripts/sage-rag-notes.mjs",
+    "sage:rag:activate": "node scripts/sage-rag-activate.mjs",
+    "sage:rag:harness": "tsx scripts/sage-rag-harness.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs"
   },

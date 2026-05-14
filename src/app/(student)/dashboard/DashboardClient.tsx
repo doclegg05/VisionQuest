@@ -15,6 +15,8 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import AssignedFormsCard from "@/components/student/AssignedFormsCard";
+import AskSageLink from "@/components/sage/AskSageLink";
+import SageInsightList from "@/components/sage/SageInsightList";
 
 interface DashboardClientProps {
   studentName: string;
@@ -84,39 +86,54 @@ export default function DashboardClient({
 
   // Determine "next step" dynamically based on student state
   const nextStep = !orientationComplete
-    ? {
-        label: "Complete orientation checklist",
-        detail: `${orientationProgress.completed} of ${orientationProgress.total} items done`,
-        href: "/orientation",
-        icon: ClipboardText,
-      }
-    : !hasGoals
       ? {
-          label: "Set your first goal",
-          detail: "Talk to Sage or add one manually",
-          href: "/goals",
-          icon: Target,
+          label: "Complete orientation checklist",
+          detail: `${orientationProgress.completed} of ${orientationProgress.total} items done`,
+          reason: "Finish this first so your goals, learning, and advising work from the same baseline.",
+          ctaLabel: "Finish orientation",
+          sagePrompt: "Help me finish my orientation checklist. Walk me through the next unfinished step in simple steps.",
+          href: "/orientation",
+          icon: ClipboardText,
         }
-      : certificationsStarted === 0
+      : !hasGoals
         ? {
-            label: "Start a certification",
-            detail: "Browse available certifications",
-            href: "/learning",
-            icon: Certificate,
+            label: "Set your first goal",
+            detail: "Talk to Sage or add one manually",
+            reason: "A confirmed goal lets the rest of VisionQuest recommend the right training and proof items.",
+            ctaLabel: "Choose a goal",
+            sagePrompt: "Help me turn my career interests into one clear goal I can confirm today.",
+            href: "/goals",
+            icon: Target,
           }
-        : !resumeCreated
+        : certificationsStarted === 0
           ? {
-              label: "Build your resume",
-              detail: "Create your professional portfolio",
-              href: "/portfolio",
-              icon: Briefcase,
+              label: "Start a certification",
+              detail: "Browse available certifications",
+              reason: "One active credential gives you a concrete skill target and something to show employers.",
+              ctaLabel: "Find training",
+              sagePrompt: "Help me pick the first certification or learning platform that best supports my goals.",
+              href: "/learning",
+              icon: Certificate,
             }
-          : {
-              label: "Check in with Sage",
-              detail: "Get coaching on your next move",
-              href: "/chat",
-              icon: ChatCircle,
-            };
+          : !resumeCreated
+            ? {
+                label: "Build your resume",
+                detail: "Create your professional portfolio",
+                reason: "Your resume turns your goals, certifications, and work samples into proof you can use.",
+                ctaLabel: "Start portfolio",
+                sagePrompt: "Help me start my resume and portfolio. Tell me the first proof item I should add.",
+                href: "/portfolio",
+                icon: Briefcase,
+              }
+            : {
+                label: "Check in with Sage",
+                detail: "Get coaching on your next move",
+                reason: "You have the core pieces started. Use Sage to choose the highest-value action for today.",
+                ctaLabel: "Open Sage",
+                sagePrompt: "Review my current VisionQuest progress and help me choose the best next action for today.",
+                href: "/chat",
+                icon: ChatCircle,
+              };
 
   // Suggested actions (context-aware pills) — merged into "What's Next" section
   const actions: { label: string; href: string; icon: typeof Target }[] = [];
@@ -127,6 +144,21 @@ export default function DashboardClient({
   if (!resumeCreated) actions.push({ label: "Resume", href: "/portfolio", icon: Briefcase });
 
   const NextStepIcon = nextStep.icon;
+  const journeySteps = [
+    { label: "Start", complete: orientationComplete, active: !orientationComplete },
+    { label: "Goal", complete: hasGoals, active: orientationComplete && !hasGoals },
+    {
+      label: "Learn",
+      complete: certificationsStarted > 0 || platformsVisited > 0,
+      active: orientationComplete && hasGoals && certificationsStarted === 0 && platformsVisited === 0,
+    },
+    {
+      label: "Proof",
+      complete: resumeCreated,
+      active: orientationComplete && hasGoals && (certificationsStarted > 0 || platformsVisited > 0) && !resumeCreated,
+    },
+    { label: "Apply", complete: false, active: orientationComplete && hasGoals && resumeCreated },
+  ];
 
   return (
     <div className="space-y-4">
@@ -152,24 +184,65 @@ export default function DashboardClient({
 
       {/* ── Section 1: Mountain Progress ── rendered in page.tsx above this component */}
 
+      <AnimatedSection delay={0.08}>
+        <SageInsightList hideWhenEmpty />
+      </AnimatedSection>
+
       {/* ── Section 2: What's Next ── */}
       <AnimatedSection delay={0.12}>
         <div className="surface-section p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-            What&apos;s Next
-          </h2>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                Do This Next
+              </p>
+              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">{nextStep.label}</h2>
+            </div>
+            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+              Most important today
+            </span>
+          </div>
 
           {/* Primary next step */}
-          <Link href={nextStep.href} prefetch={false} className="flex items-center gap-4 rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4 transition-transform hover:-translate-y-0.5 hover:shadow-lg">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-green)] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)]">
-              <NextStepIcon size={22} weight="bold" />
+          <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-4">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-green)] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)]">
+                <NextStepIcon size={22} weight="bold" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+                  Next action
+                </p>
+                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{nextStep.reason}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href={nextStep.href} prefetch={false} className="primary-button px-4 py-2.5 text-sm">
+                    {nextStep.ctaLabel}
+                    <ArrowRight size={16} weight="bold" />
+                  </Link>
+                  <AskSageLink prompt={nextStep.sagePrompt} label="Ask Sage to help" />
+                </div>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-display text-lg font-bold text-[var(--ink-strong)]">{nextStep.label}</p>
-              <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
-            </div>
-            <ArrowRight size={20} weight="bold" className="shrink-0 text-[var(--accent-green)]" />
-          </Link>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-5">
+            {journeySteps.map((step, index) => (
+              <div
+                key={step.label}
+                className={`rounded-xl border px-3 py-2 ${
+                  step.complete
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : step.active
+                      ? "border-[rgba(15,154,146,0.35)] bg-[rgba(15,154,146,0.1)] text-[var(--ink-strong)]"
+                      : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--ink-muted)]"
+                }`}
+              >
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.14em]">Step {index + 1}</p>
+                <p className="mt-1 text-sm font-semibold">{step.label}</p>
+              </div>
+            ))}
+          </div>
 
           {/* Incomplete orientation items */}
           {!orientationComplete && incompleteOrientationItems.length > 0 && (
@@ -192,22 +265,27 @@ export default function DashboardClient({
 
           {/* Quick action pills */}
           {actions.length > 0 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-              {actions.map((action) => {
-                const ActionIcon = action.icon;
-                return (
-                  <Link
-                    key={action.href}
-                    href={action.href}
-                    prefetch={false}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
-                  >
-                    <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
-                    {action.label}
-                    <ArrowRight size={14} weight="bold" className="text-[var(--ink-faint)]" />
-                  </Link>
-                );
-              })}
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                After that
+              </p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {actions.map((action) => {
+                  const ActionIcon = action.icon;
+                  return (
+                    <Link
+                      key={action.href}
+                      href={action.href}
+                      prefetch={false}
+                      className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
+                    >
+                      <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
+                      {action.label}
+                      <ArrowRight size={14} weight="bold" className="text-[var(--ink-faint)]" />
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

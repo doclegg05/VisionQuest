@@ -6,29 +6,27 @@ const mockRolePermissionCount = mock.fn() as any;
 const mockRolePermissionFindMany = mock.fn() as any;
 const mockPermissionFindUnique = mock.fn() as any;
 
-mock.module("./db", {
-  namedExports: {
-    prisma: {
-      rolePermission: {
-        count: mockRolePermissionCount,
-        findMany: mockRolePermissionFindMany,
-      },
-      permission: {
-        findUnique: mockPermissionFindUnique,
-      },
-    },
-  },
-});
+type RbacModule = typeof import("./rbac");
 
-const rbacModulePromise = import("./rbac");
+const rbacModulePromise = import(
+  `${new URL("./rbac.ts", import.meta.url).href}?rbac-test`
+) as Promise<RbacModule>;
 
 beforeEach(async () => {
   mockRolePermissionCount.mock.resetCalls();
   mockRolePermissionFindMany.mock.resetCalls();
   mockPermissionFindUnique.mock.resetCalls();
 
-  const { clearPermissionCache } = await rbacModulePromise;
-  clearPermissionCache();
+  const { setRbacPrismaClientForTests } = await rbacModulePromise;
+  setRbacPrismaClientForTests({
+    rolePermission: {
+      count: mockRolePermissionCount,
+      findMany: mockRolePermissionFindMany,
+    },
+    permission: {
+      findUnique: mockPermissionFindUnique,
+    },
+  } as never);
 });
 
 test("resolvePermission falls back when no role-permission rows exist yet", async () => {

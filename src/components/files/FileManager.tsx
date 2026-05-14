@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import AskSageLink from "@/components/sage/AskSageLink";
 
 interface FileRecord {
   id: string;
@@ -164,9 +165,28 @@ export default function FileManager() {
 
       {/* File list */}
       {files.length === 0 ? (
-        <div className="surface-section py-10 text-center text-[var(--ink-muted)]">
-          <p className="mb-3 text-4xl">📁</p>
-          <p className="text-sm">No files uploaded yet.</p>
+        <div className="surface-section px-5 py-10 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            File starter
+          </p>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Upload one useful file</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
+            Good first files include a resume, certificate, program form, ID document, or work sample.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="primary-button px-4 py-2.5 text-sm disabled:opacity-50"
+            >
+              {uploading ? "Uploading..." : "Choose a file"}
+            </button>
+            <AskSageLink
+              prompt="Help me decide which file I should upload first for my goals, portfolio, certifications, or program paperwork."
+              label="Ask Sage what to upload"
+            />
+          </div>
         </div>
       ) : (
         Object.entries(grouped).map(([cat, catFiles]) => (

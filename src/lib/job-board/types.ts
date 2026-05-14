@@ -29,10 +29,75 @@ export interface JobSourceAdapter {
 /** Status values for StudentSavedJob */
 export type SavedJobStatus = "saved" | "applied" | "interviewing" | "offered" | "withdrawn";
 
+export type JobScrapeTrigger = "manual" | "auto";
+export type JobScrapeRunStatus = "queued" | "processing" | "completed" | "failed";
+export type JobScrapeSourceStatus = "queued" | "processing" | "completed" | "failed";
+
+export interface JobScrapeSourceStatusResult {
+  id: string;
+  source: string;
+  status: JobScrapeSourceStatus;
+  fetchedCount: number;
+  upsertedCount: number;
+  error: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface JobScrapeRunStatusResult {
+  id: string;
+  trigger: JobScrapeTrigger;
+  status: JobScrapeRunStatus;
+  requestedById: string | null;
+  backgroundJobId: string | null;
+  totalSources: number;
+  completedSources: number;
+  failedSources: number;
+  totalFetched: number;
+  totalUpserted: number;
+  error: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  sourceResults: JobScrapeSourceStatusResult[];
+}
+
+export interface JobSourceHealthResult {
+  source: string;
+  label: string;
+  selected: boolean;
+  configured: boolean;
+  recentRuns: number;
+  successRate: number | null;
+  lastStatus: JobScrapeSourceStatus | null;
+  lastFetchedCount: number;
+  lastUpsertedCount: number;
+  lastError: string | null;
+  lastStartedAt: string | null;
+  lastCompletedAt: string | null;
+}
+
+export type JobMatchReasonType =
+  | "location"
+  | "remote"
+  | "cluster"
+  | "riasec"
+  | "skill"
+  | "preference"
+  | "feedback";
+
+export interface JobMatchReason {
+  type: JobMatchReasonType;
+  label: string;
+  value?: string;
+}
+
 /** Recommendation score result */
 export interface JobRecommendation {
   jobListingId: string;
   score: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusterOverlap: string[];
+  skillOverlap: string[];
+  matchReasons: JobMatchReason[];
 }

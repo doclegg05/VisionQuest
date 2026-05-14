@@ -178,6 +178,11 @@ If you do not use the blueprint:
 | `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `GOOGLE_REDIRECT_URI` | Google OAuth callback URL |
 | `GEMINI_MODEL` | Override default Gemini model |
+| `SAGE_AGENT_ENABLED` | Enable Sage tool calls and server-driven slash commands |
+| `CF_ACCESS_CLIENT_ID` | Cloudflare Access service-token client id for the local Sage AI endpoint |
+| `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access service-token client secret for the local Sage AI endpoint |
+| `AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID` | Explicit alias for `CF_ACCESS_CLIENT_ID` |
+| `AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_SECRET` | Explicit alias for `CF_ACCESS_CLIENT_SECRET` |
 | `SMTP_HOST` | Password reset mail |
 | `SMTP_PORT` | Password reset mail |
 | `SMTP_USER` | Password reset mail |
@@ -194,6 +199,12 @@ Render dashboard note:
 
 - Paste raw values without extra quotes.
 - Use normal environment variables rather than Render Secret Files.
+
+Local AI note:
+
+- Student and staff Sage chat can be forced to the local Ollama provider for protected data.
+- If the local endpoint is protected by Cloudflare Access, set the service-token values in Render env vars or in Program Setup. Env vars are preferred for production because they survive database secret-encryption-key drift.
+- The local host must run Ollama, `scripts/ollama-relay.mjs`, and `cloudflared` as auto-starting services. Use `scripts/install-local-ai-services.ps1` from an elevated PowerShell on the local AI host.
 
 ## 6. First-Run Data Setup
 
@@ -230,6 +241,7 @@ DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 
 - Student can register and sign in
 - Student can open Sage and receive a streamed response
+- Admin `Program Setup -> AI Provider -> Test Connection` succeeds if Sage is using local AI
 - Goal extraction runs after chat
 - Orientation loads
 - File upload succeeds
