@@ -2,6 +2,7 @@ import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
+import { groupDuplicateJobs } from "./duplicates";
 import { ALL_JOB_SOURCE_ADAPTERS } from "./adapters/registry";
 import type { JobScrapeTrigger, NormalizedJob } from "./types";
 
@@ -102,6 +103,45 @@ async function failSourceResult(scrapeRunId: string, source: string, error: stri
       completedAt: new Date(),
     },
   });
+}
+
+async function expireDuplicateActiveListings(configId: string): Promise<number> {
+  const activeListings = await prisma.jobListing.findMany({
+    where: { classConfigId: configId, status: "active" },
+    select: {
+      id: true,
+      title: true,
+      company: true,
+      location: true,
+      source: true,
+      salaryMin: true,
+      updatedAt: true,
+      _count: { select: { savedByStudents: true } },
+    },
+  });
+
+  const duplicateIds = groupDuplicateJobs(activeListings).flatMap((group) => {
+    if (group.jobs.length <= 1) return [];
+
+    const sorted = [...group.jobs].sort((a, b) => {
+      const savedDiff = b._count.savedByStudents - a._count.savedByStudents;
+      if (savedDiff !== 0) return savedDiff;
+      if (a.id === group.primary.id) return -1;
+      if (b.id === group.primary.id) return 1;
+      return b.updatedAt.getTime() - a.updatedAt.getTime();
+    });
+
+    return sorted.slice(1).map((job) => job.id);
+  });
+
+  if (duplicateIds.length === 0) return 0;
+
+  await prisma.jobListing.updateMany({
+    where: { id: { in: duplicateIds } },
+    data: { status: "expired" },
+  });
+
+  return duplicateIds.length;
 }
 
 /**
@@ -262,6 +302,11 @@ export async function runScrapeForConfig(
         },
         data: { status: "expired" },
       });
+
+      const expiredDuplicates = await expireDuplicateActiveListings(configId);
+      if (expiredDuplicates > 0) {
+        logger.info("Expired duplicate active job listings", { configId, expiredDuplicates });
+      }
 
       // Update config timestamp only when at least one source responded.
       await prisma.jobClassConfig.update({

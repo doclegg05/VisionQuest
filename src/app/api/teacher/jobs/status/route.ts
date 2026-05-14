@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withTeacherAuth, badRequest, type Session } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { groupDuplicateJobs } from "@/lib/job-board/duplicates";
 import { buildSourceHealth, serializeScrapeRun } from "@/lib/job-board/scrape-status";
 import { getJobSourceConfigurationStatus } from "@/lib/job-board/source-health";
 
@@ -33,25 +34,28 @@ export const GET = withTeacherAuth(async (session: Session, req: Request) => {
     });
   }
 
-  const [recentRuns, activeJobCount] = await Promise.all([
+  const [recentRuns, activeListings] = await Promise.all([
     prisma.jobScrapeRun.findMany({
       where: { classConfigId: config.id },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: { sourceResults: { orderBy: { source: "asc" } } },
     }),
-    prisma.jobListing.count({
+    prisma.jobListing.findMany({
       where: { classConfigId: config.id, status: "active" },
+      select: { title: true, company: true, location: true, source: true, salaryMin: true, updatedAt: true },
     }),
   ]);
   const latestRun = recentRuns[0] ?? null;
   const sourceConfig = getJobSourceConfigurationStatus(config.sources);
+  const activeJobCount = groupDuplicateJobs(activeListings).length;
 
   return NextResponse.json({
     latestRun: latestRun ? serializeScrapeRun(latestRun) : null,
     recentRuns: recentRuns.map(serializeScrapeRun),
     sourceHealth: buildSourceHealth(sourceConfig, recentRuns),
     activeJobCount,
+    activeListingCount: activeListings.length,
     lastScrapedAt: config.lastScrapedAt?.toISOString() ?? null,
   });
 });

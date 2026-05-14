@@ -7,6 +7,7 @@ import {
   parseTransferableSkillNames,
   rankJobs,
 } from "@/lib/job-board/recommendation";
+import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
 import { parseStoredResumeData } from "@/lib/resume";
 
 /**
@@ -52,13 +53,19 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     where.clusters = { has: clusterFilter };
   }
 
-  const jobs = await prisma.jobListing.findMany({
+  const activeJobs = await prisma.jobListing.findMany({
     where,
     orderBy: sort === "salary"
       ? { salaryMin: "desc" }
       : { createdAt: "desc" },
-    take: 100,
+    take: 500,
   });
+  const jobs = dedupeJobsForDisplay(activeJobs)
+    .sort((a, b) => {
+      if (sort === "salary") return (b.salaryMin ?? -1) - (a.salaryMin ?? -1);
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    })
+    .slice(0, 100);
 
   const [savedJobs, discovery, resumeRecord] = await Promise.all([
     prisma.studentSavedJob.findMany({

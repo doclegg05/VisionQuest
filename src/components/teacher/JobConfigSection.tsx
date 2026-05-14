@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
 import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
 import type { JobScrapeRunStatusResult, JobSourceHealthResult } from "@/lib/job-board/types";
+import { TeacherJobResultsPanel } from "./TeacherJobResultsPanel";
 
 interface ClassOption {
   id: string;
@@ -385,6 +386,14 @@ export function JobConfigSection() {
                 ))}
               </div>
             </div>
+          )}
+
+          {config && (
+            <TeacherJobResultsPanel
+              key={selectedClassId}
+              classId={selectedClassId}
+              refreshKey={statusRefreshKey}
+            />
           )}
 
           {/* Config form */}

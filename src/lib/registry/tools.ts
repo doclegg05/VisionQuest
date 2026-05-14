@@ -1006,6 +1006,17 @@ export const TOOLS: readonly ToolDefinition[] = [
     tags: ["career", "teacher", "jobs"],
   },
   {
+    id: "career.jobs_results",
+    namespace: "career",
+    name: "View Job Listings",
+    description: "Teacher reviews active job listings found for a class",
+    endpoint: { method: "GET", path: "/api/teacher/jobs/results" },
+    requiredRoles: ["teacher", "admin"],
+    auditLevel: "none",
+    enabled: true,
+    tags: ["career", "teacher", "jobs"],
+  },
+  {
     id: "career.pathways_list",
     namespace: "career",
     name: "List Pathways",
