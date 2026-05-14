@@ -11,6 +11,7 @@ interface ListJob {
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
+  skillOverlap?: string[];
   savedStatus: string | null;
   url: string;
 }

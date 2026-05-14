@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { scoreJob, rankJobs } from "./recommendation";
+import {
+  buildStudentJobProfile,
+  parseTransferableSkillNames,
+  scoreJob,
+  rankJobs,
+} from "./recommendation";
 
 describe("scoreJob", () => {
   const baseJob = { id: "job-1", location: "Charleston, WV", clusters: ["office-admin"] };
@@ -10,6 +15,7 @@ describe("scoreJob", () => {
     assert.equal(result.score, 0);
     assert.equal(result.matchLabel, null);
     assert.deepEqual(result.clusterOverlap, []);
+    assert.deepEqual(result.skillOverlap, []);
   });
 
   it("scores location match at 40 points", () => {
@@ -19,6 +25,15 @@ describe("scoreJob", () => {
       "Charleston, WV",
     );
     assert.equal(result.score, 40); // Location match only
+  });
+
+  it("scores remote jobs as location-compatible", () => {
+    const result = scoreJob(
+      { id: "remote-job", location: "Remote", clusters: ["office-admin"] },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    assert.equal(result.score, 40);
   });
 
   it("scores cluster match", () => {
@@ -85,6 +100,50 @@ describe("scoreJob", () => {
     assert.equal(result.score, 20);
     assert.deepEqual(result.clusterOverlap, ["office-admin"]);
   });
+
+  it("scores resume skill matches without career discovery", () => {
+    const profile = buildStudentJobProfile({
+      resumeSkills: ["Customer Service", "Microsoft Excel", "Scheduling"],
+    });
+    const result = scoreJob(
+      {
+        id: "job-7",
+        title: "Remote Customer Support Coordinator",
+        company: "Acme",
+        location: "Remote",
+        description: "Provide customer service, scheduling, and Microsoft Excel tracker updates.",
+        clusters: ["customer-service"],
+      },
+      null,
+      "Charleston, WV",
+      profile,
+    );
+
+    assert.equal(result.score, 60); // Remote/location (40) + 3 skill matches (20)
+    assert.equal(result.matchLabel, "Good match");
+    assert.deepEqual(result.skillOverlap, ["Customer Service", "Microsoft Excel", "Scheduling"]);
+  });
+
+  it("caps combined discovery and skill scores at 100", () => {
+    const profile = buildStudentJobProfile({
+      resumeSkills: ["Data Entry", "Scheduling", "Microsoft Excel"],
+    });
+    const result = scoreJob(
+      {
+        id: "job-8",
+        title: "Office Administrator",
+        location: "Charleston, WV",
+        description: "Data entry, scheduling, and Microsoft Excel reporting.",
+        clusters: ["office-admin"],
+      },
+      { topClusters: ["office-admin"], hollandCode: "CSE" },
+      "Charleston, WV",
+      profile,
+    );
+
+    assert.equal(result.score, 100);
+    assert.equal(result.matchLabel, "Strong match");
+  });
 });
 
 describe("rankJobs", () => {
@@ -116,5 +175,58 @@ describe("rankJobs", () => {
   it("returns empty array for empty jobs", () => {
     const results = rankJobs([], { topClusters: ["office-admin"], hollandCode: "CSE" }, "Charleston, WV");
     assert.equal(results.length, 0);
+  });
+
+  it("uses skill profile matches to rank jobs with the same discovery score", () => {
+    const jobs = [
+      {
+        id: "generic",
+        title: "Office Clerk",
+        location: "Remote",
+        description: "Maintain records and answer phones.",
+        clusters: ["office-admin"],
+      },
+      {
+        id: "skill-match",
+        title: "Office Clerk",
+        location: "Remote",
+        description: "Use Microsoft Excel for scheduling and data entry.",
+        clusters: ["office-admin"],
+      },
+    ];
+
+    const profile = buildStudentJobProfile({
+      resumeSkills: ["Microsoft Excel", "Scheduling", "Data Entry"],
+    });
+    const results = rankJobs(jobs, { topClusters: ["office-admin"], hollandCode: null }, "Charleston, WV", profile);
+
+    assert.equal(results[0].jobListingId, "skill-match");
+    assert.deepEqual(results[0].skillOverlap, ["Microsoft Excel", "Scheduling", "Data Entry"]);
+  });
+});
+
+describe("student job profile helpers", () => {
+  it("dedupes resume and discovery skills", () => {
+    const profile = buildStudentJobProfile({
+      resumeSkills: ["Microsoft Excel", " customer service "],
+      resumeCertifications: ["Microsoft Excel"],
+      discoverySkills: ["Customer Service", "Teamwork"],
+    });
+
+    assert.deepEqual(profile.skills, ["Microsoft Excel", "customer service", "Teamwork"]);
+  });
+
+  it("parses transferable skill names from CareerDiscovery JSON", () => {
+    const result = parseTransferableSkillNames(JSON.stringify([
+      { skill: "Communication", category: "people" },
+      { skill: "Problem Solving", category: "thinking" },
+      { skill: 42 },
+    ]));
+
+    assert.deepEqual(result, ["Communication", "Problem Solving"]);
+  });
+
+  it("returns an empty skill list for malformed transferable skill JSON", () => {
+    assert.deepEqual(parseTransferableSkillNames("{bad json"), []);
   });
 });

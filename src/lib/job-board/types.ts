@@ -35,4 +35,5 @@ export interface JobRecommendation {
   score: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusterOverlap: string[];
+  skillOverlap: string[];
 }

@@ -11,6 +11,7 @@ interface JobCardProps {
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
+  skillOverlap?: string[];
   savedStatus: string | null;
   url: string;
   compact?: boolean;
@@ -45,12 +46,14 @@ export function JobCard({
   salary,
   matchLabel,
   clusters,
+  skillOverlap = [],
   savedStatus,
   url,
   compact = false,
   onSave,
 }: JobCardProps) {
   const primaryCluster = clusters[0];
+  const visibleSkillMatches = skillOverlap.slice(0, 3);
 
   return (
     <div className={`surface-section rounded-xl border border-[var(--border)] ${compact ? "p-3" : "p-4"} relative`}>
@@ -92,6 +95,19 @@ export function JobCard({
         <div className="flex items-center gap-1 mt-2 text-[var(--accent)] font-semibold text-sm">
           <CurrencyDollar size={16} weight="bold" />
           <span>{salary}</span>
+        </div>
+      )}
+
+      {!compact && visibleSkillMatches.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {visibleSkillMatches.map((skill) => (
+            <span
+              key={skill}
+              className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+            >
+              {skill}
+            </span>
+          ))}
         </div>
       )}
 

@@ -57,6 +57,7 @@ interface JobData {
   matchScore: number;
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
+  skillOverlap: string[];
   savedStatus: string | null;
   url: string;
 }
@@ -64,6 +65,8 @@ interface JobData {
 interface JobsResponse {
   jobs: JobData[];
   hasDiscovery: boolean;
+  hasResume?: boolean;
+  hasPersonalization?: boolean;
   totalActive: number;
   totalSaved: number;
 }
@@ -118,6 +121,7 @@ export default function CareerHub({
 
   const matchedCount =
     jobsData?.jobs.filter((job) => job.matchScore >= 50).length ?? 0;
+  const hasPersonalizedMatches = jobsData?.hasPersonalization ?? jobsData?.hasDiscovery ?? false;
 
   return (
     <div className="space-y-10">
@@ -159,15 +163,15 @@ export default function CareerHub({
 
         {!jobsLoading && jobsData && (
           <div className="mt-6 space-y-6">
-            {!jobsData.hasDiscovery && (
+            {!hasPersonalizedMatches && (
               <div className="surface-section rounded-xl border-l-4 border-[var(--warning)] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-[var(--text-primary)]">
-                      Start career discovery to unlock personalized job matches.
+                      Add career discovery or resume skills to unlock personalized job matches.
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                      Sage can ask about your interests, strengths, schedule, and work values, then turn that into better recommendations.
+                      Sage can use your interests, strengths, saved skills, and resume details to improve recommendations.
                     </p>
                   </div>
                   <AskSageLink
@@ -180,7 +184,7 @@ export default function CareerHub({
               </div>
             )}
 
-            {jobsData.hasDiscovery && (
+            {hasPersonalizedMatches && (
               <JobRecommendations jobs={jobsData.jobs} onSave={handleSaveJob} />
             )}
 
