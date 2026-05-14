@@ -73,6 +73,46 @@ describe("scoreJob", () => {
     assert.equal(result.score, 0);
   });
 
+  it("trusts the source adapter mode over location text for local sources", () => {
+    // JSearch passes the configured region + radius to its upstream API, so the
+    // job is guaranteed to be inside the search area even if the location text
+    // is just a ZIP code or a neighborhood that doesn't string-match "Charleston".
+    const result = scoreJob(
+      {
+        id: "jsearch-local",
+        location: "25309",
+        source: "jsearch",
+        clusters: ["office-admin"],
+      },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    assert.equal(result.score, 40);
+    assert.ok(
+      result.matchReasons.some((reason) => reason.label.includes("Local")),
+      "should label match reason as Local for a local-mode source",
+    );
+  });
+
+  it("classifies any job from a remote-mode source as remote regardless of location text", () => {
+    // A Remotive job listed with location "Charleston, WV" is still a remote
+    // role — that text usually reflects the recruiter's office, not where the
+    // student would work.
+    const result = scoreJob(
+      {
+        id: "remotive-misleading",
+        location: "Charleston, WV",
+        source: "remotive",
+        clusters: ["office-admin"],
+      },
+      { topClusters: [], hollandCode: null },
+      "Charleston, WV",
+    );
+    // prefer_local: remote source → 20 points, no other signal
+    assert.equal(result.score, 20);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
+  });
+
   it("scores cluster match", () => {
     const result = scoreJob(
       { id: "job-2", location: "Somewhere else", clusters: ["office-admin"] },
@@ -214,7 +254,8 @@ describe("scoreJob", () => {
       interactionProfile,
     );
 
-    assert.equal(result.score, 12);
+    // prefer_local: remotive source → remote proximity (20) + interaction signal (12) = 32
+    assert.equal(result.score, 32);
     assert.ok(result.matchReasons.some((reason) => reason.type === "preference"));
     assert.ok(result.matchReasons.some((reason) => reason.type === "feedback"));
   });

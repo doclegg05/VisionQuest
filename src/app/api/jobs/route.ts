@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import {
   buildJobInteractionProfile,
   buildStudentJobProfile,
+  classifyJobProximity,
   parseTransferableSkillNames,
   rankJobs,
   type LocalJobPriority,
@@ -12,6 +13,8 @@ import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
 import { isJobWorkMode } from "@/lib/job-board/work-mode";
 import { parseStoredResumeData } from "@/lib/resume";
 
+const VALID_PROXIMITY_FILTERS = new Set(["local", "remote", "all"]);
+
 /**
  * GET /api/jobs
  *
@@ -19,14 +22,20 @@ import { parseStoredResumeData } from "@/lib/resume";
  * with recommendation scores if the student has CareerDiscovery or resume skill data.
  *
  * Query params:
- *   cluster  - filter by cluster ID
- *   workMode - "onsite" | "remote" | "hybrid"
- *   sort     - "recommended" (default) | "recent" | "salary"
+ *   cluster   - filter by cluster ID
+ *   workMode  - "onsite" | "remote" | "hybrid" (legacy filter, kept for back-compat)
+ *   proximity - "local" | "remote" | "all" (default "local"); filters by computed
+ *               proximity to the class region — see classifyJobProximity().
+ *   sort      - "recommended" (default) | "recent" | "salary"
  */
 export const GET = withAuth(async (session: Session, req: Request) => {
   const url = new URL(req.url);
   const clusterFilter = url.searchParams.get("cluster");
   const workModeFilter = url.searchParams.get("workMode");
+  const proximityFilterRaw = url.searchParams.get("proximity") ?? "local";
+  const proximityFilter = VALID_PROXIMITY_FILTERS.has(proximityFilterRaw)
+    ? (proximityFilterRaw as "local" | "remote" | "all")
+    : "local";
   const sort = url.searchParams.get("sort") ?? "recommended";
 
   // Find student's enrolled class
@@ -73,7 +82,25 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       : { createdAt: "desc" },
     take: 500,
   });
-  const jobs = dedupeJobsForDisplay(activeJobs)
+  const dedupedJobs = dedupeJobsForDisplay(activeJobs);
+
+  // Classify proximity for every deduped job so the UI can show accurate counts
+  // on the Local/Remote toggle even when one section is hidden.
+  const jobsWithProximity = dedupedJobs.map((job) => ({
+    job,
+    proximity: classifyJobProximity(job, config.region),
+  }));
+  const totalLocal = jobsWithProximity.filter((item) => item.proximity === "local").length;
+  const totalRemote = jobsWithProximity.filter((item) => item.proximity === "remote").length;
+
+  const filteredByProximity = jobsWithProximity.filter((item) => {
+    if (proximityFilter === "all") return true;
+    if (proximityFilter === "local") return item.proximity === "local";
+    return item.proximity === "remote";
+  });
+
+  const jobs = filteredByProximity
+    .map((item) => item.job)
     .sort((a, b) => {
       if (sort === "salary") return (b.salaryMin ?? -1) - (a.salaryMin ?? -1);
       return b.createdAt.getTime() - a.createdAt.getTime();
@@ -157,6 +184,9 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     hasResume: !!resumeRecord,
     hasPersonalization,
     totalActive: jobs.length,
+    totalLocal,
+    totalRemote,
+    proximity: proximityFilter,
     totalSaved: savedJobs.length,
   });
 });
