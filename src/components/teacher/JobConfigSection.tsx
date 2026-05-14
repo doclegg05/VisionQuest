@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
-import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
+import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS, getJobSourceMode } from "@/lib/job-board/source-options";
 import type { JobScrapeRunStatusResult, JobSourceHealthResult } from "@/lib/job-board/types";
 import { TeacherJobResultsPanel } from "./TeacherJobResultsPanel";
 
@@ -12,6 +12,8 @@ interface ClassOption {
   code: string;
 }
 
+type LocalJobPriority = "prefer_local" | "local_only" | "balanced";
+
 interface JobConfig {
   id: string;
   classId: string;
@@ -19,10 +21,41 @@ interface JobConfig {
   radius: number;
   sources: string[];
   autoRefresh: boolean;
+  localJobPriority: LocalJobPriority;
   lastScrapedAt: string | null;
 }
 
 const RADIUS_OPTIONS = [10, 25, 50];
+const SOURCE_GROUPS = [
+  { mode: "local", label: "Local / physical" },
+  { mode: "remote", label: "Remote" },
+  { mode: "mixed", label: "Mixed" },
+] as const;
+
+const LOCAL_JOB_PRIORITY_OPTIONS: Array<{
+  value: LocalJobPriority;
+  title: string;
+  description: string;
+}> = [
+  {
+    value: "prefer_local",
+    title: "Prefer local (recommended)",
+    description:
+      "Local in-person jobs near the class region rank highest in Best Match. Remote jobs still appear but score lower. Onsite roles outside the region score lowest.",
+  },
+  {
+    value: "local_only",
+    title: "Local only",
+    description:
+      "Hide remote roles from this class's job board entirely. Students see in-region onsite and hybrid jobs only.",
+  },
+  {
+    value: "balanced",
+    title: "Balanced",
+    description:
+      "Treat local in-region jobs and remote jobs equally in Best Match. Use this when remote work is a realistic path for your students.",
+  },
+];
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -53,6 +86,7 @@ export function JobConfigSection() {
   const [radius, setRadius] = useState(25);
   const [sources, setSources] = useState<string[]>([...DEFAULT_JOB_SOURCES]);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [localJobPriority, setLocalJobPriority] = useState<LocalJobPriority>("prefer_local");
   const scrapeInProgress = scrapeRun?.status === "queued" || scrapeRun?.status === "processing";
   const failedSources = scrapeRun?.sourceResults
     .filter((source) => source.status === "failed")
@@ -96,11 +130,13 @@ export function JobConfigSection() {
           setRadius(data.config.radius);
           setSources(data.config.sources);
           setAutoRefresh(data.config.autoRefresh);
+          setLocalJobPriority((data.config.localJobPriority as LocalJobPriority) ?? "prefer_local");
         } else {
           setRegion("");
           setRadius(25);
           setSources([...DEFAULT_JOB_SOURCES]);
           setAutoRefresh(true);
+          setLocalJobPriority("prefer_local");
         }
       } else if (!cancelled) {
         setJobBoardError(await readErrorMessage(res, "Could not load Job Scout configuration."));
@@ -154,6 +190,7 @@ export function JobConfigSection() {
         radius,
         sources,
         autoRefresh,
+        localJobPriority,
       }),
     });
     if (res.ok) {
@@ -428,31 +465,84 @@ export function JobConfigSection() {
               </select>
             </div>
 
+            <fieldset>
+              <legend className="text-sm font-medium text-[var(--text-primary)] mb-2">
+                Local vs remote priority
+              </legend>
+              <p className="mb-3 text-xs text-[var(--text-secondary)]">
+                Controls how the job board ranks (or hides) jobs based on whether they are local to
+                your class region.
+              </p>
+              <div className="grid gap-2">
+                {LOCAL_JOB_PRIORITY_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    htmlFor={`localJobPriority-${opt.value}`}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                      localJobPriority === opt.value
+                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                        : "border-[var(--border)] bg-[var(--surface-elevated)] hover:border-[var(--text-secondary)]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      id={`localJobPriority-${opt.value}`}
+                      name="localJobPriority"
+                      value={opt.value}
+                      checked={localJobPriority === opt.value}
+                      onChange={() => setLocalJobPriority(opt.value)}
+                      className="mt-1"
+                    />
+                    <span className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {opt.title}
+                      </span>
+                      <span className="text-xs text-[var(--text-secondary)]">
+                        {opt.description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <div>
               <label className="text-sm font-medium text-[var(--text-primary)] block mb-2">
                 Job Sources
               </label>
-              <div className="flex flex-wrap gap-2">
-                {JOB_SOURCE_OPTIONS.map((opt) => (
-                  <div key={opt.value} className="flex flex-col gap-1">
-                    <button
-                      onClick={() => toggleSource(opt.value)}
-                      className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
-                        sources.includes(opt.value)
-                          ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
-                          : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                    {sourceHealth.find(
-                      (source) =>
-                        source.source === opt.value &&
-                        sources.includes(opt.value) &&
-                        !source.configured,
-                    ) && (
-                      <span className="px-1 text-xs text-[var(--error)]">Unavailable</span>
-                    )}
+              <div className="grid gap-3 lg:grid-cols-3">
+                {SOURCE_GROUPS.map((group) => (
+                  <div key={group.mode} className="rounded-lg border border-[var(--border)] p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                      {group.label}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {JOB_SOURCE_OPTIONS
+                        .filter((option) => getJobSourceMode(option.value) === group.mode)
+                        .map((opt) => (
+                          <div key={opt.value} className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleSource(opt.value)}
+                              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                                sources.includes(opt.value)
+                                  ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
+                                  : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                            {sourceHealth.find(
+                              (source) =>
+                                source.source === opt.value &&
+                                sources.includes(opt.value) &&
+                                !source.configured,
+                            ) && (
+                              <span className="px-1 text-xs text-[var(--error)]">Unavailable</span>
+                            )}
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 ))}
               </div>

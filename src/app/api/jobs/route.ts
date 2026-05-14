@@ -6,8 +6,10 @@ import {
   buildStudentJobProfile,
   parseTransferableSkillNames,
   rankJobs,
+  type LocalJobPriority,
 } from "@/lib/job-board/recommendation";
 import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
+import { isJobWorkMode } from "@/lib/job-board/work-mode";
 import { parseStoredResumeData } from "@/lib/resume";
 
 /**
@@ -17,12 +19,14 @@ import { parseStoredResumeData } from "@/lib/resume";
  * with recommendation scores if the student has CareerDiscovery or resume skill data.
  *
  * Query params:
- *   cluster - filter by cluster ID
- *   sort    - "recommended" (default) | "recent" | "salary"
+ *   cluster  - filter by cluster ID
+ *   workMode - "onsite" | "remote" | "hybrid"
+ *   sort     - "recommended" (default) | "recent" | "salary"
  */
 export const GET = withAuth(async (session: Session, req: Request) => {
   const url = new URL(req.url);
   const clusterFilter = url.searchParams.get("cluster");
+  const workModeFilter = url.searchParams.get("workMode");
   const sort = url.searchParams.get("sort") ?? "recommended";
 
   // Find student's enrolled class
@@ -44,6 +48,8 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     return NextResponse.json({ jobs: [], recommendations: [], hasDiscovery: false });
   }
 
+  const priority = (config.localJobPriority ?? "prefer_local") as LocalJobPriority;
+
   // Fetch active jobs
   const where: Record<string, unknown> = {
     classConfigId: config.id,
@@ -51,6 +57,13 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   };
   if (clusterFilter) {
     where.clusters = { has: clusterFilter };
+  }
+  if (isJobWorkMode(workModeFilter)) {
+    where.workMode = workModeFilter;
+  } else if (priority === "local_only") {
+    // Teacher has chosen to hide remote roles entirely for this class.
+    // Hybrid is kept because in-region hybrid roles still classify as "local".
+    where.workMode = { not: "remote" };
   }
 
   const activeJobs = await prisma.jobListing.findMany({
@@ -111,7 +124,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   const hasPersonalization = Boolean(discovery) || studentProfile.skills.length > 0 || hasInteractionSignals;
 
   // Score and rank
-  const recommendations = rankJobs(jobs, discovery, config.region, studentProfile, interactionProfile);
+  const recommendations = rankJobs(jobs, discovery, config.region, studentProfile, interactionProfile, priority);
 
   // Build response with saved status merged in
   const jobsWithMeta = jobs.map((job) => {
