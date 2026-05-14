@@ -4,6 +4,7 @@ import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
 import { groupDuplicateJobs } from "./duplicates";
 import { ALL_JOB_SOURCE_ADAPTERS } from "./adapters/registry";
+import { classifyJobProximity } from "./recommendation";
 import { normalizeJobWorkMode } from "./work-mode";
 import type { JobScrapeTrigger, NormalizedJob } from "./types";
 
@@ -241,10 +242,27 @@ export async function runScrapeForConfig(
       });
     }
 
+    // When the class is in "local_only" mode, reject jobs that don't classify
+    // as local to the configured region. This stops mixed-mode sources (e.g.
+    // SmartRecruiters, Greenhouse) from polluting the database with out-of-
+    // region jobs that the teacher has explicitly opted out of.
+    const localOnly = config.localJobPriority === "local_only";
+    const acceptedJobs = localOnly
+      ? quality.jobs.filter((job) => classifyJobProximity(job, config.region) === "local")
+      : quality.jobs;
+    if (localOnly && acceptedJobs.length < quality.jobs.length) {
+      logger.info("Filtered non-local jobs (local_only mode)", {
+        configId,
+        region: config.region,
+        rejected: quality.jobs.length - acceptedJobs.length,
+        accepted: acceptedJobs.length,
+      });
+    }
+
     const upsertedBySource = new Map<string, number>();
 
     // Upsert each job
-    for (const job of quality.jobs) {
+    for (const job of acceptedJobs) {
       const clusters = matchJobToClusters(job);
 
       await prisma.jobListing.upsert({
@@ -314,6 +332,31 @@ export async function runScrapeForConfig(
       const expiredDuplicates = await expireDuplicateActiveListings(configId);
       if (expiredDuplicates > 0) {
         logger.info("Expired duplicate active job listings", { configId, expiredDuplicates });
+      }
+
+      // Expire any active jobs that no longer match local_only policy. This
+      // handles the case where a teacher switches from prefer_local to
+      // local_only with previously-scraped non-local jobs already in the DB —
+      // without this, those Dallas jobs would persist until the 2-week stale
+      // sweep removes them.
+      if (localOnly) {
+        const remainingActive = await prisma.jobListing.findMany({
+          where: { classConfigId: configId, status: "active" },
+          select: { id: true, location: true, workMode: true, source: true },
+        });
+        const nonLocalIds = remainingActive
+          .filter((job) => classifyJobProximity(job, config.region) !== "local")
+          .map((job) => job.id);
+        if (nonLocalIds.length > 0) {
+          await prisma.jobListing.updateMany({
+            where: { id: { in: nonLocalIds } },
+            data: { status: "expired" },
+          });
+          logger.info("Expired non-local active jobs (local_only mode)", {
+            configId,
+            expired: nonLocalIds.length,
+          });
+        }
       }
 
       // Update config timestamp only when at least one source responded.
