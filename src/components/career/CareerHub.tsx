@@ -8,6 +8,7 @@ import { JobFilters } from "@/components/jobs/JobFilters";
 import { JobList } from "@/components/jobs/JobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
 import AskSageLink from "@/components/sage/AskSageLink";
+import type { JobMatchReason } from "@/lib/job-board/types";
 
 interface OpportunityItem {
   id: string;
@@ -58,6 +59,7 @@ interface JobData {
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
   skillOverlap: string[];
+  matchReasons: JobMatchReason[];
   savedStatus: string | null;
   url: string;
 }

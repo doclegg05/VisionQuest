@@ -1195,7 +1195,56 @@ model JobClassConfig {
 
   class       SpokesClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
   jobListings JobListing[]
+  scrapeRuns  JobScrapeRun[]
 
+  @@schema("visionquest")
+}
+
+model JobScrapeRun {
+  id               String    @id @default(cuid())
+  classConfigId    String
+  trigger          String    @default("manual") // manual | auto
+  status           String    @default("queued") // queued | processing | completed | failed
+  requestedById    String?
+  backgroundJobId  String?
+  totalSources     Int       @default(0)
+  completedSources Int       @default(0)
+  failedSources    Int       @default(0)
+  totalFetched     Int       @default(0)
+  totalUpserted    Int       @default(0)
+  error            String?   @db.Text
+  queuedAt         DateTime  @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  classConfig   JobClassConfig          @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
+  sourceResults JobScrapeSourceResult[]
+
+  @@index([classConfigId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([backgroundJobId])
+  @@schema("visionquest")
+}
+
+model JobScrapeSourceResult {
+  id            String    @id @default(cuid())
+  scrapeRunId   String
+  source        String
+  status        String    @default("queued") // queued | processing | completed | failed
+  fetchedCount  Int       @default(0)
+  upsertedCount Int       @default(0)
+  error         String?   @db.Text
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  scrapeRun JobScrapeRun @relation(fields: [scrapeRunId], references: [id], onDelete: Cascade)
+
+  @@unique([scrapeRunId, source])
+  @@index([source, status])
   @@schema("visionquest")
 }
 

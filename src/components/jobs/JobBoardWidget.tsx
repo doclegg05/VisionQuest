@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Briefcase } from "@phosphor-icons/react";
 import { JobCard } from "./JobCard";
 import Link from "next/link";
+import type { JobMatchReason } from "@/lib/job-board/types";
 
 interface WidgetJob {
   id: string;
@@ -15,6 +16,7 @@ interface WidgetJob {
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
   skillOverlap?: string[];
+  matchReasons?: JobMatchReason[];
   savedStatus: string | null;
   url: string;
 }

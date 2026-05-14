@@ -97,6 +97,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       matchLabel: rec?.matchLabel ?? null,
       clusterOverlap: rec?.clusterOverlap ?? [],
       skillOverlap: rec?.skillOverlap ?? [],
+      matchReasons: rec?.matchReasons ?? [],
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
       expiresAt: job.expiresAt?.toISOString() ?? null,

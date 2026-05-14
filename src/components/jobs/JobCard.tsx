@@ -1,6 +1,7 @@
 "use client";
 
 import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
+import type { JobMatchReason } from "@/lib/job-board/types";
 
 interface JobCardProps {
   id: string;
@@ -12,6 +13,7 @@ interface JobCardProps {
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
   skillOverlap?: string[];
+  matchReasons?: JobMatchReason[];
   savedStatus: string | null;
   url: string;
   compact?: boolean;
@@ -46,14 +48,14 @@ export function JobCard({
   salary,
   matchLabel,
   clusters,
-  skillOverlap = [],
+  matchReasons = [],
   savedStatus,
   url,
   compact = false,
   onSave,
 }: JobCardProps) {
   const primaryCluster = clusters[0];
-  const visibleSkillMatches = skillOverlap.slice(0, 3);
+  const visibleReasons = matchReasons.slice(0, 3);
 
   return (
     <div className={`surface-section rounded-xl border border-[var(--border)] ${compact ? "p-3" : "p-4"} relative`}>
@@ -98,14 +100,14 @@ export function JobCard({
         </div>
       )}
 
-      {!compact && visibleSkillMatches.length > 0 && (
+      {!compact && visibleReasons.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
-          {visibleSkillMatches.map((skill) => (
+          {visibleReasons.map((reason) => (
             <span
-              key={skill}
+              key={`${reason.type}:${reason.value ?? reason.label}`}
               className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
             >
-              {skill}
+              {reason.label}
             </span>
           ))}
         </div>

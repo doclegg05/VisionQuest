@@ -1,6 +1,7 @@
 "use client";
 
 import { JobCard } from "./JobCard";
+import type { JobMatchReason } from "@/lib/job-board/types";
 
 interface ListJob {
   id: string;
@@ -12,6 +13,7 @@ interface ListJob {
   matchLabel: "Strong match" | "Good match" | null;
   clusters: string[];
   skillOverlap?: string[];
+  matchReasons?: JobMatchReason[];
   savedStatus: string | null;
   url: string;
 }

@@ -16,6 +16,7 @@ describe("scoreJob", () => {
     assert.equal(result.matchLabel, null);
     assert.deepEqual(result.clusterOverlap, []);
     assert.deepEqual(result.skillOverlap, []);
+    assert.deepEqual(result.matchReasons, []);
   });
 
   it("scores location match at 40 points", () => {
@@ -56,6 +57,8 @@ describe("scoreJob", () => {
     // Location (40) + Cluster (40) = 80
     assert.equal(result.score, 80);
     assert.equal(result.matchLabel, "Strong match");
+    assert.ok(result.matchReasons.some((reason) => reason.type === "location"));
+    assert.ok(result.matchReasons.some((reason) => reason.type === "cluster"));
   });
 
   it("scores RIASEC alignment", () => {
@@ -66,6 +69,7 @@ describe("scoreJob", () => {
     );
     // No location, no cluster match, but RIASEC: office-admin → CSE, student CSE → 3/3 match = 20
     assert.equal(result.score, 20);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "riasec"));
   });
 
   it("returns 'Good match' for score 50-74", () => {
@@ -122,6 +126,8 @@ describe("scoreJob", () => {
     assert.equal(result.score, 60); // Remote/location (40) + 3 skill matches (20)
     assert.equal(result.matchLabel, "Good match");
     assert.deepEqual(result.skillOverlap, ["Customer Service", "Microsoft Excel", "Scheduling"]);
+    assert.ok(result.matchReasons.some((reason) => reason.type === "remote"));
+    assert.ok(result.matchReasons.some((reason) => reason.label.includes("Microsoft Excel")));
   });
 
   it("caps combined discovery and skill scores at 100", () => {

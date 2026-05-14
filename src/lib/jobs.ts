@@ -48,7 +48,7 @@ export async function enqueueJob({ type, payload, dedupeKey }: EnqueueOptions): 
     data: {
       type,
       payload: JSON.stringify(payload),
-      dedupeKey: null,
+      dedupeKey: dedupeKey ?? null,
       status: "pending",
       attempts: 0,
     },

@@ -1,5 +1,5 @@
 import type { CareerDiscovery, JobListing } from "@prisma/client";
-import type { JobRecommendation } from "./types";
+import type { JobMatchReason, JobRecommendation } from "./types";
 
 /**
  * Scores a job listing against a student's CareerDiscovery and resume skill profile.
@@ -67,6 +67,16 @@ const CLUSTER_RIASEC: Record<string, string> = {
   "language-esl": "SAC",
 };
 
+const CLUSTER_LABELS: Record<string, string> = {
+  "office-admin": "Office & Admin",
+  "finance-bookkeeping": "Finance",
+  "tech-digital": "Technology",
+  "creative-design": "Creative",
+  "customer-service": "Customer Service",
+  "career-readiness": "Workforce Ready",
+  "language-esl": "ESL",
+};
+
 function inferJobHollandCode(clusters: string[]): string {
   if (clusters.length === 0) return "";
   return CLUSTER_RIASEC[clusters[0]] ?? "";
@@ -79,6 +89,19 @@ function scoreLocation(jobLocation: string, classRegion: string): number {
   // Simple: check if job location contains the class region city/state
   const regionLower = classRegion.toLowerCase().split(",")[0].trim();
   return jobLocation.toLowerCase().includes(regionLower) ? WEIGHT_LOCATION : 0;
+}
+
+function locationReason(jobLocation: string, classRegion: string): JobMatchReason | null {
+  if (!jobLocation) return null;
+  if (jobLocation.toLowerCase().includes("remote")) {
+    return { type: "remote", label: "Remote role", value: jobLocation };
+  }
+  if (!classRegion) return null;
+
+  const regionLower = classRegion.toLowerCase().split(",")[0].trim();
+  if (!jobLocation.toLowerCase().includes(regionLower)) return null;
+
+  return { type: "location", label: `Near ${classRegion}`, value: jobLocation };
 }
 
 function scoreCluster(jobClusters: string[], studentTopClusters: string[]): number {
@@ -217,6 +240,56 @@ function scoreSkills(skillOverlap: string[]): number {
   return WEIGHT_SKILLS;
 }
 
+function buildMatchReasons(input: {
+  job: ScoredJob;
+  discovery: Pick<CareerDiscovery, "topClusters" | "hollandCode"> | null;
+  classRegion: string;
+  clusterOverlap: string[];
+  skillOverlap: string[];
+  riasecScore: number;
+}): JobMatchReason[] {
+  const reasons: JobMatchReason[] = [];
+  const location = locationReason(input.job.location, input.classRegion);
+  if (location) reasons.push(location);
+
+  for (const cluster of input.clusterOverlap.slice(0, 3)) {
+    reasons.push({
+      type: "cluster",
+      label: `Matches your career cluster: ${CLUSTER_LABELS[cluster] ?? cluster}`,
+      value: cluster,
+    });
+  }
+
+  if (input.riasecScore > 0 && input.discovery?.hollandCode) {
+    reasons.push({
+      type: "riasec",
+      label: `Aligns with your Holland code: ${input.discovery.hollandCode}`,
+      value: input.discovery.hollandCode,
+    });
+  }
+
+  for (const skill of input.skillOverlap.slice(0, 3)) {
+    reasons.push({
+      type: "skill",
+      label: `Matches your profile skill: ${skill}`,
+      value: skill,
+    });
+  }
+
+  return reasons.slice(0, 6);
+}
+
+function emptyRecommendation(jobId: string): JobRecommendation {
+  return {
+    jobListingId: jobId,
+    score: 0,
+    matchLabel: null,
+    clusterOverlap: [],
+    skillOverlap: [],
+    matchReasons: [],
+  };
+}
+
 export function scoreJob(
   job: ScoredJob,
   discovery: Pick<CareerDiscovery, "topClusters" | "hollandCode"> | null,
@@ -225,7 +298,7 @@ export function scoreJob(
 ): JobRecommendation {
   const hasPersonalization = Boolean(discovery) || profile.skills.length > 0;
   if (!hasPersonalization) {
-    return { jobListingId: job.id, score: 0, matchLabel: null, clusterOverlap: [], skillOverlap: [] };
+    return emptyRecommendation(job.id);
   }
 
   const locationScore = scoreLocation(job.location, classRegion);
@@ -239,6 +312,14 @@ export function scoreJob(
   const clusterOverlap = discovery
     ? job.clusters.filter((c) => discovery.topClusters.includes(c))
     : [];
+  const matchReasons = buildMatchReasons({
+    job,
+    discovery,
+    classRegion,
+    clusterOverlap,
+    skillOverlap,
+    riasecScore,
+  });
 
   return {
     jobListingId: job.id,
@@ -246,6 +327,7 @@ export function scoreJob(
     matchLabel: getMatchLabel(totalScore),
     clusterOverlap,
     skillOverlap,
+    matchReasons,
   };
 }
 
