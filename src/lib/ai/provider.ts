@@ -83,13 +83,21 @@ export async function getProvider(studentId: string): Promise<AIProvider> {
 
 /**
  * Resolve a provider for a specific task. Student-record and staff-entered
- * prompts are local-only so FERPA-sensitive data never falls back to Gemini.
+ * prompts are FERPA-sensitive and route to a local model when one is
+ * configured (`ai_provider = "local"`). During alpha/pre-hardware testing
+ * the operator can flip `ai_provider = "cloud"` to honor the configured
+ * cloud provider for these prompts too — every request is still recorded
+ * in the AI audit log so the data path remains auditable.
  */
 export async function resolveAiProvider(
   request: AIProviderRequest,
 ): Promise<AIProvider> {
   if (isLocalOnlySensitivity(request.sensitivity)) {
-    return getLocalProvider();
+    const providerType = await getConfiguredProviderType();
+    if (providerType === "local") {
+      return getLocalProvider();
+    }
+    return getCloudProvider(request.studentId);
   }
 
   if (request.preferCloud && request.sensitivity === "public_program") {

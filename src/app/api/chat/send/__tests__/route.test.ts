@@ -29,6 +29,7 @@ const mockResolveAiProvider = mock.fn() as any;
 const mockGetPromptTier = mock.fn() as any;
 const mockGetProviderClass = mock.fn() as any;
 const mockLogAiAuditEvent = mock.fn() as any;
+const mockPolicyDecisionForProvider = mock.fn() as any;
 const mockLogger = {
   error: mock.fn() as any,
   warn: mock.fn() as any,
@@ -135,6 +136,7 @@ mock.module("@/lib/ai/audit", {
   namedExports: {
     getProviderClass: mockGetProviderClass,
     logAiAuditEvent: mockLogAiAuditEvent,
+    policyDecisionForProvider: mockPolicyDecisionForProvider,
   },
 });
 
@@ -311,6 +313,7 @@ function resetMocks() {
     mockGetPromptTier,
     mockGetProviderClass,
     mockLogAiAuditEvent,
+    mockPolicyDecisionForProvider,
     mockBuildSystemPrompt,
     mockGetDocumentContext,
     mockGetDirectFormAnswer,
@@ -350,6 +353,9 @@ function resetMocks() {
   mockGetPromptTier.mock.mockImplementation(() => "compact");
   mockGetProviderClass.mock.mockImplementation(() => "local");
   mockLogAiAuditEvent.mock.mockImplementation(async () => undefined);
+  mockPolicyDecisionForProvider.mock.mockImplementation((name?: string | null) =>
+    name === "ollama" ? "local_only" : "configured_provider",
+  );
   mockBuildSystemPrompt.mock.mockImplementation(() => "SYSTEM PROMPT");
   mockCheckTokenQuota.mock.mockImplementation(async () => ({ allowed: true, warning: null }));
   mockRateLimit.mock.mockImplementation(async () => ({ success: true, remaining: 100, resetTime: Date.now() + 3600_000 }));

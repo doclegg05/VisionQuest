@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { resolveAiProvider } from "@/lib/ai";
-import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
+import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { GOAL_PLANNING_STATUSES, isGoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { proposeGoal } from "@/lib/sage/propose-goal";
@@ -66,6 +66,8 @@ export async function handlePostResponse({
     sensitivity: "student_record",
   });
   const providerClass = getProviderClass(provider.name);
+  const postResponsePolicyDecision = policyDecisionForProvider(provider.name);
+  const postResponseAllowCloud = providerClass === "cloud";
   const proposalSourceMessageId = sourceMessageId ?? conversationId;
   if (!sourceMessageId) {
     logger.warn("Post-response handler missing sourceMessageId; falling back to conversationId for proposal traceability.", {
@@ -79,14 +81,17 @@ export async function handlePostResponse({
     route: "background:chat/post-response",
     task: "sage_post_response",
     sensitivity: "student_record",
-    policyDecision: "local_only",
+    policyDecision: postResponsePolicyDecision,
     status: "routed",
     targetId: conversationId,
     providerName: provider.name,
     providerClass,
-    allowCloud: false,
+    allowCloud: postResponseAllowCloud,
     inputChars: userMessage.length + fullResponse.length,
-    reason: "Post-response extraction uses student conversation content and is local-only by policy.",
+    reason:
+      postResponsePolicyDecision === "local_only"
+        ? "Post-response extraction uses student conversation content and is local-only by policy."
+        : "Operator configured cloud AI; post-response extraction routed to the configured provider.",
   });
 
   // Fire-and-forget classroom-confirmation extractor. Only runs until the
@@ -191,12 +196,12 @@ export async function handlePostResponse({
       route: "background:chat/post-response",
       task: "sage_post_response",
       sensitivity: "student_record",
-      policyDecision: "local_only",
+      policyDecision: postResponsePolicyDecision,
       status: "completed",
       targetId: conversationId,
       providerName: provider.name,
       providerClass,
-      allowCloud: false,
+      allowCloud: postResponseAllowCloud,
       inputChars: userMessage.length + fullResponse.length,
     });
     return;
@@ -319,12 +324,12 @@ export async function handlePostResponse({
     route: "background:chat/post-response",
     task: "sage_post_response",
     sensitivity: "student_record",
-    policyDecision: "local_only",
+    policyDecision: postResponsePolicyDecision,
     status: "completed",
     targetId: conversationId,
     providerName: provider.name,
     providerClass,
-    allowCloud: false,
+    allowCloud: postResponseAllowCloud,
     inputChars: userMessage.length + fullResponse.length,
   });
 }

@@ -53,6 +53,18 @@ export function getProviderClass(providerName?: string | null): "local" | "cloud
   return "unknown";
 }
 
+/**
+ * Derive the audit-log policy label from the resolved provider.
+ * Local provider → FERPA local-only enforcement actually applied.
+ * Cloud provider → operator opted into the configured cloud provider
+ * (typically Gemini during alpha/pre-hardware testing).
+ */
+export function policyDecisionForProvider(
+  providerName?: string | null,
+): AiPolicyDecision {
+  return providerName === "ollama" ? "local_only" : "configured_provider";
+}
+
 export async function logAiAuditEvent(input: AiAuditEventInput): Promise<void> {
   try {
     await logAuditEvent({

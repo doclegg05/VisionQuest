@@ -4,7 +4,7 @@ import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
-import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
+import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { logger } from "@/lib/logger";
 import {
   parseStoredResumeData,
@@ -53,20 +53,25 @@ export const POST = withAuth(async (session, req: Request) => {
     );
   }
   const providerClass = getProviderClass(provider.name);
+  const assistPolicyDecision = policyDecisionForProvider(provider.name);
+  const assistAllowCloud = providerClass === "cloud";
   await logAiAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     route: "/api/resume/assist",
     task: "resume_assist",
     sensitivity: "student_record",
-    policyDecision: "local_only",
+    policyDecision: assistPolicyDecision,
     status: "routed",
     targetId: session.id,
     providerName: provider.name,
     providerClass,
-    allowCloud: false,
+    allowCloud: assistAllowCloud,
     inputChars: body.prompt.length,
-    reason: "Resume drafting uses student records and is local-only by policy.",
+    reason:
+      assistPolicyDecision === "local_only"
+        ? "Resume drafting uses student records and is local-only by policy."
+        : "Operator configured cloud AI; resume drafting routed to the configured provider.",
   });
 
   const [student, goals, portfolioItems, certifications, storedResume] = await Promise.all([
@@ -134,12 +139,12 @@ export const POST = withAuth(async (session, req: Request) => {
       route: "/api/resume/assist",
       task: "resume_assist",
       sensitivity: "student_record",
-      policyDecision: "local_only",
+      policyDecision: assistPolicyDecision,
       status: "completed",
       targetId: session.id,
       providerName: provider.name,
       providerClass,
-      allowCloud: false,
+      allowCloud: assistAllowCloud,
       inputChars: body.prompt.length,
       outputChars: JSON.stringify(result).length,
     });
@@ -156,12 +161,12 @@ export const POST = withAuth(async (session, req: Request) => {
       route: "/api/resume/assist",
       task: "resume_assist",
       sensitivity: "student_record",
-      policyDecision: "local_only",
+      policyDecision: assistPolicyDecision,
       status: "failed",
       targetId: session.id,
       providerName: provider.name,
       providerClass,
-      allowCloud: false,
+      allowCloud: assistAllowCloud,
       inputChars: body.prompt.length,
       reason: error instanceof Error ? error.message : String(error),
       errorCode: "RESUME_ASSIST_FAILED",

@@ -201,6 +201,14 @@ export class OllamaProvider implements AIProvider {
   private static readonly STRUCTURED_MAX_OUTPUT_TOKENS = 512;
 
   /**
+   * How long Ollama should keep the model resident in VRAM after a request.
+   * Set to 8h to cover the SPOKES workday (7:30 AM – 3:30 PM) so the model
+   * stays warm between messages instead of unloading after each idle gap.
+   * Pair with the "Sage Model Warmup" scheduled task to pre-load on login.
+   */
+  private static readonly KEEP_ALIVE = "8h";
+
+  /**
    * Default KV-cache window size when no SystemConfig override is set.
    * Bumped from 4096 to 8192 to give multi-turn agent transcripts (text +
    * tool_calls + tool results across hops) more headroom before clipping.
@@ -350,7 +358,7 @@ export class OllamaProvider implements AIProvider {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         },
-        keep_alive: "10m",
+        keep_alive: OllamaProvider.KEEP_ALIVE,
       },
     );
 
@@ -388,7 +396,7 @@ export class OllamaProvider implements AIProvider {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         },
-        keep_alive: "10m",
+        keep_alive: OllamaProvider.KEEP_ALIVE,
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
     );
@@ -836,7 +844,7 @@ export class OllamaProvider implements AIProvider {
         num_ctx: this.numCtx,
         num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
       },
-      keep_alive: "10m",
+      keep_alive: OllamaProvider.KEEP_ALIVE,
     };
 
     const { mode, response } = await this.postChat(
@@ -982,7 +990,7 @@ export class OllamaProvider implements AIProvider {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
         },
-        keep_alive: "10m",
+        keep_alive: OllamaProvider.KEEP_ALIVE,
       },
     );
 
