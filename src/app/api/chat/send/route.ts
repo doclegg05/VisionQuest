@@ -1,5 +1,5 @@
 import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
-import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
+import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
@@ -223,21 +223,26 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   }
   const promptTier = getPromptTier(provider);
   const providerClass = getProviderClass(provider.name);
+  const chatPolicyDecision = policyDecisionForProvider(provider.name);
+  const allowCloud = providerClass === "cloud";
   await logAiAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     route: "/api/chat/send",
     task: chatTask,
     sensitivity: chatSensitivity,
-    policyDecision: "local_only",
+    policyDecision: chatPolicyDecision,
     status: "routed",
     targetId: conversationId,
     providerName: provider.name,
     providerClass,
     promptTier,
-    allowCloud: false,
+    allowCloud,
     inputChars: userMessage.length,
-    reason: "Student-record and staff-entered Sage chat are local-only by policy.",
+    reason:
+      chatPolicyDecision === "local_only"
+        ? "Student-record and staff-entered Sage chat are local-only by policy."
+        : "Operator configured cloud AI; chat routed to the configured provider.",
   });
 
   // Cost/token quota and the per-role daily cap only apply to cloud providers
@@ -663,13 +668,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           route: "/api/chat/send",
           task: chatTask,
           sensitivity: chatSensitivity,
-          policyDecision: "local_only",
+          policyDecision: chatPolicyDecision,
           status: "completed",
           targetId: conversation.id,
           providerName: provider.name,
           providerClass,
           promptTier,
-          allowCloud: false,
+          allowCloud,
           inputChars: userMessage.length,
           outputChars: persisted.length,
           metadata: {
@@ -732,13 +737,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           route: "/api/chat/send",
           task: chatTask,
           sensitivity: chatSensitivity,
-          policyDecision: "local_only",
+          policyDecision: chatPolicyDecision,
           status: "failed",
           targetId: conversation.id,
           providerName: provider.name,
           providerClass,
           promptTier,
-          allowCloud: false,
+          allowCloud,
           inputChars: userMessage.length,
           outputChars: fullResponse.length,
           reason: msg,

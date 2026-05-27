@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth, badRequest } from "@/lib/api-error";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
-import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
+import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { extractTextFromFile, extractResumeFromText } from "@/lib/resume-extract";
 import { logger } from "@/lib/logger";
 
@@ -70,20 +70,25 @@ export const POST = withAuth(async (session, req: Request) => {
     );
   }
   const providerClass = getProviderClass(provider.name);
+  const resumePolicyDecision = policyDecisionForProvider(provider.name);
+  const resumeAllowCloud = providerClass === "cloud";
   await logAiAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     route: "/api/resume/upload",
     task: "resume_extract",
     sensitivity: "student_record",
-    policyDecision: "local_only",
+    policyDecision: resumePolicyDecision,
     status: "routed",
     targetId: session.id,
     providerName: provider.name,
     providerClass,
-    allowCloud: false,
+    allowCloud: resumeAllowCloud,
     inputChars: file.size,
-    reason: "Resume parsing uses uploaded student documents and is local-only by policy.",
+    reason:
+      resumePolicyDecision === "local_only"
+        ? "Resume parsing uses uploaded student documents and is local-only by policy."
+        : "Operator configured cloud AI; resume parsing routed to the configured provider.",
     metadata: {
       fileType: file.type,
     },
@@ -113,12 +118,12 @@ export const POST = withAuth(async (session, req: Request) => {
       route: "/api/resume/upload",
       task: "resume_extract",
       sensitivity: "student_record",
-      policyDecision: "local_only",
+      policyDecision: resumePolicyDecision,
       status: "completed",
       targetId: session.id,
       providerName: provider.name,
       providerClass,
-      allowCloud: false,
+      allowCloud: resumeAllowCloud,
       inputChars: rawText.length,
       outputChars: JSON.stringify(result).length,
       metadata: {
@@ -134,12 +139,12 @@ export const POST = withAuth(async (session, req: Request) => {
       route: "/api/resume/upload",
       task: "resume_extract",
       sensitivity: "student_record",
-      policyDecision: "local_only",
+      policyDecision: resumePolicyDecision,
       status: "failed",
       targetId: session.id,
       providerName: provider.name,
       providerClass,
-      allowCloud: false,
+      allowCloud: resumeAllowCloud,
       inputChars: rawText.length,
       reason: err instanceof Error ? err.message : String(err),
       errorCode: "RESUME_EXTRACT_FAILED",

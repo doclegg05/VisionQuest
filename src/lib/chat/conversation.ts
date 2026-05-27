@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { resolveAiProvider } from "@/lib/ai";
-import { getProviderClass, logAiAuditEvent } from "@/lib/ai/audit";
+import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
@@ -257,20 +257,25 @@ export async function maybeUpdateSummary(
     sensitivity: "student_record",
   });
   const providerClass = getProviderClass(provider.name);
+  const summaryPolicyDecision = policyDecisionForProvider(provider.name);
+  const summaryAllowCloud = providerClass === "cloud";
   await logAiAuditEvent({
     actorId: studentId,
     actorRole: "student",
     route: "background:chat/summary",
     task: "conversation_summary",
     sensitivity: "student_record",
-    policyDecision: "local_only",
+    policyDecision: summaryPolicyDecision,
     status: "routed",
     targetId: conversationId,
     providerName: provider.name,
     providerClass,
-    allowCloud: false,
+    allowCloud: summaryAllowCloud,
     inputChars: summaryPrompt.length,
-    reason: "Conversation summaries use student conversation content and are local-only by policy.",
+    reason:
+      summaryPolicyDecision === "local_only"
+        ? "Conversation summaries use student conversation content and are local-only by policy."
+        : "Operator configured cloud AI; conversation summary routed to the configured provider.",
   });
   const updatedSummary = await provider.generateResponse(
     COMPACTION_SYSTEM_PROMPT,
@@ -282,12 +287,12 @@ export async function maybeUpdateSummary(
     route: "background:chat/summary",
     task: "conversation_summary",
     sensitivity: "student_record",
-    policyDecision: "local_only",
+    policyDecision: summaryPolicyDecision,
     status: "completed",
     targetId: conversationId,
     providerName: provider.name,
     providerClass,
-    allowCloud: false,
+    allowCloud: summaryAllowCloud,
     inputChars: summaryPrompt.length,
     outputChars: updatedSummary.length,
   });

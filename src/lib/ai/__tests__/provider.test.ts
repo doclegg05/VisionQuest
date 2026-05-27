@@ -120,9 +120,9 @@ describe("getProvider", () => {
     );
   });
 
-  it("forces student-record tasks to local even when the global provider is cloud", async () => {
+  it("routes student-record tasks to local when ai_provider is 'local'", async () => {
     mockGetPlain.mock.mockImplementation(async (key: string) => {
-      if (key === "ai_provider") return "cloud";
+      if (key === "ai_provider") return "local";
       if (key === "ai_provider_url") return "https://llm.example.com";
       if (key === "ai_provider_model") return "gemma4:26b";
       return null;
@@ -139,6 +139,28 @@ describe("getProvider", () => {
     assert.equal(mockResolveKey.mock.callCount(), 0);
   });
 
+  it("routes student-record tasks to the configured cloud provider when ai_provider is 'cloud'", async () => {
+    // Alpha/pre-hardware operating mode: when the operator has explicitly
+    // set ai_provider='cloud', honor that even for FERPA-sensitive prompts.
+    // Once local hardware is provisioned, flipping ai_provider='local'
+    // re-enforces FERPA-local routing.
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "cloud";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+    mockResolveKey.mock.mockImplementationOnce(async () => "test-gemini-key");
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "sage_student_chat",
+      sensitivity: "student_record",
+    });
+
+    assert.ok(provider instanceof GeminiProvider);
+    assert.equal(provider.name, "gemini");
+  });
+
   it("uses Cloudflare Access credentials from environment when encrypted config is absent", async () => {
     const previousId = process.env.CF_ACCESS_CLIENT_ID;
     const previousSecret = process.env.CF_ACCESS_CLIENT_SECRET;
@@ -147,7 +169,7 @@ describe("getProvider", () => {
 
     try {
       mockGetPlain.mock.mockImplementation(async (key: string) => {
-        if (key === "ai_provider") return "cloud";
+        if (key === "ai_provider") return "local";
         if (key === "ai_provider_url") return "https://llm.example.com";
         if (key === "ai_provider_model") return "gemma4:26b";
         if (key === "ai_provider_auth_mode") return "cloudflare_service_token";

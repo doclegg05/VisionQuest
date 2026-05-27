@@ -50,11 +50,17 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
-  // Load active conversation on first open
+  // Load active conversation + warm the local model on first open. Warmup is
+  // fire-and-forget — pre-loads gemma4 into VRAM so the user's first prompt
+  // doesn't pay the 20–45s cold-start hit that produces "no response" errors.
   const loadedRef = useRef(false);
   useEffect(() => {
     if (!open || loadedRef.current) return;
     loadedRef.current = true;
+
+    void apiFetch("/api/chat/warmup").catch(() => {
+      // Warmup is best-effort; rate-limit 429s and tunnel hiccups are fine.
+    });
 
     async function loadActive() {
       try {
@@ -129,16 +135,18 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
             const chunk = decoder.decode(value);
             for (const line of chunk.split("\n")) {
               if (!line.startsWith("data: ")) continue;
+              let data: { conversationId?: string; error?: string; text?: string } | null = null;
               try {
-                const data = JSON.parse(line.slice(6));
-                if (data.conversationId) setConversationId(data.conversationId);
-                if (data.error) throw new Error(data.error);
-                if (data.text) {
-                  fullContent += data.text;
-                  setStreamingContent(fullContent);
-                }
+                data = JSON.parse(line.slice(6));
               } catch {
-                // Skip malformed chunks.
+                continue;
+              }
+              if (!data) continue;
+              if (data.conversationId) setConversationId(data.conversationId);
+              if (data.error) throw new Error(data.error);
+              if (data.text) {
+                fullContent += data.text;
+                setStreamingContent(fullContent);
               }
             }
           }
