@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loginSchema, createStudentSchema, chatSendSchema, apiKeySchema } from "./schemas";
+import {
+  loginSchema,
+  createStudentSchema,
+  chatSendSchema,
+  apiKeySchema,
+  parseBody,
+  opportunityApplicationSchema,
+  bookAppointmentSchema,
+  shareCredentialSchema,
+  deleteFileSchema,
+} from "./schemas";
 
 // ---------------------------------------------------------------------------
 // loginSchema
@@ -129,4 +139,114 @@ test("apiKeySchema accepts valid key", () => {
 test("apiKeySchema rejects empty key", () => {
   const result = apiKeySchema.safeParse({ apiKey: "" });
   assert.ok(!result.success);
+});
+
+// ---------------------------------------------------------------------------
+// opportunityApplicationSchema
+// ---------------------------------------------------------------------------
+
+test("opportunityApplicationSchema applies defaults for a minimal body", () => {
+  const result = opportunityApplicationSchema.safeParse({ opportunityId: "opp1" });
+  assert.ok(result.success);
+  assert.equal(result.data.status, "saved");
+  assert.equal(result.data.notes, "");
+  assert.equal(result.data.resumeFileId, "");
+});
+
+test("opportunityApplicationSchema trims notes and keeps a valid status", () => {
+  const result = opportunityApplicationSchema.safeParse({
+    opportunityId: "opp1",
+    status: "applied",
+    notes: "  follow up  ",
+  });
+  assert.ok(result.success);
+  assert.equal(result.data.status, "applied");
+  assert.equal(result.data.notes, "follow up");
+});
+
+test("opportunityApplicationSchema rejects a missing opportunityId", () => {
+  const result = opportunityApplicationSchema.safeParse({});
+  assert.ok(!result.success);
+  assert.ok(result.error.issues.some((i) => i.path[0] === "opportunityId"));
+});
+
+test("opportunityApplicationSchema rejects an invalid status", () => {
+  const result = opportunityApplicationSchema.safeParse({ opportunityId: "opp1", status: "bogus" });
+  assert.ok(!result.success);
+  assert.ok(result.error.issues[0].message.includes("invalid"));
+});
+
+// ---------------------------------------------------------------------------
+// bookAppointmentSchema
+// ---------------------------------------------------------------------------
+
+test("bookAppointmentSchema accepts a minimal booking and defaults optionals", () => {
+  const result = bookAppointmentSchema.safeParse({ advisorId: "adv1", startsAt: "2026-06-01T15:00:00Z" });
+  assert.ok(result.success);
+  assert.equal(result.data.title, "");
+  assert.equal(result.data.description, "");
+});
+
+test("bookAppointmentSchema rejects a missing time slot", () => {
+  const result = bookAppointmentSchema.safeParse({ advisorId: "adv1" });
+  assert.ok(!result.success);
+  assert.ok(result.error.issues.some((i) => i.path[0] === "startsAt"));
+});
+
+// ---------------------------------------------------------------------------
+// shareCredentialSchema
+// ---------------------------------------------------------------------------
+
+test("shareCredentialSchema defaults isPublic to false", () => {
+  const result = shareCredentialSchema.safeParse({});
+  assert.ok(result.success);
+  assert.equal(result.data.isPublic, false);
+  assert.equal(result.data.headline, "");
+});
+
+test("shareCredentialSchema rejects a non-boolean isPublic", () => {
+  const result = shareCredentialSchema.safeParse({ isPublic: "yes" });
+  assert.ok(!result.success);
+});
+
+// ---------------------------------------------------------------------------
+// deleteFileSchema
+// ---------------------------------------------------------------------------
+
+test("deleteFileSchema requires a non-empty id", () => {
+  assert.ok(deleteFileSchema.safeParse({ id: "file1" }).success);
+  assert.ok(!deleteFileSchema.safeParse({ id: "" }).success);
+  assert.ok(!deleteFileSchema.safeParse({}).success);
+});
+
+// ---------------------------------------------------------------------------
+// parseBody (shared helper)
+// ---------------------------------------------------------------------------
+
+function jsonRequest(body: string): Request {
+  return new Request("http://localhost/api/test", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
+}
+
+test("parseBody returns validated, defaulted data for a valid body", async () => {
+  const data = await parseBody(jsonRequest(JSON.stringify({ opportunityId: "opp1" })), opportunityApplicationSchema);
+  assert.equal(data.opportunityId, "opp1");
+  assert.equal(data.status, "saved");
+});
+
+test("parseBody throws badRequest (400) on malformed JSON", async () => {
+  await assert.rejects(
+    () => parseBody(jsonRequest("{ not json"), deleteFileSchema),
+    (err: unknown) => (err as { statusCode?: number }).statusCode === 400,
+  );
+});
+
+test("parseBody throws badRequest (400) when the body fails validation", async () => {
+  await assert.rejects(
+    () => parseBody(jsonRequest(JSON.stringify({})), deleteFileSchema),
+    (err: unknown) => (err as { statusCode?: number }).statusCode === 400,
+  );
 });

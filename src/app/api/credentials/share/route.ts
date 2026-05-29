@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
+import { parseBody, shareCredentialSchema } from "@/lib/schemas";
 
 function slugify(value: string) {
   return value
@@ -57,10 +58,7 @@ export const GET = withAuth(async (session, req: Request) => {
 });
 
 export const POST = withAuth(async (session, req: Request) => {
-  const body = await req.json();
-  const isPublic = Boolean(body.isPublic);
-  const headline = typeof body.headline === "string" ? body.headline.trim() : "";
-  const summary = typeof body.summary === "string" ? body.summary.trim() : "";
+  const { isPublic, headline, summary } = await parseBody(req, shareCredentialSchema);
 
   const certification = await prisma.certification.findUnique({
     where: {

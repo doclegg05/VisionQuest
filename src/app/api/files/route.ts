@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, notFound } from "@/lib/api-error";
+import { parseBody, deleteFileSchema } from "@/lib/schemas";
 
 // GET — list student's files
 export const GET = withAuth(async (session) => {
@@ -51,8 +52,7 @@ export const POST = withAuth(async (session, req: Request) => {
 
 // DELETE — delete a file
 export const DELETE = withAuth(async (session, req: Request) => {
-  const { id } = await req.json();
-  if (!id) throw badRequest("id is required");
+  const { id } = await parseBody(req, deleteFileSchema);
 
   const file = await prisma.fileUpload.findFirst({
     where: { id, studentId: session.id },
