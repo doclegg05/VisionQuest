@@ -201,7 +201,7 @@ describe("POST /api/auth/reset-password", () => {
     const body = (await res.json()) as { error: string };
 
     assert.equal(res.status, 400);
-    assert.match(body.error, /at least 8/i);
+    assert.match(body.error, /at least 12/i);
     assert.equal(mockFindUnique.mock.callCount(), 0, "schema validation should run before DB read");
     assert.equal(studentUpdateCalls.length, 0);
   });

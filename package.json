@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --experimental-test-module-mocks src/**/*.test.ts",
     "test:rls": "tsx --test src/lib/rls.test.ts",
-    "test:api": "tsx --test src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
+    "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
     "test:smoke:api": "python scripts/smoke_api_routes.py",
     "test:e2e": "playwright test",

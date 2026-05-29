@@ -91,7 +91,7 @@ describe("POST /api/jobs/save", () => {
   it("sets appliedAt when the student moves a job into the applied pipeline", async () => {
     const req = mockRequest("/api/jobs/save", {
       method: "POST",
-      body: { jobListingId: "job-1", status: "applied", notes: "Applied through employer site" },
+      body: { jobListingId: "cjld2cyuq0000t3t37ch82xgg", status: "applied", notes: "Applied through employer site" },
     });
 
     const res = await route.POST(req as never);
@@ -110,7 +110,7 @@ describe("POST /api/jobs/save", () => {
 
     const req = mockRequest("/api/jobs/save", {
       method: "POST",
-      body: { jobListingId: "job-1", status: "interviewing" },
+      body: { jobListingId: "cjld2cyuq0000t3t37ch82xgg", status: "interviewing" },
     });
 
     const res = await route.POST(req as never);
@@ -124,7 +124,7 @@ describe("POST /api/jobs/save", () => {
 
     const req = mockRequest("/api/jobs/save", {
       method: "POST",
-      body: { jobListingId: "job-99", status: "saved" },
+      body: { jobListingId: "cjld2cyuq0099t3t37ch82xgz", status: "saved" },
     });
 
     const res = await route.POST(req as never);
