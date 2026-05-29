@@ -8,6 +8,7 @@ import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
 import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
+import { detectCrisisSignal, recordWellbeingConcern } from "@/lib/sage/crisis-detection";
 import {
   recordWeeklyReview,
   recordMonthlyReview,
@@ -60,6 +61,23 @@ export async function handlePostResponse({
   programType,
   classroomConfirmedAt,
 }: PostResponseParams): Promise<void> {
+  // 0. Wellbeing/crisis safety-net — runs FIRST and independently of the AI
+  //    provider, so a provider outage can never suppress a staff alert. The
+  //    detector is a deterministic keyword scan (no AI cost/latency) on the
+  //    student's latest turn, regardless of conversation stage.
+  try {
+    const signal = detectCrisisSignal(userMessage);
+    if (signal.matched) {
+      await recordWellbeingConcern({ studentId, conversationId, reason: "message_signal" });
+    }
+  } catch (err) {
+    logger.error("Wellbeing detection failed", {
+      conversationId,
+      alert: "wellbeing_detection_failed",
+      error: String(err),
+    });
+  }
+
   const provider = await resolveAiProvider({
     studentId,
     task: "sage_post_response",

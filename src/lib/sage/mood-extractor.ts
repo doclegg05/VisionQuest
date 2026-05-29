@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/db";
 import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
+import { recordWellbeingConcern } from "./crisis-detection";
+
+// A self-reported mood/motivation score at or below this (out of 10) raises a
+// wellbeing concern for staff review.
+const LOW_MOOD_THRESHOLD = 2;
 
 const EXTRACTION_PROMPT = `Analyze this coaching conversation and extract any self-reported mood or motivation scores the student gave on a 1-10 scale. Look for phrases like "I'd say a 7", "maybe like a 3 out of 10", "I'm feeling about a 5", or similar scaling responses.
 
@@ -80,6 +85,19 @@ export async function extractMoodFromConversation(
         score,
         error: String(err),
       });
+    }
+
+    // Wellbeing safety-net: a very low self-reported score alerts staff.
+    if (score <= LOW_MOOD_THRESHOLD) {
+      try {
+        await recordWellbeingConcern({ studentId, conversationId, reason: "low_mood" });
+      } catch (err) {
+        logger.error("Mood extraction: failed to record wellbeing concern", {
+          studentId,
+          score,
+          error: String(err),
+        });
+      }
     }
   }
 }
