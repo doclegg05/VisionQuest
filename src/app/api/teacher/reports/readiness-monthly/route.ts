@@ -56,6 +56,9 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         totalGoals: 0,
         totalCompleted: 0,
         totalConfirmed: 0,
+        // Keep the shape consistent with the populated response so callers
+        // that always read summary.pathwayCoverage don't break on empty cohorts.
+        pathwayCoverage: { eligibleGoals: 0, goalsWithPathway: 0, coverageRate: 0 },
       },
     });
   }
@@ -87,10 +90,16 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       const readinessData = await fetchStudentReadinessData(s.id);
       const { readiness } = readinessData;
 
-      // Goal counts
-      const planningGoals = s.goals.filter((g) => goalCountsTowardPlan(g.status));
+      // Goal counts — mutually exclusive buckets so active + completed +
+      // confirmed never exceeds total. "active" = in-plan goals still being
+      // worked, EXCLUDING the completed/confirmed goals that get their own
+      // counts below (goalCountsTowardPlan() includes completed/confirmed, so
+      // counting all planning goals as "active" double-counted them).
       const completedGoals = s.goals.filter((g) => g.status === "completed");
       const confirmedGoals = s.goals.filter((g) => g.status === "confirmed");
+      const activeGoals = s.goals.filter(
+        (g) => goalCountsTowardPlan(g.status) && g.status !== "completed" && g.status !== "confirmed",
+      );
 
       return {
         id: s.id,
@@ -108,7 +117,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         },
         goals: {
           total: s.goals.length,
-          active: planningGoals.length,
+          active: activeGoals.length,
           completed: completedGoals.length,
           confirmed: confirmedGoals.length,
         },
@@ -184,9 +193,11 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       pathwayCoverage: {
         eligibleGoals,
         goalsWithPathway,
+        // No eligible goals = no pathways to cover = 0% (NOT 100%, which would
+        // report perfect grant compliance on zero data).
         coverageRate: eligibleGoals > 0
           ? Math.round((goalsWithPathway / eligibleGoals) * 100)
-          : 100,
+          : 0,
       },
       requirementCompliance,
     },
