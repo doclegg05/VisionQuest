@@ -210,7 +210,14 @@ export const POST = withAuth(async (session, req: Request) => {
         mutate: (state) => recordCertificationEarned(state),
       });
     } catch (err) {
+      // The cert is already marked completed above. Swallowing an award
+      // failure here leaves a "phantom" cert — completed with no XP —
+      // which corrupts grant counts. awardEvent is idempotent (events.ts),
+      // so surfacing the error lets the request retry and reconcile rather
+      // than silently diverging. (Full atomicity would wrap update+recompute
+      // +award in a single $transaction; tracked as a follow-up.)
       logger.error("Failed to record certification earned", { error: String(err) });
+      throw err;
     }
   }
 
