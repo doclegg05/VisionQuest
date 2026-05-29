@@ -16,24 +16,29 @@ import { logger } from "./logger";
  * For multi-instance deployments, reduce pool size per instance:
  *   2 instances × 5 pool = 10 connections (well under Supabase 50 limit)
  *
- * --- RLS STATUS (updated 2026-04-21, Phase 3 Slice A) ---
- * RLS is ENABLED on ALL tables:
+ * --- RLS STATUS (Slice C LIVE in prod; verified 2026-05-29) ---
+ * RLS is ENABLED on ALL tables and ENFORCED in production:
  *   - Migration 20260403060000: RLS + vq_app policies on 29 student-data tables
  *   - Migration 20260415000000: RLS enabled on remaining 32 tables
  *   - Migration 20260421020000: vq_app role + managed_student_ids function
+ *   - Migration 20260423120000/130000/140000: policy recovery + recursion fix
  *
- * The `prisma` export connects as `postgres` (superuser) which bypasses RLS.
- * Tenant isolation still relies on app-layer `where` clauses.
+ * In production `DATABASE_URL` points at the restricted `vq_app` role and
+ * `RLS_CONTEXT_INJECTION=true` (both set in the Render dashboard, so they
+ * are NOT visible in render.yaml). Verified 2026-05-29: as `vq_app` with no
+ * session context, `SELECT count(*) FROM "Student"` returns 0 — policies
+ * fail closed. Tenant isolation is enforced by the DB, not just app-layer
+ * `where` clauses.
  *
  * When RLS_CONTEXT_INJECTION=true, every query wraps in a transaction that
- * calls `set_config('app.current_user_id', ..., true)` and friends. With
- * the current postgres connection this is a no-op at enforcement level
- * but verifies the plumbing end-to-end ahead of the Slice C connection-
- * role swap.
+ * calls `set_config('app.current_user_id', ..., true)` and friends so the
+ * policies can see who is asking. A query with no context returns zero rows
+ * (fail-closed) — a silent "empty page" in prod usually means a code path
+ * touched `prisma` outside `withAuth` / server-component header context.
  *
- * `prismaAdmin` is identical to `prisma` but bypasses the RLS extension.
- * Use it from internal cron endpoints, background job handlers, and
- * admin operations that must see all rows.
+ * `prismaAdmin` uses ADMIN_DATABASE_URL (the `postgres` role) and bypasses
+ * RLS. Use it ONLY from internal cron endpoints, background job handlers,
+ * pre-auth/public routes, and admin operations that must see all rows.
  */
 function applyPoolDefaults(): void {
   const poolSize = parseInt(process.env.DB_POOL_SIZE ?? "5", 10);
