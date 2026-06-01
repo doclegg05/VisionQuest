@@ -8,6 +8,7 @@ import {
 } from "./intervention-notifications";
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
+import { isEmailDeliveryConfigured } from "./email";
 import { prisma } from "./db";
 import type { AlertDescriptor } from "./advising-alerts";
 
@@ -50,8 +51,16 @@ export async function syncInterventionNotifications({
     ),
   );
 
+  // Nudge emails are best-effort: the in-app notification above is persisted to
+  // the Notification table, so a student sees the nudge on next login even with
+  // no live SSE session — email is only an extra push. Skip enqueuing email
+  // jobs when SMTP isn't configured; otherwise every nudge would create a
+  // guaranteed-fail job (the send_email handler throws on missing SMTP).
+  // Important low-volume mail (crisis/wellbeing) still enqueues and fails loud.
+  const emailEnabled = isEmailDeliveryConfigured();
+
   const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || "";
-  if (studentEmail) {
+  if (emailEnabled && studentEmail) {
     await Promise.allSettled(
       studentSpecs.map((spec) => {
         const href = `${baseUrl}${studentInterventionHref(spec.type)}`;
@@ -118,7 +127,7 @@ export async function syncInterventionNotifications({
 
   await Promise.allSettled(
     teachers.flatMap((teacher) => {
-      if (!teacher.email) return [];
+      if (!emailEnabled || !teacher.email) return [];
 
       return teacherSpecs.map((spec) => {
         const href = `${baseUrl}${teacherInterventionHref(spec.type, studentId)}`;
