@@ -145,6 +145,14 @@ export const deleteFileSchema = z.object({
   id: z.string().min(1, "id is required"),
 });
 
+// ─── Generic Delete-by-CUID Schema ──────────────────────────────────────────
+// Shared by DELETE handlers whose only body field is a record id (e.g.
+// admin/webhooks, portfolio). Use deleteFileSchema where the id is not a cuid.
+
+export const deleteByIdSchema = z.object({
+  id: z.string().cuid("Invalid id."),
+});
+
 // ─── Vision Board Schemas ───────────────────────────────────────────────────
 
 export const visionBoardItemSchema = z.object({

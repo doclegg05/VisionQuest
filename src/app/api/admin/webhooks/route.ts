@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { isSafeExternalUrl } from "@/lib/validation";
 import { logAuditEvent } from "@/lib/audit";
 import { invalidateWebhookCache } from "@/lib/webhooks";
-import { parseBody } from "@/lib/schemas";
+import { parseBody, deleteByIdSchema } from "@/lib/schemas";
 
 const webhookCreateSchema = z.object({
   url: z.string().url().max(2000),
@@ -94,10 +94,7 @@ export const PATCH = withAdminAuth(async (session, req: Request) => {
 });
 
 export const DELETE = withAdminAuth(async (session, req: Request) => {
-  const body = await req.json();
-  const { id } = body as { id: unknown };
-
-  if (!id || typeof id !== "string") throw badRequest("id is required");
+  const { id } = await parseBody(req, deleteByIdSchema);
 
   const existing = await prisma.webhookSubscription.findUnique({ where: { id } });
   if (!existing) throw notFound("Webhook subscription not found");

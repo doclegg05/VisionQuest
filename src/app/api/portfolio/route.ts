@@ -5,7 +5,7 @@ import { recomputeCertificationStatus } from "@/lib/certification-service";
 import { validateRequirementUpdate } from "@/lib/certifications";
 import { isValidUrl } from "@/lib/validation";
 import { withAuth, badRequest, notFound } from "@/lib/api-error";
-import { parseBody } from "@/lib/schemas";
+import { parseBody, deleteByIdSchema } from "@/lib/schemas";
 import {
   PORTFOLIO_ITEM_TYPES,
   normalizePortfolioItemType,
@@ -222,8 +222,7 @@ export const PUT = withAuth(async (session, req: Request) => {
 
 // DELETE — remove a portfolio item
 export const DELETE = withAuth(async (session, req: Request) => {
-  const { id } = await req.json();
-  if (!id) throw badRequest("id is required");
+  const { id } = await parseBody(req, deleteByIdSchema);
 
   const existing = await prisma.portfolioItem.findFirst({
     where: { id, studentId: session.id },

@@ -10,6 +10,7 @@ import {
   bookAppointmentSchema,
   shareCredentialSchema,
   deleteFileSchema,
+  deleteByIdSchema,
 } from "./schemas";
 
 // ---------------------------------------------------------------------------
@@ -217,6 +218,17 @@ test("deleteFileSchema requires a non-empty id", () => {
   assert.ok(deleteFileSchema.safeParse({ id: "file1" }).success);
   assert.ok(!deleteFileSchema.safeParse({ id: "" }).success);
   assert.ok(!deleteFileSchema.safeParse({}).success);
+});
+
+// ---------------------------------------------------------------------------
+// deleteByIdSchema
+// ---------------------------------------------------------------------------
+
+test("deleteByIdSchema requires a valid cuid", () => {
+  assert.ok(deleteByIdSchema.safeParse({ id: "ckv1q2w3e4r5t6y7u8i9o0p1" }).success);
+  assert.ok(!deleteByIdSchema.safeParse({ id: "not-a-cuid" }).success);
+  assert.ok(!deleteByIdSchema.safeParse({ id: "" }).success);
+  assert.ok(!deleteByIdSchema.safeParse({}).success);
 });
 
 // ---------------------------------------------------------------------------
