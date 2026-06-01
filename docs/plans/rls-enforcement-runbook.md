@@ -1,5 +1,9 @@
 # RLS Enforcement Rollout Runbook
 
+> **✅ STATUS: COMPLETE — all three slices shipped; RLS is LIVE and ENFORCED in production (verified 2026-05-29).**
+> Prod connects as the restricted `vq_app` role with `RLS_CONTEXT_INJECTION=true` (both set in the Render dashboard, so not visible in `render.yaml`). Fail-closed check: as `vq_app` with no session context, `SELECT count(*) FROM visionquest."Student"` returns **0**.
+> **The slice-by-slice prose below is the original rollout plan, kept for history. Statements like "no enforcement until Slice C", "`RLS_CONTEXT_INJECTION` defaults to unset → no-op", and "Slice C still pending" describe the *plan at the time*, NOT current state — Slice C went live 2026-04-23.** Do not infer current RLS state from this document; verify against the running system (Render env + the `vq_app` fail-closed query). See `src/lib/db.ts` header for the authoritative current status.
+
 **Context:** Phase 3 of [supabase-optimization.md](./supabase-optimization.md).
 RLS policies already exist on every student-facing table. This runbook
 describes the three-slice plan to actually ENFORCE them, rather than rely
