@@ -9,6 +9,7 @@ import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-ext
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { detectCrisisSignal, recordWellbeingConcern } from "@/lib/sage/crisis-detection";
+import { retryWithBackoff } from "@/lib/sage/retry";
 import {
   recordWeeklyReview,
   recordMonthlyReview,
@@ -131,9 +132,17 @@ export async function handlePostResponse({
   // 0. Discovery extraction (runs instead of goal extraction during discovery)
   if (conversationStage === "discovery") {
     try {
-      const discoveryResult = await extractDiscoverySignals(
-        provider,
-        [...allMessages, { role: "model" as const, content: fullResponse }],
+      const discoveryResult = await retryWithBackoff(
+        () =>
+          extractDiscoverySignals(provider, [
+            ...allMessages,
+            { role: "model" as const, content: fullResponse },
+          ]),
+        {
+          label: "Discovery extraction",
+          alertKey: "discovery_extraction_exhausted",
+          context: { conversationId, studentId },
+        },
       );
 
       // Upsert CareerDiscovery record with latest signals

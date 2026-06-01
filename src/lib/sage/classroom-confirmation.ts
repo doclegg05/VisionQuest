@@ -1,6 +1,7 @@
 import type { AIProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { retryWithBackoff } from "./retry";
 
 /**
  * JSON contract the LLM returns when asked to inspect a single student turn
@@ -78,7 +79,14 @@ export async function detectAndRecordClassroomConfirmation(
       return { confirmed: false, mismatch: false, noSignal: true };
     }
 
-    const signal = await extractSignal(provider, userMessage, sageReply);
+    const signal = await retryWithBackoff(
+      () => extractSignal(provider, userMessage, sageReply),
+      {
+        label: "Classroom confirmation extraction",
+        alertKey: "classroom_confirmation_exhausted",
+        context: { studentId },
+      },
+    );
 
     if (!signal.confirmed || signal.confidence < CONFIDENCE_THRESHOLD) {
       return { confirmed: false, mismatch: false, noSignal: true };

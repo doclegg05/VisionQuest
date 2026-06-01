@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { recordWellbeingConcern } from "./crisis-detection";
+import { retryWithBackoff } from "./retry";
 
 // A self-reported mood/motivation score at or below this (out of 10) raises a
 // wellbeing concern for staff review.
@@ -38,9 +39,17 @@ export async function extractMoodFromConversation(
 
   let result: ExtractionResult;
   try {
-    const raw = await provider.generateResponse(EXTRACTION_PROMPT, [
-      { role: "user", content: conversationText },
-    ]);
+    const raw = await retryWithBackoff(
+      () =>
+        provider.generateResponse(EXTRACTION_PROMPT, [
+          { role: "user", content: conversationText },
+        ]),
+      {
+        label: "Mood extraction",
+        alertKey: "mood_extraction_exhausted",
+        context: { conversationId, studentId },
+      },
+    );
 
     const cleaned = raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
     const parsed: unknown = JSON.parse(cleaned);
