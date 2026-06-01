@@ -18,6 +18,45 @@
 --   teacher = rows for students in their classes (via managed_student_ids)
 
 -- =========================================================================
+-- PREREQUISITES: role + helper function (idempotent)
+-- =========================================================================
+-- The policies below reference role `vq_app` and the function
+-- `managed_student_ids`, which were originally created out-of-band in prod and
+-- only committed later as 20260421020000 (a LATER timestamp). On a fresh
+-- database (CI RLS container / disaster recovery), that ordering inversion made
+-- this migration fail with `role "vq_app" does not exist`. Create them here,
+-- idempotently, so the migration history replays cleanly from empty. When
+-- 20260421020000 runs afterward it is a harmless no-op (role exists, function
+-- CREATE OR REPLACE). Prod already has this migration applied, so `migrate
+-- deploy` skips it there and is unaffected. The function's dependency tables
+-- (StudentClassEnrollment, SpokesClassInstructor) exist by 20260323163000.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'vq_app') THEN
+    CREATE ROLE vq_app WITH NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+  END IF;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION visionquest.managed_student_ids(teacher_id text)
+RETURNS SETOF text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = visionquest, pg_temp
+AS $fn$
+  SELECT sce."studentId"
+  FROM visionquest."StudentClassEnrollment" sce
+  JOIN visionquest."SpokesClassInstructor" sci
+    ON sci."classId" = sce."classId"
+  WHERE sci."instructorId" = teacher_id
+    AND sce.status IN ('active', 'inactive', 'completed', 'withdrawn');
+$fn$;
+
+GRANT EXECUTE ON FUNCTION visionquest.managed_student_ids(text) TO vq_app;
+
+-- =========================================================================
 -- PATTERN A: Standard student-owned (direct studentId FK)
 -- =========================================================================
 
