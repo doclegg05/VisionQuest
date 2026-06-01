@@ -107,6 +107,52 @@ export const applicationSchema = z.object({
   notes: z.string().max(2000).nullish(),
 });
 
+// ─── Opportunity Application Schema (job-board opportunities) ────────────────
+// Distinct from applicationSchema above (manual company/position entries).
+// Mirrors the prior manual guards in src/app/api/applications/route.ts.
+
+export const opportunityApplicationSchema = z.object({
+  opportunityId: z.string().min(1, "Opportunity is required."),
+  status: z
+    .enum(["saved", "applied", "interviewing", "offer", "withdrawn"], {
+      message: "Application status is invalid.",
+    })
+    .default("saved"),
+  notes: z.string().trim().max(2000).default(""),
+  resumeFileId: z.string().default(""),
+});
+
+// ─── Appointment Booking Schema ─────────────────────────────────────────────
+
+export const bookAppointmentSchema = z.object({
+  advisorId: z.string().trim().min(1, "Advisor and time slot are required."),
+  startsAt: z.string().min(1, "Advisor and time slot are required."),
+  title: z.string().trim().max(200).default(""),
+  description: z.string().trim().max(2000).default(""),
+});
+
+// ─── Credential Share Schema ────────────────────────────────────────────────
+
+export const shareCredentialSchema = z.object({
+  isPublic: z.boolean().default(false),
+  headline: z.string().trim().max(200).default(""),
+  summary: z.string().trim().max(2000).default(""),
+});
+
+// ─── File Delete Schema ─────────────────────────────────────────────────────
+
+export const deleteFileSchema = z.object({
+  id: z.string().min(1, "id is required"),
+});
+
+// ─── Generic Delete-by-CUID Schema ──────────────────────────────────────────
+// Shared by DELETE handlers whose only body field is a record id (e.g.
+// admin/webhooks, portfolio). Use deleteFileSchema where the id is not a cuid.
+
+export const deleteByIdSchema = z.object({
+  id: z.string().cuid("Invalid id."),
+});
+
 // ─── Vision Board Schemas ───────────────────────────────────────────────────
 
 export const visionBoardItemSchema = z.object({

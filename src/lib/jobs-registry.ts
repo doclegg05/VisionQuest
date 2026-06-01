@@ -23,8 +23,17 @@ registerJobHandler("send_email", async (payload) => {
   }
 
   if (!isEmailDeliveryConfigured()) {
-    logger.info("Skipping email job because SMTP is not configured", { to, subject });
-    return;
+    // Fail loud instead of marking the job complete. A silent skip used to hide
+    // a real delivery gap — wellbeing/crisis alerts and nudges depend on email,
+    // and "completed with nothing sent" is indistinguishable from success in
+    // monitoring. Throwing lets the job queue record a visible failure (and
+    // surfaces the misconfiguration) instead of a phantom success.
+    logger.error("Email job failed: SMTP is not configured", {
+      to,
+      subject,
+      alert: "email_delivery_unconfigured",
+    });
+    throw new Error("Email delivery is not configured (SMTP_* env vars missing).");
   }
 
   await sendEmail({

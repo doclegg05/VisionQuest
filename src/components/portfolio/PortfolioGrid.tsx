@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import AskSageLink from "@/components/sage/AskSageLink";
+import { useConfirm } from "@/components/ui/useConfirm";
 import {
   fileCategoryForPortfolioType,
   normalizePortfolioItemType,
@@ -96,6 +97,7 @@ export default function PortfolioGrid() {
   const [certificationRequirementId, setCertificationRequirementId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<PortfolioFormState>(EMPTY_FORM);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     fetchItems();
@@ -211,7 +213,7 @@ export default function PortfolioGrid() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Remove this portfolio item?")) return;
+    if (!(await confirm({ title: "Remove this portfolio item?", confirmLabel: "Remove" }))) return;
     try {
       await fetch("/api/portfolio", {
         method: "DELETE",
@@ -579,6 +581,7 @@ export default function PortfolioGrid() {
           <span className="text-lg">+</span> Add Portfolio Item
         </button>
       ) : null}
+      {confirmDialog}
     </div>
   );
 }

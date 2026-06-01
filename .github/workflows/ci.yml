@@ -9,6 +9,21 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      # Hermetic Postgres for the RLS integration suite (src/lib/rls.test.ts).
+      # The main `npm test` step keeps using the fake DATABASE_URL below; only
+      # the RLS migrate/test steps point DATABASE_URL at this container.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionquest_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
       JWT_SECRET: "ci-test-secret-not-real-at-all-32"
@@ -50,6 +65,22 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      # --- RLS cross-tenant integration tests (the only guard against a
+      # policy regression re-exposing other students' data — P0 for the
+      # TANF/SNAP population). Run against the hermetic Postgres service
+      # above with a real, migrated schema. See
+      # docs/runbooks/enable-rls-tests-in-ci.md.
+      - name: Apply migrations to RLS test database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+
+      - name: Run RLS integration tests
+        run: npm run test:rls
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          RLS_TEST_ENABLED: "true"
 
       - name: Build
         run: npm run build

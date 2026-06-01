@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import AskSageLink from "@/components/sage/AskSageLink";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface FileRecord {
   id: string;
@@ -39,6 +40,7 @@ export default function FileManager() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState("general");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { confirm, alert, confirmDialog } = useConfirm();
 
   useEffect(() => {
     fetchFiles();
@@ -80,7 +82,7 @@ export default function FileManager() {
         fetchFiles();
       } else {
         const err = await res.json();
-        alert(err.error || "Upload failed");
+        await alert({ title: "Upload failed", message: err.error || "Please try again." });
       }
     } catch (err) {
       console.error("Upload failed:", err instanceof Error ? err.message : "Unknown error");
@@ -91,7 +93,7 @@ export default function FileManager() {
   }
 
   async function handleDelete(id: string, filename: string) {
-    if (!confirm(`Delete "${filename}"?`)) return;
+    if (!(await confirm({ title: `Delete "${filename}"?`, confirmLabel: "Delete" }))) return;
 
     try {
       const res = await fetch("/api/files", {
@@ -234,6 +236,7 @@ export default function FileManager() {
           </div>
         ))
       )}
+      {confirmDialog}
     </div>
   );
 }

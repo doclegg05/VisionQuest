@@ -187,7 +187,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
     const body = (await res.json()) as { error: string };
 
     assert.equal(res.status, 400);
-    assert.match(body.error, /at least 8/i);
+    assert.match(body.error, /at least 12/i);
     assert.equal(mockFindFirst.mock.callCount(), 0, "schema validation should run before DB read");
     assert.equal(mockCreate.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);

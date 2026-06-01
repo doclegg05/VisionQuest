@@ -4,21 +4,14 @@ import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
+import { parseBody, bookAppointmentSchema } from "@/lib/schemas";
 
 export const POST = withAuth(async (session, req: Request) => {
   if (session.role !== "student") {
     return NextResponse.json({ error: "Only students can self-book appointments." }, { status: 403 });
   }
 
-  const body = await req.json();
-  const advisorId = typeof body.advisorId === "string" ? body.advisorId.trim() : "";
-  const startsAt = typeof body.startsAt === "string" ? body.startsAt : "";
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const description = typeof body.description === "string" ? body.description.trim() : "";
-
-  if (!advisorId || !startsAt) {
-    return NextResponse.json({ error: "Advisor and time slot are required." }, { status: 400 });
-  }
+  const { advisorId, startsAt, title, description } = await parseBody(req, bookAppointmentSchema);
 
   const advisors = await listBookableAdvisors({
     days: 21,

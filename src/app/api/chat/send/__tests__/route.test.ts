@@ -372,7 +372,7 @@ function resetMocks() {
     stage: "general",
     messages: [],
   }));
-  mockSaveMessage.mock.mockImplementation(async () => undefined);
+  mockSaveMessage.mock.mockImplementation(async () => ({ id: "test-msg-id" }));
   mockGetConversationContext.mock.mockImplementation(async () => ({ messages: [] }));
   mockMaybeUpdateSummary.mock.mockImplementation(async () => undefined);
   mockHandlePostResponse.mock.mockImplementation(async () => undefined);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Trash } from "@phosphor-icons/react";
 import type { ConversationSummary } from "@/types";
 import { apiFetch } from "@/lib/api";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface ConversationListProps {
   onSelect: (conversationId: string) => void;
@@ -35,6 +36,7 @@ export default function ConversationList({
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { confirm, alert, confirmDialog } = useConfirm();
 
   useEffect(() => {
     async function load() {
@@ -62,9 +64,11 @@ export default function ConversationList({
     if (deletingId) return;
 
     const label = conv.title || STAGE_LABELS[conv.stage] || "this conversation";
-    const confirmed = window.confirm(
-      `Delete "${label}"? This will remove the full message history and cannot be undone.`,
-    );
+    const confirmed = await confirm({
+      title: `Delete "${label}"?`,
+      message: "This will remove the full message history and cannot be undone.",
+      confirmLabel: "Delete",
+    });
     if (!confirmed) return;
 
     setDeletingId(conv.id);
@@ -79,7 +83,7 @@ export default function ConversationList({
       onDelete?.(conv.id);
     } catch (err) {
       console.error("Failed to delete conversation:", err instanceof Error ? err.message : "Unknown error");
-      window.alert("Could not delete conversation. Please try again.");
+      await alert({ title: "Could not delete conversation", message: "Please try again." });
     } finally {
       setDeletingId(null);
     }
@@ -170,6 +174,7 @@ export default function ConversationList({
           })
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

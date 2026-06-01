@@ -58,39 +58,64 @@ export async function extractGoals(
   currentStage: string,
   programType: ProgramType | string | null = null,
 ): Promise<ExtractionResult> {
-  try {
-    // Use the last 10 messages for context efficiency
-    const recent = messages.slice(-10);
+  // Use the last 10 messages for context efficiency
+  const recent = messages.slice(-10);
 
-    const contextPrompt = `Current goal-setting stage: ${currentStage}\n\nAnalyze the conversation and extract goals:`;
-    const messagesWithContext = [
-      ...recent,
-      { role: "user" as const, content: contextPrompt },
-    ];
+  const contextPrompt = `Current goal-setting stage: ${currentStage}\n\nAnalyze the conversation and extract goals:`;
+  const messagesWithContext = [
+    ...recent,
+    { role: "user" as const, content: contextPrompt },
+  ];
 
-    const extractionPrompt = buildExtractionPrompt(
-      normalizeProgramType(typeof programType === "string" ? programType : null),
-    );
-    const result = await provider.generateStructuredResponse(extractionPrompt, messagesWithContext);
-    const parsed = JSON.parse(result);
+  const extractionPrompt = buildExtractionPrompt(
+    normalizeProgramType(typeof programType === "string" ? programType : null),
+  );
 
-    // Validate structure before using — Gemini may return malformed JSON
-    const goalsFound = Array.isArray(parsed?.goals_found) ? parsed.goals_found : [];
-    const validGoals = goalsFound.filter(
-      (g: unknown): g is ExtractedGoal =>
-        typeof g === "object" && g !== null &&
-        typeof (g as ExtractedGoal).level === "string" &&
-        typeof (g as ExtractedGoal).content === "string" &&
-        typeof (g as ExtractedGoal).confidence === "number" &&
-        (g as ExtractedGoal).confidence > 0.7,
-    );
+  // Goal extraction is the core value loop. Transient AI failures (timeouts,
+  // rate limits, malformed JSON) used to be swallowed silently, leaving the
+  // student with a normal reply but no goals. Retry with backoff, then
+  // escalate loudly so the failure surfaces in monitoring.
+  const MAX_ATTEMPTS = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await provider.generateStructuredResponse(extractionPrompt, messagesWithContext);
+      const parsed = JSON.parse(result);
 
-    return {
-      goals_found: validGoals,
-      stage_complete: parsed?.stage_complete === true,
-    };
-  } catch (error) {
-    logger.error("Goal extraction failed", { error: String(error) });
-    return { goals_found: [], stage_complete: false };
+      // Validate structure before using — Gemini may return malformed JSON
+      const goalsFound = Array.isArray(parsed?.goals_found) ? parsed.goals_found : [];
+      const validGoals = goalsFound.filter(
+        (g: unknown): g is ExtractedGoal =>
+          typeof g === "object" && g !== null &&
+          typeof (g as ExtractedGoal).level === "string" &&
+          typeof (g as ExtractedGoal).content === "string" &&
+          typeof (g as ExtractedGoal).confidence === "number" &&
+          (g as ExtractedGoal).confidence > 0.7,
+      );
+
+      return {
+        goals_found: validGoals,
+        stage_complete: parsed?.stage_complete === true,
+      };
+    } catch (error) {
+      lastError = error;
+      logger.warn("Goal extraction attempt failed", {
+        attempt,
+        maxAttempts: MAX_ATTEMPTS,
+        error: String(error),
+      });
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
+      }
+    }
   }
+
+  // All retries exhausted. TODO: persist to a goal_extraction_failure table
+  // for instructor review (needs a schema migration).
+  logger.error("Goal extraction failed after retries — no goals created this turn", {
+    attempts: MAX_ATTEMPTS,
+    error: String(lastError),
+    alert: "goal_extraction_exhausted",
+  });
+  return { goals_found: [], stage_complete: false };
 }

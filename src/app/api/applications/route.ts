@@ -5,14 +5,7 @@ import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import { deleteFile } from "@/lib/storage";
-
-const VALID_APPLICATION_STATUSES = [
-  "saved",
-  "applied",
-  "interviewing",
-  "offer",
-  "withdrawn",
-] as const;
+import { parseBody, opportunityApplicationSchema } from "@/lib/schemas";
 
 async function cleanupDetachedGeneratedResumeFile(
   studentId: string,
@@ -70,18 +63,10 @@ async function cleanupDetachedGeneratedResumeFile(
 }
 
 export const POST = withAuth(async (session, req: Request) => {
-  const body = await req.json();
-  const opportunityId = typeof body.opportunityId === "string" ? body.opportunityId : "";
-  const status = typeof body.status === "string" ? body.status.trim() : "saved";
-  const notes = typeof body.notes === "string" ? body.notes.trim() : "";
-  const resumeFileId = typeof body.resumeFileId === "string" ? body.resumeFileId : "";
-
-  if (!opportunityId) {
-    return NextResponse.json({ error: "Opportunity is required." }, { status: 400 });
-  }
-  if (!VALID_APPLICATION_STATUSES.includes(status as (typeof VALID_APPLICATION_STATUSES)[number])) {
-    return NextResponse.json({ error: "Application status is invalid." }, { status: 400 });
-  }
+  const { opportunityId, status, notes, resumeFileId } = await parseBody(
+    req,
+    opportunityApplicationSchema,
+  );
 
   // opportunity, resume-file ownership, and existing-application lookups
   // are independent — run together.

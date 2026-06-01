@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import {
-  resolveStudentMention,
-  shouldAttemptStaffStudentContext,
-  type StaffStudentCandidate,
-} from "./staff-student-context";
+import { before, describe, it, mock } from "node:test";
+
+// "server-only" throws at import time outside a Next.js server build.
+// The functions exercised here are pure, so we stub the module before
+// the dynamic import below resolves staff-student-context.ts.
+mock.module("server-only", { namedExports: {} });
+
+type StaffStudentCandidate = import("./staff-student-context").StaffStudentCandidate;
+let resolveStudentMention: typeof import("./staff-student-context").resolveStudentMention;
+let shouldAttemptStaffStudentContext: typeof import("./staff-student-context").shouldAttemptStaffStudentContext;
+
+before(async () => {
+  const mod = await import("./staff-student-context");
+  resolveStudentMention = mod.resolveStudentMention;
+  shouldAttemptStaffStudentContext = mod.shouldAttemptStaffStudentContext;
+});
 
 const candidates: StaffStudentCandidate[] = [
   { id: "stu1", displayName: "Karissa Johnson", studentId: "karissa.j" },

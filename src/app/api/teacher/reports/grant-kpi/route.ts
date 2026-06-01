@@ -3,6 +3,7 @@ import { withTeacherAuth } from "@/lib/api-error";
 import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { computeGrantKpis, currentProgramYear } from "@/lib/grant-kpi";
+import { programYearBoundsUtc } from "@/lib/timezone";
 import { escapeCsvValue } from "@/lib/csv";
 
 export const GET = withTeacherAuth(async (session, req: Request) => {
@@ -20,10 +21,10 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     includeInactiveAccounts: true,
   });
 
-  // Derive date range from program year (PY2026 = July 1 2025 – June 30 2026)
+  // Derive date range from program year (PY2026 = July 1 2025 – June 30 2026),
+  // anchored to ET so referrals near the July boundary land in the right year.
   const pyNum = parseInt(programYear.replace("PY", ""), 10);
-  const startDate = new Date(`${pyNum - 1}-07-01`);
-  const endDate = new Date(`${pyNum}-07-01`);
+  const { start: startDate, end: endDate } = programYearBoundsUtc(pyNum);
 
   const records = await prisma.spokesRecord.findMany({
     where: {
