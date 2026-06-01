@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { classIdsInRegion } from "@/lib/region";
 import { monthBoundsInZone } from "@/lib/timezone";
+import { APPLICATION_STATUS } from "@/lib/constants";
 
 export type GrantMetric = "enrollments" | "certifications" | "placements" | "ged_earned" | "custom";
 
@@ -96,9 +97,13 @@ export async function computeActual(
       });
     }
     case "placements": {
+      // A placement = an accepted job offer. The literal "placed" used here
+      // before is not a value any write path produces (APPLICATION_STATUS has
+      // no such member), so this metric silently read 0 forever. Use the
+      // constant so a future rename is a compile error, not a silent zero.
       return prisma.application.count({
         where: {
-          status: "placed",
+          status: APPLICATION_STATUS.ACCEPTED,
           updatedAt: { gte: options.periodStart, lt: options.periodEnd },
           student: {
             classEnrollments: {
