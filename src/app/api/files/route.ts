@@ -59,10 +59,20 @@ export const DELETE = withAuth(async (session, req: Request) => {
   });
   if (!file) throw notFound("File not found");
 
+  // Delete the storage object FIRST and abort if it fails. Previously the DB
+  // row was deleted unconditionally, so a storage failure orphaned the object
+  // (a row pointing nowhere is worse than a recoverable retry). Ordering it
+  // this way means a failure leaves both the row and the object intact so the
+  // student can retry; the only residual risk is a dangling object if the DB
+  // delete fails afterward, which is the safer direction (no broken reference).
   try {
     await deleteFile(file.storageKey);
   } catch (err) {
-    logger.warn("Failed to delete file from storage (orphaned file)", { storageKey: file.storageKey, error: String(err) });
+    logger.error("Failed to delete file from storage; aborting DB delete", {
+      storageKey: file.storageKey,
+      error: String(err),
+    });
+    throw new ApiError(500, "Failed to delete file. Please try again.");
   }
   await prisma.fileUpload.delete({ where: { id } });
 
