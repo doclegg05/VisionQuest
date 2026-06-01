@@ -41,8 +41,9 @@ export async function awardEvent({
   metadata,
   mutate,
 }: AwardEventParams): Promise<boolean> {
+  let createdEventId: string;
   try {
-    await prisma.progressionEvent.create({
+    const created = await prisma.progressionEvent.create({
       data: {
         studentId,
         eventType,
@@ -52,6 +53,7 @@ export async function awardEvent({
         metadata: metadata ? JSON.stringify(metadata) : null,
       },
     });
+    createdEventId = created.id;
   } catch (err) {
     // Unique constraint violation = already awarded (idempotent)
     if (
@@ -69,9 +71,30 @@ export async function awardEvent({
     return false;
   }
 
-  // Update the progression state snapshot
+  // Update the progression state snapshot. The event row is the idempotency
+  // key, so it is created first — but that means a failure here would otherwise
+  // be unrecoverable: a retry hits the unique constraint (P2002 → returns
+  // false) and skips the mutation forever, leaving the event recorded with no
+  // XP/state change. Roll the event row back on failure so a retry re-applies
+  // both. (A single $transaction would be cleaner, but updateProgression uses
+  // optimistic version-locking with internal retries that don't compose with
+  // an interactive transaction.)
   if (mutate) {
-    await updateProgression(studentId, mutate);
+    try {
+      await updateProgression(studentId, mutate);
+    } catch (err) {
+      await prisma.progressionEvent
+        .delete({ where: { id: createdEventId } })
+        .catch((rollbackErr) =>
+          logger.error("Failed to roll back progression event after update failure", {
+            eventType,
+            sourceType,
+            sourceId,
+            error: String(rollbackErr),
+          }),
+        );
+      throw err;
+    }
   }
 
   return true;

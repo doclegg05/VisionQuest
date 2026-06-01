@@ -14,6 +14,7 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 // ---------------------------------------------------------------------------
 
 const mockCreate = mock.fn() as any;
+const mockDelete = mock.fn() as any;
 const mockUpdateProgression = mock.fn() as any;
 
 mock.module("@/lib/db", {
@@ -21,11 +22,13 @@ mock.module("@/lib/db", {
     prisma: {
       progressionEvent: {
         create: mockCreate,
+        delete: mockDelete,
       },
     },
     prismaAdmin: {
       progressionEvent: {
         create: mockCreate,
+        delete: mockDelete,
       },
     },
   },
@@ -46,8 +49,10 @@ before(async () => {
 describe("awardEvent idempotency", () => {
   beforeEach(() => {
     mockCreate.mock.resetCalls();
+    mockDelete.mock.resetCalls();
     mockUpdateProgression.mock.resetCalls();
     mockUpdateProgression.mock.mockImplementation(async () => undefined);
+    mockDelete.mock.mockImplementation(async () => undefined);
   });
 
   it("the same (studentId, eventType, sourceType, sourceId) cannot award twice", async () => {
@@ -174,5 +179,33 @@ describe("awardEvent idempotency", () => {
 
     assert.equal(result, false, "non-P2002 error should also return false");
     assert.equal(mockUpdateProgression.mock.callCount(), 0, "no state mutation on error");
+  });
+
+  it("rolls back the event row when updateProgression fails, so a retry re-applies", async () => {
+    mockCreate.mock.mockImplementation(async () => ({ id: "evt-rollback" }));
+    mockUpdateProgression.mock.mockImplementation(async () => {
+      throw new Error("progression write hard-failed");
+    });
+    const mutate = mock.fn();
+
+    await assert.rejects(
+      () =>
+        events.awardEvent({
+          studentId: "stu-1",
+          eventType: "cert_earned",
+          sourceType: "certification",
+          sourceId: "cert-1",
+          xp: 100,
+          mutate,
+        }),
+      /progression write hard-failed/,
+    );
+
+    // The just-created event row must be deleted so the unique constraint
+    // doesn't block re-applying both the event and the mutation on retry.
+    assert.equal(mockDelete.mock.callCount(), 1, "event row should be rolled back");
+    assert.deepEqual(mockDelete.mock.calls[0].arguments[0], {
+      where: { id: "evt-rollback" },
+    });
   });
 });
