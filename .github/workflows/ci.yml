@@ -26,6 +26,10 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+      # schema.prisma requires directUrl; any Prisma CLI step that loads config
+      # needs it present. Fake by default (no step connects via it except the
+      # RLS migrate/test steps, which override both with the real container URL).
+      DIRECT_URL: "postgresql://fake:fake@localhost:5432/fake"
       JWT_SECRET: "ci-test-secret-not-real-at-all-32"
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
@@ -75,11 +79,16 @@ jobs:
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          # schema.prisma declares directUrl = env("DIRECT_URL"); migrate deploy
+          # validates it. The hermetic CI Postgres has no pooler, so direct ==
+          # pooled. Without this the RLS CI step fails P1012 before any test runs.
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
 
       - name: Run RLS integration tests
         run: npm run test:rls
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RLS_TEST_ENABLED: "true"
 
       - name: Build
