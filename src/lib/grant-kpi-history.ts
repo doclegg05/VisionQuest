@@ -1,6 +1,7 @@
 import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "./classroom";
 import { prisma } from "./db";
 import { computeGrantKpis, currentProgramYear, type GrantKpiPayload } from "./grant-kpi";
+import { programYearBoundsUtc } from "./timezone";
 import { logger } from "./logger";
 
 export async function takeGrantKpiSnapshot(classId?: string): Promise<void> {
@@ -9,8 +10,7 @@ export async function takeGrantKpiSnapshot(classId?: string): Promise<void> {
   const snapshotDate = new Date(now.toISOString().slice(0, 10));
 
   const pyNum = parseInt(programYear.replace("PY", ""), 10);
-  const startDate = new Date(`${pyNum - 1}-07-01`);
-  const endDate = new Date(`${pyNum}-07-01`);
+  const { start: startDate, end: endDate } = programYearBoundsUtc(pyNum);
 
   const records = await prisma.spokesRecord.findMany({
     where: {

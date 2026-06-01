@@ -16,19 +16,22 @@ function makeRecord(overrides: Partial<GrantKpiRecord> = {}): GrantKpiRecord {
   };
 }
 
-describe("currentProgramYear", () => {
+describe("currentProgramYear (Eastern Time boundaries)", () => {
   it("returns PY2026 for dates in the second half of 2025", () => {
-    assert.equal(currentProgramYear(new Date("2025-07-01")), "PY2026");
-    assert.equal(currentProgramYear(new Date("2025-12-15")), "PY2026");
+    assert.equal(currentProgramYear(new Date("2025-07-01T12:00:00Z")), "PY2026");
+    assert.equal(currentProgramYear(new Date("2025-12-15T12:00:00Z")), "PY2026");
   });
 
   it("returns PY2026 for dates in the first half of 2026", () => {
-    assert.equal(currentProgramYear(new Date("2026-01-15")), "PY2026");
-    assert.equal(currentProgramYear(new Date("2026-06-30")), "PY2026");
+    assert.equal(currentProgramYear(new Date("2026-01-15T12:00:00Z")), "PY2026");
+    assert.equal(currentProgramYear(new Date("2026-06-30T12:00:00Z")), "PY2026");
   });
 
-  it("returns PY2027 starting July 2026", () => {
-    assert.equal(currentProgramYear(new Date("2026-07-01")), "PY2027");
+  it("rolls to PY2027 at ET midnight July 1, not UTC midnight", () => {
+    // 2026-07-01T00:00Z is still June 30, 8pm ET → PY2026.
+    assert.equal(currentProgramYear(new Date("2026-07-01T00:00:00Z")), "PY2026");
+    // 2026-07-01T04:00Z = July 1 00:00 ET (EDT) → PY2027.
+    assert.equal(currentProgramYear(new Date("2026-07-01T04:00:00Z")), "PY2027");
   });
 });
 

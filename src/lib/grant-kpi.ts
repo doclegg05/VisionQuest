@@ -5,6 +5,8 @@
 // SpokesEmploymentFollowUp data, plus "Program of the Year" qualification.
 // ---------------------------------------------------------------------------
 
+import { programYearNumber } from "./timezone";
+
 // ---------------------------------------------------------------------------
 // Input shape — matches what the API route fetches from Prisma
 // ---------------------------------------------------------------------------
@@ -88,15 +90,11 @@ function metric(
 
 /**
  * Derive the program year from the current date.
- * WV SPOKES program years run July 1 – June 30.
+ * WV SPOKES program years run July 1 – June 30 (Eastern Time).
  * PY2026 = July 1 2025 – June 30 2026.
  */
 export function currentProgramYear(now: Date = new Date()): string {
-  const month = now.getUTCMonth(); // 0-indexed
-  const year = now.getUTCFullYear();
-  // July (6) or later = next program year
-  const py = month >= 6 ? year + 1 : year;
-  return `PY${py}`;
+  return `PY${programYearNumber(now)}`;
 }
 
 // ---------------------------------------------------------------------------

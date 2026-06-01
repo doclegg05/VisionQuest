@@ -5,19 +5,27 @@ import { __private, currentMonthBounds, GRANT_METRICS } from "./grant-metrics";
 
 const { computeGoalStatus } = __private;
 
-describe("currentMonthBounds", () => {
-  it("returns UTC first-of-month as start and first-of-next-month as end", () => {
+describe("currentMonthBounds (Eastern Time)", () => {
+  it("returns ET first-of-month boundaries as UTC instants (EDT, UTC-4)", () => {
     const ref = new Date("2026-04-17T15:30:00Z");
     const { start, end } = currentMonthBounds(ref);
-    assert.equal(start.toISOString(), "2026-04-01T00:00:00.000Z");
-    assert.equal(end.toISOString(), "2026-05-01T00:00:00.000Z");
+    assert.equal(start.toISOString(), "2026-04-01T04:00:00.000Z");
+    assert.equal(end.toISOString(), "2026-05-01T04:00:00.000Z");
   });
 
-  it("wraps to next year across December", () => {
+  it("buckets a late-night-ET event on the last day into the correct month", () => {
+    // 2026-05-01T02:00Z = April 30, 10pm EDT → belongs to April, not May.
+    const ref = new Date("2026-05-01T02:00:00Z");
+    const { start, end } = currentMonthBounds(ref);
+    assert.equal(start.toISOString(), "2026-04-01T04:00:00.000Z");
+    assert.equal(end.toISOString(), "2026-05-01T04:00:00.000Z");
+  });
+
+  it("wraps to next year across December (EST, UTC-5)", () => {
     const ref = new Date("2026-12-31T23:59:59Z");
     const { start, end } = currentMonthBounds(ref);
-    assert.equal(start.toISOString(), "2026-12-01T00:00:00.000Z");
-    assert.equal(end.toISOString(), "2027-01-01T00:00:00.000Z");
+    assert.equal(start.toISOString(), "2026-12-01T05:00:00.000Z");
+    assert.equal(end.toISOString(), "2027-01-01T05:00:00.000Z");
   });
 });
 

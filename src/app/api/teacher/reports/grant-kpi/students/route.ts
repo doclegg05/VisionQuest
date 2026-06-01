@@ -3,6 +3,7 @@ import { withTeacherAuth } from "@/lib/api-error";
 import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { currentProgramYear } from "@/lib/grant-kpi";
+import { programYearBoundsUtc } from "@/lib/timezone";
 
 const VALID_METRICS = [
   "enrollment",
@@ -42,8 +43,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   });
 
   const pyNum = parseInt(programYear.replace("PY", ""), 10);
-  const startDate = new Date(`${pyNum - 1}-07-01`);
-  const endDate = new Date(`${pyNum}-07-01`);
+  const { start: startDate, end: endDate } = programYearBoundsUtc(pyNum);
 
   const records = await prisma.spokesRecord.findMany({
     where: {

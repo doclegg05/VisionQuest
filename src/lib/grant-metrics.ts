@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { classIdsInRegion } from "@/lib/region";
+import { monthBoundsInZone } from "@/lib/timezone";
 
 export type GrantMetric = "enrollments" | "certifications" | "placements" | "ged_earned" | "custom";
 
@@ -46,9 +47,9 @@ interface PeriodBounds {
 }
 
 export function currentMonthBounds(reference: Date = new Date()): PeriodBounds {
-  const start = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 1));
-  return { start, end };
+  // Bounds anchor to the ET calendar month (not UTC) so month-end events for
+  // the Eastern-time cohort bucket into the correct grant month.
+  return monthBoundsInZone(reference);
 }
 
 /**
