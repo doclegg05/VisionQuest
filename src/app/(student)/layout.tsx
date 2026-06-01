@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { hasConfiguredSecurityQuestionSet } from "@/lib/security-questions";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
@@ -26,11 +27,23 @@ export default async function StudentLayout({
   }
 
   // Lightweight fetch for nav phase (cached by Next.js request dedup)
-  const [goalCount, progression, orientationDone] = await Promise.all([
+  const [goalCount, progression, orientationDone, securityKeys] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id }, select: { state: true } }),
     prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
+    prisma.securityQuestionAnswer.findMany({
+      where: { studentId: session.id },
+      select: { questionKey: true },
+    }),
   ]);
+
+  // One-time recovery gate: staff-created accounts have no recovery questions,
+  // so a forgotten password can lock a student out when SMTP is unconfigured.
+  // Force setup before any student page renders (the setup route is outside
+  // this layout's group, so this redirect cannot loop).
+  if (!hasConfiguredSecurityQuestionSet(securityKeys.map((k) => k.questionKey))) {
+    redirect("/recovery-setup");
+  }
 
   const progState = progression ? parseState(progression.state) : createInitialState();
   const navPhase: NavPhase = computeNavPhase({
