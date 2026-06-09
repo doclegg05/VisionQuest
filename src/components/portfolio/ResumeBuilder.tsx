@@ -430,8 +430,10 @@ export default function ResumeBuilder() {
         {(["edit", "preview"] as const).map((tab) => (
           <button
             key={tab}
+            id={`resume-tab-${tab}`}
             role="tab"
             aria-selected={activeTab === tab}
+            aria-controls={`resume-tabpanel-${tab}`}
             tabIndex={activeTab === tab ? 0 : -1}
             onClick={() => setActiveTab(tab)}
             className={`min-h-[44px] flex-1 rounded-lg px-4 text-sm font-semibold transition ${
@@ -446,7 +448,7 @@ export default function ResumeBuilder() {
       </div>
 
       {activeTab === "preview" ? (
-        <div role="tabpanel" aria-label="Resume preview" className="surface-section p-3">
+        <div role="tabpanel" id="resume-tabpanel-preview" aria-labelledby="resume-tab-preview" className="surface-section p-3">
           {isResumeEmpty(resume) ? (
             <div className="rounded-xl border border-dashed border-[var(--border)] px-6 py-16 text-center">
               <p className="text-sm font-medium text-[var(--ink-strong)]">Your resume is empty</p>
@@ -464,7 +466,7 @@ export default function ResumeBuilder() {
           )}
         </div>
       ) : (
-        <div role="tabpanel" aria-label="Resume editor" className="space-y-6">
+        <div role="tabpanel" id="resume-tabpanel-edit" aria-labelledby="resume-tab-edit" className="space-y-6">
       <div
         className={`surface-section p-5 ${dragOver ? "ring-2 ring-[var(--accent-strong)] ring-inset" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
