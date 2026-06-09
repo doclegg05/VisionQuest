@@ -39,6 +39,17 @@ test("parseStoredResumeData returns an empty resume for malformed JSON", () => {
   assert.deepEqual(resume, EMPTY_RESUME);
 });
 
+test("resume content defaults font to times and is backward compatible", () => {
+  // Old saved resume JSON had no `font` key
+  const parsed = normalizeResumeContent({ headline: "Office Assistant" });
+  assert.equal(parsed.font, "times");
+});
+
+test("resume content keeps a valid font and rejects an invalid one", () => {
+  assert.equal(normalizeResumeContent({ font: "lato" }).font, "lato");
+  assert.equal(normalizeResumeContent({ font: "comic-sans" }).font, "times");
+});
+
 test("buildResumePlainText creates ATS-friendly plain text output", () => {
   const text = buildResumePlainText("Jane Doe", normalizeResumeContent({
     headline: "Office support candidate",

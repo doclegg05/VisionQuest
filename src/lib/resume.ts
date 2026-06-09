@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RESUME_FONT_KEYS, DEFAULT_RESUME_FONT } from "@/lib/resume-layout";
 
 const trimmedString = (max: number) =>
   z
@@ -63,6 +64,7 @@ export const resumeContentSchema = z.object({
   education: z.array(resumeEducationSchema).default([]).catch([]),
   certifications: z.array(resumeCertificationSchema).default([]).catch([]),
   references: trimmedString(1000),
+  font: z.enum(RESUME_FONT_KEYS).catch(DEFAULT_RESUME_FONT).default(DEFAULT_RESUME_FONT),
 });
 
 export const resumeSaveSchema = z.object({
@@ -154,6 +156,7 @@ export function normalizeResumeContent(input: unknown): ResumeContent {
     education: normalizeEducationList(raw.education),
     certifications: normalizeCertificationList(raw.certifications),
     references: raw.references,
+    font: raw.font,
   });
 }
 
