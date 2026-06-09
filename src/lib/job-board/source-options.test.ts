@@ -43,4 +43,11 @@ describe("job source options", () => {
     assert.equal(isValidJobSource("linkedin"), false);
     assert.equal(isValidJobSource(""), false);
   });
+
+  it("defaults to local-first sources including the WV feed", () => {
+    assert.deepEqual(DEFAULT_JOB_SOURCES, ["careeronestop", "usajobs", "adzuna"]);
+    for (const source of DEFAULT_JOB_SOURCES) {
+      assert.equal(JOB_SOURCE_OPTIONS.find((o) => o.value === source)?.sourceMode, "local");
+    }
+  });
 });
