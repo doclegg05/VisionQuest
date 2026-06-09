@@ -71,7 +71,9 @@ export const RESUME_SECTION_ORDER = [
   "references",
 ] as const;
 
-export const RESUME_SECTION_TITLES: Record<string, string> = {
+export type ResumeSectionId = (typeof RESUME_SECTION_ORDER)[number];
+
+export const RESUME_SECTION_TITLES: Record<ResumeSectionId, string> = {
   summary: "Professional Summary",
   skills: "Skills",
   experience: "Experience",
@@ -86,4 +88,4 @@ export const RESUME_RGB = {
   ink: [22, 38, 63] as const,
   inkSoft: [72, 86, 107] as const,
   rule: [156, 167, 182] as const,
-};
+} as const;
