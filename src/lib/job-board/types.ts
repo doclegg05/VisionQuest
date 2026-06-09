@@ -88,7 +88,8 @@ export type JobMatchReasonType =
   | "riasec"
   | "skill"
   | "preference"
-  | "feedback";
+  | "feedback"
+  | "source";
 
 export interface JobMatchReason {
   type: JobMatchReasonType;
