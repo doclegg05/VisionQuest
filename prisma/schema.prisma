@@ -1259,6 +1259,7 @@ model JobListing {
   workMode      String    @default("onsite")
   salary        String?
   salaryMin     Float?
+  employmentType String?
   description   String    @db.Text
   url           String
   source        String

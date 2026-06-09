@@ -6,6 +6,7 @@ import { groupDuplicateJobs } from "./duplicates";
 import { ALL_JOB_SOURCE_ADAPTERS } from "./adapters/registry";
 import { classifyJobProximity } from "./recommendation";
 import { normalizeJobWorkMode } from "./work-mode";
+import { inferEmploymentType } from "./employment-type";
 import type { JobScrapeTrigger, NormalizedJob } from "./types";
 
 interface RunScrapeOptions {
@@ -229,6 +230,7 @@ export async function runScrapeForConfig(
     const normalizedJobs = allJobs.map((job) => ({
       ...job,
       workMode: normalizeJobWorkMode(job.workMode, job),
+      employmentType: job.employmentType ?? inferEmploymentType(job),
     }));
     const quality = filterQualityJobs(normalizedJobs);
     if (quality.rejected.length > 0) {
@@ -274,6 +276,7 @@ export async function runScrapeForConfig(
           workMode: job.workMode,
           salary: job.salary,
           salaryMin: job.salaryMin,
+          employmentType: job.employmentType,
           description: job.description,
           url: job.url,
           source: job.source,
@@ -291,6 +294,7 @@ export async function runScrapeForConfig(
           workMode: job.workMode,
           salary: job.salary,
           salaryMin: job.salaryMin,
+          employmentType: job.employmentType,
           description: job.description,
           clusters,
           status: "active",

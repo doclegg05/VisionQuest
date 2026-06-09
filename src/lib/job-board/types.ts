@@ -9,6 +9,7 @@ export interface NormalizedJob {
   workMode?: JobWorkMode;
   salary: string | null;
   salaryMin: number | null;
+  employmentType?: string | null;
   description: string;
   url: string;
   source: string;
