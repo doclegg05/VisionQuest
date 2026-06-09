@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   EMPTY_RESUME,
   buildResumePlainText,
+  buildResumePrintHtml,
   normalizeResumeContent,
   parseStoredResumeData,
 } from "@/lib/resume";
@@ -48,6 +49,19 @@ test("resume content defaults font to times and is backward compatible", () => {
 test("resume content keeps a valid font and rejects an invalid one", () => {
   assert.equal(normalizeResumeContent({ font: "lato" }).font, "lato");
   assert.equal(normalizeResumeContent({ font: "comic-sans" }).font, "times");
+});
+
+test("print HTML uses the selected core font and no Google Fonts link", () => {
+  const html = buildResumePrintHtml("Maria Sanchez", normalizeResumeContent({ font: "arial", headline: "Office" }));
+  assert.ok(html.includes("Arial, Helvetica, sans-serif"));
+  assert.ok(!html.includes("fonts.googleapis.com"));
+});
+
+test("print HTML injects a Google Fonts link for an embedded font", () => {
+  const html = buildResumePrintHtml("Maria Sanchez", normalizeResumeContent({ font: "garamond" }));
+  assert.ok(html.includes("fonts.googleapis.com"));
+  assert.ok(html.includes("EB+Garamond"));
+  assert.ok(html.includes(`"EB Garamond", Georgia, serif`));
 });
 
 test("buildResumePlainText creates ATS-friendly plain text output", () => {
