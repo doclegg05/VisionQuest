@@ -3,6 +3,33 @@ import test from "node:test";
 import { generateResumePdf, generateResumePdfArrayBuffer } from "@/lib/resume-pdf";
 import { normalizeResumeContent } from "@/lib/resume";
 
+/**
+ * Resolves which BaseFonts are ACTUALLY used in the content stream by mapping
+ * each `/Fn ... Tf` reference through the /Font resource dict to its /BaseFont.
+ * jsPDF embeds all 14 standard fonts in every PDF, so only the *used* refs
+ * distinguish the selected font.
+ */
+function activeBaseFonts(pdf: string): string[] {
+  const refByKey = new Map<string, string>();
+  for (const dict of pdf.matchAll(/\/Font\s*<<([^>]*)>>/g)) {
+    for (const m of dict[1].matchAll(/\/(F\d+)\s+(\d+)\s+(\d+)\s+R/g)) {
+      refByKey.set(m[1], `${m[2]} ${m[3]}`);
+    }
+  }
+  const baseFontByObj = new Map<string, string>();
+  for (const m of pdf.matchAll(/(\d+)\s+(\d+)\s+obj\b([\s\S]*?)endobj/g)) {
+    const bf = m[3].match(/\/BaseFont\s*\/([A-Za-z0-9+\-]+)/);
+    if (bf) baseFontByObj.set(`${m[1]} ${m[2]}`, bf[1]);
+  }
+  const used = new Set<string>();
+  for (const m of pdf.matchAll(/\/(F\d+)\s+[\d.]+\s+Tf/g)) {
+    const ref = refByKey.get(m[1]);
+    const bf = ref ? baseFontByObj.get(ref) : undefined;
+    if (bf) used.add(bf);
+  }
+  return [...used];
+}
+
 test("generateResumePdfArrayBuffer returns PDF bytes for a populated resume", async () => {
   const resume = normalizeResumeContent({
     headline: "Help Desk Support Specialist",
@@ -45,16 +72,18 @@ test("generateResumePdf returns a PDF blob for browser downloads", async () => {
   assert.ok(pdf.size > 0);
 });
 
-test("default resume PDF uses the Times base font", async () => {
+test("default resume PDF actually renders text in Times", async () => {
   const resume = normalizeResumeContent({ headline: "Office Assistant", skills: ["Scheduling"] });
   const buffer = await generateResumePdfArrayBuffer("Test Student", resume);
-  const pdf = Buffer.from(buffer).toString("latin1");
-  assert.match(pdf, /Times/);
+  const fonts = activeBaseFonts(Buffer.from(buffer).toString("latin1"));
+  assert.ok(fonts.length > 0, "expected at least one used font");
+  assert.ok(fonts.every((f) => f.startsWith("Times")), `expected only Times fonts, got ${JSON.stringify(fonts)}`);
 });
 
-test("arial resume PDF uses the Helvetica base font", async () => {
+test("arial resume PDF actually renders text in Helvetica", async () => {
   const resume = normalizeResumeContent({ headline: "Office Assistant", font: "arial", skills: ["Scheduling"] });
   const buffer = await generateResumePdfArrayBuffer("Test Student", resume);
-  const pdf = Buffer.from(buffer).toString("latin1");
-  assert.match(pdf, /Helvetica/);
+  const fonts = activeBaseFonts(Buffer.from(buffer).toString("latin1"));
+  assert.ok(fonts.length > 0, "expected at least one used font");
+  assert.ok(fonts.every((f) => f.startsWith("Helvetica")), `expected only Helvetica fonts, got ${JSON.stringify(fonts)}`);
 });
