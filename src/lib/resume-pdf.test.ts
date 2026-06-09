@@ -44,3 +44,17 @@ test("generateResumePdf returns a PDF blob for browser downloads", async () => {
   assert.equal(pdf.type, "application/pdf");
   assert.ok(pdf.size > 0);
 });
+
+test("default resume PDF uses the Times base font", async () => {
+  const resume = normalizeResumeContent({ headline: "Office Assistant", skills: ["Scheduling"] });
+  const buffer = await generateResumePdfArrayBuffer("Test Student", resume);
+  const pdf = Buffer.from(buffer).toString("latin1");
+  assert.match(pdf, /Times/);
+});
+
+test("arial resume PDF uses the Helvetica base font", async () => {
+  const resume = normalizeResumeContent({ headline: "Office Assistant", font: "arial", skills: ["Scheduling"] });
+  const buffer = await generateResumePdfArrayBuffer("Test Student", resume);
+  const pdf = Buffer.from(buffer).toString("latin1");
+  assert.match(pdf, /Helvetica/);
+});
