@@ -366,6 +366,23 @@ describe("rankJobs", () => {
   });
 });
 
+describe("trusted-source boost", () => {
+  it("ranks trusted local sources above generic local sources", () => {
+    const discovery = { topClusters: ["finance-bookkeeping"], hollandCode: null };
+    const region = "Charleston, WV";
+    const generic = scoreJob(
+      { id: "a", location: "Charleston, WV", clusters: ["office-admin"], source: "arbeitnow", workMode: "onsite" },
+      discovery, region,
+    );
+    const trusted = scoreJob(
+      { id: "b", location: "Charleston, WV", clusters: ["office-admin"], source: "careeronestop", workMode: "onsite" },
+      discovery, region,
+    );
+    assert.ok(trusted.score > generic.score);
+    assert.ok(trusted.matchReasons.some((r) => r.type === "source"));
+  });
+});
+
 describe("student job profile helpers", () => {
   it("dedupes resume and discovery skills", () => {
     const profile = buildStudentJobProfile({

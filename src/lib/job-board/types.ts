@@ -9,6 +9,7 @@ export interface NormalizedJob {
   workMode?: JobWorkMode;
   salary: string | null;
   salaryMin: number | null;
+  employmentType?: string | null;
   description: string;
   url: string;
   source: string;
@@ -88,7 +89,8 @@ export type JobMatchReasonType =
   | "riasec"
   | "skill"
   | "preference"
-  | "feedback";
+  | "feedback"
+  | "source";
 
 export interface JobMatchReason {
   type: JobMatchReasonType;

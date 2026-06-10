@@ -1,4 +1,5 @@
 import type { JobSourceAdapter } from "../types";
+import { careerOneStopAdapter } from "./careeronestop";
 import { jsearchAdapter } from "./jsearch";
 import { usajobsAdapter } from "./usajobs";
 import { adzunaAdapter } from "./adzuna";
@@ -10,6 +11,7 @@ import { ashbyAdapter, greenhouseAdapter, leverAdapter } from "./ats";
 import { smartRecruitersAdapter } from "./smartrecruiters";
 
 export const ALL_JOB_SOURCE_ADAPTERS: JobSourceAdapter[] = [
+  careerOneStopAdapter,
   remotiveAdapter,
   remoteOkAdapter,
   weWorkRemotelyAdapter,
