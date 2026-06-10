@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ConsentSection } from "@/components/settings/ConsentSection";
 
 interface CompletedForm {
   title: string;
@@ -42,6 +43,13 @@ export default function WizardCompletion({ completedForms }: WizardCompletionPro
       <p className="mt-4 text-xs text-[var(--ink-faint)]">
         This page will be removed from your menu.
       </p>
+
+      <div className="mt-6 text-left">
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[var(--ink-muted)]">
+          One choice before you go
+        </p>
+        <ConsentSection />
+      </div>
 
       <button
         type="button"

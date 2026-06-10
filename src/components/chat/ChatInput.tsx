@@ -7,7 +7,7 @@ import { CommandPalette } from "./CommandPalette";
 import { type ChatRole, type SlashCommand } from "@/lib/chat/commands";
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, attachmentIds?: string[]) => void;
   disabled?: boolean;
   compact?: boolean;
   role?: ChatRole;
@@ -20,6 +20,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
   const [focused, setFocused] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<{ id: string; filename: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDisabledRef = useRef(disabled);
@@ -79,16 +80,20 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
 
   const handleSubmit = useCallback(() => {
     const trimmed = message.trim();
-    if (!trimmed || disabled) return;
-    onSend(trimmed);
+    if ((!trimmed && attachments.length === 0) || disabled) return;
+    onSend(
+      trimmed || "I attached a file for you.",
+      attachments.length > 0 ? attachments.map((attachment) => attachment.id) : undefined,
+    );
     setMessage("");
+    setAttachments([]);
     setUploadStatus(null);
     setPaletteOpen(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.focus();
     }
-  }, [message, disabled, onSend]);
+  }, [message, attachments, disabled, onSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // When palette is open, let it handle Enter/Arrow/Escape via its own listener.
@@ -165,8 +170,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
       try {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("category", "sage-chat");
-        const res = await fetch("/api/files", {
+        const res = await fetch("/api/chat/upload", {
           method: "POST",
           body: formData,
           credentials: "include",
@@ -176,12 +180,12 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
           throw new Error(data?.error || "Could not upload that file.");
         }
 
-        const filename = data?.file?.filename || file.name;
-        setUploadStatus(`${filename} uploaded to Files.`);
-        setMessage((current) => {
-          const note = `I uploaded "${filename}" to my Files.`;
-          return current.trim().length > 0 ? `${current}\n\n${note}` : note;
-        });
+        const filename = data?.data?.filename || file.name;
+        setAttachments((current) => [
+          ...current,
+          { id: data.data.fileUploadId as string, filename },
+        ]);
+        setUploadStatus(`${filename} attached — send your message and Sage will see it.`);
         requestAnimationFrame(() => textareaRef.current?.focus());
       } catch (error) {
         setUploadStatus(error instanceof Error ? error.message : "Could not upload that file.");
@@ -191,6 +195,10 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     },
     [disabled],
   );
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+  }, []);
 
   const hasMessage = message.trim().length > 0;
 
@@ -202,6 +210,26 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
       ].join(" ")}
     >
       <div className={compact ? "" : "mx-auto max-w-4xl"}>
+        {attachments.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachments.map((attachment) => (
+              <span
+                key={attachment.id}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)]"
+              >
+                <span className="max-w-40 truncate">{attachment.filename}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(attachment.id)}
+                  aria-label={`Remove attachment ${attachment.filename}`}
+                  className="text-[var(--ink-faint)] hover:text-red-600"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <input
           ref={fileInputRef}
           type="file"

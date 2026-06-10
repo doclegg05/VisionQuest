@@ -33,7 +33,7 @@ export interface ChatSseEvent {
   data?: unknown;
 
   // action
-  action?: "navigate" | "open_form" | "open_resource" | "highlight";
+  action?: "navigate" | "open_form" | "open_resource" | "highlight" | "confirm_tool";
   target?: string;
   label?: string;
   meta?: Record<string, unknown>;

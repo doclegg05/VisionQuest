@@ -39,6 +39,7 @@ model Student {
   certifications          Certification[]
   portfolioItems          PortfolioItem[]
   resumeData              ResumeData?
+  consentRecords          ConsentRecord[]
   passwordResetTokens     PasswordResetToken[]
   securityQuestionAnswers SecurityQuestionAnswer[]
   appointments            Appointment[]            @relation("StudentAppointments")
@@ -500,6 +501,10 @@ model FileUpload {
   sizeBytes  Int
   storageKey String
   category   String   @default("general")
+  // Chat uploads (Phase 3): short description used in Sage's turn context.
+  // Always produced server-side at upload time — never client-supplied.
+  gist       String?  @db.Text
+  gistMethod String? // cloud | local | none
   uploadedAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1075,6 +1080,26 @@ model SageMemoryEdge {
 
   @@index([fromId])
   @@index([toId])
+  @@schema("visionquest")
+}
+
+// Recorded student consent (Phase 3). Active consent = grantedAt set and
+// revokedAt null for the scope. History preserved: revocation closes the row;
+// re-granting creates a new one. scope: cloud_file_processing (Gemini Files
+// API may process this student's uploaded documents).
+model ConsentRecord {
+  id         String    @id @default(cuid())
+  studentId  String
+  scope      String
+  grantedAt  DateTime  @default(now())
+  revokedAt  DateTime?
+  recordedBy String // student id (self-service) or staff id
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, scope, revokedAt])
   @@schema("visionquest")
 }
 

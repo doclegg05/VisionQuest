@@ -70,7 +70,7 @@ export async function* runAgentTurn(
           status: record.result.status,
         };
       },
-      { maxHops: maxHops ?? 5 },
+      { maxHops: maxHops ?? 8 },
     );
 
     for await (const event of stream) {

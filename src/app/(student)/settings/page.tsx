@@ -5,6 +5,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import StaffMfaPanel from "@/components/auth/StaffMfaPanel";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
+import { ConsentSection } from "@/components/settings/ConsentSection";
 
 const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
 
@@ -380,6 +381,8 @@ export default function SettingsPage() {
           )}
         </div>
       )}
+
+      <ConsentSection />
 
       <div className="surface-section p-6">
         <div className="mb-6">
