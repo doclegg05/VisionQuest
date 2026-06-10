@@ -7,20 +7,20 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
-Chat-first rebuild milestone (master plan: `docs/superpowers/plans/2026-06-09-chat-first-rebuild-master-plan.md`) — all 6 phases built; Phase 6 PR is the last to merge.
+Chat-first rebuild milestone COMPLETE (PRs #66–#75) and post-launch loose ends merged (PR #77, 2026-06-10). Prod healthy on the new deploy.
 
 ## Last Session
-- **Date**: 2026-06-10
-- **What we worked on**: Phases 0–6 of the chat-first rebuild, executed inline via an orchestrator loop (PRs #66–#74 + Phase 6 hardening)
-- **What we decided**: Gemini 3.1 Flash Lite; consent-gated cloud file processing; bold chat-first home (supersedes 2026-04-01 nav retention — see PRODUCT_DECISIONS.md 2026-06-10); confirm-before-execute HMAC cards for all consequential Sage actions
-- **Where we left off**: Phase 6 hardening branch ready for PR (evals green, 18/18 e2e, queue reason chips, docs)
+- **Date**: 2026-06-10 (afternoon)
+- **What we worked on**: Post-launch loose ends (PR #77): staff-assisted tool confirmations (targetStudentId bound into HMAC end-to-end), one-curl prod embedding backfill (`POST /api/internal/rag/backfill`, Bearer CRON_SECRET), Lighthouse a11y measurement + fixes (all public pages 100), classic-dashboard removal scheduled as issue #76
+- **What we decided**: Authed-page a11y honestly recorded as unscored (no seeded login exists); backfill loop extracted to `src/lib/sage/backfill-embeddings.ts` shared by script + route
+- **Where we left off**: PR #77 squash-merged, CI green, prod 200, new backfill route confirmed live (403 without bearer, as designed)
 
 ## Open Items
-- [ ] PROD one-time: `npm run sage:rag:backfill` via Render shell (idempotent)
+- [ ] **USER**: trigger prod backfill once: `curl -X POST https://visionquest.onrender.com/api/internal/rag/backfill -H "Authorization: Bearer $CRON_SECRET"` (idempotent; needs CRON_SECRET)
 - [ ] Optional: COS_USER_ID/COS_API_TOKEN in Render for WV state jobs
-- [ ] Remove `/dashboard/classic` after one release of parity
-- [ ] Staff-assisted tool confirmations (tokens don't bind targetStudentId yet — fails safe)
-- [x] Lighthouse a11y formal measurement — public pages all score 100 (landing, /teacher-register, /forgot-password) after skip-link + dark-mode contrast fixes; authed pages unscored (no seeded login) — see docs/superpowers/plans/2026-06-10-a11y-results.md
+- [ ] Remove `/dashboard/classic` ~2026-07-10 — tracked as GitHub issue #76
+- [ ] A11y for authenticated pages: seed a test user, add @axe-core/playwright to existing e2e specs (see docs/superpowers/plans/2026-06-10-a11y-results.md)
+- [ ] Dark-mode contrast sweep: hardcoded `bg-white` + ink tokens in StaffMfaPanel.tsx (same bug class fixed on /forgot-password)
 
 ## Key Decisions Log
 | Date | Decision | Rationale |
