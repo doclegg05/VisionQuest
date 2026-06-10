@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { sanitizeForPrompt } from "./system-prompts";
+import { tokenizeForRetrieval } from "./retrieval-tokens";
 
 interface SageDocument {
   id: string;
@@ -27,46 +28,6 @@ function isSageRagEnabled(): boolean {
   const value = process.env.SAGE_RAG_ENABLED;
   if (!value) return true;
   return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
-}
-
-const GENERIC_RETRIEVAL_WORDS = new Set([
-  "about",
-  "category",
-  "certificate",
-  "certificates",
-  "certification",
-  "complete",
-  "document",
-  "documents",
-  "file",
-  "fillable",
-  "form",
-  "forms",
-  "guide",
-  "guides",
-  "information",
-  "need",
-  "needs",
-  "platform",
-  "program",
-  "related",
-  "required",
-  "student",
-  "students",
-  "submit",
-  "used",
-  "uses",
-  "using",
-  "work",
-]);
-
-function tokenizeForRetrieval(text: string, minLength: number): string[] {
-  return (
-    text
-      .toLowerCase()
-      .match(/[a-z0-9]+/g)
-      ?.filter((word) => word.length >= minLength && !GENERIC_RETRIEVAL_WORDS.has(word)) ?? []
-  );
 }
 
 function messageIncludesIdentifier(messageLower: string, identifier: string): boolean {
