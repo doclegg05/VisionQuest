@@ -1025,6 +1025,78 @@ model DocumentChunk {
   @@schema("visionquest")
 }
 
+// Durable Sage memory (Phase 2). One row = one fact about a subject.
+// kind: episodic (events/sessions) | semantic (stable facts/preferences) |
+// procedural (what works when coaching this subject).
+// Temporal validity (Graphiti pattern): active rows have validTo = NULL;
+// superseded/expired rows keep history. sourceHash dedupes re-extraction
+// (TEKTON pattern): sha256 over normalized subject + content.
+// Manual SQL (see migration): HNSW index SageMemory_embedding_hnsw_idx,
+// partial unique index on (subjectType, subjectId, sourceHash) WHERE
+// "validTo" IS NULL, RLS (students read/insert own rows only).
+model SageMemory {
+  id          String    @id @default(cuid())
+  subjectType String // student | teacher | class | program
+  subjectId   String
+  kind        String // episodic | semantic | procedural
+  content     String    @db.Text
+  embedding   Unsupported("vector(768)")?
+  category    String // goal | preference | circumstance | skill | coaching | progress | other
+  confidence  Float     @default(0.7)
+  validFrom   DateTime  @default(now())
+  validTo     DateTime?
+  sourceType  String // conversation | operation | manual
+  sourceId    String?
+  sourceHash  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  edgesFrom SageMemoryEdge[] @relation("MemoryEdgeFrom")
+  edgesTo   SageMemoryEdge[] @relation("MemoryEdgeTo")
+
+  @@index([subjectType, subjectId, validTo])
+  @@index([sourceType, sourceId])
+  @@schema("visionquest")
+}
+
+// Typed relationships between memories with evidence (TEKTON pattern).
+model SageMemoryEdge {
+  id         String   @id @default(cuid())
+  fromId     String
+  toId       String
+  predicate  String // depends_on | blocks | supersedes | relates_to | evidenced_by
+  evidence   String   @db.Text
+  confidence Float    @default(0.7)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  from SageMemory @relation("MemoryEdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   SageMemory @relation("MemoryEdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([fromId])
+  @@index([toId])
+  @@schema("visionquest")
+}
+
+// Operation ledger: every Sage write action records here (Phase 3 write
+// tools consume this). Deterministic ids ("op-{timestamp}-{slug}") make
+// repeated tool invocations idempotent and auditable.
+model SageOperation {
+  id            String   @id
+  actorType     String // student | teacher | admin | system
+  actorId       String
+  toolName      String
+  status        String // proposed | confirmed | executed | failed | rejected
+  payload       Json
+  resultSummary String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([actorType, actorId])
+  @@index([toolName, status])
+  @@schema("visionquest")
+}
+
 enum ProgramDocCategory {
   // Student-facing
   ORIENTATION // New student onboarding forms and guides
