@@ -99,12 +99,12 @@ after stream — Mem0 pattern), `src/lib/sage/system-prompts.ts` (inject retriev
 `src/app/api/internal/memory/consolidate/route.ts` (weekly cron: dedupe by sourceHash, decay
 confidence, archive expired), teacher-visible memory inspector in student detail Progress tab.
 
-- [ ] Models + migration; validation gate (controlled vocab, required fields) before any write.
-- [ ] Extraction: post-response LLM pass produces candidate memories (ADD-only accumulation);
+- [x] Models + migration; validation gate (controlled vocab, required fields) before any write.
+- [x] Extraction: post-response LLM pass produces candidate memories (ADD-only accumulation);
       provider routing per FERPA policy + consent.
-- [ ] Retrieval: hybrid search over memories scoped by subject; merged into `buildSystemPrompt`.
-- [ ] Consolidation cron + decay; source-hash drift check against Postgres rows (TEKTON pattern).
-- [ ] Memory inspector UI (teacher can view/correct/delete a student's memories — FERPA right).
+- [x] Retrieval: hybrid search over memories scoped by subject; merged into `buildSystemPrompt`.
+- [x] Consolidation cron + decay; source-hash drift check against Postgres rows (TEKTON pattern).
+- [x] Memory inspector UI (teacher can view/correct/delete a student's memories — FERPA right).
 
 **Acceptance:** Sage answers "what do you know about me?" accurately from memory; duplicate-fact
 rate < 5% on a 20-conversation test script; memory writes never block the SSE stream.
