@@ -38,7 +38,7 @@ Read when deciding what to build, cut, simplify, or automate.
 ## Project Overview
 - **Name**: VisionQuest
 - **Description**: AI-coach-driven program portal for SPOKES workforce development (adults on TANF/SNAP). AI coach named "Sage" guides students through goal-setting, orientation, certification tracking, portfolio building, and employability skills.
-- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 2.5 Flash, Tailwind CSS 4, Sentry
+- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 3.1 Flash Lite, Tailwind CSS 4, Sentry
 - **Hosting**: Render.com (free tier)
 - **Repo**: https://github.com/doclegg05/VisionQuest.git
 - **Live URL**: https://visionquest.onrender.com

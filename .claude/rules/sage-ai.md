@@ -6,7 +6,7 @@
 - Tone: encouraging but realistic, never condescending, always student-first
 
 ## Technical Implementation
-- Model: Google Gemini 2.5 Flash (`MODEL_NAME` constant in `src/lib/gemini.ts`)
+- Model: Google Gemini 3.1 Flash Lite (`MODEL_NAME` constant in `src/lib/gemini.ts`)
 - `systemInstruction` set at `getGenerativeModel()` level — NOT at chat level (breaks streaming)
 - Chat streaming via SSE at `/api/chat/send`
 - Two-call pattern: (1) stream response to student, (2) async goal extraction from conversation
