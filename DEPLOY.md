@@ -301,8 +301,11 @@ psql "DIRECT_URL" < backup.sql
   `SAGE_MEMORY_ENABLED=false` (memory extraction/retrieval), `SAGE_RAG_MODE=keyword`
   (revert to legacy retrieval). Retrieval tuning: `SAGE_RAG_DISTANCE_MARGIN` (0.04),
   `SAGE_RAG_MAX_DISTANCE` (0.55), `SAGE_MEMORY_DUP_DISTANCE` (0.08).
-- **One-time after first deploy**: run `npm run sage:rag:backfill` in the Render shell to
-  embed program documents in production (idempotent; until then Sage uses keyword fallback).
+- **One-time after first deploy**: trigger the embedding backfill with one curl
+  (idempotent; until then Sage uses keyword fallback):
+  `curl -X POST https://visionquest.onrender.com/api/internal/rag/backfill -H "Authorization: Bearer $CRON_SECRET"`
+  Pass `-H "Content-Type: application/json" -d '{"force":true}'` to re-embed everything.
+  (Local equivalent: `npm run sage:rag:backfill`.)
 - **Optional**: set `COS_USER_ID` + `COS_API_TOKEN` (CareerOneStop) to activate the WV
   state-jobs adapter for local job feeds.
 - All migrations are additive and apply automatically via `prisma migrate deploy`.
