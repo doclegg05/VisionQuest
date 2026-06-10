@@ -8,6 +8,7 @@ import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
 import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
+import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
 import { detectCrisisSignal, recordWellbeingConcern } from "@/lib/sage/crisis-detection";
 import { retryWithBackoff } from "@/lib/sage/retry";
 import {
@@ -124,6 +125,28 @@ export async function handlePostResponse({
       fullResponse,
     ).catch((err) =>
       logger.error("Classroom confirmation extractor failed", {
+        studentId,
+        error: String(err),
+      }),
+    );
+  }
+
+  // Fire-and-forget memory extraction (Phase 2, Mem0 pattern). Uses the same
+  // resolved provider as every other post-response extractor, so FERPA
+  // routing is inherited. extractAndStoreMemories never throws, but the
+  // catch stays as a belt-and-suspenders guard — memory must never block or
+  // fail the post-response pipeline.
+  if (process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
+    void extractAndStoreMemories({
+      provider,
+      studentId,
+      conversationId,
+      messages: [
+        ...allMessages,
+        { role: "model" as const, content: fullResponse },
+      ],
+    }).catch((err) =>
+      logger.error("Memory extraction failed", {
         studentId,
         error: String(err),
       }),
