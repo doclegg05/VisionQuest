@@ -53,9 +53,9 @@ async function main() {
     const ext = extOf(doc.storageKey);
     const extractable = EXTRACTABLE_EXTS.has(ext);
 
-    // Idempotency: an embedded doc is done unless it should have chunks but
-    // has none (a partial earlier run) — or --force re-embeds everything.
-    if (doc.hasEmbedding && !FORCE && (doc.chunkCount > 0 || !extractable)) {
+    // Idempotency: doc vector + chunks are written in one transaction, so an
+    // embedded doc is always complete. --force re-embeds everything.
+    if (doc.hasEmbedding && !FORCE) {
       tally.skipped++;
       continue;
     }
