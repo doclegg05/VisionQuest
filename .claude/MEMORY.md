@@ -20,7 +20,7 @@ Chat-first rebuild milestone (master plan: `docs/superpowers/plans/2026-06-09-ch
 - [ ] Optional: COS_USER_ID/COS_API_TOKEN in Render for WV state jobs
 - [ ] Remove `/dashboard/classic` after one release of parity
 - [ ] Staff-assisted tool confirmations (tokens don't bind targetStudentId yet — fails safe)
-- [ ] Lighthouse a11y formal measurement (panels built to AA tokens; not yet scored)
+- [x] Lighthouse a11y formal measurement — public pages all score 100 (landing, /teacher-register, /forgot-password) after skip-link + dark-mode contrast fixes; authed pages unscored (no seeded login) — see docs/superpowers/plans/2026-06-10-a11y-results.md
 
 ## Key Decisions Log
 | Date | Decision | Rationale |

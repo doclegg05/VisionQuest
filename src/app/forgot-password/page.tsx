@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="relative min-h-screen px-4 py-6 md:px-6 md:py-8">
+    <main id="main-content" className="relative min-h-screen px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-2xl items-center">
         <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
           <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
               }}
               className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "questions"
-                  ? "bg-white text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
+                  ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
@@ -127,7 +127,7 @@ export default function ForgotPasswordPage() {
               }}
               className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "email"
-                  ? "bg-white text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
+                  ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
