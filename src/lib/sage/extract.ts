@@ -12,6 +12,61 @@ export interface ExtractionResult {
   pageCount?: number;
 }
 
+export interface ExtractOptions {
+  /** Cap on returned characters. Default 4000 (summary-sized). */
+  maxChars?: number;
+  /** PDF only: number of leading pages to parse. Default 3. */
+  maxPages?: number;
+}
+
+const DEFAULT_MAX_CHARS = 4000;
+const DEFAULT_MAX_PAGES = 3;
+
+/**
+ * Extract readable text from an in-memory file body. Works for both local
+ * files and storage downloads (Supabase/R2 buffers). Returns null if
+ * extraction fails or the type is unsupported (images, etc.).
+ */
+export async function extractTextFromBuffer(
+  buffer: Buffer,
+  ext: string,
+  options: ExtractOptions = {},
+): Promise<ExtractionResult | null> {
+  const normalizedExt = ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+  const maxChars = options.maxChars ?? DEFAULT_MAX_CHARS;
+  const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+
+  try {
+    if (buffer.length === 0) return null;
+
+    switch (normalizedExt) {
+      case ".pdf": {
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        const result = await parser.getText({ first: maxPages });
+        const text = result.text?.trim();
+        if (!text) return null;
+        return { text: text.slice(0, maxChars), pageCount: result.total };
+      }
+      case ".docx": {
+        const result = await mammoth.extractRawText({ buffer });
+        const text = result.value?.trim();
+        if (!text) return null;
+        return { text: text.slice(0, maxChars) };
+      }
+      case ".txt":
+      case ".md":
+        return { text: buffer.toString("utf-8").slice(0, maxChars) };
+      default:
+        return null; // Unsupported (images, etc.)
+    }
+  } catch (error) {
+    logger.error(`Extraction failed for buffer (${normalizedExt})`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 /**
  * Extract readable text from a file. Returns null if extraction fails
  * or the file type is unsupported (images, etc.).
@@ -28,40 +83,17 @@ export async function extractText(
       return null;
     }
 
-    switch (ext) {
-      case ".pdf":
-        return await extractPdf(filePath);
-      case ".docx":
-        return await extractDocx(filePath);
-      case ".txt":
-      case ".md":
-        return { text: await fs.readFile(filePath, "utf-8") };
-      default:
-        return null; // Unsupported (images, etc.)
-    }
+    const buffer = await fs.readFile(filePath);
+    // txt/md historically returned the full file; pdf/docx cap at 4000 chars.
+    const maxChars =
+      ext === ".txt" || ext === ".md" ? Number.POSITIVE_INFINITY : DEFAULT_MAX_CHARS;
+    return await extractTextFromBuffer(buffer, ext, { maxChars });
   } catch (error) {
     logger.error(`Extraction failed for ${filePath}`, {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
-}
-
-async function extractPdf(filePath: string): Promise<ExtractionResult | null> {
-  const buffer = await fs.readFile(filePath);
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  const result = await parser.getText({ first: 3 }); // First 3 pages
-  const text = result.text?.trim();
-  if (!text) return null;
-  return { text: text.slice(0, 4000), pageCount: result.total };
-}
-
-async function extractDocx(filePath: string): Promise<ExtractionResult | null> {
-  const buffer = await fs.readFile(filePath);
-  const result = await mammoth.extractRawText({ buffer });
-  const text = result.value?.trim();
-  if (!text) return null;
-  return { text: text.slice(0, 4000) };
 }
 
 /**

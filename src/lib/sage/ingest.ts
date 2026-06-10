@@ -3,7 +3,8 @@ import path from "path";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { GeminiProvider } from "@/lib/ai/gemini-provider";
-import { extractText, containsPII } from "@/lib/sage/extract";
+import { extractText, extractTextFromBuffer, containsPII } from "@/lib/sage/extract";
+import { embedProgramDocument } from "@/lib/sage/document-embedding";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import type { ProgramDocCategory, ProgramDocAudience } from "@prisma/client";
@@ -329,15 +330,44 @@ export async function syncSageDocuments(
 
       // Upsert handles race conditions and storageKey mismatches from prior seeds
       const before = existing ? "update" : "create";
-      await prisma.programDocument.upsert({
+      const saved = await prisma.programDocument.upsert({
         where: { storageKey },
         update: data,
         create: data,
+        select: { id: true },
       });
       if (before === "update") {
         result.updated++;
       } else {
         result.added++;
+      }
+
+      // Embed doc + chunks (Phase 1 semantic RAG). Failures are recorded but
+      // never abort the sync loop — the keyword fallback covers unembedded docs.
+      try {
+        const ext = path.extname(relativePath).toLowerCase();
+        let chunkSourceText: string | null = null;
+        if ([".pdf", ".docx", ".txt", ".md"].includes(ext)) {
+          const buffer = await fs.readFile(fullPath);
+          const chunkExtraction = await extractTextFromBuffer(buffer, ext, {
+            maxChars: 12000,
+            maxPages: 6,
+          });
+          const candidate = chunkExtraction?.text ?? null;
+          // PII bodies are never embedded; the doc-level vector (title +
+          // generated summary) still gets written.
+          chunkSourceText = candidate && !containsPII(candidate) ? candidate : null;
+        }
+        await embedProgramDocument(saved.id, {
+          title,
+          sageContextNote,
+          text: chunkSourceText,
+          usage: { studentId: null, callSite: "sage_embedding_ingest" },
+        });
+      } catch (error) {
+        const msg = `${relativePath}: embedding failed — ${error instanceof Error ? error.message : String(error)}`;
+        result.errors.push(msg);
+        logger.error(`Ingestion embedding error: ${msg}`);
       }
     } catch (error) {
       const msg = `${relativePath}: ${error instanceof Error ? error.message : String(error)}`;
