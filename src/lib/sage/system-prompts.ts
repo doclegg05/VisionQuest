@@ -490,6 +490,7 @@ export function buildSystemPrompt(
     discovery_summary?: string;
     career_profile_context?: string;
     skillGapContext?: string;
+    careerThreadContext?: string;
     pathwayContext?: string;
     coachingArcContext?: string;
     staffStudentContext?: string | null;
@@ -628,6 +629,13 @@ export function buildSystemPrompt(
 
   // Inject skill gap context for goal-setting stages
   const goalSettingStages: ConversationStage[] = ["bhag", "monthly", "weekly", "daily"];
+  if (context.careerThreadContext) {
+    parts.push({
+      name: "state.career_thread",
+      content: context.careerThreadContext,
+    });
+  }
+
   if (context.skillGapContext && goalSettingStages.includes(stage)) {
     parts.push({
       name: "state.skill_gap",
