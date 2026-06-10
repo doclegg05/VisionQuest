@@ -34,17 +34,6 @@ export const POST = withAuth(async (session, req: Request) => {
     throw new ApiError(500, "Failed to upload file to storage");
   }
 
-  const record = await prisma.fileUpload.create({
-    data: {
-      studentId: session.id,
-      filename: file.name,
-      mimeType: file.type,
-      sizeBytes: file.size,
-      storageKey,
-      category: "chat",
-    },
-  });
-
   const cloudAllowed =
     session.role === "student" && (await hasActiveConsent(session.id, "cloud_file_processing"));
 
@@ -54,6 +43,19 @@ export const POST = withAuth(async (session, req: Request) => {
     mimeType: file.type,
     studentId: session.id,
     cloudAllowed,
+  });
+
+  const record = await prisma.fileUpload.create({
+    data: {
+      studentId: session.id,
+      filename: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      storageKey,
+      category: "chat",
+      gist,
+      gistMethod: method,
+    },
   });
 
   await logAiAuditEvent({

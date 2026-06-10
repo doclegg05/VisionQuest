@@ -501,6 +501,10 @@ model FileUpload {
   sizeBytes  Int
   storageKey String
   category   String   @default("general")
+  // Chat uploads (Phase 3): short description used in Sage's turn context.
+  // Always produced server-side at upload time — never client-supplied.
+  gist       String?  @db.Text
+  gistMethod String? // cloud | local | none
   uploadedAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
