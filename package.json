@@ -27,6 +27,7 @@
     "sage:rag:harness": "tsx scripts/sage-rag-harness.mjs",
     "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
     "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
+    "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs"
   },
