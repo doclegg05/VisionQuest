@@ -247,10 +247,12 @@ export function recordGoalSet(
 export function recordDailyCheckin(
   state: ProgressionState
 ): { state: ProgressionState; xpGained: number; streakMilestone: number | null } {
-  const today = new Date().toISOString().slice(0, 10);
+  // Must match the local-day normalization used for stored streakDays — a raw
+  // UTC date here lets evening check-ins (local day != UTC day) double-award.
+  const today = normalizeDay(isoNow());
   if (state.streakDays.includes(today)) return { state, xpGained: 0, streakMilestone: null }; // Already checked in today
 
-  const day = normalizeDay(isoNow());
+  const day = today;
   let xpGained = 15;
   state.xp += xpGained;
   state.dailyCheckinsCount++;

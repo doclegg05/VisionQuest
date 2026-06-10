@@ -8,7 +8,7 @@
     "start": "node scripts/start-production.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test --experimental-test-module-mocks src/**/*.test.ts",
+    "test": "tsx --test --experimental-test-module-mocks $(git ls-files 'src/*.test.ts' 'src/*.test.tsx')",
     "test:rls": "tsx --test src/lib/rls.test.ts",
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
