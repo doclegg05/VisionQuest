@@ -107,7 +107,8 @@ export type AiTask =
   | "resume_assist"
   | "resume_extract"
   | "public_form_lookup"
-  | "public_program_help";
+  | "public_program_help"
+  | "chat_file_gist";
 
 export type DataSensitivity =
   | "configured"
