@@ -1,4 +1,4 @@
-import { computeUrgencyScore, type StudentSignals } from "@/lib/intervention-scoring";
+import { computeUrgencyScore, computeUrgencyReasons, type StudentSignals } from "@/lib/intervention-scoring";
 import { isGoalStale } from "@/lib/stale-goal-rules";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
@@ -76,6 +76,8 @@ export interface InterventionQueueEntry {
   email: string | null;
   programType: ProgramType;
   urgencyScore: number;
+  /** Plain-language chips explaining the score (Phase 6). */
+  urgencyReasons: string[];
   primaryAlert: {
     id: string;
     type: string;
@@ -295,6 +297,7 @@ export function buildInterventionQueueEntry(input: {
     email: student.email,
     programType,
     urgencyScore: computeUrgencyScore(signals),
+    urgencyReasons: computeUrgencyReasons(signals),
     primaryAlert: primaryAlert
       ? {
           id: primaryAlert.id,

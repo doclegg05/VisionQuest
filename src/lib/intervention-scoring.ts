@@ -110,3 +110,48 @@ export function computeUrgencyScore(signals: StudentSignals): number {
 
   return score;
 }
+
+/**
+ * Plain-language reasons mirroring every signal that contributed to the
+ * urgency score (Phase 6 — teachers see WHY a student is flagged, not just
+ * a number). Ordered roughly by severity; empty when the score is 0.
+ */
+export function computeUrgencyReasons(signals: StudentSignals): string[] {
+  const reasons: string[] = [];
+
+  if (signals.highSeverityAlertCount > 0) {
+    reasons.push(
+      `${signals.highSeverityAlertCount} critical alert${signals.highSeverityAlertCount === 1 ? "" : "s"}`,
+    );
+  }
+  const nonHighAlertCount = Math.max(0, signals.openAlertCount - signals.highSeverityAlertCount);
+  if (nonHighAlertCount > 0) {
+    reasons.push(`${nonHighAlertCount} open alert${nonHighAlertCount === 1 ? "" : "s"}`);
+  }
+  if (signals.daysSinceLastLogin > LOGIN_INACTIVITY_THRESHOLD_DAYS) {
+    reasons.push(`no login for ${signals.daysSinceLastLogin} days`);
+  }
+  if (signals.stalledGoalCount > 0) {
+    reasons.push(`${signals.stalledGoalCount} stalled goal${signals.stalledGoalCount === 1 ? "" : "s"}`);
+  }
+  if (signals.daysSinceLastGoalReview > GOAL_REVIEW_STALENESS_THRESHOLD_DAYS) {
+    reasons.push(`goals unreviewed for ${signals.daysSinceLastGoalReview} days`);
+  }
+  if (signals.overdueTaskCount > 0) {
+    reasons.push(`${signals.overdueTaskCount} overdue task${signals.overdueTaskCount === 1 ? "" : "s"}`);
+  }
+  if (signals.unmatchedGoalCount > 0) {
+    reasons.push(`${signals.unmatchedGoalCount} goal${signals.unmatchedGoalCount === 1 ? "" : "s"} without a pathway`);
+  }
+  if (signals.evidenceGapCount > 0) {
+    reasons.push(`${signals.evidenceGapCount} evidence gap${signals.evidenceGapCount === 1 ? "" : "s"}`);
+  }
+  if (!signals.orientationComplete) {
+    reasons.push("orientation incomplete");
+  }
+  if (signals.readinessScore < LOW_READINESS_THRESHOLD) {
+    reasons.push(`low readiness (${signals.readinessScore}%)`);
+  }
+
+  return reasons;
+}
