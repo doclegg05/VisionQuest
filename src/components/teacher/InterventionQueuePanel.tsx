@@ -416,6 +416,17 @@ function StudentRow({
           <ProgramBadge programType={student.programType} size="sm" />
         </div>
         <p className="truncate text-xs text-[var(--ink-muted)]">{reason}</p>
+        {student.urgencyReasons.length > 0 && (
+          <p
+            className="mt-0.5 truncate text-xs text-[var(--ink-faint)]"
+            title={student.urgencyReasons.join(" · ")}
+          >
+            Flagged for: {student.urgencyReasons.slice(0, 3).join(" · ")}
+            {student.urgencyReasons.length > 3
+              ? ` · +${student.urgencyReasons.length - 3} more`
+              : ""}
+          </p>
+        )}
         {student.primaryAlert?.summary ? (
           <p className="mt-0.5 line-clamp-2 text-xs text-[var(--ink-muted)]">
             {student.primaryAlert.summary}
