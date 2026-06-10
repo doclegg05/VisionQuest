@@ -91,7 +91,7 @@ export async function hybridSearchDocuments(
         ${vectorLiteral}::vector(768),
         ${queryText},
         ${callerRole},
-        ${limit}
+        ${limit}::int
       )
     `;
 
