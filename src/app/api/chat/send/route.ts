@@ -32,7 +32,7 @@ import { executeSlashCommand } from "@/lib/sage/agent/executor";
 const CHAT_SSE_HEARTBEAT_MS = 15_000;
 
 function isAgentEnabled(): boolean {
-  return process.env.SAGE_AGENT_ENABLED === "true";
+  return process.env.SAGE_AGENT_ENABLED?.trim().toLowerCase() !== "false";
 }
 
 const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|bye|goodbye|cya)[!.,?]*$/i;

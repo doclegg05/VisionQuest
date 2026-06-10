@@ -587,7 +587,7 @@ export function buildSystemPrompt(
   // a `lookup_program_info` tool — Sage retrieves detail on demand instead
   // of carrying it on every turn.
   const agentLazyKnowledgeAvailable =
-    process.env.SAGE_AGENT_ENABLED === "true" &&
+    process.env.SAGE_AGENT_ENABLED?.trim().toLowerCase() !== "false" &&
     !isCompact &&
     KNOWLEDGE_HEAVY_STAGES.has(stage) &&
     (programType === "spokes" || programType === "ietp");
@@ -678,7 +678,7 @@ export function buildSystemPrompt(
   // When agent mode is enabled, teach Sage how to call her tools. The
   // function declarations themselves arrive via the SDK — this addendum
   // sets policy: when to call vs. when to talk, how to frame results.
-  if (process.env.SAGE_AGENT_ENABLED === "true") {
+  if (process.env.SAGE_AGENT_ENABLED?.trim().toLowerCase() !== "false") {
     parts.push({ name: "action.tools", content: AGENT_TOOLS_ADDENDUM });
   }
 

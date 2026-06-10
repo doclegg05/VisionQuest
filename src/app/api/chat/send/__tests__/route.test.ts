@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { after, before, beforeEach, describe, it, mock } from "node:test";
 import { mockStudentSession, mockRequest } from "@/lib/test-helpers";
 
 // ---------------------------------------------------------------------------
@@ -498,6 +498,17 @@ describe("POST /api/chat/send — rate limiting", () => {
 });
 
 describe("POST /api/chat/send — SSE happy path", () => {
+  // This suite drives the classic streamResponse() path; the agent default
+  // flipped to on (Phase 3), so pin it off explicitly.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+  });
+
   beforeEach(() => {
     resetMocks();
   });
