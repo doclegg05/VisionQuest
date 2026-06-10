@@ -92,7 +92,17 @@ export default function CareerHub({
   const [cluster, setCluster] = useState("");
   const [proximity, setProximity] = useState<JobProximityFilter>("local");
   const [sort, setSort] = useState("recommended");
+  const [keyword, setKeyword] = useState("");
+  const [debouncedKeyword, setDebouncedKeyword] = useState("");
+  const [postedWithinDays, setPostedWithinDays] = useState("");
+  const [minPay, setMinPay] = useState("");
+  const [jobType, setJobType] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedKeyword(keyword), 300);
+    return () => clearTimeout(handle);
+  }, [keyword]);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +113,10 @@ export default function CareerHub({
       if (cluster) params.set("cluster", cluster);
       params.set("proximity", proximity);
       if (sort) params.set("sort", sort);
+      if (debouncedKeyword.trim()) params.set("q", debouncedKeyword.trim());
+      if (postedWithinDays) params.set("postedWithinDays", postedWithinDays);
+      if (minPay) params.set("minPay", minPay);
+      if (jobType) params.set("jobType", jobType);
 
       const res = await fetch(`/api/jobs?${params}`);
       if (!cancelled && res.ok) {
@@ -117,7 +131,7 @@ export default function CareerHub({
     return () => {
       cancelled = true;
     };
-  }, [cluster, proximity, sort, refreshKey]);
+  }, [cluster, proximity, sort, debouncedKeyword, postedWithinDays, minPay, jobType, refreshKey]);
 
   const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
@@ -211,11 +225,19 @@ export default function CareerHub({
                 cluster={cluster}
                 proximity={proximity}
                 sort={sort}
+                keyword={keyword}
+                postedWithinDays={postedWithinDays}
+                minPay={minPay}
+                jobType={jobType}
                 localCount={jobsData.totalLocal}
                 remoteCount={jobsData.totalRemote}
                 onClusterChange={setCluster}
                 onProximityChange={setProximity}
                 onSortChange={setSort}
+                onKeywordChange={setKeyword}
+                onPostedChange={setPostedWithinDays}
+                onMinPayChange={setMinPay}
+                onJobTypeChange={setJobType}
               />
             </div>
 
