@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   memoryCandidateSchema,
-  parseMemoryCandidates,
+  parseExtractionItems,
   sourceHashFor,
 } from "./schema";
 
@@ -65,11 +65,11 @@ describe("sourceHashFor", () => {
   });
 });
 
-describe("parseMemoryCandidates", () => {
+describe("parseExtractionItems", () => {
   it("keeps valid entries, counts rejects, never throws", () => {
-    const { accepted, rejected } = parseMemoryCandidates([
-      valid,
-      { ...valid, kind: "nonsense" },
+    const { accepted, rejected } = parseExtractionItems([
+      { kind: "semantic", content: "Valid fact.", category: "skill", confidence: 0.8 },
+      { kind: "nonsense", content: "Bad kind.", category: "skill", confidence: 0.8 },
       "garbage",
     ]);
     assert.equal(accepted.length, 1);
@@ -77,6 +77,6 @@ describe("parseMemoryCandidates", () => {
   });
 
   it("returns empty for non-arrays", () => {
-    assert.deepEqual(parseMemoryCandidates({ not: "an array" }), { accepted: [], rejected: 0 });
+    assert.deepEqual(parseExtractionItems({ not: "an array" }), { accepted: [], rejected: 0 });
   });
 });

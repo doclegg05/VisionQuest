@@ -71,19 +71,33 @@ export function sourceHashFor(candidate: Pick<MemoryCandidate, "subjectType" | "
 }
 
 /**
- * Parse a batch of raw extraction candidates. Invalid entries are dropped
+ * What the extraction model is allowed to provide: content fields only.
+ * Subject identity and provenance are pinned server-side — the model is
+ * never trusted with them.
+ */
+export const extractionItemSchema = memoryCandidateSchema.pick({
+  kind: true,
+  content: true,
+  category: true,
+  confidence: true,
+});
+
+export type ExtractionItem = z.infer<typeof extractionItemSchema>;
+
+/**
+ * Parse a batch of raw model extraction items. Invalid entries are dropped
  * (reported in `rejected`), never thrown — extraction is best-effort.
  */
-export function parseMemoryCandidates(raw: unknown): {
-  accepted: MemoryCandidate[];
+export function parseExtractionItems(raw: unknown): {
+  accepted: ExtractionItem[];
   rejected: number;
 } {
   if (!Array.isArray(raw)) return { accepted: [], rejected: 0 };
 
-  const accepted: MemoryCandidate[] = [];
+  const accepted: ExtractionItem[] = [];
   let rejected = 0;
   for (const entry of raw) {
-    const result = memoryCandidateSchema.safeParse(entry);
+    const result = extractionItemSchema.safeParse(entry);
     if (result.success) {
       accepted.push(result.data);
     } else {
