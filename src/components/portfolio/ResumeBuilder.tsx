@@ -5,6 +5,7 @@ import {
   EMPTY_RESUME,
   buildResumePlainText,
   buildResumePrintHtml,
+  isResumeEmpty,
   type ResumeCertification,
   type ResumeContent,
   type ResumeEducation,
@@ -47,6 +48,7 @@ export default function ResumeBuilder() {
   const [uploading, setUploading] = useState(false);
   const [uploadImprovements, setUploadImprovements] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchResume() {
@@ -414,6 +416,57 @@ export default function ResumeBuilder() {
         ) : null}
       </div>
 
+      <div
+        role="tablist"
+        aria-label="Resume editor view"
+        className="flex gap-1 rounded-xl bg-[var(--surface-soft)] p-1"
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            setActiveTab((t) => (t === "edit" ? "preview" : "edit"));
+          }
+        }}
+      >
+        {(["edit", "preview"] as const).map((tab) => (
+          <button
+            key={tab}
+            id={`resume-tab-${tab}`}
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`resume-tabpanel-${tab}`}
+            tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => setActiveTab(tab)}
+            className={`min-h-[44px] flex-1 rounded-lg px-4 text-sm font-semibold transition ${
+              activeTab === tab
+                ? "bg-white text-[var(--accent-strong)] shadow-sm"
+                : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+            }`}
+          >
+            {tab === "edit" ? "Edit" : "Preview"}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "preview" ? (
+        <div role="tabpanel" id="resume-tabpanel-preview" aria-labelledby="resume-tab-preview" className="surface-section p-3">
+          {isResumeEmpty(resume) ? (
+            <div className="rounded-xl border border-dashed border-[var(--border)] px-6 py-16 text-center">
+              <p className="text-sm font-medium text-[var(--ink-strong)]">Your resume is empty</p>
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                Switch to <span className="font-semibold">Edit</span> and add your details — they’ll show up here.
+              </p>
+            </div>
+          ) : (
+            <iframe
+              title="Resume preview"
+              sandbox=""
+              className="h-[80vh] w-full rounded-lg border border-[var(--border)] bg-white"
+              srcDoc={buildResumePrintHtml(displayName || "Resume", resume)}
+            />
+          )}
+        </div>
+      ) : (
+        <div role="tabpanel" id="resume-tabpanel-edit" aria-labelledby="resume-tab-edit" className="space-y-6">
       <div
         className={`surface-section p-5 ${dragOver ? "ring-2 ring-[var(--accent-strong)] ring-inset" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -818,6 +871,8 @@ export default function ResumeBuilder() {
       >
         {saved ? "Resume Saved" : saving ? "Saving..." : "Save Resume"}
       </button>
+        </div>
+      )}
     </div>
   );
 }
