@@ -117,6 +117,7 @@ const proposeResumeEdit: AgentTool = {
       args: toolArgs,
       sessionId: ctx.session.id,
       conversationId: ctx.conversationId,
+      targetStudentId: ctx.targetStudentId,
     };
     const now = new Date();
 

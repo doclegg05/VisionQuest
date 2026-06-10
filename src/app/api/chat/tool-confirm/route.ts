@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, badRequest } from "@/lib/api-error";
+import { withAuth, badRequest, isStaffRole } from "@/lib/api-error";
 import { executeAgentTool } from "@/lib/sage/agent/executor";
 import { verifyConfirmationToken } from "@/lib/sage/agent/confirmation";
 
@@ -9,6 +9,7 @@ const confirmSchema = z.object({
   args: z.record(z.string(), z.unknown()),
   token: z.string().min(1).max(512),
   conversationId: z.string().cuid(),
+  targetStudentId: z.string().cuid().optional(),
 });
 
 /**
@@ -24,11 +25,17 @@ export const POST = withAuth(async (session, req: Request) => {
   const body = confirmSchema.safeParse(await req.json());
   if (!body.success) throw badRequest("Invalid confirmation request.");
 
-  const { toolName, args, token, conversationId } = body.data;
+  const { toolName, args, token, conversationId, targetStudentId } = body.data;
+
+  // Staff-assisted flows only: a student must never confirm on behalf of
+  // another student, so reject targetStudentId from non-staff sessions.
+  if (targetStudentId && !isStaffRole(session.role)) {
+    throw badRequest("Invalid confirmation request.");
+  }
 
   const valid = verifyConfirmationToken(
     token,
-    { toolName, args, sessionId: session.id, conversationId },
+    { toolName, args, sessionId: session.id, conversationId, targetStudentId },
     new Date(),
   );
   if (!valid) {
@@ -40,6 +47,7 @@ export const POST = withAuth(async (session, req: Request) => {
     conversationId,
     toolName,
     args,
+    targetStudentId,
     confirmedToken: token,
   });
 

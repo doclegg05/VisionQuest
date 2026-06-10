@@ -32,6 +32,7 @@ export function ConfirmToolCard({ label, summary, meta }: ConfirmToolCardProps) 
           args: meta.args,
           token: meta.token,
           conversationId: meta.conversationId,
+          targetStudentId: meta.targetStudentId,
         }),
       });
       const json = await res.json();

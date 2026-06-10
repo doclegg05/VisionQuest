@@ -175,6 +175,94 @@ describe("write tools — confirmation enforcement", () => {
   });
 });
 
+describe("write tools — staff-assisted target binding", () => {
+  beforeEach(() => {
+    mockFileFindFirst.mock.resetCalls();
+    mockTransaction.mock.resetCalls();
+    mockRecordOperation.mock.resetCalls();
+    mockFileFindFirst.mock.mockImplementation(async () => ({ id: "file-1", filename: "signed-form.pdf" }));
+    mockItemFindUnique.mock.mockImplementation(async () => ({ id: "item-1", label: "Dress Code Policy" }));
+  });
+
+  it("a token bound to targetStudentId cannot confirm without it — proposal again, no write", async () => {
+    const token = createConfirmationToken(
+      {
+        toolName: "submit_form",
+        args: SUBMIT_ARGS,
+        sessionId: "teach-1",
+        conversationId: "conv-1",
+        targetStudentId: "stu-2",
+      },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      // targetStudentId deliberately omitted — token must not verify
+      confirmedToken: token,
+    });
+    assert.equal(record.result.action?.action, "confirm_tool");
+    assert.equal(mockTransaction.mock.callCount(), 0);
+  });
+
+  it("teacher round-trip with targetStudentId executes against the TARGET student", async () => {
+    const token = createConfirmationToken(
+      {
+        toolName: "submit_form",
+        args: SUBMIT_ARGS,
+        sessionId: "teach-1",
+        conversationId: "conv-1",
+        targetStudentId: "stu-2",
+      },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      targetStudentId: "stu-2",
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /Done/);
+    assert.equal(mockTransaction.mock.callCount(), 1);
+    // Ownership lookup must be scoped to the target student, not the teacher.
+    const fileWhere = mockFileFindFirst.mock.calls[0].arguments[0].where;
+    assert.equal(fileWhere.studentId, "stu-2");
+  });
+
+  it("a token bound to one target cannot confirm for a different target", async () => {
+    const token = createConfirmationToken(
+      {
+        toolName: "submit_form",
+        args: SUBMIT_ARGS,
+        sessionId: "teach-1",
+        conversationId: "conv-1",
+        targetStudentId: "stu-2",
+      },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      targetStudentId: "stu-OTHER",
+      confirmedToken: token,
+    });
+    assert.equal(record.result.action?.action, "confirm_tool");
+    assert.equal(mockTransaction.mock.callCount(), 0);
+  });
+
+  // Note: a STUDENT supplying targetStudentId to /api/chat/tool-confirm is
+  // rejected with 400 at the route itself (isStaffRole guard in
+  // src/app/api/chat/tool-confirm/route.ts) before any verification runs.
+});
+
 describe("write tools — role gating at the executor", () => {
   it("rejects a teacher calling the student-only save_job", async () => {
     const record = await executeAgentTool({
