@@ -5,6 +5,7 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 const mockFindMany = mock.fn() as any;
 const mockCreate = mock.fn() as any;
 const mockExecuteRaw = mock.fn(async () => 1) as any;
+const mockQueryRaw = mock.fn(async () => []) as any;
 const mockEmbedTexts = mock.fn() as any;
 
 mock.module("@/lib/db", {
@@ -19,6 +20,7 @@ mock.module("@/lib/db", {
         },
       },
       $executeRaw: mockExecuteRaw,
+      $queryRaw: mockQueryRaw,
     },
   },
 });
@@ -60,11 +62,20 @@ describe("extractAndStoreMemories", () => {
     mockFindMany.mock.resetCalls();
     mockCreate.mock.resetCalls();
     mockExecuteRaw.mock.resetCalls();
+    mockQueryRaw.mock.resetCalls();
     mockEmbedTexts.mock.resetCalls();
     mockFindMany.mock.mockImplementation(async () => []);
+    mockQueryRaw.mock.mockImplementation(async () => []);
     let n = 0;
     mockCreate.mock.mockImplementation(async () => ({ id: `mem-${n++}` }));
-    mockEmbedTexts.mock.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+    // Orthogonal unit vectors per text so batch self-dedupe doesn't trigger.
+    mockEmbedTexts.mock.mockImplementation(async (texts: string[]) =>
+      texts.map((_, i) => {
+        const vector = new Array(4).fill(0);
+        vector[i % 4] = 1;
+        return vector;
+      }),
+    );
   });
 
   it("stores validated candidates with server-pinned subject and provenance", async () => {
@@ -107,6 +118,33 @@ describe("extractAndStoreMemories", () => {
       content: "Wants to become a CNA.",
     });
     mockFindMany.mock.mockImplementation(async () => [{ sourceHash: existingHash }]);
+
+    const result = await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+    assert.deepEqual(result, { stored: 1, deduped: 1, rejected: 0 });
+  });
+
+  it("skips semantic near-duplicates of existing memories", async () => {
+    // DB similarity probe reports an existing close neighbor for every candidate.
+    mockQueryRaw.mock.mockImplementation(async () => [{ id: "existing-mem" }]);
+
+    const result = await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+    assert.deepEqual(result, { stored: 0, deduped: 2, rejected: 0 });
+    assert.equal(mockCreate.mock.callCount(), 0);
+  });
+
+  it("skips near-duplicates within the same extraction batch", async () => {
+    // Same vector for both candidates → second is a batch-level duplicate.
+    mockEmbedTexts.mock.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0, 0]));
 
     const result = await extractAndStoreMemories({
       provider: providerReturning(VALID_JSON),

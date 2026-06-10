@@ -28,6 +28,30 @@ import {
 
 const MAX_MEMORIES_PER_CONVERSATION = 5;
 
+/**
+ * Semantic dedupe cutoff: a candidate whose embedding is within this cosine
+ * distance of an existing ACTIVE memory is a rephrasing, not a new fact.
+ * (0.08 distance ≈ 0.92 similarity.) Overridable via SAGE_MEMORY_DUP_DISTANCE.
+ */
+const DEFAULT_DUP_DISTANCE = 0.08;
+
+function getDupDistance(): number {
+  const raw = Number.parseFloat(process.env.SAGE_MEMORY_DUP_DISTANCE ?? "");
+  return Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : DEFAULT_DUP_DISTANCE;
+}
+
+function cosineDistance(a: number[], b: number[]): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return 1 - dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 const EXTRACTION_PROMPT = `You are a memory extractor for Sage, an AI coach for adult workforce-development students.
 
 From the conversation, extract up to ${MAX_MEMORIES_PER_CONVERSATION} NEW durable facts worth remembering about the student in future sessions.
@@ -136,8 +160,35 @@ export async function extractAndStoreMemories({
     );
 
     let stored = 0;
+    const insertedVectors: number[][] = [];
     for (let i = 0; i < fresh.length; i++) {
       const candidate = fresh[i];
+
+      // Semantic dedupe layer 1: rephrased versions of facts already in the
+      // DB (the hash layer only catches near-verbatim restatements).
+      const dupDistance = getDupDistance();
+      const vectorLiteral = toVectorLiteral(vectors[i]);
+      const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "visionquest"."SageMemory"
+        WHERE "subjectType" = ${candidate.subjectType}
+          AND "subjectId" = ${candidate.subjectId}
+          AND "validTo" IS NULL
+          AND embedding IS NOT NULL
+          AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
+        LIMIT 1
+      `;
+      if (semanticDup.length > 0) {
+        deduped++;
+        continue;
+      }
+
+      // Semantic dedupe layer 2: near-duplicates within this same batch
+      // (the model sometimes emits the same fact twice in one response).
+      if (insertedVectors.some((vector) => cosineDistance(vector, vectors[i]) <= dupDistance)) {
+        deduped++;
+        continue;
+      }
+
       try {
         const row = await prisma.sageMemory.create({
           data: {
@@ -155,9 +206,10 @@ export async function extractAndStoreMemories({
         });
         await prisma.$executeRaw`
           UPDATE "visionquest"."SageMemory"
-          SET embedding = ${toVectorLiteral(vectors[i])}::vector(768)
+          SET embedding = ${vectorLiteral}::vector(768)
           WHERE id = ${row.id}
         `;
+        insertedVectors.push(vectors[i]);
         stored++;
       } catch (error) {
         if (isUniqueViolation(error)) {
