@@ -128,12 +128,12 @@ confirm-before-execute card except trivially reversible ones):**
 notified), `update_goal_status`, `mark_requirement_complete` (proposes; teacher still verifies),
 `update_profile_field`, `save_job`, `book_appointment`, `add_portfolio_item`.
 
-- [ ] Consent model + orientation/settings UI + provider routing.
-- [ ] Chat attachments end-to-end (UI composer → storage → classification → filing card).
-- [ ] Write tools with zod-validated params, confirmation UX, ledger + audit on every execution.
-- [ ] Orientation-via-chat golden path: instructor/student hands Sage a signed form →
+- [x] Consent model + orientation/settings UI + provider routing.
+- [x] Chat attachments end-to-end (UI composer → storage → classification → filing card).
+- [x] Write tools with zod-validated params, confirmation UX, ledger + audit on every execution.
+- [x] Orientation-via-chat golden path: instructor/student hands Sage a signed form →
       classified → linked to orientation item → status flips → appears on teacher dashboard.
-- [ ] `SAGE_AGENT_ENABLED` default true; `maxHops` raised to 8; agent eval set
+- [x] `SAGE_AGENT_ENABLED` default true; `maxHops` raised to 8; agent eval set
       (`config/sage-agent-eval.json`, ≥25 scripted tool-use scenarios) added to harness.
 
 **Acceptance:** golden path passes e2e; every write tool execution has a ledger + audit row;
