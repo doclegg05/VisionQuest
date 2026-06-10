@@ -2,6 +2,7 @@ import type {
   StudentData,
   PublicCredentialPageData,
 } from "./types";
+import { MemoryInspectorPanel } from "./MemoryInspectorPanel";
 
 interface ProgressTabProps {
   data: StudentData;
@@ -316,6 +317,8 @@ export default function ProgressTab({
           </div>
         )}
       </div>
+
+      <MemoryInspectorPanel studentId={data.studentId} />
     </div>
   );
 }
