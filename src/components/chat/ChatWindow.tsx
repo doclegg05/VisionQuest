@@ -95,12 +95,14 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
         }
         if (event.kind === "action" && event.target) {
           const external = /^https?:\/\//i.test(event.target);
+          // Form PDFs open in a new tab so they don't replace the chat.
+          const newTab = external || event.action === "open_form";
           return (
             <a
               key={event.id}
               href={event.target}
-              target={external ? "_blank" : undefined}
-              rel={external ? "noopener noreferrer" : undefined}
+              target={newTab ? "_blank" : undefined}
+              rel={newTab ? "noopener noreferrer" : undefined}
               className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-semibold text-[var(--accent-strong)] shadow-sm transition-colors hover:bg-[var(--surface-interactive)]"
             >
               <ArrowSquareOut size={17} weight="bold" className="shrink-0" />
