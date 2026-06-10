@@ -35,7 +35,7 @@ mock.module("@/lib/cache", {
 mock.module("./hybrid-retrieval", {
   namedExports: {
     hybridSearchDocuments: mockHybridSearch,
-    MAX_COSINE_DISTANCE: 0.55,
+    getMaxCosineDistance: () => 0.55,
     buildWebsearchQuery: (msg: string) => msg,
   },
 });

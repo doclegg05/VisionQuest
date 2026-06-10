@@ -39,7 +39,7 @@ let MAX_COSINE_DISTANCE: number;
 before(async () => {
   const mod = await import("./hybrid-retrieval");
   hybridSearchDocuments = mod.hybridSearchDocuments;
-  MAX_COSINE_DISTANCE = mod.MAX_COSINE_DISTANCE;
+  MAX_COSINE_DISTANCE = mod.getMaxCosineDistance();
 });
 
 function dbRow(overrides: Record<string, unknown> = {}) {

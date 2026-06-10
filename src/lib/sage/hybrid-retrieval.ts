@@ -30,9 +30,47 @@ export interface HybridDocResult {
 /**
  * Clean-retrieval cutoff: semantic-only matches (no FTS hit) farther than
  * this cosine distance are dropped as noise. Tuned against
- * `npm run sage:rag:harness -- --strict-clean` (Task 9).
+ * `npm run sage:rag:harness -- --strict-clean` (Task 9); overridable via
+ * SAGE_RAG_MAX_DISTANCE for operational tuning without a deploy.
  */
-export const MAX_COSINE_DISTANCE = 0.55;
+const DEFAULT_MAX_COSINE_DISTANCE = 0.55;
+
+export function getMaxCosineDistance(): number {
+  const raw = Number.parseFloat(process.env.SAGE_RAG_MAX_DISTANCE ?? "");
+  return Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : DEFAULT_MAX_COSINE_DISTANCE;
+}
+
+/**
+ * Relative score cutoff: entries scoring below this fraction of the top
+ * result's RRF score are dropped. A doc that hits both search legs scores
+ * roughly 2x a single-leg match, so this separates "the answer plus its
+ * genuine peers" from plausible-but-off-target fillers. Overridable via
+ * SAGE_RAG_MIN_SCORE_RATIO.
+ */
+const DEFAULT_MIN_SCORE_RATIO = 0;
+
+export function getMinScoreRatio(): number {
+  const raw = Number.parseFloat(process.env.SAGE_RAG_MIN_SCORE_RATIO ?? "");
+  return Number.isFinite(raw) && raw >= 0 && raw < 1 ? raw : DEFAULT_MIN_SCORE_RATIO;
+}
+
+/**
+ * Relative distance margin: entries whose best cosine distance exceeds the
+ * closest entry's distance by more than this are dropped, even when they hit
+ * the full-text leg. RRF treats rank positions as equal-quality, so weak
+ * shared-word FTS matches ("SPOKES", "services") otherwise score nearly as
+ * high as the true answer; the embedding distance separates them cleanly.
+ * Disabled when 0. Overridable via SAGE_RAG_DISTANCE_MARGIN.
+ *
+ * 0.04 tuned via harness sweep (2026-06-10): margins ≤0.035 break the
+ * 100% top-3 gate; ≥0.045 lets fillers back in (clean 18/20 at 0.04).
+ */
+const DEFAULT_DISTANCE_MARGIN = 0.04;
+
+export function getDistanceMargin(): number {
+  const raw = Number.parseFloat(process.env.SAGE_RAG_DISTANCE_MARGIN ?? "");
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : DEFAULT_DISTANCE_MARGIN;
+}
 
 const QUERY_EMBED_CACHE_TTL_SECONDS = 300;
 
@@ -95,11 +133,29 @@ export async function hybridSearchDocuments(
       )
     `;
 
-    return rows
+    const filtered = rows.filter(
+      (row) =>
+        row.fts_rank !== null ||
+        (row.best_distance !== null && row.best_distance <= getMaxCosineDistance()),
+    );
+
+    // Rows arrive ordered by fused score; apply relative cutoffs against the
+    // best surviving entry.
+    const topScore = filtered[0]?.score ?? 0;
+    const minScore = topScore * getMinScoreRatio();
+
+    const distances = filtered
+      .map((row) => row.best_distance)
+      .filter((distance): distance is number => distance !== null);
+    const margin = getDistanceMargin();
+    const maxAllowedDistance =
+      margin > 0 && distances.length > 0 ? Math.min(...distances) + margin : Infinity;
+
+    return filtered
       .filter(
         (row) =>
-          row.fts_rank !== null ||
-          (row.best_distance !== null && row.best_distance <= MAX_COSINE_DISTANCE),
+          row.score >= minScore &&
+          (row.best_distance === null || row.best_distance <= maxAllowedDistance),
       )
       .map((row) => ({
         id: row.id,
