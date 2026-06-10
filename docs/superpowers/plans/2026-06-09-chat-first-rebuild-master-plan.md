@@ -166,16 +166,16 @@ accessibility ≥ 90 on home; existing dashboards' data parity verified.
 
 **Branch:** `feat/career-connected`
 
-- [ ] Resume: JSON-Patch propose→accept/reject flow for Sage edits (Reactive Resume pattern) —
+- [x] Resume: JSON-Patch propose→accept/reject flow for Sage edits (Reactive Resume pattern) —
       new `propose_resume_edit` tool; student reviews diff card; accepted patches applied to
       `ResumeData`.
-- [ ] Jobs: `analyze_job_match` tool — Sage reads a posting + student profile/resume/certs →
+- [x] Jobs: `analyze_job_match` tool — Sage reads a posting + student profile/resume/certs →
       skill-gap summary + "resources to close gap" (links Learning items); job search via chat
       ("find me CNA jobs near Beckley").
-- [ ] Credentials: Sage suggests evidence→`CertRequirement` matches when documents are filed
+- [x] Credentials: Sage suggests evidence→`CertRequirement` matches when documents are filed
       (teacher verification unchanged); server-side Credly badge caching
       (`src/app/api/credly/badges` gains DB cache w/ 24h TTL).
-- [ ] Goal → resume → job thread: confirming a career goal prompts Sage to flag resume gaps
+- [x] Goal → resume → job thread: confirming a career goal prompts Sage to flag resume gaps
       and relevant job matches.
 
 **Acceptance:** each flow has an e2e test; resume edits never apply without explicit accept;

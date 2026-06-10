@@ -446,6 +446,7 @@ const classifyAttachment: AgentTool = {
 // -----------------------------------------------------------------------------
 
 import { WRITE_TOOLS } from "./write-tools";
+import { CAREER_TOOLS } from "./career-tools";
 
 const ALL_TOOLS: AgentTool[] = [
   presentForm,
@@ -455,6 +456,7 @@ const ALL_TOOLS: AgentTool[] = [
   lookupProgramInfo,
   classifyAttachment,
   ...WRITE_TOOLS,
+  ...CAREER_TOOLS,
 ];
 
 export function getEnabledTools(role: string): AgentTool[] {
