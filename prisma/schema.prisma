@@ -979,6 +979,17 @@ model ProgramDocument {
   sageContextNote String?   @db.Text
   fileModifiedAt  DateTime? // Filesystem mtime at ingestion — for change detection
 
+  // --- Semantic Retrieval (Phase 1 — hybrid RAG) ---
+  // gemini-embedding-001 @ 768 dims over `title + sageContextNote`.
+  // Read/written only via $queryRaw/$executeRaw (Prisma Unsupported type).
+  // Manual SQL objects NOT representable here (see migrations):
+  //   - HNSW index ProgramDocument_embedding_hnsw_idx (vector_cosine_ops)
+  //   - GIN expression index ProgramDocument_fts_idx on
+  //     to_tsvector('english', title || ' ' || coalesce(sageContextNote, ''))
+  //   - Function visionquest.sage_hybrid_search(...) — RRF hybrid retrieval
+  embedding Unsupported("vector(768)")?
+  chunks    DocumentChunk[]
+
   // --- Metadata ---
   sortOrder  Int      @default(0)
   isActive   Boolean  @default(true)
@@ -990,6 +1001,27 @@ model ProgramDocument {
   @@index([certificationId])
   @@index([platformId])
   @@index([usedBySage, isActive])
+  @@schema("visionquest")
+}
+
+// Chunked bodies of extractable-text ProgramDocuments (~512-token chunks,
+// 50-token overlap) embedded for semantic retrieval. Scanned/image docs have
+// no chunks — their doc-level embedding (title + sageContextNote) suffices.
+// Manual SQL (see migrations): HNSW index DocumentChunk_embedding_hnsw_idx,
+// RLS policies mirroring program_document_read/write.
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  chunkIndex Int
+  content    String   @db.Text
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document ProgramDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
   @@schema("visionquest")
 }
 
@@ -1306,7 +1338,10 @@ model StudentSavedJob {
 
 model LlmCallLog {
   id           String   @id @default(cuid())
-  studentId    String
+  // Nullable since Phase 1 semantic RAG: system calls (embedding ingest /
+  // backfill scripts) have no student. NULL rows are admin-visible only under
+  // the existing llm_call_log_access RLS policy and never count toward quotas.
+  studentId    String?
   callSite     String
   model        String
   inputTokens  Int      @default(0)
@@ -1315,7 +1350,7 @@ model LlmCallLog {
   durationMs   Int?
   createdAt    DateTime @default(now())
 
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, createdAt])
   @@index([createdAt])
