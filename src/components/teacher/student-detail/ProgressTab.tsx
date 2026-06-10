@@ -318,7 +318,7 @@ export default function ProgressTab({
         )}
       </div>
 
-      <MemoryInspectorPanel studentId={data.studentId} />
+      <MemoryInspectorPanel studentId={data.student.id} />
     </div>
   );
 }
