@@ -46,18 +46,18 @@ as fallback, jsPDF/`@react-pdf/renderer` for resume, Playwright e2e.
 
 **Branch:** work directly via PRs from existing branches; model change on `feat/gemini-3-1-upgrade`.
 
-- [ ] Merge `origin/feat/resume-live-preview` via PR (verified conflict-free; tests included).
-- [ ] Finish `origin/feat/wv-local-job-feed`:
-  - [ ] Generate + apply Prisma migration for `JobListing.employmentType`.
-  - [ ] Complete student filter UI in `src/components/jobs/JobFilters.tsx`
+- [x] Merge `origin/feat/resume-live-preview` via PR (verified conflict-free; tests included).
+- [x] Finish `origin/feat/wv-local-job-feed`:
+  - [x] Generate + apply Prisma migration for `JobListing.employmentType`.
+  - [x] Complete student filter UI in `src/components/jobs/JobFilters.tsx`
         (keyword, min pay, employment type, posted-after — API already accepts these params).
-  - [ ] End-to-end test: filters → `/api/jobs` → filtered list.
-  - [ ] Merge via PR.
-- [ ] Model upgrade: default `gemini-3.1-flash-lite` in `src/lib/ai/gemini-provider.ts`
+  - [x] End-to-end test: filters → `/api/jobs` → filtered list.
+  - [x] Merge via PR.
+- [x] Model upgrade: default `gemini-3.1-flash-lite` in `src/lib/ai/gemini-provider.ts`
       (env-overridable via `GEMINI_MODEL`); verify model-level `systemInstruction` still applies
       (per CLAUDE.md gotcha); run `npm run sage:rag:harness` + chat smoke tests; re-check token
       quota math in `src/lib/llm-usage.ts` against 3.1 pricing ($0.25/$1.50 per M).
-- [ ] Remove orphaned `/jobs` redirect page.
+- [x] Remove orphaned `/jobs` redirect page.
 
 **Acceptance:** both branches merged; harness pass-rate unchanged or better on 3.1;
 `npm run build` + full test suite green.
