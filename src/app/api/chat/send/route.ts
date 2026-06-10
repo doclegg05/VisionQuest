@@ -3,6 +3,7 @@ import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
+import { getMemoryContext } from "@/lib/sage/memory/retrieve";
 import { getDirectFormAnswer, getFormContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
@@ -413,6 +414,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     if (formContext) {
       formContextChars = formContext.length;
       systemPrompt += formContext;
+    }
+
+    // Durable memory (Phase 2): what Sage remembers about this student from
+    // previous sessions. Student-subject only — teacher chat gets student
+    // context via staff-student-context, not memories.
+    if (!isTeacher && process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
+      const memoryContext = await getMemoryContext(session.id, userMessage);
+      if (memoryContext) {
+        systemPrompt += memoryContext;
+      }
     }
   }
 
