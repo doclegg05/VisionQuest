@@ -73,12 +73,12 @@ on `ProgramDocument`, new `DocumentChunk` model), new `src/lib/ai/embeddings.ts`
 keyword scoring with hybrid retrieval; keep keyword fallback when embeddings absent),
 `scripts/backfill-embeddings.mjs`, `scripts/sage-rag-harness.mjs` (add clean-retrieval gate).
 
-- [ ] Enable pgvector; add embedding columns + `DocumentChunk` (chunk size 512 tokens, 50 overlap).
-- [ ] Embedding service with batching + retry + `LlmCallLog` cost logging.
-- [ ] Hybrid search SQL function: `tsvector` GIN + HNSW index, RRF k=50, weights configurable.
-- [ ] Ingest pipeline embeds `sageContextNote` + chunks; backfill all ~150 ProgramDocuments.
-- [ ] Retrieval swap in `getDocumentContext()`; audience filtering preserved.
-- [ ] Harness: keep 100% top-3 relevance; **clean retrieval ≥ 80%** (now 25%); add 20 new
+- [x] Enable pgvector; add embedding columns + `DocumentChunk` (chunk size 512 tokens, 50 overlap).
+- [x] Embedding service with batching + retry + `LlmCallLog` cost logging.
+- [x] Hybrid search SQL function: `tsvector` GIN + HNSW index, RRF k=50, weights configurable.
+- [x] Ingest pipeline embeds `sageContextNote` + chunks; backfill all ~150 ProgramDocuments.
+- [x] Retrieval swap in `getDocumentContext()`; audience filtering preserved.
+- [x] Harness: keep 100% top-3 relevance; **clean retrieval ≥ 80%** (now 25%); add 20 new
       fixture questions covering forms + LMS guides.
 
 **Acceptance:** harness thresholds met; retrieval latency < 300ms p95 locally; no FERPA
