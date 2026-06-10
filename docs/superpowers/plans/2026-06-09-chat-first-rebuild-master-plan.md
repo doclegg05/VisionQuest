@@ -185,15 +185,15 @@ job analysis cites only real posting content (no hallucinated requirements — e
 
 **Branch:** `chore/launch-hardening`
 
-- [ ] Security review of all new write tools + upload pipeline + consent enforcement
+- [x] Security review of all new write tools + upload pipeline + consent enforcement
       (treat as auth-adjacent: injection, path traversal, MIME spoofing, role bypass).
-- [ ] Full eval pass: RAG harness, agent eval set, memory accuracy script; quota/pricing
+- [x] Full eval pass: RAG harness, agent eval set, memory accuracy script; quota/pricing
       re-tune for 3.1 Flash Lite.
-- [ ] E2e suite green (Playwright); 80% coverage on new modules.
-- [ ] Render deploy: migrations via `prisma migrate deploy` (auto on deploy), env vars
+- [x] E2e suite green (Playwright); 80% coverage on new modules.
+- [x] Render deploy: migrations via `prisma migrate deploy` (auto on deploy), env vars
       (GEMINI_MODEL, COS_USER_ID/COS_API_TOKEN for CareerOneStop, embedding config) —
       mind Render gotchas: devDependencies, standalone mode, env var formatting.
-- [ ] Docs: update CLAUDE.md, DEPLOY.md, README; project `.claude/MEMORY.md` session log.
+- [x] Docs: update CLAUDE.md, DEPLOY.md, README; project `.claude/MEMORY.md` session log.
 
 **Acceptance:** production deploy healthy; smoke tests on prod; rollback plan documented.
 
