@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { sanitizeForPrompt } from "./system-prompts";
 import { tokenizeForRetrieval } from "./retrieval-tokens";
+import { hybridSearchDocuments } from "./hybrid-retrieval";
 
 interface SageDocument {
   id: string;
@@ -28,6 +29,13 @@ function isSageRagEnabled(): boolean {
   const value = process.env.SAGE_RAG_ENABLED;
   if (!value) return true;
   return !["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+}
+
+type RagMode = "hybrid" | "keyword";
+
+/** SAGE_RAG_MODE=keyword is the operational kill switch back to legacy scoring. */
+function getSageRagMode(): RagMode {
+  return process.env.SAGE_RAG_MODE?.trim().toLowerCase() === "keyword" ? "keyword" : "hybrid";
 }
 
 function messageIncludesIdentifier(messageLower: string, identifier: string): boolean {
@@ -165,25 +173,40 @@ function formatEntry(entry: ScoredEntry): string {
 }
 
 /**
- * Retrieve relevant program documents based on the user's message.
- * Returns formatted context string to inject into Sage's system prompt.
- *
- * Uses keyword matching on document titles, certification/platform IDs,
- * and sageContextNote content. Returns top 3 matches.
- *
- * Upgrade path: replace keyword matching with pgvector cosine similarity
- * if corpus grows beyond 200 documents. The function signature stays the same.
+ * Mirrors the RRF k-constant in visionquest.sage_hybrid_search() so
+ * keyword-ranked snippets fuse onto the same score scale as hybrid docs
+ * (rank 0 → 1/51 ≈ 0.0196, comparable to a single-leg document hit).
  */
-export async function getDocumentContext(
-  userMessage: string,
-  callerRole: CallerRole = "student",
-  maxResults: number = 3,
-  tokenBudgetChars: number = TOKEN_BUDGET_CHARS,
+const RRF_K = 50;
+
+/** Sort by score, cap at maxResults, drop lowest-scoring entries to fit budget. */
+function assembleContext(
+  entries: ScoredEntry[],
+  maxResults: number,
+  tokenBudgetChars: number,
+): string {
+  let combined = [...entries].sort((a, b) => b.score - a.score).slice(0, maxResults);
+
+  if (combined.length === 0) return "";
+
+  let totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  while (totalChars > tokenBudgetChars && combined.length > 1) {
+    combined = combined.slice(0, -1);
+    totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  }
+
+  const content = combined.map(formatEntry).join("\n\n");
+
+  return `\n\nPROGRAM DOCUMENT REFERENCE (use this for specific, accurate answers about program materials):\n${content}`;
+}
+
+/** Legacy keyword-scoring retrieval — kept as the fallback and kill-switch path. */
+async function keywordDocumentContext(
+  messageLower: string,
+  callerRole: CallerRole,
+  maxResults: number,
+  tokenBudgetChars: number,
 ): Promise<string> {
-  if (!isSageRagEnabled()) return "";
-
-  const messageLower = userMessage.toLowerCase();
-
   const [docs, snippets] = await Promise.all([
     loadSageDocuments(callerRole),
     loadSageSnippets(),
@@ -208,20 +231,56 @@ export async function getDocumentContext(
     }))
     .filter((entry) => entry.score > 0);
 
-  let combined = [...scoredDocs, ...scoredSnippets]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxResults);
+  return assembleContext([...scoredDocs, ...scoredSnippets], maxResults, tokenBudgetChars);
+}
 
-  if (combined.length === 0) return "";
+/**
+ * Retrieve relevant program documents based on the user's message.
+ * Returns formatted context string to inject into Sage's system prompt.
+ *
+ * Default path is hybrid semantic retrieval (pgvector + full-text RRF via
+ * sage_hybrid_search); staff-authored snippets are keyword-ranked and fused
+ * onto the same RRF scale. Falls back to legacy keyword scoring when the
+ * hybrid path is unavailable (returns null) or SAGE_RAG_MODE=keyword.
+ */
+export async function getDocumentContext(
+  userMessage: string,
+  callerRole: CallerRole = "student",
+  maxResults: number = 3,
+  tokenBudgetChars: number = TOKEN_BUDGET_CHARS,
+): Promise<string> {
+  if (!isSageRagEnabled()) return "";
 
-  // Enforce token budget — drop lowest-scoring entries until under budget
-  let totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
-  while (totalChars > tokenBudgetChars && combined.length > 1) {
-    combined = combined.slice(0, -1);
-    totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  const messageLower = userMessage.toLowerCase();
+
+  if (getSageRagMode() === "hybrid") {
+    const hybridDocs = await hybridSearchDocuments(userMessage, callerRole, maxResults);
+    if (hybridDocs !== null) {
+      const snippets = await loadSageSnippets();
+
+      const docEntries: ScoredEntry[] = hybridDocs.map((doc) => ({
+        type: "doc" as const,
+        id: doc.id,
+        label: doc.title,
+        content: doc.sageContextNote || doc.title,
+        score: doc.score,
+      }));
+
+      const snippetEntries: ScoredEntry[] = snippets
+        .map((snippet) => ({ snippet, keywordScore: scoreSnippet(snippet, messageLower) }))
+        .filter((scored) => scored.keywordScore > 0)
+        .sort((a, b) => b.keywordScore - a.keywordScore)
+        .map((scored, rank) => ({
+          type: "snippet" as const,
+          label: `Q&A: ${scored.snippet.question}`,
+          content: scored.snippet.answer,
+          score: 1 / (RRF_K + rank + 1),
+        }));
+
+      return assembleContext([...docEntries, ...snippetEntries], maxResults, tokenBudgetChars);
+    }
+    // hybrid unavailable (embedding/SQL failure) — fall through to keyword path
   }
 
-  const content = combined.map(formatEntry).join("\n\n");
-
-  return `\n\nPROGRAM DOCUMENT REFERENCE (use this for specific, accurate answers about program materials):\n${content}`;
+  return keywordDocumentContext(messageLower, callerRole, maxResults, tokenBudgetChars);
 }
