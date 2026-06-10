@@ -7,6 +7,7 @@ import { useReducedMotion } from "framer-motion";
 import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
+import { ConfirmToolCard } from "./ConfirmToolCard";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
@@ -35,6 +36,7 @@ interface AgentEventItem {
   action?: ChatSseEvent["action"];
   target?: string;
   label?: string;
+  meta?: Record<string, unknown>;
 }
 
 async function getErrorMessage(res: Response) {
@@ -81,6 +83,16 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
   return (
     <div className="ml-12 mt-2 space-y-2">
       {events.map((event) => {
+        if (event.kind === "action" && event.action === "confirm_tool" && event.meta) {
+          return (
+            <ConfirmToolCard
+              key={event.id}
+              label={event.label || "Confirm"}
+              summary={String((event.meta as { summary?: unknown }).summary ?? event.summary)}
+              meta={event.meta}
+            />
+          );
+        }
         if (event.kind === "action" && event.target) {
           const external = /^https?:\/\//i.test(event.target);
           return (
@@ -309,7 +321,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   }, []);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, attachmentIds?: string[]) => {
       setChatError(null);
 
       // B2: Hoist the loading state so the TypingIndicator renders immediately
@@ -359,6 +371,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             conversationId,
             // Only send on the first message of a new conversation
             requestedStage: conversationId ? undefined : stageParam,
+            attachmentIds: attachmentIds && attachmentIds.length > 0 ? attachmentIds : undefined,
           }),
         });
 
@@ -424,6 +437,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
               action: data.action,
               target: data.target,
               label: data.label,
+              meta: data.meta,
               summary: data.label || "Open",
             });
             setStreamingEvents([...agentEvents]);

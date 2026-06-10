@@ -71,7 +71,7 @@ async function confirmationGate(
       action: "confirm_tool",
       target: toolName,
       label: confirmLabel,
-      meta: { token: proposalToken, toolName, args, conversationId: ctx.conversationId },
+      meta: { token: proposalToken, toolName, args, conversationId: ctx.conversationId, summary: proposalSummary },
     },
     modelHint:
       `You proposed ${toolName}. A confirmation card is now shown to the user. ` +
