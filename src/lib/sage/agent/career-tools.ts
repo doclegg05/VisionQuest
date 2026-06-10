@@ -21,7 +21,7 @@ import {
 } from "@/lib/resume";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
-import type { AgentTool, AgentToolContext, AgentToolResult } from "./types";
+import type { AgentTool, AgentToolResult } from "./types";
 
 const EDITABLE_SECTIONS = ["headline", "objective", "skills", "references"] as const;
 type EditableSection = (typeof EDITABLE_SECTIONS)[number];
@@ -117,6 +117,7 @@ const proposeResumeEdit: AgentTool = {
       args: toolArgs,
       sessionId: ctx.session.id,
       conversationId: ctx.conversationId,
+      targetStudentId: ctx.targetStudentId,
     };
     const now = new Date();
 

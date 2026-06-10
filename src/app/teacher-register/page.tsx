@@ -51,7 +51,7 @@ export default function StaffRegisterPage() {
   };
 
   return (
-    <main className="relative min-h-screen px-4 py-4 md:px-6 md:py-6">
+    <main id="main-content" className="relative min-h-screen px-4 py-4 md:px-6 md:py-6">
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-xl items-center">
         <div className="panel panel-strong w-full rounded-[2rem] p-6 md:p-10">
           <div className="mb-8">

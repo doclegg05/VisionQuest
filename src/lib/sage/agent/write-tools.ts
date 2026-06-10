@@ -45,6 +45,7 @@ async function confirmationGate(
     args,
     sessionId: ctx.session.id,
     conversationId: ctx.conversationId,
+    targetStudentId: ctx.targetStudentId,
   };
 
   if (token && verifyConfirmationToken(token, payload, new Date())) {
@@ -71,7 +72,7 @@ async function confirmationGate(
       action: "confirm_tool",
       target: toolName,
       label: confirmLabel,
-      meta: { token: proposalToken, toolName, args, conversationId: ctx.conversationId, summary: proposalSummary },
+      meta: { token: proposalToken, toolName, args, conversationId: ctx.conversationId, summary: proposalSummary, targetStudentId: ctx.targetStudentId },
     },
     modelHint:
       `You proposed ${toolName}. A confirmation card is now shown to the user. ` +

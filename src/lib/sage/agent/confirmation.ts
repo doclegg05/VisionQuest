@@ -18,6 +18,9 @@ export interface ConfirmationPayload {
   args: Record<string, unknown>;
   sessionId: string;
   conversationId: string;
+  /** Staff-assisted flows: the student the action targets. Bound into the
+   *  HMAC so a token proposed for one student cannot confirm for another. */
+  targetStudentId?: string;
 }
 
 function getSecret(): string {
@@ -48,6 +51,7 @@ function signatureFor(payload: ConfirmationPayload, expiresAt: number): string {
         canonicalize(payload.args),
         payload.sessionId,
         payload.conversationId,
+        payload.targetStudentId ?? "",
         String(expiresAt),
       ].join("|"),
     )
