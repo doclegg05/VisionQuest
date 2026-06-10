@@ -96,11 +96,11 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
 
   // Secondary nav items (student only)
   const secondaryItems =
-    role === "student" ? getVisibleSecondaryNavItems(navPhase ?? 3) : [];
+    role === "student" ? getVisibleSecondaryNavItems(navPhase ?? 3, orientationComplete) : [];
 
   // Mobile bottom bar: 5 slots — Home, Goals, Sage (center FAB), Learning, More
   // "More" sheet contains the rest: Career, Advising, Portfolio, Vision Board, Files, Resources, Settings
-  const allStudentItems = [...getVisibleNavItems(navPhase ?? 3, orientationComplete), ...getVisibleSecondaryNavItems(navPhase ?? 3)];
+  const allStudentItems = [...getVisibleNavItems(navPhase ?? 3, orientationComplete), ...getVisibleSecondaryNavItems(navPhase ?? 3, orientationComplete)];
   const mobileMain = role === "student"
     ? allStudentItems.slice(0, 2) // Home, Goals
     : primaryItems.slice(0, 2);
@@ -481,7 +481,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       </aside>
 
       {/* Floating Sage button + mini chat */}
-      {pathname !== "/chat" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && (
+      {pathname !== "/chat" && pathname !== "/dashboard" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && (
         <>
           <button
             onClick={() => setSageMiniOpen((v) => !v)}

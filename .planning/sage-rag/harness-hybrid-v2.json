@@ -1,0 +1,1346 @@
+{
+  "generatedAt": "2026-06-10T13:47:38.995Z",
+  "fixturePath": "config/sage-rag-top-questions.json",
+  "role": "student",
+  "maxResults": 3,
+  "tokenBudgetChars": 6000,
+  "legacyPassed": 20,
+  "strictPassed": 20,
+  "strictCleanPassed": 6,
+  "total": 20,
+  "expectedChecks": 20,
+  "passRate": 1,
+  "top1Expected": 15,
+  "top3Expected": 20,
+  "cleanTop3": 6,
+  "unexpectedTop3Docs": 18,
+  "missingExpectationKeys": [],
+  "results": [
+    {
+      "id": "orientation-overview",
+      "question": "What forms do I need to complete for orientation?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyy9zg10001eadk7g53hx7i",
+          "title": "Authorization for Release of Strictly Confidential Information v1",
+          "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9z1k0000eadkqsl45f7y",
+          "title": "Authorization for Release of Information to External Agencies v1",
+          "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1240,
+      "matchedTitles": [
+        "Authorization for Release of Strictly Confidential Information v1",
+        "SPOKES Checklist for Student Orientation",
+        "Authorization for Release of Information to External Agencies v1"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyy9zg10001eadk7g53hx7i",
+          "title": "Authorization for Release of Strictly Confidential Information v1",
+          "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb8ln0038eadke643r7ht",
+          "title": "SPOKES Checklist for Student Orientation",
+          "storageKey": "orientation/SPOKES Checklist for Student Orientation.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9z1k0000eadkqsl45f7y",
+          "title": "Authorization for Release of Information to External Agencies v1",
+          "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "orientation",
+        "student profile",
+        "rights",
+        "responsibilities",
+        "dress code"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES Checklist for Student Orientation.pdf",
+        "orientation/New Student Welcome Letter.pdf",
+        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+        "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+        "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+        "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+        "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+        "orientation/Media_Release_Form_FY26_Fillable.pdf"
+      ]
+    },
+    {
+      "id": "rights-responsibilities",
+      "question": "Where can I find my SPOKES rights and responsibilities?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1183,
+      "matchedTitles": [
+        "SPOKES Rights and Responsibilities FY26 Fillable",
+        "SPOKES Personal Attendance Contract FY26 Fillable",
+        "SPOKES Checklist for Student Orientation"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmnoqeee30009eadkj4lkripv",
+          "title": "SPOKES Rights and Responsibilities FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb8ln0038eadke643r7ht",
+          "title": "SPOKES Checklist for Student Orientation",
+          "storageKey": "orientation/SPOKES Checklist for Student Orientation.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "rights",
+        "responsibilities"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ]
+    },
+    {
+      "id": "dress-code",
+      "question": "What is the SPOKES dress code?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1162,
+      "matchedTitles": [
+        "SPOKES Dress Code Policy FY26 Fillable",
+        "SPOKES Personal Attendance Contract FY26 Fillable",
+        "SPOKES Checklist for Student Orientation"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb8zl0039eadkyb2luayk",
+          "title": "SPOKES Dress Code Policy FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb8ln0038eadke643r7ht",
+          "title": "SPOKES Checklist for Student Orientation",
+          "storageKey": "orientation/SPOKES Checklist for Student Orientation.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "dress code"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ]
+    },
+    {
+      "id": "acceptable-use",
+      "question": "What technology acceptable use form do I need?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": false,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "documentContextChars": 1140,
+      "matchedTitles": [
+        "WVAdultEd Tech Accept Use Fillable",
+        "WVAdultEd Technology Acceptable Use",
+        "Virtual Student Acceptable Use 2023"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyybb0r003eeadk08dd0vjs",
+          "title": "WVAdultEd Tech Accept Use Fillable",
+          "storageKey": "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybbek003feadkbbddsuwa",
+          "title": "WVAdultEd Technology Acceptable Use",
+          "storageKey": "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya63p000ieadkx38fp1rd",
+          "title": "Virtual Student Acceptable Use 2023",
+          "storageKey": "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "acceptable use",
+        "technology"
+      ],
+      "expectedStorageKeys": [
+        "orientation/WVAdultEd_Technology_Acceptable_Use.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/WVAdultEd_Technology_Acceptable_Use.pdf",
+        "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+        "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ]
+    },
+    {
+      "id": "dohs-release",
+      "question": "What is the DoHS release of information form?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": false,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "documentContextChars": 1210,
+      "matchedTitles": [
+        "WVAdultEd DoHS Release of Information FY26 Fillable",
+        "WVAdultEd DoHS Release of Information FY26 Fillable",
+        "Authorization for Release of Information to External Agencies v1"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmnoqc2xh0006eadkqyc887nx",
+          "title": "WVAdultEd DoHS Release of Information FY26 Fillable",
+          "storageKey": "forms/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybam8003deadk8lxvafj4",
+          "title": "WVAdultEd DoHS Release of Information FY26 Fillable",
+          "storageKey": "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9z1k0000eadkqsl45f7y",
+          "title": "Authorization for Release of Information to External Agencies v1",
+          "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "dohs",
+        "release",
+        "information"
+      ],
+      "expectedStorageKeys": [
+        "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+        "forms/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+        "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+        "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ]
+    },
+    {
+      "id": "student-profile",
+      "question": "How do I complete my student profile form?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyya63p000ieadkx38fp1rd",
+          "title": "Virtual Student Acceptable Use 2023",
+          "storageKey": "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybb0r003eeadk08dd0vjs",
+          "title": "WVAdultEd Tech Accept Use Fillable",
+          "storageKey": "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1150,
+      "matchedTitles": [
+        "SPOKES Student Profile FY26 Fillable",
+        "Virtual Student Acceptable Use 2023",
+        "WVAdultEd Tech Accept Use Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyba8e003ceadkm1er6sx1",
+          "title": "SPOKES Student Profile FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya63p000ieadkx38fp1rd",
+          "title": "Virtual Student Acceptable Use 2023",
+          "storageKey": "forms/Virtual_Student_Acceptable_Use_2023.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybb0r003eeadk08dd0vjs",
+          "title": "WVAdultEd Tech Accept Use Fillable",
+          "storageKey": "orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "student profile"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ]
+    },
+    {
+      "id": "portfolio-checklist",
+      "question": "What goes in my employment portfolio?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyybfp4003qeadktl2bytzo",
+          "title": "SPOKES Life and Employability Module Rubric Record",
+          "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1112,
+      "matchedTitles": [
+        "Employment Portfolio Checklist FY26 Fillable",
+        "Student Portfolio Checklist",
+        "SPOKES Life and Employability Module Rubric Record"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb7tt0036eadkzpoj2ucf",
+          "title": "Employment Portfolio Checklist FY26 Fillable",
+          "storageKey": "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybg3q003readkc9vfs4vo",
+          "title": "Student Portfolio Checklist",
+          "storageKey": "students/resources/Student Portfolio Checklist.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybfp4003qeadktl2bytzo",
+          "title": "SPOKES Life and Employability Module Rubric Record",
+          "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "portfolio",
+        "employment"
+      ],
+      "expectedStorageKeys": [
+        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+        "students/resources/Student Portfolio Checklist.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+        "students/resources/Student Portfolio Checklist.pdf"
+      ]
+    },
+    {
+      "id": "ready-to-work",
+      "question": "What is the Ready to Work certificate?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "documentContextChars": 1191,
+      "matchedTitles": [
+        "Ready to Work Certficate",
+        "ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre requisite)",
+        "Checklist for Documentation of Benchmarks Certificate of Ready to Work"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb2pj002teadkmah3csjo",
+          "title": "Ready to Work Certficate",
+          "storageKey": "lms/Ready to Work/Ready to Work Certficate.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyazm3002leadk2ypq97fm",
+          "title": "ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre requisite)",
+          "storageKey": "lms/Ready to Work/ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre-requisite).pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb1xg002readk8ht84xbn",
+          "title": "Checklist for Documentation of Benchmarks Certificate of Ready to Work",
+          "storageKey": "lms/Ready to Work/Checklist for Documentation of Benchmarks Certificate of Ready to Work.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "ready to work",
+        "certificate"
+      ],
+      "expectedStorageKeys": [
+        "lms/Ready to Work/Ready to Work Certficate.pdf",
+        "lms/Ready to Work/ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre-requisite).pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Ready to Work/Ready to Work Certficate.pdf",
+        "lms/Ready to Work/ACT WORKKEYS National Career Readiness Certificate (Ready to Work Certificate Pre-requisite).pdf",
+        "forms/Ready to Work Certification Attendance Verification Form.pdf",
+        "lms/Ready to Work/Certificate of Achievement.pdf",
+        "lms/Ready to Work/Certificate of Participation.pdf",
+        "lms/Ready to Work/Checklist for Documentation of Benchmarks Certificate of Ready to Work.pdf"
+      ]
+    },
+    {
+      "id": "ic3",
+      "question": "Tell me about the IC3 certification.",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyarqc0021eadktmpbefmo",
+          "title": "Computer Essentials Certificate",
+          "storageKey": "lms/Essential Education/Computer Essentials Certificate.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1124,
+      "matchedTitles": [
+        "IC3 Module Descriptor",
+        "IC3 Digital Literacy Master Certification",
+        "Computer Essentials Certificate"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyycofq006weadkdcyu58l0",
+          "title": "IC3 Module Descriptor",
+          "storageKey": "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyaugh0028eadk206gtc06",
+          "title": "IC3 Digital Literacy Master Certification",
+          "storageKey": "lms/GMetrix and LearnKey/IC3/IC3_Digital_Literacy_Master_Certification.png",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyarqc0021eadktmpbefmo",
+          "title": "Computer Essentials Certificate",
+          "storageKey": "lms/Essential Education/Computer Essentials Certificate.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "ic3",
+        "certification"
+      ],
+      "expectedStorageKeys": [
+        "lms/certifications/program-info/IC3 Module Descriptor.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+        "lms/GMetrix and LearnKey/IC3/IC3_Digital_Literacy_Master_Certification.png",
+        "lms/GMetrix and LearnKey/IC3/IC3_GS6_Level_1_Certificate.png",
+        "lms/GMetrix and LearnKey/IC3/IC3_GS6_Level_2_Certificate.png",
+        "lms/GMetrix and LearnKey/IC3/IC3_GS6_Level_3_Certificate.png"
+      ]
+    },
+    {
+      "id": "mos",
+      "question": "What is Microsoft Office Specialist certification?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyycofq006weadkdcyu58l0",
+          "title": "IC3 Module Descriptor",
+          "storageKey": "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1138,
+      "matchedTitles": [
+        "Microsoft Office Specialist (MOS) — Module Descriptor",
+        "Microsoft Office (MOS) Certificate",
+        "IC3 Module Descriptor"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyycr5n0073eadkl5f8cox6",
+          "title": "Microsoft Office Specialist (MOS) — Module Descriptor",
+          "storageKey": "lms/certifications/program-info/MOS Module Descriptor.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyaxzj002headkukvn1eoz",
+          "title": "Microsoft Office (MOS) Certificate",
+          "storageKey": "lms/GMetrix and LearnKey/Microsoft Office Specialist (MOS)/Microsoft Office (MOS) Certificate.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyycofq006weadkdcyu58l0",
+          "title": "IC3 Module Descriptor",
+          "storageKey": "lms/certifications/program-info/IC3 Module Descriptor.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "microsoft office",
+        "mos",
+        "specialist"
+      ],
+      "expectedStorageKeys": [
+        "lms/certifications/program-info/MOS Module Descriptor.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/certifications/program-info/MOS Module Descriptor.pdf",
+        "lms/GMetrix and LearnKey/Microsoft Office Specialist (MOS)/Microsoft Office (MOS) Certificate.pdf"
+      ]
+    },
+    {
+      "id": "quickbooks",
+      "question": "Can I work on QuickBooks certification in SPOKES?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1204,
+      "matchedTitles": [
+        "Intuit QuickBooks Certified User Certificate",
+        "Intuit Quickbooks Module Descriptor",
+        "SPOKES Personal Attendance Contract FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyaxkt002geadkeb61rbxs",
+          "title": "Intuit QuickBooks Certified User Certificate",
+          "storageKey": "lms/GMetrix and LearnKey/Intuit/Intuit_QuickBooks_Certified_User_Certificate.jpg",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyycpzq0070eadk7m65olqn",
+          "title": "Intuit Quickbooks Module Descriptor",
+          "storageKey": "lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "quickbooks",
+        "intuit"
+      ],
+      "expectedStorageKeys": [
+        "lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/certifications/program-info/Intuit Quickbooks Module Descriptor.pdf",
+        "lms/GMetrix and LearnKey/Intuit/Instuit Quickbooks Certificate.pdf",
+        "lms/GMetrix and LearnKey/Intuit/Intuit_QuickBooks_Certified_User_Certificate.jpg"
+      ]
+    },
+    {
+      "id": "bring-your-a-game",
+      "question": "What is Bring Your A Game to Work?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1258,
+      "matchedTitles": [
+        "Bring Your A Game to Work Presentation Outline",
+        "Bring Your A Game to Work Detailed Instructions for Administering Online Exams",
+        "SPOKES Personal Attendance Contract FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyagev0018eadkg8x8zx4j",
+          "title": "Bring Your A Game to Work Presentation Outline",
+          "storageKey": "lms/Bring Your A Game to Work/Bring_Your_A_Game_to_Work_Presentation_Outline.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyad9g0010eadkn7yj7a5z",
+          "title": "Bring Your A Game to Work Detailed Instructions for Administering Online Exams",
+          "storageKey": "lms/Bring Your A Game to Work/Bring Your A Game to Work Detailed Instructions for Administering Online Exams.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "bring your a game"
+      ],
+      "expectedStorageKeys": [
+        "lms/Bring Your A Game to Work/Bring_Your_A_Game_to_Work_Presentation_Outline.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Bring Your A Game to Work/Bring_Your_A_Game_to_Work_Presentation_Outline.pdf",
+        "lms/Bring Your A Game to Work/Bring Your A Game to Work Detailed Instructions for Administering Online Exams.pdf",
+        "lms/Bring Your A Game to Work/Multimedia_Resource_Guide.pdf",
+        "lms/Bring Your A Game to Work/Certificate_of_Work_Ethic_Proficiency.JPG"
+      ]
+    },
+    {
+      "id": "burlington",
+      "question": "How do I use Burlington English?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyakag001ieadktr8o9z1c",
+          "title": "BE Career Extensions Chart",
+          "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1057,
+      "matchedTitles": [
+        "Setting Up Burlington English Account",
+        "02 Accessing BE 1",
+        "BE Career Extensions Chart"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyan2n001peadkosyow7hw",
+          "title": "Setting Up Burlington English Account",
+          "storageKey": "lms/Burlington English/Setting Up Burlington English Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyajwh001headkrxu8cay2",
+          "title": "02 Accessing BE 1",
+          "storageKey": "lms/Burlington English/02_Accessing_BE_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyakag001ieadktr8o9z1c",
+          "title": "BE Career Extensions Chart",
+          "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "burlington english"
+      ],
+      "expectedStorageKeys": [
+        "lms/Burlington English/Setting Up Burlington English Account.pdf",
+        "lms/Burlington English/02_Accessing_BE_1.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Burlington English/Setting Up Burlington English Account.pdf",
+        "lms/Burlington English/02_Accessing_BE_1.pdf"
+      ]
+    },
+    {
+      "id": "aztec",
+      "question": "How do I use Aztec for classwork?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "documentContextChars": 1088,
+      "matchedTitles": [
+        "Aztec PLUS Student Support Guide Version 9.0 1",
+        "Internet Student Handout PLUS Version 9.0 1",
+        "Aztecs Continuum of Learning Chart 1"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya7oc000meadk43360ps0",
+          "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+          "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya8ga000oeadkarei8d19",
+          "title": "Internet Student Handout PLUS Version 9.0 1",
+          "storageKey": "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya82c000neadkueckga1u",
+          "title": "Aztecs Continuum of Learning Chart 1",
+          "storageKey": "lms/Aztec/Aztecs_Continuum_of_Learning_Chart_1.png",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "aztec"
+      ],
+      "expectedStorageKeys": [
+        "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+        "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+        "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf",
+        "lms/Aztec/Aztecs_Continuum_of_Learning_Chart_1.png"
+      ]
+    },
+    {
+      "id": "essential-education",
+      "question": "What is Essential Education used for?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "documentContextChars": 1132,
+      "matchedTitles": [
+        "Work Essentials",
+        "Money Essentials Certification",
+        "Computer Essentials Certificate"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyasib0023eadkokezsjfr",
+          "title": "Work Essentials",
+          "storageKey": "lms/Essential Education/Work Essentials.png",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyas4b0022eadkmo66g1nv",
+          "title": "Money Essentials Certification",
+          "storageKey": "lms/Essential Education/Money Essentials Certification.png",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyarqc0021eadktmpbefmo",
+          "title": "Computer Essentials Certificate",
+          "storageKey": "lms/Essential Education/Computer Essentials Certificate.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "essential education"
+      ],
+      "expectedStorageKeys": [
+        "lms/Essential Education/Computer Essentials Certificate.pdf",
+        "lms/Essential Education/Work Essentials.png"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Essential Education/Computer Essentials Certificate.pdf",
+        "lms/Essential Education/Work Essentials.png",
+        "lms/Essential Education/Money Essentials Certification.png"
+      ]
+    },
+    {
+      "id": "khan-academy",
+      "question": "Can Khan Academy help me study?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyaz7z002keadk6vq82g4b",
+          "title": "Registering for a Free LearningExpress Library Account",
+          "storageKey": "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1098,
+      "matchedTitles": [
+        "Enrolling Students in Khan Academy Courses",
+        "Accessing the Khan Academy Activity Report",
+        "Registering for a Free LearningExpress Library Account"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyayu2002jeadkfnd07tjt",
+          "title": "Enrolling Students in Khan Academy Courses",
+          "storageKey": "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyayg8002ieadkl2fv89x7",
+          "title": "Accessing the Khan Academy Activity Report",
+          "storageKey": "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyaz7z002keadk6vq82g4b",
+          "title": "Registering for a Free LearningExpress Library Account",
+          "storageKey": "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "khan academy"
+      ],
+      "expectedStorageKeys": [
+        "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+        "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+        "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+      ]
+    },
+    {
+      "id": "learning-express",
+      "question": "What is Learning Express Library?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyya7oc000meadk43360ps0",
+          "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+          "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyakag001ieadktr8o9z1c",
+          "title": "BE Career Extensions Chart",
+          "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1111,
+      "matchedTitles": [
+        "Registering for a Free LearningExpress Library Account",
+        "Aztec PLUS Student Support Guide Version 9.0 1",
+        "BE Career Extensions Chart"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyaz7z002keadk6vq82g4b",
+          "title": "Registering for a Free LearningExpress Library Account",
+          "storageKey": "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya7oc000meadk43360ps0",
+          "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+          "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyakag001ieadktr8o9z1c",
+          "title": "BE Career Extensions Chart",
+          "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "learning express"
+      ],
+      "expectedStorageKeys": [
+        "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"
+      ]
+    },
+    {
+      "id": "usa-learns",
+      "question": "Can USA Learns help me with English?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyakag001ieadktr8o9z1c",
+          "title": "BE Career Extensions Chart",
+          "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyan2n001peadkosyow7hw",
+          "title": "Setting Up Burlington English Account",
+          "storageKey": "lms/Burlington English/Setting Up Burlington English Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1082,
+      "matchedTitles": [
+        "USA Learns Student Activity Report",
+        "BE Career Extensions Chart",
+        "Setting Up Burlington English Account"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb7fb0035eadkhdq61cj4",
+          "title": "USA Learns Student Activity Report",
+          "storageKey": "lms/USA Learns/USA Learns Student Activity Report.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyakag001ieadktr8o9z1c",
+          "title": "BE Career Extensions Chart",
+          "storageKey": "lms/Burlington English/BE_Career_Extensions_Chart.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyan2n001peadkosyow7hw",
+          "title": "Setting Up Burlington English Account",
+          "storageKey": "lms/Burlington English/Setting Up Burlington English Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "usa learns"
+      ],
+      "expectedStorageKeys": [
+        "lms/USA Learns/USA Learns Student Activity Report.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/USA Learns/USA Learns Student Activity Report.pdf"
+      ]
+    },
+    {
+      "id": "wv-works-timesheet",
+      "question": "Which WV Works or TANF timesheet form do I need?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": false,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "documentContextChars": 1069,
+      "matchedTitles": [
+        "DFA TS 12 Rev 2 24",
+        "DFA TS 12 Rev 2 24 Fillable",
+        "DFA WVW 70 Rev 3 5 24 Sample"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya1ed0006eadkl7mt1qn2",
+          "title": "DFA TS 12 Rev 2 24",
+          "storageKey": "forms/DFA-TS-12_Rev_-2-24.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya10e0005eadkbkncyy6k",
+          "title": "DFA TS 12 Rev 2 24 Fillable",
+          "storageKey": "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya27a0008eadkm7k8rmlp",
+          "title": "DFA WVW 70 Rev 3 5 24 Sample",
+          "storageKey": "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "wv works",
+        "tanf",
+        "timesheet"
+      ],
+      "expectedStorageKeys": [
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+        "forms/DFA-TS-12_Rev_-2-24.pdf",
+        "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+        "forms/DFA-WVW-25_Rev_6-24.pdf"
+      ]
+    },
+    {
+      "id": "support-services",
+      "question": "Where can I learn about support services?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyya7oc000meadk43360ps0",
+          "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+          "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "documentContextChars": 1071,
+      "matchedTitles": [
+        "Support Services Fact Sheet Rev 6 22",
+        "Aztec PLUS Student Support Guide Version 9.0 1",
+        "Dental Services 2025 through WV Works"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya5bc000geadkkrhe2hds",
+          "title": "Support Services Fact Sheet Rev 6 22",
+          "storageKey": "forms/Support_Services_Fact_Sheet_Rev_6-22.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya7oc000meadk43360ps0",
+          "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+          "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9zu00002eadk0pqfmsjd",
+          "title": "Dental Services 2025 through WV Works",
+          "storageKey": "forms/Dental_Services_2025_through_WV_Works.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "support services"
+      ],
+      "expectedStorageKeys": [
+        "forms/Support_Services_Fact_Sheet_Rev_6-22.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "forms/Support_Services_Fact_Sheet_Rev_6-22.pdf",
+        "forms/Dental_Services_2025_through_WV_Works.pdf"
+      ]
+    }
+  ]
+}
