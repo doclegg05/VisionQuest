@@ -144,19 +144,19 @@ no tool executes outside the actor's role permissions.
 
 **Branch:** `feat/chat-first-home`
 
-- [ ] New student home: persistent Sage conversation as the primary surface with ambient
+- [x] New student home: persistent Sage conversation as the primary surface with ambient
       panels (readiness w/ "what's next" breakdown, today's tasks, alerts, overdue forms) —
       panels are driven by the same data as today's dashboard widgets; Sage `navigate` actions
       (already in `AgentToolResult.action`) deep-link to pages.
-- [ ] Replace single-exchange `SageMiniChat` with a persistent multi-turn dock sharing
+- [x] Replace single-exchange `SageMiniChat` with a persistent multi-turn dock sharing
       conversation state with `/chat` (one conversation source of truth).
-- [ ] Nav consolidation: Resources → Learning tab section; Files → "Documents" (Sage-managed
+- [x] Nav consolidation: Resources → Learning tab section; Files → "Documents" (Sage-managed
       view of FileUpload + filed items); Orientation re-accessible post-completion (read-only
       archive); resume gets a Home entry point; tool-result cards (document preview, form
       status, job match) rendered inline in chat.
 - [ ] Teacher: Sage chat gains intervention-queue summarization tool with *reasons*
       ("flagged for: stale goals 14d, missed appointment 6/2"); queue UI shows same reasons.
-- [ ] Old dashboard preserved at `/dashboard/classic` for one release (fallback + comparison).
+- [x] Old dashboard preserved at `/dashboard/classic` for one release (fallback + comparison).
 
 **Acceptance:** new-student e2e (register → welcome → chat-first home → set BHAG via Sage →
 sign form via chat) passes; mobile bottom-nav still functional at 375px; Lighthouse

@@ -58,7 +58,7 @@ Read when deciding what to build, cut, simplify, or automate.
 
 ## Product Scope Authority
 - **Authoritative doc**: `docs/PRODUCT_DECISIONS.md` — governs all product scope decisions (5-step framework: Question → Delete → Simplify → Accelerate → Automate)
-- **Key decision (April 1, 2026)**: Vision Board, Files, and Resources are permanently **retained** and must be restored to student navigation.
+- **Key decision (April 1, 2026, superseded June 10, 2026)**: Vision Board, Files, and Resources features are retained; the chat-first redesign (user-approved 2026-06-09) moved Resources into Learning and renamed Files to "Documents" in nav. See the 2026-06-10 entry in PRODUCT_DECISIONS.md.
 
 ## Key Decisions Log
 | Date | Decision | Rationale |
@@ -78,6 +78,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | 2026-04-01 | Unified readiness computation | Single `fetchStudentReadinessData()` used by all 6 consumers |
 | 2026-04-01 | CSP headers with nonce-based scripts/styles | Hardened via `src/proxy.ts`; Gemini, Credly, Sentry, Google Fonts whitelisted |
 | 2026-05-07 | Phase 2 and Phase 3 outcomes tracked as GitHub milestones | Single source of truth between `docs/PRODUCT_GUIDE.md` 90-Day Outcomes and the issue tracker. Milestones #1 (Phase 2, due 2026-05-17) and #2 (Phase 3, due 2026-06-21) with tracking issues #37–#40 carry outcome-style "definition of done" so risk-scout can flag slippage |
+| 2026-06-10 | Chat-first student home (Phase 4) | Sage conversation is the home surface; ambient rail carries vitals; classic dashboard at /dashboard/classic for one release |
 | 2026-05-07 | Project Autopilot installed locally | Read-only Claude Code orchestrator at `project-autopilot/` (gitignored) generates morning digests, weekly reviews, and triage sweeps over the GitHub repo. Deny list blocks all `gh` writes; agents propose, humans apply |
 
 ## Known Issues

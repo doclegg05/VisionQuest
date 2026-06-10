@@ -374,3 +374,17 @@ No automation ships without: baseline manual workflow documented, owner named, t
 12. Goal stale detection alerts
 13. Orientation follow-up reminders
 14. Monthly readiness reports
+
+## 2026-06-10 — Chat-first home supersedes the 2026-04-01 navigation retention decision
+
+User-approved (2026-06-09) as part of the chat-first rebuild: the student home is now a
+persistent Sage conversation with an ambient vital-signs rail. Consequences for navigation:
+
+- **Vision Board**: retained in secondary nav (unchanged).
+- **Files**: retained, presented as **"Documents"** — Sage files chat uploads there.
+- **Resources**: route retained, removed from nav; reachable via the Resource Center card on Learning.
+- **Orientation**: returns to secondary nav AFTER completion as a read-only archive of signed documents.
+- The previous dashboard remains available at `/dashboard/classic` for one release.
+
+This supersedes the 2026-04-01 decision that Vision Board, Files, and Resources are permanently
+retained as top-level nav items; all three FEATURES remain — their placement changed.

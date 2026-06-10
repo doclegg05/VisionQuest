@@ -5,6 +5,7 @@ import {
   STUDENT_NAV_ITEMS,
   STUDENT_SECONDARY_NAV,
   getVisibleNavItems,
+  getVisibleSecondaryNavItems,
 } from "./nav-items";
 
 describe("STUDENT_NAV_ITEMS", () => {
@@ -18,9 +19,17 @@ describe("STUDENT_NAV_ITEMS", () => {
     assert.equal(STUDENT_NAV_ITEMS[1]?.href, "/goals");
   });
 
-  it("exposes retained features as secondary nav items", () => {
+  it("exposes consolidated secondary nav items (Phase 4 chat-first redesign)", () => {
     const hrefs = STUDENT_SECONDARY_NAV.map((item) => item.href);
-    assert.deepEqual(hrefs, ["/vision-board", "/files", "/resources"]);
+    // Resources merged into Learning; Files presented as "Documents".
+    assert.deepEqual(hrefs, ["/vision-board", "/files"]);
+  });
+
+  it("adds the orientation archive to secondary nav only after completion", () => {
+    const before = getVisibleSecondaryNavItems(3, false).map((item) => item.href);
+    assert.ok(!before.includes("/orientation"));
+    const after = getVisibleSecondaryNavItems(3, true).map((item) => item.href);
+    assert.ok(after.includes("/orientation"));
   });
 
   it("does not expose orientation after completion because it is not a primary nav item", () => {
