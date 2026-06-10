@@ -46,18 +46,18 @@ as fallback, jsPDF/`@react-pdf/renderer` for resume, Playwright e2e.
 
 **Branch:** work directly via PRs from existing branches; model change on `feat/gemini-3-1-upgrade`.
 
-- [ ] Merge `origin/feat/resume-live-preview` via PR (verified conflict-free; tests included).
-- [ ] Finish `origin/feat/wv-local-job-feed`:
-  - [ ] Generate + apply Prisma migration for `JobListing.employmentType`.
-  - [ ] Complete student filter UI in `src/components/jobs/JobFilters.tsx`
+- [x] Merge `origin/feat/resume-live-preview` via PR (verified conflict-free; tests included).
+- [x] Finish `origin/feat/wv-local-job-feed`:
+  - [x] Generate + apply Prisma migration for `JobListing.employmentType`.
+  - [x] Complete student filter UI in `src/components/jobs/JobFilters.tsx`
         (keyword, min pay, employment type, posted-after — API already accepts these params).
-  - [ ] End-to-end test: filters → `/api/jobs` → filtered list.
-  - [ ] Merge via PR.
-- [ ] Model upgrade: default `gemini-3.1-flash-lite` in `src/lib/ai/gemini-provider.ts`
+  - [x] End-to-end test: filters → `/api/jobs` → filtered list.
+  - [x] Merge via PR.
+- [x] Model upgrade: default `gemini-3.1-flash-lite` in `src/lib/ai/gemini-provider.ts`
       (env-overridable via `GEMINI_MODEL`); verify model-level `systemInstruction` still applies
       (per CLAUDE.md gotcha); run `npm run sage:rag:harness` + chat smoke tests; re-check token
       quota math in `src/lib/llm-usage.ts` against 3.1 pricing ($0.25/$1.50 per M).
-- [ ] Remove orphaned `/jobs` redirect page.
+- [x] Remove orphaned `/jobs` redirect page.
 
 **Acceptance:** both branches merged; harness pass-rate unchanged or better on 3.1;
 `npm run build` + full test suite green.
@@ -73,12 +73,12 @@ on `ProgramDocument`, new `DocumentChunk` model), new `src/lib/ai/embeddings.ts`
 keyword scoring with hybrid retrieval; keep keyword fallback when embeddings absent),
 `scripts/backfill-embeddings.mjs`, `scripts/sage-rag-harness.mjs` (add clean-retrieval gate).
 
-- [ ] Enable pgvector; add embedding columns + `DocumentChunk` (chunk size 512 tokens, 50 overlap).
-- [ ] Embedding service with batching + retry + `LlmCallLog` cost logging.
-- [ ] Hybrid search SQL function: `tsvector` GIN + HNSW index, RRF k=50, weights configurable.
-- [ ] Ingest pipeline embeds `sageContextNote` + chunks; backfill all ~150 ProgramDocuments.
-- [ ] Retrieval swap in `getDocumentContext()`; audience filtering preserved.
-- [ ] Harness: keep 100% top-3 relevance; **clean retrieval ≥ 80%** (now 25%); add 20 new
+- [x] Enable pgvector; add embedding columns + `DocumentChunk` (chunk size 512 tokens, 50 overlap).
+- [x] Embedding service with batching + retry + `LlmCallLog` cost logging.
+- [x] Hybrid search SQL function: `tsvector` GIN + HNSW index, RRF k=50, weights configurable.
+- [x] Ingest pipeline embeds `sageContextNote` + chunks; backfill all ~150 ProgramDocuments.
+- [x] Retrieval swap in `getDocumentContext()`; audience filtering preserved.
+- [x] Harness: keep 100% top-3 relevance; **clean retrieval ≥ 80%** (now 25%); add 20 new
       fixture questions covering forms + LMS guides.
 
 **Acceptance:** harness thresholds met; retrieval latency < 300ms p95 locally; no FERPA

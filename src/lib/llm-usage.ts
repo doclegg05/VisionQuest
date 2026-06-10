@@ -4,7 +4,8 @@ import { logger } from "./logger";
 // ─── Token Logging ──────────────────────────────────────────────────────────
 
 interface LogLlmCallParams {
-  studentId: string;
+  /** Null for system calls (embedding ingest/backfill) with no student. */
+  studentId: string | null;
   callSite: string;
   model: string;
   inputTokens: number;
