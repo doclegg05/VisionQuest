@@ -445,6 +445,8 @@ const classifyAttachment: AgentTool = {
 // Registry
 // -----------------------------------------------------------------------------
 
+import { WRITE_TOOLS } from "./write-tools";
+
 const ALL_TOOLS: AgentTool[] = [
   presentForm,
   findCertification,
@@ -452,6 +454,7 @@ const ALL_TOOLS: AgentTool[] = [
   openResource,
   lookupProgramInfo,
   classifyAttachment,
+  ...WRITE_TOOLS,
 ];
 
 export function getEnabledTools(role: string): AgentTool[] {

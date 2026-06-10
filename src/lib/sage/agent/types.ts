@@ -65,6 +65,11 @@ export interface AgentToolContext {
   conversationId: string;
   /** Optional studentId override for staff acting on behalf of a student. */
   targetStudentId?: string;
+  /**
+   * Set ONLY by /api/chat/tool-confirm: the HMAC confirmation token for this
+   * exact call. Write tools verify it before executing (confirmation.ts).
+   */
+  confirmedToken?: string;
 }
 
 export interface AgentToolResult {
@@ -91,7 +96,8 @@ export type AgentActionKind =
   | "navigate"
   | "open_form"
   | "open_resource"
-  | "highlight";
+  | "highlight"
+  | "confirm_tool";
 
 export interface AgentAction {
   action: AgentActionKind;
