@@ -4,7 +4,7 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 
 const mockQueryRawUnsafe = mock.fn() as any;
 const mockDownloadFile = mock.fn() as any;
-const mockExtractTextFromBuffer = mock.fn() as any;
+const mockExtractPagesFromBuffer = mock.fn() as any;
 const mockContainsPII = mock.fn(() => false) as any;
 const mockEmbedProgramDocument = mock.fn(async () => ({ chunkCount: 3 })) as any;
 
@@ -28,8 +28,8 @@ mock.module("@/lib/storage", {
 
 mock.module("./extract", {
   namedExports: {
-    get extractTextFromBuffer() {
-      return mockExtractTextFromBuffer;
+    get extractPagesFromBuffer() {
+      return mockExtractPagesFromBuffer;
     },
     get containsPII() {
       return mockContainsPII;
@@ -46,9 +46,10 @@ mock.module("./document-embedding", {
 });
 
 let backfillProgramDocumentEmbeddings: typeof import("./backfill-embeddings").backfillProgramDocumentEmbeddings;
+let buildDryRunManifest: typeof import("./backfill-embeddings").buildDryRunManifest;
 
 before(async () => {
-  ({ backfillProgramDocumentEmbeddings } = await import("./backfill-embeddings"));
+  ({ backfillProgramDocumentEmbeddings, buildDryRunManifest } = await import("./backfill-embeddings"));
 });
 
 function doc(overrides: Record<string, unknown> = {}) {
@@ -67,14 +68,17 @@ describe("backfillProgramDocumentEmbeddings", () => {
   beforeEach(() => {
     mockQueryRawUnsafe.mock.resetCalls();
     mockDownloadFile.mock.resetCalls();
-    mockExtractTextFromBuffer.mock.resetCalls();
+    mockExtractPagesFromBuffer.mock.resetCalls();
     mockContainsPII.mock.resetCalls();
     mockEmbedProgramDocument.mock.resetCalls();
     mockDownloadFile.mock.mockImplementation(async () => ({
       buffer: Buffer.from("body"),
       mimeType: "application/pdf",
     }));
-    mockExtractTextFromBuffer.mock.mockImplementation(async () => ({ text: "Policy body text" }));
+    mockExtractPagesFromBuffer.mock.mockImplementation(async () => ({
+      pages: [{ pageNumber: 1, text: "Policy body text" }],
+      pageCount: 1,
+    }));
     mockContainsPII.mock.mockImplementation(() => false);
     mockEmbedProgramDocument.mock.mockImplementation(async () => ({ chunkCount: 3 }));
   });
@@ -84,6 +88,18 @@ describe("backfillProgramDocumentEmbeddings", () => {
     const tally = await backfillProgramDocumentEmbeddings();
     assert.deepEqual(tally, { total: 1, embedded: 1, skipped: 0, noText: 0, errors: 0 });
     assert.equal(mockEmbedProgramDocument.mock.callCount(), 1);
+  });
+
+  it("passes pages (not flat text) to embedProgramDocument", async () => {
+    mockQueryRawUnsafe.mock.mockImplementation(async () => [doc()]);
+    await backfillProgramDocumentEmbeddings();
+    const call = mockEmbedProgramDocument.mock.calls[0];
+    const input = call.arguments[1];
+    // pages must be present; legacy text field must be absent / undefined
+    assert.ok(Array.isArray(input.pages), "pages should be an array");
+    assert.equal(input.pages.length, 1);
+    assert.equal(input.pages[0].pageNumber, 1);
+    assert.equal(input.text, undefined);
   });
 
   it("skips already-embedded docs unless force", async () => {
@@ -107,9 +123,9 @@ describe("backfillProgramDocumentEmbeddings", () => {
 
     const tally = await backfillProgramDocumentEmbeddings();
     assert.deepEqual(tally, { total: 2, embedded: 2, skipped: 0, noText: 2, errors: 0 });
-    // Both embed calls received text: null
+    // Both embed calls received pages: undefined (falsy — no body text)
     for (const call of mockEmbedProgramDocument.mock.calls) {
-      assert.equal(call.arguments[1].text, null);
+      assert.ok(!call.arguments[1].pages, "pages should be undefined when PII/unextractable");
     }
     // The .png never hit storage
     assert.equal(mockDownloadFile.mock.callCount(), 1);
@@ -139,5 +155,73 @@ describe("backfillProgramDocumentEmbeddings", () => {
 
     await backfillProgramDocumentEmbeddings({ all: true });
     assert.doesNotMatch(mockQueryRawUnsafe.mock.calls[1].arguments[0], /usedBySage/);
+  });
+});
+
+// ── Dry-run manifest tests ────────────────────────────────────────────────────
+
+describe("buildDryRunManifest", () => {
+  it("marks extractable docs and skips image-only docs with a reason", async () => {
+    const fakeDocs = [
+      doc({ id: "doc-pdf", title: "Orientation Guide", storageKey: "docs/orientation.pdf" }),
+      doc({ id: "doc-docx", title: "Staff Handbook", storageKey: "docs/staff.docx" }),
+      doc({ id: "doc-png", title: "Photo ID", storageKey: "docs/id-scan.png" }),
+      doc({ id: "doc-jpg", title: "Event Flyer", storageKey: "docs/flyer.jpg" }),
+    ];
+
+    const manifest = await buildDryRunManifest(fakeDocs as any);
+
+    // Two extractable docs appear in manifest.docs
+    assert.equal(manifest.docs.length, 2, "only extractable docs in docs[]");
+    assert.ok(manifest.docs.every((d) => d.extractable), "all manifest.docs are extractable");
+    assert.equal(manifest.docs[0].ext, ".pdf");
+    assert.equal(manifest.docs[1].ext, ".docx");
+
+    // Two image-only docs appear in skipped with reasons
+    assert.equal(manifest.skipped.length, 2, "image docs must appear in skipped");
+    const skippedIds = manifest.skipped.map((s) => s.id);
+    assert.ok(skippedIds.includes("doc-png"), "doc-png must be in skipped");
+    assert.ok(skippedIds.includes("doc-jpg"), "doc-jpg must be in skipped");
+
+    // Every skipped entry has a non-empty reason (no silent drops)
+    for (const s of manifest.skipped) {
+      assert.ok(s.reason.length > 0, `skipped doc ${s.id} must have a reason`);
+    }
+
+    // totalEstChunks reflects the extractable count
+    assert.equal(manifest.totalEstChunks, manifest.docs.reduce((sum, d) => sum + d.estChunks, 0));
+  });
+
+  it("puts a doc with no extension in skipped with a reason", async () => {
+    const fakeDocs = [
+      doc({ id: "doc-noext", title: "Mystery File", storageKey: "docs/mystery" }),
+    ];
+
+    const manifest = await buildDryRunManifest(fakeDocs as any);
+
+    assert.equal(manifest.docs.length, 0);
+    assert.equal(manifest.skipped.length, 1);
+    assert.equal(manifest.skipped[0].id, "doc-noext");
+    assert.ok(manifest.skipped[0].reason.length > 0, "no-extension doc needs a reason");
+  });
+
+  it("dryRun mode in backfill returns a tally without calling embedProgramDocument", async () => {
+    mockQueryRawUnsafe.mock.resetCalls();
+    mockEmbedProgramDocument.mock.resetCalls();
+
+    mockQueryRawUnsafe.mock.mockImplementation(async () => [
+      doc({ id: "doc-pdf", storageKey: "docs/guide.pdf" }),
+      doc({ id: "doc-img", storageKey: "docs/photo.png" }),
+    ]);
+
+    const tally = await backfillProgramDocumentEmbeddings({ dryRun: true });
+
+    // No embeddings should have been called
+    assert.equal(mockEmbedProgramDocument.mock.callCount(), 0, "dryRun must not embed");
+    // Total reflects all docs queried
+    assert.equal(tally.total, 2);
+    // skipped = manifest.docs.length (1 extractable) + noText = manifest.skipped.length (1 image)
+    assert.equal(tally.skipped, 1, "1 extractable doc counted as surveyed (skipped)");
+    assert.equal(tally.noText, 1, "1 image doc counted as noText in dry-run");
   });
 });
