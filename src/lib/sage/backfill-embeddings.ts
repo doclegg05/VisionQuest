@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
 import { extractPagesFromBuffer, containsPII } from "./extract";
 import { embedProgramDocument } from "./document-embedding";
+import { chunkPages } from "./chunking";
 
 const EXTRACTABLE_EXTS = new Set([".pdf", ".docx", ".txt", ".md"]);
 
@@ -163,9 +164,17 @@ export async function backfillProgramDocumentEmbeddings(
 // ── Dry-run manifest builder ──────────────────────────────────────────────────
 
 /**
- * Build a manifest of what the backfill would process without actually
- * downloading or embedding. Non-extractable (image-only, unknown ext) docs
- * appear in `skipped` with a reason — no silent drops.
+ * Build a manifest of what the backfill would process.
+ *
+ * Dry-run couples to storage availability: we download and extract each
+ * candidate doc so the operator sees REAL pageCount/estChunks before the
+ * actual run. This is intentional — it makes the manifest a genuine prod
+ * pre-flight rather than a rough estimate.
+ *
+ * Guarantees:
+ * - No embedProgramDocument calls — no embeddings, no DB writes.
+ * - Non-extractable, undownloadable, or text-empty docs go to `skipped[]`
+ *   with a clear reason — no silent drops.
  */
 export async function buildDryRunManifest(
   docs: BackfillDocRow[],
@@ -190,18 +199,51 @@ export async function buildDryRunManifest(
       continue;
     }
 
-    // Estimate: we don't download in dry-run mode — use sizeBytes if available.
-    // We have no size here (not in BackfillDocRow), so we estimate 1 chunk/page
-    // for extractable docs and surface pageCount = 0 as "unknown until run".
-    manifestDocs.push({
-      id: doc.id,
-      title: doc.title,
-      ext,
-      pageCount: 0, // unknown until storage download
-      estChunks: 1, // minimum 1 (title-only embedding always happens)
-      extractable: true,
-    });
-    onProgress?.(`  OK   ${doc.title} (${ext})`);
+    // Download + extract to compute real page and chunk counts.
+    try {
+      const download = await downloadFile(doc.storageKey);
+      if (!download) {
+        skipped.push({
+          id: doc.id,
+          title: doc.title,
+          reason: "file not found in storage — cannot download",
+        });
+        onProgress?.(`  SKIP ${doc.title}: not found in storage`);
+        continue;
+      }
+
+      const extraction = await extractPagesFromBuffer(download.buffer, ext);
+      if (!extraction || extraction.pages.length === 0) {
+        skipped.push({
+          id: doc.id,
+          title: doc.title,
+          reason: "extraction yielded no text — unsupported format or blank document",
+        });
+        onProgress?.(`  SKIP ${doc.title}: no extractable text`);
+        continue;
+      }
+
+      const chunks = chunkPages(extraction.pages);
+      const pageCount = extraction.pages.length;
+      const estChunks = chunks.length;
+
+      manifestDocs.push({
+        id: doc.id,
+        title: doc.title,
+        ext,
+        pageCount,
+        estChunks,
+        extractable: true,
+      });
+      onProgress?.(`  OK   ${doc.title} (${ext}, ${pageCount}p, ~${estChunks} chunks)`);
+    } catch (err) {
+      skipped.push({
+        id: doc.id,
+        title: doc.title,
+        reason: `download/extraction error: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      onProgress?.(`  SKIP ${doc.title}: error — ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   return {
