@@ -18,21 +18,34 @@ loadEnvFile();
 
 const FORCE = process.argv.includes("--force");
 const ALL = process.argv.includes("--all");
+const DRY_RUN = process.argv.includes("--dry-run");
 
 async function main() {
   const { prisma } = await import("../src/lib/db.ts");
   const { backfillProgramDocumentEmbeddings } = await import("../src/lib/sage/backfill-embeddings.ts");
 
-  console.log(`Backfilling embeddings${FORCE ? " (--force)" : ""}${ALL ? " (--all)" : ""}…`);
+  if (DRY_RUN) {
+    console.log(`Dry-run manifest${ALL ? " (--all)" : ""}… (no storage writes)`);
+  } else {
+    console.log(`Backfilling embeddings${FORCE ? " (--force)" : ""}${ALL ? " (--all)" : ""}…`);
+  }
+
   const tally = await backfillProgramDocumentEmbeddings({
     force: FORCE,
     all: ALL,
+    dryRun: DRY_RUN,
     onProgress: (message) => console.log(message),
   });
 
-  console.log(
-    `\nDone: ${tally.embedded} embedded, ${tally.skipped} skipped, ${tally.noText} without body text, ${tally.errors} errors (${tally.total} total)`,
-  );
+  if (DRY_RUN) {
+    console.log(
+      `\nDry-run complete: ${tally.skipped} docs surveyed, ${tally.noText} would be skipped (no extractable text)`,
+    );
+  } else {
+    console.log(
+      `\nDone: ${tally.embedded} embedded, ${tally.skipped} skipped, ${tally.noText} without body text, ${tally.errors} errors (${tally.total} total)`,
+    );
+  }
   await prisma.$disconnect();
   if (tally.errors > 0) process.exitCode = 1;
 }

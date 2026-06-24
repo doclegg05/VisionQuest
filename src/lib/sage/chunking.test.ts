@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { chunkText } from "./chunking";
+import { describe, it, test } from "node:test";
+import { chunkPages, chunkText } from "./chunking";
 
 describe("chunkText", () => {
   it("returns [] for blank input", () => {
@@ -67,4 +67,22 @@ describe("chunkText", () => {
       assert.ok(chunk.length > 0);
     }
   });
+});
+
+test("chunkPages tags each chunk with its page number", () => {
+  const pages = [
+    { pageNumber: 1, text: "Attendance policy. Students must attend." },
+    { pageNumber: 2, text: "Assessment policy. TABE is required." },
+  ];
+  const chunks = chunkPages(pages);
+  assert.ok(chunks.length >= 2);
+  assert.equal(chunks[0].pageNumber, 1);
+  assert.ok(chunks.some((c) => c.pageNumber === 2));
+  assert.ok(chunks.every((c) => c.tokenCount > 0));
+});
+
+test("chunkPages captures nearest heading as sectionTitle", () => {
+  const pages = [{ pageNumber: 1, text: "SECTION 4: ATTENDANCE\n\nStudents must attend 80% of sessions." }];
+  const chunks = chunkPages(pages);
+  assert.match(chunks[0].sectionTitle ?? "", /ATTENDANCE/i);
 });

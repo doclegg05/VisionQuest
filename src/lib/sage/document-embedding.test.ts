@@ -36,16 +36,33 @@ mock.module("@/lib/db", {
 
 let embedProgramDocument: typeof import("./document-embedding").embedProgramDocument;
 let buildDocEmbeddingText: typeof import("./document-embedding").buildDocEmbeddingText;
+let buildChunkRows: typeof import("./document-embedding").buildChunkRows;
 
 before(async () => {
   const mod = await import("./document-embedding");
   embedProgramDocument = mod.embedProgramDocument;
   buildDocEmbeddingText = mod.buildDocEmbeddingText;
+  buildChunkRows = mod.buildChunkRows;
 });
 
 function fakeVector(seed: number): number[] {
   return [seed, 0, 0];
 }
+
+describe("buildChunkRows", () => {
+  it("buildChunkRows carries provenance from chunkPages output", () => {
+    const rows = buildChunkRows([
+      { content: "Students must attend.", tokenCount: 5, pageNumber: 4, sectionTitle: "ATTENDANCE" },
+    ]);
+    assert.deepEqual(rows[0], {
+      chunkIndex: 0,
+      content: "Students must attend.",
+      tokenCount: 5,
+      pageNumber: 4,
+      sectionTitle: "ATTENDANCE",
+    });
+  });
+});
 
 describe("buildDocEmbeddingText", () => {
   it("joins title and note, or returns title alone", () => {

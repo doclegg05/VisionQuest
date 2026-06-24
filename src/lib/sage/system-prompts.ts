@@ -578,6 +578,7 @@ export function buildSystemPrompt(
         parts.push({ name: "semantic.relevant_topic", content: relevantContent });
       }
     }
+    parts.push({ name: "procedural.rag_grounding", content: RAG_GROUNDING_INSTRUCTION });
     return joinPromptSections(parts);
   }
 
@@ -690,6 +691,8 @@ export function buildSystemPrompt(
     parts.push({ name: "action.tools", content: AGENT_TOOLS_ADDENDUM });
   }
 
+  parts.push({ name: "procedural.rag_grounding", content: RAG_GROUNDING_INSTRUCTION });
+
   let result = joinPromptSections(parts);
   result = result.replace(/\{[a-z_]+\}/g, "");
   return result;
@@ -738,6 +741,16 @@ Tool-calling rules:
 5. Never call a tool just to confirm something the student already knows. If they say "I already opened the form", don't re-pull it.
 
 If the student's request doesn't map to a tool, just reply with text as usual.`;
+
+/**
+ * RAG grounding and citation policy injected into every assembled prompt
+ * (both staff/admin and student variants). Appended additively — no
+ * existing prompt text is altered.
+ */
+const RAG_GROUNDING_INSTRUCTION =
+  "When document passages are provided below, answer from them and cite the source " +
+  "(e.g. \"Per the Administrative Guide, p.12…\"). If the passages don't cover the " +
+  "question, say you couldn't find it in the available documents and suggest who to ask — do not guess.";
 
 export function determineStage(
   goals: { level: string }[],

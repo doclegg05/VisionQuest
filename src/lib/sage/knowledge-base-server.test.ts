@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding must accept many signatures */
 import assert from "node:assert/strict";
-import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock, test } from "node:test";
 
 const mockDocFindMany = mock.fn() as any;
 const mockSnippetFindMany = mock.fn() as any;
 const mockHybridSearch = mock.fn() as any;
+const mockGetBestChunks = mock.fn() as any;
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -35,16 +36,19 @@ mock.module("@/lib/cache", {
 mock.module("./hybrid-retrieval", {
   namedExports: {
     hybridSearchDocuments: mockHybridSearch,
+    getBestChunks: mockGetBestChunks,
     getMaxCosineDistance: () => 0.55,
     buildWebsearchQuery: (msg: string) => msg,
   },
 });
 
 let getDocumentContext: typeof import("./knowledge-base-server").getDocumentContext;
+let formatDocEntryForTest: typeof import("./knowledge-base-server").formatDocEntryForTest;
 
 before(async () => {
   const mod = await import("./knowledge-base-server");
   getDocumentContext = mod.getDocumentContext;
+  formatDocEntryForTest = mod.formatDocEntryForTest;
 });
 
 function hybridDoc(overrides: Record<string, unknown> = {}) {
@@ -72,6 +76,54 @@ function keywordDoc(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// ── Pure formatter tests (no async, no mocks needed) ──────────────────────────
+
+test("doc entry with passages renders page citation", () => {
+  const out = formatDocEntryForTest({
+    type: "doc",
+    id: "d1",
+    label: "Administrative Guide",
+    score: 1,
+    content: "fallback summary",
+    passages: [
+      { content: "Students must attend 80%.", pageNumber: 12, sectionTitle: "ATTENDANCE" },
+    ],
+  });
+  assert.match(out, /Administrative Guide, p\.12/);
+  assert.match(out, /Students must attend 80%/);
+  assert.doesNotMatch(out, /fallback summary/);
+});
+
+test("doc entry with section-only passage renders section citation", () => {
+  const out = formatDocEntryForTest({
+    type: "doc",
+    id: "d2",
+    label: "Dress Code Policy",
+    score: 1,
+    content: "fallback summary",
+    passages: [
+      { content: "Business casual required.", pageNumber: null, sectionTitle: "ATTIRE" },
+    ],
+  });
+  assert.match(out, /Dress Code Policy — ATTIRE/);
+  assert.match(out, /Business casual required/);
+  assert.doesNotMatch(out, /fallback summary/);
+});
+
+test("doc entry with no passages renders legacy summary format", () => {
+  const out = formatDocEntryForTest({
+    type: "doc",
+    id: "d3",
+    label: "Orientation Guide",
+    score: 1,
+    content: "Overview of the SPOKES program.",
+  });
+  assert.match(out, /Summary: Overview of the SPOKES program/);
+  assert.match(out, /Orientation Guide/);
+});
+
+// ── Integration tests ──────────────────────────────────────────────────────────
+
 const originalRagEnabled = process.env.SAGE_RAG_ENABLED;
 const originalRagMode = process.env.SAGE_RAG_MODE;
 
@@ -82,9 +134,11 @@ describe("getDocumentContext", () => {
     mockDocFindMany.mock.resetCalls();
     mockSnippetFindMany.mock.resetCalls();
     mockHybridSearch.mock.resetCalls();
+    mockGetBestChunks.mock.resetCalls();
     mockDocFindMany.mock.mockImplementation(async () => [keywordDoc()]);
     mockSnippetFindMany.mock.mockImplementation(async () => []);
     mockHybridSearch.mock.mockImplementation(async () => [hybridDoc()]);
+    mockGetBestChunks.mock.mockImplementation(async () => new Map());
   });
 
   afterEach(() => {
@@ -186,5 +240,33 @@ describe("getDocumentContext", () => {
     ]);
     const context = await getDocumentContext("what is the dress code?", "student");
     assert.ok(!context.includes("Irrelevant snippet"));
+  });
+
+  it("injects passage citations when getBestChunks returns chunks", async () => {
+    const passages = new Map([
+      [
+        "doc-dress",
+        [
+          {
+            documentId: "doc-dress",
+            content: "Students must wear business casual.",
+            pageNumber: 5,
+            sectionTitle: "ATTIRE",
+            distance: 0.2,
+          },
+        ],
+      ],
+    ]);
+    mockGetBestChunks.mock.mockImplementation(async () => passages);
+    const context = await getDocumentContext("what is the dress code?", "student");
+    assert.match(context, /SPOKES Dress Code Policy FY26 Fillable, p\.5/);
+    assert.match(context, /Students must wear business casual/);
+    assert.ok(!context.includes("Summary: Explains what students can wear"), "passage present — no fallback summary");
+  });
+
+  it("falls back to summary when getBestChunks returns empty map", async () => {
+    mockGetBestChunks.mock.mockImplementation(async () => new Map());
+    const context = await getDocumentContext("what is the dress code?", "student");
+    assert.match(context, /Summary: Explains what students can wear at SPOKES/);
   });
 });

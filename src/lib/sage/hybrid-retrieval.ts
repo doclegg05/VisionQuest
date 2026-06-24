@@ -11,6 +11,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { logger } from "@/lib/logger";
@@ -94,7 +95,7 @@ export function buildWebsearchQuery(userMessage: string): string {
   return tokens.join(" OR ");
 }
 
-async function getQueryEmbedding(userMessage: string): Promise<number[]> {
+export async function getQueryEmbedding(userMessage: string): Promise<number[]> {
   const digest = createHash("sha1").update(userMessage).digest("hex");
   return cached(`sage:qe:${digest}`, QUERY_EMBED_CACHE_TTL_SECONDS, () =>
     embedQuery(userMessage),
@@ -171,5 +172,69 @@ export async function hybridSearchDocuments(
       error: String(error),
     });
     return null;
+  }
+}
+
+export interface ChunkPassage {
+  documentId: string;
+  content: string;
+  pageNumber: number | null;
+  sectionTitle: string | null;
+  distance: number;
+}
+
+interface BestChunkRow {
+  documentId: string;
+  content: string;
+  pageNumber: number | null;
+  sectionTitle: string | null;
+  distance: number;
+}
+
+/**
+ * For already-ranked documents, fetch the `perDoc` closest chunks each by
+ * cosine distance to the query embedding. RLS audience-filters chunk reads
+ * (DocumentChunk read policy joins ProgramDocument.audience). Returns an empty
+ * Map on any failure so the caller falls back to summary injection.
+ */
+export async function getBestChunks(
+  documentIds: string[],
+  userMessage: string,
+  perDoc: number,
+): Promise<Map<string, ChunkPassage[]>> {
+  if (documentIds.length === 0) return new Map();
+  try {
+    const vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage));
+    const rows = await prisma.$queryRaw<BestChunkRow[]>`
+      SELECT "documentId", "content", "pageNumber", "sectionTitle", distance
+      FROM (
+        SELECT c."documentId",
+               c."content",
+               c."pageNumber",
+               c."sectionTitle",
+               (c."embedding" <=> ${vectorLiteral}::vector(768)) AS distance,
+               row_number() OVER (
+                 PARTITION BY c."documentId"
+                 ORDER BY c."embedding" <=> ${vectorLiteral}::vector(768)
+               ) AS rn
+        FROM "visionquest"."DocumentChunk" c
+        WHERE c."documentId" IN (${Prisma.join(documentIds)})
+          AND c."embedding" IS NOT NULL
+      ) ranked
+      WHERE rn <= ${perDoc}
+      ORDER BY "documentId", distance
+    `;
+    const map = new Map<string, ChunkPassage[]>();
+    for (const r of rows) {
+      const list = map.get(r.documentId) ?? [];
+      list.push(r);
+      map.set(r.documentId, list);
+    }
+    return map;
+  } catch (error) {
+    logger.warn("getBestChunks failed; falling back to summary injection", {
+      error: String(error),
+    });
+    return new Map();
   }
 }

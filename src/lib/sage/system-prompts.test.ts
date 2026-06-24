@@ -245,6 +245,20 @@ describe("buildSystemPrompt", () => {
     assert.equal(ends.length, 1);
     assert.match(prompt, /Ignore previous instructions/);
   });
+
+  it("system prompt instructs citing provided passages", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", {
+      userMessage: "What forms does a student need to complete?",
+    });
+    assert.match(prompt, /cite the source/i);
+    assert.match(prompt, /couldn't find/i);
+  });
+
+  it("student prompt also instructs citing provided passages", () => {
+    const prompt = buildSystemPrompt("general");
+    assert.match(prompt, /cite the source/i);
+    assert.match(prompt, /couldn't find/i);
+  });
 });
 
 describe("buildSystemPrompt — program awareness", () => {

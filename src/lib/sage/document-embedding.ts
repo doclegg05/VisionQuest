@@ -16,14 +16,30 @@ import {
   toVectorLiteral,
   type EmbeddingUsageContext,
 } from "@/lib/ai/embeddings";
-import { chunkText } from "./chunking";
+import { chunkText, chunkPages, type ChunkWithProvenance } from "./chunking";
 
 export interface EmbedProgramDocumentInput {
   title: string;
   sageContextNote: string | null;
   /** Full extracted body text; chunk embeddings are skipped when absent. */
   text?: string | null;
+  /** Page-structured input; when present, enables full provenance (tokenCount/pageNumber/sectionTitle). */
+  pages?: { pageNumber: number; text: string }[];
   usage?: EmbeddingUsageContext;
+}
+
+/**
+ * Map ChunkWithProvenance[] to indexed row objects for Prisma inserts.
+ * Pure function — safe to test without DB access.
+ */
+export function buildChunkRows(chunks: ChunkWithProvenance[]) {
+  return chunks.map((c, i) => ({
+    chunkIndex: i,
+    content: c.content,
+    tokenCount: c.tokenCount,
+    pageNumber: c.pageNumber,
+    sectionTitle: c.sectionTitle,
+  }));
 }
 
 /** Text embedded at the document level — keep in sync with sage_hybrid_search. */
@@ -41,9 +57,19 @@ export async function embedProgramDocument(
   input: EmbedProgramDocumentInput,
 ): Promise<{ chunkCount: number }> {
   const docText = buildDocEmbeddingText(input.title, input.sageContextNote);
-  const chunks = input.text ? chunkText(input.text) : [];
 
-  const vectors = await embedTexts([docText, ...chunks], {
+  const provChunks: ChunkWithProvenance[] = input.pages
+    ? chunkPages(input.pages)
+    : (input.text ? chunkText(input.text) : []).map((content) => ({
+        content,
+        tokenCount: Math.ceil(content.length / 4),
+        pageNumber: 1,
+        sectionTitle: null,
+      }));
+  const rows = buildChunkRows(provChunks);
+  const chunkTexts = rows.map((r) => r.content);
+
+  const vectors = await embedTexts([docText, ...chunkTexts], {
     taskType: "RETRIEVAL_DOCUMENT",
     usage: input.usage ?? { studentId: null, callSite: "sage_embedding_ingest" },
   });
@@ -58,18 +84,25 @@ export async function embedProgramDocument(
 
     await tx.documentChunk.deleteMany({ where: { documentId: docId } });
 
-    for (let i = 0; i < chunks.length; i++) {
-      const row = await tx.documentChunk.create({
-        data: { documentId: docId, chunkIndex: i, content: chunks[i] },
+    for (let i = 0; i < rows.length; i++) {
+      const created = await tx.documentChunk.create({
+        data: {
+          documentId: docId,
+          chunkIndex: rows[i].chunkIndex,
+          content: rows[i].content,
+          tokenCount: rows[i].tokenCount,
+          pageNumber: rows[i].pageNumber,
+          sectionTitle: rows[i].sectionTitle,
+        },
         select: { id: true },
       });
       await tx.$executeRaw`
         UPDATE "visionquest"."DocumentChunk"
         SET embedding = ${toVectorLiteral(chunkVectors[i])}::vector(768)
-        WHERE id = ${row.id}
+        WHERE id = ${created.id}
       `;
     }
   });
 
-  return { chunkCount: chunks.length };
+  return { chunkCount: rows.length };
 }

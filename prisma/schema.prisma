@@ -1023,6 +1023,13 @@ model DocumentChunk {
   chunkIndex Int
   content    String   @db.Text
   embedding  Unsupported("vector(768)")?
+  tokenCount   Int?
+  pageNumber   Int?
+  sectionTitle String?
+  // fts is a GENERATED tsvector managed in raw SQL (see add_chunk_provenance
+  // migration). Prisma cannot express GENERATED columns; declared Unsupported
+  // so it stays out of drift detection — do NOT accept a migrate-dev drop diff.
+  fts          Unsupported("tsvector")?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
