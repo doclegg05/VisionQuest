@@ -7,12 +7,37 @@
   {
     "id": "form-attendance",
     "message": "I need the attendance contract form",
-    "expectedTool": "present_form"
+    "expectedTool": "present_form",
+    "acceptableTools": ["search_forms"]
   },
   {
     "id": "form-media",
     "message": "Pull up the media release form please",
-    "expectedTool": "present_form"
+    "expectedTool": "present_form",
+    "acceptableTools": ["search_forms"]
+  },
+  {
+    "id": "search-loose-attendance",
+    "message": "What's that paper I sign promising I'll show up to class? I forget what it's called.",
+    "expectedTool": "search_forms",
+    "acceptableTools": ["present_form"]
+  },
+  {
+    "id": "search-find-cert-tracking",
+    "message": "Is there a form to help me keep track of my certifications? Not sure what it's named.",
+    "expectedTool": "search_forms",
+    "acceptableTools": ["present_form"]
+  },
+  {
+    "id": "search-help-find",
+    "message": "Can you help me find the right form for getting my attendance verified for WV Works?",
+    "expectedTool": "search_forms",
+    "acceptableTools": ["present_form"]
+  },
+  {
+    "id": "search-explicit-browse",
+    "message": "I'm not sure which form I need — can you search the forms for something about photo or media permission?",
+    "expectedTool": "search_forms"
   },
   {
     "id": "cert-quickbooks",

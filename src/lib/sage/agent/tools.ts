@@ -15,9 +15,8 @@ import { FORMS, FORM_CATEGORIES, buildFormDownloadUrl } from "@/lib/spokes/forms
 import { searchForms } from "@/lib/spokes/form-search";
 import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
 import { logger } from "@/lib/logger";
-import { downloadFile } from "@/lib/storage";
 import { hasActiveConsent } from "@/lib/consent";
-import { classifyAttachment as runClassifyAttachment } from "@/lib/sage/classify-attachment";
+import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
 import type { AgentTool, AgentToolResult } from "./types";
 
@@ -545,49 +544,52 @@ const classifyAttachment: AgentTool = {
 
     const file = await prisma.fileUpload.findFirst({
       where: { id: fileUploadId, studentId },
-      select: { id: true, filename: true, mimeType: true, storageKey: true },
+      select: {
+        id: true,
+        filename: true,
+        mimeType: true,
+        storageKey: true,
+        classification: true,
+        classificationMethod: true,
+      },
     });
     if (!file) {
       return { status: "error", summary: "That uploaded file was not found on this account." };
-    }
-
-    const download = await downloadFile(file.storageKey);
-    if (!download) {
-      return { status: "error", summary: `I couldn't open "${file.filename}" from storage.` };
     }
 
     // Cloud document understanding is gated on the owning student's recorded
     // consent — same boundary as the upload-time gist (2026-06-09 decision).
     const cloudAllowed = await hasActiveConsent(studentId, "cloud_file_processing");
 
-    const { classification, method } = await runClassifyAttachment({
-      buffer: download.buffer,
-      filename: file.filename,
-      mimeType: file.mimeType || download.mimeType,
-      studentId,
-      cloudAllowed,
-    });
+    const ensured = await ensureClassification({ file, studentId, cloudAllowed });
+    if (!ensured) {
+      return { status: "error", summary: `I couldn't open "${file.filename}" from storage.` };
+    }
+    const { classification, method, fromCache } = ensured;
 
-    await logAiAuditEvent({
-      actorId: ctx.session.id,
-      actorRole: ctx.session.role,
-      route: "/api/chat/send#classify_attachment",
-      task: "chat_file_gist",
-      sensitivity: "student_record",
-      policyDecision: method === "cloud" ? "cloud_allowed" : "local_only",
-      status: "completed",
-      targetId: file.id,
-      providerName: method === "cloud" ? "gemini" : null,
-      providerClass: method === "cloud" ? "cloud" : "none",
-      allowCloud: cloudAllowed,
-      outputChars: classification.summary.length,
-      reason:
-        method === "cloud"
-          ? "Active cloud_file_processing consent; attachment sent to Gemini for structured classification."
-          : "No active cloud consent (or cloud unavailable); local extraction/heuristics only.",
-    }).catch((err) => {
-      logger.warn("classify_attachment: AI audit log failed", { err: String(err) });
-    });
+    // Only audit an actual model/extraction pass — a cache hit makes no call.
+    if (!fromCache) {
+      await logAiAuditEvent({
+        actorId: ctx.session.id,
+        actorRole: ctx.session.role,
+        route: "/api/chat/send#classify_attachment",
+        task: "chat_file_gist",
+        sensitivity: "student_record",
+        policyDecision: method === "cloud" ? "cloud_allowed" : "local_only",
+        status: "completed",
+        targetId: file.id,
+        providerName: method === "cloud" ? "gemini" : null,
+        providerClass: method === "cloud" ? "cloud" : "none",
+        allowCloud: cloudAllowed,
+        outputChars: classification.summary.length,
+        reason:
+          method === "cloud"
+            ? "Active cloud_file_processing consent; attachment sent to Gemini for structured classification."
+            : "No active cloud consent (or cloud unavailable); local extraction/heuristics only.",
+      }).catch((err) => {
+        logger.warn("classify_attachment: AI audit log failed", { err: String(err) });
+      });
+    }
 
     const detail = [
       classification.title ? `titled "${classification.title}"` : null,

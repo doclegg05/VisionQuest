@@ -508,6 +508,13 @@ model FileUpload {
   // Always produced server-side at upload time — never client-supplied.
   gist       String?  @db.Text
   gistMethod String? // cloud | local | none
+  // Structured attachment-vision classification (kind, title, issuer, date,
+  // identifiers, confidence). Cached so classify_attachment isn't re-run per
+  // turn. A free local baseline is stored at upload; an active-consent cloud
+  // pass upgrades it on first use. Server-produced only — never client-set.
+  classification       Json?
+  classificationMethod String? // cloud | local | none
+  classifiedAt         DateTime?
   uploadedAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
