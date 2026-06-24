@@ -12,7 +12,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { sanitizeForPrompt } from "./system-prompts";
 import { tokenizeForRetrieval } from "./retrieval-tokens";
-import { hybridSearchDocuments } from "./hybrid-retrieval";
+import { hybridSearchDocuments, getBestChunks } from "./hybrid-retrieval";
 
 interface SageDocument {
   id: string;
@@ -145,7 +145,14 @@ function scoreSnippet(snippet: SageSnippetRow, messageLower: string): number {
 
 const TOKEN_BUDGET_CHARS = 6000; // ~2,000 tokens at ~3 chars/token for Gemini
 
-type ScoredDoc = { type: "doc"; id: string; label: string; content: string; score: number };
+type ScoredDoc = {
+  type: "doc";
+  id: string;
+  label: string;
+  content: string;
+  score: number;
+  passages?: { content: string; pageNumber: number | null; sectionTitle: string | null }[];
+};
 type ScoredSnippet = { type: "snippet"; label: string; content: string; score: number };
 type ScoredEntry = ScoredDoc | ScoredSnippet;
 
@@ -161,7 +168,22 @@ const SNIPPET_FRAMING =
 
 function formatEntry(entry: ScoredEntry): string {
   if (entry.type === "doc") {
-    return `[${entry.label}]\nLink: /api/documents/download?id=${entry.id}&mode=view\nSummary: ${entry.content}`;
+    const link = `Link: /api/documents/download?id=${entry.id}&mode=view`;
+    if (entry.passages && entry.passages.length > 0) {
+      const passages = entry.passages
+        .map((p) => {
+          const cite =
+            p.pageNumber != null
+              ? `[${entry.label}, p.${p.pageNumber}]`
+              : p.sectionTitle
+                ? `[${entry.label} — ${p.sectionTitle}]`
+                : `[${entry.label}]`;
+          return `${cite}\n${p.content}`;
+        })
+        .join("\n\n");
+      return `${link}\n${passages}`;
+    }
+    return `[${entry.label}]\n${link}\nSummary: ${entry.content}`;
   }
   // Staff-authored snippet: wrap in delimited tags + sanitize the content so
   // a teacher (compromised account, misconfigured snippet, or just inexperienced)
@@ -258,13 +280,28 @@ export async function getDocumentContext(
     if (hybridDocs !== null) {
       const snippets = await loadSageSnippets();
 
-      const docEntries: ScoredEntry[] = hybridDocs.map((doc) => ({
-        type: "doc" as const,
-        id: doc.id,
-        label: doc.title,
-        content: doc.sageContextNote || doc.title,
-        score: doc.score,
-      }));
+      const docIds = hybridDocs.map((d) => d.id);
+      const chunksByDoc = await getBestChunks(docIds, userMessage, 2);
+
+      const docEntries: ScoredEntry[] = hybridDocs.map((doc) => {
+        const passages = chunksByDoc.get(doc.id);
+        return {
+          type: "doc" as const,
+          id: doc.id,
+          label: doc.title,
+          content: doc.sageContextNote || doc.title,
+          score: doc.score,
+          ...(passages && passages.length > 0
+            ? {
+                passages: passages.map((p) => ({
+                  content: p.content,
+                  pageNumber: p.pageNumber,
+                  sectionTitle: p.sectionTitle,
+                })),
+              }
+            : {}),
+        };
+      });
 
       const snippetEntries: ScoredEntry[] = snippets
         .map((snippet) => ({ snippet, keywordScore: scoreSnippet(snippet, messageLower) }))
@@ -284,3 +321,10 @@ export async function getDocumentContext(
 
   return keywordDocumentContext(messageLower, callerRole, maxResults, tokenBudgetChars);
 }
+
+/**
+ * Thin re-export of the pure `formatEntry` formatter for unit testing.
+ * Only the `doc` branch is exercised by tests; the snippet branch is covered
+ * by integration tests via `getDocumentContext`.
+ */
+export const formatDocEntryForTest: (entry: ScoredDoc) => string = formatEntry;
