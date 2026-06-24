@@ -103,3 +103,77 @@ export async function extractText(
 export function containsPII(text: string): boolean {
   return SSN_PATTERN.test(text) || CASE_NUMBER_PATTERN.test(text);
 }
+
+// ---------------------------------------------------------------------------
+// Page-aware extraction — used by the RAG chunk pipeline (Task 1+)
+// ---------------------------------------------------------------------------
+
+export interface PageExtraction {
+  pages: { pageNumber: number; text: string }[];
+  pageCount: number;
+}
+
+/**
+ * Collect per-page text from a pdf-parse result. The v2 `getText()` return
+ * value includes a `pages` array of `{ text: string; num: number }` objects,
+ * one entry per page. We map them directly; `cap` limits characters per page.
+ */
+async function collectPdfPages(
+  pages: { text: string; num: number }[],
+  cap: number,
+): Promise<{ pageNumber: number; text: string }[]> {
+  return pages.map((p) => ({
+    pageNumber: p.num,
+    text: p.text.slice(0, cap),
+  }));
+}
+
+/**
+ * Full-document, page-aware extraction for chunk-level RAG. Unlike
+ * extractTextFromBuffer (summary-capped, flat string), this returns text per
+ * page so chunks can carry page provenance. Returns null on empty/unsupported.
+ */
+export async function extractPagesFromBuffer(
+  buffer: Buffer,
+  ext: string,
+  options: { maxCharsPerPage?: number } = {},
+): Promise<PageExtraction | null> {
+  const normalizedExt = ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+  const cap = options.maxCharsPerPage ?? Number.POSITIVE_INFINITY;
+  try {
+    if (buffer.length === 0) return null;
+    switch (normalizedExt) {
+      case ".pdf": {
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        const result = await parser.getText();
+        const total: number = result.total ?? 0;
+        if (!Array.isArray(result.pages) || result.pages.length === 0) return null;
+        const pages = await collectPdfPages(
+          result.pages as { text: string; num: number }[],
+          cap,
+        );
+        const nonEmpty = pages.filter((p) => p.text.trim().length > 0);
+        return nonEmpty.length > 0 ? { pages: nonEmpty, pageCount: total } : null;
+      }
+      case ".docx": {
+        const result = await mammoth.extractRawText({ buffer });
+        const text = result.value?.trim();
+        if (!text) return null;
+        return { pages: [{ pageNumber: 1, text: text.slice(0, cap) }], pageCount: 1 };
+      }
+      case ".txt":
+      case ".md": {
+        const text = buffer.toString("utf-8").trim();
+        if (!text) return null;
+        return { pages: [{ pageNumber: 1, text: text.slice(0, cap) }], pageCount: 1 };
+      }
+      default:
+        return null;
+    }
+  } catch (error) {
+    logger.error(`Page extraction failed (${normalizedExt})`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
