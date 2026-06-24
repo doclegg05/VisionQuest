@@ -34,11 +34,13 @@ mock.module("@/lib/cache", {
 });
 
 let hybridSearchDocuments: typeof import("./hybrid-retrieval").hybridSearchDocuments;
+let getBestChunks: typeof import("./hybrid-retrieval").getBestChunks;
 let MAX_COSINE_DISTANCE: number;
 
 before(async () => {
   const mod = await import("./hybrid-retrieval");
   hybridSearchDocuments = mod.hybridSearchDocuments;
+  getBestChunks = mod.getBestChunks;
   MAX_COSINE_DISTANCE = mod.getMaxCosineDistance();
 });
 
@@ -135,5 +137,62 @@ describe("hybridSearchDocuments", () => {
     mockQueryRaw.mock.mockImplementation(async () => []);
     const results = await hybridSearchDocuments("zzz", "student", 12);
     assert.deepEqual(results, []);
+  });
+});
+
+describe("getBestChunks", () => {
+  beforeEach(() => {
+    mockQueryRaw.mock.resetCalls();
+    mockEmbedQuery.mock.resetCalls();
+    mockEmbedQuery.mock.mockImplementation(async () => new Array(768).fill(0.1));
+  });
+
+  it("groups passages by documentId", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      {
+        documentId: "d1",
+        content: "Attendance policy text",
+        pageNumber: 1,
+        sectionTitle: "Attendance",
+        distance: 0.22,
+      },
+      {
+        documentId: "d1",
+        content: "More attendance detail",
+        pageNumber: 2,
+        sectionTitle: "Attendance",
+        distance: 0.28,
+      },
+    ]);
+    const result = await getBestChunks(["d1"], "attendance policy", 2);
+    const passages = result.get("d1");
+    assert.ok(passages && passages.length >= 1);
+    assert.equal(passages[0].documentId, "d1");
+    assert.equal(passages[0].content, "Attendance policy text");
+  });
+
+  it("returns empty Map for no documentIds", async () => {
+    const result = await getBestChunks([], "anything", 2);
+    assert.equal(result.size, 0);
+    assert.equal(mockQueryRaw.mock.callCount(), 0);
+  });
+
+  it("returns empty Map when $queryRaw throws", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => {
+      throw new Error("db error");
+    });
+    const result = await getBestChunks(["d1"], "attendance", 2);
+    assert.equal(result.size, 0);
+  });
+
+  it("groups multiple docs into separate Map entries", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      { documentId: "d1", content: "chunk A", pageNumber: null, sectionTitle: null, distance: 0.2 },
+      { documentId: "d2", content: "chunk B", pageNumber: null, sectionTitle: null, distance: 0.3 },
+    ]);
+    const result = await getBestChunks(["d1", "d2"], "query", 1);
+    assert.equal(result.size, 2);
+    assert.equal(result.get("d1")?.[0].content, "chunk A");
+    assert.equal(result.get("d2")?.[0].content, "chunk B");
   });
 });
