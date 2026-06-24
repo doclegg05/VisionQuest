@@ -79,6 +79,7 @@ _old_MEMORY.md
 .remember/
 .superpowers/
 .worktrees/
+.claude/worktrees/
 
 # Test artifacts
 playwright-report/
