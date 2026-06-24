@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { buildSystemPrompt, determineStage, sanitizeForPrompt } from "./system-prompts";
 import { SPOKES_BRIEF } from "./knowledge-base";
 
@@ -248,6 +248,17 @@ describe("buildSystemPrompt", () => {
 });
 
 describe("buildSystemPrompt — program awareness", () => {
+  // These suites exercise the NON-agent knowledge path; the agent default
+  // flipped to on (Phase 3), so pin it off explicitly.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+  });
+
   it("injects SPOKES addendum when programType is spokes", () => {
     const prompt = buildSystemPrompt("onboarding", { programType: "spokes", classroomConfirmedAt: new Date() });
     assert.match(prompt, /PROGRAM CONTEXT — SPOKES \(workforce training\)/);
@@ -360,6 +371,17 @@ describe("buildSystemPrompt — program awareness", () => {
 });
 
 describe("buildSystemPrompt — stage-gated knowledge injection", () => {
+  // These suites exercise the NON-agent knowledge path; the agent default
+  // flipped to on (Phase 3), so pin it off explicitly.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+  });
+
   it("orientation stage includes full SPOKES knowledge block", () => {
     const prompt = buildSystemPrompt("orientation");
     assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);

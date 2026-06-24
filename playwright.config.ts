@@ -6,6 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
  * Tests run against a local dev server or the URL specified by BASE_URL.
  * The dev server is started automatically if not already running.
  */
+const baseURL = process.env.BASE_URL ?? "http://localhost:3000";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -15,7 +17,7 @@ export default defineConfig({
   reporter: "html",
 
   use: {
-    baseURL: process.env.BASE_URL ?? "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -28,8 +30,10 @@ export default defineConfig({
   ],
 
   webServer: {
+    // PORT is inherited by `next dev`, so BASE_URL + PORT together relocate
+    // the whole suite when port 3000 is occupied by something else.
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

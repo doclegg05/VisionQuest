@@ -14,8 +14,6 @@ jobs:
       # The main `npm test` step keeps using the fake DATABASE_URL below; only
       # the RLS migrate/test steps point DATABASE_URL at this container.
       postgres:
-        # pgvector image (postgres:16 + pgvector) so RAG migrations that create a
-        # vector(768) column + HNSW index apply cleanly in the hermetic migrate step.
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
@@ -46,7 +44,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - uses: actions/setup-python@v5

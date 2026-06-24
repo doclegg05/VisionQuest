@@ -115,12 +115,14 @@ async function main() {
 
   const results = [];
   for (const item of questions) {
+    const startedAt = performance.now();
     const context = await getDocumentContext(
       item.question,
       role,
       maxResults,
       tokenBudgetChars,
     );
+    const latencyMs = Math.round(performance.now() - startedAt);
     const contextLower = context.toLowerCase();
     const matchedRefs = parseDocumentRefs(context);
     const matchedIds = unique(matchedRefs.map((ref) => ref.id));
@@ -180,6 +182,7 @@ async function main() {
       top3Expected,
       cleanTop3,
       unexpectedTop3,
+      latencyMs,
       documentContextChars: context.length,
       matchedTitles: matchedDocuments.map((doc) => doc.title),
       matchedDocuments: matchedDocuments.map(compactDoc),
@@ -201,6 +204,20 @@ async function main() {
     0,
   );
 
+  // Latency percentiles over sequential per-question wall-clock. The first
+  // question pays cold-start costs (module load, DB connect, embedding HTTP
+  // warm-up), so it is reported separately and excluded from nothing — both
+  // numbers below include every question, honestly.
+  const latencies = results.map((result) => result.latencyMs).sort((a, b) => a - b);
+  const percentile = (p) =>
+    latencies.length ? latencies[Math.min(latencies.length - 1, Math.ceil(p * latencies.length) - 1)] : 0;
+  const latencySummary = {
+    coldFirstCallMs: results[0]?.latencyMs ?? 0,
+    p50Ms: percentile(0.5),
+    p95Ms: percentile(0.95),
+    maxMs: latencies[latencies.length - 1] ?? 0,
+  };
+
   const report = {
     generatedAt: new Date().toISOString(),
     fixturePath,
@@ -217,6 +234,7 @@ async function main() {
     top3Expected,
     cleanTop3,
     unexpectedTop3Docs,
+    latency: latencySummary,
     missingExpectationKeys,
     results,
   };
@@ -238,6 +256,9 @@ async function main() {
     console.log(`Top-3 contains expected: ${top3Expected}/${expectedResults.length}`);
     console.log(`Clean top-3: ${cleanTop3}/${expectedResults.length}`);
     console.log(`Unexpected top-3 docs: ${unexpectedTop3Docs}`);
+    console.log(
+      `Latency: cold first call ${latencySummary.coldFirstCallMs}ms, p50 ${latencySummary.p50Ms}ms, p95 ${latencySummary.p95Ms}ms, max ${latencySummary.maxMs}ms`,
+    );
 
     if (missingExpectationKeys.length > 0) {
       console.log("\nMissing fixture storage keys:");

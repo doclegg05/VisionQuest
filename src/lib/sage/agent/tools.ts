@@ -11,7 +11,7 @@
 // =============================================================================
 
 import { prisma } from "@/lib/db";
-import { FORMS } from "@/lib/spokes/forms";
+import { FORMS, buildFormDownloadUrl } from "@/lib/spokes/forms";
 import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
 import { logger } from "@/lib/logger";
 import type { AgentTool, AgentToolResult } from "./types";
@@ -100,7 +100,9 @@ const presentForm: AgentTool = {
       },
       action: {
         action: "open_form",
-        target: `/forms/${match.id}`,
+        // The PDF download endpoint — /forms/<id> is the Forms Hub fill UI
+        // keyed by DB FormTemplate ids, where catalog slugs 404.
+        target: buildFormDownloadUrl(match.id, "view"),
         label: `Open ${match.title}`,
       },
       modelHint: `Surfaced form "${match.title}" (${match.category}). The student now has a button to open it. Briefly tell them what the form is for and any next step.`,
@@ -445,6 +447,9 @@ const classifyAttachment: AgentTool = {
 // Registry
 // -----------------------------------------------------------------------------
 
+import { WRITE_TOOLS } from "./write-tools";
+import { CAREER_TOOLS } from "./career-tools";
+
 const ALL_TOOLS: AgentTool[] = [
   presentForm,
   findCertification,
@@ -452,6 +457,8 @@ const ALL_TOOLS: AgentTool[] = [
   openResource,
   lookupProgramInfo,
   classifyAttachment,
+  ...WRITE_TOOLS,
+  ...CAREER_TOOLS,
 ];
 
 export function getEnabledTools(role: string): AgentTool[] {

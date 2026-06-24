@@ -1,5 +1,15 @@
 import jsPDF from "jspdf";
 import type { ResumeContent } from "@/lib/resume";
+import { getResumeFont, RESUME_RGB, type ResumeFont } from "@/lib/resume-layout";
+
+/**
+ * jsPDF throws if a font/style pair was never registered. Core fonts have
+ * italic; embedded fonts here register only normal + bold, so fall italic → normal.
+ */
+function fontStyle(font: ResumeFont, style: "normal" | "bold" | "italic"): string {
+  if (style === "italic" && font.kind === "embedded") return "normal";
+  return style;
+}
 
 interface Cursor {
   y: number;
@@ -28,14 +38,14 @@ function drawWrappedText(doc: jsPDF, text: string, x: number, cursor: Cursor, wi
   cursor.y += lines.length * lineHeight;
 }
 
-function drawSectionTitle(doc: jsPDF, title: string, cursor: Cursor) {
+function drawSectionTitle(doc: jsPDF, title: string, cursor: Cursor, font: ResumeFont) {
   ensureSpace(doc, cursor, 14);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(font.jsPdfFont, "bold");
   doc.setFontSize(11);
-  doc.setTextColor(22, 38, 63);
+  doc.setTextColor(...RESUME_RGB.ink);
   doc.text(title.toUpperCase(), 16, cursor.y);
   cursor.y += 2;
-  doc.setDrawColor(160, 172, 188);
+  doc.setDrawColor(...RESUME_RGB.rule);
   doc.setLineWidth(0.3);
   doc.line(16, cursor.y, 194, cursor.y);
   cursor.y += 6;
@@ -53,16 +63,17 @@ export async function generateResumePdfArrayBuffer(name: string, resume: ResumeC
     format: "letter",
   });
 
+  const font = getResumeFont(resume.font);
   const cursor: Cursor = { y: 18 };
   const textWidth = 178;
 
-  doc.setTextColor(18, 38, 63);
-  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...RESUME_RGB.ink);
+  doc.setFont(font.jsPdfFont, fontStyle(font, "bold"));
   doc.setFontSize(20);
   doc.text(name, 16, cursor.y);
   cursor.y += 8;
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont(font.jsPdfFont, fontStyle(font, "normal"));
   doc.setFontSize(11);
   if (resume.headline) {
     doc.text(resume.headline, 16, cursor.y);
@@ -84,38 +95,38 @@ export async function generateResumePdfArrayBuffer(name: string, resume: ResumeC
   }
 
   if (resume.objective) {
-    drawSectionTitle(doc, "Professional Summary", cursor);
-    doc.setFont("helvetica", "normal");
+    drawSectionTitle(doc, "Professional Summary", cursor, font);
+    doc.setFont(font.jsPdfFont, fontStyle(font, "normal"));
     doc.setFontSize(10);
     drawWrappedText(doc, resume.objective, 16, cursor, textWidth, 4.7);
     cursor.y += 3;
   }
 
   if (resume.skills.length > 0) {
-    drawSectionTitle(doc, "Skills", cursor);
-    doc.setFont("helvetica", "normal");
+    drawSectionTitle(doc, "Skills", cursor, font);
+    doc.setFont(font.jsPdfFont, fontStyle(font, "normal"));
     doc.setFontSize(10);
     drawWrappedText(doc, resume.skills.join(" | "), 16, cursor, textWidth, 4.7);
     cursor.y += 3;
   }
 
   if (resume.experience.length > 0) {
-    drawSectionTitle(doc, "Experience", cursor);
+    drawSectionTitle(doc, "Experience", cursor, font);
     for (const item of resume.experience) {
       const meta = [item.location, item.dates].filter(Boolean).join(" | ");
       ensureSpace(doc, cursor, 18);
-      doc.setFont("helvetica", "bold");
+      doc.setFont(font.jsPdfFont, fontStyle(font, "bold"));
       doc.setFontSize(10.5);
       doc.text([item.title, item.company].filter(Boolean).join(" | "), 16, cursor.y);
       cursor.y += 4.7;
       if (meta) {
-        doc.setFont("helvetica", "italic");
+        doc.setFont(font.jsPdfFont, fontStyle(font, "italic"));
         doc.setFontSize(9.5);
         doc.text(meta, 16, cursor.y);
         cursor.y += 4.4;
       }
 
-      doc.setFont("helvetica", "normal");
+      doc.setFont(font.jsPdfFont, fontStyle(font, "normal"));
       doc.setFontSize(9.5);
       const bullets = bulletLines(item.description);
       for (const bullet of bullets.length > 0 ? bullets : item.description ? [item.description] : []) {
@@ -126,16 +137,16 @@ export async function generateResumePdfArrayBuffer(name: string, resume: ResumeC
   }
 
   if (resume.education.length > 0) {
-    drawSectionTitle(doc, "Education", cursor);
+    drawSectionTitle(doc, "Education", cursor, font);
     for (const item of resume.education) {
       const meta = [item.location, item.dates].filter(Boolean).join(" | ");
       ensureSpace(doc, cursor, 12);
-      doc.setFont("helvetica", "bold");
+      doc.setFont(font.jsPdfFont, fontStyle(font, "bold"));
       doc.setFontSize(10.5);
       doc.text([item.degree, item.school].filter(Boolean).join(" | "), 16, cursor.y);
       cursor.y += 4.7;
       if (meta) {
-        doc.setFont("helvetica", "italic");
+        doc.setFont(font.jsPdfFont, fontStyle(font, "italic"));
         doc.setFontSize(9.5);
         doc.text(meta, 16, cursor.y);
         cursor.y += 4.4;
@@ -145,8 +156,8 @@ export async function generateResumePdfArrayBuffer(name: string, resume: ResumeC
   }
 
   if (resume.certifications.length > 0) {
-    drawSectionTitle(doc, "Certifications", cursor);
-    doc.setFont("helvetica", "normal");
+    drawSectionTitle(doc, "Certifications", cursor, font);
+    doc.setFont(font.jsPdfFont, fontStyle(font, "normal"));
     doc.setFontSize(9.5);
     for (const item of resume.certifications) {
       const line = [item.name, item.issuer, item.dates].filter(Boolean).join(" | ");
@@ -156,8 +167,8 @@ export async function generateResumePdfArrayBuffer(name: string, resume: ResumeC
   }
 
   if (resume.references) {
-    drawSectionTitle(doc, "References", cursor);
-    doc.setFont("helvetica", "normal");
+    drawSectionTitle(doc, "References", cursor, font);
+    doc.setFont(font.jsPdfFont, fontStyle(font, "normal"));
     doc.setFontSize(9.5);
     drawWrappedText(doc, resume.references, 16, cursor, textWidth, 4.4);
   }

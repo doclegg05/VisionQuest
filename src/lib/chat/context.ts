@@ -67,6 +67,8 @@ export interface BaseStudentPromptContext {
 
 export interface StudentPromptContext extends BaseStudentPromptContext {
   skillGapContext?: string;
+  /** Phase 5 goal→resume→job thread: nudge when a BHAG exists but no resume. */
+  careerThreadContext?: string;
   pathwayContext?: string;
   coachingArcContext?: string;
   careerProfileContext?: string;
@@ -313,7 +315,7 @@ export async function getStudentPromptContext(
     priorSummaryLimit,
   );
 
-  const [skillGapContext, pathwayContext, coachingArcContext] =
+  const [skillGapContext, pathwayContext, coachingArcContext, careerThreadContext] =
     await Promise.all([
       shouldLoadSkillGapContext(stage, baseContext.careerDiscovery?.status)
         ? cached(
@@ -372,6 +374,24 @@ export async function getStudentPromptContext(
             )
             .catch(() => undefined)
         : Promise.resolve(undefined),
+      baseContext.goalsByLevel.bhag
+        ? cached(
+            `chat:career-thread:${studentId}`,
+            SUPPLEMENTAL_CONTEXT_TTL_SECONDS,
+            async () => {
+              const resume = await prisma.resumeData.findUnique({
+                where: { studentId },
+                select: { id: true },
+              });
+              if (resume) return undefined;
+              return (
+                "CAREER THREAD: The student has a big career goal but NO resume started yet. " +
+                "When career, jobs, or readiness come up naturally, offer to start their resume together " +
+                "(you can propose edits with the propose_resume_edit tool). Do not push it more than once per conversation."
+              );
+            },
+          )
+        : Promise.resolve(undefined),
     ]);
 
   return {
@@ -379,6 +399,7 @@ export async function getStudentPromptContext(
     skillGapContext,
     pathwayContext,
     coachingArcContext,
+    careerThreadContext,
     careerProfileContext:
       stage === "career_profile_review"
         ? buildCareerProfileContext(baseContext.careerDiscovery)

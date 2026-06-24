@@ -89,6 +89,9 @@ export const chatSendSchema = z.object({
   conversationId: z.string().cuid("Invalid conversation ID.").nullish(),
   requestedStage: z.string().max(64).optional(),
   targetStudentId: z.string().cuid("Invalid student ID.").nullish(),
+  // Phase 3: FileUpload ids attached to this turn (chat uploads). Gists are
+  // loaded server-side, ownership-checked — never client-supplied.
+  attachmentIds: z.array(z.string().cuid("Invalid attachment ID.")).max(3).optional(),
 });
 
 // ─── Settings Schemas ───────────────────────────────────────────────────────

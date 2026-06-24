@@ -10,7 +10,7 @@ import type {
   ToolStreamOptions,
 } from "./types";
 
-const DEFAULT_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const MODEL = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 
 export class GeminiProvider implements AIProvider {

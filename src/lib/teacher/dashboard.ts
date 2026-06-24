@@ -29,6 +29,8 @@ export interface QueueStudent {
   email: string | null;
   programType: ProgramType;
   urgencyScore: number;
+  /** Plain-language chips explaining the score (Phase 6). */
+  urgencyReasons: string[];
   primaryAlert: {
     id: string;
     type: string;

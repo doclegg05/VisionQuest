@@ -20,7 +20,10 @@ const WEIGHT_CLUSTER = 40;
 const WEIGHT_RIASEC = 20;
 const WEIGHT_SKILLS = 20;
 const WEIGHT_INTERACTIONS = 12;
+const WEIGHT_SOURCE_TRUST = 5;
 const MAX_SKILL_MATCHES = 5;
+
+const TRUSTED_LOCAL_SOURCES = new Set(["careeronestop", "usajobs"]);
 
 export interface StudentJobProfile {
   skills: string[];
@@ -452,6 +455,18 @@ function scoreInteractions(job: ScoredJob, profile: JobInteractionProfile): {
   };
 }
 
+function scoreSourceTrust(
+  job: ScoredJob,
+  classRegion: string,
+): { score: number; reason: JobMatchReason | null } {
+  if (!job.source || !TRUSTED_LOCAL_SOURCES.has(job.source)) return { score: 0, reason: null };
+  if (classifyJobProximity(job, classRegion) !== "local") return { score: 0, reason: null };
+  return {
+    score: WEIGHT_SOURCE_TRUST,
+    reason: { type: "source", label: "Verified local listing", value: job.source },
+  };
+}
+
 function buildMatchReasons(input: {
   job: ScoredJob;
   discovery: Pick<CareerDiscovery, "topClusters" | "hollandCode"> | null;
@@ -526,15 +541,16 @@ export function scoreJob(
   const skillOverlap = getSkillOverlap(job, profile);
   const skillScore = scoreSkills(skillOverlap);
   const interactionScore = scoreInteractions(job, interactionProfile);
+  const trust = scoreSourceTrust(job, classRegion);
   const totalScore = Math.max(
     0,
-    Math.min(100, locationScore + clusterScore + riasecScore + skillScore + interactionScore.score),
+    Math.min(100, locationScore + clusterScore + riasecScore + skillScore + interactionScore.score + trust.score),
   );
 
   const clusterOverlap = discovery
     ? job.clusters.filter((c) => discovery.topClusters.includes(c))
     : [];
-  const matchReasons = buildMatchReasons({
+  const baseReasons = buildMatchReasons({
     job,
     discovery,
     classRegion,
@@ -543,6 +559,7 @@ export function scoreJob(
     riasecScore,
     interactionReasons: interactionScore.reasons,
   });
+  const matchReasons = trust.reason ? [trust.reason, ...baseReasons].slice(0, 6) : baseReasons;
 
   return {
     jobListingId: job.id,

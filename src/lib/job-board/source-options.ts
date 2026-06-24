@@ -1,11 +1,11 @@
 export const DEFAULT_JOB_SOURCES = [
-  "remotive",
-  "remoteok",
-  "weworkremotely",
-  "jsearch",
+  "careeronestop",
+  "usajobs",
+  "adzuna",
 ] as const;
 
 export const JOB_SOURCE_OPTIONS = [
+  { value: "careeronestop", label: "WV Local Jobs — state job bank", sourceMode: "local" },
   { value: "remotive", label: "Remotive (remote, no key)", sourceMode: "remote" },
   { value: "remoteok", label: "Remote OK (remote, no key)", sourceMode: "remote" },
   { value: "weworkremotely", label: "We Work Remotely (remote, no key)", sourceMode: "remote" },

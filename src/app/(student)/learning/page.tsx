@@ -28,6 +28,19 @@ export default async function LearningPage() {
         description="Keep your goal-aligned platforms, certification progress, and required training work in one place."
       />
 
+      {/* Phase 4 consolidation: the Resource Center moved out of the nav and lives here. */}
+      <a
+        href="/resources"
+        className="mt-4 block rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 transition-colors hover:bg-[var(--surface-interactive)]"
+      >
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+          Resource Center
+        </p>
+        <p className="mt-1 text-sm text-[var(--ink-strong)]">
+          Program guides, handouts, and reference materials →
+        </p>
+      </a>
+
       <section id="roadmap" className="mt-6">
         <h2 className="sr-only">Your Learning Roadmap</h2>
         {pathway ? (

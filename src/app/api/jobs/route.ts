@@ -10,6 +10,7 @@ import {
   type LocalJobPriority,
 } from "@/lib/job-board/recommendation";
 import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
+import { parseJobFilters, buildJobFilterWhere } from "@/lib/job-board/job-filters";
 import { isJobWorkMode } from "@/lib/job-board/work-mode";
 import { parseStoredResumeData } from "@/lib/resume";
 
@@ -74,6 +75,9 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     // Hybrid is kept because in-region hybrid roles still classify as "local".
     where.workMode = { not: "remote" };
   }
+
+  const filters = parseJobFilters(url.searchParams);
+  Object.assign(where, buildJobFilterWhere(filters, new Date()));
 
   const activeJobs = await prisma.jobListing.findMany({
     where,

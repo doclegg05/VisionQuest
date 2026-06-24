@@ -8,7 +8,7 @@
     "start": "node scripts/start-production.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test --experimental-test-module-mocks src/**/*.test.ts",
+    "test": "tsx --test --experimental-test-module-mocks $(git ls-files 'src/*.test.ts' 'src/*.test.tsx')",
     "test:rls": "tsx --test src/lib/rls.test.ts",
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
@@ -25,6 +25,9 @@
     "sage:rag:notes": "node scripts/sage-rag-notes.mjs",
     "sage:rag:activate": "node scripts/sage-rag-activate.mjs",
     "sage:rag:harness": "tsx scripts/sage-rag-harness.mjs",
+    "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
+    "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
+    "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs"
   },

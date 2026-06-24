@@ -294,3 +294,20 @@ psql "DIRECT_URL" < backup.sql
 
 1. Roll back the service in Render to the last healthy deploy.
 2. If the problem is a migration, restore the database from backup because Prisma migrations are not automatically reversed.
+
+## Chat-First Rebuild (June 2026) — operational notes
+
+- **Kill switches** (env vars, all default ON): `SAGE_AGENT_ENABLED=false` (agent tools),
+  `SAGE_MEMORY_ENABLED=false` (memory extraction/retrieval), `SAGE_RAG_MODE=keyword`
+  (revert to legacy retrieval). Retrieval tuning: `SAGE_RAG_DISTANCE_MARGIN` (0.04),
+  `SAGE_RAG_MAX_DISTANCE` (0.55), `SAGE_MEMORY_DUP_DISTANCE` (0.08).
+- **One-time after first deploy**: trigger the embedding backfill with one curl
+  (idempotent; until then Sage uses keyword fallback):
+  `curl -X POST https://visionquest.onrender.com/api/internal/rag/backfill -H "Authorization: Bearer $CRON_SECRET"`
+  Pass `-H "Content-Type: application/json" -d '{"force":true}'` to re-embed everything.
+  (Local equivalent: `npm run sage:rag:backfill`.)
+- **Optional**: set `COS_USER_ID` + `COS_API_TOKEN` (CareerOneStop) to activate the WV
+  state-jobs adapter for local job feeds.
+- All migrations are additive and apply automatically via `prisma migrate deploy`.
+- E2E locally: `BASE_URL=http://localhost:3100 PORT=3100 npx playwright test` if port 3000
+  is occupied (config honors BASE_URL/PORT).

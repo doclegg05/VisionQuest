@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RESUME_FONT_KEYS, DEFAULT_RESUME_FONT, getResumeFont } from "@/lib/resume-layout";
 
 const trimmedString = (max: number) =>
   z
@@ -63,6 +64,7 @@ export const resumeContentSchema = z.object({
   education: z.array(resumeEducationSchema).default([]).catch([]),
   certifications: z.array(resumeCertificationSchema).default([]).catch([]),
   references: trimmedString(1000),
+  font: z.enum(RESUME_FONT_KEYS).catch(DEFAULT_RESUME_FONT).default(DEFAULT_RESUME_FONT),
 });
 
 export const resumeSaveSchema = z.object({
@@ -154,6 +156,7 @@ export function normalizeResumeContent(input: unknown): ResumeContent {
     education: normalizeEducationList(raw.education),
     certifications: normalizeCertificationList(raw.certifications),
     references: raw.references,
+    font: raw.font,
   });
 }
 
@@ -267,6 +270,13 @@ function sectionHtml(title: string, body: string): string {
 }
 
 export function buildResumePrintHtml(name: string, resume: ResumeContent): string {
+  const font = getResumeFont(resume.font);
+  const fontLink = font.googleFamily
+    ? `<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=${font.googleFamily}&display=swap" rel="stylesheet" />`
+    : "";
+
   const summaryHtml = resume.objective
     ? `<p>${escapeHtml(resume.objective).replace(/\n/g, "<br />")}</p>`
     : "";
@@ -338,6 +348,7 @@ export function buildResumePrintHtml(name: string, resume: ResumeContent): strin
   <head>
     <meta charset="utf-8" />
     <title>${escapeHtml(name)} Resume</title>
+    ${fontLink}
     <style>
       :root {
         color-scheme: light;
@@ -349,7 +360,7 @@ export function buildResumePrintHtml(name: string, resume: ResumeContent): strin
         margin: 0;
         background: #f4f1ea;
         color: #16263f;
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: ${font.cssStack};
       }
       .page {
         width: 8.5in;

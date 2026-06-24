@@ -18,6 +18,9 @@ model Student {
   authProvider         String?
   geminiApiKey         String?
   credlyUsername       String?
+  // Last-good Credly badges (Phase 5): survives restarts and Credly outages.
+  credlyBadgesCache    String?   @db.Text
+  credlyBadgesCachedAt DateTime?
   role                 String    @default("student")
   isActive             Boolean   @default(true)
   sessionVersion       Int       @default(0)
@@ -39,6 +42,7 @@ model Student {
   certifications          Certification[]
   portfolioItems          PortfolioItem[]
   resumeData              ResumeData?
+  consentRecords          ConsentRecord[]
   passwordResetTokens     PasswordResetToken[]
   securityQuestionAnswers SecurityQuestionAnswer[]
   appointments            Appointment[]            @relation("StudentAppointments")
@@ -500,6 +504,10 @@ model FileUpload {
   sizeBytes  Int
   storageKey String
   category   String   @default("general")
+  // Chat uploads (Phase 3): short description used in Sage's turn context.
+  // Always produced server-side at upload time — never client-supplied.
+  gist       String?  @db.Text
+  gistMethod String? // cloud | local | none
   uploadedAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -979,6 +987,17 @@ model ProgramDocument {
   sageContextNote String?   @db.Text
   fileModifiedAt  DateTime? // Filesystem mtime at ingestion — for change detection
 
+  // --- Semantic Retrieval (Phase 1 — hybrid RAG) ---
+  // gemini-embedding-001 @ 768 dims over `title + sageContextNote`.
+  // Read/written only via $queryRaw/$executeRaw (Prisma Unsupported type).
+  // Manual SQL objects NOT representable here (see migrations):
+  //   - HNSW index ProgramDocument_embedding_hnsw_idx (vector_cosine_ops)
+  //   - GIN expression index ProgramDocument_fts_idx on
+  //     to_tsvector('english', title || ' ' || coalesce(sageContextNote, ''))
+  //   - Function visionquest.sage_hybrid_search(...) — RRF hybrid retrieval
+  embedding Unsupported("vector(768)")?
+  chunks    DocumentChunk[]
+
   // --- Metadata ---
   sortOrder  Int      @default(0)
   isActive   Boolean  @default(true)
@@ -993,6 +1012,119 @@ model ProgramDocument {
   @@index([certificationId])
   @@index([platformId])
   @@index([usedBySage, isActive])
+  @@schema("visionquest")
+}
+
+// Chunked bodies of extractable-text ProgramDocuments (~512-token chunks,
+// 50-token overlap) embedded for semantic retrieval. Scanned/image docs have
+// no chunks — their doc-level embedding (title + sageContextNote) suffices.
+// Manual SQL (see migrations): HNSW index DocumentChunk_embedding_hnsw_idx,
+// RLS policies mirroring program_document_read/write.
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  chunkIndex Int
+  content    String   @db.Text
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document ProgramDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@schema("visionquest")
+}
+
+// Durable Sage memory (Phase 2). One row = one fact about a subject.
+// kind: episodic (events/sessions) | semantic (stable facts/preferences) |
+// procedural (what works when coaching this subject).
+// Temporal validity (Graphiti pattern): active rows have validTo = NULL;
+// superseded/expired rows keep history. sourceHash dedupes re-extraction
+// (TEKTON pattern): sha256 over normalized subject + content.
+// Manual SQL (see migration): HNSW index SageMemory_embedding_hnsw_idx,
+// partial unique index on (subjectType, subjectId, sourceHash) WHERE
+// "validTo" IS NULL, RLS (students read/insert own rows only).
+model SageMemory {
+  id          String    @id @default(cuid())
+  subjectType String // student | teacher | class | program
+  subjectId   String
+  kind        String // episodic | semantic | procedural
+  content     String    @db.Text
+  embedding   Unsupported("vector(768)")?
+  category    String // goal | preference | circumstance | skill | coaching | progress | other
+  confidence  Float     @default(0.7)
+  validFrom   DateTime  @default(now())
+  validTo     DateTime?
+  sourceType  String // conversation | operation | manual
+  sourceId    String?
+  sourceHash  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  edgesFrom SageMemoryEdge[] @relation("MemoryEdgeFrom")
+  edgesTo   SageMemoryEdge[] @relation("MemoryEdgeTo")
+
+  @@index([subjectType, subjectId, validTo])
+  @@index([sourceType, sourceId])
+  @@schema("visionquest")
+}
+
+// Typed relationships between memories with evidence (TEKTON pattern).
+model SageMemoryEdge {
+  id         String   @id @default(cuid())
+  fromId     String
+  toId       String
+  predicate  String // depends_on | blocks | supersedes | relates_to | evidenced_by
+  evidence   String   @db.Text
+  confidence Float    @default(0.7)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  from SageMemory @relation("MemoryEdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   SageMemory @relation("MemoryEdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([fromId])
+  @@index([toId])
+  @@schema("visionquest")
+}
+
+// Recorded student consent (Phase 3). Active consent = grantedAt set and
+// revokedAt null for the scope. History preserved: revocation closes the row;
+// re-granting creates a new one. scope: cloud_file_processing (Gemini Files
+// API may process this student's uploaded documents).
+model ConsentRecord {
+  id         String    @id @default(cuid())
+  studentId  String
+  scope      String
+  grantedAt  DateTime  @default(now())
+  revokedAt  DateTime?
+  recordedBy String // student id (self-service) or staff id
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, scope, revokedAt])
+  @@schema("visionquest")
+}
+
+// Operation ledger: every Sage write action records here (Phase 3 write
+// tools consume this). Deterministic ids ("op-{timestamp}-{slug}") make
+// repeated tool invocations idempotent and auditable.
+model SageOperation {
+  id            String   @id
+  actorType     String // student | teacher | admin | system
+  actorId       String
+  toolName      String
+  status        String // proposed | confirmed | executed | failed | rejected
+  payload       Json
+  resultSummary String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([actorType, actorId])
+  @@index([toolName, status])
   @@schema("visionquest")
 }
 
@@ -1291,6 +1423,7 @@ model JobListing {
   workMode      String    @default("onsite")
   salary        String?
   salaryMin     Float?
+  employmentType String?
   description   String    @db.Text
   url           String
   source        String
@@ -1337,7 +1470,10 @@ model StudentSavedJob {
 
 model LlmCallLog {
   id           String   @id @default(cuid())
-  studentId    String
+  // Nullable since Phase 1 semantic RAG: system calls (embedding ingest /
+  // backfill scripts) have no student. NULL rows are admin-visible only under
+  // the existing llm_call_log_access RLS policy and never count toward quotas.
+  studentId    String?
   callSite     String
   model        String
   inputTokens  Int      @default(0)
@@ -1346,7 +1482,7 @@ model LlmCallLog {
   durationMs   Int?
   createdAt    DateTime @default(now())
 
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, createdAt])
   @@index([createdAt])

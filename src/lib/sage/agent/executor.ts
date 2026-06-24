@@ -22,12 +22,14 @@ export interface ExecuteToolOptions {
   targetStudentId?: string;
   /** Provided when the call originated from the model rather than a slash command. */
   callId?: string;
+  /** Set ONLY by /api/chat/tool-confirm — see AgentToolContext.confirmedToken. */
+  confirmedToken?: string;
 }
 
 export async function executeAgentTool(
   options: ExecuteToolOptions,
 ): Promise<AgentToolCallRecord> {
-  const { session, conversationId, toolName, args, targetStudentId } = options;
+  const { session, conversationId, toolName, args, targetStudentId, confirmedToken } = options;
   const callId = options.callId ?? randomUUID();
   const startedAt = new Date().toISOString();
 
@@ -68,6 +70,7 @@ export async function executeAgentTool(
     const result = await tool.execute(validation.args, {
       session,
       conversationId,
+      confirmedToken,
       targetStudentId,
     });
 
