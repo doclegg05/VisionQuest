@@ -14,7 +14,9 @@ jobs:
       # The main `npm test` step keeps using the fake DATABASE_URL below; only
       # the RLS migrate/test steps point DATABASE_URL at this container.
       postgres:
-        image: postgres:16
+        # pgvector image (postgres:16 + pgvector) so RAG migrations that create a
+        # vector(768) column + HNSW index apply cleanly in the hermetic migrate step.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: visionquest_ci

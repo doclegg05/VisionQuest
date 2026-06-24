@@ -986,6 +986,9 @@ model ProgramDocument {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // --- RAG (Phase 4 retrieval pipeline) ---
+  chunks DocumentChunk[] // Extracted + embedded text chunks for citation-grounded retrieval
+
   @@index([category, audience, isActive])
   @@index([certificationId])
   @@index([platformId])
@@ -1027,6 +1030,35 @@ enum ProgramDocAudience {
   TEACHER // Visible only to teachers/admins
   BOTH // Visible to everyone
 
+  @@schema("visionquest")
+}
+
+/// Extracted, chunked, and embedded text of a ProgramDocument — the substrate
+/// for citation-grounded RAG retrieval (Phase 4). One ProgramDocument → many chunks.
+model DocumentChunk {
+  id String @id @default(cuid())
+
+  // Parent registry row (513 ProgramDocuments). Cascade: chunks die with the doc.
+  programDocumentId String
+  programDocument   ProgramDocument @relation(fields: [programDocumentId], references: [id], onDelete: Cascade)
+
+  // Chunk content + provenance (powers "[Doc Title, p.N]" citations)
+  chunkIndex   Int // 0-based order within the source document
+  content      String  @db.Text
+  tokenCount   Int
+  pageNumber   Int? // source page when extractable
+  sectionTitle String? // nearest heading when detectable
+
+  // pgvector + full-text columns are managed in raw migration SQL (Prisma cannot
+  // express vector types or GENERATED tsvector columns). Written via $executeRaw
+  // during ingestion, read via $queryRaw during hybrid search. See the migration
+  // for the CREATE EXTENSION, GENERATED fts column, HNSW, and GIN indexes.
+  embedding Unsupported("vector(768)")? // Gemini text-embedding-004 (768-dim)
+  fts       Unsupported("tsvector")? // GENERATED ALWAYS AS to_tsvector('english', content) STORED
+
+  createdAt DateTime @default(now())
+
+  @@index([programDocumentId])
   @@schema("visionquest")
 }
 
