@@ -11,7 +11,8 @@
 // =============================================================================
 
 import { prisma } from "@/lib/db";
-import { FORMS, buildFormDownloadUrl } from "@/lib/spokes/forms";
+import { FORMS, FORM_CATEGORIES, buildFormDownloadUrl } from "@/lib/spokes/forms";
+import { searchForms } from "@/lib/spokes/form-search";
 import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
 import { logger } from "@/lib/logger";
 import { downloadFile } from "@/lib/storage";
@@ -110,6 +111,107 @@ const presentForm: AgentTool = {
         label: `Open ${match.title}`,
       },
       modelHint: `Surfaced form "${match.title}" (${match.category}). The student now has a button to open it. Briefly tell them what the form is for and any next step.`,
+    };
+  },
+};
+
+// -----------------------------------------------------------------------------
+// search_forms — advanced search-and-retrieve over the program form catalog
+// -----------------------------------------------------------------------------
+
+const searchFormsTool: AgentTool = {
+  name: "search_forms",
+  description:
+    "Search the SPOKES form catalog with natural language and return the top matching forms, each with a link the student can open to verify it's the right one. Use this when the student describes a form loosely or you're not sure which exact form they mean — it ranks candidates semantically. When you already know the exact form, use present_form instead.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description:
+          "What the student is looking for, in their own words (e.g. 'the paper I sign promising I'll show up', 'something to track my certifications').",
+      },
+      limit: {
+        type: "integer",
+        description: "How many candidates to return (default 3, max 5).",
+      },
+    },
+    required: ["query"],
+  },
+  slashCommand: {
+    command: "/findform",
+    label: "Search for a form",
+    description: "Find the right form by describing it",
+    argHint: "describe the form",
+    parseArgs: (raw) => ({ query: raw.trim() }),
+  },
+  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const query = String(args.query ?? "").trim();
+    const limit = Math.min(Math.max(Number(args.limit) || 3, 1), 5);
+    if (!query) {
+      return { status: "error", summary: "Tell me what form you're looking for and I'll search for it." };
+    }
+
+    const { candidates, method } = await searchForms({
+      query,
+      role: ctx.session.role,
+      limit,
+    });
+
+    if (candidates.length === 0) {
+      return {
+        status: "success",
+        summary: `I couldn't find a form matching "${query}".`,
+        data: { query, method, candidates: [] },
+        modelHint:
+          `No form candidates for "${query}". Ask the student a clarifying question — what step or task is the form for? — rather than guessing.`,
+      };
+    }
+
+    const enriched = candidates.map((c) => ({
+      id: c.form.id,
+      title: c.form.title,
+      description: c.form.description,
+      category: FORM_CATEGORIES[c.form.category]?.label ?? c.form.category,
+      required: c.form.required,
+      available: c.available,
+      verifyUrl: c.available ? buildFormDownloadUrl(c.form.id, "view") : null,
+      score: Math.round(c.score * 100) / 100,
+    }));
+
+    // One verify-link button per retrievable candidate so the student can
+    // open each and confirm which is correct.
+    const actions = enriched
+      .filter((c) => c.verifyUrl)
+      .map((c) => ({
+        action: "open_form" as const,
+        target: c.verifyUrl as string,
+        label: `Verify: ${c.title}`,
+      }));
+
+    const top = enriched[0];
+    const unavailable = enriched.filter((c) => !c.available).map((c) => c.title);
+
+    return {
+      status: "success",
+      summary:
+        candidates.length === 1
+          ? `Best match: "${top.title}".`
+          : `Top ${candidates.length} matches for "${query}".`,
+      data: { query, method, candidates: enriched },
+      actions,
+      modelHint:
+        `Form search for "${query}" (${method}) returned, best first: ${enriched
+          .map((c) => `"${c.title}" (${c.category}${c.available ? "" : ", no PDF on file"})`)
+          .join("; ")}. ` +
+        `Recommend the top one — "${top.title}" — in a short, warm reply and tell the student to open the verify link to confirm it's correct. ` +
+        `If there's a close runner-up, mention it as an alternative. ` +
+        (unavailable.length
+          ? `These have no digital PDF yet, so no link was shown — mention the instructor can provide a paper copy: ${unavailable.join(", ")}. `
+          : "") +
+        `One verify button per available form is already shown; don't repeat the raw links in your text.`,
     };
   },
 };
@@ -529,6 +631,7 @@ import { CAREER_TOOLS } from "./career-tools";
 
 const ALL_TOOLS: AgentTool[] = [
   presentForm,
+  searchFormsTool,
   findCertification,
   lookupAppointment,
   openResource,

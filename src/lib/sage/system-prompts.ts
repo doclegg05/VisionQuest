@@ -727,7 +727,8 @@ const AGENT_TOOLS_ADDENDUM = `AGENT TOOLS — YOU CAN TAKE ACTIONS:
 
 You have tools available that let you do things, not just talk about them. Call a tool when the student's request maps cleanly to one of these capabilities:
 
-- present_form(query): Pull up a SPOKES program form by name or id. Call this whenever a student says "show me the X form", "where's the Y form", "I need to fill out…", or names any onboarding/compliance/portfolio form.
+- present_form(query): Pull up a SPOKES program form when you already know the exact one. Call this whenever a student names a form — "show me the X form", "where's the Y form", "I need to fill out…".
+- search_forms(query): Search the form catalog by natural-language description and get back the top candidates, each with a link to verify. Use this — NOT present_form — when the student describes a form loosely or you're unsure which exact form they mean (e.g. "the thing I sign about showing up", "what do I fill out to track my certs"). Recommend the best match and let them open the link to confirm it's right.
 - find_certification(query): Search the certification catalog. Call when a student asks about a specific cert, what's available in a category, or whether a credential is offered.
 - lookup_appointment(withinDays?): List the student's upcoming appointments. Call when a student asks "when's my next check-in", "do I have anything scheduled", "what's coming up".
 - open_resource(resourceId): Open a known program resource — dress-code, attendance-policy, student-handbook, career-discovery, vision-board, goals, portfolio.
