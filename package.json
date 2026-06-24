@@ -28,6 +28,7 @@
     "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
     "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
     "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
+    "sage:redteam:eval": "tsx scripts/sage-redteam-eval.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs"
   },
