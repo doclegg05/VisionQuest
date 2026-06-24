@@ -68,6 +68,27 @@
     "expectedTool": "lookup_appointment"
   },
   {
+    "id": "schedule-meet",
+    "message": "I'd like to set up a time to meet with my advisor next week.",
+    "expectedTool": "find_appointment_slots"
+  },
+  {
+    "id": "schedule-checkin",
+    "message": "Can I book a check-in sometime soon?",
+    "expectedTool": "find_appointment_slots"
+  },
+  {
+    "id": "cert-progress",
+    "message": "How am I doing on my Ready to Work certification?",
+    "expectedTool": "lookup_cert_progress"
+  },
+  {
+    "id": "cert-mark-done",
+    "message": "I finished the resume requirement for my certification — can you mark it done?",
+    "expectedTool": "lookup_cert_progress",
+    "acceptableTools": ["mark_certification_complete"]
+  },
+  {
     "id": "resource-vision",
     "message": "Open my vision board",
     "expectedTool": "open_resource"

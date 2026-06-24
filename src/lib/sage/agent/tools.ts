@@ -18,6 +18,9 @@ import { logger } from "@/lib/logger";
 import { hasActiveConsent } from "@/lib/consent";
 import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
+import { listBookableAdvisors } from "@/lib/advising";
+import { formatCohortDateTime } from "@/lib/timezone";
+import { ensureStudentCertification } from "@/lib/sage/cert-actions";
 import type { AgentTool, AgentToolResult } from "./types";
 
 const PROGRAM_INFO_TOPICS = Object.keys(TOPIC_CONTENT) as ReadonlyArray<string>;
@@ -298,6 +301,65 @@ const findCertification: AgentTool = {
 };
 
 // -----------------------------------------------------------------------------
+// lookup_cert_progress — the student's Ready-to-Work requirement checklist
+// -----------------------------------------------------------------------------
+
+const lookupCertProgress: AgentTool = {
+  name: "lookup_cert_progress",
+  description:
+    "Show the student's Ready-to-Work certification checklist — which requirements are done, which are left, and which need a file or instructor verification. Call this when a student asks about their cert progress or wants to mark something complete; the returned requirementId is what mark_certification_complete needs.",
+  parameters: { type: "object", properties: {} },
+  slashCommand: {
+    command: "/certprogress",
+    label: "My certification progress",
+    description: "See your Ready-to-Work checklist",
+  },
+  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  enabled: true,
+  async execute(_args, ctx): Promise<AgentToolResult> {
+    const studentId = ctx.targetStudentId ?? ctx.session.id;
+    const progress = await ensureStudentCertification(studentId);
+    if (!progress) {
+      return {
+        status: "error",
+        summary: "I couldn't load the certification checklist right now.",
+      };
+    }
+
+    const remaining = progress.requirements.filter((r) => !r.completed);
+    const awaiting = progress.requirements.filter((r) => r.awaitingVerification);
+
+    return {
+      status: "success",
+      summary: `Ready-to-Work: ${progress.done}/${progress.total} required items done.`,
+      data: {
+        certificationId: progress.certificationId,
+        status: progress.status,
+        done: progress.done,
+        total: progress.total,
+        requirements: progress.requirements,
+      },
+      action: { action: "navigate", target: "/certifications", label: "View certification" },
+      modelHint:
+        `Ready-to-Work progress: ${progress.done}/${progress.total} required done (status ${progress.status}). ` +
+        (remaining.length
+          ? `Still open: ${remaining
+              .map(
+                (r) =>
+                  `"${r.label}" [requirementId=${r.requirementId}${r.needsFile ? ", needs a file" : ""}${r.needsVerify ? ", needs instructor verification" : ""}]`,
+              )
+              .join("; ")}. `
+          : "Everything required is complete. ") +
+        (awaiting.length
+          ? `Marked done but awaiting instructor sign-off: ${awaiting.map((r) => `"${r.label}"`).join(", ")}. `
+          : "") +
+        `To mark one done for the student, call mark_certification_complete with its requirementId. ` +
+        `If an item needs a file, ask them to upload it first. If it needs instructor verification, you can still mark it but tell them their instructor must confirm it.`,
+    };
+  },
+};
+
+// -----------------------------------------------------------------------------
 // lookup_appointment
 // -----------------------------------------------------------------------------
 
@@ -380,6 +442,78 @@ const lookupAppointment: AgentTool = {
       modelHint: `Upcoming: ${appointments
         .map((a) => `${a.title} @ ${a.startsAt.toLocaleString()}`)
         .join("; ")}. Mention the next one specifically.`,
+    };
+  },
+};
+
+// -----------------------------------------------------------------------------
+// find_appointment_slots — open advising times the student can book
+// -----------------------------------------------------------------------------
+
+const findAppointmentSlots: AgentTool = {
+  name: "find_appointment_slots",
+  description:
+    "List open advising slots the student can book, soonest first. Call this when a student wants to schedule, meet, or check in with an advisor. After showing options, use book_appointment to actually book the one they pick.",
+  parameters: {
+    type: "object",
+    properties: {
+      withinDays: {
+        type: "integer",
+        description: "How far ahead to look for openings (default 14, max 30).",
+      },
+    },
+  },
+  slashCommand: {
+    command: "/schedule",
+    label: "Find a time to meet",
+    description: "See open advising slots you can book",
+  },
+  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  enabled: true,
+  async execute(args): Promise<AgentToolResult> {
+    const days = Math.min(Math.max(Number(args.withinDays) || 14, 1), 30);
+    const advisors = await listBookableAdvisors({
+      days,
+      maxSlotsPerAdvisor: 6,
+      minimumLeadMinutes: 60,
+    });
+
+    const slots = advisors
+      .flatMap((advisor) =>
+        advisor.slots.map((slot) => ({
+          advisorId: advisor.advisorId,
+          advisorName: advisor.advisorName,
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
+          when: formatCohortDateTime(slot.startsAt),
+          locationType: slot.locationType,
+          locationLabel: slot.locationLabel,
+        })),
+      )
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .slice(0, 6);
+
+    if (slots.length === 0) {
+      return {
+        status: "success",
+        summary: `No open advising slots in the next ${days} days.`,
+        data: { slots: [] },
+        action: { action: "navigate", target: "/appointments", label: "Appointments" },
+        modelHint:
+          `No bookable slots in the window. Tell the student plainly and suggest they check the Appointments page or ask their advisor directly. Do NOT invent times.`,
+      };
+    }
+
+    return {
+      status: "success",
+      summary: `${slots.length} open advising time${slots.length === 1 ? "" : "s"} in the next ${days} days.`,
+      data: { slots },
+      modelHint:
+        `Open slots (soonest first): ${slots
+          .map((s) => `${s.when} with ${s.advisorName} [advisorId=${s.advisorId}, startsAt=${s.startsAt}]`)
+          .join("; ")}. ` +
+        `Offer the student the 2-3 soonest in plain language and ask which works. ` +
+        `When they choose, call book_appointment with that slot's exact advisorId and startsAt — don't paraphrase the time.`,
     };
   },
 };
@@ -635,7 +769,9 @@ const ALL_TOOLS: AgentTool[] = [
   presentForm,
   searchFormsTool,
   findCertification,
+  lookupCertProgress,
   lookupAppointment,
+  findAppointmentSlots,
   openResource,
   lookupProgramInfo,
   classifyAttachment,

@@ -16,6 +16,9 @@
 
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
+import { formatCohortDateTime } from "@/lib/timezone";
+import { markRequirementComplete } from "../cert-actions";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
 import type { AgentTool, AgentToolContext, AgentToolResult } from "./types";
@@ -387,10 +390,172 @@ const addPortfolioItem: AgentTool = {
   },
 };
 
+// ─── book_appointment — schedule an advising slot ───────────────────────────
+
+const bookAppointment: AgentTool = {
+  name: "book_appointment",
+  description:
+    "Book an advising slot the student picked from find_appointment_slots. Pass the exact advisorId and startsAt from that slot. Requires user confirmation.",
+  parameters: {
+    type: "object",
+    properties: {
+      advisorId: { type: "string", description: "The advisor's id from the chosen slot." },
+      startsAt: { type: "string", description: "The chosen slot's exact startsAt ISO timestamp." },
+    },
+    required: ["advisorId", "startsAt"],
+  },
+  // Self-booking only — the backend (/api/appointments/book) is student-scoped.
+  requiredRoles: ["student"],
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const advisorId = String(args.advisorId ?? "");
+    const startsAt = String(args.startsAt ?? "");
+    if (!advisorId || !startsAt) {
+      return { status: "error", summary: "I need both the advisor and the exact time to book." };
+    }
+
+    // Re-validate the slot against live availability (mirrors the API route)
+    // so a stale pick fails cleanly instead of double-booking.
+    const advisors = await listBookableAdvisors({
+      days: 21,
+      maxSlotsPerAdvisor: 100,
+      minimumLeadMinutes: 60,
+    });
+    const advisor = advisors.find((entry) => entry.advisorId === advisorId);
+    const slot = advisor?.slots.find((entry) => entry.startsAt === startsAt);
+    if (!advisor || !slot) {
+      return {
+        status: "error",
+        summary: "That time slot is no longer available.",
+        modelHint:
+          "The chosen slot is gone. Call find_appointment_slots again to get fresh times, then offer those.",
+      };
+    }
+
+    const when = formatCohortDateTime(slot.startsAt);
+    const gate = await confirmationGate(
+      "book_appointment",
+      { advisorId, startsAt },
+      ctx,
+      `Book an advising session with ${advisor.advisorName} on ${when}?`,
+      `Book ${when}`,
+    );
+    if (gate) return gate;
+
+    return executeAndLedger("book_appointment", { advisorId, startsAt }, ctx, async () => {
+      const appointment = await prisma.appointment.create({
+        data: {
+          studentId: ctx.session.id,
+          advisorId,
+          title: "Advising session",
+          startsAt: new Date(slot.startsAt),
+          endsAt: new Date(slot.endsAt),
+          locationType: slot.locationType,
+          locationLabel: slot.locationLabel,
+          meetingUrl: slot.meetingUrl,
+          bookingSource: "student",
+          status: "scheduled",
+        },
+        select: { id: true },
+      });
+
+      await syncStudentAlerts(ctx.session.id);
+      try {
+        await sendAppointmentConfirmation(appointment.id);
+      } catch (error) {
+        logger.error("book_appointment: confirmation send failed", { error: String(error) });
+      }
+
+      return {
+        summary: `Booked — you're set with ${advisor.advisorName} on ${when}.`,
+        data: { appointmentId: appointment.id, advisorId, startsAt: slot.startsAt },
+      };
+    });
+  },
+};
+
+// ─── mark_certification_complete — self-report a Ready-to-Work item ─────────
+
+const markCertificationComplete: AgentTool = {
+  name: "mark_certification_complete",
+  description:
+    "Mark one of the student's Ready-to-Work certification requirements complete (self-report). Use the requirementId from lookup_cert_progress. Optionally attach an uploaded file as evidence. Requires user confirmation.",
+  parameters: {
+    type: "object",
+    properties: {
+      requirementId: { type: "string", description: "The requirement's id from lookup_cert_progress." },
+      fileId: { type: "string", description: "Optional uploaded fileUploadId to attach as evidence." },
+    },
+    required: ["requirementId"],
+  },
+  // Self-report only — mirrors the student-scoped POST /api/certifications.
+  requiredRoles: ["student"],
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const requirementId = String(args.requirementId ?? "");
+    const fileId = args.fileId ? String(args.fileId) : undefined;
+    const studentId = ctx.session.id;
+    if (!requirementId) {
+      return { status: "error", summary: "I need to know which certification item to mark." };
+    }
+
+    // Validate ownership + name the item before proposing, so the confirm card
+    // references a real requirement (mirrors submit_form's upfront check).
+    const requirement = await prisma.certRequirement.findFirst({
+      where: { id: requirementId, certification: { studentId } },
+      select: { id: true, template: { select: { label: true, needsFile: true } } },
+    });
+    if (!requirement) {
+      return { status: "error", summary: "That certification item wasn't found on your account." };
+    }
+    if (requirement.template.needsFile && !fileId) {
+      // Surfaced before the confirm card so the student knows what's needed.
+      const file = await prisma.certRequirement.findFirst({
+        where: { id: requirementId },
+        select: { fileId: true },
+      });
+      if (!file?.fileId) {
+        return {
+          status: "error",
+          summary: `"${requirement.template.label}" needs a file attached before it can be marked complete. Ask the student to upload it, then attach it here.`,
+        };
+      }
+    }
+
+    const gateArgs: Record<string, unknown> = fileId ? { requirementId, fileId } : { requirementId };
+    const gate = await confirmationGate(
+      "mark_certification_complete",
+      gateArgs,
+      ctx,
+      `Mark "${requirement.template.label}" complete on your Ready-to-Work certification?`,
+      `Mark "${requirement.template.label}" done`,
+    );
+    if (gate) return gate;
+
+    return executeAndLedger("mark_certification_complete", gateArgs, ctx, async () => {
+      const result = await markRequirementComplete({ studentId, requirementId, fileId });
+      if (!result.ok) {
+        // Surface the domain reason (e.g. needs a file) as a thrown error so
+        // executeAndLedger records a failed op and returns a clean message.
+        throw new Error(result.reason);
+      }
+      const notes: string[] = [];
+      if (result.certCompleted) notes.push("That finishes your Ready-to-Work certification — nice work!");
+      if (result.awaitingVerification) notes.push("Your instructor still needs to verify this one.");
+      return {
+        summary: `Marked "${result.label}" complete.${notes.length ? " " + notes.join(" ") : ""}`,
+        data: { requirementId, certCompleted: result.certCompleted, awaitingVerification: result.awaitingVerification },
+      };
+    });
+  },
+};
+
 export const WRITE_TOOLS: AgentTool[] = [
   submitForm,
   fileDocument,
   updateGoalStatus,
   saveJob,
   addPortfolioItem,
+  bookAppointment,
+  markCertificationComplete,
 ];

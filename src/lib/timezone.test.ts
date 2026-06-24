@@ -1,11 +1,30 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  formatCohortDateTime,
   monthBoundsInZone,
   programYearBoundsUtc,
   programYearNumber,
   zonedTimeToUtc,
 } from "./timezone";
+
+describe("formatCohortDateTime (America/New_York)", () => {
+  it("renders a UTC instant as cohort-local wall-clock", () => {
+    // 2026-06-29 18:30 UTC = 2:30 PM EDT (UTC-4).
+    const out = formatCohortDateTime("2026-06-29T18:30:00.000Z");
+    assert.match(out, /Mon/);
+    assert.match(out, /Jun 29/);
+    assert.match(out, /2:30/);
+    assert.match(out, /PM/);
+  });
+
+  it("accepts a Date as well as a string", () => {
+    const out = formatCohortDateTime(new Date("2026-01-05T14:00:00.000Z"));
+    // EST (UTC-5) → 9:00 AM.
+    assert.match(out, /9:00/);
+    assert.match(out, /AM/);
+  });
+});
 
 describe("zonedTimeToUtc (America/New_York)", () => {
   it("maps ET midnight to the correct UTC instant during EDT (UTC-4)", () => {
