@@ -47,6 +47,53 @@ function splitIntoSegments(text: string, maxChars: number): string[] {
   return segments;
 }
 
+export interface ChunkWithProvenance {
+  content: string;
+  tokenCount: number;
+  pageNumber: number;
+  sectionTitle: string | null;
+}
+
+const HEADING_RE =
+  /^(?:section\s+\d+|chapter\s+\d+|\d+\.\s+\S|[A-Z][A-Z0-9 ,:&/-]{6,})\s*$/;
+
+function detectHeading(line: string): string | null {
+  const trimmed = line.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) return null;
+  return HEADING_RE.test(trimmed) ? trimmed : null;
+}
+
+/**
+ * Chunk page-structured text, carrying page number and nearest preceding
+ * heading onto each chunk. Chunks never span pages (page boundary forces a
+ * flush) so the page citation is exact.
+ */
+export function chunkPages(
+  pages: { pageNumber: number; text: string }[],
+  options: ChunkOptions = {},
+): ChunkWithProvenance[] {
+  const out: ChunkWithProvenance[] = [];
+  let currentSection: string | null = null;
+
+  for (const page of pages) {
+    // Track the latest heading seen on this page (carries forward across pages).
+    for (const line of page.text.split("\n")) {
+      const heading = detectHeading(line);
+      if (heading) currentSection = heading;
+    }
+    // chunkText already does boundary-aware ~512-token splitting; reuse it per page.
+    for (const content of chunkText(page.text, options)) {
+      out.push({
+        content,
+        tokenCount: Math.ceil(content.length / 4),
+        pageNumber: page.pageNumber,
+        sectionTitle: currentSection,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Chunk text for embedding. Returns [] for blank input, a single chunk for
  * short text. No chunk exceeds maxChars; consecutive chunks share up to
