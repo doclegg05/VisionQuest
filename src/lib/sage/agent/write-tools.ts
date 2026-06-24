@@ -18,6 +18,8 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
 import { formatCohortDateTime } from "@/lib/timezone";
+import { isValidUrl } from "@/lib/validation";
+import { normalizePortfolioItemType, PORTFOLIO_ITEM_TYPES } from "@/lib/portfolio";
 import { markRequirementComplete } from "../cert-actions";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
@@ -349,12 +351,18 @@ const saveJob: AgentTool = {
 const addPortfolioItem: AgentTool = {
   name: "add_portfolio_item",
   description:
-    "Add an item to the student's portfolio — optionally linking a file they uploaded in chat.",
+    "Add an item to the student's portfolio. Set type to categorize it (project, achievement, certification, skill, resume, other). Optionally attach a file they uploaded in chat OR link an external url (e.g. a GitHub repo or live site).",
   parameters: {
     type: "object",
     properties: {
       title: { type: "string", description: "Short item title." },
       description: { type: "string", description: "Optional description." },
+      type: {
+        type: "string",
+        enum: PORTFOLIO_ITEM_TYPES,
+        description: "Item category (default project).",
+      },
+      url: { type: "string", description: "Optional external link (http/https) — e.g. a project repo or live site." },
       fileUploadId: { type: "string", description: "Optional uploaded file to attach." },
     },
     required: ["title"],
@@ -365,9 +373,14 @@ const addPortfolioItem: AgentTool = {
     const title = String(args.title ?? "").trim().slice(0, 200);
     const description = args.description ? String(args.description).slice(0, 2000) : null;
     const fileUploadId = args.fileUploadId ? String(args.fileUploadId) : null;
+    const url = args.url ? String(args.url).trim().slice(0, 2000) : null;
+    const type = normalizePortfolioItemType(args.type) ?? "project";
     const studentId = ctx.session.id;
 
     if (!title) return { status: "error", summary: "The portfolio item needs a title." };
+    if (url && !isValidUrl(url)) {
+      return { status: "error", summary: "That link isn't a valid http or https URL." };
+    }
     if (fileUploadId) {
       const file = await prisma.fileUpload.findFirst({
         where: { id: fileUploadId, studentId },
@@ -378,15 +391,125 @@ const addPortfolioItem: AgentTool = {
 
     return executeAndLedger(
       "add_portfolio_item",
-      { title, description, fileUploadId },
+      { title, description, type, url, fileUploadId },
       ctx,
       async () => {
         await prisma.portfolioItem.create({
-          data: { studentId, title, description, fileId: fileUploadId },
+          data: { studentId, title, description, type, url, fileId: fileUploadId },
         });
+        await syncStudentAlerts(studentId);
         return { summary: `Added "${title}" to your portfolio.` };
       },
     );
+  },
+};
+
+// ─── edit_portfolio_item (confirmation — overwrites existing content) ────────
+
+const editPortfolioItem: AgentTool = {
+  name: "edit_portfolio_item",
+  description:
+    "Edit an existing portfolio item — its title, description, type, or external url. Use the portfolioItemId from review_portfolio. Requires user confirmation.",
+  parameters: {
+    type: "object",
+    properties: {
+      portfolioItemId: { type: "string", description: "The item's id from review_portfolio." },
+      title: { type: "string", description: "New title (omit to leave unchanged)." },
+      description: { type: "string", description: "New description (empty string clears it)." },
+      type: { type: "string", enum: PORTFOLIO_ITEM_TYPES, description: "New category." },
+      url: { type: "string", description: "New external link, or empty string to remove it." },
+    },
+    required: ["portfolioItemId"],
+  },
+  requiredRoles: ["student"],
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const portfolioItemId = String(args.portfolioItemId ?? "");
+    const studentId = ctx.session.id;
+
+    const existing = await prisma.portfolioItem.findFirst({
+      where: { id: portfolioItemId, studentId },
+      select: { id: true, title: true },
+    });
+    if (!existing) return { status: "error", summary: "That portfolio item wasn't found on your account." };
+
+    const data: Record<string, unknown> = {};
+    if (args.title !== undefined) {
+      const title = String(args.title).trim().slice(0, 200);
+      if (!title) return { status: "error", summary: "A portfolio item needs a title." };
+      data.title = title;
+    }
+    if (args.description !== undefined) data.description = String(args.description).slice(0, 2000) || null;
+    if (args.type !== undefined) {
+      const type = normalizePortfolioItemType(args.type);
+      if (!type) return { status: "error", summary: "That isn't a valid portfolio item type." };
+      data.type = type;
+    }
+    if (args.url !== undefined) {
+      const url = String(args.url).trim().slice(0, 2000);
+      if (url && !isValidUrl(url)) return { status: "error", summary: "That link isn't a valid http or https URL." };
+      data.url = url || null;
+    }
+    if (Object.keys(data).length === 0) {
+      return { status: "error", summary: "Tell me what to change about the item." };
+    }
+
+    const gate = await confirmationGate(
+      "edit_portfolio_item",
+      { portfolioItemId, ...data },
+      ctx,
+      `Update your portfolio item "${existing.title}"?`,
+      `Update "${existing.title}"`,
+    );
+    if (gate) return gate;
+
+    return executeAndLedger("edit_portfolio_item", { portfolioItemId, ...data }, ctx, async () => {
+      await prisma.portfolioItem.update({ where: { id: portfolioItemId }, data });
+      await syncStudentAlerts(studentId);
+      return { summary: `Updated "${data.title ?? existing.title}".` };
+    });
+  },
+};
+
+// ─── delete_portfolio_item (confirmation — destructive) ─────────────────────
+
+const deletePortfolioItem: AgentTool = {
+  name: "delete_portfolio_item",
+  description:
+    "Delete a portfolio item the student no longer wants. Use the portfolioItemId from review_portfolio. Requires user confirmation.",
+  parameters: {
+    type: "object",
+    properties: {
+      portfolioItemId: { type: "string", description: "The item's id from review_portfolio." },
+    },
+    required: ["portfolioItemId"],
+  },
+  requiredRoles: ["student"],
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const portfolioItemId = String(args.portfolioItemId ?? "");
+    const studentId = ctx.session.id;
+
+    const existing = await prisma.portfolioItem.findFirst({
+      where: { id: portfolioItemId, studentId },
+      select: { id: true, title: true },
+    });
+    if (!existing) return { status: "error", summary: "That portfolio item wasn't found on your account." };
+
+    const gate = await confirmationGate(
+      "delete_portfolio_item",
+      { portfolioItemId },
+      ctx,
+      `Delete the portfolio item "${existing.title}"? This can't be undone.`,
+      `Delete "${existing.title}"`,
+    );
+    if (gate) return gate;
+
+    return executeAndLedger("delete_portfolio_item", { portfolioItemId }, ctx, async () => {
+      await prisma.portfolioItem.delete({ where: { id: portfolioItemId } });
+      await syncStudentAlerts(studentId);
+      return { summary: `Deleted "${existing.title}" from your portfolio.` };
+    });
   },
 };
 
@@ -550,12 +673,88 @@ const markCertificationComplete: AgentTool = {
   },
 };
 
+// ─── update_application_status — track a saved job through the pipeline ─────
+
+const APPLICATION_STATUSES = ["saved", "applied", "interviewing", "offered", "withdrawn"] as const;
+const APPLIED_STATUSES = new Set<string>(["applied", "interviewing", "offered"]);
+
+const updateApplicationStatus: AgentTool = {
+  name: "update_application_status",
+  description:
+    "Update where a job sits in the student's application pipeline (saved, applied, interviewing, offered, withdrawn) and optionally add a note. Use the jobListingId from lookup_saved_jobs.",
+  parameters: {
+    type: "object",
+    properties: {
+      jobListingId: { type: "string", description: "The job listing's id from lookup_saved_jobs." },
+      status: { type: "string", enum: APPLICATION_STATUSES, description: "The new pipeline status." },
+      notes: { type: "string", description: "Optional note (e.g. interview date, contact name)." },
+    },
+    required: ["jobListingId", "status"],
+  },
+  requiredRoles: ["student"],
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const jobListingId = String(args.jobListingId ?? "");
+    const status = String(args.status ?? "");
+    const notes = args.notes !== undefined ? String(args.notes).slice(0, 10000) : undefined;
+    const studentId = ctx.session.id;
+
+    if (!(APPLICATION_STATUSES as ReadonlyArray<string>).includes(status)) {
+      return { status: "error", summary: "That isn't a valid application status." };
+    }
+
+    // Scope to the student's active class (mirrors /api/jobs/save).
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) return { status: "error", summary: "I couldn't find your active class enrollment." };
+
+    const job = await prisma.jobListing.findFirst({
+      where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
+      select: { id: true, title: true, company: true },
+    });
+    if (!job) return { status: "error", summary: "That job listing wasn't found on your job board." };
+
+    return executeAndLedger("update_application_status", { jobListingId, status, notes }, ctx, async () => {
+      const existing = await prisma.studentSavedJob.findUnique({
+        where: { studentId_jobListingId: { studentId, jobListingId } },
+        select: { appliedAt: true },
+      });
+      const setAppliedAt = APPLIED_STATUSES.has(status) && !existing?.appliedAt ? new Date() : undefined;
+
+      await prisma.studentSavedJob.upsert({
+        where: { studentId_jobListingId: { studentId, jobListingId } },
+        create: {
+          studentId,
+          jobListingId,
+          status,
+          notes: notes || null,
+          appliedAt: APPLIED_STATUSES.has(status) ? new Date() : null,
+        },
+        update: {
+          status,
+          ...(notes !== undefined ? { notes: notes || null } : {}),
+          appliedAt: setAppliedAt,
+        },
+      });
+      return {
+        summary: `Marked "${job.title}" at ${job.company} as ${status}.`,
+        data: { jobListingId, status },
+      };
+    });
+  },
+};
+
 export const WRITE_TOOLS: AgentTool[] = [
   submitForm,
   fileDocument,
   updateGoalStatus,
   saveJob,
   addPortfolioItem,
+  editPortfolioItem,
+  deletePortfolioItem,
   bookAppointment,
   markCertificationComplete,
+  updateApplicationStatus,
 ];

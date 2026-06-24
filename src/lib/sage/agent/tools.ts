@@ -360,6 +360,71 @@ const lookupCertProgress: AgentTool = {
 };
 
 // -----------------------------------------------------------------------------
+// review_portfolio — the student's portfolio + completeness for coaching
+// -----------------------------------------------------------------------------
+
+const reviewPortfolio: AgentTool = {
+  name: "review_portfolio",
+  description:
+    "Review the student's portfolio: every item with its id and what backs it (file/link/description), plus whether they have a resume and a shared public page. Call this before coaching them on what to add, edit, or remove — it returns the portfolioItemId edit/delete need.",
+  parameters: { type: "object", properties: {} },
+  slashCommand: {
+    command: "/portfolio",
+    label: "Review my portfolio",
+    description: "See your portfolio and what's missing",
+  },
+  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  enabled: true,
+  async execute(_args, ctx): Promise<AgentToolResult> {
+    const studentId = ctx.targetStudentId ?? ctx.session.id;
+
+    const [items, resume, publicPage] = await Promise.all([
+      prisma.portfolioItem.findMany({
+        where: { studentId },
+        orderBy: [{ type: "asc" }, { sortOrder: "asc" }],
+        select: { id: true, title: true, type: true, description: true, fileId: true, url: true },
+      }),
+      prisma.resumeData.findUnique({ where: { studentId }, select: { studentId: true } }),
+      prisma.publicCredentialPage.findUnique({ where: { studentId }, select: { isPublic: true } }),
+    ]);
+
+    const view = items.map((item) => ({
+      portfolioItemId: item.id,
+      title: item.title,
+      type: item.type,
+      hasDescription: Boolean(item.description && item.description.trim()),
+      hasFile: Boolean(item.fileId),
+      hasLink: Boolean(item.url),
+    }));
+    // An item with no description, no file, AND no link is thin — nothing backs it.
+    const thin = view.filter((v) => !v.hasDescription && !v.hasFile && !v.hasLink);
+    const hasResume = Boolean(resume);
+    const shared = Boolean(publicPage?.isPublic);
+
+    return {
+      status: "success",
+      summary: `${items.length} portfolio item${items.length === 1 ? "" : "s"}; resume ${hasResume ? "started" : "not started"}; ${shared ? "shared publicly" : "not shared"}.`,
+      data: {
+        itemCount: items.length,
+        hasResume,
+        shared,
+        items: view,
+      },
+      action: { action: "navigate", target: "/portfolio", label: "Open portfolio" },
+      modelHint:
+        `Portfolio: ${items.length} items` +
+        (view.length
+          ? ` — ${view.map((v) => `"${v.title}" (${v.type}; ${[v.hasFile ? "file" : null, v.hasLink ? "link" : null, v.hasDescription ? "description" : null].filter(Boolean).join("+") || "nothing attached"}) [portfolioItemId=${v.portfolioItemId}]`).join("; ")}.`
+          : " (empty).") +
+        ` Resume ${hasResume ? "exists" : "is NOT started"}; public page ${shared ? "is shared" : "is NOT shared"}. ` +
+        (thin.length ? `Thin items needing a description, file, or link: ${thin.map((t) => `"${t.title}"`).join(", ")}. ` : "") +
+        "Coach the student on the biggest gap first (no resume > empty/thin portfolio > not shared). " +
+        "Offer to add, edit, or remove specific items, and to strengthen thin ones. Use the portfolioItemId for edit_portfolio_item / delete_portfolio_item.",
+    };
+  },
+};
+
+// -----------------------------------------------------------------------------
 // lookup_appointment
 // -----------------------------------------------------------------------------
 
@@ -770,6 +835,7 @@ const ALL_TOOLS: AgentTool[] = [
   searchFormsTool,
   findCertification,
   lookupCertProgress,
+  reviewPortfolio,
   lookupAppointment,
   findAppointmentSlots,
   openResource,
