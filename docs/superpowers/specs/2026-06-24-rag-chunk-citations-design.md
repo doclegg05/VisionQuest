@@ -43,7 +43,7 @@ Success:
 Keep main's deployed, harness-tuned `sage_hybrid_search` for **document ranking**. Change only **what gets injected** (passages vs summary) and **add** provenance. Rejected alternative B (chunk-first retrieval) would discard the tuned RRF/distance-margin work and require full re-tuning.
 
 ### 4.1 Full + page-aware extraction — `src/lib/sage/extract.ts`
-Add a full-document extraction mode returning **per-page text** (e.g. `{ pages: { pageNumber, text }[] }`) via `unpdf` (PDF) / `mammoth` (DOCX, no native pages → single logical page or heading-derived sections). Preserve the existing summary mode (3-page cap) for the doc-level `ProgramDocument.embedding`. Image-only / no-text docs return null and are **reported** by the ingest manifest, never silently dropped.
+Add a full-document extraction mode returning **per-page text** (e.g. `{ pages: { pageNumber, text }[] }`) via the **installed `pdf-parse` v2 (`PDFParse`)** for PDFs (note: `main` shipped `pdf-parse`, not the handoff's locked `unpdf` — build on what exists; verify `PDFParse`'s per-page API, fall back to incremental page-range parsing if needed) / `mammoth` (DOCX, no native pages → single logical page or heading-derived sections). Preserve the existing summary mode (3-page cap) for the doc-level `ProgramDocument.embedding`. Image-only / no-text docs return null and are **reported** by the ingest manifest, never silently dropped.
 
 ### 4.2 Provenance-capturing chunking — `src/lib/sage/chunking.ts`
 Add a structure-aware variant returning `{ content, tokenCount, pageNumber, sectionTitle }[]` (~512 tokens, ~50 overlap), assigning each chunk the page it falls on and the nearest preceding heading. Keep `chunkText(string): string[]` for existing callers.
