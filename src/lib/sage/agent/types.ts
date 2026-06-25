@@ -85,6 +85,13 @@ export interface AgentToolResult {
    */
   action?: AgentAction;
   /**
+   * Optional list of additional UI actions, each surfaced as its own button
+   * card. Used by tools that present several choices at once — e.g.
+   * `search_forms` returns one verify-link per candidate form. Emitted after
+   * `action` (if any), in order.
+   */
+  actions?: AgentAction[];
+  /**
    * Optional follow-up text sent back to the model in place of (or
    * alongside) `summary`. Lets the tool give the model richer context
    * for its next reply without surfacing it to the user.

@@ -7,12 +7,37 @@
   {
     "id": "form-attendance",
     "message": "I need the attendance contract form",
-    "expectedTool": "present_form"
+    "expectedTool": "present_form",
+    "acceptableTools": ["search_forms"]
   },
   {
     "id": "form-media",
     "message": "Pull up the media release form please",
-    "expectedTool": "present_form"
+    "expectedTool": "present_form",
+    "acceptableTools": ["search_forms"]
+  },
+  {
+    "id": "search-loose-attendance",
+    "message": "What's that paper I sign promising I'll show up to class? I forget what it's called.",
+    "expectedTool": "search_forms",
+    "acceptableTools": ["present_form"]
+  },
+  {
+    "id": "search-find-cert-tracking",
+    "message": "Is there a form to help me keep track of my certifications? Not sure what it's named.",
+    "expectedTool": "search_forms",
+    "acceptableTools": ["present_form"]
+  },
+  {
+    "id": "search-help-find",
+    "message": "Can you help me find the right form for getting my attendance verified for WV Works?",
+    "expectedTool": "search_forms",
+    "acceptableTools": ["present_form"]
+  },
+  {
+    "id": "search-explicit-browse",
+    "message": "I'm not sure which form I need — can you search the forms for something about photo or media permission?",
+    "expectedTool": "search_forms"
   },
   {
     "id": "cert-quickbooks",
@@ -41,6 +66,27 @@
     "id": "appt-week",
     "message": "Do I have any meetings scheduled this week?",
     "expectedTool": "lookup_appointment"
+  },
+  {
+    "id": "schedule-meet",
+    "message": "I'd like to set up a time to meet with my advisor next week.",
+    "expectedTool": "find_appointment_slots"
+  },
+  {
+    "id": "schedule-checkin",
+    "message": "Can I book a check-in sometime soon?",
+    "expectedTool": "find_appointment_slots"
+  },
+  {
+    "id": "cert-progress",
+    "message": "How am I doing on my Ready to Work certification?",
+    "expectedTool": "lookup_cert_progress"
+  },
+  {
+    "id": "cert-mark-done",
+    "message": "I finished the resume requirement for my certification — can you mark it done?",
+    "expectedTool": "lookup_cert_progress",
+    "acceptableTools": ["mark_certification_complete"]
   },
   {
     "id": "resource-vision",
@@ -138,6 +184,45 @@
     "id": "portfolio-add-2",
     "message": "Put my food handler card in my portfolio as a work credential",
     "expectedTool": "add_portfolio_item"
+  },
+  {
+    "id": "portfolio-add-link",
+    "message": "Add my GitHub project at https://github.com/me/store to my portfolio",
+    "expectedTool": "add_portfolio_item"
+  },
+  {
+    "id": "portfolio-review",
+    "message": "Can you look at my portfolio and tell me what I should work on?",
+    "expectedTool": "review_portfolio"
+  },
+  {
+    "id": "portfolio-delete",
+    "message": "Delete the duplicate project from my portfolio",
+    "expectedTool": "review_portfolio",
+    "acceptableTools": ["delete_portfolio_item"]
+  },
+  {
+    "id": "job-saved-list",
+    "message": "What jobs am I keeping track of right now?",
+    "expectedTool": "lookup_saved_jobs"
+  },
+  {
+    "id": "job-interview-prep",
+    "message": "I have an interview for that warehouse job — help me get ready",
+    "expectedTool": "prepare_for_interview",
+    "acceptableTools": ["lookup_saved_jobs"]
+  },
+  {
+    "id": "job-cover-letter",
+    "message": "Can you write me a cover letter for the CNA job?",
+    "expectedTool": "generate_cover_letter",
+    "acceptableTools": ["lookup_saved_jobs"]
+  },
+  {
+    "id": "job-status-applied",
+    "message": "I applied to the warehouse lead job yesterday — mark it as applied",
+    "expectedTool": "update_application_status",
+    "acceptableTools": ["lookup_saved_jobs"]
   },
   {
     "id": "injection-filename",

@@ -66,6 +66,13 @@ interface RollupResponse {
     periodStart: string;
     periodEnd: string;
   };
+  wagerHitRate: {
+    open: number;
+    won: number;
+    lost: number;
+    voided: number;
+    hitRate: number;
+  };
 }
 
 function formatPercent(value: number): string {
@@ -108,6 +115,44 @@ function SageEffectivenessCard({ metrics }: { metrics: RollupResponse["sageEffec
         {metrics.averageDaysToConfirmation !== null
           ? ` • average ${metrics.averageDaysToConfirmation.toFixed(1)} days to confirm`
           : ""}
+      </p>
+    </section>
+  );
+}
+
+function WagerHitRateCard({ metrics }: { metrics: RollupResponse["wagerHitRate"] }) {
+  return (
+    <section className="theme-card rounded-xl p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Sage wager hit-rate (program-wide, 30d)</h2>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            Goal-proposal wagers settled in the last 30 days — not region-scoped.
+          </p>
+        </div>
+        <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+          {formatPercent(metrics.hitRate)} hit rate
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        {[
+          ["Won", metrics.won],
+          ["Lost", metrics.lost],
+          ["Open", metrics.open],
+          ["Voided", metrics.voided],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+            <p className="text-2xl font-bold text-[var(--ink-strong)]">{value}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+              {label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-xs text-[var(--ink-muted)]">
+        Hit rate = won ÷ (won + lost). Open wagers are excluded from the rate.
       </p>
     </section>
   );
@@ -186,6 +231,7 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
         <div className="space-y-5">
           <RegionRollupCard rollup={data.rollup} />
           <SageEffectivenessCard metrics={data.sageEffectiveness} />
+          <WagerHitRateCard metrics={data.wagerHitRate} />
           <GrantProgressPanel goals={data.rollup.grantGoals} regionId={regionId} onChange={() => loadRollup(regionId)} />
           <InstructorGrid metrics={data.instructorMetrics} />
           <FormRollupList />

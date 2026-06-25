@@ -99,13 +99,19 @@ export async function getMemoryContext(
   studentId: string,
   userMessage: string,
   budgetChars: number = DEFAULT_BUDGET_CHARS,
+  excludeContents: ReadonlyArray<string> = [],
 ): Promise<string> {
   const memories = await retrieveMemories("student", studentId, userMessage);
   if (memories.length === 0) return "";
 
+  // Skip anything already shown in the always-on durable profile so the two
+  // blocks don't repeat the same facts.
+  const exclude = new Set(excludeContents);
+
   const lines: string[] = [];
   let used = 0;
   for (const memory of memories) {
+    if (exclude.has(memory.content)) continue;
     const line = `- (${memory.category}) ${sanitizeForPrompt(memory.content)}`;
     if (used + line.length + 1 > budgetChars) break;
     lines.push(line);

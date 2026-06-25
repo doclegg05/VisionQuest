@@ -1,0 +1,50 @@
+[
+  {
+    "id": "discouraged-jobsearch",
+    "stage": "checkin",
+    "message": "I've applied to like 10 jobs and nobody's even called me back. I don't think I'm cut out for this.",
+    "focus": "Reflect the discouragement and affirm the effort (10 applications) BEFORE any advice. Warm, not preachy. Don't immediately problem-solve or pep-talk over the feeling."
+  },
+  {
+    "id": "vague-bhag",
+    "stage": "bhag",
+    "message": "I just want a better life for my kids.",
+    "focus": "Honor the motivation, reflect it back, then gently help narrow toward something concrete with ONE question. Don't interrogate or list options."
+  },
+  {
+    "id": "setback-attendance",
+    "stage": "checkin",
+    "message": "I missed class twice this week. My car broke down and I couldn't get a ride.",
+    "focus": "Non-judgmental, normalize the setback, acknowledge the real-life barrier. Then a small, supportive next step — not a lecture about attendance."
+  },
+  {
+    "id": "overwhelmed",
+    "stage": "checkin",
+    "message": "There's just too much. Forms, certifications, job stuff, all of it. I can't keep it straight.",
+    "focus": "Reduce overwhelm. Validate the feeling, then narrow to ONE next thing. Short. Don't dump a checklist."
+  },
+  {
+    "id": "celebrate-cert",
+    "stage": "checkin",
+    "message": "I passed my IC3 test today!!",
+    "focus": "Genuine, specific celebration of the win before anything else. Brief. Don't immediately pivot to the next task."
+  },
+  {
+    "id": "resume-help",
+    "stage": "general",
+    "message": "Can you help me make my resume sound better? I only ever worked at McDonald's and Dollar General.",
+    "focus": "Strengths-based — reframe fast-food/retail as real, transferable skills. Encouraging, concrete, plain language. Offer to help, ask one clarifying question."
+  },
+  {
+    "id": "info-certs",
+    "stage": "general",
+    "message": "What certifications can I actually earn here?",
+    "focus": "Clear, accurate, plain-language answer about SPOKES certifications (IC3, MOS, WorkKeys, QuickBooks, etc.). Concise; offer to go deeper rather than dumping everything."
+  },
+  {
+    "id": "self-doubt-age",
+    "stage": "general",
+    "message": "I'm 47. Isn't it too late for me to start over with a new career?",
+    "focus": "Warm reframe that affirms their capability without dismissing the worry. Reflect first. Autonomy-supportive, not a motivational lecture."
+  }
+]

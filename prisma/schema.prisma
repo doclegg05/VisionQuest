@@ -82,6 +82,7 @@ model Student {
   formResponses           FormResponse[]           @relation("FormResponses")
   reviewedFormResponses   FormResponse[]           @relation("ReviewedFormResponses")
   regionAssignments       RegionCoordinator[]
+  wagers                  Wager[]
 
   @@schema("visionquest")
 }
@@ -508,6 +509,13 @@ model FileUpload {
   // Always produced server-side at upload time — never client-supplied.
   gist       String?  @db.Text
   gistMethod String? // cloud | local | none
+  // Structured attachment-vision classification (kind, title, issuer, date,
+  // identifiers, confidence). Cached so classify_attachment isn't re-run per
+  // turn. A free local baseline is stored at upload; an active-consent cloud
+  // pass upgrades it on first use. Server-produced only — never client-set.
+  classification       Json?
+  classificationMethod String? // cloud | local | none
+  classifiedAt         DateTime?
   uploadedAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1129,6 +1137,56 @@ model SageOperation {
 
   @@index([actorType, actorId])
   @@index([toolName, status])
+  @@schema("visionquest")
+}
+
+// Sage predictive wager — a hypothesis Sage stakes on an observable outcome
+// for a student (e.g. "will reach weekly goal by Friday"). Verdicts are
+// resolved by the background verdict-runner and feed the Sage learning loop.
+// Manual SQL (see migration 20260625000000_add_wager_models): RLS read-only
+// for vq_app; prismaAdmin (bypass) handles writes.
+model Wager {
+  id                String   @id @default(cuid())
+  studentId         String
+  wagerType         String
+  targetType        String
+  targetId          String
+  sourceOperationId String?
+  sourceMessageId   String?
+  hypothesis        String   @db.Text
+  predictedOutcome  String
+  confidence        Float?
+  horizonAt         DateTime
+  status            String   @default("open")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  verdict WagerVerdict?
+
+  @@unique([targetType, targetId, wagerType])
+  @@index([status, horizonAt])
+  @@index([studentId, wagerType])
+  @@schema("visionquest")
+}
+
+// Resolved verdict for a Wager. Created by the verdict-runner once horizonAt
+// passes and the predicted outcome can be evaluated against observable data.
+model WagerVerdict {
+  id                String   @id @default(cuid())
+  wagerId           String   @unique
+  outcome           String
+  result            String
+  resolvedBy        String
+  evidence          Json
+  observedAt        DateTime @default(now())
+  diagnosis         String?  @db.Text
+  diagnosisModel    String?
+  knowledgeUpdateId String?
+  createdAt         DateTime @default(now())
+
+  wager Wager @relation(fields: [wagerId], references: [id], onDelete: Cascade)
+
   @@schema("visionquest")
 }
 

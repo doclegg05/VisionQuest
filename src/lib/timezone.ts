@@ -14,6 +14,25 @@
 export const COHORT_TIME_ZONE = "America/New_York";
 
 /**
+ * Human-friendly cohort-local rendering of an instant, e.g.
+ * "Mon, Jun 29, 2:30 PM". Used when Sage speaks appointment times to students.
+ */
+export function formatCohortDateTime(
+  value: Date | string,
+  timeZone: string = COHORT_TIME_ZONE,
+): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(date);
+}
+
+/**
  * Minutes the zone is offset from UTC at a given instant (negative for ET,
  * which is behind UTC: -240 during EDT, -300 during EST).
  */

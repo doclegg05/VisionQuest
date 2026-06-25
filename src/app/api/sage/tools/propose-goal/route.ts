@@ -13,6 +13,7 @@ import { z } from "zod";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody } from "@/lib/schemas";
 import { proposeGoal } from "@/lib/sage/propose-goal";
+import { maybeCreateGoalProposalWager } from "@/lib/sage/propose-goal-wager";
 
 const proposeGoalSchema = z.object({
   level: z.enum(["bhag", "monthly", "weekly", "daily", "task"]),
@@ -35,6 +36,13 @@ export const POST = withRegistry("sage.propose_goal", async (session, req: NextR
     parentId: body.parentId ?? null,
     invokedBy: session.id,
     confidence: body.confidence,
+  });
+
+  await maybeCreateGoalProposalWager(result, {
+    studentId: session.id,
+    sourceMessageId: body.sourceMessageId,
+    confidence: body.confidence,
+    now: new Date(),
   });
 
   if (result.status === "rejected") {
