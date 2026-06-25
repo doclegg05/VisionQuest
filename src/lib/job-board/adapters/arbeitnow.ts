@@ -15,6 +15,7 @@ interface ArbeitnowJob {
   url?: string;
   remote?: boolean;
   tags?: string[];
+  created_at?: number;
 }
 
 export const arbeitnowAdapter: JobSourceAdapter = {
@@ -55,6 +56,11 @@ export const arbeitnowAdapter: JobSourceAdapter = {
         source: "arbeitnow",
         sourceType: "api",
         sourceId: `arbeitnow:${job.slug}`,
+        postedAt: (() => {
+          if (job.created_at == null) return undefined;
+          const d = new Date(job.created_at * 1000);
+          return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+        })(),
       });
 
       if (normalized.length >= 60) break;

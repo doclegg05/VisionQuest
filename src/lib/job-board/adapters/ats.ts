@@ -96,6 +96,11 @@ export const greenhouseAdapter: JobSourceAdapter = {
           source: "greenhouse",
           sourceType: "api",
           sourceId: `greenhouse:${board}:${job.id}`,
+          postedAt: (() => {
+            if (!job.updated_at) return undefined;
+            const d = new Date(job.updated_at);
+            return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+          })(),
         });
         if (out.length >= 60) return out;
       }
@@ -112,6 +117,7 @@ interface LeverJob {
   description?: string;
   descriptionPlain?: string;
   categories?: { location?: string };
+  createdAt?: number;
 }
 
 export const leverAdapter: JobSourceAdapter = {
@@ -149,6 +155,11 @@ export const leverAdapter: JobSourceAdapter = {
           source: "lever",
           sourceType: "api",
           sourceId: `lever:${board}:${job.id}`,
+          postedAt: (() => {
+            if (job.createdAt == null) return undefined;
+            const d = new Date(job.createdAt);
+            return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+          })(),
         });
         if (out.length >= 60) return out;
       }
@@ -165,6 +176,7 @@ interface AshbyJob {
   descriptionPlain?: string;
   location?: string;
   isRemote?: boolean;
+  publishedAt?: string;
   compensation?: {
     compensationTierSummary?: string;
   };
@@ -213,6 +225,11 @@ export const ashbyAdapter: JobSourceAdapter = {
           source: "ashby",
           sourceType: "api",
           sourceId: `ashby:${board}:${job.id}`,
+          postedAt: (() => {
+            if (!job.publishedAt) return undefined;
+            const d = new Date(job.publishedAt);
+            return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+          })(),
         });
         if (out.length >= 60) return out;
       }

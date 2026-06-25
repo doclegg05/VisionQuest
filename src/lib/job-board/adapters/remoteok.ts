@@ -13,6 +13,7 @@ interface RemoteOkJob {
   salary_min?: number | null;
   salary_max?: number | null;
   tags?: string[];
+  date?: string;
 }
 
 export const remoteOkAdapter: JobSourceAdapter = {
@@ -44,6 +45,11 @@ export const remoteOkAdapter: JobSourceAdapter = {
         source: "remoteok",
         sourceType: "api",
         sourceId: `remoteok:${job.id}`,
+        postedAt: (() => {
+          if (!job.date) return undefined;
+          const d = new Date(job.date);
+          return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+        })(),
       });
 
       if (normalized.length >= 60) break;

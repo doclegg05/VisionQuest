@@ -33,6 +33,12 @@ export const weWorkRemotelyAdapter: JobSourceAdapter = {
         const description = stripHtml(xmlTag(item, "description"));
         const { company, title } = splitTitle(rawTitle);
 
+        const pubDate = stripHtml(xmlTag(item, "pubDate"));
+        const postedAt = (() => {
+          if (!pubDate) return undefined;
+          const d = new Date(pubDate);
+          return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+        })();
         return {
           title: title || rawTitle,
           company,
@@ -45,6 +51,7 @@ export const weWorkRemotelyAdapter: JobSourceAdapter = {
           source: "weworkremotely",
           sourceType: "api" as const,
           sourceId: `weworkremotely:${guid}`,
+          postedAt,
         };
       })
       .filter((job) => job.title && job.url)
