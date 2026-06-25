@@ -299,11 +299,6 @@ const STATIC_RESOURCES: Record<string, { label: string; href: string; summary: s
     href: "/resources",
     summary: "Full student handbook with policies and resources.",
   },
-  "career-discovery": {
-    label: "Career Discovery",
-    href: "/career",
-    summary: "Career discovery questionnaire and pathway recommendations.",
-  },
   "vision-board": {
     label: "Vision Board",
     href: "/vision-board",
@@ -324,13 +319,13 @@ const STATIC_RESOURCES: Record<string, { label: string; href: string; summary: s
 const openResource: AgentTool = {
   name: "open_resource",
   description:
-    "Open a known program resource (dress code, attendance policy, handbook, career discovery, vision board, goals, portfolio).",
+    "Open a known program resource (dress code, attendance policy, handbook, vision board, goals, portfolio).",
   parameters: {
     type: "object",
     properties: {
       resourceId: {
         type: "string",
-        description: "One of: dress-code, attendance-policy, student-handbook, career-discovery, vision-board, goals, portfolio.",
+        description: "One of: dress-code, attendance-policy, student-handbook, vision-board, goals, portfolio.",
         enum: Object.keys(STATIC_RESOURCES),
       },
     },
@@ -340,7 +335,7 @@ const openResource: AgentTool = {
     command: "/open",
     label: "Open a resource",
     description: "Pull up a program resource by name",
-    argHint: "dress-code | attendance-policy | handbook | career-discovery | vision-board | goals | portfolio",
+    argHint: "dress-code | attendance-policy | handbook | vision-board | goals | portfolio",
     parseArgs: (raw) => ({ resourceId: raw.trim() }),
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],

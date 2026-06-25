@@ -38,3 +38,20 @@ describe("present_form — link target", () => {
     assert.match(String(result.summary), /Education and Career Plan/);
   });
 });
+
+describe("open_resource — career-discovery redirect loop fix", () => {
+  it("no longer resolves the self-referential career-discovery resource", async () => {
+    const tool = getToolByName("open_resource");
+    assert.ok(tool, "open_resource tool should exist");
+    const result = await tool.execute({ resourceId: "career-discovery" }, CTX);
+    assert.equal(result.status, "error");
+  });
+
+  it("still resolves a real resource (goals)", async () => {
+    const tool = getToolByName("open_resource");
+    assert.ok(tool, "open_resource tool should exist");
+    const result = await tool.execute({ resourceId: "goals" }, CTX);
+    assert.equal(result.status, "success");
+    assert.equal(result.action?.target, "/goals");
+  });
+});
