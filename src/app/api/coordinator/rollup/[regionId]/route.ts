@@ -10,6 +10,7 @@ import {
 } from "@/lib/grant-metrics";
 import { listInstructorMetricsForRegion } from "@/lib/instructor-metrics";
 import { getGoalProposalConfirmationMetrics } from "@/lib/sage/closed-loop-metrics";
+import { getWagerHitRate } from "@/lib/sage/wager-metrics";
 
 interface RouteContext {
   params: Promise<{ regionId: string }>;
@@ -26,7 +27,7 @@ export const GET = withCoordinatorAuth(
     const url = new URL(req.url);
     const period = resolvePeriod(url);
 
-    const [rollup, instructorMetrics, unregionedClasses, sageEffectiveness] = await Promise.all([
+    const [rollup, instructorMetrics, unregionedClasses, sageEffectiveness, wagerHitRate] = await Promise.all([
       getRegionRollup(regionId, period),
       listInstructorMetricsForRegion(regionId),
       countUnregionedClasses(),
@@ -35,6 +36,7 @@ export const GET = withCoordinatorAuth(
         periodStart: period.start,
         periodEnd: period.end,
       }),
+      getWagerHitRate({ wagerType: "goal_proposal", sinceDays: 30 }),
     ]);
 
     if (!rollup) throw notFound("Region not found.");
@@ -53,6 +55,7 @@ export const GET = withCoordinatorAuth(
         periodStart: sageEffectiveness.periodStart.toISOString(),
         periodEnd: sageEffectiveness.periodEnd.toISOString(),
       },
+      wagerHitRate,
     });
   },
 );

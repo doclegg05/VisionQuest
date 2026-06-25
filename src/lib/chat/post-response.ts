@@ -4,6 +4,7 @@ import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/
 import { GOAL_PLANNING_STATUSES, isGoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { proposeGoal } from "@/lib/sage/propose-goal";
+import { maybeCreateGoalProposalWager } from "@/lib/sage/propose-goal-wager";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
 import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
@@ -310,6 +311,11 @@ export async function handlePostResponse({
           sourceMessageId: proposalSourceMessageId,
           conversationId,
           invokedBy: studentId,
+        });
+        await maybeCreateGoalProposalWager(result, {
+          studentId,
+          sourceMessageId: proposalSourceMessageId,
+          now: new Date(),
         });
         if (result.status === "created" || result.status === "duplicate") {
           existingLevels.add(goal.level);

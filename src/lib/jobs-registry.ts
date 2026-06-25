@@ -66,3 +66,8 @@ registerJobHandler("scrape_jobs", async (payload) => {
     sourceAllowlist,
   });
 });
+
+registerJobHandler("wager_diagnosis", async (payload) => {
+  const { diagnoseWager } = await import("./sage/wager-diagnosis");
+  await diagnoseWager(payload.wagerId as string);
+});
