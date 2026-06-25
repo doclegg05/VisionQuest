@@ -1421,6 +1421,36 @@ model JobListing {
   @@schema("visionquest")
 }
 
+/// Program-wide browse pool: keyless remote/ATS jobs, not class-scoped.
+/// Lets any student browse the market with zero teacher setup.
+model JobBrowseListing {
+  id             String    @id @default(cuid())
+  title          String
+  company        String
+  location       String
+  workMode       String    @default("remote")
+  salary         String?
+  salaryMin      Float?
+  employmentType String?
+  description    String    @db.Text
+  url            String
+  source         String
+  sourceType     String
+  sourceId       String
+  clusters       String[]  @default([])
+  status         String    @default("active") // active | expired
+  postedAt       DateTime?
+  expiresAt      DateTime?
+  scrapeBatchId  String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([source, sourceId])
+  @@index([status, postedAt])
+  @@index([status, workMode])
+  @@schema("visionquest")
+}
+
 model StudentSavedJob {
   id           String   @id @default(cuid())
   studentId    String
