@@ -58,6 +58,7 @@ const mockRunAgentTurn = mock.fn() as any;
 const mockExecuteSlashCommand = mock.fn() as any;
 const mockAssembleStudentContextBundle = mock.fn() as any;
 const mockSelfMetricLineFromBundle = mock.fn() as any;
+const mockGetSituationalSnapshot = mock.fn() as any;
 
 // ---------------------------------------------------------------------------
 // withRegistry passthrough — mirrors the withTeacherAuth pattern in
@@ -209,6 +210,12 @@ mock.module("@/lib/sage/context-bundle", {
   },
 });
 
+mock.module("@/lib/sage/situational-snapshot", {
+  namedExports: {
+    getSituationalSnapshot: mockGetSituationalSnapshot,
+  },
+});
+
 mock.module("@/lib/sage/staff-student-context", {
   namedExports: {
     buildStaffStudentContext: mockBuildStaffStudentContext,
@@ -338,6 +345,7 @@ function resetMocks() {
     mockGetStudentPromptContext,
     mockAssembleStudentContextBundle,
     mockSelfMetricLineFromBundle,
+    mockGetSituationalSnapshot,
     mockBuildStaffStudentContext,
     mockShouldAttemptStaffStudentContext,
     mockCheckTokenQuota,
@@ -416,6 +424,7 @@ function resetMocks() {
     meta: { selfMetrics: undefined },
   }));
   mockSelfMetricLineFromBundle.mock.mockImplementation(() => "");
+  mockGetSituationalSnapshot.mock.mockImplementation(async () => null);
   mockBuildStaffStudentContext.mock.mockImplementation(async () => ({
     context: null,
     targetStudentId: null,
