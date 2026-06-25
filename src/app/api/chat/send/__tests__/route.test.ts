@@ -626,6 +626,19 @@ describe("POST /api/chat/send — Sage self-metric wiring", () => {
     assert.equal(mockGetStudentPromptContext.mock.callCount(), 0);
   });
 
+  it("passes an empty self-metric line through for a new student (zero settled wagers)", async () => {
+    mockSelfMetricLineFromBundle.mock.mockImplementation(() => "");
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How am I doing on my goals?" },
+    });
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+
+    const promptCtx = mockBuildSystemPrompt.mock.calls[0].arguments[1];
+    assert.equal(promptCtx.selfMetricsLine, "");
+  });
+
   it("computes situationalSnapshot (non-discovery, non-compact) and passes it to buildSystemPrompt", async () => {
     mockGetPromptTier.mock.mockImplementation(() => "full");
     mockGetSituationalSnapshot.mock.mockImplementation(async () => "SNAPSHOT_STUB");

@@ -618,4 +618,14 @@ describe("buildSystemPrompt — self-metric line", () => {
     const prompt = buildSystemPrompt("teacher_assistant", { selfMetricsLine: LINE });
     assert.ok(!prompt.includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
   });
+
+  it("omits the self-metric section when an empty or whitespace-only line is provided", () => {
+    assert.ok(!buildSystemPrompt("checkin", { selfMetricsLine: "" }).includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
+    assert.ok(!buildSystemPrompt("checkin", { selfMetricsLine: "   " }).includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
+  });
+
+  it("omits the self-metric section for the admin_assistant staff stage", () => {
+    const prompt = buildSystemPrompt("admin_assistant", { selfMetricsLine: LINE });
+    assert.ok(!prompt.includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
+  });
 });
