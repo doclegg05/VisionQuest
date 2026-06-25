@@ -37,7 +37,7 @@ function actorTypeFor(role: string): OperationActorType {
  * Confirmation gate shared by consequential tools. Returns null when the
  * call is confirmed (proceed); otherwise returns the proposal result.
  */
-async function confirmationGate(
+export async function confirmationGate(
   toolName: string,
   args: Record<string, unknown>,
   ctx: AgentToolContext,
@@ -85,7 +85,7 @@ async function confirmationGate(
   };
 }
 
-async function executeAndLedger(
+export async function executeAndLedger(
   toolName: string,
   args: Record<string, unknown>,
   ctx: AgentToolContext,

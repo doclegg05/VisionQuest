@@ -10,6 +10,7 @@ import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
 import { detectCrisisSignal, recordWellbeingConcern } from "@/lib/sage/crisis-detection";
+import { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } from "@/lib/sage/readability";
 import { retryWithBackoff } from "@/lib/sage/retry";
 import {
   recordWeeklyReview,
@@ -78,6 +79,27 @@ export async function handlePostResponse({
       alert: "wellbeing_detection_failed",
       error: String(err),
     });
+  }
+
+  // Plain-language guard — deterministic reading-level signal on Sage's reply.
+  // Non-blocking and model-free; surfaces when Sage drifts above the ~6th-8th
+  // grade target so prompt regressions are visible in logs, never altering the
+  // student's experience.
+  try {
+    const readability = assessReadability(fullResponse);
+    if (readability.scorable && !readability.withinTarget) {
+      logger.warn("Sage reply above plain-language target", {
+        conversationId,
+        stage: conversationStage,
+        grade: readability.grade,
+        ease: readability.ease,
+        words: readability.words,
+        maxGrade: PLAIN_LANGUAGE_MAX_GRADE,
+        signal: "readability_over_target",
+      });
+    }
+  } catch (err) {
+    logger.error("Readability check failed", { conversationId, error: String(err) });
   }
 
   const provider = await resolveAiProvider({

@@ -4,6 +4,7 @@ import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
 import { getMemoryContext } from "@/lib/sage/memory/retrieve";
+import { getStudentProfile } from "@/lib/sage/memory/profile";
 import { getDirectFormAnswer, getFormContext } from "@/lib/sage/knowledge-base";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
@@ -14,6 +15,7 @@ import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { getStudentPromptContext } from "@/lib/chat/context";
+import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
 import {
   buildStaffStudentContext,
@@ -367,12 +369,21 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       promptTier === "compact" ? 1 : 3,
     );
 
+    // Whole-student situational awareness. Skipped for the first-meeting
+    // discovery stage (no history to summarize) and the compact tier (token
+    // budget). Cached per student; never blocks chat if it fails.
+    const situationalSnapshot =
+      conversationStage !== "discovery" && promptTier !== "compact"
+        ? (await getSituationalSnapshot(session.id)) ?? undefined
+        : undefined;
+
     systemPrompt =
       promptContext.priorConversationContext +
       buildSystemPrompt(conversationStage, {
         studentName: session.displayName,
         programType: studentProgramType,
         classroomConfirmedAt: studentClassroomConfirmedAt,
+        situationalSnapshot,
         bhag: promptContext.goalsByLevel["bhag"],
         monthly: promptContext.goalsByLevel["monthly"],
         weekly: promptContext.goalsByLevel["weekly"],
@@ -420,7 +431,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     // previous sessions. Student-subject only — teacher chat gets student
     // context via staff-student-context, not memories.
     if (!isTeacher && process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
-      const memoryContext = await getMemoryContext(session.id, userMessage);
+      // Always-on durable profile (who the student fundamentally is) + the
+      // query-relevant recall (what's relevant to this message), deduped.
+      const profile = await getStudentProfile(session.id);
+      if (profile.block) {
+        systemPrompt += `\n\n${profile.block}`;
+      }
+      const memoryContext = await getMemoryContext(session.id, userMessage, undefined, profile.contents);
       if (memoryContext) {
         systemPrompt += memoryContext;
       }
