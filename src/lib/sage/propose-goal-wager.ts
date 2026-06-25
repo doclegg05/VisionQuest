@@ -1,10 +1,6 @@
 import { logger } from "@/lib/logger";
 import { createWager, goalProposalWagerInput } from "@/lib/sage/wagers";
-
-type ProposeGoalResult =
-  | { status: "created"; goalId: string }
-  | { status: "duplicate"; goalId: string }
-  | { status: "rejected"; reason: string };
+import type { ProposeGoalResult } from "@/lib/sage/propose-goal";
 
 /**
  * Create the goal_proposal wager after proposeGoal(). Runs on BOTH

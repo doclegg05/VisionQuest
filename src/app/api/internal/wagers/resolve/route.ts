@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logger } from "@/lib/logger";
 import { resolveDueWagers } from "@/lib/sage/wagers";
 import { enqueueJob } from "@/lib/jobs";
 
@@ -24,22 +25,29 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await resolveDueWagers(new Date());
+  try {
+    const result = await resolveDueWagers(new Date());
 
-  if (process.env.SAGE_WAGER_DIAGNOSIS_ENABLED === "true") {
-    for (const wagerId of result.diagnosable) {
-      await enqueueJob({
-        type: "wager_diagnosis",
-        payload: { wagerId },
-        dedupeKey: `wager_diagnosis:${wagerId}`,
-      });
+    if (process.env.SAGE_WAGER_DIAGNOSIS_ENABLED === "true") {
+      for (const wagerId of result.diagnosable) {
+        await enqueueJob({
+          type: "wager_diagnosis",
+          payload: { wagerId },
+          dedupeKey: `wager_diagnosis:${wagerId}`,
+        });
+      }
     }
-  }
 
-  return NextResponse.json({
-    resolved: result.resolved,
-    won: result.won,
-    lost: result.lost,
-    voided: result.voided,
-  });
+    return NextResponse.json({
+      resolved: result.resolved,
+      won: result.won,
+      lost: result.lost,
+      voided: result.voided,
+    });
+  } catch (error) {
+    logger.error("Wager resolution failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: "Wager resolution failed" }, { status: 500 });
+  }
 }

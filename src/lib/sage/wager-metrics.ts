@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prismaAdmin } from "@/lib/db";
 
 export interface WagerStatusRow {
   status: string;
@@ -23,6 +23,17 @@ export function computeWagerHitRate(rows: WagerStatusRow[]): WagerHitRate {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Fetch wager rows and return hit-rate metrics via the admin client.
+ *
+ * Using prismaAdmin (not prisma) because coordinator sessions collapse to
+ * role="student" / studentId="" under RLS, causing the wager_read policy to
+ * reject program-wide queries and return 0/0/0/0 (Slice D). This is safe:
+ * the result is a non-PII aggregate (counts of status strings) and is always
+ * scoped by the WHERE clause — wagerType always, studentId when provided —
+ * so it works correctly for both the coordinator tile and the per-student
+ * self-metric without leaking cross-student data.
+ */
 export async function getWagerHitRate(options: {
   wagerType: string;
   sinceDays?: number;
@@ -35,6 +46,6 @@ export async function getWagerHitRate(options: {
   if (options.sinceDays) {
     where.createdAt = { gte: new Date(Date.now() - options.sinceDays * DAY_MS) };
   }
-  const rows = await prisma.wager.findMany({ where, select: { status: true } });
+  const rows = await prismaAdmin.wager.findMany({ where, select: { status: true } });
   return computeWagerHitRate(rows);
 }
