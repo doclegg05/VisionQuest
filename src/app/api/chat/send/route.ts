@@ -605,6 +605,20 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
                 "action",
               );
             }
+            if (record.result.actions) {
+              for (const extra of record.result.actions) {
+                sendEvent(
+                  {
+                    type: "action",
+                    action: extra.action,
+                    target: extra.target,
+                    label: extra.label,
+                    meta: extra.meta,
+                  },
+                  "action",
+                );
+              }
+            }
             fullResponse = record.result.summary;
             // Surface the summary as a regular text event so the chat
             // transcript reads naturally even if the UI ignores the

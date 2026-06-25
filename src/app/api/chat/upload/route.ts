@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest } from "@/lib/api-error";
 import { hasActiveConsent } from "@/lib/consent";
 import { buildFileGist } from "@/lib/sage/file-gist";
+import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
 
 /**
@@ -56,6 +57,19 @@ export const POST = withAuth(async (session, req: Request) => {
       gist,
       gistMethod: method,
     },
+  });
+
+  // Store a free local-baseline classification so Sage has structured context
+  // (kind/title/date) immediately. An active-consent cloud pass upgrades it
+  // lazily the first time Sage actually calls classify_attachment, so we don't
+  // pay for cloud vision on every upload. Best-effort — never fails the upload.
+  await ensureClassification({
+    file: { ...record, classification: null, classificationMethod: null },
+    studentId: session.id,
+    cloudAllowed: false,
+    buffer,
+  }).catch((err) => {
+    logger.warn("Upload baseline classification failed", { error: String(err) });
   });
 
   await logAiAuditEvent({

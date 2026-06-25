@@ -96,6 +96,11 @@ export async function* runAgentTurn(
             const a = record.result.action;
             yield { type: "action", action: a.action, target: a.target, label: a.label, meta: a.meta };
           }
+          if (record?.result.actions) {
+            for (const a of record.result.actions) {
+              yield { type: "action", action: a.action, target: a.target, label: a.label, meta: a.meta };
+            }
+          }
           break;
         }
         case "done":
