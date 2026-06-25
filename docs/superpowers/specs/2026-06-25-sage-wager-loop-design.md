@@ -431,3 +431,28 @@ part-time.
   aggregate/global learning deferred to cycle 2, always human-proposed.
 - **Diagnosis gating:** `SAGE_WAGER_DIAGNOSIS_ENABLED` flag + the
   Phase-3 agentic-Sage cloud-staging / local-production boundary.
+
+## As-built corrections (2026-06-25)
+
+Recorded during the prompt-wiring follow-up (closed-loop criterion #6). Two
+premises above were superseded by safer choices in the shipped code. The spec
+text above is left intact for the historical record; the differences are noted
+here:
+
+- **Touch-point 4 — coordinator metric reads.** The spec says the coordinator
+  "Sage effectiveness" tile reads via app `prisma`. As shipped,
+  `getWagerHitRate()` (`src/lib/sage/wager-metrics.ts`) uses **`prismaAdmin`**
+  for an aggregate-only, WHERE-scoped status count. Reason: coordinator sessions
+  collapse to `role="student"` / empty `studentId` under RLS, so the
+  `wager_read` policy would reject program-wide reads and return 0/0/0/0. The
+  admin client is safe here — the result is a non-PII status-count aggregate,
+  always scoped by the query's WHERE clause.
+- **Touch-point 3 — diagnosis model call.** Any snippet implying a
+  `provider.generate(...)` call is superseded: the shipped worker
+  (`src/lib/sage/wager-diagnosis.ts`) calls **`provider.generateResponse(...)`**,
+  the real provider interface (`src/lib/ai/types.ts`).
+
+Two findings from the same review remain genuinely open and are tracked as
+separate follow-up tasks (not part of the prompt-wiring change): hardening
+`resolveDueWagers()` against concurrent runs, and adding untrusted-data
+boundaries to the diagnosis prompt.
