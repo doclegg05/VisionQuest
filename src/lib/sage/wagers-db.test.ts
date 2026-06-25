@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding must accept many signatures */
 import assert from "node:assert/strict";
-import { before, describe, it, mock } from "node:test";
+import { before, beforeEach, describe, it, mock } from "node:test";
 
 // Captured calls against the faked prismaAdmin.
 const calls: { upserts: unknown[]; verdicts: unknown[]; updates: unknown[] } = {
@@ -8,6 +8,11 @@ const calls: { upserts: unknown[]; verdicts: unknown[]; updates: unknown[] } = {
   verdicts: [],
   updates: [],
 };
+
+// Models the WagerVerdict.wagerId unique constraint: a second create for the
+// same wagerId throws P2002, exactly as Postgres/Prisma would when two resolve
+// runs (daily pg_cron + the manual fallback) race on the same open wager.
+const verdictWagerIds = new Set<string>();
 
 // Top-level mock.module (operations.test.ts pattern) — must be at module scope,
 // not inside before(), so the mock is applied before any import of the unit.
@@ -36,7 +41,16 @@ mock.module("@/lib/db", {
         ],
       },
       wagerVerdict: {
-        create: async (args: { data: unknown }) => {
+        create: async (args: { data: { wagerId: string } }) => {
+          const { wagerId } = args.data;
+          if (verdictWagerIds.has(wagerId)) {
+            const err = new Error(
+              "Unique constraint failed on the fields: (`wagerId`)",
+            ) as Error & { code: string };
+            err.code = "P2002";
+            throw err;
+          }
+          verdictWagerIds.add(wagerId);
           calls.verdicts.push(args.data);
           return {};
         },
@@ -94,5 +108,28 @@ describe("resolveDueWagers", () => {
     assert.equal(res.lost, 1); // g2 abandoned
     assert.equal(calls.verdicts.length, 2);
     assert.equal(res.diagnosable.length, 1); // the loss is diagnosable
+  });
+});
+
+describe("resolveDueWagers concurrency / idempotency", () => {
+  beforeEach(() => {
+    calls.verdicts.length = 0;
+    calls.updates.length = 0;
+    verdictWagerIds.clear();
+  });
+
+  // Two resolve runs overlap (daily pg_cron + manual fallback both fire and
+  // read the same open wagers). The second run must NOT throw on the unique
+  // WagerVerdict.wagerId collision and must NOT abort the rest of the batch.
+  it("does not throw and writes exactly one verdict when the same open wager is resolved twice", async () => {
+    const now = new Date("2026-06-20T00:00:00Z");
+
+    const first = await resolveDueWagers(now);
+    const second = await resolveDueWagers(now); // overlapping/duplicate run
+
+    assert.equal(first.resolved, 2);
+    assert.equal(second.resolved, 0); // nothing newly resolved by the racing run
+    assert.equal(second.skipped, 2); // both already resolved → skipped, not errored
+    assert.equal(calls.verdicts.length, 2); // exactly one verdict per wager, total
   });
 });

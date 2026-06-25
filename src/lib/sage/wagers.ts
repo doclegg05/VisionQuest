@@ -169,10 +169,26 @@ export interface ResolveResult {
   won: number;
   lost: number;
   voided: number;
+  /** Wagers a concurrent resolve run already verdicted — counted, not errored. */
+  skipped: number;
   diagnosable: string[];
 }
 
 const RESOLVE_BATCH = 500;
+
+/**
+ * Prisma P2002 = unique-constraint violation. Here it can only come from the
+ * `WagerVerdict.wagerId` unique index, which means another resolve run
+ * verdicted this wager first. Treat it as "already resolved", not an error.
+ */
+function isWagerAlreadyResolved(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: string }).code === "P2002"
+  );
+}
 
 /**
  * Resolve all open wagers past their horizon, deterministically. Catch-up
@@ -199,27 +215,45 @@ export async function resolveDueWagers(now: Date): Promise<ResolveResult> {
   );
 
   const planned = planWagerResolutions(due, goalsById);
+  let resolved = 0;
   let won = 0;
   let lost = 0;
   let voided = 0;
+  let skipped = 0;
   const diagnosable: string[] = [];
 
   for (const p of planned) {
-    await prismaAdmin.$transaction([
-      prismaAdmin.wagerVerdict.create({
-        data: {
-          wagerId: p.wagerId,
-          outcome: p.outcome,
-          result: p.result,
-          resolvedBy: "deterministic",
-          evidence: p.evidence,
-        },
-      }),
-      prismaAdmin.wager.update({
-        where: { id: p.wagerId },
-        data: { status: p.nextStatus },
-      }),
-    ]);
+    // Verdict create + status flip are one atomic transaction. The unique
+    // index on WagerVerdict.wagerId is the idempotency guard: if a concurrent
+    // run (pg_cron + manual fallback) verdicted this wager first, this whole
+    // transaction rolls back (no double status flip) and throws P2002 — which
+    // we treat as "already resolved" and skip, so the rest of the batch still
+    // resolves instead of the loop aborting on the first collision.
+    try {
+      await prismaAdmin.$transaction([
+        prismaAdmin.wagerVerdict.create({
+          data: {
+            wagerId: p.wagerId,
+            outcome: p.outcome,
+            result: p.result,
+            resolvedBy: "deterministic",
+            evidence: p.evidence,
+          },
+        }),
+        prismaAdmin.wager.update({
+          where: { id: p.wagerId },
+          data: { status: p.nextStatus },
+        }),
+      ]);
+    } catch (err) {
+      if (isWagerAlreadyResolved(err)) {
+        skipped += 1;
+        continue;
+      }
+      throw err;
+    }
+
+    resolved += 1;
     if (p.result === "win") won += 1;
     else if (p.result === "void") voided += 1;
     else {
@@ -228,5 +262,5 @@ export async function resolveDueWagers(now: Date): Promise<ResolveResult> {
     }
   }
 
-  return { resolved: planned.length, won, lost, voided, diagnosable };
+  return { resolved, won, lost, voided, skipped, diagnosable };
 }
