@@ -13,6 +13,7 @@ import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
 import { parseJobFilters, buildJobFilterWhere } from "@/lib/job-board/job-filters";
 import { isJobWorkMode } from "@/lib/job-board/work-mode";
 import { parseStoredResumeData } from "@/lib/resume";
+import { loadBrowseJobs } from "@/lib/job-board/browse-jobs";
 
 const VALID_PROXIMITY_FILTERS = new Set(["local", "remote", "all"]);
 
@@ -21,6 +22,7 @@ const VALID_PROXIMITY_FILTERS = new Set(["local", "remote", "all"]);
  *
  * Returns active job listings for the student's enrolled class,
  * with recommendation scores if the student has CareerDiscovery or resume skill data.
+ * When no enrollment or class config exists, falls back to the program-wide browse pool.
  *
  * Query params:
  *   cluster   - filter by cluster ID
@@ -39,6 +41,52 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     : "local";
   const sort = url.searchParams.get("sort") ?? "recommended";
 
+  /**
+   * Maps a JobBrowseListing row to the same response shape the UI consumes
+   * for class-scoped JobListing rows. Browse jobs carry no personalization.
+   */
+  function mapBrowseRow(row: Awaited<ReturnType<typeof loadBrowseJobs>>[number]) {
+    return {
+      ...row,
+      savedStatus: null,
+      savedNotes: null,
+      savedAppliedAt: null,
+      matchScore: 0,
+      matchLabel: null,
+      clusterOverlap: [] as string[],
+      skillOverlap: [] as string[],
+      matchReasons: [] as unknown[],
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      expiresAt: row.expiresAt?.toISOString() ?? null,
+      postedAt: row.postedAt?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * Fallback path: no enrollment or no class config.
+   * Serve the browse pool so counts are always numeric and jobs still show.
+   */
+  async function browseOnlyResponse() {
+    const browseRows = await loadBrowseJobs({
+      proximity: proximityFilter,
+      sort,
+      searchParams: url.searchParams,
+    });
+    const jobs = browseRows.map(mapBrowseRow);
+    return NextResponse.json({
+      jobs,
+      hasDiscovery: false,
+      hasResume: false,
+      hasPersonalization: false,
+      totalActive: jobs.length,
+      totalLocal: 0,
+      totalRemote: jobs.length,
+      proximity: proximityFilter,
+      totalSaved: 0,
+    });
+  }
+
   // Find student's enrolled class
   const enrollment = await prisma.studentClassEnrollment.findFirst({
     where: { studentId: session.id, status: "active" },
@@ -46,7 +94,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   });
 
   if (!enrollment) {
-    return NextResponse.json({ jobs: [], recommendations: [], hasDiscovery: false });
+    return browseOnlyResponse();
   }
 
   // Get class config
@@ -55,7 +103,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   });
 
   if (!config) {
-    return NextResponse.json({ jobs: [], recommendations: [], hasDiscovery: false });
+    return browseOnlyResponse();
   }
 
   const priority = (config.localJobPriority ?? "prefer_local") as LocalJobPriority;
@@ -94,8 +142,8 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     job,
     proximity: classifyJobProximity(job, config.region),
   }));
-  const totalLocal = jobsWithProximity.filter((item) => item.proximity === "local").length;
-  const totalRemote = jobsWithProximity.filter((item) => item.proximity === "remote").length;
+  const classLocalCount = jobsWithProximity.filter((item) => item.proximity === "local").length;
+  const classRemoteCount = jobsWithProximity.filter((item) => item.proximity === "remote").length;
 
   const filteredByProximity = jobsWithProximity.filter((item) => {
     if (proximityFilter === "all") return true;
@@ -103,7 +151,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     return item.proximity === "remote";
   });
 
-  const jobs = filteredByProximity
+  const classJobs = filteredByProximity
     .map((item) => item.job)
     .sort((a, b) => {
       if (sort === "salary") return (b.salaryMin ?? -1) - (a.salaryMin ?? -1);
@@ -154,11 +202,11 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     interactionProfile.preferredSources.length > 0;
   const hasPersonalization = Boolean(discovery) || studentProfile.skills.length > 0 || hasInteractionSignals;
 
-  // Score and rank
-  const recommendations = rankJobs(jobs, discovery, config.region, studentProfile, interactionProfile, priority);
+  // Score and rank class jobs
+  const recommendations = rankJobs(classJobs, discovery, config.region, studentProfile, interactionProfile, priority);
 
-  // Build response with saved status merged in
-  const jobsWithMeta = jobs.map((job) => {
+  // Build response with saved status merged in (class jobs only)
+  const classJobsWithMeta = classJobs.map((job) => {
     const rec = recommendations.find((r) => r.jobListingId === job.id);
     const saved = savedMap.get(job.id);
     return {
@@ -174,16 +222,44 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
       expiresAt: job.expiresAt?.toISOString() ?? null,
+      // JobListing has no postedAt; match the shape browse rows emit
+      postedAt: null as string | null,
     };
   });
 
-  // Re-sort by recommendation score if sort=recommended
+  // Re-sort class jobs by recommendation score if sort=recommended
   if (sort === "recommended" && hasPersonalization) {
-    jobsWithMeta.sort((a, b) => b.matchScore - a.matchScore);
+    classJobsWithMeta.sort((a, b) => b.matchScore - a.matchScore);
   }
 
+  // Merge browse-pool jobs into the Remote/All views.
+  // Local tab always excludes browse jobs (browse pool is remote-only).
+  // Dedup by source+sourceId against class jobs (class jobs take precedence).
+  const classJobKeys = new Set(
+    dedupedJobs.map((j) => `${j.source}:${j.sourceId}`),
+  );
+
+  const browseRows = await loadBrowseJobs({
+    proximity: proximityFilter,
+    sort,
+    searchParams: url.searchParams,
+  });
+
+  const uniqueBrowseRows = browseRows.filter(
+    (row) => !classJobKeys.has(`${row.source}:${row.sourceId}`),
+  );
+  const browseMapped = uniqueBrowseRows.map(mapBrowseRow);
+  const browseRemoteCount = uniqueBrowseRows.length;
+
+  // Combine: class jobs first (already ranked/sorted), then browse jobs appended.
+  // The Local tab won't have browse jobs because loadBrowseJobs returns [] for proximity=local.
+  const jobs = [...classJobsWithMeta, ...browseMapped];
+
+  const totalLocal = classLocalCount;
+  const totalRemote = classRemoteCount + browseRemoteCount;
+
   return NextResponse.json({
-    jobs: jobsWithMeta,
+    jobs,
     hasDiscovery: !!discovery,
     hasResume: !!resumeRecord,
     hasPersonalization,
