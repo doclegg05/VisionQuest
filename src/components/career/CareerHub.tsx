@@ -90,7 +90,7 @@ export default function CareerHub({
   const [jobsData, setJobsData] = useState<JobsResponse | null>(null);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [cluster, setCluster] = useState("");
-  const [proximity, setProximity] = useState<JobProximityFilter>("local");
+  const [proximity, setProximity] = useState<JobProximityFilter>("all");
   const [sort, setSort] = useState("recommended");
   const [keyword, setKeyword] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
@@ -229,8 +229,8 @@ export default function CareerHub({
                 postedWithinDays={postedWithinDays}
                 minPay={minPay}
                 jobType={jobType}
-                localCount={jobsData.totalLocal}
-                remoteCount={jobsData.totalRemote}
+                localCount={jobsData?.totalLocal ?? 0}
+                remoteCount={jobsData?.totalRemote ?? 0}
                 onClusterChange={setCluster}
                 onProximityChange={setProximity}
                 onSortChange={setSort}

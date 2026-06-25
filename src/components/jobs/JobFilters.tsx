@@ -86,10 +86,13 @@ export function JobFilters({
   onMinPayChange,
   onJobTypeChange,
 }: JobFiltersProps) {
+  const safeCount = (value: number): number => (Number.isFinite(value) ? value : 0);
   const countFor = (value: JobProximityFilter): number => {
-    if (value === "local") return localCount;
-    if (value === "remote") return remoteCount;
-    return localCount + remoteCount;
+    const local = safeCount(localCount);
+    const remote = safeCount(remoteCount);
+    if (value === "local") return local;
+    if (value === "remote") return remote;
+    return local + remote;
   };
 
   return (
