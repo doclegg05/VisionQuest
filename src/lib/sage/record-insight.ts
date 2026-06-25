@@ -16,6 +16,7 @@
 
 import { prisma } from "@/lib/db";
 import { logSageAction } from "@/lib/sage/audit";
+import { dispatchAutomationEvent } from "@/lib/automation/dispatch";
 
 export type SageInsightCategory =
   | "goal"
@@ -122,6 +123,20 @@ export async function recordInsight(
         : {}),
     },
   });
+
+  // Outbound automation (experiment): a "concern" is the highest-signal,
+  // staff-relevant category — notify the automation layer so a workflow can
+  // ping a case manager to look. PII-minimal by design: we send IDs + a link,
+  // never the insight content. Fire-and-forget — must never block or break the
+  // turn, and is a no-op unless AUTOMATIONS_ENABLED.
+  if (insight.category === "concern") {
+    void dispatchAutomationEvent("student.concern.recorded", {
+      studentId: input.studentId,
+      insightId: insight.id,
+      confidence: typeof input.confidence === "number" ? input.confidence : null,
+      link: `/teacher/students/${input.studentId}`,
+    });
+  }
 
   return { status: "created", insightId: insight.id };
 }
