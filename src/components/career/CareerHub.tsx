@@ -66,6 +66,9 @@ interface JobData {
   savedNotes: string | null;
   savedAppliedAt: string | null;
   url: string;
+  postedAt?: string | null;
+  createdAt?: string | null;
+  source?: string | null;
 }
 
 interface JobsResponse {
