@@ -155,6 +155,7 @@ export const leverAdapter: JobSourceAdapter = {
           source: "lever",
           sourceType: "api",
           sourceId: `lever:${board}:${job.id}`,
+          // Lever v0 API returns createdAt as a unix timestamp in milliseconds.
           postedAt: (() => {
             if (job.createdAt == null) return undefined;
             const d = new Date(job.createdAt);
