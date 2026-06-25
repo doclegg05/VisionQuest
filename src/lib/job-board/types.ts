@@ -15,6 +15,8 @@ export interface NormalizedJob {
   source: string;
   sourceType: "scrape" | "api";
   sourceId: string;
+  /** ISO date the job was posted at source, when available. */
+  postedAt?: string | null;
 }
 
 /**

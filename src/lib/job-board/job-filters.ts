@@ -28,8 +28,15 @@ export function parseJobFilters(searchParams: URLSearchParams): JobFilterValues 
 /**
  * Extra Prisma `where` clauses for JobListing. minPay deliberately keeps
  * unknown-pay jobs (salaryMin null) so missing data never hides a job.
+ *
+ * @param dateField - The date field to filter on for postedWithinDays. Defaults
+ *   to "createdAt" (JobListing behaviour). Pass "postedAt" for JobBrowseListing.
  */
-export function buildJobFilterWhere(filters: JobFilterValues, now: Date): Record<string, unknown> {
+export function buildJobFilterWhere(
+  filters: JobFilterValues,
+  now: Date,
+  dateField: "createdAt" | "postedAt" = "createdAt",
+): Record<string, unknown> {
   const where: Record<string, unknown> = {};
   const and: unknown[] = [];
 
@@ -48,7 +55,7 @@ export function buildJobFilterWhere(filters: JobFilterValues, now: Date): Record
   }
 
   if (filters.postedWithinDays != null) {
-    where.createdAt = { gte: new Date(now.getTime() - filters.postedWithinDays * DAY_MS) };
+    where[dateField] = { gte: new Date(now.getTime() - filters.postedWithinDays * DAY_MS) };
   }
 
   if (filters.jobType != null) {

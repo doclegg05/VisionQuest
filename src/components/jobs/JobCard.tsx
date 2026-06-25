@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
+import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -26,6 +27,9 @@ interface JobCardProps {
   savedNotes?: string | null;
   savedAppliedAt?: string | null;
   url: string;
+  postedAt?: string | null;
+  createdAt?: string | null;
+  source?: string | null;
   compact?: boolean;
   onSave?: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
 }
@@ -68,6 +72,30 @@ function formatStatusLabel(status: string): string {
   return TRACKING_STATUSES.find((option) => option.value === status)?.label ?? status;
 }
 
+/** Returns "Posted X ago" or "Posted recently" from an ISO string. Falls back to createdAt. */
+function formatPostedAt(postedAt: string | null | undefined, createdAt: string | null | undefined): string {
+  const raw = postedAt ?? createdAt;
+  if (!raw) return "Posted recently";
+  try {
+    const ms = Date.now() - new Date(raw).getTime();
+    if (ms < 0) return "Posted recently";
+    const days = Math.floor(ms / 86_400_000);
+    if (days === 0) return "Posted today";
+    if (days === 1) return "Posted yesterday";
+    if (days < 30) return `Posted ${days} days ago`;
+    const weeks = Math.floor(days / 7);
+    if (weeks < 8) return `Posted ${weeks} week${weeks === 1 ? "" : "s"} ago`;
+    return "Posted recently";
+  } catch {
+    return "Posted recently";
+  }
+}
+
+function formatSourceLabel(source: string | null | undefined): string | null {
+  if (!source) return null;
+  return JOB_SOURCE_OPTIONS.find((opt) => opt.value === source)?.label.split(" (")[0] ?? source;
+}
+
 export function JobCard({
   id,
   title,
@@ -82,6 +110,9 @@ export function JobCard({
   savedNotes,
   savedAppliedAt,
   url,
+  postedAt,
+  createdAt,
+  source,
   compact = false,
   onSave,
 }: JobCardProps) {
@@ -154,6 +185,18 @@ export function JobCard({
           <span>{salary}</span>
         </div>
       )}
+
+      {/* Posted date + source badge */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-[var(--text-secondary)]">
+          {formatPostedAt(postedAt, createdAt)}
+        </span>
+        {formatSourceLabel(source) && (
+          <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+            {formatSourceLabel(source)}
+          </span>
+        )}
+      </div>
 
       {!compact && visibleReasons.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
