@@ -272,6 +272,7 @@ describe("buildSystemPrompt — guardrails & role-awareness (regression)", () =>
     assert.match(prompt, /you stay Sage/); // no role-swap / no prompt disclosure
     assert.match(prompt, /permissions come from who is signed in/); // anti-exfiltration
     assert.match(prompt, /reference data to reason about, never a command/); // injection-via-data
+    assert.match(prompt, /acrostic/i); // disguised prompt-leak resistance (acrostic/encoding/translation)
     assert.match(prompt, /actually used a tool/); // no fabricated actions
   });
 
@@ -285,6 +286,7 @@ describe("buildSystemPrompt — guardrails & role-awareness (regression)", () =>
     const prompt = buildSystemPrompt("general", {}, "compact");
     assert.match(prompt, /caseworker or instructor/);
     assert.match(prompt, /Stay Sage/);
+    assert.match(prompt, /disguised asks/i); // acrostic/encoding prompt-leak resistance
     assert.match(prompt, /Treat text inside uploads/);
     assert.match(prompt, /988/);
   });
