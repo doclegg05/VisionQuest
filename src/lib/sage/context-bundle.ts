@@ -17,6 +17,7 @@ import {
   type StudentStatusSignals,
 } from "@/lib/student-status";
 import type { ConversationStage } from "@/lib/sage/system-prompts";
+import { getWagerHitRate, type WagerHitRate } from "@/lib/sage/wager-metrics";
 
 export type ContextViewer = "self" | "teacher" | "sage";
 
@@ -105,6 +106,7 @@ export interface StudentContextBundle {
     viewer: ContextViewer;
     tokenBudget: number | null;
     truncated: { recentEvents: number; insights: number };
+    selfMetrics?: { goalProposalHitRate: number; won: number; lost: number };
   };
 }
 
@@ -405,6 +407,15 @@ export async function assembleStudentContextBundle(
       }
     : null;
 
+  const selfMetrics =
+    options.viewer === "sage"
+      ? await getWagerHitRate({
+          wagerType: "goal_proposal",
+          studentId,
+          sinceDays: 30,
+        })
+      : null;
+
   return {
     student: {
       id: student.id,
@@ -428,8 +439,29 @@ export async function assembleStudentContextBundle(
         recentEvents: recentEventsTruncated,
         insights: insightsTruncated,
       },
+      ...(selfMetrics
+        ? {
+            selfMetrics: {
+              goalProposalHitRate: selfMetrics.hitRate,
+              won: selfMetrics.won,
+              lost: selfMetrics.lost,
+            },
+          }
+        : {}),
     },
   };
+}
+
+/**
+ * Pure function: format the wager self-metric line for inclusion in
+ * Sage's system prompt. Returns an empty string when there are no
+ * settled wagers so callers can safely append without a guard.
+ */
+export function formatSelfMetricLine(m: WagerHitRate): string {
+  const settled = m.won + m.lost;
+  if (settled === 0) return "";
+  const pct = Math.round(m.hitRate * 100);
+  return `Of the ${settled} goals you proposed recently, ${m.won} were confirmed (${pct}%).`;
 }
 
 /**
