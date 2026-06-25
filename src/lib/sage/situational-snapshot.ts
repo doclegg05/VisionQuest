@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 
@@ -102,9 +103,9 @@ export function renderSituationalSnapshot(input: SituationalSnapshotInput): stri
 }
 
 function pickStrengthAndGap(
-  breakdown: Record<string, { score: number; max: number; label: string }>,
+  breakdown: ReadinessBreakdown,
 ): { strongest: string | null; weakest: string | null } {
-  const dims = Object.values(breakdown);
+  const dims: { score: number; max: number; label: string }[] = Object.values(breakdown);
   let strongest: { label: string; ratio: number } | null = null;
   let weakest: { label: string; ratio: number } | null = null;
   for (const d of dims) {
