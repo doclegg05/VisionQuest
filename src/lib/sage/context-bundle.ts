@@ -17,7 +17,11 @@ import {
   type StudentStatusSignals,
 } from "@/lib/student-status";
 import type { ConversationStage } from "@/lib/sage/system-prompts";
-import { getWagerHitRate, type WagerHitRate } from "@/lib/sage/wager-metrics";
+import { getWagerHitRate } from "@/lib/sage/wager-metrics";
+import {
+  getStudentPromptContext,
+  type StudentPromptContext,
+} from "@/lib/chat/context";
 
 export type ContextViewer = "self" | "teacher" | "sage";
 
@@ -100,6 +104,8 @@ export interface StudentContextBundle {
   alerts: AlertSummary[];
   insights: SageInsightSummary[];
   conversationContext: ConversationContext | null;
+  /** Present only when assembled with includeChatPromptContext (chat path). */
+  chatPromptContext?: StudentPromptContext;
   meta: {
     assembledAt: Date;
     version: "v1";
@@ -121,6 +127,10 @@ export interface AssembleOptions {
   maxRecentEvents?: number;
   /** Override for tests; defaults to 20. */
   maxInsights?: number;
+  /** Chat path: also compose getStudentPromptContext and attach as chatPromptContext. */
+  includeChatPromptContext?: boolean;
+  /** Forwarded to getStudentPromptContext; defaults to 3. */
+  priorSummaryLimit?: number;
 }
 
 const DEFAULT_RECENT_WINDOW_DAYS = 30;
@@ -155,6 +165,19 @@ export async function assembleStudentContextBundle(
   const confirmedSince = new Date(
     now.getTime() - RECENTLY_CONFIRMED_DAYS * 24 * 60 * 60 * 1000,
   );
+
+  // Kick off the prompt-context composition concurrently with the main reads.
+  // Only runs on the chat path (flag + conversationId); the diagnosis caller
+  // omits the flag and pays nothing.
+  const chatPromptContextPromise =
+    options.includeChatPromptContext && options.conversationId
+      ? getStudentPromptContext(
+          studentId,
+          options.conversationId,
+          options.conversationStage ?? "discovery",
+          options.priorSummaryLimit ?? 3,
+        )
+      : Promise.resolve(undefined);
 
   const [
     student,
@@ -416,6 +439,8 @@ export async function assembleStudentContextBundle(
         })
       : null;
 
+  const chatPromptContext = await chatPromptContextPromise;
+
   return {
     student: {
       id: student.id,
@@ -430,6 +455,7 @@ export async function assembleStudentContextBundle(
     alerts: alertSummaries,
     insights,
     conversationContext,
+    chatPromptContext,
     meta: {
       assembledAt: now,
       version: "v1",
@@ -457,11 +483,31 @@ export async function assembleStudentContextBundle(
  * Sage's system prompt. Returns an empty string when there are no
  * settled wagers so callers can safely append without a guard.
  */
-export function formatSelfMetricLine(m: WagerHitRate): string {
+export function formatSelfMetricLine(m: {
+  won: number;
+  lost: number;
+  hitRate: number;
+}): string {
   const settled = m.won + m.lost;
   if (settled === 0) return "";
   const pct = Math.round(m.hitRate * 100);
   return `Of the ${settled} goals you proposed recently, ${m.won} were confirmed (${pct}%).`;
+}
+
+/**
+ * Pure: derive the self-metric prompt line from an assembled bundle. Reads
+ * meta.selfMetrics (present only for viewer "sage" with settled wagers) and
+ * formats it via formatSelfMetricLine; returns "" when absent so callers can
+ * append unconditionally.
+ */
+export function selfMetricLineFromBundle(bundle: StudentContextBundle): string {
+  const sm = bundle.meta.selfMetrics;
+  if (!sm) return "";
+  return formatSelfMetricLine({
+    won: sm.won,
+    lost: sm.lost,
+    hitRate: sm.goalProposalHitRate,
+  });
 }
 
 /**

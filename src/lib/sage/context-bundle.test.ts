@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import {
   trimRecentEvents,
   fieldsForViewer,
+  formatSelfMetricLine,
+  selfMetricLineFromBundle,
   type ProgressionEventSummary,
   type ContextViewer,
+  type StudentContextBundle,
 } from "./context-bundle";
 
 function makeEvent(occurredAt: Date): ProgressionEventSummary {
@@ -84,4 +87,34 @@ test("fieldsForViewer: returns the same key set for every viewer in Tier A", () 
   ] as const) {
     assert.ok(sets[0]!.has(required), `expected viewer fields to include "${required}"`);
   }
+});
+
+test("formatSelfMetricLine: formats settled wagers as a sentence", () => {
+  assert.equal(
+    formatSelfMetricLine({ won: 3, lost: 2, hitRate: 0.6 }),
+    "Of the 5 goals you proposed recently, 3 were confirmed (60%).",
+  );
+});
+
+test("formatSelfMetricLine: returns empty string when nothing is settled", () => {
+  assert.equal(formatSelfMetricLine({ won: 0, lost: 0, hitRate: 0 }), "");
+});
+
+// Minimal fixture: selfMetricLineFromBundle only reads meta.selfMetrics, so we
+// cast a partial shape rather than build a full bundle.
+function bundleWithSelfMetrics(
+  selfMetrics: { goalProposalHitRate: number; won: number; lost: number } | undefined,
+): StudentContextBundle {
+  return { meta: { selfMetrics } } as unknown as StudentContextBundle;
+}
+
+test("selfMetricLineFromBundle: derives the line from meta.selfMetrics", () => {
+  const line = selfMetricLineFromBundle(
+    bundleWithSelfMetrics({ goalProposalHitRate: 0.6, won: 3, lost: 2 }),
+  );
+  assert.equal(line, "Of the 5 goals you proposed recently, 3 were confirmed (60%).");
+});
+
+test("selfMetricLineFromBundle: returns empty string when selfMetrics absent", () => {
+  assert.equal(selfMetricLineFromBundle(bundleWithSelfMetrics(undefined)), "");
 });
