@@ -19,6 +19,10 @@ export async function loadBrowseJobs(params: {
     status: "active",
     expiresAt: { gt: now },
   };
+  const cluster = params.searchParams.get("cluster");
+  if (cluster) {
+    where.clusters = { has: cluster };
+  }
   // Browse listings use postedAt for the "posted within" filter (not createdAt).
   Object.assign(where, buildJobFilterWhere(parseJobFilters(params.searchParams), now, "postedAt"));
 
