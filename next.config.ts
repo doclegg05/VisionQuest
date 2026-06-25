@@ -36,6 +36,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: repoRoot,
   },
+  images: {
+    // Credly badge images (Portfolio → Shareable Proof) are served from
+    // images.credly.com. The CSP img-src already allows this host; next/image
+    // additionally requires it here or the optimizer rejects the URL (400).
+    remotePatterns: [
+      { protocol: "https", hostname: "images.credly.com" },
+    ],
+  },
   async headers() {
     return [
       {
