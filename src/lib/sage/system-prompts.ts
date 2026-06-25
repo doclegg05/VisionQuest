@@ -496,6 +496,7 @@ export function buildSystemPrompt(
     pathwayContext?: string;
     coachingArcContext?: string;
     staffStudentContext?: string | null;
+    selfMetricsLine?: string;
   } = {},
   tier: PromptTier = "full",
 ): string {
@@ -672,6 +673,17 @@ export function buildSystemPrompt(
         context.student_status_summary,
         "Treat this status as factual website state. Do not say a form or orientation step is complete unless it appears complete here. If the student asks about next steps, paperwork, readiness, or the conversation is in onboarding/orientation, use the exact missing items in your reply. If a form is awaiting instructor review, explain that it has been submitted and is pending review. If a form needs revision, tell the student it still needs attention before moving on.",
       ].join("\n"),
+    });
+  }
+
+  // Sage self-awareness: her recent goal-proposal confirmation rate, so she can
+  // calibrate how she proposes goals. System-authored aggregate (counts +
+  // percent) — no untrusted input, so no bracketing/sanitize needed. The staff
+  // branch returns earlier, so this only reaches student stages.
+  if (context.selfMetricsLine && context.selfMetricsLine.trim().length > 0) {
+    parts.push({
+      name: "state.self_metrics",
+      content: `YOUR RECENT GOAL-PROPOSAL TRACK RECORD: ${context.selfMetricsLine}`,
     });
   }
 

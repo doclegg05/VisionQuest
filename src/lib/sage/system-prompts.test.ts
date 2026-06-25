@@ -599,3 +599,23 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     }
   });
 });
+
+describe("buildSystemPrompt — self-metric line", () => {
+  const LINE = "Of the 5 goals you proposed recently, 3 were confirmed (60%).";
+
+  it("appends the self-metric section for a student stage when provided", () => {
+    const prompt = buildSystemPrompt("checkin", { selfMetricsLine: LINE });
+    assert.match(prompt, /YOUR RECENT GOAL-PROPOSAL TRACK RECORD/);
+    assert.ok(prompt.includes(LINE));
+  });
+
+  it("omits the self-metric section when no line is provided", () => {
+    const prompt = buildSystemPrompt("checkin", {});
+    assert.ok(!prompt.includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
+  });
+
+  it("omits the self-metric section for staff stages even when a line is provided", () => {
+    const prompt = buildSystemPrompt("teacher_assistant", { selfMetricsLine: LINE });
+    assert.ok(!prompt.includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
+  });
+});
