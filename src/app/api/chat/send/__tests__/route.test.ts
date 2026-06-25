@@ -56,6 +56,8 @@ const mockPrismaStudentFindUnique = mock.fn() as any;
 const mockFormatClustersForPrompt = mock.fn() as any;
 const mockRunAgentTurn = mock.fn() as any;
 const mockExecuteSlashCommand = mock.fn() as any;
+const mockAssembleStudentContextBundle = mock.fn() as any;
+const mockSelfMetricLineFromBundle = mock.fn() as any;
 
 // ---------------------------------------------------------------------------
 // withRegistry passthrough — mirrors the withTeacherAuth pattern in
@@ -200,6 +202,13 @@ mock.module("@/lib/chat/context", {
   },
 });
 
+mock.module("@/lib/sage/context-bundle", {
+  namedExports: {
+    assembleStudentContextBundle: mockAssembleStudentContextBundle,
+    selfMetricLineFromBundle: mockSelfMetricLineFromBundle,
+  },
+});
+
 mock.module("@/lib/sage/staff-student-context", {
   namedExports: {
     buildStaffStudentContext: mockBuildStaffStudentContext,
@@ -327,6 +336,8 @@ function resetMocks() {
     mockMaybeUpdateSummary,
     mockHandlePostResponse,
     mockGetStudentPromptContext,
+    mockAssembleStudentContextBundle,
+    mockSelfMetricLineFromBundle,
     mockBuildStaffStudentContext,
     mockShouldAttemptStaffStudentContext,
     mockCheckTokenQuota,
@@ -388,6 +399,23 @@ function resetMocks() {
     coachingArcContext: undefined,
     careerProfileContext: undefined,
   }));
+  mockAssembleStudentContextBundle.mock.mockImplementation(async () => ({
+    chatPromptContext: {
+      priorConversationContext: "",
+      goalsByLevel: {},
+      goalsSummary: "",
+      studentStatusSummary: undefined,
+      discoverySummary: undefined,
+      careerDiscovery: null,
+      skillGapContext: undefined,
+      pathwayContext: undefined,
+      coachingArcContext: undefined,
+      careerProfileContext: undefined,
+      careerThreadContext: undefined,
+    },
+    meta: { selfMetrics: undefined },
+  }));
+  mockSelfMetricLineFromBundle.mock.mockImplementation(() => "");
   mockBuildStaffStudentContext.mock.mockImplementation(async () => ({
     context: null,
     targetStudentId: null,
@@ -547,5 +575,45 @@ describe("POST /api/chat/send — SSE happy path", () => {
 
     await route.POST(req as never, { params: Promise.resolve({}) } as never);
     assert.equal(toolCapturedBy_withRegistry, "sage.chat");
+  });
+});
+
+describe("POST /api/chat/send — Sage self-metric wiring", () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("routes the student prompt through the bundle and injects the self-metric line", async () => {
+    mockSelfMetricLineFromBundle.mock.mockImplementation(
+      () => "Of the 5 goals you proposed recently, 3 were confirmed (60%).",
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How am I doing on my goals?" },
+    });
+
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+
+    // Bundle is the canonical feed: assembled with viewer "sage" + the
+    // prompt-context composition flag + the active conversation id.
+    assert.equal(mockAssembleStudentContextBundle.mock.callCount(), 1);
+    const [studentId, options] =
+      mockAssembleStudentContextBundle.mock.calls[0].arguments;
+    assert.equal(studentId, session.id);
+    assert.equal(options.viewer, "sage");
+    assert.equal(options.includeChatPromptContext, true);
+    assert.equal(options.conversationId, "conv-1");
+
+    // The formatted line reaches buildSystemPrompt.
+    assert.ok(mockBuildSystemPrompt.mock.callCount() >= 1);
+    const promptCtx = mockBuildSystemPrompt.mock.calls[0].arguments[1];
+    assert.equal(
+      promptCtx.selfMetricsLine,
+      "Of the 5 goals you proposed recently, 3 were confirmed (60%).",
+    );
+
+    // The legacy direct path is no longer used on the student branch.
+    assert.equal(mockGetStudentPromptContext.mock.callCount(), 0);
   });
 });

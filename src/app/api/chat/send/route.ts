@@ -14,8 +14,10 @@ import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
-import { getStudentPromptContext } from "@/lib/chat/context";
-import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
+import {
+  assembleStudentContextBundle,
+  selfMetricLineFromBundle,
+} from "@/lib/sage/context-bundle";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
 import {
   buildStaffStudentContext,
@@ -362,20 +364,23 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       staffStudentContext,
     }, promptTier);
   } else {
-    const promptContext = await getStudentPromptContext(
-      session.id,
-      conversation.id,
+    // Canonical context feed: the bundle is the single entry point for Sage
+    // student chat. includeChatPromptContext composes getStudentPromptContext
+    // (wrapped, not removed) so the prompt inputs are identical to before; the
+    // only new content is the self-metric line from meta.selfMetrics.
+    const bundle = await assembleStudentContextBundle(session.id, {
+      viewer: "sage",
+      conversationId: conversation.id,
       conversationStage,
-      promptTier === "compact" ? 1 : 3,
-    );
-
-    // Whole-student situational awareness. Skipped for the first-meeting
-    // discovery stage (no history to summarize) and the compact tier (token
-    // budget). Cached per student; never blocks chat if it fails.
-    const situationalSnapshot =
-      conversationStage !== "discovery" && promptTier !== "compact"
-        ? (await getSituationalSnapshot(session.id)) ?? undefined
-        : undefined;
+      includeChatPromptContext: true,
+      priorSummaryLimit: promptTier === "compact" ? 1 : 3,
+    });
+    const promptContext = bundle.chatPromptContext;
+    if (!promptContext) {
+      throw new Error(
+        "assembleStudentContextBundle returned no chatPromptContext despite includeChatPromptContext",
+      );
+    }
 
     systemPrompt =
       promptContext.priorConversationContext +
@@ -383,7 +388,6 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         studentName: session.displayName,
         programType: studentProgramType,
         classroomConfirmedAt: studentClassroomConfirmedAt,
-        situationalSnapshot,
         bhag: promptContext.goalsByLevel["bhag"],
         monthly: promptContext.goalsByLevel["monthly"],
         weekly: promptContext.goalsByLevel["weekly"],
@@ -400,6 +404,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         skillGapContext: promptContext.skillGapContext,
         pathwayContext: promptContext.pathwayContext,
         coachingArcContext: promptContext.coachingArcContext,
+        selfMetricsLine: selfMetricLineFromBundle(bundle),
       }, promptTier);
   }
 
