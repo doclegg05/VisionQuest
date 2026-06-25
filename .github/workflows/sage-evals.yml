@@ -1,0 +1,67 @@
+name: Sage Evals
+
+# Live model evals for Sage. Separate from the main `CI` workflow because they
+# (a) call the Gemini API (cost + a GEMINI_API_KEY secret) and (b) are
+# non-deterministic, so they don't belong on the hard PR gate for every change.
+#
+# Triggers: on-demand, nightly, and on PRs that touch Sage's prompt/tools/evals.
+# When GEMINI_API_KEY is not configured the live steps no-op (so forks and
+# secret-less environments stay green).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "27 7 * * *" # nightly ~07:27 UTC
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/lib/sage/**"
+      - "config/sage-*.json"
+      - "scripts/sage-*.mjs"
+
+jobs:
+  sage-evals:
+    runs-on: ubuntu-latest
+    env:
+      # Importing the tool registry pulls in the Prisma client; a fake URL is
+      # fine because no eval connects to a database (the model calls are HTTP).
+      DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+      DIRECT_URL: "postgresql://fake:fake@localhost:5432/fake"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Red-team eval (gating — hard boundary violations fail the run)
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not set — skipping live red-team eval."
+            exit 0
+          fi
+          npm run sage:redteam:eval
+
+      - name: Quality eval (informational)
+        continue-on-error: true
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not set — skipping quality eval."
+            exit 0
+          fi
+          npm run sage:quality:eval
+
+      - name: Tool-selection eval (informational)
+        continue-on-error: true
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not set — skipping tool-selection eval."
+            exit 0
+          fi
+          npm run sage:agent:eval
