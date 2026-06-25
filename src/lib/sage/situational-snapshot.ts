@@ -17,6 +17,7 @@ import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 import { formatCohortDateTime } from "@/lib/timezone";
+import { topProactiveNudge } from "./proactivity";
 import { logger } from "@/lib/logger";
 
 const SNAPSHOT_TTL_SECONDS = 180;
@@ -153,8 +154,11 @@ export async function getSituationalSnapshot(studentId: string): Promise<string 
       ).length;
 
       const { strongest, weakest } = pickStrengthAndGap(readinessData.readiness.breakdown);
+      const nextAppointmentLabel = nextAppt
+        ? `${nextAppt.title} on ${formatCohortDateTime(nextAppt.startsAt)}`
+        : null;
 
-      return renderSituationalSnapshot({
+      const block = renderSituationalSnapshot({
         readinessScore: readinessData.readiness.score,
         level: readinessData.state.level,
         xp: readinessData.state.xp,
@@ -167,10 +171,26 @@ export async function getSituationalSnapshot(studentId: string): Promise<string 
           .slice(0, MAX_GOALS_SHOWN)
           .map((g) => ({ level: g.level, content: g.content })),
         stalledGoalCount,
-        nextAppointment: nextAppt
-          ? { title: nextAppt.title, when: formatCohortDateTime(nextAppt.startsAt) }
-          : null,
+        nextAppointment: nextAppt ? { title: nextAppt.title, when: formatCohortDateTime(nextAppt.startsAt) } : null,
       });
+
+      // Pillar 4: the single most useful thing to gently raise this turn.
+      const nudge = topProactiveNudge({
+        readinessScore: readinessData.readiness.score,
+        activeGoalCount: goals.length,
+        stalledGoalCount,
+        orientationComplete: readinessData.orientationProgress.completed >= readinessData.orientationProgress.total,
+        orientationRemaining: Math.max(
+          0,
+          readinessData.orientationProgress.total - readinessData.orientationProgress.completed,
+        ),
+        nextAppointmentInHours: nextAppt
+          ? (nextAppt.startsAt.getTime() - now.getTime()) / (60 * 60 * 1000)
+          : null,
+        nextAppointmentLabel,
+      });
+
+      return nudge ? `${block}\n\n${nudge}` : block;
     });
   } catch (err) {
     logger.warn("Situational snapshot failed; continuing without it", {
