@@ -11,8 +11,12 @@
  * arrive via staff-student-context when a teacher names a student.
  */
 
-import { getInterventionQueue } from "@/lib/teacher/dashboard";
 import type { AgentTool, AgentToolResult } from "./types";
+
+// NOTE: @/lib/teacher/dashboard pulls in `server-only`, which throws if loaded
+// outside a server runtime (e.g. the node test runner collecting the tool
+// registry). Import it LAZILY inside execute so the registry stays importable
+// in tests and client bundles; it only loads when the tool actually runs.
 
 const listStudentsNeedingAttention: AgentTool = {
   name: "list_students_needing_attention",
@@ -33,6 +37,7 @@ const listStudentsNeedingAttention: AgentTool = {
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const limit = Math.min(Math.max(Number(args.limit) || 8, 1), 20);
+    const { getInterventionQueue } = await import("@/lib/teacher/dashboard");
     const { queue } = await getInterventionQueue(ctx.session);
 
     if (queue.length === 0) {
