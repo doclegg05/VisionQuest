@@ -625,4 +625,22 @@ describe("POST /api/chat/send — Sage self-metric wiring", () => {
     // The legacy direct path is no longer used on the student branch.
     assert.equal(mockGetStudentPromptContext.mock.callCount(), 0);
   });
+
+  it("computes situationalSnapshot (non-discovery, non-compact) and passes it to buildSystemPrompt", async () => {
+    mockGetPromptTier.mock.mockImplementation(() => "full");
+    mockGetSituationalSnapshot.mock.mockImplementation(async () => "SNAPSHOT_STUB");
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How am I doing on my goals?" },
+    });
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+
+    // The gated situational call fires for a non-discovery stage at non-compact tier...
+    assert.equal(mockGetSituationalSnapshot.mock.callCount(), 1);
+    assert.equal(mockGetSituationalSnapshot.mock.calls[0].arguments[0], session.id);
+    // ...and its result reaches buildSystemPrompt.
+    const promptCtx = mockBuildSystemPrompt.mock.calls[0].arguments[1];
+    assert.equal(promptCtx.situationalSnapshot, "SNAPSHOT_STUB");
+  });
 });
