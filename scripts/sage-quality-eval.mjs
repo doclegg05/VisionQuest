@@ -63,6 +63,7 @@ async function callModel(apiKey, model, body) {
 
 async function main() {
   const { buildSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
+  const { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } = await import("../src/lib/sage/readability.ts");
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY missing — the quality eval calls the live model.");
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
@@ -74,6 +75,9 @@ async function main() {
   const totals = Object.fromEntries(DIMENSIONS.map(([k]) => [k, 0]));
   let passes = 0;
   let scored = 0;
+  let gradeSum = 0;
+  let gradeCount = 0;
+  let overTarget = 0;
 
   for (const scenario of SCENARIOS) {
     let reply = "";
@@ -116,9 +120,21 @@ async function main() {
     for (const [k] of DIMENSIONS) totals[k] += Number(verdict[k]) || 0;
     const low = DIMENSIONS.filter(([k]) => (Number(verdict[k]) || 0) <= 2).map(([k]) => k);
     const mark = verdict.overall_pass ? (low.length ? "⚠️ " : "✅") : "❌";
+
+    // Deterministic reading-level check alongside the judge's subjective score.
+    const r = assessReadability(reply);
+    let gradeTag = "";
+    if (r.scorable) {
+      gradeSum += r.grade;
+      gradeCount++;
+      if (!r.withinTarget) overTarget++;
+      gradeTag = `  FK=${r.grade}${r.withinTarget ? "" : "⛔"}`;
+    }
+
     console.log(
       `  ${mark} ${scenario.id}: ` +
         DIMENSIONS.map(([k]) => `${k[0]}${k.split("_")[1]?.[0] ?? ""}=${verdict[k]}`).join(" ") +
+        gradeTag +
         (low.length ? `  LOW:[${low.join(",")}]` : "") +
         `  — ${verdict.note}`,
     );
@@ -134,6 +150,12 @@ async function main() {
   console.log(`Dimension averages (1-5):`);
   for (const [k] of DIMENSIONS) {
     console.log(`  ${k.padEnd(22)} ${(totals[k] / scored).toFixed(2)}`);
+  }
+  if (gradeCount > 0) {
+    console.log(
+      `Reading level (Flesch-Kincaid): avg ${(gradeSum / gradeCount).toFixed(1)}; ` +
+        `${overTarget}/${gradeCount} over the grade-${PLAIN_LANGUAGE_MAX_GRADE} target.`,
+    );
   }
   const passRate = passes / scored;
   console.log(passRate >= 0.7 ? `\nPASS-level quality (informational).` : `\nREVIEW: pass rate below 70% — inspect the low scorers above.`);
