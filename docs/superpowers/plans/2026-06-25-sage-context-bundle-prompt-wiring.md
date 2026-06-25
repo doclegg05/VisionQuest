@@ -535,3 +535,10 @@ git commit -m "feat(chat): route student prompt through context bundle; inject s
 - Finding #3 (`resolveDueWagers` concurrency) and Finding #5 (diagnosis-prompt boundaries) — spawned as separate follow-up tasks.
 - Findings #2/#4 stale spec premises — recorded as an "As-built corrections" note in the wager-loop design spec.
 - Deduping the bundle ↔ `getBaseStudentPromptContext` overlapping reads; retiring the legacy prompt field bag in favor of structured bundle fields.
+
+## As-built note (2026-06-25)
+
+Two details of the shipped implementation differ from the Task 3 prose above; the code is authoritative and correct:
+
+- **`situationalSnapshot` is preserved.** Task 3's replacement code block omitted the route's existing `situationalSnapshot` computation (a `getSituationalSnapshot(session.id)` sibling call, gated `conversationStage !== "discovery" && promptTier !== "compact"`) — it was transcribed from a stale read of the route. The shipped route keeps it (restored in commit `06fd587`); a regression test (`e31c9e3`) locks it in. Only `selfMetricsLine` is genuinely new in the prompt.
+- **Prompt-context composition runs alongside `Promise.all`, not inside it.** In `context-bundle.ts` the `getStudentPromptContext` call is started as a promise before the main `Promise.all` and awaited after, so it runs concurrently without restructuring the destructured `Promise.all`.
