@@ -485,6 +485,8 @@ export function buildSystemPrompt(
     daily?: string;
     goals_summary?: string;
     student_status_summary?: string;
+    /** Live, whole-student awareness snapshot (readiness, certs, goals, next steps). */
+    situationalSnapshot?: string;
     userMessage?: string;
     career_clusters?: string;
     discovery_summary?: string;
@@ -650,6 +652,15 @@ export function buildSystemPrompt(
     parts.push({
       name: "state.pathway",
       content: `STUDENT LEARNING PATHWAY:\n[PATHWAY_START]\n${sanitizeForPrompt(context.pathwayContext)}\n[PATHWAY_END]\nWhen discussing what to work on today or this week, connect suggestions to their current pathway step. Celebrate progress on completed steps.`,
+    });
+  }
+
+  // Whole-student situational awareness — the live picture of where this
+  // student stands. Sanitized because it embeds student-authored goal text.
+  if (context.situationalSnapshot) {
+    parts.push({
+      name: "state.situational_snapshot",
+      content: sanitizeForPrompt(context.situationalSnapshot),
     });
   }
 
