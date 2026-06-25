@@ -71,6 +71,21 @@ mock.module("@/lib/instructor-metrics", {
   },
 });
 
+// getWagerHitRate is program-wide (no region short-circuit), so unlike
+// getGoalProposalConfirmationMetrics it always issues a DB query. Mock it
+// so the authorized (200) paths don't hit a real prismaAdmin client.
+mock.module("@/lib/sage/wager-metrics", {
+  namedExports: {
+    getWagerHitRate: async () => ({
+      open: 0,
+      won: 0,
+      lost: 0,
+      voided: 0,
+      hitRate: 0,
+    }),
+  },
+});
+
 let route: Awaited<typeof import("./rollup/[regionId]/route")>;
 
 before(async () => {
