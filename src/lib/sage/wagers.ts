@@ -202,7 +202,7 @@ export async function resolveDueWagers(now: Date): Promise<ResolveResult> {
     take: RESOLVE_BATCH,
   });
   if (due.length === 0) {
-    return { resolved: 0, won: 0, lost: 0, voided: 0, diagnosable: [] };
+    return { resolved: 0, won: 0, lost: 0, voided: 0, skipped: 0, diagnosable: [] };
   }
 
   const goalIds = [...new Set(due.map((w) => w.targetId))];
