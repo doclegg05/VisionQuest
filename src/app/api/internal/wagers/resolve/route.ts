@@ -43,6 +43,7 @@ export async function POST(req: Request): Promise<Response> {
       won: result.won,
       lost: result.lost,
       voided: result.voided,
+      skipped: result.skipped,
     });
   } catch (error) {
     logger.error("Wager resolution failed", {
