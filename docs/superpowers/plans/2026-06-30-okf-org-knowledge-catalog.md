@@ -1011,6 +1011,8 @@ async function main() {
 main().catch((e) => { console.error(e); process.exit(1); });
 ```
 
+> **Source-availability assumption (per operator note, 2026-06-30):** `--apply` must run where the bundled `docs-upload/` files are present — an operator's repo checkout, or a standalone build that ships `docs-upload/`. `downloadBundledFile()` is the correct source for these *bundled* program docs; only switch to `downloadFile()` if program docs are ever migrated into object storage.
+
 - [ ] **Step 6: Add npm script + ensure overlay ships.** In `package.json` after `catalog:validate`:
 
 ```json
