@@ -25,6 +25,7 @@
     "sage:rag:notes": "node scripts/sage-rag-notes.mjs",
     "sage:rag:activate": "node scripts/sage-rag-activate.mjs",
     "sage:rag:harness": "tsx scripts/sage-rag-harness.mjs",
+    "sage:form:harness": "tsx scripts/sage-form-harness.mjs",
     "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
     "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
     "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",

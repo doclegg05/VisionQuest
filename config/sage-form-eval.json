@@ -1,0 +1,82 @@
+{
+  "cases": [
+    {
+      "id": "attendance-contract",
+      "query": "What form do I sign to promise I will come to class every day?",
+      "role": "student",
+      "expectedFormIds": ["attendance-contract"],
+      "forbiddenFormIds": ["sign-in-sheet", "rtw-attendance"]
+    },
+    {
+      "id": "student-profile",
+      "query": "I need to fill out my personal information and contact details for the program",
+      "role": "student",
+      "expectedFormIds": ["student-profile"],
+      "forbiddenFormIds": ["dfa-wvw-70", "dfa-ts-12"]
+    },
+    {
+      "id": "dfa-ts-12",
+      "query": "Where do I track my daily hours and activities for WV Works?",
+      "role": "student",
+      "expectedFormIds": ["dfa-ts-12"]
+    },
+    {
+      "id": "rights-responsibilities",
+      "query": "What are my rights in this program and what am I expected to do?",
+      "role": "student",
+      "expectedFormIds": ["rights-responsibilities"],
+      "forbiddenFormIds": ["dress-code", "non-discrimination"]
+    },
+    {
+      "id": "dress-code",
+      "query": "What should I wear to class? Is there a dress code policy?",
+      "role": "student",
+      "expectedFormIds": ["dress-code"],
+      "forbiddenFormIds": ["rights-responsibilities", "non-discrimination"]
+    },
+    {
+      "id": "dohs-release",
+      "query": "I need to sign the form that lets the Department of Health Services share my information",
+      "role": "student",
+      "expectedFormIds": ["dohs-release"],
+      "forbiddenFormIds": ["auth-release"]
+    },
+    {
+      "id": "tech-acceptable-use",
+      "query": "What are the rules for using the computers and internet in this program?",
+      "role": "student",
+      "expectedFormIds": ["tech-acceptable-use"]
+    },
+    {
+      "id": "media-release",
+      "query": "Can the program use my photo or video? What do I need to sign?",
+      "role": "student",
+      "expectedFormIds": ["media-release"],
+      "forbiddenFormIds": ["auth-release", "dohs-release"]
+    },
+    {
+      "id": "support-services",
+      "query": "What help is available for transportation or childcare costs through WV Works?",
+      "role": "student",
+      "expectedFormIds": ["support-services-fact-sheet", "dfa-wvw-25"]
+    },
+    {
+      "id": "portfolio-checklist",
+      "query": "What do I need to include in my employment portfolio?",
+      "role": "student",
+      "expectedFormIds": ["portfolio-checklist-tracking", "portfolio-checklist"]
+    },
+    {
+      "id": "auth-release",
+      "query": "I need to authorize an outside agency to receive information about me",
+      "role": "student",
+      "expectedFormIds": ["auth-release"]
+    },
+    {
+      "id": "welcome-letter",
+      "query": "Is there an overview or welcome packet explaining the SPOKES program?",
+      "role": "student",
+      "expectedFormIds": ["welcome-letter", "orientation-guide"]
+    }
+  ]
+}
