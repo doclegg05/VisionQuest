@@ -44,4 +44,13 @@ describe("buildDocSyncManifest (dual-sink)", () => {
   it("skips a node with no storageKey", () => {
     assert.deepEqual(buildDocSyncManifest([n({ vq_storage_key: undefined })], new Map()), []);
   });
+  it("merges notes for multiple nodes sharing one storageKey (no clobber)", () => {
+    const a = n({ vq_id:"portfolio-checklist", vq_storage_key:"orientation/EPC.pdf" }, { whenToUse:"Intro at onboarding.", whenNotToUse:"" });
+    const b = n({ vq_id:"portfolio-checklist-tracking", vq_storage_key:"orientation/EPC.pdf" }, { whenToUse:"Track progress over time.", whenNotToUse:"" });
+    const m = buildDocSyncManifest([a, b], new Map([["orientation/EPC.pdf", { id:"doc_epc" }]]));
+    assert.equal(m.length, 1);
+    assert.equal(m[0].docId, "doc_epc");
+    assert.match(m[0].newNote, /Intro at onboarding/);
+    assert.match(m[0].newNote, /Track progress over time/);
+  });
 });
