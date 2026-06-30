@@ -28,6 +28,7 @@
     "sage:form:harness": "tsx scripts/sage-form-harness.mjs",
     "catalog:generate": "tsx scripts/catalog/generate.mjs",
     "catalog:validate": "tsx scripts/catalog/validate.mjs",
+    "catalog:sync": "tsx scripts/catalog/sync.mjs",
     "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
     "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
     "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
