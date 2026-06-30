@@ -43,9 +43,17 @@ function unique(values) {
 }
 
 function parseDocumentRefs(context) {
+  // formatEntry() emits a doc entry in one of two shapes (see knowledge-base-server.ts):
+  //   no passages:  "[Title]\nLink: /api/documents/download?id=ID&mode=view\nSummary: …"
+  //   chunk path:   "Link: /api/documents/download?id=ID&mode=view\n[Title, p.N]\n…"
+  // The chunk-citation path (live hybrid retrieval) puts Link FIRST with no leading
+  // [Title], so the old `^\[Title\]\nLink:` anchor silently missed every chunk-retrieved
+  // doc. Parse on the invariant Link token instead (one per doc, in score order);
+  // capture the leading [Title] only when present — the DB lookup by id supplies the
+  // title for the chunk shape downstream.
   const refs = [];
   const pattern =
-    /^\[([^\]]+)\]\nLink: \/api\/documents\/download\?id=([^&\n]+)&mode=view/gm;
+    /(?:\[([^\]]+)\]\n)?Link: \/api\/documents\/download\?id=([^&\n]+)&mode=view/g;
   let match;
   while ((match = pattern.exec(context)) !== null) {
     refs.push({ title: match[1], id: decodeURIComponent(match[2]) });
