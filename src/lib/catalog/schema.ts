@@ -34,6 +34,13 @@ export interface CatalogNode {
 export interface FormRoutingEntry {
   formId: string;
   whenToUse: string;
+  /**
+   * Names sibling forms this one is commonly confused with. NEVER fed into a
+   * retrieval index (negation is invisible to keyword/vector matching — see
+   * form-search.ts). Answer-time only: consumed via notes.ts to help Sage
+   * disambiguate already-retrieved candidates.
+   */
+  whenNotToUse: string;
   tags: string[];
 }
 

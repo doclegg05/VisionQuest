@@ -16,35 +16,19 @@
 // only. The 29-form catalog is embedded once per process and cached.
 // =============================================================================
 
-import { readFileSync, existsSync } from "node:fs";
 import { FORMS, FORM_CATEGORIES, canViewForm, hasDownloadableFormDocument } from "@/lib/spokes/forms";
 import type { SpokesForm } from "@/lib/spokes/forms";
 import { embedQuery, embedTexts } from "@/lib/ai/embeddings";
 import { logger } from "@/lib/logger";
-import type { FormRoutingOverlay } from "@/lib/catalog/schema";
 
-// ---- Catalog routing overlay (optional, additive) ---------------------------
-// Produced by `catalog:sync --apply`. Absent until that command runs; all
-// behavior must be identical to today when the file does not exist.
-
-let overlayCache: FormRoutingOverlay | null | undefined;
-
-function getOverlay(): FormRoutingOverlay | null {
-  if (overlayCache !== undefined) return overlayCache;
-  try {
-    overlayCache = existsSync("config/form-routing.generated.json")
-      ? (JSON.parse(readFileSync("config/form-routing.generated.json", "utf8")) as FormRoutingOverlay)
-      : null;
-  } catch {
-    overlayCache = null;
-  }
-  return overlayCache;
-}
-
-/** Test seam: inject or clear the routing overlay without touching the filesystem. */
-export function __setFormRoutingOverlayForTest(o: FormRoutingOverlay | null): void {
-  overlayCache = o;
-}
+// NOTE: the OKF catalog's curated notes (when-to-use / when-NOT-to-use) are
+// deliberately NOT folded into this ranking index. Measurement showed adding
+// them regressed top-1 12/12 -> 10/12: the form pipeline was already optimal,
+// and "when NOT to use" text names sibling forms, which a keyword/vector
+// matcher reads as plain tokens (it can't see the negation) and so matches
+// THIS form to the sibling's queries more. Catalog notes are consumed at
+// answer time instead — see src/lib/catalog/notes.ts, used by the
+// search_forms tool's modelHint and the getDirectFormAnswer bypass.
 
 export interface FormSearchCandidate {
   form: SpokesForm;
@@ -106,9 +90,7 @@ function expand(tokens: string[]): Set<string> {
 
 function embeddingTextFor(form: SpokesForm): string {
   const categoryLabel = FORM_CATEGORIES[form.category]?.label ?? form.category;
-  const base = `${form.title}. ${form.description}. Category: ${categoryLabel}.`;
-  const entry = getOverlay()?.entries[form.id];
-  return entry?.whenToUse ? `${base} ${entry.whenToUse}` : base;
+  return `${form.title}. ${form.description}. Category: ${categoryLabel}.`;
 }
 
 /**
@@ -124,13 +106,8 @@ export function keywordScore(query: string, form: SpokesForm): number {
   const categoryLabel = FORM_CATEGORIES[form.category]?.label ?? form.category;
   const titleTokens = new Set(tokenize(form.title));
 
-  // Fold overlay whenToUse + tags into the body token set when present.
-  const overlayEntry = getOverlay()?.entries[form.id];
-  const overlayText = overlayEntry
-    ? `${overlayEntry.whenToUse} ${overlayEntry.tags.join(" ")}`
-    : "";
   const bodyTokens = new Set(
-    tokenize(`${form.title} ${form.description} ${categoryLabel} ${form.fileName} ${overlayText}`),
+    tokenize(`${form.title} ${form.description} ${categoryLabel} ${form.fileName}`),
   );
 
   let overlap = 0;
@@ -237,9 +214,8 @@ export async function searchForms(params: {
   return { candidates: ranked, method };
 }
 
-/** Test seam: reset the in-process embedding cache and overlay cache. */
+/** Test seam: reset the in-process embedding cache. */
 export function __resetFormEmbeddingCache(): void {
   formEmbeddingCache = null;
   formEmbeddingInit = null;
-  overlayCache = undefined;
 }

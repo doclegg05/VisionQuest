@@ -6,23 +6,30 @@ export interface DocUpdate {
   newNote: string;
 }
 
+// whenToUse-only: this note feeds BOTH the doc embedding (DB-side semantic
+// index) and the prompt summary Sage sees for a retrieved doc. Negation
+// (whenNotToUse) must never enter an embedding — a keyword/vector matcher
+// reads "NOT the sign-in sheet" as the literal tokens "sign-in sheet", which
+// pollutes this doc with its sibling's queries (measured regression).
 export function buildDocNote(node: CatalogNode): string {
-  const parts = [node.frontmatter.description, node.sections.whenToUse, node.sections.whenNotToUse]
+  const parts = [node.frontmatter.description, node.sections.whenToUse]
     .map((s) => (s ?? "").trim())
     .filter(Boolean);
   return parts.join(" ");
 }
 
+// Answer-time only — NEVER fed into form-search.ts's retrieval index (see the
+// header comment there for why). Both directions are included because Sage
+// reads this at answer time to disambiguate already-retrieved candidates;
+// negation is exactly the useful signal here, just not in an index.
 export function buildFormRoutingOverlay(approvedNodes: CatalogNode[]): FormRoutingOverlay {
   const entries: Record<string, FormRoutingEntry> = {};
   for (const node of approvedNodes) {
     if (node.frontmatter.type !== "form" || node.frontmatter.vq_status !== "approved") continue;
     entries[node.frontmatter.vq_id] = {
       formId: node.frontmatter.vq_id,
-      whenToUse: [node.sections.whenToUse, node.sections.whenNotToUse]
-        .map((s) => (s ?? "").trim())
-        .filter(Boolean)
-        .join(" "),
+      whenToUse: (node.sections.whenToUse ?? "").trim(),
+      whenNotToUse: (node.sections.whenNotToUse ?? "").trim(),
       tags: node.frontmatter.tags ?? [],
     };
   }

@@ -19,6 +19,12 @@ async function main() {
   const overlay = buildFormRoutingOverlay(formNodes);
   console.log(`FORM OVERLAY: ${Object.keys(overlay.entries).length} entries`);
 
+  if (process.argv.includes("--overlay-only")) {
+    writeFileSync("config/form-routing.generated.json", JSON.stringify(overlay, null, 2) + "\n");
+    console.log("Overlay written (--overlay-only); NO DB changes.");
+    return;
+  }
+
   const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient();
   const keys = [...new Set(allNodes.map((n) => n.frontmatter.vq_storage_key).filter(Boolean))];

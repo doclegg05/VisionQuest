@@ -13,11 +13,12 @@ function n(over = {}, sections = {}) {
 }
 
 describe("buildFormRoutingOverlay", () => {
-  it("keys approved form entries by formId with note+tags", () => {
+  it("keys approved form entries by formId with note+tags, including when-NOT (answer-time only — never fed into the retrieval index)", () => {
     const o = buildFormRoutingOverlay([n({ vq_id:"attendance-contract", tags:["attendance"] })]);
     assert.equal(o.version, 1);
     assert.equal(o.entries["attendance-contract"].tags[0], "attendance");
     assert.match(o.entries["attendance-contract"].whenToUse, /weekly/);
+    assert.match(o.entries["attendance-contract"].whenNotToUse, /Not for X/);
   });
   it("ignores non-form or non-approved nodes", () => {
     const o = buildFormRoutingOverlay([n({ type:"program_document" }), n({ vq_status:"draft" })]);
@@ -26,9 +27,11 @@ describe("buildFormRoutingOverlay", () => {
 });
 
 describe("buildDocNote", () => {
-  it("combines description + when-to-use + when-not", () => {
+  it("combines description + when-to-use, excluding when-NOT (this note feeds the doc embedding — negation would pollute it)", () => {
     const note = buildDocNote(n({ description:"RTW." }));
-    assert.match(note, /RTW\./); assert.match(note, /Use it weekly/); assert.match(note, /Not for X/);
+    assert.match(note, /RTW\./);
+    assert.match(note, /Use it weekly/);
+    assert.doesNotMatch(note, /Not for X/);
   });
 });
 
