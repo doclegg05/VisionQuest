@@ -1,7 +1,9 @@
 ---
 type: form
 title: DFA-WVW-25 Support Services
-description: The WV Works form a student submits to request support services such as transportation, childcare, or work-related supplies.
+description: >-
+  The WV Works form a student submits to request support services such as
+  transportation, childcare, or work-related supplies.
 resource: /api/forms/download?formId=dfa-wvw-25&mode=view
 tags:
   - support-services

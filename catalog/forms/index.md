@@ -9,7 +9,6 @@
 - [dress-code](./dress-code.md)
 - [media-release](./media-release.md)
 - [non-discrimination](./non-discrimination.md)
-- [orientation-guide](./orientation-guide.md)
 - [portfolio-checklist-tracking](./portfolio-checklist-tracking.md)
 - [portfolio-checklist](./portfolio-checklist.md)
 - [rights-responsibilities](./rights-responsibilities.md)

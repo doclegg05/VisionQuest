@@ -1,7 +1,9 @@
 ---
 type: form
 title: Student Sign-in Sheet
-description: The daily sign-in roster — the instructor's official proof of attendance and the source used to calculate and report each student's hours.
+description: >-
+  The daily sign-in roster — the instructor's official proof of attendance and
+  the source used to calculate and report each student's hours.
 resource: /api/forms/download?formId=sign-in-sheet&mode=view
 tags:
   - attendance
@@ -14,7 +16,7 @@ timestamp: '2026-06-30'
 vq_id: sign-in-sheet
 vq_audience: BOTH
 vq_category: compliance
-vq_storage_key: "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+vq_storage_key: teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf
 vq_status: draft
 ---
 ## When to use

@@ -1,7 +1,9 @@
 ---
 type: program_document
 title: Aztec PLUS Student Support Guide Version 9.0 1
-description: The comprehensive student guide for using the Aztec PLUS learning platform — covers navigation, lessons, tests, and how to get help within the system.
+description: >-
+  The comprehensive student guide for using the Aztec PLUS learning platform —
+  covers navigation, lessons, tests, and how to get help within the system.
 resource: lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf
 tags:
   - aztec

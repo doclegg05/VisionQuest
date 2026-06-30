@@ -1,7 +1,9 @@
 ---
 type: form
 title: Dress Code Policy
-description: The policy form that outlines the professional appearance standards students are expected to meet in the classroom and when representing the program.
+description: >-
+  The policy form that outlines the professional appearance standards students
+  are expected to meet in the classroom and when representing the program.
 resource: /api/forms/download?formId=dress-code&mode=view
 tags:
   - dress-code

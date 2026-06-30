@@ -1,7 +1,9 @@
 ---
 type: form
 title: Employment Portfolio Checklist
-description: Master checklist for building your employment portfolio with resume, certifications, and work samples
+description: >-
+  Master checklist for building your employment portfolio with resume,
+  certifications, and work samples
 resource: /api/forms/download?formId=portfolio-checklist-tracking&mode=view
 tags:
   - portfolio

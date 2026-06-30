@@ -1,7 +1,9 @@
 ---
 type: form
 title: DFA-TS-12 Activity Tracking
-description: The monthly WV Works activity and time sheet where a student's total hours for the month are compiled and submitted to the state.
+description: >-
+  The monthly WV Works activity and time sheet where a student's total hours for
+  the month are compiled and submitted to the state.
 resource: /api/forms/download?formId=dfa-ts-12&mode=view
 tags:
   - timesheet

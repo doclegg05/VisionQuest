@@ -1,7 +1,9 @@
 ---
 type: form
 title: DFA-WVW-70 Participant Form
-description: The WV Works form that documents and verifies that a student is actively participating in the program — separate from hours tracking.
+description: >-
+  The WV Works form that documents and verifies that a student is actively
+  participating in the program — separate from hours tracking.
 resource: /api/forms/download?formId=dfa-wvw-70&mode=view
 tags:
   - participation

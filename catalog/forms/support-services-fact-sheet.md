@@ -1,7 +1,10 @@
 ---
 type: form
 title: Support Services Fact Sheet
-description: An informational handout that explains the transportation, childcare, work supplies, and other support services available to WV Works participants — and how to access them.
+description: >-
+  An informational handout that explains the transportation, childcare, work
+  supplies, and other support services available to WV Works participants — and
+  how to access them.
 resource: /api/forms/download?formId=support-services-fact-sheet&mode=view
 tags:
   - support-services

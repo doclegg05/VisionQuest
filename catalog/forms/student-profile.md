@@ -1,7 +1,9 @@
 ---
 type: form
 title: SPOKES Student Profile
-description: The intake form that captures a new student's personal information, background, and contact details at the start of their enrollment.
+description: >-
+  The intake form that captures a new student's personal information,
+  background, and contact details at the start of their enrollment.
 resource: /api/forms/download?formId=student-profile&mode=view
 tags:
   - intake
@@ -21,7 +23,7 @@ During orientation, when a new student is enrolling and the program needs to col
 
 ## When NOT to use
 - NOT for recording rights or program expectations — that is the [Rights and Responsibilities](./rights-responsibilities.md) form.
-- NOT a general orientation checklist — see the [SPOKES Orientation Checklist](./orientation-guide.md) for the full intake sequence.
+- NOT a general orientation checklist — see the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md) for the full intake sequence.
 
 ## Related
-Collected at the same orientation session as [Rights and Responsibilities](./rights-responsibilities.md), [Personal Attendance Contract](./attendance-contract.md), and other onboarding forms tracked on the [SPOKES Orientation Checklist](./orientation-guide.md).
+Collected at the same orientation session as [Rights and Responsibilities](./rights-responsibilities.md), [Personal Attendance Contract](./attendance-contract.md), and other onboarding forms tracked on the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md).

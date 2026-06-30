@@ -1,7 +1,9 @@
 ---
 type: form
 title: Rights and Responsibilities
-description: The orientation form that explains what rights students have in the SPOKES program and what the program expects from them in return.
+description: >-
+  The orientation form that explains what rights students have in the SPOKES
+  program and what the program expects from them in return.
 resource: /api/forms/download?formId=rights-responsibilities&mode=view
 tags:
   - rights
@@ -24,4 +26,4 @@ During orientation, when a new student needs to read and acknowledge their right
 - NOT for the attendance commitment specifically — that is the [Personal Attendance Contract](./attendance-contract.md).
 
 ## Related
-Completed during the same orientation session as the [SPOKES Student Profile](./student-profile.md), [Personal Attendance Contract](./attendance-contract.md), and other forms tracked on the [SPOKES Orientation Checklist](./orientation-guide.md).
+Completed during the same orientation session as the [SPOKES Student Profile](./student-profile.md), [Personal Attendance Contract](./attendance-contract.md), and other forms tracked on the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md).

@@ -1,7 +1,10 @@
 ---
 type: platform
 title: Aztec PLUS
-description: Aztec PLUS is the online learning management system (LMS) used in the SPOKES program for self-paced academic instruction in reading, math, writing, and career readiness skills.
+description: >-
+  Aztec PLUS is the online learning management system (LMS) used in the SPOKES
+  program for self-paced academic instruction in reading, math, writing, and
+  career readiness skills.
 resource: ''
 tags:
   - aztec

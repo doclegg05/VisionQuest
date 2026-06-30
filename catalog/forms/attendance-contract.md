@@ -1,7 +1,9 @@
 ---
 type: form
 title: Personal Attendance Contract
-description: The orientation agreement where a student commits to attending class on a regular schedule sufficient to meet their required weekly/monthly hours.
+description: >-
+  The orientation agreement where a student commits to attending class on a
+  regular schedule sufficient to meet their required weekly/monthly hours.
 resource: /api/forms/download?formId=attendance-contract&mode=view
 tags:
   - attendance

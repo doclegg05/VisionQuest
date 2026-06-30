@@ -1,7 +1,9 @@
 ---
 type: form
 title: Media Release Form
-description: A consent form where a student gives the program permission to use their photo or video in promotional or program materials.
+description: >-
+  A consent form where a student gives the program permission to use their photo
+  or video in promotional or program materials.
 resource: /api/forms/download?formId=media-release&mode=view
 tags:
   - media

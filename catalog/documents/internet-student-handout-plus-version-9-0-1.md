@@ -1,7 +1,10 @@
 ---
 type: program_document
 title: Internet Student Handout PLUS Version 9.0 1
-description: A quick-reference handout for students on how to access the internet and log in to the Aztec PLUS learning platform, including browser setup and account credentials.
+description: >-
+  A quick-reference handout for students on how to access the internet and log
+  in to the Aztec PLUS learning platform, including browser setup and account
+  credentials.
 resource: lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf
 tags:
   - aztec

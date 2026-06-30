@@ -1,7 +1,10 @@
 ---
 type: program_document
 title: SPOKES Checklist for Student Orientation
-description: The master onboarding checklist that lists every step, form, and topic an instructor must complete with a new student during orientation before they begin class.
+description: >-
+  The master onboarding checklist that lists every step, form, and topic an
+  instructor must complete with a new student during orientation before they
+  begin class.
 resource: orientation/SPOKES Checklist for Student Orientation.pdf
 tags:
   - orientation

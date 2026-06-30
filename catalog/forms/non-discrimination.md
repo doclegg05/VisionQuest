@@ -1,7 +1,11 @@
 ---
 type: form
 title: Non-Discrimination Notice
-description: The federal equal-opportunity notice that informs students of their right to participate in the program free from discrimination on the basis of race, color, national origin, sex, disability, age, or other protected characteristics.
+description: >-
+  The federal equal-opportunity notice that informs students of their right to
+  participate in the program free from discrimination on the basis of race,
+  color, national origin, sex, disability, age, or other protected
+  characteristics.
 resource: /api/forms/download?formId=non-discrimination&mode=view
 tags:
   - non-discrimination

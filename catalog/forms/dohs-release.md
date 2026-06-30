@@ -1,7 +1,9 @@
 ---
 type: form
 title: DoHS Release of Information
-description: A release-of-information consent scoped specifically to the WV Department of Health Services (DoHS).
+description: >-
+  A release-of-information consent scoped specifically to the WV Department of
+  Health Services (DoHS).
 resource: /api/forms/download?formId=dohs-release&mode=view
 tags:
   - release

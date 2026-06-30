@@ -1,7 +1,9 @@
 ---
 type: form
 title: Ready to Work Attendance Verification
-description: The official form that verifies a student's attendance record for the purpose of earning the Ready to Work certificate.
+description: >-
+  The official form that verifies a student's attendance record for the purpose
+  of earning the Ready to Work certificate.
 resource: /api/forms/download?formId=rtw-attendance&mode=view
 tags:
   - attendance

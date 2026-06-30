@@ -1,7 +1,9 @@
 ---
 type: form
 title: Technology Acceptable Use Policy
-description: The policy agreement students sign to acknowledge the rules for using program computers, internet access, and other technology resources.
+description: >-
+  The policy agreement students sign to acknowledge the rules for using program
+  computers, internet access, and other technology resources.
 resource: /api/forms/download?formId=tech-acceptable-use&mode=view
 tags:
   - technology
