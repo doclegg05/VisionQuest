@@ -3,7 +3,7 @@ import type { CatalogFrontmatter, CatalogNode, CatalogNodeSections } from "./sch
 
 export function extractSections(body: string): CatalogNodeSections {
   const get = (heading: string): string => {
-    const re = new RegExp(`(?:^|\\n)##\\s+${heading}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "i");
+    const re = new RegExp(`(?:^|\\n)##\\s+${heading}\\s*\\n([\\s\\S]*?)(?=\\n*##\\s|$)`, "i");
     const m = body.match(re);
     return m ? m[1].trim() : "";
   };
