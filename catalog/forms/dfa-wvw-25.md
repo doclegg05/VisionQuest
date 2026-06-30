@@ -17,7 +17,7 @@ vq_id: dfa-wvw-25
 vq_audience: BOTH
 vq_category: dohs
 vq_storage_key: forms/DFA-WVW-25_Rev_6-24.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student needs to submit a formal request for WV Works support services — for example, to get reimbursed for transportation costs or to request childcare assistance.

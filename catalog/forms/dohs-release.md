@@ -16,7 +16,7 @@ vq_id: dohs-release
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student authorizes sharing their information specifically with the WV Department of Health Services (DoHS).

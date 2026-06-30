@@ -16,7 +16,7 @@ vq_id: welcome-letter
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: forms/New Student Welcome Letter.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 At the very start of orientation, when a new student is first joining the program and needs an encouraging introduction to what SPOKES is and what they can expect.

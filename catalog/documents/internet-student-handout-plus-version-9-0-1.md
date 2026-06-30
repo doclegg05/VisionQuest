@@ -19,7 +19,7 @@ vq_audience: BOTH
 vq_category: LMS_PLATFORM_GUIDE
 vq_platform: aztec
 vq_storage_key: lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student is setting up internet access or logging in to Aztec PLUS for the first time — covers browser requirements, the login URL, and initial account setup.

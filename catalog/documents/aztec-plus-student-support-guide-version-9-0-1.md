@@ -18,7 +18,7 @@ vq_audience: BOTH
 vq_category: LMS_PLATFORM_GUIDE
 vq_platform: aztec
 vq_storage_key: lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student (or instructor supporting a student) needs help using the Aztec PLUS platform — finding lessons, taking tests, tracking progress, or troubleshooting the system.

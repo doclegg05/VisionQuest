@@ -16,7 +16,7 @@ vq_id: dfa-wvw-70
 vq_audience: BOTH
 vq_category: dohs
 vq_storage_key: forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When documentation is needed to confirm that a student is actively participating in the WV Works program — for example, when the state or a caseworker requires participation verification.

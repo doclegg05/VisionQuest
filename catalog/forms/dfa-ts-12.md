@@ -17,7 +17,7 @@ vq_id: dfa-ts-12
 vq_audience: BOTH
 vq_category: dohs
 vq_storage_key: forms/DFA-TS-12_Rev_-2-24_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 At the end of each month, to compile and submit a WV Works student's total activity hours to DoHS. The daily hours that feed this sheet come from the [Student Sign-in Sheet](./sign-in-sheet.md).

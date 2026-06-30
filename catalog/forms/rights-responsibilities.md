@@ -16,7 +16,7 @@ vq_id: rights-responsibilities
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation, when a new student needs to read and acknowledge their rights within the program and understand what is expected of them.

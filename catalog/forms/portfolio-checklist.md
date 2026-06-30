@@ -14,7 +14,7 @@ vq_id: portfolio-checklist
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation, when a student needs to understand what is required to complete their employment portfolio — the full list of what they will need to collect and build.

@@ -18,7 +18,7 @@ vq_category: onboarding
 vq_storage_key: >-
   teachers/guides/Hanbook Appendix/Section 4/Fillable Intake
   Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student authorizes sharing their information with an approved outside agency or person (for example, an employer or a partner organization).

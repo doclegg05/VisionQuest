@@ -17,7 +17,7 @@ timestamp: '2026-06-30'
 vq_id: aztec
 vq_audience: BOTH
 vq_category: platform
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student needs a self-paced academic learning environment for subjects such as reading, math, or career readiness — Aztec PLUS is the platform the program uses for this instruction.

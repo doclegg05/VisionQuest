@@ -17,7 +17,7 @@ vq_id: tech-acceptable-use
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation, when a student needs to read and sign the rules for appropriate use of program computers and internet access before they begin using technology resources.

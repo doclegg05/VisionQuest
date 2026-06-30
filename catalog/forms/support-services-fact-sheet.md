@@ -18,7 +18,7 @@ vq_id: support-services-fact-sheet
 vq_audience: BOTH
 vq_category: dohs
 vq_storage_key: forms/Support_Services_Fact_Sheet_Rev_6-22.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When a student or instructor needs to understand what WV Works support services are available (transportation, childcare, work-related costs, etc.) before submitting a request.

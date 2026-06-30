@@ -17,7 +17,7 @@ vq_id: sign-in-sheet
 vq_audience: BOTH
 vq_category: compliance
 vq_storage_key: teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 Every class day, to record who attended. This is the record an instructor uses to total each student's hours for the monthly timesheet.

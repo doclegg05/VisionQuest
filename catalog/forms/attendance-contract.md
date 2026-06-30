@@ -16,7 +16,7 @@ vq_id: attendance-contract
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation, when a new student commits to a regular attendance schedule that meets their required weekly/monthly hours.

@@ -18,7 +18,7 @@ vq_id: spokes-checklist-for-student-orientation
 vq_audience: STUDENT
 vq_category: ORIENTATION
 vq_storage_key: orientation/SPOKES Checklist for Student Orientation.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 When preparing for or conducting a new student's orientation — this is the master reference that ensures every required form, policy acknowledgment, and program introduction is covered.

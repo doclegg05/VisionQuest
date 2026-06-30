@@ -16,7 +16,7 @@ vq_id: dress-code
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation, when a student needs to review and acknowledge the professional dress expectations for the classroom and any work-site visits.

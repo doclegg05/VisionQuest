@@ -20,7 +20,7 @@ vq_category: onboarding
 vq_storage_key: >-
   teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination
   Notice.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation, when a student must be given the required federal notice of their equal-opportunity rights in the program.

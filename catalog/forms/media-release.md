@@ -17,7 +17,7 @@ vq_id: media-release
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: orientation/Media_Release_Form_FY26_Fillable.pdf
-vq_status: draft
+vq_status: approved
 ---
 ## When to use
 During orientation (or whenever needed), when a student is asked whether they consent to having their photo or video used by the program in materials such as newsletters, social media, or grant reports.
