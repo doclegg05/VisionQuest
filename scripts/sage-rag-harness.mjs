@@ -165,7 +165,7 @@ async function main() {
     const hasContext = context.trim().length > 0;
     const forbiddenSet = new Set(asArray(item.forbiddenStorageKeys));
     const audienceLeak = matchedDocuments.filter((doc) => doc.storageKey && forbiddenSet.has(doc.storageKey)).length;
-    const noAnswerOk = item.expectNoContext ? !hasContext : null;
+    const noAnswerOk = item.expectNoContext ? (matchedDocuments.length === 0) : null;
     const matchedExpectedTerm = includesAny(contextLower, item.expectedTerms || []);
     const legacyPassed = hasContext && matchedExpectedTerm;
     const relevancePassed = hasExpectations ? top3Expected : null;
