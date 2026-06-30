@@ -13,6 +13,7 @@
 import { prisma } from "@/lib/db";
 import { FORMS, FORM_CATEGORIES, buildFormDownloadUrl } from "@/lib/spokes/forms";
 import { searchForms } from "@/lib/spokes/form-search";
+import { getFormCatalogNote } from "@/lib/catalog/notes";
 import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
 import { logger } from "@/lib/logger";
 import { hasActiveConsent } from "@/lib/consent";
@@ -42,6 +43,38 @@ function scoreMatch(query: string, candidate: string): number {
   if (q.length === 0 || c.length === 0) return 0;
   const cSet = new Set(c);
   return q.reduce((acc, token) => acc + (cSet.has(token) ? 1 : 0), 0) / q.length;
+}
+
+/** Catalog `whenNotToUse` text links siblings as `[Title](./form-id.md)`. */
+function referencedFormIds(whenNotToUse: string): string[] {
+  const ids: string[] = [];
+  const pattern = /\(\.\/([a-z0-9-]+)\.md\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(whenNotToUse)) !== null) ids.push(match[1]);
+  return ids;
+}
+
+/**
+ * Disambiguation text for the model to reason with — built ONLY from
+ * collisions actually present in this result set (a candidate's catalog note
+ * names a sibling that's ALSO a returned candidate), not generic catalog
+ * noise on every call. This targets the measured failure mode: ranking
+ * returns the right form in the top-3, but a confusable sibling rides along
+ * and the model has no signal to rule it out beyond raw score order.
+ */
+function buildDisambiguationNotes(candidateIds: string[]): string {
+  const idSet = new Set(candidateIds);
+  const lines: string[] = [];
+  const covered = new Set<string>();
+  for (const id of candidateIds) {
+    const note = getFormCatalogNote(id);
+    if (!note?.whenNotToUse) continue;
+    const collides = referencedFormIds(note.whenNotToUse).some((ref) => idSet.has(ref) && ref !== id);
+    if (!collides || covered.has(id)) continue;
+    covered.add(id);
+    lines.push(`- "${id}": use when ${note.whenToUse} ${note.whenNotToUse}`.trim());
+  }
+  return lines.join("\n");
 }
 
 // -----------------------------------------------------------------------------
@@ -195,6 +228,7 @@ const searchFormsTool: AgentTool = {
 
     const top = enriched[0];
     const unavailable = enriched.filter((c) => !c.available).map((c) => c.title);
+    const disambiguation = buildDisambiguationNotes(enriched.map((c) => c.id));
 
     return {
       status: "success",
@@ -213,7 +247,10 @@ const searchFormsTool: AgentTool = {
         (unavailable.length
           ? `These have no digital PDF yet, so no link was shown — mention the instructor can provide a paper copy: ${unavailable.join(", ")}. `
           : "") +
-        `One verify button per available form is already shown; don't repeat the raw links in your text.`,
+        `One verify button per available form is already shown; don't repeat the raw links in your text.` +
+        (disambiguation
+          ? ` Some of these candidates are easy to mix up — use these curated notes to pick the right one, not just rank order:\n${disambiguation}`
+          : ""),
     };
   },
 };

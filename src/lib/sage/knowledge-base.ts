@@ -33,6 +33,7 @@ import {
   hasDownloadableFormDocument,
   type SpokesForm,
 } from "@/lib/spokes/forms";
+import { isKnownAmbiguousForm } from "@/lib/catalog/notes";
 
 export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
 You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
@@ -585,6 +586,29 @@ function scoreForm(form: SpokesForm, messageLower: string): number {
   return score;
 }
 
+/**
+ * True when the student named this form directly (its id phrase or title
+ * appears literally in the message) — the same high-confidence signal
+ * scoreForm() already weights heavily. Used to distinguish "the student said
+ * the form's name" (keep the fast direct answer) from "the scorer landed on
+ * this form via loose keyword overlap" (no such guarantee — see the
+ * known-ambiguous bypass in getDirectFormAnswer below).
+ */
+function isLiteralFormNameMatch(form: SpokesForm, messageLower: string): boolean {
+  const idPhrase = form.id.replace(/-/g, " ").toLowerCase();
+  const titleLower = form.title.toLowerCase();
+  const compactMessage = messageLower.replace(/[^a-z0-9]/g, "");
+  const compactId = form.id.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const compactTitle = titleLower.replace(/[^a-z0-9]/g, "");
+
+  return (
+    messageLower.includes(idPhrase) ||
+    messageLower.includes(titleLower) ||
+    (Boolean(compactId) && compactMessage.includes(compactId)) ||
+    (Boolean(compactTitle) && compactMessage.includes(compactTitle))
+  );
+}
+
 export function findRelevantForms(
   userMessage: string,
   maxResults: number = 3,
@@ -620,11 +644,47 @@ export function getFormContext(userMessage: string): string {
   return `\n\nFORM LINKS (provide these exact URLs when relevant; do not make up form links):\n${lines.join("\n")}`;
 }
 
+/**
+ * Whether a message reads as a form request — the same gate getDirectFormAnswer
+ * checks first. Exported so eval tooling can tell a bypass caused by the new
+ * ambiguity logic apart from one caused by this pre-existing intent gate.
+ */
+export function messageHasFormIntent(userMessage: string): boolean {
+  return FORM_INTENT_WORDS.test(userMessage);
+}
+
 export function getDirectFormAnswer(userMessage: string): string | null {
   if (!FORM_INTENT_WORDS.test(userMessage)) return null;
 
   const matches = findRelevantForms(userMessage);
   if (matches.length === 0) return null;
+
+  // This is a deterministic, no-model shortcut — there's no LLM in the loop
+  // to course-correct a wrong pick. findRelevantForms() uses a simpler scorer
+  // than search_forms's hybrid ranker and, measured against the same
+  // fixture, confidently returns a confusable SIBLING as the only match for
+  // some queries (e.g. "what form do I sign to promise I'll attend" ->
+  // Sign-in Sheet, not Attendance Contract). But when the student names the
+  // form directly ("attendance contract PDF"), the literal-name match is
+  // high-confidence even if the form has known siblings — don't bypass that.
+  //
+  // A literal match only confers confidence when it identifies ONE form,
+  // though: portfolio-checklist and portfolio-checklist-tracking share an
+  // identical title, so a literal title hit matches BOTH and can't tell the
+  // sibling the student wants from the one they don't. Treat the literal
+  // signal as non-disambiguating when another returned candidate also matches
+  // the message literally. Bypass to the agent path (search_forms's hybrid
+  // ranking + catalog-note-enriched modelHint, which has a model to reason
+  // with the notes) whenever the top match isn't a UNIQUE literal hit AND a
+  // catalog-flagged sibling is in the results.
+  const lower = userMessage.toLowerCase();
+  const top = matches[0];
+  const topUniquelyLiteral =
+    isLiteralFormNameMatch(top.form, lower) &&
+    !matches.some((m) => m.form.id !== top.form.id && isLiteralFormNameMatch(m.form, lower));
+  if (!topUniquelyLiteral && matches.some(({ form }) => isKnownAmbiguousForm(form.id))) {
+    return null;
+  }
 
   const lines = matches.map(
     ({ form, url }) => `- [${form.title}](${url})${formatFormTags(form)}`,
