@@ -58,6 +58,7 @@
     "eslint-config-next": "16.2.4",
     "framer-motion": "^12.38.0",
     "google-auth-library": "^10.6.2",
+    "gray-matter": "^4.0.3",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "mammoth": "^1.12.0",
