@@ -16,10 +16,35 @@
 // only. The 29-form catalog is embedded once per process and cached.
 // =============================================================================
 
+import { readFileSync, existsSync } from "node:fs";
 import { FORMS, FORM_CATEGORIES, canViewForm, hasDownloadableFormDocument } from "@/lib/spokes/forms";
 import type { SpokesForm } from "@/lib/spokes/forms";
 import { embedQuery, embedTexts } from "@/lib/ai/embeddings";
 import { logger } from "@/lib/logger";
+import type { FormRoutingOverlay } from "@/lib/catalog/schema";
+
+// ---- Catalog routing overlay (optional, additive) ---------------------------
+// Produced by `catalog:sync --apply`. Absent until that command runs; all
+// behavior must be identical to today when the file does not exist.
+
+let overlayCache: FormRoutingOverlay | null | undefined;
+
+function getOverlay(): FormRoutingOverlay | null {
+  if (overlayCache !== undefined) return overlayCache;
+  try {
+    overlayCache = existsSync("config/form-routing.generated.json")
+      ? (JSON.parse(readFileSync("config/form-routing.generated.json", "utf8")) as FormRoutingOverlay)
+      : null;
+  } catch {
+    overlayCache = null;
+  }
+  return overlayCache;
+}
+
+/** Test seam: inject or clear the routing overlay without touching the filesystem. */
+export function __setFormRoutingOverlayForTest(o: FormRoutingOverlay | null): void {
+  overlayCache = o;
+}
 
 export interface FormSearchCandidate {
   form: SpokesForm;
@@ -81,7 +106,9 @@ function expand(tokens: string[]): Set<string> {
 
 function embeddingTextFor(form: SpokesForm): string {
   const categoryLabel = FORM_CATEGORIES[form.category]?.label ?? form.category;
-  return `${form.title}. ${form.description}. Category: ${categoryLabel}.`;
+  const base = `${form.title}. ${form.description}. Category: ${categoryLabel}.`;
+  const entry = getOverlay()?.entries[form.id];
+  return entry?.whenToUse ? `${base} ${entry.whenToUse}` : base;
 }
 
 /**
@@ -96,8 +123,14 @@ export function keywordScore(query: string, form: SpokesForm): number {
 
   const categoryLabel = FORM_CATEGORIES[form.category]?.label ?? form.category;
   const titleTokens = new Set(tokenize(form.title));
+
+  // Fold overlay whenToUse + tags into the body token set when present.
+  const overlayEntry = getOverlay()?.entries[form.id];
+  const overlayText = overlayEntry
+    ? `${overlayEntry.whenToUse} ${overlayEntry.tags.join(" ")}`
+    : "";
   const bodyTokens = new Set(
-    tokenize(`${form.title} ${form.description} ${categoryLabel} ${form.fileName}`),
+    tokenize(`${form.title} ${form.description} ${categoryLabel} ${form.fileName} ${overlayText}`),
   );
 
   let overlap = 0;
@@ -204,8 +237,9 @@ export async function searchForms(params: {
   return { candidates: ranked, method };
 }
 
-/** Test seam: reset the in-process embedding cache. */
+/** Test seam: reset the in-process embedding cache and overlay cache. */
 export function __resetFormEmbeddingCache(): void {
   formEmbeddingCache = null;
   formEmbeddingInit = null;
+  overlayCache = undefined;
 }

@@ -8,10 +8,11 @@ delete process.env.GEMINI_API_KEY;
 let searchForms: typeof import("./form-search").searchForms;
 let keywordScore: typeof import("./form-search").keywordScore;
 let resetCache: typeof import("./form-search").__resetFormEmbeddingCache;
+let setOverlay: typeof import("./form-search").__setFormRoutingOverlayForTest;
 let getFormById: typeof import("./forms").getFormById;
 
 before(async () => {
-  ({ searchForms, keywordScore, __resetFormEmbeddingCache: resetCache } = await import("./form-search"));
+  ({ searchForms, keywordScore, __resetFormEmbeddingCache: resetCache, __setFormRoutingOverlayForTest: setOverlay } = await import("./form-search"));
   ({ getFormById } = await import("./forms"));
   resetCache();
 });
@@ -65,5 +66,25 @@ describe("searchForms — keyword fallback", () => {
     const top = result.candidates[0];
     assert.ok(typeof top.available === "boolean");
     assert.ok(top.form.id.length > 0);
+  });
+});
+
+describe("overlay-aware keyword ranking", () => {
+  it("boosts a form whose overlay note matches the query", async () => {
+    resetCache();
+    setOverlay({
+      version: 1,
+      entries: {
+        "dress-code": {
+          formId: "dress-code",
+          whenToUse: "what to wear clothing attire appearance",
+          tags: ["attire"],
+        },
+      },
+    });
+    const result = await searchForms({ query: "what should i wear", role: "student" });
+    assert.ok(result.candidates.length > 0, "expected at least one candidate");
+    assert.equal(result.candidates[0].form.id, "dress-code");
+    setOverlay(null);
   });
 });
