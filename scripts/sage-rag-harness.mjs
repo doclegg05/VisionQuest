@@ -163,6 +163,9 @@ async function main() {
     const cleanTop3 = hasExpectations ? unexpectedTop3.length === 0 : null;
 
     const hasContext = context.trim().length > 0;
+    const forbiddenSet = new Set(asArray(item.forbiddenStorageKeys));
+    const audienceLeak = matchedDocuments.filter((doc) => doc.storageKey && forbiddenSet.has(doc.storageKey)).length;
+    const noAnswerOk = item.expectNoContext ? !hasContext : null;
     const matchedExpectedTerm = includesAny(contextLower, item.expectedTerms || []);
     const legacyPassed = hasContext && matchedExpectedTerm;
     const relevancePassed = hasExpectations ? top3Expected : null;
@@ -189,6 +192,8 @@ async function main() {
       expectedTerms: item.expectedTerms || [],
       expectedStorageKeys,
       acceptableStorageKeys,
+      audienceLeak,
+      noAnswerOk,
     });
   }
 
@@ -203,6 +208,9 @@ async function main() {
     (sum, result) => sum + result.unexpectedTop3.length,
     0,
   );
+  const audienceLeakage = results.reduce((sum, r) => sum + (r.audienceLeak ?? 0), 0);
+  const noAnswerCases = results.filter((r) => r.noAnswerOk !== null);
+  const noAnswerPassed = noAnswerCases.filter((r) => r.noAnswerOk).length;
 
   // Latency percentiles over sequential per-question wall-clock. The first
   // question pays cold-start costs (module load, DB connect, embedding HTTP
@@ -234,6 +242,9 @@ async function main() {
     top3Expected,
     cleanTop3,
     unexpectedTop3Docs,
+    audienceLeakage,
+    noAnswerPassed,
+    noAnswerTotal: noAnswerCases.length,
     latency: latencySummary,
     missingExpectationKeys,
     results,

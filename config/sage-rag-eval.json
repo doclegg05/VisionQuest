@@ -1,0 +1,201 @@
+[
+  {
+    "id": "close-confusion-ts12-fillable-vs-nonfillable",
+    "question": "Which DFA-TS-12 form do I need to fill out and sign?",
+    "expectedStorageKeys": ["forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+      "forms/DFA-TS-12_Rev_-2-24.pdf"
+    ],
+    "expectedTerms": ["ts-12", "fillable"]
+  },
+  {
+    "id": "close-confusion-wvw70-vs-wvw25",
+    "question": "I need to document my WV Works participation verification, which form is that?",
+    "expectedStorageKeys": ["forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf"],
+    "acceptableStorageKeys": [
+      "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+      "forms/DFA-WVW-25_Rev_6-24.pdf"
+    ],
+    "expectedTerms": ["wvw-70", "wvw 70", "participant"]
+  },
+  {
+    "id": "close-confusion-rights-vs-dress-code",
+    "question": "What document explains the rules I agreed to in the SPOKES program?",
+    "expectedStorageKeys": [
+      "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+      "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ],
+    "expectedTerms": ["rights", "responsibilities"]
+  },
+  {
+    "id": "close-confusion-attendance-vs-profile",
+    "question": "Where is the form I signed about showing up to class every day?",
+    "expectedStorageKeys": [
+      "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+      "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
+    ],
+    "expectedTerms": ["attendance"]
+  },
+  {
+    "id": "close-confusion-prc1-vs-ssp1",
+    "question": "I completed the WV Works program — what's the form that records my milestones?",
+    "expectedStorageKeys": ["forms/DFA-PRC-1_Rev-1-24.pdf"],
+    "acceptableStorageKeys": [
+      "forms/DFA-PRC-1_Rev-1-24.pdf",
+      "forms/DFA_-_SSP-1_1-9-24.pdf"
+    ],
+    "expectedTerms": ["prc", "completion"]
+  },
+  {
+    "id": "close-confusion-student-aztec-vs-teacher-aztec",
+    "question": "How do I log in and use Aztec to study on my own?",
+    "expectedStorageKeys": [
+      "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+      "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+      "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf"
+    ],
+    "forbiddenStorageKeys": [
+      "lms/Aztec/MSESC_-_PLUS_Quick_Start_Teacher_Guide_-_Version_9.0.pdf"
+    ],
+    "expectedTerms": ["aztec"]
+  },
+  {
+    "id": "close-confusion-dohs-authorization-types",
+    "question": "I need to authorize the release of my DoHS information to the school program.",
+    "expectedStorageKeys": [
+      "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+      "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+      "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf"
+    ],
+    "expectedTerms": ["dohs", "release"]
+  },
+  {
+    "id": "no-answer-unrelated-topic",
+    "question": "What is the capital of France?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-medical-advice",
+    "question": "Can you recommend medication for my back pain?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-outside-program-scope",
+    "question": "How do I apply for Social Security Disability Insurance benefits?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "low-literacy-orientation-forms",
+    "question": "What papers I gotta sign when I first start?",
+    "expectedStorageKeys": [
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES Checklist for Student Orientation.pdf",
+      "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+      "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+      "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
+    ],
+    "expectedTerms": ["orientation", "sign"]
+  },
+  {
+    "id": "low-literacy-timesheet",
+    "question": "Where do I write down my hours for the state?",
+    "expectedStorageKeys": ["forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"],
+    "acceptableStorageKeys": [
+      "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+      "forms/DFA-TS-12_Rev_-2-24.pdf",
+      "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf"
+    ],
+    "expectedTerms": ["time", "hours", "wv works", "tanf"]
+  },
+  {
+    "id": "low-literacy-portfolio",
+    "question": "What stuff do I need to put in my work folder?",
+    "expectedStorageKeys": [
+      "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "students/resources/SPOKES Life and Employability Module Rubric Record.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+      "students/resources/SPOKES Life and Employability Module Rubric Record.pdf"
+    ],
+    "expectedTerms": ["portfolio", "employment"]
+  },
+  {
+    "id": "low-literacy-dress-code",
+    "question": "What clothes am I supposed to wear to class?",
+    "expectedStorageKeys": [
+      "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ],
+    "expectedTerms": ["dress code", "appearance"]
+  },
+  {
+    "id": "student-role-no-teacher-admin-guide",
+    "question": "How does the SPOKES program track my attendance and participation?",
+    "expectedStorageKeys": [
+      "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf",
+      "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"
+    ],
+    "forbiddenStorageKeys": [
+      "teachers/Administrative_Guide_Revised_10.4.2024.pdf",
+      "teachers/SPOKES_Database_Handbook.pdf"
+    ],
+    "expectedTerms": ["attendance"]
+  },
+  {
+    "id": "student-role-no-teacher-sign-in-sheet",
+    "question": "What form is used to record who comes to class each day?",
+    "expectedStorageKeys": [
+      "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
+    ],
+    "forbiddenStorageKeys": [
+      "teachers/Administrative_Guide_Revised_10.4.2024.pdf"
+    ],
+    "expectedTerms": ["sign-in", "attendance", "class"]
+  },
+  {
+    "id": "student-role-no-teacher-ecp-instructions",
+    "question": "How do I fill out my Education and Career Plan?",
+    "expectedStorageKeys": [
+      "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
+    ],
+    "acceptableStorageKeys": [
+      "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+      "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
+    ],
+    "forbiddenStorageKeys": [
+      "teachers/guides/Hanbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf"
+    ],
+    "expectedTerms": ["education", "career", "plan", "ecp"]
+  }
+]
