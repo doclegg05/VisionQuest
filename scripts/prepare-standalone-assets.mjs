@@ -17,6 +17,12 @@ const copies = [
     from: join(root, "public"),
     to: join(standaloneDir, "public"),
   },
+  // config/ holds generated runtime files (e.g. form-routing.generated.json, sage-overrides.json).
+  // Copy if present so they are available to the standalone server.
+  {
+    from: join(root, "config"),
+    to: join(standaloneDir, "config"),
+  },
 ];
 
 for (const { from, to } of copies) {

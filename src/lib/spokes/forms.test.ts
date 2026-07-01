@@ -11,6 +11,10 @@ import {
   getDirectFormAnswer,
   getFormContext,
 } from "@/lib/sage/knowledge-base";
+import {
+  __setFormCatalogNotesForTest,
+  __resetFormCatalogNotesCache,
+} from "@/lib/catalog/notes";
 
 describe("FORMS", () => {
   it("has unique ids", () => {
@@ -53,6 +57,64 @@ describe("FORMS", () => {
     assert.ok(answer);
     assert.match(answer, /\[Personal Attendance Contract\]/);
     assert.match(answer, /\/api\/forms\/download\?formId=attendance-contract&mode=view/);
+  });
+
+  it("bypasses the direct answer when a literal title hit can't tell two same-title siblings apart", () => {
+    // portfolio-checklist and portfolio-checklist-tracking share the identical
+    // title "Employment Portfolio Checklist", so a literal title hit matches
+    // both — the no-model direct answer can't disambiguate. With both flagged
+    // ambiguous, getDirectFormAnswer must defer to the agent path (return null).
+    __setFormCatalogNotesForTest({
+      version: 1,
+      entries: {
+        "portfolio-checklist": {
+          formId: "portfolio-checklist",
+          whenToUse: "Intro at onboarding.",
+          whenNotToUse: "NOT for ongoing tracking — that is the tracking checklist.",
+          tags: ["portfolio"],
+        },
+        "portfolio-checklist-tracking": {
+          formId: "portfolio-checklist-tracking",
+          whenToUse: "Track progress over time.",
+          whenNotToUse: "NOT the onboarding intro — that is the orientation checklist.",
+          tags: ["portfolio"],
+        },
+      },
+    });
+    try {
+      const answer = getDirectFormAnswer(
+        "I need the employment portfolio checklist form for ongoing tracking",
+      );
+      assert.equal(answer, null, "shared-title ambiguous pair should defer to the agent path");
+    } finally {
+      __setFormCatalogNotesForTest(null);
+      __resetFormCatalogNotesCache();
+    }
+  });
+
+  it("still answers directly when a unique literal name hit names one ambiguous form", () => {
+    // "attendance contract" uniquely matches attendance-contract's title (no
+    // other form shares it), so even though it's catalog-ambiguous the direct
+    // answer is high-confidence and must NOT bypass.
+    __setFormCatalogNotesForTest({
+      version: 1,
+      entries: {
+        "attendance-contract": {
+          formId: "attendance-contract",
+          whenToUse: "Onboarding commitment.",
+          whenNotToUse: "NOT the daily sign-in sheet.",
+          tags: ["attendance"],
+        },
+      },
+    });
+    try {
+      const answer = getDirectFormAnswer("I need the attendance contract PDF");
+      assert.ok(answer, "unique literal name hit should still answer directly");
+      assert.match(answer, /formId=attendance-contract/);
+    } finally {
+      __setFormCatalogNotesForTest(null);
+      __resetFormCatalogNotesCache();
+    }
   });
 
   it("builds prompt context with exact form URLs", () => {

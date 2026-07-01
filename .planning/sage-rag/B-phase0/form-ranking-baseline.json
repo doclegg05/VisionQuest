@@ -1,0 +1,143 @@
+{
+  "fixturePath": "config/sage-form-eval.json",
+  "method": "hybrid",
+  "total": 12,
+  "top1": 12,
+  "top3": 12,
+  "cleanTop3": 10,
+  "forbiddenHits": 3,
+  "results": [
+    {
+      "id": "attendance-contract",
+      "ids": [
+        "attendance-contract",
+        "rtw-attendance",
+        "sign-in-sheet"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": false
+    },
+    {
+      "id": "student-profile",
+      "ids": [
+        "student-profile",
+        "rights-responsibilities",
+        "media-release"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "dfa-ts-12",
+      "ids": [
+        "dfa-ts-12",
+        "dfa-wvw-25",
+        "employer-letter"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "rights-responsibilities",
+      "ids": [
+        "rights-responsibilities",
+        "tech-acceptable-use",
+        "media-release"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "dress-code",
+      "ids": [
+        "dress-code",
+        "tech-acceptable-use",
+        "rtw-attendance"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "dohs-release",
+      "ids": [
+        "dohs-release",
+        "auth-release",
+        "media-release"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": false
+    },
+    {
+      "id": "tech-acceptable-use",
+      "ids": [
+        "tech-acceptable-use",
+        "rights-responsibilities",
+        "media-release"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "media-release",
+      "ids": [
+        "media-release",
+        "tech-acceptable-use",
+        "rights-responsibilities"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "support-services",
+      "ids": [
+        "support-services-fact-sheet",
+        "dental-services",
+        "dfa-wvw-25"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "portfolio-checklist",
+      "ids": [
+        "portfolio-checklist-tracking",
+        "portfolio-checklist",
+        "education-career-plan"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "auth-release",
+      "ids": [
+        "auth-release",
+        "dohs-release",
+        "dental-services"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    },
+    {
+      "id": "welcome-letter",
+      "ids": [
+        "welcome-letter",
+        "orientation-guide",
+        "student-profile"
+      ],
+      "inTop1": true,
+      "inTop3": true,
+      "clean": true
+    }
+  ]
+}

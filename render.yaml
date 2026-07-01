@@ -25,6 +25,8 @@ services:
         sync: false
       - key: SAGE_AGENT_ENABLED
         value: "false"
+      - key: SAGE_RAG_ABSTAIN_DISTANCE
+        value: "0.40"
       - key: CF_ACCESS_CLIENT_ID
         sync: false
       - key: CF_ACCESS_CLIENT_SECRET

@@ -21,6 +21,15 @@ import type { SpokesForm } from "@/lib/spokes/forms";
 import { embedQuery, embedTexts } from "@/lib/ai/embeddings";
 import { logger } from "@/lib/logger";
 
+// NOTE: the OKF catalog's curated notes (when-to-use / when-NOT-to-use) are
+// deliberately NOT folded into this ranking index. Measurement showed adding
+// them regressed top-1 12/12 -> 10/12: the form pipeline was already optimal,
+// and "when NOT to use" text names sibling forms, which a keyword/vector
+// matcher reads as plain tokens (it can't see the negation) and so matches
+// THIS form to the sibling's queries more. Catalog notes are consumed at
+// answer time instead — see src/lib/catalog/notes.ts, used by the
+// search_forms tool's modelHint and the getDirectFormAnswer bypass.
+
 export interface FormSearchCandidate {
   form: SpokesForm;
   /** Blended 0..1 relevance score. */
@@ -96,6 +105,7 @@ export function keywordScore(query: string, form: SpokesForm): number {
 
   const categoryLabel = FORM_CATEGORIES[form.category]?.label ?? form.category;
   const titleTokens = new Set(tokenize(form.title));
+
   const bodyTokens = new Set(
     tokenize(`${form.title} ${form.description} ${categoryLabel} ${form.fileName}`),
   );

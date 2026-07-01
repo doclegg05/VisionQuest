@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding must accept many signatures */
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 const mockQueryRaw = mock.fn() as any;
 const mockEmbedQuery = mock.fn() as any;
@@ -35,12 +35,14 @@ mock.module("@/lib/cache", {
 
 let hybridSearchDocuments: typeof import("./hybrid-retrieval").hybridSearchDocuments;
 let getBestChunks: typeof import("./hybrid-retrieval").getBestChunks;
+let getAbstentionDistance: typeof import("./hybrid-retrieval").getAbstentionDistance;
 let MAX_COSINE_DISTANCE: number;
 
 before(async () => {
   const mod = await import("./hybrid-retrieval");
   hybridSearchDocuments = mod.hybridSearchDocuments;
   getBestChunks = mod.getBestChunks;
+  getAbstentionDistance = mod.getAbstentionDistance;
   MAX_COSINE_DISTANCE = mod.getMaxCosineDistance();
 });
 
@@ -137,6 +139,78 @@ describe("hybridSearchDocuments", () => {
     mockQueryRaw.mock.mockImplementation(async () => []);
     const results = await hybridSearchDocuments("zzz", "student", 12);
     assert.deepEqual(results, []);
+  });
+});
+
+describe("hybridSearchDocuments abstention gate", () => {
+  beforeEach(() => {
+    mockQueryRaw.mock.resetCalls();
+    mockEmbedQuery.mock.resetCalls();
+    mockEmbedQuery.mock.mockImplementation(async () => new Array(768).fill(0.1));
+  });
+
+  afterEach(() => {
+    delete process.env.SAGE_RAG_ABSTAIN_DISTANCE;
+  });
+
+  it("getAbstentionDistance defaults to 1 (off) and rejects out-of-range values", () => {
+    delete process.env.SAGE_RAG_ABSTAIN_DISTANCE;
+    assert.equal(getAbstentionDistance(), 1);
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "0.62";
+    assert.equal(getAbstentionDistance(), 0.62);
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "0"; // must be > 0
+    assert.equal(getAbstentionDistance(), 1);
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "3"; // must be <= 2
+    assert.equal(getAbstentionDistance(), 1);
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "notanumber";
+    assert.equal(getAbstentionDistance(), 1);
+  });
+
+  it("abstains (returns []) when every surviving match is beyond the floor", async () => {
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "0.4";
+    // fts_rank set so rows survive the semantic-distance filter; all far (> 0.4).
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "far1", fts_rank: 1, best_distance: 0.6 }),
+      dbRow({ id: "far2", fts_rank: 2, best_distance: 0.7 }),
+    ]);
+    const results = await hybridSearchDocuments("what's the weather?", "student", 12);
+    // [] not null: null would trigger the keyword fallback and re-surface weak docs.
+    assert.ok(results !== null, "abstention must return [] not null");
+    assert.equal(results.length, 0);
+  });
+
+  it("does not abstain when at least one match is within the floor", async () => {
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "0.5";
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "close", fts_rank: 1, best_distance: 0.3 }),
+      dbRow({ id: "far", fts_rank: 2, best_distance: 0.6 }),
+    ]);
+    const results = await hybridSearchDocuments("dress code", "student", 12);
+    assert.ok(results);
+    assert.ok(results.length >= 1);
+    assert.equal(results[0].id, "close");
+  });
+
+  it("is off by default: far matches are still returned when the env var is unset", async () => {
+    delete process.env.SAGE_RAG_ABSTAIN_DISTANCE;
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "far1", fts_rank: 1, best_distance: 0.6 }),
+    ]);
+    const results = await hybridSearchDocuments("dress code", "student", 12);
+    assert.ok(results);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].id, "far1");
+  });
+
+  it("never abstains on FTS-only rows that carry no distance", async () => {
+    process.env.SAGE_RAG_ABSTAIN_DISTANCE = "0.4";
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "fts1", semantic_rank: null, fts_rank: 1, best_distance: null }),
+      dbRow({ id: "fts2", semantic_rank: null, fts_rank: 2, best_distance: null }),
+    ]);
+    const results = await hybridSearchDocuments("dress code", "student", 12);
+    assert.ok(results);
+    assert.equal(results.length, 2);
   });
 });
 

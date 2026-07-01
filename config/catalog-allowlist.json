@@ -1,0 +1,31 @@
+{
+  "forms": [
+    "attendance-contract",
+    "sign-in-sheet",
+    "rtw-attendance",
+    "student-profile",
+    "dfa-wvw-70",
+    "dfa-ts-12",
+    "rights-responsibilities",
+    "dress-code",
+    "non-discrimination",
+    "dohs-release",
+    "auth-release",
+    "tech-acceptable-use",
+    "media-release",
+    "support-services-fact-sheet",
+    "dfa-wvw-25",
+    "portfolio-checklist-tracking",
+    "portfolio-checklist",
+    "welcome-letter"
+  ],
+  "documents": [
+    "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+    "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf",
+    "orientation/SPOKES Checklist for Student Orientation.pdf"
+  ],
+  "certifications": [],
+  "platforms": [
+    { "id": "aztec", "title": "Aztec PLUS" }
+  ]
+}

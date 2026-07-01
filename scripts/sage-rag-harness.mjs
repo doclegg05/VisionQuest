@@ -14,6 +14,7 @@
  *   npm run sage:rag:harness
  *   npm run sage:rag:harness -- --strict
  *   npm run sage:rag:harness -- --strict-clean
+ *   npm run sage:rag:harness -- --strict-noanswer
  *   npm run sage:rag:harness -- --json --out=.planning/sage-rag/harness.json
  */
 
@@ -43,9 +44,17 @@ function unique(values) {
 }
 
 function parseDocumentRefs(context) {
+  // formatEntry() emits a doc entry in one of two shapes (see knowledge-base-server.ts):
+  //   no passages:  "[Title]\nLink: /api/documents/download?id=ID&mode=view\nSummary: …"
+  //   chunk path:   "Link: /api/documents/download?id=ID&mode=view\n[Title, p.N]\n…"
+  // The chunk-citation path (live hybrid retrieval) puts Link FIRST with no leading
+  // [Title], so the old `^\[Title\]\nLink:` anchor silently missed every chunk-retrieved
+  // doc. Parse on the invariant Link token instead (one per doc, in score order);
+  // capture the leading [Title] only when present — the DB lookup by id supplies the
+  // title for the chunk shape downstream.
   const refs = [];
   const pattern =
-    /^\[([^\]]+)\]\nLink: \/api\/documents\/download\?id=([^&\n]+)&mode=view/gm;
+    /(?:\[([^\]]+)\]\n)?Link: \/api\/documents\/download\?id=([^&\n]+)&mode=view/g;
   let match;
   while ((match = pattern.exec(context)) !== null) {
     refs.push({ title: match[1], id: decodeURIComponent(match[2]) });
@@ -163,6 +172,9 @@ async function main() {
     const cleanTop3 = hasExpectations ? unexpectedTop3.length === 0 : null;
 
     const hasContext = context.trim().length > 0;
+    const forbiddenSet = new Set(asArray(item.forbiddenStorageKeys));
+    const audienceLeak = matchedDocuments.filter((doc) => doc.storageKey && forbiddenSet.has(doc.storageKey)).length;
+    const noAnswerOk = item.expectNoContext ? (matchedDocuments.length === 0) : null;
     const matchedExpectedTerm = includesAny(contextLower, item.expectedTerms || []);
     const legacyPassed = hasContext && matchedExpectedTerm;
     const relevancePassed = hasExpectations ? top3Expected : null;
@@ -189,6 +201,8 @@ async function main() {
       expectedTerms: item.expectedTerms || [],
       expectedStorageKeys,
       acceptableStorageKeys,
+      audienceLeak,
+      noAnswerOk,
     });
   }
 
@@ -203,6 +217,9 @@ async function main() {
     (sum, result) => sum + result.unexpectedTop3.length,
     0,
   );
+  const audienceLeakage = results.reduce((sum, r) => sum + (r.audienceLeak ?? 0), 0);
+  const noAnswerCases = results.filter((r) => r.noAnswerOk !== null);
+  const noAnswerPassed = noAnswerCases.filter((r) => r.noAnswerOk).length;
 
   // Latency percentiles over sequential per-question wall-clock. The first
   // question pays cold-start costs (module load, DB connect, embedding HTTP
@@ -234,6 +251,9 @@ async function main() {
     top3Expected,
     cleanTop3,
     unexpectedTop3Docs,
+    audienceLeakage,
+    noAnswerPassed,
+    noAnswerTotal: noAnswerCases.length,
     latency: latencySummary,
     missingExpectationKeys,
     results,
@@ -298,6 +318,9 @@ async function main() {
     process.exitCode = 1;
   }
   if (args["strict-clean"] && strictCleanPassed !== results.length) {
+    process.exitCode = 1;
+  }
+  if (args["strict-noanswer"] && noAnswerPassed !== noAnswerCases.length) {
     process.exitCode = 1;
   }
 }
