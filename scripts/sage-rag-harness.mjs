@@ -14,6 +14,7 @@
  *   npm run sage:rag:harness
  *   npm run sage:rag:harness -- --strict
  *   npm run sage:rag:harness -- --strict-clean
+ *   npm run sage:rag:harness -- --strict-noanswer
  *   npm run sage:rag:harness -- --json --out=.planning/sage-rag/harness.json
  */
 
@@ -317,6 +318,9 @@ async function main() {
     process.exitCode = 1;
   }
   if (args["strict-clean"] && strictCleanPassed !== results.length) {
+    process.exitCode = 1;
+  }
+  if (args["strict-noanswer"] && noAnswerPassed !== noAnswerCases.length) {
     process.exitCode = 1;
   }
 }

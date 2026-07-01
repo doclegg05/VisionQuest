@@ -102,6 +102,42 @@
     "expectedTerms": []
   },
   {
+    "id": "no-answer-weather",
+    "question": "What's the weather going to be like in Charleston this weekend?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-sports-trivia",
+    "question": "Who won the last Super Bowl?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-recipe",
+    "question": "Can you give me a recipe for chocolate chip cookies?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-general-trivia",
+    "question": "How many planets are in the solar system?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-near-miss-refund-policy",
+    "question": "What is the SPOKES program refund policy?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-near-miss-ged-schedule",
+    "question": "When is the next GED test date scheduled?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
     "id": "low-literacy-orientation-forms",
     "question": "What papers I gotta sign when I first start?",
     "expectedStorageKeys": [
