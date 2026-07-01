@@ -73,6 +73,22 @@ export function getDistanceMargin(): number {
   return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : DEFAULT_DISTANCE_MARGIN;
 }
 
+/**
+ * Abstention floor (Sub-project B): when even the closest surviving match's
+ * cosine distance exceeds this, hybridSearchDocuments returns [] (no docs)
+ * rather than surfacing a weak/off-topic result for an off-topic query. The
+ * default of 1 leaves the gate effectively OFF — genuine matches sit well
+ * below 1 — so behavior is unchanged until an operator sets
+ * SAGE_RAG_ABSTAIN_DISTANCE to a calibrated value (see
+ * scripts/sage-rag-calibrate-abstention.mjs). Valid range (0, 2].
+ */
+const DEFAULT_ABSTENTION_DISTANCE = 1;
+
+export function getAbstentionDistance(): number {
+  const raw = Number.parseFloat(process.env.SAGE_RAG_ABSTAIN_DISTANCE ?? "");
+  return Number.isFinite(raw) && raw > 0 && raw <= 2 ? raw : DEFAULT_ABSTENTION_DISTANCE;
+}
+
 const QUERY_EMBED_CACHE_TTL_SECONDS = 300;
 
 interface HybridSearchRow {
@@ -140,17 +156,28 @@ export async function hybridSearchDocuments(
         (row.best_distance !== null && row.best_distance <= getMaxCosineDistance()),
     );
 
+    const distances = filtered
+      .map((row) => row.best_distance)
+      .filter((distance): distance is number => distance !== null);
+    const closestDistance = distances.length > 0 ? Math.min(...distances) : null;
+
+    // Abstention gate (Sub-project B): when even the closest surviving match is
+    // farther than the absolute floor, return nothing rather than surfacing a
+    // weak/off-topic doc. Best-match-only — abstains only when EVERYTHING is
+    // far; FTS-only rows (no distance) never trigger it. Off by default
+    // (floor 1); armed via SAGE_RAG_ABSTAIN_DISTANCE once calibrated.
+    if (closestDistance !== null && closestDistance > getAbstentionDistance()) {
+      return [];
+    }
+
     // Rows arrive ordered by fused score; apply relative cutoffs against the
     // best surviving entry.
     const topScore = filtered[0]?.score ?? 0;
     const minScore = topScore * getMinScoreRatio();
 
-    const distances = filtered
-      .map((row) => row.best_distance)
-      .filter((distance): distance is number => distance !== null);
     const margin = getDistanceMargin();
     const maxAllowedDistance =
-      margin > 0 && distances.length > 0 ? Math.min(...distances) + margin : Infinity;
+      margin > 0 && closestDistance !== null ? closestDistance + margin : Infinity;
 
     return filtered
       .filter(

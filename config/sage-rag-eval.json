@@ -102,6 +102,42 @@
     "expectedTerms": []
   },
   {
+    "id": "no-answer-weather",
+    "question": "What's the weather going to be like in Charleston this weekend?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-sports-trivia",
+    "question": "Who won the last Super Bowl?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-recipe",
+    "question": "Can you give me a recipe for chocolate chip cookies?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-general-trivia",
+    "question": "How many planets are in the solar system?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-near-miss-refund-policy",
+    "question": "What is the SPOKES program refund policy?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
+    "id": "no-answer-near-miss-ged-schedule",
+    "question": "When is the next GED test date scheduled?",
+    "expectNoContext": true,
+    "expectedTerms": []
+  },
+  {
     "id": "low-literacy-orientation-forms",
     "question": "What papers I gotta sign when I first start?",
     "expectedStorageKeys": [
@@ -197,5 +233,65 @@
       "teachers/guides/Hanbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf"
     ],
     "expectedTerms": ["education", "career", "plan", "ecp"]
+  },
+  {
+    "id": "platform-usa-learns-activity-report",
+    "question": "Where do I find my activity report in USA Learns?",
+    "expectedStorageKeys": ["lms/USA Learns/USA Learns Student Activity Report.pdf"],
+    "acceptableStorageKeys": ["lms/USA Learns/USA Learns Student Activity Report.pdf"],
+    "forbiddenStorageKeys": ["lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"],
+    "expectedTerms": ["usa learns", "activity report"]
+  },
+  {
+    "id": "platform-khan-activity-report",
+    "question": "How do I get to the activity report inside Khan Academy?",
+    "expectedStorageKeys": ["lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"],
+    "acceptableStorageKeys": [
+      "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf",
+      "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf"
+    ],
+    "forbiddenStorageKeys": ["lms/USA Learns/USA Learns Student Activity Report.pdf"],
+    "expectedTerms": ["khan", "activity report"]
+  },
+  {
+    "id": "platform-burlington-account-setup",
+    "question": "How do I set up my Burlington English account?",
+    "expectedStorageKeys": ["lms/Burlington English/Setting Up Burlington English Account.pdf"],
+    "acceptableStorageKeys": [
+      "lms/Burlington English/Setting Up Burlington English Account.pdf",
+      "lms/Burlington English/02_Accessing_BE_1.pdf"
+    ],
+    "forbiddenStorageKeys": ["lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"],
+    "expectedTerms": ["burlington", "account"]
+  },
+  {
+    "id": "platform-learningexpress-register",
+    "question": "How do I register for a free LearningExpress library account?",
+    "expectedStorageKeys": ["lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"],
+    "acceptableStorageKeys": ["lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"],
+    "forbiddenStorageKeys": ["lms/Burlington English/Setting Up Burlington English Account.pdf"],
+    "expectedTerms": ["learningexpress", "learning express", "register"]
+  },
+  {
+    "id": "platform-khan-enroll",
+    "question": "How do students get enrolled in Khan Academy courses?",
+    "expectedStorageKeys": ["lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf"],
+    "acceptableStorageKeys": [
+      "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+      "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+    ],
+    "forbiddenStorageKeys": ["lms/Burlington English/Setting Up Burlington English Account.pdf"],
+    "expectedTerms": ["khan", "enroll"]
+  },
+  {
+    "id": "platform-burlington-accessing",
+    "question": "How do I log in and access Burlington English?",
+    "expectedStorageKeys": ["lms/Burlington English/02_Accessing_BE_1.pdf"],
+    "acceptableStorageKeys": [
+      "lms/Burlington English/02_Accessing_BE_1.pdf",
+      "lms/Burlington English/Setting Up Burlington English Account.pdf"
+    ],
+    "forbiddenStorageKeys": ["lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"],
+    "expectedTerms": ["burlington", "access", "log in"]
   }
 ]

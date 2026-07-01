@@ -1,0 +1,182 @@
+{
+  "generatedAt": "2026-07-01T13:56:26.629Z",
+  "fixturePath": "config/sage-rag-eval.json",
+  "role": "student",
+  "stats": {
+    "lmaxLegit": 0.38294752734586646,
+    "ominOfftopic": 0.3029763879165869,
+    "ominSeparableOfftopic": 0.4070323705673218,
+    "separation": 0.024,
+    "suggestedFloor": 0.397,
+    "offtopicAlreadyEmpty": [],
+    "offtopicFtsOnlyUncatchable": [],
+    "offtopicOverlapUncatchable": [
+      "no-answer-near-miss-refund-policy"
+    ]
+  },
+  "legit": [
+    {
+      "id": "close-confusion-ts12-fillable-vs-nonfillable",
+      "question": "Which DFA-TS-12 form do I need to fill out and sign?",
+      "returned": 2,
+      "closest": 0.25927930408232847,
+      "ftsOnly": false
+    },
+    {
+      "id": "close-confusion-wvw70-vs-wvw25",
+      "question": "I need to document my WV Works participation verification, which form is that?",
+      "returned": 1,
+      "closest": 0.2222854495048523,
+      "ftsOnly": false
+    },
+    {
+      "id": "close-confusion-rights-vs-dress-code",
+      "question": "What document explains the rules I agreed to in the SPOKES program?",
+      "returned": 2,
+      "closest": 0.22803092002868652,
+      "ftsOnly": false
+    },
+    {
+      "id": "close-confusion-attendance-vs-profile",
+      "question": "Where is the form I signed about showing up to class every day?",
+      "returned": 3,
+      "closest": 0.2699523842391458,
+      "ftsOnly": false
+    },
+    {
+      "id": "close-confusion-prc1-vs-ssp1",
+      "question": "I completed the WV Works program — what's the form that records my milestones?",
+      "returned": 3,
+      "closest": 0.28517818450927734,
+      "ftsOnly": false
+    },
+    {
+      "id": "close-confusion-student-aztec-vs-teacher-aztec",
+      "question": "How do I log in and use Aztec to study on my own?",
+      "returned": 2,
+      "closest": 0.23174927802370848,
+      "ftsOnly": false
+    },
+    {
+      "id": "close-confusion-dohs-authorization-types",
+      "question": "I need to authorize the release of my DoHS information to the school program.",
+      "returned": 3,
+      "closest": 0.2568252392798934,
+      "ftsOnly": false
+    },
+    {
+      "id": "low-literacy-orientation-forms",
+      "question": "What papers I gotta sign when I first start?",
+      "returned": 3,
+      "closest": 0.32326694449579896,
+      "ftsOnly": false
+    },
+    {
+      "id": "low-literacy-timesheet",
+      "question": "Where do I write down my hours for the state?",
+      "returned": 2,
+      "closest": 0.32860469818115234,
+      "ftsOnly": false
+    },
+    {
+      "id": "low-literacy-portfolio",
+      "question": "What stuff do I need to put in my work folder?",
+      "returned": 2,
+      "closest": 0.29192330563296676,
+      "ftsOnly": false
+    },
+    {
+      "id": "low-literacy-dress-code",
+      "question": "What clothes am I supposed to wear to class?",
+      "returned": 3,
+      "closest": 0.3820667126258269,
+      "ftsOnly": false
+    },
+    {
+      "id": "student-role-no-teacher-admin-guide",
+      "question": "How does the SPOKES program track my attendance and participation?",
+      "returned": 2,
+      "closest": 0.2835372348383334,
+      "ftsOnly": false
+    },
+    {
+      "id": "student-role-no-teacher-sign-in-sheet",
+      "question": "What form is used to record who comes to class each day?",
+      "returned": 2,
+      "closest": 0.28112733364105225,
+      "ftsOnly": false
+    },
+    {
+      "id": "student-role-no-teacher-ecp-instructions",
+      "question": "How do I fill out my Education and Career Plan?",
+      "returned": 3,
+      "closest": 0.38294752734586646,
+      "ftsOnly": false
+    }
+  ],
+  "offtopic": [
+    {
+      "id": "no-answer-unrelated-topic",
+      "question": "What is the capital of France?",
+      "returned": 3,
+      "closest": 0.42315590381622314,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-medical-advice",
+      "question": "Can you recommend medication for my back pain?",
+      "returned": 2,
+      "closest": 0.4070323705673218,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-outside-program-scope",
+      "question": "How do I apply for Social Security Disability Insurance benefits?",
+      "returned": 2,
+      "closest": 0.42967813368774954,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-weather",
+      "question": "What's the weather going to be like in Charleston this weekend?",
+      "returned": 3,
+      "closest": 0.4488368034362793,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-sports-trivia",
+      "question": "Who won the last Super Bowl?",
+      "returned": 3,
+      "closest": 0.4366142153739929,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-recipe",
+      "question": "Can you give me a recipe for chocolate chip cookies?",
+      "returned": 2,
+      "closest": 0.41680458683939314,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-general-trivia",
+      "question": "How many planets are in the solar system?",
+      "returned": 2,
+      "closest": 0.4290704131126404,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-near-miss-refund-policy",
+      "question": "What is the SPOKES program refund policy?",
+      "returned": 3,
+      "closest": 0.3029763879165869,
+      "ftsOnly": false
+    },
+    {
+      "id": "no-answer-near-miss-ged-schedule",
+      "question": "When is the next GED test date scheduled?",
+      "returned": 3,
+      "closest": 0.4192881238036219,
+      "ftsOnly": false
+    }
+  ]
+}
