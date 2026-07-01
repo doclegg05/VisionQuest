@@ -7,6 +7,7 @@ const mockCreate = mock.fn() as any;
 const mockExecuteRaw = mock.fn(async () => 1) as any;
 const mockQueryRaw = mock.fn(async () => []) as any;
 const mockEmbedTexts = mock.fn() as any;
+const mockLogLlmCall = mock.fn(async () => undefined) as any;
 
 // Real pg_advisory_xact_lock blocks a second transaction until the first
 // one commits/rolls back. A naive `$transaction` mock that just invokes its
@@ -48,6 +49,10 @@ mock.module("@/lib/ai/embeddings", {
   },
 });
 
+mock.module("@/lib/llm-usage", {
+  namedExports: { logLlmCall: mockLogLlmCall },
+});
+
 let extractAndStoreMemories: typeof import("./extract").extractAndStoreMemories;
 let sourceHashFor: typeof import("./schema").sourceHashFor;
 
@@ -80,6 +85,7 @@ describe("extractAndStoreMemories", () => {
     mockExecuteRaw.mock.resetCalls();
     mockQueryRaw.mock.resetCalls();
     mockEmbedTexts.mock.resetCalls();
+    mockLogLlmCall.mock.resetCalls();
     mockTransaction.mock.resetCalls();
     transactionMutex = Promise.resolve();
     mockFindMany.mock.mockImplementation(async () => []);
@@ -113,6 +119,21 @@ describe("extractAndStoreMemories", () => {
     // one advisory-lock acquisition for the subject, plus one embedding
     // UPDATE per stored memory (both go through $executeRaw)
     assert.equal(mockExecuteRaw.mock.callCount(), 3);
+  });
+
+  it("logs an estimated token cost for the extraction call so it counts toward the student's quota", async () => {
+    await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+
+    assert.equal(mockLogLlmCall.mock.callCount(), 1);
+    const call = mockLogLlmCall.mock.calls[0].arguments[0];
+    assert.equal(call.studentId, "stu-1");
+    assert.equal(call.callSite, "sage_memory_extract");
+    assert.ok(call.totalTokens > 0);
   });
 
   it("parses fenced JSON and drops invalid candidates without throwing", async () => {

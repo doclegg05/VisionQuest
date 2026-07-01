@@ -10,6 +10,7 @@ import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-ext
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
+import { rateLimitDaily } from "@/lib/rate-limit";
 import { detectCrisisSignal, recordWellbeingConcern } from "@/lib/sage/crisis-detection";
 import { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } from "@/lib/sage/readability";
 import { retryWithBackoff } from "@/lib/sage/retry";
@@ -21,6 +22,20 @@ import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
 import { generateConversationTitle } from "./conversation";
 import type { ProgramType } from "@/lib/program-type";
+
+const DEFAULT_MEMORY_EXTRACT_DAILY_LIMIT = 200;
+
+/**
+ * Daily circuit-breaker ceiling for memory extraction. Mirrors the
+ * validated-env-var pattern used by getDupDistance() in
+ * src/lib/sage/memory/extract.ts: parse, reject non-finite/non-positive
+ * values, and fall back to the default rather than passing NaN/0 through to
+ * rateLimitDaily().
+ */
+function getMemoryExtractDailyLimit(): number {
+  const raw = Number.parseInt(process.env.SAGE_MEMORY_EXTRACT_DAILY_LIMIT ?? "", 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MEMORY_EXTRACT_DAILY_LIMIT;
+}
 
 // ─── Main post-response handler ─────────────────────────────────────────────
 
@@ -159,21 +174,38 @@ export async function handlePostResponse({
   // routing is inherited. extractAndStoreMemories never throws, but the
   // catch stays as a belt-and-suspenders guard — memory must never block or
   // fail the post-response pipeline.
+  //
+  // Independent daily circuit-breaker (separate from the chat message caps):
+  // memory extraction can in principle fire once per message, so a prompt
+  // regression or adversarial input designed to maximize "durable facts"
+  // shouldn't be able to run away unbounded even within the existing message
+  // caps. Default well above normal usage — this is a safety ceiling, not a
+  // routine limiter.
   if (process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
-    void extractAndStoreMemories({
-      provider,
-      studentId,
-      conversationId,
-      messages: [
-        ...allMessages,
-        { role: "model" as const, content: fullResponse },
-      ],
-    }).catch((err) =>
-      logger.error("Memory extraction failed", {
+    const extractionLimit = getMemoryExtractDailyLimit();
+    const extractionRl = await rateLimitDaily(`sage-memory-extract:${studentId}`, extractionLimit);
+    if (!extractionRl.success) {
+      logger.warn("Sage memory extraction daily limit reached; skipping extraction for this turn", {
         studentId,
-        error: String(err),
-      }),
-    );
+        conversationId,
+        extractionLimit,
+      });
+    } else {
+      void extractAndStoreMemories({
+        provider,
+        studentId,
+        conversationId,
+        messages: [
+          ...allMessages,
+          { role: "model" as const, content: fullResponse },
+        ],
+      }).catch((err) =>
+        logger.error("Memory extraction failed", {
+          studentId,
+          error: String(err),
+        }),
+      );
+    }
   }
   // 0. Discovery extraction (runs instead of goal extraction during discovery)
   if (conversationStage === "discovery") {

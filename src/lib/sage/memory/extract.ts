@@ -17,6 +17,7 @@
 
 import { prisma } from "@/lib/db";
 import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
+import { logLlmCall } from "@/lib/llm-usage";
 import { logger } from "@/lib/logger";
 import type { AIProvider } from "@/lib/ai/types";
 import {
@@ -137,6 +138,26 @@ export async function extractAndStoreMemories({
     if (recent.length === 0) return empty;
 
     const raw = await provider.generateStructuredResponse(EXTRACTION_PROMPT, recent);
+
+    // generateStructuredResponse() doesn't return real usageMetadata (unlike
+    // the raw REST calls in classify-attachment.ts/file-gist.ts), so this is
+    // a chars/4 estimate — the same approximation embedTexts() already uses
+    // in src/lib/ai/embeddings.ts. This closes the immediate "invisible to
+    // the cost governor" gap; giving every generateStructuredResponse caller
+    // (goal/mood/discovery extractors too) real usage metadata is a larger
+    // AIProvider interface change, out of scope here.
+    const inputChars = EXTRACTION_PROMPT.length + recent.reduce((sum, m) => sum + m.content.length, 0);
+    const inputTokens = Math.ceil(inputChars / 4);
+    const outputTokens = Math.ceil(raw.length / 4);
+    await logLlmCall({
+      studentId,
+      callSite: "sage_memory_extract",
+      model: provider.name,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+    });
+
     const { accepted, rejected } = parseExtractionItems(parseModelJson(raw));
     if (accepted.length === 0) return { ...empty, rejected };
 
