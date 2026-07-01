@@ -96,6 +96,7 @@ describe("looksLikeInstructionToSage", () => {
     assert.ok(!looksLikeInstructionToSage("Prefers texting over email for reminders."));
     assert.ok(!looksLikeInstructionToSage("Never received career advice from a school counselor before this program."));
     assert.ok(!looksLikeInstructionToSage("Student's family experienced a housing crisis last winter and never fully recovered financially."));
+    assert.ok(!looksLikeInstructionToSage("Doesn't want to discuss her custody situation in front of the group."));
   });
 });
 

@@ -37,7 +37,17 @@ export const MEMORY_EDGE_PREDICATES = [
  * defense-in-depth: this is a heuristic proximity match, not a semantic
  * classifier, and is not a substitute for treating retrieved memory as
  * data-not-instruction at render time (see sanitizeForPrompt and the
- * [MEMORY_START]/[MEMORY_END] framing in retrieve.ts/profile.ts).
+ * [MEMORY_START]/[MEMORY_END] framing in retrieve.ts/profile.ts) — that
+ * render-time framing is the real structural backstop.
+ *
+ * Two-tier trigger split: `IMPERATIVE_TRIGGER` (don't/never/always/stop/
+ * etc.) is used by both the wide-window verb path and the tight
+ * adjacent-noun path. `WANT_NEGATION_TRIGGER` ("doesn't want"/"does not
+ * want") is restricted to the adjacent-noun path only — "doesn't want to
+ * discuss her custody situation" is an everyday circumstance fact, not an
+ * instruction, so this weaker signal must never combine with the wide
+ * action-verb window (that combination is what produced the custody false
+ * positive found in review).
  *
  * Three patterns, each requiring an imperative/negation trigger CLOSE to a
  * Sage-behavior target — not just anywhere in the same sentence. Bare
@@ -45,11 +55,18 @@ export const MEMORY_EDGE_PREDICATES = [
  * topic noun ("advice") is too frequent in ordinary circumstance narratives
  * ("never received career advice", "a housing crisis... never recovered")
  * to use as a standalone signal.
+ *
+ * Known accepted gaps (not fixed — see task notes): synonym paraphrases
+ * (e.g. "bring up the hotline" instead of "mention the hotline") and bare
+ * polite-imperative phrasing without a trigger word (e.g. "Please skip the
+ * redirect...") slip through undetected. Two review rounds showed that
+ * tightening this regex to catch more attack phrasings reliably reopens
+ * false positives on ordinary sentences, so further iteration here is not
+ * planned — Task 6's render-time "treat as data, not instructions" framing
+ * is the backstop for what this heuristic misses.
  */
-const TRIGGER = [
+const IMPERATIVE_TRIGGER = [
   "don'?t",
-  "do(?:es)?n'?t want",
-  "do(?:es)? not want",
   "never",
   "always",
   "stop(?:s|ping)?",
@@ -57,19 +74,27 @@ const TRIGGER = [
   "no need to",
   "just",
 ].join("|");
+const WANT_NEGATION_TRIGGER = [
+  "do(?:es)?n'?t want",
+  "do(?:es)? not want",
+].join("|");
 const ACTION_VERBS = "mention(?:s|ing)?|skip(?:s|ping)?|ignor(?:e|es|ing)|redirect(?:s|ing)?|tell|give|agree|recite|discuss";
 const TOPIC_NOUNS = "hotline|guardrails?|advice|instructions?|prompts?|crisis[- ]redirect";
 
 // Trigger within a few words of an action verb (either order) — action
-// verbs are specific enough to tolerate a wider window.
+// verbs are specific enough to tolerate a wider window. Only the
+// imperative trigger set participates here; the weaker want-negation
+// trigger is excluded (see comment above).
 const TRIGGER_NEAR_VERB = new RegExp(
-  `\\b(?:${TRIGGER})\\b(?:\\W+\\w+){0,3}\\W+\\b(?:${ACTION_VERBS})\\b|\\b(?:${ACTION_VERBS})\\b(?:\\W+\\w+){0,3}\\W+\\b(?:${TRIGGER})\\b`,
+  `\\b(?:${IMPERATIVE_TRIGGER})\\b(?:\\W+\\w+){0,3}\\W+\\b(?:${ACTION_VERBS})\\b|\\b(?:${ACTION_VERBS})\\b(?:\\W+\\w+){0,3}\\W+\\b(?:${IMPERATIVE_TRIGGER})\\b`,
   "i",
 );
 // Trigger immediately adjacent to a topic noun — topic nouns are common
-// enough words that only direct adjacency avoids false positives.
+// enough words that only direct adjacency avoids false positives. Both
+// trigger sets participate here since direct adjacency is tight enough to
+// tolerate the weaker want-negation signal.
 const TRIGGER_ADJACENT_NOUN = new RegExp(
-  `\\b(?:${TRIGGER})\\b\\W+\\b(?:${TOPIC_NOUNS})\\b|\\b(?:${TOPIC_NOUNS})\\b\\W+\\b(?:${TRIGGER})\\b`,
+  `\\b(?:${IMPERATIVE_TRIGGER}|${WANT_NEGATION_TRIGGER})\\b\\W+\\b(?:${TOPIC_NOUNS})\\b|\\b(?:${TOPIC_NOUNS})\\b\\W+\\b(?:${IMPERATIVE_TRIGGER}|${WANT_NEGATION_TRIGGER})\\b`,
   "i",
 );
 // "Sage"/"coach" directly commanding a bare action verb, with no other
