@@ -65,3 +65,44 @@ jobs:
             exit 0
           fi
           npm run sage:agent:eval
+
+  sage-memory-eval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionquest_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+      DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      - name: Sage memory eval (informational — non-deterministic, needs live DB + model)
+        continue-on-error: true
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not set — skipping sage memory eval."
+            exit 0
+          fi
+          npm run sage:memory:eval
