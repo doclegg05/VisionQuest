@@ -1,0 +1,182 @@
+{
+  "generatedAt": "2026-07-01T13:26:18.561Z",
+  "corpus": {
+    "totalDocs": 513,
+    "retrievableDocs": 50
+  },
+  "coverage": {
+    "withCertificationId": 8,
+    "withCertificationIdPct": 0.16,
+    "withPlatformId": 21,
+    "withPlatformIdPct": 0.42,
+    "withEither": 21,
+    "withEitherPct": 0.42
+  },
+  "perCategory": {
+    "CERTIFICATION_INFO": {
+      "total": 12,
+      "withCert": 8,
+      "withPlatform": 8
+    },
+    "LMS_PLATFORM_GUIDE": {
+      "total": 13,
+      "withCert": 0,
+      "withPlatform": 13
+    },
+    "ORIENTATION": {
+      "total": 13,
+      "withCert": 0,
+      "withPlatform": 0
+    },
+    "STUDENT_REFERRAL": {
+      "total": 6,
+      "withCert": 0,
+      "withPlatform": 0
+    },
+    "STUDENT_RESOURCE": {
+      "total": 6,
+      "withCert": 0,
+      "withPlatform": 0
+    }
+  },
+  "certificationValues": [
+    {
+      "value": "byag",
+      "count": 2,
+      "canonical": true
+    },
+    {
+      "value": "ic3",
+      "count": 1,
+      "canonical": true
+    },
+    {
+      "value": "intuit",
+      "count": 1,
+      "canonical": false
+    },
+    {
+      "value": "mos",
+      "count": 1,
+      "canonical": false
+    },
+    {
+      "value": "rtw",
+      "count": 3,
+      "canonical": false
+    }
+  ],
+  "platformValues": [
+    {
+      "value": "aztec",
+      "count": 3,
+      "canonical": true
+    },
+    {
+      "value": "bring-your-a-game",
+      "count": 2,
+      "canonical": true
+    },
+    {
+      "value": "burlington-english",
+      "count": 3,
+      "canonical": true
+    },
+    {
+      "value": "essential-education",
+      "count": 3,
+      "canonical": true
+    },
+    {
+      "value": "gmetrix-and-learnkey",
+      "count": 3,
+      "canonical": true
+    },
+    {
+      "value": "khan-academy",
+      "count": 2,
+      "canonical": true
+    },
+    {
+      "value": "learning-express",
+      "count": 1,
+      "canonical": false
+    },
+    {
+      "value": "ready-to-work",
+      "count": 3,
+      "canonical": false
+    },
+    {
+      "value": "usa-learns",
+      "count": 1,
+      "canonical": true
+    }
+  ],
+  "canonicalization": {
+    "canonicalCertIds": [
+      "ic3",
+      "computer-essentials",
+      "ai-foundations",
+      "mos-word",
+      "mos-excel",
+      "mos-powerpoint",
+      "mos-outlook",
+      "mos-access",
+      "adobe-aca",
+      "intuit-quickbooks",
+      "intuit-bookkeeping",
+      "intuit-personal-finance",
+      "intuit-design-delight",
+      "workkeys-ncrc",
+      "it-specialist-cybersecurity",
+      "customer-service-ttce",
+      "customer-service-csm",
+      "byag",
+      "professional-communications",
+      "burlington-english"
+    ],
+    "canonicalPlatformIds": [
+      "gmetrix-and-learnkey",
+      "edgenuity",
+      "khan-academy",
+      "aztec",
+      "essential-education",
+      "burlington-english",
+      "usa-learns",
+      "csmlearn",
+      "through-the-customers-eyes",
+      "bring-your-a-game",
+      "wv-tourism-works"
+    ],
+    "nonCanonicalCertValues": [
+      {
+        "value": "intuit",
+        "count": 1,
+        "canonical": false
+      },
+      {
+        "value": "mos",
+        "count": 1,
+        "canonical": false
+      },
+      {
+        "value": "rtw",
+        "count": 3,
+        "canonical": false
+      }
+    ],
+    "nonCanonicalPlatformValues": [
+      {
+        "value": "learning-express",
+        "count": 1,
+        "canonical": false
+      },
+      {
+        "value": "ready-to-work",
+        "count": 3,
+        "canonical": false
+      }
+    ]
+  }
+}

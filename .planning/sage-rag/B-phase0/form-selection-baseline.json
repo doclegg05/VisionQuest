@@ -1,0 +1,113 @@
+{
+  "fixturePath": "config/sage-form-eval.json",
+  "total": 6,
+  "directPass": 6,
+  "selectionPass": 6,
+  "allPass": 6,
+  "exerciseNewBypass": 4,
+  "exerciseDisambiguation": 2,
+  "results": [
+    {
+      "id": "attendance-contract",
+      "query": "What form do I sign to promise I will come to class every day?",
+      "directBypassed": true,
+      "directBypassReason": "NEW: ambiguity bypass",
+      "reachesNewBypass": true,
+      "directSafe": true,
+      "candidateIds": [
+        "attendance-contract",
+        "rtw-attendance",
+        "sign-in-sheet"
+      ],
+      "forbiddenPresent": true,
+      "hasDisambiguation": true,
+      "selectionSafe": true,
+      "pass": true
+    },
+    {
+      "id": "student-profile",
+      "query": "I need to fill out my personal information and contact details for the program",
+      "directBypassed": true,
+      "directBypassReason": "NEW: ambiguity bypass",
+      "reachesNewBypass": true,
+      "directSafe": true,
+      "candidateIds": [
+        "student-profile",
+        "rights-responsibilities",
+        "media-release"
+      ],
+      "forbiddenPresent": false,
+      "hasDisambiguation": true,
+      "selectionSafe": true,
+      "pass": true
+    },
+    {
+      "id": "rights-responsibilities",
+      "query": "What are my rights in this program and what am I expected to do?",
+      "directBypassed": true,
+      "directBypassReason": "pre-existing: no form-intent words",
+      "reachesNewBypass": false,
+      "directSafe": true,
+      "candidateIds": [
+        "rights-responsibilities",
+        "tech-acceptable-use",
+        "media-release"
+      ],
+      "forbiddenPresent": false,
+      "hasDisambiguation": true,
+      "selectionSafe": true,
+      "pass": true
+    },
+    {
+      "id": "dress-code",
+      "query": "What should I wear to class? Is there a dress code policy?",
+      "directBypassed": true,
+      "directBypassReason": "pre-existing: no form-intent words",
+      "reachesNewBypass": false,
+      "directSafe": true,
+      "candidateIds": [
+        "dress-code",
+        "tech-acceptable-use",
+        "rtw-attendance"
+      ],
+      "forbiddenPresent": false,
+      "hasDisambiguation": true,
+      "selectionSafe": true,
+      "pass": true
+    },
+    {
+      "id": "dohs-release",
+      "query": "I need to sign the form that lets the Department of Health Services share my information",
+      "directBypassed": true,
+      "directBypassReason": "NEW: ambiguity bypass",
+      "reachesNewBypass": true,
+      "directSafe": true,
+      "candidateIds": [
+        "dohs-release",
+        "auth-release",
+        "media-release"
+      ],
+      "forbiddenPresent": true,
+      "hasDisambiguation": true,
+      "selectionSafe": true,
+      "pass": true
+    },
+    {
+      "id": "media-release",
+      "query": "Can the program use my photo or video? What do I need to sign?",
+      "directBypassed": true,
+      "directBypassReason": "NEW: ambiguity bypass",
+      "reachesNewBypass": true,
+      "directSafe": true,
+      "candidateIds": [
+        "media-release",
+        "tech-acceptable-use",
+        "rights-responsibilities"
+      ],
+      "forbiddenPresent": false,
+      "hasDisambiguation": true,
+      "selectionSafe": true,
+      "pass": true
+    }
+  ]
+}
