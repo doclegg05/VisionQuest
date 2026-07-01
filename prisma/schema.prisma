@@ -1058,22 +1058,23 @@ model DocumentChunk {
 // partial unique index on (subjectType, subjectId, sourceHash) WHERE
 // "validTo" IS NULL, RLS (students read/insert own rows only).
 model SageMemory {
-  id            String    @id @default(cuid())
-  subjectType   String // student | teacher | class | program
-  subjectId     String
-  kind          String // episodic | semantic | procedural
-  content       String    @db.Text
-  embedding     Unsupported("vector(768)")?
-  category      String // goal | preference | circumstance | skill | coaching | progress | other
-  confidence    Float     @default(0.7)
-  validFrom     DateTime  @default(now())
-  validTo       DateTime?
-  lastDecayedAt DateTime?
-  sourceType    String // conversation | operation | manual
-  sourceId      String?
-  sourceHash    String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String                      @id @default(cuid())
+  subjectType       String // student | teacher | class | program
+  subjectId         String
+  kind              String // episodic | semantic | procedural
+  content           String                      @db.Text
+  embedding         Unsupported("vector(768)")?
+  category          String // goal | preference | circumstance | skill | coaching | progress | other
+  confidence        Float                       @default(0.7)
+  validFrom         DateTime                    @default(now())
+  validTo           DateTime?
+  lastDecayedAt     DateTime?
+  suppressedByStaff Boolean                     @default(false)
+  sourceType        String // conversation | operation | manual
+  sourceId          String?
+  sourceHash        String
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 
   edgesFrom SageMemoryEdge[] @relation("MemoryEdgeFrom")
   edgesTo   SageMemoryEdge[] @relation("MemoryEdgeTo")

@@ -125,7 +125,7 @@ export const DELETE = withTeacherAuth(async (
       subjectId: studentId,
       validTo: null,
     },
-    data: { validTo: new Date() },
+    data: { validTo: new Date(), suppressedByStaff: true },
   });
   if (count === 0) {
     return NextResponse.json({ error: "Memory not found." }, { status: 404 });

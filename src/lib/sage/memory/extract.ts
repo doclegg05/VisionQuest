@@ -181,8 +181,8 @@ export async function extractAndStoreMemories({
         where: {
           subjectType: "student",
           subjectId: studentId,
-          validTo: null,
           sourceHash: { in: hashes },
+          OR: [{ validTo: null }, { suppressedByStaff: true }],
         },
         select: { sourceHash: true },
       });
@@ -213,7 +213,7 @@ export async function extractAndStoreMemories({
           SELECT id FROM "visionquest"."SageMemory"
           WHERE "subjectType" = ${candidate.subjectType}
             AND "subjectId" = ${candidate.subjectId}
-            AND "validTo" IS NULL
+            AND ("validTo" IS NULL OR "suppressedByStaff" = true)
             AND embedding IS NOT NULL
             AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
           LIMIT 1

@@ -239,6 +239,38 @@ describe("extractAndStoreMemories", () => {
     assert.equal(mockCreate.mock.callCount(), 0);
   });
 
+  it("does not re-insert a memory whose sourceHash was staff-suppressed", async () => {
+    const suppressedHash = sourceHashFor({
+      subjectType: "student",
+      subjectId: "stu-1",
+      content: "Wants to become a CNA.",
+    });
+    // No active row (validTo IS NULL) matches, but a staff-suppressed
+    // archived row with the same hash exists — the hash pre-check as
+    // written today only looks at active rows and would miss this. The
+    // suppressedByStaff condition is Prisma-valid as a nested `OR` clause
+    // (ANDing it as a flat top-level key would wrongly exclude ordinary
+    // active rows), so detect it anywhere in the where clause rather than
+    // only as a flat property.
+    mockFindMany.mock.mockImplementation(async (args: any) => {
+      if (args.where.sourceHash) {
+        return JSON.stringify(args.where).includes("suppressedByStaff")
+          ? [{ sourceHash: suppressedHash }]
+          : [];
+      }
+      return [];
+    });
+
+    const result = await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+    assert.equal(result.stored, 1, "the CNA fact should be suppressed; the transportation fact should still store");
+    assert.equal(result.deduped, 1);
+  });
+
   it("serializes concurrent extractions for the same student via advisory lock", async () => {
     // Simulate two callers racing: track advisory-lock acquisition order and
     // ensure the second caller's semantic-dup check only proceeds after the

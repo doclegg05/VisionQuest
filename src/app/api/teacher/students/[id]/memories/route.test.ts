@@ -79,4 +79,15 @@ describe("DELETE /api/teacher/students/[id]/memories", () => {
     assert.equal(mockInvalidate.mock.callCount(), 1);
     assert.equal(mockInvalidate.mock.calls[0].arguments[0], "chat:profile:stu-1");
   });
+
+  it("marks the memory as staff-suppressed, not just archived", async () => {
+    const req = new Request("http://localhost", {
+      method: "DELETE",
+      body: JSON.stringify({ memoryId: "cktest0000000000000000000" }),
+    });
+    await DELETE(req, { params });
+    const updateArgs = mockUpdateMany.mock.calls[0].arguments[0];
+    assert.equal(updateArgs.data.suppressedByStaff, true);
+    assert.ok(updateArgs.data.validTo instanceof Date);
+  });
 });
