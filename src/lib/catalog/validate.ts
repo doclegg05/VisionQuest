@@ -22,7 +22,7 @@ export function validateNode(node: CatalogNode, expected: ExpectedHardFields, ct
   if (fm.vq_status !== "draft" && fm.vq_status !== "approved") push("required", "vq_status invalid");
 
   for (const [k, v] of Object.entries(expected) as [keyof ExpectedHardFields, string | undefined][]) {
-    if ((fm as Record<string, unknown>)[k] !== v) push("drift", `${k} drifted: catalog=${(fm as Record<string, unknown>)[k]} source=${v}`);
+    if ((fm as unknown as Record<string, unknown>)[k] !== v) push("drift", `${k} drifted: catalog=${(fm as unknown as Record<string, unknown>)[k]} source=${v}`);
   }
 
   if (fm.vq_status === "approved" && !node.sections.whenToUse.trim()) push("empty-approved", "approved node has empty 'When to use'");
