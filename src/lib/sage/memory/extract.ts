@@ -107,13 +107,32 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * Serializes concurrent extractions for the same subject. The dedupe-check-
- * then-insert sequence below is not otherwise atomic (embedTexts is a
- * network call sitting between the SELECT and the INSERT), so two
- * concurrent extractions for the same student could both pass the semantic
- * pre-check before either commits. pg_advisory_xact_lock is transaction-
- * scoped — it releases automatically at commit/rollback, so a second
- * concurrent caller blocks here until the first caller's transaction ends.
+ * Serializes concurrent extractions for the same subject via a mutual-
+ * exclusion lock only — `fn()` does NOT run inside the lock-holding
+ * transaction. The advisory lock is acquired on `tx`, but `fn()` (the hash
+ * pre-check `findMany`, the semantic-dup `$queryRaw`, `sageMemory.create`,
+ * and the embedding `$executeRaw` UPDATE) runs against the outer
+ * module-level `prisma` client on its own connection(s), committing
+ * independently of — and typically before — the lock-holding transaction
+ * itself commits.
+ *
+ * This is still correct for closing the semantic-dedupe race the lock was
+ * built for: the dedupe-check-then-insert sequence in `fn()` is not
+ * otherwise atomic (embedTexts is a network call sitting between the
+ * SELECT and the INSERT), so two concurrent extractions for the same
+ * student could both pass the semantic pre-check before either commits.
+ * pg_advisory_xact_lock is transaction-scoped — it releases automatically
+ * at commit/rollback — and this function's transaction does not commit
+ * until `fn()` has resolved. So a second concurrent caller genuinely
+ * blocks here until the first caller's entire `fn()` (including its own
+ * writes) has finished, not merely until the first caller reaches some
+ * midpoint.
+ *
+ * Tradeoff: each in-flight extraction now holds one pooled connection for
+ * the lock's duration, on top of whatever connections `fn()`'s own queries
+ * and the `embedTexts` network call consume from the same pool. This is a
+ * connection-amplification cost worth watching if concurrent load
+ * increases; not a concern at current alpha-stage, low-traffic volumes.
  */
 async function withSubjectLock<T>(subjectId: string, fn: () => Promise<T>): Promise<T> {
   return prisma.$transaction(
