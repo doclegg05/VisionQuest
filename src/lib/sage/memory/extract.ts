@@ -105,6 +105,25 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+/**
+ * Serializes concurrent extractions for the same subject. The dedupe-check-
+ * then-insert sequence below is not otherwise atomic (embedTexts is a
+ * network call sitting between the SELECT and the INSERT), so two
+ * concurrent extractions for the same student could both pass the semantic
+ * pre-check before either commits. pg_advisory_xact_lock is transaction-
+ * scoped — it releases automatically at commit/rollback, so a second
+ * concurrent caller blocks here until the first caller's transaction ends.
+ */
+async function withSubjectLock<T>(subjectId: string, fn: () => Promise<T>): Promise<T> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subjectId})::bigint)`;
+      return fn();
+    },
+    { timeout: 30_000 },
+  );
+}
+
 export async function extractAndStoreMemories({
   provider,
   studentId,
@@ -135,92 +154,94 @@ export async function extractAndStoreMemories({
         }),
       );
 
-    const hashes = candidates.map((candidate) => sourceHashFor(candidate));
-    const existing = await prisma.sageMemory.findMany({
-      where: {
-        subjectType: "student",
-        subjectId: studentId,
-        validTo: null,
-        sourceHash: { in: hashes },
-      },
-      select: { sourceHash: true },
-    });
-    const existingHashes = new Set(existing.map((row) => row.sourceHash));
+    return await withSubjectLock(studentId, async () => {
+      const hashes = candidates.map((candidate) => sourceHashFor(candidate));
+      const existing = await prisma.sageMemory.findMany({
+        where: {
+          subjectType: "student",
+          subjectId: studentId,
+          validTo: null,
+          sourceHash: { in: hashes },
+        },
+        select: { sourceHash: true },
+      });
+      const existingHashes = new Set(existing.map((row) => row.sourceHash));
 
-    const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
-    let deduped = candidates.length - fresh.length;
-    if (fresh.length === 0) return { stored: 0, deduped, rejected };
+      const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
+      let deduped = candidates.length - fresh.length;
+      if (fresh.length === 0) return { stored: 0, deduped, rejected };
 
-    const vectors = await embedTexts(
-      fresh.map((candidate) => candidate.content),
-      {
-        taskType: "RETRIEVAL_DOCUMENT",
-        usage: { studentId, callSite: "sage_memory_extract" },
-      },
-    );
+      const vectors = await embedTexts(
+        fresh.map((candidate) => candidate.content),
+        {
+          taskType: "RETRIEVAL_DOCUMENT",
+          usage: { studentId, callSite: "sage_memory_extract" },
+        },
+      );
 
-    let stored = 0;
-    const insertedVectors: number[][] = [];
-    for (let i = 0; i < fresh.length; i++) {
-      const candidate = fresh[i];
+      let stored = 0;
+      const insertedVectors: number[][] = [];
+      for (let i = 0; i < fresh.length; i++) {
+        const candidate = fresh[i];
 
-      // Semantic dedupe layer 1: rephrased versions of facts already in the
-      // DB (the hash layer only catches near-verbatim restatements).
-      const dupDistance = getDupDistance();
-      const vectorLiteral = toVectorLiteral(vectors[i]);
-      const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "visionquest"."SageMemory"
-        WHERE "subjectType" = ${candidate.subjectType}
-          AND "subjectId" = ${candidate.subjectId}
-          AND "validTo" IS NULL
-          AND embedding IS NOT NULL
-          AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
-        LIMIT 1
-      `;
-      if (semanticDup.length > 0) {
-        deduped++;
-        continue;
-      }
-
-      // Semantic dedupe layer 2: near-duplicates within this same batch
-      // (the model sometimes emits the same fact twice in one response).
-      if (insertedVectors.some((vector) => cosineDistance(vector, vectors[i]) <= dupDistance)) {
-        deduped++;
-        continue;
-      }
-
-      try {
-        const row = await prisma.sageMemory.create({
-          data: {
-            subjectType: candidate.subjectType,
-            subjectId: candidate.subjectId,
-            kind: candidate.kind,
-            content: candidate.content,
-            category: candidate.category,
-            confidence: candidate.confidence,
-            sourceType: candidate.sourceType,
-            sourceId: candidate.sourceId,
-            sourceHash: sourceHashFor(candidate),
-          },
-          select: { id: true },
-        });
-        await prisma.$executeRaw`
-          UPDATE "visionquest"."SageMemory"
-          SET embedding = ${vectorLiteral}::vector(768)
-          WHERE id = ${row.id}
+        // Semantic dedupe layer 1: rephrased versions of facts already in the
+        // DB (the hash layer only catches near-verbatim restatements).
+        const dupDistance = getDupDistance();
+        const vectorLiteral = toVectorLiteral(vectors[i]);
+        const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT id FROM "visionquest"."SageMemory"
+          WHERE "subjectType" = ${candidate.subjectType}
+            AND "subjectId" = ${candidate.subjectId}
+            AND "validTo" IS NULL
+            AND embedding IS NOT NULL
+            AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
+          LIMIT 1
         `;
-        insertedVectors.push(vectors[i]);
-        stored++;
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          deduped++; // raced with a concurrent extraction — index did its job
-        } else {
-          throw error;
+        if (semanticDup.length > 0) {
+          deduped++;
+          continue;
+        }
+
+        // Semantic dedupe layer 2: near-duplicates within this same batch
+        // (the model sometimes emits the same fact twice in one response).
+        if (insertedVectors.some((vector) => cosineDistance(vector, vectors[i]) <= dupDistance)) {
+          deduped++;
+          continue;
+        }
+
+        try {
+          const row = await prisma.sageMemory.create({
+            data: {
+              subjectType: candidate.subjectType,
+              subjectId: candidate.subjectId,
+              kind: candidate.kind,
+              content: candidate.content,
+              category: candidate.category,
+              confidence: candidate.confidence,
+              sourceType: candidate.sourceType,
+              sourceId: candidate.sourceId,
+              sourceHash: sourceHashFor(candidate),
+            },
+            select: { id: true },
+          });
+          await prisma.$executeRaw`
+            UPDATE "visionquest"."SageMemory"
+            SET embedding = ${vectorLiteral}::vector(768)
+            WHERE id = ${row.id}
+          `;
+          insertedVectors.push(vectors[i]);
+          stored++;
+        } catch (error) {
+          if (isUniqueViolation(error)) {
+            deduped++; // raced with a concurrent extraction — index did its job
+          } else {
+            throw error;
+          }
         }
       }
-    }
 
-    return { stored, deduped, rejected };
+      return { stored, deduped, rejected };
+    });
   } catch (error) {
     logger.error("Memory extraction failed (non-fatal)", {
       conversationId,
