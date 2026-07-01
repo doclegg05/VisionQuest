@@ -94,6 +94,8 @@ describe("looksLikeInstructionToSage", () => {
     assert.ok(!looksLikeInstructionToSage("Wants to become a certified nursing assistant."));
     assert.ok(!looksLikeInstructionToSage("Struggles with fractions and always gets nervous before tests."));
     assert.ok(!looksLikeInstructionToSage("Prefers texting over email for reminders."));
+    assert.ok(!looksLikeInstructionToSage("Never received career advice from a school counselor before this program."));
+    assert.ok(!looksLikeInstructionToSage("Student's family experienced a housing crisis last winter and never fully recovered financially."));
   });
 });
 
