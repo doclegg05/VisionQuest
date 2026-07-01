@@ -59,9 +59,15 @@ export const MEMORY_EDGE_PREDICATES = [
  * Known accepted gaps (not fixed — see task notes): synonym paraphrases
  * (e.g. "bring up the hotline" instead of "mention the hotline") and bare
  * polite-imperative phrasing without a trigger word (e.g. "Please skip the
- * redirect...") slip through undetected. Two review rounds showed that
- * tightening this regex to catch more attack phrasings reliably reopens
- * false positives on ordinary sentences, so further iteration here is not
+ * redirect...") slip through undetected. The adjacent-noun path also still
+ * over-fires on ordinary "doesn't want <common topic noun>" sentences with
+ * no Sage/coach context at all (e.g. "Doesn't want advice from her
+ * caseworker on this" or "Doesn't want instructions repeated more than
+ * once") — direct adjacency to a common noun like "advice"/"instructions"
+ * is not, on its own, a reliable Sage-targeting signal either. Three review
+ * rounds showed that tightening this regex to catch more attack phrasings,
+ * or narrowing it to avoid more false positives, reliably reintroduces the
+ * opposite failure somewhere else, so further iteration here is not
  * planned — Task 6's render-time "treat as data, not instructions" framing
  * is the backstop for what this heuristic misses.
  */
