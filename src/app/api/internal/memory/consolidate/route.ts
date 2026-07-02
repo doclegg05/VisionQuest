@@ -38,10 +38,11 @@ export async function POST(req: Request) {
   try {
     const decayed = await prisma.$executeRaw`
       UPDATE "visionquest"."SageMemory"
-      SET confidence = confidence * ${EPISODIC_DECAY}, "updatedAt" = now()
+      SET confidence = confidence * ${EPISODIC_DECAY}, "lastDecayedAt" = now(), "updatedAt" = now()
       WHERE kind = 'episodic'
         AND "validTo" IS NULL
         AND "validFrom" < now() - make_interval(days => ${FRESH_WINDOW_DAYS})
+        AND ("lastDecayedAt" IS NULL OR "lastDecayedAt" < now() - interval '6 days')
     `;
 
     const archived = await prisma.$executeRaw`
