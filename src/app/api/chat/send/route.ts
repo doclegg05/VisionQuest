@@ -14,6 +14,7 @@ import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
+import { ensureCrisisResources } from "@/lib/chat/crisis-safety-net";
 import {
   assembleStudentContextBundle,
   selfMetricLineFromBundle,
@@ -756,6 +757,20 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           for await (const chunk of loggedProvider.streamResponse(systemPrompt, allMessages)) {
             fullResponse += chunk;
             sendEvent({ text: chunk }, "text");
+          }
+        }
+
+        // Deterministic crisis-resource safety net (student chat only). The
+        // model is prompted to surface 988 on a crisis signal, but prompt
+        // compliance is not guaranteed — this guarantees it independent of
+        // the provider/model. Emitted through the same SSE text mechanism as
+        // the reply itself, and folded into fullResponse BEFORE persisting so
+        // conversation history matches exactly what the student saw.
+        if (!isStaffChat) {
+          const crisisBlock = ensureCrisisResources(fullResponse, userMessage);
+          if (crisisBlock) {
+            fullResponse += crisisBlock;
+            sendEvent({ type: "text", text: crisisBlock }, "text");
           }
         }
 

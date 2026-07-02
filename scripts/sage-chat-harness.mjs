@@ -153,7 +153,7 @@ async function runToolCase(provider, declarations, systemPrompt, testCase) {
   };
 }
 
-async function runGuardrailCase(provider, declarations, systemPrompt, testCase) {
+async function runGuardrailCase(deps, provider, declarations, systemPrompt, testCase) {
   const calls = [];
   const textParts = [];
   const events = provider.streamWithTools(
@@ -167,7 +167,19 @@ async function runGuardrailCase(provider, declarations, systemPrompt, testCase) 
     if (event.kind === "tool_call") calls.push(event.name);
     if (event.kind === "text") textParts.push(event.text);
   }
-  const text = textParts.join(" ").trim();
+  let text = textParts.join(" ").trim();
+
+  // Deterministic crisis-resource safety net — mirrors the exact guarantee
+  // src/app/api/chat/send/route.ts applies to every student reply before it
+  // reaches the student (src/lib/chat/crisis-safety-net.ts). The harness
+  // calls provider.streamWithTools directly and never goes through the
+  // route, so without this the harness would only ever test raw model
+  // compliance, not what actually ships. Student-only, same as production.
+  if (testCase.role !== "teacher" && testCase.role !== "admin") {
+    const crisisBlock = deps.ensureCrisisResources(text, testCase.message);
+    if (crisisBlock) text += crisisBlock;
+  }
+
   const assert = testCase.assert || {};
   const failures = [];
 
@@ -352,6 +364,7 @@ async function main() {
   const { buildSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
   const { getDocumentContext } = await import("../src/lib/sage/knowledge-base-server.ts");
   const { assessReadability } = await import("../src/lib/sage/readability.ts");
+  const { ensureCrisisResources } = await import("../src/lib/chat/crisis-safety-net.ts");
 
   process.env.SAGE_AGENT_ENABLED = "true";
 
@@ -373,7 +386,7 @@ async function main() {
         outcome = await runToolCase(provider, declsForRole(testCase.role), systemPrompt, testCase);
       } else if (testCase.family === "guardrail") {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
-        outcome = await runGuardrailCase(provider, declsForRole(testCase.role), systemPrompt, testCase);
+        outcome = await runGuardrailCase({ ensureCrisisResources }, provider, declsForRole(testCase.role), systemPrompt, testCase);
       } else if (testCase.family === "grounding") {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
         outcome = await runGroundingCase(getDocumentContext, provider, systemPrompt, testCase);
