@@ -20,7 +20,13 @@ mock.module("@/lib/ai/embeddings", {
     embedQuery: mockEmbedQuery,
     toVectorLiteral: (v: number[]) => `[${v.join(",")}]`,
     EMBEDDING_DIMENSIONS: 768,
-    EMBEDDING_MODEL: "gemini-embedding-001",
+  },
+});
+
+const ACTIVE_MODEL = "gemini-embedding-001";
+mock.module("@/lib/ai/embedding-provider", {
+  namedExports: {
+    getActiveEmbeddingModel: async () => ACTIVE_MODEL,
   },
 });
 
@@ -82,7 +88,7 @@ describe("hybridSearchDocuments", () => {
     });
   });
 
-  it("passes role and limit through to the SQL call", async () => {
+  it("passes role, query_model, and limit through to the SQL call", async () => {
     await hybridSearchDocuments("dress code", "staff", 7);
     assert.equal(mockQueryRaw.mock.callCount(), 1);
     const args = mockQueryRaw.mock.calls[0].arguments;
@@ -90,6 +96,23 @@ describe("hybridSearchDocuments", () => {
     const params = args.slice(1);
     assert.ok(params.includes("staff"), `expected role param, got ${JSON.stringify(params)}`);
     assert.ok(params.includes(7), `expected limit param, got ${JSON.stringify(params)}`);
+    // The active embedding model is threaded as the query_model guard arg.
+    assert.ok(
+      params.includes(ACTIVE_MODEL),
+      `expected query_model param, got ${JSON.stringify(params)}`,
+    );
+  });
+
+  it("threads the active model into the getBestChunks chunk query", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      { documentId: "d1", content: "chunk A", pageNumber: 1, sectionTitle: null, distance: 0.2 },
+    ]);
+    await getBestChunks(["d1"], "dress code", 2);
+    const params = mockQueryRaw.mock.calls[0].arguments.slice(1);
+    assert.ok(
+      params.includes(ACTIVE_MODEL),
+      `expected query_model param in chunk query, got ${JSON.stringify(params)}`,
+    );
   });
 
   it("builds an OR-joined websearch query from message keywords", async () => {

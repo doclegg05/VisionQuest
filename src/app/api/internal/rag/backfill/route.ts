@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
-import { backfillProgramDocumentEmbeddings } from "@/lib/sage/backfill-embeddings";
+import {
+  backfillProgramDocumentEmbeddings,
+  backfillSageMemoryEmbeddings,
+} from "@/lib/sage/backfill-embeddings";
 
 // ~50 docs at 1-2 minutes total; give the embed loop room on Render.
 export const maxDuration = 300;
@@ -13,7 +16,10 @@ function isAuthorized(req: Request) {
   return authHeader === `Bearer ${secret}`;
 }
 
-const bodySchema = z.object({ force: z.boolean().optional() });
+const bodySchema = z.object({
+  force: z.boolean().optional(),
+  reembed: z.boolean().optional(),
+});
 
 /**
  * POST /api/internal/rag/backfill
@@ -34,6 +40,7 @@ export async function POST(req: Request) {
   }
 
   let force = false;
+  let reembed = false;
   const raw = await req.text();
   if (raw) {
     let json: unknown;
@@ -47,14 +54,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
     force = parsed.data.force ?? false;
+    reembed = parsed.data.reembed ?? false;
   }
 
   const start = Date.now();
   try {
-    const tally = await backfillProgramDocumentEmbeddings({ force });
+    const tally = await backfillProgramDocumentEmbeddings({ force, reembed });
+    // Re-embed mode also refreshes model-stale Sage memories.
+    const memory = reembed ? await backfillSageMemoryEmbeddings() : undefined;
     const durationMs = Date.now() - start;
-    logger.info("RAG embedding backfill complete", { ...tally, force, durationMs });
-    return NextResponse.json({ success: true, data: { ...tally, durationMs } });
+    logger.info("RAG embedding backfill complete", { ...tally, force, reembed, memory, durationMs });
+    return NextResponse.json({ success: true, data: { ...tally, memory, durationMs } });
   } catch (error) {
     logger.error("RAG embedding backfill failed", {
       error: error instanceof Error ? error.message : String(error),
