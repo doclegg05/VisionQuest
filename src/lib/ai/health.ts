@@ -109,6 +109,7 @@ async function validateChatPath(
   model: string,
   headers: Record<string, string>,
   timeoutMs: number,
+  openAiOnly: boolean,
 ): Promise<{ ok: boolean; apiMode: "openai" | "native"; error?: string }> {
   if (apiMode === "openai") {
     const openAiResponse = await probeOpenAiChat(
@@ -120,7 +121,9 @@ async function validateChatPath(
     if (openAiResponse.ok) {
       return { ok: true, apiMode: "openai" };
     }
-    if (openAiResponse.status !== 404) {
+    // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
+    // only expose /v1/* — never probe native /api/chat for them.
+    if (openAiOnly || openAiResponse.status !== 404) {
       return {
         ok: false,
         apiMode: "openai",
@@ -168,35 +171,15 @@ export async function checkOllamaHealth(
     };
   }
 
-  try {
-    const tagsResponse = await fetchWithTimeout(
-      `${normalizedBaseUrl}/api/tags`,
-      timeoutMs,
-      { headers },
-    );
+  const openAiOnly = derivedOptions.authConfig?.apiStyle === "openai";
 
+  try {
     let models: string[] = [];
     let apiMode: "openai" | "native" = "native";
 
-    if (tagsResponse.ok) {
-      models = getModelsFromTagsPayload(await tagsResponse.json());
-
-      const openAICompatibility = await fetchWithTimeout(
-        `${normalizedBaseUrl}/v1/models`,
-        timeoutMs,
-        { headers },
-      ).catch(() => null);
-
-      if (openAICompatibility?.ok) {
-        const openAiModels = getModelsFromOpenAIPayload(
-          await openAICompatibility.json(),
-        );
-        if (openAiModels.length > 0) {
-          models = Array.from(new Set([...models, ...openAiModels]));
-        }
-        apiMode = "openai";
-      }
-    } else {
+    if (openAiOnly) {
+      // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp
+      // server) don't expose /api/tags — go straight to /v1/models.
       const openAIResponse = await fetchWithTimeout(
         `${normalizedBaseUrl}/v1/models`,
         timeoutMs,
@@ -204,11 +187,50 @@ export async function checkOllamaHealth(
       );
 
       if (!openAIResponse.ok) {
-        return { healthy: false, error: `Server returned ${tagsResponse.status}` };
+        return { healthy: false, error: `Server returned ${openAIResponse.status}` };
       }
 
       models = getModelsFromOpenAIPayload(await openAIResponse.json());
       apiMode = "openai";
+    } else {
+      const tagsResponse = await fetchWithTimeout(
+        `${normalizedBaseUrl}/api/tags`,
+        timeoutMs,
+        { headers },
+      );
+
+      if (tagsResponse.ok) {
+        models = getModelsFromTagsPayload(await tagsResponse.json());
+
+        const openAICompatibility = await fetchWithTimeout(
+          `${normalizedBaseUrl}/v1/models`,
+          timeoutMs,
+          { headers },
+        ).catch(() => null);
+
+        if (openAICompatibility?.ok) {
+          const openAiModels = getModelsFromOpenAIPayload(
+            await openAICompatibility.json(),
+          );
+          if (openAiModels.length > 0) {
+            models = Array.from(new Set([...models, ...openAiModels]));
+          }
+          apiMode = "openai";
+        }
+      } else {
+        const openAIResponse = await fetchWithTimeout(
+          `${normalizedBaseUrl}/v1/models`,
+          timeoutMs,
+          { headers },
+        );
+
+        if (!openAIResponse.ok) {
+          return { healthy: false, error: `Server returned ${tagsResponse.status}` };
+        }
+
+        models = getModelsFromOpenAIPayload(await openAIResponse.json());
+        apiMode = "openai";
+      }
     }
 
     const modelToUse = chooseModel(derivedOptions.model, models);
@@ -226,6 +248,7 @@ export async function checkOllamaHealth(
       modelToUse,
       headers,
       timeoutMs,
+      openAiOnly,
     );
 
     if (!chatValidation.ok) {
