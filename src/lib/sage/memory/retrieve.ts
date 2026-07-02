@@ -11,6 +11,7 @@
 
 import { prisma } from "@/lib/db";
 import { embedQuery, toVectorLiteral } from "@/lib/ai/embeddings";
+import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { logger } from "@/lib/logger";
 import { sanitizeForPrompt } from "../system-prompts";
 
@@ -63,6 +64,7 @@ export async function retrieveMemories(
 ): Promise<RetrievedMemory[]> {
   try {
     const vectorLiteral = toVectorLiteral(await embedQuery(query));
+    const queryModel = await getActiveEmbeddingModel();
 
     const rows = await prisma.$queryRaw<MemoryRow[]>`
       SELECT id, kind, content, category, confidence, "validFrom",
@@ -72,6 +74,7 @@ export async function retrieveMemories(
         AND "subjectId" = ${subjectId}
         AND "validTo" IS NULL
         AND embedding IS NOT NULL
+        AND "embeddingModel" = ${queryModel}
       ORDER BY embedding <=> ${vectorLiteral}::vector(768)
       LIMIT ${CANDIDATE_POOL}::int
     `;

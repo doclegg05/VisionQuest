@@ -17,6 +17,7 @@
 
 import { prisma } from "@/lib/db";
 import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
+import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { logLlmCall } from "@/lib/llm-usage";
 import { logger } from "@/lib/logger";
 import type { AIProvider } from "@/lib/ai/types";
@@ -218,6 +219,8 @@ export async function extractAndStoreMemories({
           usage: { studentId, callSite: "sage_memory_extract" },
         },
       );
+      // Provenance for the memory guard: same-model invariant as embedTexts above.
+      const activeModel = await getActiveEmbeddingModel();
 
       let stored = 0;
       const insertedVectors: number[][] = [];
@@ -266,7 +269,8 @@ export async function extractAndStoreMemories({
           });
           await prisma.$executeRaw`
             UPDATE "visionquest"."SageMemory"
-            SET embedding = ${vectorLiteral}::vector(768)
+            SET embedding = ${vectorLiteral}::vector(768),
+                "embeddingModel" = ${activeModel}
             WHERE id = ${row.id}
           `;
           insertedVectors.push(vectors[i]);
