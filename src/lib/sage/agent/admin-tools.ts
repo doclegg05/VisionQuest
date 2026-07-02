@@ -108,6 +108,7 @@ const getSystemStatus: AgentTool = {
     description: "Show AI provider + config status",
   },
   requiredRoles: ["admin"],
+  riskTier: "read",
   enabled: true,
   async execute(): Promise<AgentToolResult> {
     const readable = await Promise.all(
@@ -156,6 +157,7 @@ const setSystemConfig: AgentTool = {
     required: ["key", "value"],
   },
   requiredRoles: ["admin"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const key = String(args.key ?? "").trim();

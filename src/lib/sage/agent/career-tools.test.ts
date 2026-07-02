@@ -48,6 +48,21 @@ mock.module("../operations", {
   },
 });
 
+// Stub the executor's per-tool rate limit so these tests don't hit the real
+// RateLimitEntry store (DB). Covered by rate-limit.test.ts.
+mock.module("./rate-limit", {
+  namedExports: {
+    checkToolRateLimit: async () => ({
+      allowed: true,
+      remaining: 99,
+      resetTime: Date.now() + 86_400_000,
+      limit: 100,
+      window: "day",
+    }),
+    rateLimitMessage: () => "rate limited",
+  },
+});
+
 let executeAgentTool: typeof import("./executor").executeAgentTool;
 let createConfirmationToken: typeof import("./confirmation").createConfirmationToken;
 

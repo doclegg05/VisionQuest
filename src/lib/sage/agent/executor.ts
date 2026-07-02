@@ -11,6 +11,7 @@ import { logAuditEvent } from "@/lib/audit";
 import type { Session } from "@/lib/api-error";
 import { getToolByName, findToolBySlashCommand } from "./tools";
 import { validateToolArgs } from "./validation";
+import { checkToolRateLimit, rateLimitMessage } from "./rate-limit";
 import type { AgentTool, AgentToolCallRecord, AgentToolResult } from "./types";
 
 export interface ExecuteToolOptions {
@@ -62,6 +63,45 @@ export async function executeAgentTool(
         modelHint:
           `Your ${toolName} tool call did not match the declared schema. ` +
           `${validation.error} Call the tool again with only valid JSON arguments.`,
+      },
+    );
+  }
+
+  // Per-student per-tool rate limit — enforced BEFORE execute so a runaway
+  // loop can't hammer a tool. Composes with (does not replace) the token/cost
+  // quota checked upstream in the chat route. Blocked → friendly, audited
+  // error record, same as other pre-execution rejections.
+  const rateDecision = await checkToolRateLimit(session.id, toolName, tool.riskTier);
+  if (!rateDecision.allowed) {
+    void logAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      action: `sage.tool.${toolName}.rate_limited`,
+      targetType: "sage_conversation",
+      targetId: conversationId,
+      summary: `Sage tool "${toolName}" blocked by rate limit (${rateDecision.limit}/${rateDecision.window}).`,
+      metadata: {
+        callId,
+        tier: tool.riskTier,
+        limit: rateDecision.limit,
+        window: rateDecision.window,
+        resetTime: rateDecision.resetTime,
+        targetStudentId: targetStudentId ?? null,
+      },
+    }).catch((err) => {
+      logger.warn("agent.executor: rate-limit audit log failed", { err: String(err), toolName });
+    });
+    return errorRecord(
+      callId,
+      toolName,
+      validation.args,
+      startedAt,
+      rateLimitMessage(toolName, rateDecision),
+      {
+        modelHint:
+          `The ${toolName} tool is rate-limited for this student right now ` +
+          `(${rateDecision.limit} per ${rateDecision.window}). Do NOT retry it this turn — ` +
+          "tell the user plainly they've hit the limit and can try again later.",
       },
     );
   }

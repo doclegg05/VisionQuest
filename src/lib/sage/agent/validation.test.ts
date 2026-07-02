@@ -17,6 +17,7 @@ const sampleTool: AgentTool = {
     required: ["query"],
   },
   requiredRoles: ["student"],
+  riskTier: "read",
   enabled: true,
   async execute() {
     return { status: "success", summary: "ok" };

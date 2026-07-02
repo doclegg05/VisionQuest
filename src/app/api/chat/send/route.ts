@@ -33,14 +33,11 @@ import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
 import { runAgentTurn } from "@/lib/sage/agent/loop";
 import { executeSlashCommand } from "@/lib/sage/agent/executor";
+import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
 const CHAT_SSE_HEARTBEAT_MS = 15_000;
-
-function isAgentEnabled(): boolean {
-  return process.env.SAGE_AGENT_ENABLED?.trim().toLowerCase() !== "false";
-}
 
 const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|bye|goodbye|cya)[!.,?]*$/i;
 
@@ -626,14 +623,14 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           callSite: "sage_chat",
         });
 
-        const agentMode = isAgentEnabled();
+        const agentLoopEnabled = isAgentLoopEnabled();
 
         // Slash-command fast path: invoke the tool directly without going
         // through the model when it maps to a registered tool. Unknown slash
         // prompts fall through to the regular agent loop so legacy coaching
         // prompts like "/goal" still get a real response.
         let handledSlashCommand = false;
-        if (agentMode && userMessage.startsWith("/")) {
+        if (agentLoopEnabled && userMessage.startsWith("/")) {
           const slashOutcome = await executeSlashCommand(
             userMessage,
             session,
@@ -699,7 +696,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
         if (handledSlashCommand) {
           // Tool summary has already been emitted as the assistant response.
-        } else if (agentMode) {
+        } else if (agentLoopEnabled) {
           // Agent loop — model may emit tool calls mid-turn.
           const agentEvents = runAgentTurn({
             provider: loggedProvider,
