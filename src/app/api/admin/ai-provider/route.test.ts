@@ -26,6 +26,24 @@ const mockCheckOllamaHealth = mock.fn<
     modelUsed?: string;
   }>
 >();
+const mockDetectModelCapabilities = mock.fn<
+  (cfg: unknown) => Promise<{
+    reachable: boolean;
+    apiMode: "openai" | "native" | null;
+    chatValidated: boolean;
+    supportsTools: boolean;
+    supportsJsonOutput: boolean;
+    contextLength: number | null;
+    embedding: {
+      reachable: boolean;
+      model: string | null;
+      dims: number | null;
+      matches768: boolean;
+    };
+    installedModels: Array<{ name: string; likelyEmbedding: boolean }>;
+    warnings: string[];
+  }>
+>();
 const mockReadLocalAiProviderConfig = mock.fn<
   () => Promise<{
     url: string | null;
@@ -95,6 +113,7 @@ mock.module("@/lib/audit", {
 mock.module("@/lib/ai", {
   namedExports: {
     checkOllamaHealth: mockCheckOllamaHealth,
+    detectModelCapabilities: mockDetectModelCapabilities,
     DEFAULT_LOCAL_AI_AUTH_MODE: "none",
     readLocalAiProviderConfig: mockReadLocalAiProviderConfig,
     resolveLocalAiAuthMode: (authMode?: string | null) => {
@@ -134,6 +153,7 @@ describe("admin AI provider routes", () => {
     mockGetConfigValue.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
     mockCheckOllamaHealth.mock.resetCalls();
+    mockDetectModelCapabilities.mock.resetCalls();
     mockReadLocalAiProviderConfig.mock.resetCalls();
 
     mockSetPlainConfigValue.mock.mockImplementation(async () => undefined);
@@ -147,6 +167,17 @@ describe("admin AI provider routes", () => {
       models: ["gemma4:26b"],
       chatValidated: true,
       modelUsed: "gemma4:26b",
+    }));
+    mockDetectModelCapabilities.mock.mockImplementation(async () => ({
+      reachable: true,
+      apiMode: "native",
+      chatValidated: true,
+      supportsTools: true,
+      supportsJsonOutput: true,
+      contextLength: 32768,
+      embedding: { reachable: true, model: "nomic-embed-text", dims: 768, matches768: true },
+      installedModels: [{ name: "gemma4:26b", likelyEmbedding: false }],
+      warnings: [],
     }));
     mockReadLocalAiProviderConfig.mock.mockImplementation(async () => {
       const [url, model, embeddingModel, authModeRaw, numCtxRaw, apiKey, cloudflareId, cloudflareSecret] =
@@ -358,5 +389,55 @@ describe("admin AI provider routes", () => {
       cloudflareAccessClientSecret: "client-secret",
     });
     assert.equal((call.arguments[1] as { model?: string }).model, "gemma4:latest");
+  });
+
+  it("returns model capabilities alongside the existing health-check fields", async () => {
+    mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider_url") return "https://llm.example.com";
+      if (key === "ai_provider_model") return "gemma4:latest";
+      if (key === "ai_provider_embedding_model") return "nomic-embed-text";
+      return null;
+    });
+    mockDetectModelCapabilities.mock.mockImplementation(async () => ({
+      reachable: true,
+      apiMode: "native",
+      chatValidated: true,
+      supportsTools: false,
+      supportsJsonOutput: true,
+      contextLength: 8192,
+      embedding: { reachable: true, model: "nomic-embed-text", dims: 768, matches768: true },
+      installedModels: [{ name: "gemma4:latest", likelyEmbedding: false }],
+      warnings: ["Tool calling not supported (/api/chat with tools returned 404)."],
+    }));
+
+    const res = await testRoute.POST();
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(mockDetectModelCapabilities.mock.callCount(), 1);
+    // Existing response fields must remain intact alongside the new capabilities field.
+    assert.deepEqual(body.models, ["gemma4:26b"]);
+    assert.equal(body.chatValidated, true);
+    assert.equal(body.modelUsed, "gemma4:26b");
+    assert.ok(body.capabilities);
+    assert.equal(body.capabilities.reachable, true);
+    assert.equal(body.capabilities.supportsTools, false);
+    assert.equal(body.capabilities.embedding.matches768, true);
+    assert.deepEqual(body.capabilities.warnings, [
+      "Tool calling not supported (/api/chat with tools returned 404).",
+    ]);
+
+    const call = mockDetectModelCapabilities.mock.calls[0];
+    assert.deepEqual(call.arguments[0], {
+      url: "https://llm.example.com",
+      model: "gemma4:latest",
+      embeddingModel: "nomic-embed-text",
+      authConfig: {
+        authMode: "none",
+        apiKey: null,
+        cloudflareAccessClientId: null,
+        cloudflareAccessClientSecret: null,
+      },
+    });
   });
 });
