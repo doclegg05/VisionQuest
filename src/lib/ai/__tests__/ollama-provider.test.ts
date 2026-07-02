@@ -473,6 +473,152 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
   });
 
+  describe("onUsage", () => {
+    it("generateResponse reports real usage from OpenAI-compat 'usage' field", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [{ message: { content: "Hello there!" } }],
+          usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
+        }),
+      );
+
+      const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
+      await provider.generateResponse("Be helpful.", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage));
+
+      assert.equal(usages.length, 1);
+      assert.deepEqual(usages[0], {
+        inputTokens: 10,
+        outputTokens: 4,
+        totalTokens: 14,
+        source: "provider",
+      });
+    });
+
+    it("generateResponse falls back to the estimator when 'usage' is absent (older Ollama)", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({ choices: [{ message: { content: "Hi" } }] }),
+      );
+
+      const usages: Array<{ source: string }> = [];
+      await provider.generateResponse("Be helpful.", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage));
+
+      assert.equal(usages.length, 1);
+      assert.equal(usages[0].source, "estimated");
+    });
+
+    it("generateResponse parses prompt_eval_count/eval_count on the native /api/chat path", async () => {
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
+        return Response.json({
+          message: { content: "Hello from native Ollama!" },
+          prompt_eval_count: 20,
+          eval_count: 6,
+        });
+      });
+
+      const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
+      await provider.generateResponse("Be helpful.", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage));
+
+      assert.equal(usages.length, 1);
+      assert.deepEqual(usages[0], {
+        inputTokens: 20,
+        outputTokens: 6,
+        totalTokens: 26,
+        source: "provider",
+      });
+    });
+
+    it("streamResponse reports real usage from the final SSE usage chunk", async () => {
+      const encoder = new TextEncoder();
+      const chunks = [
+        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hello" } }] }) + "\n\n",
+        "data: " + JSON.stringify({ choices: [{ delta: { content: " world" } }] }) + "\n\n",
+        "data: " +
+          JSON.stringify({
+            choices: [{ delta: {}, finish_reason: "stop" }],
+            usage: { prompt_tokens: 8, completion_tokens: 2, total_tokens: 10 },
+          }) +
+          "\n\n",
+        "data: [DONE]\n\n",
+      ];
+      const stream = new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+          controller.close();
+        },
+      });
+      mockFetch.mock.mockImplementationOnce(async () => new Response(stream, { status: 200 }));
+
+      const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage))) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Hello", " world"]);
+      assert.equal(usages.length, 1);
+      assert.deepEqual(usages[0], {
+        inputTokens: 8,
+        outputTokens: 2,
+        totalTokens: 10,
+        source: "provider",
+      });
+
+      // stream_options.include_usage was requested.
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.deepEqual(body.stream_options, { include_usage: true });
+    });
+
+    it("streamResponse falls back to the estimator when no usage chunk arrives", async () => {
+      const encoder = new TextEncoder();
+      const chunks = [
+        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hello" } }] }) + "\n\n",
+        "data: [DONE]\n\n",
+      ];
+      const stream = new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+          controller.close();
+        },
+      });
+      mockFetch.mock.mockImplementationOnce(async () => new Response(stream, { status: 200 }));
+
+      const usages: Array<{ source: string }> = [];
+      for await (const _chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage))) {
+        // drain
+      }
+
+      assert.equal(usages.length, 1);
+      assert.equal(usages[0].source, "estimated");
+    });
+
+    it("does not require onUsage (non-breaking for existing callers)", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({ choices: [{ message: { content: "ok" } }] }),
+      );
+
+      const result = await provider.generateResponse("sys", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      assert.equal(result, "ok");
+    });
+  });
+
   describe("message role mapping", () => {
     it("maps 'model' role to 'assistant' for OpenAI format", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
@@ -725,6 +871,70 @@ describe("OllamaProvider", { concurrency: false }, () => {
       );
       assert.ok(toolMsg, "hop 2 should carry the tool-role message back to the model");
       assert.equal(toolMsg.tool_call_id, "call-1");
+    });
+
+    it("accumulates real usage across hops into one final onUsage call", async () => {
+      // Hop 1: tool call + usage on the final chunk.
+      const hop1Chunks = [
+        `data: ${JSON.stringify({
+          choices: [
+            { delta: { tool_calls: [{ index: 0, id: "call-1", function: { name: "lookup_thing", arguments: '{"id":"abc"}' } }] } },
+          ],
+        })}\n`,
+        `data: ${JSON.stringify({
+          choices: [{ delta: {}, finish_reason: "tool_calls" }],
+          usage: { prompt_tokens: 50, completion_tokens: 5, total_tokens: 55 },
+        })}\n`,
+        `data: [DONE]\n`,
+      ];
+      // Hop 2: text reply + usage on the final chunk (input grows with history).
+      const hop2Chunks = [
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "Got it." } }] })}\n`,
+        `data: ${JSON.stringify({
+          choices: [{ delta: {}, finish_reason: "stop" }],
+          usage: { prompt_tokens: 80, completion_tokens: 3, total_tokens: 83 },
+        })}\n`,
+        `data: [DONE]\n`,
+      ];
+
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        const stream = fetchCount === 1 ? hop1Chunks : hop2Chunks;
+        return new Response(streamFromChunks(stream), { status: 200 });
+      });
+
+      const onToolCall = mock.fn(async () => ({
+        response: { found: true },
+        summary: "Found it.",
+        status: "success" as const,
+      }));
+
+      const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
+      const events: Array<{ kind: string }> = [];
+      for await (const event of provider.streamWithTools(
+        "sys",
+        [{ role: "user", content: "Find abc." }],
+        tools,
+        onToolCall,
+        { onUsage: (usage) => usages.push(usage) },
+      )) {
+        events.push(event as { kind: string });
+      }
+
+      assert.equal(onToolCall.mock.callCount(), 1);
+      assert.equal(events.at(-1)?.kind, "done");
+
+      // One onUsage call for the whole turn, not one per hop.
+      assert.equal(usages.length, 1);
+      // Input tokens take the LATEST hop's value (already includes growing
+      // history); output tokens sum across hops (5 + 3 = 8).
+      assert.deepEqual(usages[0], {
+        inputTokens: 80,
+        outputTokens: 8,
+        totalTokens: 88,
+        source: "provider",
+      });
     });
 
     it("stops at maxHops when the model loops on tool calls", async () => {

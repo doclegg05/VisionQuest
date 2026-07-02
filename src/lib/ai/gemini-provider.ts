@@ -1,8 +1,11 @@
-import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration, type Part, type Schema, type Tool } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration, type Part, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
+import { estimateTokens } from "../llm-usage-estimate";
 import type {
   AIProvider,
   ChatMessage,
+  OnUsage,
+  TokenUsage,
   ToolCallHandler,
   ToolDeclaration,
   ToolParameterSchema,
@@ -36,6 +39,7 @@ export class GeminiProvider implements AIProvider {
   async generateResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
   ): Promise<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
     const model = this.getModel(systemPrompt);
@@ -48,12 +52,15 @@ export class GeminiProvider implements AIProvider {
 
     const lastMessage = messages[messages.length - 1];
     const result = await chat.sendMessage(lastMessage.content);
-    return result.response.text();
+    const text = result.response.text();
+    reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
+    return text;
   }
 
   async *streamResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
   ): AsyncGenerator<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
     const model = this.getModel(systemPrompt);
@@ -67,15 +74,23 @@ export class GeminiProvider implements AIProvider {
     const lastMessage = messages[messages.length - 1];
     const result = await chat.sendMessageStream(lastMessage.content);
 
+    let outputChars = 0;
     for await (const chunk of result.stream) {
       const text = chunk.text();
-      if (text) yield text;
+      if (text) {
+        outputChars += text.length;
+        yield text;
+      }
     }
+
+    const finalResponse = await result.response;
+    reportUsage(onUsage, finalResponse.usageMetadata, systemPrompt, messages, undefined, outputChars);
   }
 
   async generateStructuredResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
   ): Promise<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
     const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -96,7 +111,9 @@ export class GeminiProvider implements AIProvider {
 
     const lastMessage = messages[messages.length - 1];
     const result = await chat.sendMessage(lastMessage.content);
-    return result.response.text();
+    const text = result.response.text();
+    reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
+    return text;
   }
 
   async *streamWithTools(
@@ -129,6 +146,10 @@ export class GeminiProvider implements AIProvider {
     });
 
     let nextParts: string | Part[] = messages[messages.length - 1].content;
+    // Accumulated across hops — one final onUsage call for the whole turn,
+    // not one per hop.
+    let accumulated: TokenUsage | null = null;
+    let outputChars = 0;
 
     for (let hop = 0; hop < maxHops; hop++) {
       const result = await chat.sendMessageStream(nextParts);
@@ -138,6 +159,7 @@ export class GeminiProvider implements AIProvider {
         const parts = chunk.candidates?.[0]?.content?.parts ?? [];
         for (const part of parts) {
           if (typeof part.text === "string" && part.text.length > 0) {
+            outputChars += part.text.length;
             yield { kind: "text", text: part.text };
           }
         }
@@ -145,9 +167,11 @@ export class GeminiProvider implements AIProvider {
 
       // After the stream completes, inspect for function calls.
       const finalResponse = await result.response;
+      accumulated = accumulateUsage(accumulated, finalResponse.usageMetadata);
       const calls = finalResponse.functionCalls() ?? [];
 
       if (calls.length === 0) {
+        reportUsage(options?.onUsage, accumulated, systemPrompt, messages, undefined, outputChars);
         yield { kind: "done", reason: "complete" };
         return;
       }
@@ -194,8 +218,73 @@ export class GeminiProvider implements AIProvider {
       nextParts = responseParts;
     }
 
+    reportUsage(options?.onUsage, accumulated, systemPrompt, messages, undefined, outputChars);
     yield { kind: "done", reason: "max_hops" };
   }
+}
+
+/**
+ * Accumulates Gemini usageMetadata across tool-loop hops. Each hop's
+ * promptTokenCount already includes the growing conversation history, so
+ * input tokens take the LATEST hop's value (not a sum) while output tokens
+ * sum across hops — that mirrors what a single non-tool call would have
+ * reported had the whole exchange happened in one request.
+ */
+function accumulateUsage(
+  prior: TokenUsage | null,
+  metadata: UsageMetadata | undefined,
+): TokenUsage | null {
+  if (!metadata) return prior;
+  const priorOutput = prior?.source === "provider" ? prior.outputTokens : 0;
+  const inputTokens = metadata.promptTokenCount;
+  const outputTokens = priorOutput + metadata.candidatesTokenCount;
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    source: "provider",
+  };
+}
+
+/** Reports real Gemini usage when present, else falls back to the shared estimator. */
+function reportUsage(
+  onUsage: OnUsage | undefined,
+  metadataOrAccumulated: UsageMetadata | TokenUsage | undefined | null,
+  systemPrompt: string,
+  messages: ChatMessage[],
+  outputText?: string,
+  outputCharsOverride?: number,
+): void {
+  if (!onUsage) return;
+
+  if (metadataOrAccumulated && "source" in metadataOrAccumulated) {
+    onUsage(metadataOrAccumulated);
+    return;
+  }
+
+  if (metadataOrAccumulated) {
+    const { promptTokenCount, candidatesTokenCount, totalTokenCount } = metadataOrAccumulated;
+    onUsage({
+      inputTokens: promptTokenCount,
+      outputTokens: candidatesTokenCount,
+      // Defensive: the SDK types totalTokenCount as required, but guard
+      // against a missing/malformed response rather than propagate undefined.
+      totalTokens: totalTokenCount ?? promptTokenCount + candidatesTokenCount,
+      source: "provider",
+    });
+    return;
+  }
+
+  const inputChars = systemPrompt.length + messages.reduce((sum, m) => sum + m.content.length, 0);
+  const outputChars = outputCharsOverride ?? outputText?.length ?? 0;
+  const inputTokens = estimateTokens(inputChars);
+  const outputTokens = estimateTokens(outputChars);
+  onUsage({
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    source: "estimated",
+  });
 }
 
 function toGeminiFunctionDeclaration(tool: ToolDeclaration): FunctionDeclaration {

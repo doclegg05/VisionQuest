@@ -96,4 +96,70 @@ describe("GeminiProvider", () => {
       /messages array must not be empty/,
     );
   });
+
+  describe("onUsage", () => {
+    it("generateResponse reports real usageMetadata as source 'provider'", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        geminiResponse("Gemini says hello"),
+      );
+
+      const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
+      await provider.generateResponse("Be helpful.", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage));
+
+      assert.equal(usages.length, 1);
+      assert.deepEqual(usages[0], {
+        inputTokens: 1,
+        outputTokens: 1,
+        totalTokens: 2,
+        source: "provider",
+      });
+    });
+
+    it("streamResponse falls back to the estimator when usageMetadata is absent", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        geminiStreamResponse(["chunk1", "chunk2"]),
+      );
+
+      const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
+      const chunks: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ], (usage) => usages.push(usage))) {
+        chunks.push(chunk);
+      }
+
+      assert.deepEqual(chunks, ["chunk1", "chunk2"]);
+      assert.equal(usages.length, 1);
+      assert.equal(usages[0].source, "estimated");
+      assert.ok(usages[0].outputTokens > 0, "should estimate output tokens from streamed text");
+    });
+
+    it("generateStructuredResponse reports real usageMetadata as source 'provider'", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        geminiResponse('{"goals_found":[]}'),
+      );
+
+      const usages: Array<{ source: string }> = [];
+      await provider.generateStructuredResponse("Extract.", [
+        { role: "user", content: "text" },
+      ], (usage) => usages.push(usage));
+
+      assert.equal(usages.length, 1);
+      assert.equal(usages[0].source, "provider");
+    });
+
+    it("does not call onUsage-less callers differently (non-breaking)", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        geminiResponse("no usage callback"),
+      );
+
+      const result = await provider.generateResponse("Be helpful.", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      assert.equal(result, "no usage callback");
+    });
+  });
 });
