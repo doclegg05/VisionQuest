@@ -1,5 +1,7 @@
 export { getProvider, getPromptTier, resolveAiProvider } from "./provider";
 export { checkOllamaHealth } from "./health";
+export { detectModelCapabilities } from "./capabilities";
+export type { ModelCapabilities, DetectCapabilitiesConfig } from "./capabilities";
 export {
   DEFAULT_OLLAMA_MODEL,
   DEFAULT_LOCAL_EMBEDDING_MODEL,
