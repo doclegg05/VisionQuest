@@ -30,6 +30,7 @@ const mockReadLocalAiProviderConfig = mock.fn<
   () => Promise<{
     url: string | null;
     model: string | null;
+    embeddingModel: string | null;
     authMode: "none" | "bearer" | "cloudflare_service_token";
     numCtxRaw: string | null;
     apiKey: string | null;
@@ -148,10 +149,11 @@ describe("admin AI provider routes", () => {
       modelUsed: "gemma4:26b",
     }));
     mockReadLocalAiProviderConfig.mock.mockImplementation(async () => {
-      const [url, model, authModeRaw, numCtxRaw, apiKey, cloudflareId, cloudflareSecret] =
+      const [url, model, embeddingModel, authModeRaw, numCtxRaw, apiKey, cloudflareId, cloudflareSecret] =
         await Promise.all([
           mockGetPlainConfigValue("ai_provider_url"),
           mockGetPlainConfigValue("ai_provider_model"),
+          mockGetPlainConfigValue("ai_provider_embedding_model"),
           mockGetPlainConfigValue("ai_provider_auth_mode"),
           mockGetPlainConfigValue("ai_provider_num_ctx"),
           mockGetConfigValue("ai_provider_api_key"),
@@ -165,6 +167,7 @@ describe("admin AI provider routes", () => {
       return {
         url,
         model,
+        embeddingModel,
         authMode,
         numCtxRaw,
         apiKey,
@@ -210,6 +213,30 @@ describe("admin AI provider routes", () => {
 
     assert.equal(res.status, 200);
     assert.ok(mockSetPlainConfigValue.mock.callCount() >= 2);
+  });
+
+  it("persists the local embedding model override", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        embeddingModel: "embeddinggemma",
+        authMode: "none",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+
+    assert.equal(res.status, 200);
+    assert.ok(
+      mockSetPlainConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) =>
+          call.arguments[0] === "ai_provider_embedding_model" &&
+          call.arguments[1] === "embeddinggemma",
+      ),
+    );
   });
 
   it("persists auth mode and encrypted Cloudflare service-token credentials", async () => {

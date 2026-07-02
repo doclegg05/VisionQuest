@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration, type Part, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
+import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
 import type {
   AIProvider,
   ChatMessage,
@@ -12,9 +13,6 @@ import type {
   ToolStreamEvent,
   ToolStreamOptions,
 } from "./types";
-
-const DEFAULT_MODEL = "gemini-3.1-flash-lite";
-const MODEL = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
