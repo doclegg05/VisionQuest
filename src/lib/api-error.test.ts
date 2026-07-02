@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ApiError,
+  rlsContextFor,
   unauthorized,
   badRequest,
   notFound,
   conflict,
   rateLimited,
   withErrorHandler,
+  type Session,
 } from "./api-error";
 
 // ---------------------------------------------------------------------------
@@ -260,4 +262,69 @@ test("withErrorHandler returns 500 for a thrown non-Error value", async () => {
 
   assert.equal(response.status, 500);
   assert.equal(body.error, "Internal server error");
+});
+
+// ---------------------------------------------------------------------------
+// rlsContextFor — session → RLS context mapping
+// ---------------------------------------------------------------------------
+
+function sessionWith(role: string): Session {
+  return { id: `${role}-1`, studentId: `${role}-1`, displayName: role, role };
+}
+
+const SLICE_D_TRIPWIRE =
+  "rlsContextFor no longer collapses this role to \"student\" — coordinator/cdc " +
+  "RLS policies are going live (Slice D). App-layer helpers rely on that collapse " +
+  "to fail closed; the biggest is buildManagedStudentWhere (src/lib/classroom.ts), " +
+  "which builds an UNSCOPED student where-clause for coordinators. Region-scope " +
+  "that helper (mirror getCoordinatorInterventionQueue in " +
+  "src/lib/teacher/dashboard.ts) and audit every call site before shipping. " +
+  "See docs/plans/rls-enforcement-runbook.md → Slice D.";
+
+test("rlsContextFor passes teacher sessions through with empty studentId", () => {
+  assert.deepEqual(rlsContextFor(sessionWith("teacher")), {
+    userId: "teacher-1",
+    role: "teacher",
+    studentId: "",
+  });
+});
+
+test("rlsContextFor passes admin sessions through with empty studentId", () => {
+  assert.deepEqual(rlsContextFor(sessionWith("admin")), {
+    userId: "admin-1",
+    role: "admin",
+    studentId: "",
+  });
+});
+
+test("rlsContextFor maps student sessions to their own row-ownership key", () => {
+  assert.deepEqual(rlsContextFor(sessionWith("student")), {
+    userId: "student-1",
+    role: "student",
+    studentId: "student-1",
+  });
+});
+
+test("TRIPWIRE (Slice D): coordinator sessions collapse to the student RLS role", () => {
+  assert.deepEqual(
+    rlsContextFor(sessionWith("coordinator")),
+    {
+      userId: "coordinator-1",
+      role: "student",
+      studentId: "coordinator-1",
+    },
+    SLICE_D_TRIPWIRE,
+  );
+});
+
+test("TRIPWIRE (Slice D): cdc sessions collapse to the student RLS role", () => {
+  assert.deepEqual(
+    rlsContextFor(sessionWith("cdc")),
+    {
+      userId: "cdc-1",
+      role: "student",
+      studentId: "cdc-1",
+    },
+    SLICE_D_TRIPWIRE,
+  );
 });
