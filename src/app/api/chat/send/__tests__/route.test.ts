@@ -51,6 +51,7 @@ const mockGetStudentPromptContext = mock.fn() as any;
 const mockBuildStaffStudentContext = mock.fn() as any;
 const mockShouldAttemptStaffStudentContext = mock.fn() as any;
 const mockCheckTokenQuota = mock.fn() as any;
+const mockWithUsageLogging = mock.fn() as any;
 const mockGetStudentProgramType = mock.fn() as any;
 const mockPrismaStudentFindUnique = mock.fn() as any;
 const mockFormatClustersForPrompt = mock.fn() as any;
@@ -232,6 +233,7 @@ mock.module("@/lib/spokes/career-clusters", {
 mock.module("@/lib/llm-usage", {
   namedExports: {
     checkTokenQuota: mockCheckTokenQuota,
+    withUsageLogging: mockWithUsageLogging,
   },
 });
 
@@ -349,6 +351,7 @@ function resetMocks() {
     mockBuildStaffStudentContext,
     mockShouldAttemptStaffStudentContext,
     mockCheckTokenQuota,
+    mockWithUsageLogging,
     mockGetStudentProgramType,
     mockPrismaStudentFindUnique,
     mockFormatClustersForPrompt,
@@ -377,6 +380,7 @@ function resetMocks() {
   );
   mockBuildSystemPrompt.mock.mockImplementation(() => "SYSTEM PROMPT");
   mockCheckTokenQuota.mock.mockImplementation(async () => ({ allowed: true, warning: null }));
+  mockWithUsageLogging.mock.mockImplementation((provider: unknown) => provider);
   mockRateLimit.mock.mockImplementation(async () => ({ success: true, remaining: 100, resetTime: Date.now() + 3600_000 }));
   mockRateLimitDaily.mock.mockImplementation(async () => ({ success: true, remaining: 200, resetTime: Date.now() + 3600_000 }));
   mockGetOrCreateConversation.mock.mockImplementation(async () => ({
