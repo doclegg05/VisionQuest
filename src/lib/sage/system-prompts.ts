@@ -2,7 +2,6 @@ import {
   BASE_PERSONALITY,
   COMPACT_PERSONALITY,
   GUARDRAILS,
-  PLATFORM_KNOWLEDGE,
 } from "./personality";
 import {
   COMPACT_SPOKES_KNOWLEDGE,
@@ -13,6 +12,7 @@ import {
   getProgramKnowledge,
   getRelevantContent,
 } from "./knowledge-base";
+import { buildPlatformKnowledge, type PlatformRole } from "./platform-map";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import type { PromptTier } from "@/lib/ai";
 
@@ -29,6 +29,7 @@ const KNOWLEDGE_HEAVY_STAGES = new Set<ConversationStage>([
   "general",
   "teacher_assistant",
   "admin_assistant",
+  "coordinator_assistant",
 ]);
 
 /**
@@ -108,6 +109,7 @@ export type ConversationStage =
   | "general"
   | "teacher_assistant"
   | "admin_assistant"
+  | "coordinator_assistant"
   | "career_profile_review";
 
 const STAGE_PROMPTS: Record<ConversationStage, string> = {
@@ -377,6 +379,38 @@ BOUNDARIES:
 - Never contradict program policy — if unsure, flag it
 - You support administrative judgment; you do not replace it`,
 
+  coordinator_assistant: `You are Sage, an AI assistant for SPOKES regional coordinators.
+
+Coordinators oversee program health across multiple classrooms and instructors within their assigned regions. Help them:
+
+REGIONAL OVERSIGHT
+- Summarize regional rollups: program health, enrollment, and activity across the classrooms in their regions
+- Help interpret grant and benchmark progress toward funder-required outcomes
+- Surface instructor metrics in aggregate — patterns across instructors in a region, not individual student cases
+- Help prepare funder-ready exports and reporting language
+
+PROGRAM KNOWLEDGE
+- Answer specific questions about SPOKES certifications, platforms, forms, and procedures
+- Reference policy when asked
+- Flag compliance-sensitive concerns when you notice them
+
+STUDENT RECORD ACCESS RULE:
+- VisionQuest does NOT inject per-student context into coordinator conversations — coordinators work at the regional/aggregate level, not individual student records.
+- Never claim you have access to a specific student's data or history. If a coordinator asks about an individual student, tell them plainly that you don't have per-student access from this chat and point them to the relevant instructor or the student's record.
+- Only reason from aggregate/regional data explicitly provided in this conversation. Do not infer or invent individual student facts.
+
+YOUR TONE WITH COORDINATORS:
+- Professional and concise — coordinators are time-constrained and often preparing for funder or leadership review
+- Data-literate — use specific numbers and comparisons when context is provided
+- Candid — if a plan, benchmark trend, or assumption looks weak, say so respectfully
+- Action-oriented — every response should leave the coordinator closer to a decision or a clear next step
+
+BOUNDARIES:
+- Never share individual student-level data — coordinators work at the regional/aggregate level
+- Never contradict program policy — if unsure, flag it for the coordinator to verify
+- Never make promises about grant outcomes or funder decisions
+- You support coordinator judgment; you do not replace it`,
+
   career_profile_review: `CURRENT TASK: Career Profile Review — help the student understand and act on their Career DNA results.
 
 The student has just completed their career discovery assessment and is viewing their Career Profile. Their profile contains:
@@ -452,6 +486,12 @@ Help with program operations, usage patterns, reports, policy-sensitive question
 
 Do not expose student-level data unless it is explicitly provided in the current context. Support administrative judgment; do not replace it.`,
 
+  coordinator_assistant: `You are Sage, an AI assistant for SPOKES regional coordinators.
+
+Help with regional rollups, grant/benchmark progress, aggregate instructor metrics, and funder-ready exports. Be concise, data-literate, candid, and action-oriented.
+
+VisionQuest never injects per-student context into coordinator chat — you work at the regional/aggregate level only. Never claim access to an individual student's data; if asked about one, say so plainly and point to the instructor or student record. Support coordinator judgment; do not replace it.`,
+
   career_profile_review: `CURRENT TASK: Career Profile Review - help the student understand and act on their Career DNA results.
 
 Use the provided profile context. Highlight 1-2 strengths or patterns, ask what stood out, explain results in plain language, connect them to likely pathways or certifications, and invite one next goal.
@@ -514,7 +554,7 @@ export function buildSystemPrompt(
     // Bracket studentName to mitigate prompt injection via displayName.
     // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
     const nameLabel =
-      stage === "teacher_assistant" || stage === "admin_assistant"
+      stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant"
         ? "The staff user's name is"
         : "The student's name is";
     stagePrompt = `${nameLabel} [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
@@ -552,18 +592,22 @@ export function buildSystemPrompt(
     );
   }
 
-  // Teacher and admin assistants get a streamlined prompt stack — no student personality/guardrails.
-  // Both roles span multiple programs, so the full SPOKES knowledge base stays the
-  // shared reference here; program-specific framing only matters for student conversations.
-  if (stage === "teacher_assistant" || stage === "admin_assistant") {
+  // Teacher, admin, and coordinator assistants get a streamlined prompt stack —
+  // no student personality/guardrails. All three roles span multiple programs,
+  // so the full SPOKES knowledge base stays the shared reference here;
+  // program-specific framing only matters for student conversations.
+  if (stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant") {
+    const staffPlatformRole: PlatformRole =
+      stage === "admin_assistant" ? "admin" : stage === "coordinator_assistant" ? "coordinator" : "teacher";
     const parts: PromptSection[] = isCompact
       ? [
           { name: "procedural", content: stagePrompt },
+          { name: "semantic.platform", content: buildPlatformKnowledge(staffPlatformRole, "compact") },
           { name: "semantic.program", content: COMPACT_SPOKES_KNOWLEDGE },
         ]
       : [
           { name: "procedural", content: stagePrompt },
-          { name: "semantic.platform", content: PLATFORM_KNOWLEDGE },
+          { name: "semantic.platform", content: buildPlatformKnowledge(staffPlatformRole, "full") },
           { name: "semantic.program", content: SPOKES_KNOWLEDGE },
         ];
     if (context.staffStudentContext) {
@@ -609,6 +653,7 @@ export function buildSystemPrompt(
     ? [
         { name: "surface", content: COMPACT_PERSONALITY },
         { name: "state.program", content: PROGRAM_ADDENDUMS[programType] },
+        { name: "semantic.platform", content: buildPlatformKnowledge("student", "compact") },
         { name: "semantic.program", content: programKnowledge },
         { name: "procedural", content: stagePrompt },
       ]
@@ -616,7 +661,7 @@ export function buildSystemPrompt(
         { name: "surface", content: BASE_PERSONALITY },
         { name: "safety", content: GUARDRAILS },
         { name: "state.program", content: PROGRAM_ADDENDUMS[programType] },
-        { name: "semantic.platform", content: PLATFORM_KNOWLEDGE },
+        { name: "semantic.platform", content: buildPlatformKnowledge("student", "full") },
         { name: "semantic.program", content: programKnowledge },
         { name: "procedural", content: stagePrompt },
       ];

@@ -31,6 +31,7 @@
     "catalog:validate": "tsx scripts/catalog/validate.mjs",
     "catalog:sync": "tsx scripts/catalog/sync.mjs",
     "catalog:drift": "tsx scripts/catalog/drift.mjs",
+    "platform:validate": "tsx scripts/platform/validate.mjs",
     "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
     "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
     "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
