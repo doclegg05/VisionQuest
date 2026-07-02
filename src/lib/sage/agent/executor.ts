@@ -12,6 +12,7 @@ import type { Session } from "@/lib/api-error";
 import { getToolByName, findToolBySlashCommand } from "./tools";
 import { validateToolArgs } from "./validation";
 import { checkToolRateLimit, rateLimitMessage } from "./rate-limit";
+import { agentMode, isTierAllowedInMode } from "./flags";
 import type { AgentTool, AgentToolCallRecord, AgentToolResult } from "./types";
 
 export interface ExecuteToolOptions {
@@ -48,6 +49,23 @@ export async function executeAgentTool(
       args,
       startedAt,
       `You don't have permission to use ${toolName}.`,
+    );
+  }
+
+  // Independent mode re-check — defense in depth. getEnabledTools() already
+  // filters the model's function-declaration list by mode, but that's a
+  // listing-time filter only. Re-verify here so a stale tool call (model
+  // loop) or a direct call (e.g. /api/chat/tool-confirm, which never goes
+  // through getEnabledTools) can't run a tool whose tier isn't allowed under
+  // the CURRENT mode — closing the SAGE_AGENT_MODE rollback gap.
+  const mode = agentMode();
+  if (!isTierAllowedInMode(tool.riskTier, mode)) {
+    return errorRecord(
+      callId,
+      toolName,
+      args,
+      startedAt,
+      `${toolName} isn't available right now.`,
     );
   }
 
