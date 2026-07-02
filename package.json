@@ -37,6 +37,7 @@
     "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
     "sage:redteam:eval": "tsx scripts/sage-redteam-eval.mjs",
     "sage:quality:eval": "tsx scripts/sage-quality-eval.mjs",
+    "sage:chat:harness": "tsx scripts/sage-chat-harness.mjs",
     "sage:usage:summary": "node scripts/sage-usage-summary.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs"

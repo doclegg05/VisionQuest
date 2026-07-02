@@ -66,6 +66,14 @@ jobs:
           fi
           npm run sage:agent:eval
 
+      - name: Chat harness — deterministic families (gating — tool + guardrail failures fail the run)
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
+            exit 0
+          fi
+          node scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail
+
   sage-memory-eval:
     runs-on: ubuntu-latest
     services:
@@ -106,3 +114,47 @@ jobs:
             exit 0
           fi
           npm run sage:memory:eval
+
+      - name: Chat harness — full run with judge (informational — nightly only, needs live DB + model)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::notice::GEMINI_API_KEY not set — skipping full chat harness."
+            exit 0
+          fi
+          node scripts/sage-chat-harness.mjs --provider=gemini --judge=gemini --out=.planning/sage-chat-harness/nightly.json
+
+  sage-chat-harness-ollama:
+    # On-demand acceptance run against a self-hosted Ollama endpoint. No-ops
+    # without OLLAMA_URL configured (this repo has no default local server in
+    # CI) — exists so an operator can point OLLAMA_URL/OLLAMA_MODEL at a
+    # reachable server (e.g. via a self-hosted runner or tunnel) and confirm
+    # the provider-agnostic harness holds up before cutover.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+      DIRECT_URL: "postgresql://fake:fake@localhost:5432/fake"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
+      OLLAMA_URL: ${{ secrets.OLLAMA_URL }}
+      OLLAMA_MODEL: ${{ secrets.OLLAMA_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Chat harness — Ollama acceptance (no-op without OLLAMA_URL)
+        continue-on-error: true
+        run: |
+          if [ -z "$OLLAMA_URL" ]; then
+            echo "::notice::OLLAMA_URL not set — skipping Ollama acceptance run."
+            exit 0
+          fi
+          node scripts/sage-chat-harness.mjs --provider=ollama --families=tool,guardrail,readability
