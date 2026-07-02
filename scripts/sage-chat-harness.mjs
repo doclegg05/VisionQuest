@@ -31,11 +31,14 @@
  *   --out <path>                write the JSON report
  *   --judge=gemini              optional LLM-judge scoring for readability cases
  *   --keep                      keep seeded memory rows (memory family)
+ *   --temperature=<n>           sampling temperature override, e.g. 0 for
+ *                                deterministic runs (default: provider default)
  *
  * Usage:
  *   npm run sage:chat:harness
  *   npm run sage:chat:harness -- --families=tool,guardrail --strict
  *   npm run sage:chat:harness -- --provider=ollama --families=tool
+ *   npm run sage:chat:harness -- --families=guardrail --strict --temperature=0
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -51,6 +54,13 @@ const KEEP = Boolean(args.keep);
 const JUDGE = args.judge === "gemini" ? "gemini" : args.judge ? "invalid" : null;
 if (JUDGE === "invalid") {
   throw new Error(`Unsupported --judge="${args.judge}" — only "gemini" is supported.`);
+}
+// Optional sampling temperature override for deterministic eval runs.
+// Undefined (flag omitted) preserves the provider's default — no behavior
+// change for callers that don't pass --temperature.
+const TEMPERATURE = args.temperature !== undefined ? Number(args.temperature) : undefined;
+if (TEMPERATURE !== undefined && !Number.isFinite(TEMPERATURE)) {
+  throw new Error(`Invalid --temperature="${args.temperature}" — must be a number.`);
 }
 
 const SENTINEL_MEMORY_STUDENT_ID = "sage-chat-harness-student";
@@ -135,7 +145,7 @@ async function runToolCase(provider, declarations, systemPrompt, testCase) {
     [{ role: "user", content: testCase.message }],
     declarations,
     noopToolHandler,
-    { maxHops: 1 },
+    { maxHops: 1, temperature: TEMPERATURE },
   );
   for await (const event of events) {
     if (event.kind === "tool_call") calls.push(event.name);
@@ -167,7 +177,7 @@ async function runGuardrailCase(deps, provider, declarations, systemPrompt, test
     [{ role: "user", content: testCase.message }],
     declarations,
     noopToolHandler,
-    { maxHops: 1 },
+    { maxHops: 1, temperature: TEMPERATURE },
   );
   for await (const event of events) {
     if (event.kind === "tool_call") calls.push(event.name);
@@ -228,7 +238,12 @@ async function runGroundingCase(getDocumentContext, provider, systemPrompt, test
   // The reply itself: grounded system prompt + doc context, no tools.
   let reply = "";
   try {
-    reply = await provider.generateResponse(systemPrompt + context, [{ role: "user", content: testCase.message }]);
+    reply = await provider.generateResponse(
+      systemPrompt + context,
+      [{ role: "user", content: testCase.message }],
+      undefined,
+      { temperature: TEMPERATURE },
+    );
   } catch (err) {
     failures.push(`reply generation failed — ${err.message}`);
   }
@@ -272,7 +287,12 @@ async function runMemoryCase(deps, provider, testCase) {
     const memoryBlock = retrieved.length
       ? `\n\n[STUDENT MEMORY CONTEXT]\n${retrieved.map((m) => `- ${m.content}`).join("\n")}\n[END STUDENT MEMORY CONTEXT]`
       : "";
-    const reply = await provider.generateResponse(systemPrompt + memoryBlock, [{ role: "user", content: testCase.message }]);
+    const reply = await provider.generateResponse(
+      systemPrompt + memoryBlock,
+      [{ role: "user", content: testCase.message }],
+      undefined,
+      { temperature: TEMPERATURE },
+    );
 
     const assert = testCase.assert || {};
     const failures = [];
@@ -296,7 +316,12 @@ async function runReadabilityCase(deps, provider, systemPrompt, testCase) {
   const assert = testCase.assert || {};
   let reply = "";
   try {
-    reply = await provider.generateResponse(systemPrompt, [{ role: "user", content: testCase.message }]);
+    reply = await provider.generateResponse(
+      systemPrompt,
+      [{ role: "user", content: testCase.message }],
+      undefined,
+      { temperature: TEMPERATURE },
+    );
   } catch (err) {
     return { pass: false, reason: `reply generation failed — ${err.message}`, text: "" };
   }
@@ -379,7 +404,7 @@ async function main() {
   const adminDecls = toolDeclarationsFor(getEnabledTools, "admin");
   const declsForRole = (role) => (role === "teacher" ? teacherDecls : role === "admin" ? adminDecls : studentDecls);
 
-  console.log(`Sage Chat Harness — provider ${label}, ${cases.length} case(s)${FAMILIES ? ` (families: ${FAMILIES.join(", ")})` : ""}\n`);
+  console.log(`Sage Chat Harness — provider ${label}, ${cases.length} case(s)${FAMILIES ? ` (families: ${FAMILIES.join(", ")})` : ""}${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}\n`);
 
   const results = [];
 
@@ -465,6 +490,7 @@ async function main() {
     provider: label,
     fixturePath: FIXTURE_PATH,
     families: FAMILIES ?? "all",
+    temperature: TEMPERATURE ?? "default",
     totals: { total: results.length, passed, failed, skipped: skippedCount },
     byFamily,
     latency,

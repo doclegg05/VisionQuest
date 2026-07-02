@@ -72,7 +72,7 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
             exit 0
           fi
-          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail
+          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail --temperature=0
 
   sage-memory-eval:
     runs-on: ubuntu-latest

@@ -23,14 +23,27 @@
  * no DB is touched) and maxHops 1. Defaults to Gemini; pass --provider=ollama
  * to run against a configured Ollama server.
  *
- * Usage: npm run sage:redteam:eval  [-- --provider=ollama]
+ * CLI:
+ *   --provider=gemini|ollama   (default gemini)
+ *   --temperature=<n>          sampling temperature override, e.g. 0 for
+ *                               deterministic runs (default: provider default)
+ *
+ * Usage: npm run sage:redteam:eval  [-- --provider=ollama --temperature=0]
  */
 
 import { readFileSync } from "node:fs";
-import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
+import { loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
 import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
 
 loadEnvFile();
+
+const args = parseArgs();
+// Optional sampling temperature override for deterministic eval runs.
+// Undefined (flag omitted) preserves the provider's default.
+const TEMPERATURE = args.temperature !== undefined ? Number(args.temperature) : undefined;
+if (TEMPERATURE !== undefined && !Number.isFinite(TEMPERATURE)) {
+  throw new Error(`Invalid --temperature="${args.temperature}" — must be a number.`);
+}
 
 const SCENARIOS = JSON.parse(readFileSync("config/sage-redteam-eval.json", "utf8"));
 
@@ -121,7 +134,7 @@ async function main() {
   };
 
   console.log(
-    `Red-teaming ${SCENARIOS.length} scenarios against ${label} (student + teacher personas)…\n`,
+    `Red-teaming ${SCENARIOS.length} scenarios against ${label} (student + teacher personas)${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}…\n`,
   );
 
   let hardFails = 0;
@@ -145,7 +158,7 @@ async function main() {
         [{ role: "user", content: userText }],
         declarations,
         noopToolHandler,
-        { maxHops: 1 },
+        { maxHops: 1, temperature: TEMPERATURE },
       );
       const textParts = [];
       for await (const event of events) {

@@ -4,6 +4,7 @@ import { estimateTokens } from "../llm-usage-estimate";
 import type {
   AIProvider,
   ChatMessage,
+  GenerationOptions,
   LocalAIAuthConfig,
   OnUsage,
   TokenUsage,
@@ -430,6 +431,7 @@ export class OllamaProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
     const { mode, response } = await this.postChat(
@@ -439,6 +441,7 @@ export class OllamaProvider implements AIProvider {
         stream: false,
         max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
@@ -447,6 +450,7 @@ export class OllamaProvider implements AIProvider {
         options: {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
@@ -480,6 +484,7 @@ export class OllamaProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     usageSink?: UsageSink,
+    options?: GenerationOptions,
   ): AsyncGenerator<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
     // Use the streaming-specific timeout (first-byte only).
@@ -493,6 +498,7 @@ export class OllamaProvider implements AIProvider {
         max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
         stream_options: { include_usage: true },
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
@@ -501,6 +507,7 @@ export class OllamaProvider implements AIProvider {
         options: {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
@@ -717,6 +724,7 @@ export class OllamaProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): AsyncGenerator<string> {
     let lastError: unknown = null;
     let yieldedAny = false;
@@ -726,7 +734,7 @@ export class OllamaProvider implements AIProvider {
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
       let yieldedThisAttempt = false;
       try {
-        for await (const chunk of this.streamResponseOnce(systemPrompt, messages, usageSink)) {
+        for await (const chunk of this.streamResponseOnce(systemPrompt, messages, usageSink, options)) {
           yieldedAny = true;
           yieldedThisAttempt = true;
           outputChars += chunk.length;
@@ -810,12 +818,13 @@ export class OllamaProvider implements AIProvider {
   private async *streamHopWithStartupRetry(
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
+    temperature?: number,
   ): AsyncGenerator<string, HopResult> {
     let lastError: unknown = null;
     let yieldedAny = false;
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
-      const hopGen = this.streamHopOnce(conversation, ollamaTools);
+      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature);
 
       try {
         while (true) {
@@ -877,7 +886,9 @@ export class OllamaProvider implements AIProvider {
 
     // No tools registered → degrade to plain streaming.
     if (tools.length === 0) {
-      for await (const text of this.streamResponse(systemPrompt, messages, options?.onUsage)) {
+      for await (const text of this.streamResponse(systemPrompt, messages, options?.onUsage, {
+        temperature: options?.temperature,
+      })) {
         yield { kind: "text", text };
       }
       yield { kind: "done", reason: "complete" };
@@ -896,7 +907,7 @@ export class OllamaProvider implements AIProvider {
     for (let hop = 0; hop < maxHops; hop++) {
       // Stream one hop. The inner generator yields text strings as they
       // arrive and returns a final summary with collected tool calls.
-      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools);
+      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature);
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
@@ -984,6 +995,7 @@ export class OllamaProvider implements AIProvider {
   private async *streamHopOnce(
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
+    temperature?: number,
   ): AsyncGenerator<string, HopResult> {
     const openAIBody = {
       model: this.model,
@@ -993,6 +1005,7 @@ export class OllamaProvider implements AIProvider {
       max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
       num_ctx: this.numCtx,
       stream_options: { include_usage: true },
+      ...(temperature !== undefined ? { temperature } : {}),
     };
     const nativeBody = {
       model: this.model,
@@ -1002,6 +1015,7 @@ export class OllamaProvider implements AIProvider {
       options: {
         num_ctx: this.numCtx,
         num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+        ...(temperature !== undefined ? { temperature } : {}),
       },
       keep_alive: OllamaProvider.KEEP_ALIVE,
     };
@@ -1136,6 +1150,7 @@ export class OllamaProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
     const { mode, response } = await this.postChat(
@@ -1146,6 +1161,7 @@ export class OllamaProvider implements AIProvider {
         response_format: { type: "json_object" },
         max_tokens: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
@@ -1155,6 +1171,7 @@ export class OllamaProvider implements AIProvider {
         options: {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },

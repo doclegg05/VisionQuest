@@ -25,6 +25,16 @@ export interface TokenUsage {
  */
 export type OnUsage = (usage: TokenUsage) => void;
 
+/**
+ * Optional sampling temperature override. Undefined means "use the
+ * provider's default" — production call sites never pass this, so
+ * behavior there is unchanged. Exists so deterministic eval harnesses can
+ * pin temperature (typically 0) to reduce phrasing variance across runs.
+ */
+export interface GenerationOptions {
+  temperature?: number;
+}
+
 export interface AIProvider {
   readonly name: string;
 
@@ -33,6 +43,7 @@ export interface AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string>;
 
   /** Streaming completion. Yields text chunks as they arrive. */
@@ -40,6 +51,7 @@ export interface AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): AsyncGenerator<string>;
 
   /** Non-streaming completion with JSON output mode enabled. Returns raw JSON string. */
@@ -47,6 +59,7 @@ export interface AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string>;
 
   /**
@@ -93,6 +106,8 @@ export interface ToolStreamOptions {
    * loop finishes (not once per hop) — see providers' streamWithTools impls.
    */
   onUsage?: OnUsage;
+  /** Optional sampling temperature override — see GenerationOptions. */
+  temperature?: number;
 }
 
 /**
