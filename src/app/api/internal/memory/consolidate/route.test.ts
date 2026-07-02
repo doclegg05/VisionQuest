@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { before, beforeEach, describe, it, mock, type Mock } from "node:test";
+import type { PrismaClient } from "@prisma/client";
 
-const mockExecuteRaw = mock.fn(async () => 0) as any;
+const mockExecuteRaw = mock.fn(async () => 0) as unknown as Mock<PrismaClient["$executeRaw"]>;
 
 mock.module("@/lib/db", {
   namedExports: { prismaAdmin: { $executeRaw: mockExecuteRaw } },
