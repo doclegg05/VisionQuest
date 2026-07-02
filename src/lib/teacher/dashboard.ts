@@ -5,10 +5,11 @@ import {
   buildManagedStudentWhere,
   listManagedClasses,
   listManagedStudentIds,
+  NON_ARCHIVED_ENROLLMENT_STATUSES,
 } from "@/lib/classroom";
 import { getCertificationProgress } from "@/lib/certifications";
-import { prisma } from "@/lib/db";
-import { type Session } from "@/lib/api-error";
+import { prisma, prismaAdmin } from "@/lib/db";
+import { forbidden, type Session } from "@/lib/api-error";
 import { goalCountsTowardPlan } from "@/lib/goals";
 import {
   ALL_INACTIVITY_ALERT_TYPES,
@@ -19,7 +20,10 @@ import {
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
-import { buildInterventionQueueEntry } from "@/lib/teacher/intervention-queue";
+import {
+  buildInterventionQueueEntry,
+  type InterventionQueueStudentRecord,
+} from "@/lib/teacher/intervention-queue";
 import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
 
 export interface QueueStudent {
@@ -187,91 +191,95 @@ function latestDate(...values: Array<Date | null | undefined>) {
   }, null);
 }
 
-export async function getInterventionQueue(
-  session: Session,
-  options: { classId?: string } = {},
-): Promise<InterventionQueueResponse> {
-  const now = new Date();
-  const students = await prisma.student.findMany({
-    where: buildManagedStudentWhere(session, {
-      classId: options.classId,
-      includeInactiveAccounts: false,
-    }),
-    select: {
-      id: true,
-      studentId: true,
-      displayName: true,
-      email: true,
-      createdAt: true,
-      updatedAt: true,
-      progression: { select: { state: true } },
-      goals: {
-        select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
-      },
-      orientationProgress: {
-        select: { completed: true, completedAt: true },
-      },
-      alerts: {
-        where: { status: "open" },
-        select: {
-          id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-        },
-      },
-      assignedTasks: {
-        where: {
-          status: { not: "completed" },
-          dueAt: { lt: now },
-        },
-        select: { id: true },
-      },
-      conversations: {
-        select: { updatedAt: true },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-      },
-      portfolioItems: { select: { updatedAt: true } },
-      files: { select: { uploadedAt: true } },
-      formSubmissions: {
-        select: { updatedAt: true },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-      },
-      applications: {
-        select: { updatedAt: true },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-      },
-      eventRegistrations: {
-        select: { updatedAt: true },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-      },
-      certifications: {
-        select: {
-          status: true,
-        },
-      },
-      resumeData: { select: { id: true } },
-      publicCredentialPage: { select: { isPublic: true } },
-      classEnrollments: {
-        select: {
-          enrolledAt: true,
-          status: true,
-          class: { select: { programType: true } },
-        },
-        orderBy: { enrolledAt: "desc" },
+/**
+ * Select for the intervention-queue student query. A builder rather than a
+ * constant because `now` is embedded in the overdue-task filter. `as const`
+ * keeps the literal types Prisma needs for payload inference.
+ */
+function interventionQueueStudentSelect(now: Date) {
+  return {
+    id: true,
+    studentId: true,
+    displayName: true,
+    email: true,
+    createdAt: true,
+    updatedAt: true,
+    progression: { select: { state: true } },
+    goals: {
+      select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
+    },
+    orientationProgress: {
+      select: { completed: true, completedAt: true },
+    },
+    alerts: {
+      where: { status: "open" },
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        title: true,
+        summary: true,
+        sourceType: true,
+        sourceId: true,
+        detectedAt: true,
       },
     },
-  });
+    assignedTasks: {
+      where: {
+        status: { not: "completed" },
+        dueAt: { lt: now },
+      },
+      select: { id: true },
+    },
+    conversations: {
+      select: { updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 1,
+    },
+    portfolioItems: { select: { updatedAt: true } },
+    files: { select: { uploadedAt: true } },
+    formSubmissions: {
+      select: { updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 1,
+    },
+    applications: {
+      select: { updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 1,
+    },
+    eventRegistrations: {
+      select: { updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 1,
+    },
+    certifications: {
+      select: {
+        status: true,
+      },
+    },
+    resumeData: { select: { id: true } },
+    publicCredentialPage: { select: { isPublic: true } },
+    classEnrollments: {
+      select: {
+        enrolledAt: true,
+        status: true,
+        class: { select: { programType: true } },
+      },
+      orderBy: { enrolledAt: "desc" },
+    },
+  } as const;
+}
 
-  const orientationTotalCount = await prisma.orientationItem.count();
+/**
+ * Shared tail of both queue variants: score each student, drop
+ * zero-urgency entries, sort most-urgent first.
+ */
+function buildQueueResponse(
+  students: InterventionQueueStudentRecord[],
+  orientationTotalCount: number,
+  now: Date,
+): InterventionQueueResponse {
   const queueEntries = students.map((student) =>
     buildInterventionQueueEntry({
       student,
@@ -285,6 +293,74 @@ export async function getInterventionQueue(
       .filter((entry) => entry.urgencyScore > 0)
       .sort((a, b) => b.urgencyScore - a.urgencyScore),
   };
+}
+
+export async function getInterventionQueue(
+  session: Session,
+  options: { classId?: string } = {},
+): Promise<InterventionQueueResponse> {
+  const now = new Date();
+  const students = await prisma.student.findMany({
+    where: buildManagedStudentWhere(session, {
+      classId: options.classId,
+      includeInactiveAccounts: false,
+    }),
+    select: interventionQueueStudentSelect(now),
+  });
+
+  const orientationTotalCount = await prisma.orientationItem.count();
+  return buildQueueResponse(students, orientationTotalCount, now);
+}
+
+/**
+ * Coordinator variant of `getInterventionQueue`.
+ *
+ * Coordinator sessions collapse to role="student" under RLS (first-class
+ * coordinator policies are a Slice D concern — see the coordinator note in
+ * the baseline migration), so the RLS-scoped `prisma` client silently
+ * returns zero Student rows for them. Until Slice D ships, coordinator
+ * reads follow the interim pattern documented in wager-metrics: query via
+ * `prismaAdmin`, explicitly scoped — here to active students enrolled
+ * (non-archived enrollment) in non-archived classes inside the
+ * coordinator's active regions. Fails closed to an empty queue when the
+ * coordinator has no region assignments.
+ */
+export async function getCoordinatorInterventionQueue(
+  session: Session,
+): Promise<InterventionQueueResponse> {
+  if (session.role !== "coordinator") {
+    throw forbidden("Coordinator session required.");
+  }
+
+  const assignments = await prismaAdmin.regionCoordinator.findMany({
+    where: { coordinatorId: session.id, region: { status: "active" } },
+    select: { regionId: true },
+  });
+  const regionIds = assignments.map((assignment) => assignment.regionId);
+  if (regionIds.length === 0) {
+    return { queue: [] };
+  }
+
+  const now = new Date();
+  const students = await prismaAdmin.student.findMany({
+    where: {
+      role: "student",
+      isActive: true,
+      classEnrollments: {
+        some: {
+          status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
+          class: {
+            regionId: { in: regionIds },
+            status: { not: "archived" },
+          },
+        },
+      },
+    },
+    select: interventionQueueStudentSelect(now),
+  });
+
+  const orientationTotalCount = await prismaAdmin.orientationItem.count();
+  return buildQueueResponse(students, orientationTotalCount, now);
 }
 
 export async function getTeacherDashboardPage(

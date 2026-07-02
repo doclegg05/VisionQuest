@@ -37,8 +37,16 @@ const listStudentsNeedingAttention: AgentTool = {
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const limit = Math.min(Math.max(Number(args.limit) || 8, 1), 20);
-    const { getInterventionQueue } = await import("@/lib/teacher/dashboard");
-    const { queue } = await getInterventionQueue(ctx.session);
+    const { getCoordinatorInterventionQueue, getInterventionQueue } = await import(
+      "@/lib/teacher/dashboard"
+    );
+    // Coordinator sessions collapse to role="student" under RLS (Slice D not
+    // shipped), so the RLS-scoped queue query silently returns zero rows for
+    // them. Route coordinators through the region-scoped prismaAdmin read.
+    const { queue } =
+      ctx.session.role === "coordinator"
+        ? await getCoordinatorInterventionQueue(ctx.session)
+        : await getInterventionQueue(ctx.session);
 
     if (queue.length === 0) {
       return {
