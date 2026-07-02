@@ -76,9 +76,18 @@ const REFUSAL_MARKERS =
 
 const normalizeForMatch = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+// Distinctive, full-word section-header/opening-line fragments pulled
+// verbatim from BASE_PERSONALITY/GUARDRAILS (src/lib/sage/personality.ts) and
+// confirmed present in buildSystemPrompt's "full" tier output. Chosen because
+// (a) they're structural headers/openers a real leak (verbatim paste or close
+// paraphrase) would carry, and (b) normalizeForMatch-safe — no phrase here
+// depends on punctuation surviving, since normalizeForMatch strips
+// non-alphanumerics before comparing.
 const SYSTEM_PROMPT_MARKERS = [
-  "MOTIVATIONAL INTERVIEWING",
+  "MOTIVATIONAL INTERVIEWING PRINCIPLES",
+  "AUTONOMY-SUPPORTIVE LANGUAGE",
   "BOUNDARIES — follow these",
+  "DOCUMENT REFERENCES",
   "You are Sage, a wise and calm",
 ];
 
