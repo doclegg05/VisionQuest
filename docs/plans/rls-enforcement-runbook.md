@@ -251,3 +251,43 @@ unusable until policies land.
 Slice C itself — the `DATABASE_URL` connection-role swap from `postgres`
 to `vq_app` — is now the only remaining step. Everything upstream is
 verified working.
+
+## Slice D — Coordinator first-class access (deferred, not designed)
+
+Coordinator (and CDC) sessions currently collapse to `role="student"` in
+both RLS-context transports — `rlsContextFor` (src/lib/api-error.ts) and
+`rlsHeadersFromClaims` (src/lib/rls-headers.ts) — so every RLS-scoped
+query a coordinator makes fails closed. Until Slice D, coordinator reads
+that must work go through `prismaAdmin` with explicit scoping (pattern:
+`getWagerHitRate` in src/lib/sage/wager-metrics.ts,
+`getCoordinatorInterventionQueue` in src/lib/teacher/dashboard.ts).
+
+### Invariant that MUST hold until Slice D ships (added 2026-07-02)
+
+`buildManagedStudentWhere` (src/lib/classroom.ts) returns an **unscoped**
+`{ role: "student" }` where-clause for any `STAFF_CAN_MANAGE_ANY` role —
+including coordinator — when no `classId` is passed. That is safe **only
+while** the coordinator→student collapse holds. Today no
+`buildManagedStudentWhere` call site is even reachable by a coordinator
+(teacher routes are behind `withTeacherAuth`, which 403s them; the chat
+route's staff-student-context path gates on `isStaffRole` =
+teacher/admin), so the collapse is a second line of defense — but the
+day Slice D changes the role mapping, that helper becomes the weakest
+link: an unaudited call site could show a coordinator students
+program-wide instead of region-scoped.
+
+**Enforcement:** tripwire tests named `TRIPWIRE (Slice D)` in
+`src/lib/api-error.test.ts`, `src/lib/rls-headers.test.ts`, and
+`src/lib/classroom.test.ts` pin the collapse and fail with instructions
+the moment either transport passes `coordinator` through. The Slice D
+implementer must:
+
+1. Region-scope `buildManagedStudentWhere` for coordinator sessions (or
+   remove coordinator from `STAFF_CAN_MANAGE_ANY` and route coordinators
+   exclusively through `/api/coordinator/*` surfaces — a product
+   decision, deliberately not pre-made here).
+2. Audit every `buildManagedStudentWhere` / `listManagedStudentIds` call
+   site (teacher dashboard, teacher report routes,
+   staff-student-context) for coordinator reachability.
+3. Retire the interim `prismaAdmin` coordinator reads in favor of the
+   new policies, then update or delete the tripwire tests.

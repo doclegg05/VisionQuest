@@ -38,6 +38,16 @@ export function normalizeInstructorIds(instructorIds: string[]): string[] {
   return [...new Set(instructorIds.map((id) => id.trim()).filter(Boolean))];
 }
 
+/**
+ * ⚠️ Slice D invariant: for STAFF_CAN_MANAGE_ANY roles with no classId this
+ * returns an UNSCOPED student where-clause. For coordinators that is safe
+ * only because rlsContextFor (src/lib/api-error.ts) collapses coordinator
+ * sessions to role="student", so every query built from this fails closed
+ * under vq_app. Before shipping first-class coordinator RLS policies,
+ * region-scope this helper (mirror getCoordinatorInterventionQueue in
+ * src/lib/teacher/dashboard.ts). Tripwire tests in classroom.test.ts,
+ * api-error.test.ts, and rls-headers.test.ts will fail to flag this.
+ */
 export function buildManagedStudentWhere(
   session: Session,
   options: {
