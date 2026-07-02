@@ -50,6 +50,7 @@ const mockReadLocalAiProviderConfig = mock.fn<
     model: string | null;
     embeddingModel: string | null;
     authMode: "none" | "bearer" | "cloudflare_service_token";
+    apiStyle: "ollama" | "openai";
     numCtxRaw: string | null;
     apiKey: string | null;
     apiKeySource: "config" | "env" | null;
@@ -122,6 +123,8 @@ mock.module("@/lib/ai", {
       }
       return "none";
     },
+    resolveLocalAiApiStyle: (apiStyle?: string | null) =>
+      apiStyle === "openai" ? "openai" : "ollama",
     toLocalAiAuthConfig: (config: {
       authMode: "none" | "bearer" | "cloudflare_service_token";
       apiKey: string | null;
@@ -180,12 +183,13 @@ describe("admin AI provider routes", () => {
       warnings: [],
     }));
     mockReadLocalAiProviderConfig.mock.mockImplementation(async () => {
-      const [url, model, embeddingModel, authModeRaw, numCtxRaw, apiKey, cloudflareId, cloudflareSecret] =
+      const [url, model, embeddingModel, authModeRaw, apiStyleRaw, numCtxRaw, apiKey, cloudflareId, cloudflareSecret] =
         await Promise.all([
           mockGetPlainConfigValue("ai_provider_url"),
           mockGetPlainConfigValue("ai_provider_model"),
           mockGetPlainConfigValue("ai_provider_embedding_model"),
           mockGetPlainConfigValue("ai_provider_auth_mode"),
+          mockGetPlainConfigValue("ai_provider_api_style"),
           mockGetPlainConfigValue("ai_provider_num_ctx"),
           mockGetConfigValue("ai_provider_api_key"),
           mockGetConfigValue("ai_provider_cloudflare_access_client_id"),
@@ -195,11 +199,13 @@ describe("admin AI provider routes", () => {
         authModeRaw === "bearer" || authModeRaw === "cloudflare_service_token"
           ? authModeRaw
           : "none";
+      const apiStyle = apiStyleRaw === "openai" ? "openai" : "ollama";
       return {
         url,
         model,
         embeddingModel,
         authMode,
+        apiStyle,
         numCtxRaw,
         apiKey,
         apiKeySource: apiKey ? "config" : null,
@@ -268,6 +274,69 @@ describe("admin AI provider routes", () => {
           call.arguments[1] === "embeddinggemma",
       ),
     );
+  });
+
+  it("persists apiStyle 'openai' and defaults to 'ollama' when omitted", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:1234",
+        model: "local-model",
+        authMode: "none",
+        apiStyle: "openai",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+
+    assert.equal(res.status, 200);
+    assert.ok(
+      mockSetPlainConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) =>
+          call.arguments[0] === "ai_provider_api_style" &&
+          call.arguments[1] === "openai",
+      ),
+    );
+
+    mockSetPlainConfigValue.mock.resetCalls();
+
+    const defaultReq = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        authMode: "none",
+      },
+    });
+
+    const defaultRes = await configRoute.PUT(defaultReq as never);
+
+    assert.equal(defaultRes.status, 200);
+    assert.ok(
+      mockSetPlainConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) =>
+          call.arguments[0] === "ai_provider_api_style" &&
+          call.arguments[1] === "ollama",
+      ),
+    );
+  });
+
+  it("rejects an invalid apiStyle value", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        authMode: "none",
+        apiStyle: "lmstudio",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+    assert.equal(res.status, 400);
   });
 
   it("persists auth mode and encrypted Cloudflare service-token credentials", async () => {

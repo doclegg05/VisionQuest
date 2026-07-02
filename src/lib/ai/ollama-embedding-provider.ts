@@ -49,7 +49,13 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   readonly model: string;
   private readonly baseUrl: string;
   private readonly authConfig: LocalAIAuthConfig | null;
-  private useNative = true;
+  /**
+   * Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
+   * only expose /v1/embeddings — never probe/fall back to native /api/embed
+   * for them.
+   */
+  private readonly openAiOnly: boolean;
+  private useNative: boolean;
 
   constructor(
     baseUrl: string,
@@ -59,6 +65,8 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.model = model;
     this.authConfig = authConfig ?? null;
+    this.openAiOnly = authConfig?.apiStyle === "openai";
+    this.useNative = !this.openAiOnly;
   }
 
   private get headers(): Record<string, string> {
