@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
+import { invalidate } from "@/lib/cache";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
@@ -79,6 +80,8 @@ export const PATCH = withTeacherAuth(async (
     return NextResponse.json({ error: "Memory not found." }, { status: 404 });
   }
 
+  invalidate(`chat:profile:${studentId}`);
+
   await logAuditEvent({
     actorId: session.id,
     actorRole: session.role,
@@ -86,6 +89,7 @@ export const PATCH = withTeacherAuth(async (
     targetType: "sage_memory",
     targetId: parsed.data.memoryId,
     summary: `Adjusted Sage memory confidence to ${parsed.data.confidence} for student ${studentId}`,
+    metadata: { studentId, confidence: parsed.data.confidence },
   });
 
   return NextResponse.json({ success: true, data: { memoryId: parsed.data.memoryId } });
@@ -121,11 +125,13 @@ export const DELETE = withTeacherAuth(async (
       subjectId: studentId,
       validTo: null,
     },
-    data: { validTo: new Date() },
+    data: { validTo: new Date(), suppressedByStaff: true },
   });
   if (count === 0) {
     return NextResponse.json({ error: "Memory not found." }, { status: 404 });
   }
+
+  invalidate(`chat:profile:${studentId}`);
 
   await logAuditEvent({
     actorId: session.id,
@@ -134,6 +140,7 @@ export const DELETE = withTeacherAuth(async (
     targetType: "sage_memory",
     targetId: parsed.data.memoryId,
     summary: `Removed a Sage memory for student ${studentId}`,
+    metadata: { studentId },
   });
 
   return NextResponse.json({ success: true, data: { memoryId: parsed.data.memoryId } });

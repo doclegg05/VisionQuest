@@ -17,6 +17,7 @@
 
 import { prisma } from "@/lib/db";
 import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
+import { logLlmCall } from "@/lib/llm-usage";
 import { logger } from "@/lib/logger";
 import type { AIProvider } from "@/lib/ai/types";
 import {
@@ -105,6 +106,44 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+/**
+ * Serializes concurrent extractions for the same subject via a mutual-
+ * exclusion lock only — `fn()` does NOT run inside the lock-holding
+ * transaction. The advisory lock is acquired on `tx`, but `fn()` (the hash
+ * pre-check `findMany`, the semantic-dup `$queryRaw`, `sageMemory.create`,
+ * and the embedding `$executeRaw` UPDATE) runs against the outer
+ * module-level `prisma` client on its own connection(s), committing
+ * independently of — and typically before — the lock-holding transaction
+ * itself commits.
+ *
+ * This is still correct for closing the semantic-dedupe race the lock was
+ * built for: the dedupe-check-then-insert sequence in `fn()` is not
+ * otherwise atomic (embedTexts is a network call sitting between the
+ * SELECT and the INSERT), so two concurrent extractions for the same
+ * student could both pass the semantic pre-check before either commits.
+ * pg_advisory_xact_lock is transaction-scoped — it releases automatically
+ * at commit/rollback — and this function's transaction does not commit
+ * until `fn()` has resolved. So a second concurrent caller genuinely
+ * blocks here until the first caller's entire `fn()` (including its own
+ * writes) has finished, not merely until the first caller reaches some
+ * midpoint.
+ *
+ * Tradeoff: each in-flight extraction now holds one pooled connection for
+ * the lock's duration, on top of whatever connections `fn()`'s own queries
+ * and the `embedTexts` network call consume from the same pool. This is a
+ * connection-amplification cost worth watching if concurrent load
+ * increases; not a concern at current alpha-stage, low-traffic volumes.
+ */
+async function withSubjectLock<T>(subjectId: string, fn: () => Promise<T>): Promise<T> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subjectId})::bigint)`;
+      return fn();
+    },
+    { timeout: 30_000 },
+  );
+}
+
 export async function extractAndStoreMemories({
   provider,
   studentId,
@@ -118,6 +157,26 @@ export async function extractAndStoreMemories({
     if (recent.length === 0) return empty;
 
     const raw = await provider.generateStructuredResponse(EXTRACTION_PROMPT, recent);
+
+    // generateStructuredResponse() doesn't return real usageMetadata (unlike
+    // the raw REST calls in classify-attachment.ts/file-gist.ts), so this is
+    // a chars/4 estimate — the same approximation embedTexts() already uses
+    // in src/lib/ai/embeddings.ts. This closes the immediate "invisible to
+    // the cost governor" gap; giving every generateStructuredResponse caller
+    // (goal/mood/discovery extractors too) real usage metadata is a larger
+    // AIProvider interface change, out of scope here.
+    const inputChars = EXTRACTION_PROMPT.length + recent.reduce((sum, m) => sum + m.content.length, 0);
+    const inputTokens = Math.ceil(inputChars / 4);
+    const outputTokens = Math.ceil(raw.length / 4);
+    await logLlmCall({
+      studentId,
+      callSite: "sage_memory_extract",
+      model: provider.name,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+    });
+
     const { accepted, rejected } = parseExtractionItems(parseModelJson(raw));
     if (accepted.length === 0) return { ...empty, rejected };
 
@@ -135,92 +194,94 @@ export async function extractAndStoreMemories({
         }),
       );
 
-    const hashes = candidates.map((candidate) => sourceHashFor(candidate));
-    const existing = await prisma.sageMemory.findMany({
-      where: {
-        subjectType: "student",
-        subjectId: studentId,
-        validTo: null,
-        sourceHash: { in: hashes },
-      },
-      select: { sourceHash: true },
-    });
-    const existingHashes = new Set(existing.map((row) => row.sourceHash));
+    return await withSubjectLock(studentId, async () => {
+      const hashes = candidates.map((candidate) => sourceHashFor(candidate));
+      const existing = await prisma.sageMemory.findMany({
+        where: {
+          subjectType: "student",
+          subjectId: studentId,
+          sourceHash: { in: hashes },
+          OR: [{ validTo: null }, { suppressedByStaff: true }],
+        },
+        select: { sourceHash: true },
+      });
+      const existingHashes = new Set(existing.map((row) => row.sourceHash));
 
-    const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
-    let deduped = candidates.length - fresh.length;
-    if (fresh.length === 0) return { stored: 0, deduped, rejected };
+      const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
+      let deduped = candidates.length - fresh.length;
+      if (fresh.length === 0) return { stored: 0, deduped, rejected };
 
-    const vectors = await embedTexts(
-      fresh.map((candidate) => candidate.content),
-      {
-        taskType: "RETRIEVAL_DOCUMENT",
-        usage: { studentId, callSite: "sage_memory_extract" },
-      },
-    );
+      const vectors = await embedTexts(
+        fresh.map((candidate) => candidate.content),
+        {
+          taskType: "RETRIEVAL_DOCUMENT",
+          usage: { studentId, callSite: "sage_memory_extract" },
+        },
+      );
 
-    let stored = 0;
-    const insertedVectors: number[][] = [];
-    for (let i = 0; i < fresh.length; i++) {
-      const candidate = fresh[i];
+      let stored = 0;
+      const insertedVectors: number[][] = [];
+      for (let i = 0; i < fresh.length; i++) {
+        const candidate = fresh[i];
 
-      // Semantic dedupe layer 1: rephrased versions of facts already in the
-      // DB (the hash layer only catches near-verbatim restatements).
-      const dupDistance = getDupDistance();
-      const vectorLiteral = toVectorLiteral(vectors[i]);
-      const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "visionquest"."SageMemory"
-        WHERE "subjectType" = ${candidate.subjectType}
-          AND "subjectId" = ${candidate.subjectId}
-          AND "validTo" IS NULL
-          AND embedding IS NOT NULL
-          AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
-        LIMIT 1
-      `;
-      if (semanticDup.length > 0) {
-        deduped++;
-        continue;
-      }
-
-      // Semantic dedupe layer 2: near-duplicates within this same batch
-      // (the model sometimes emits the same fact twice in one response).
-      if (insertedVectors.some((vector) => cosineDistance(vector, vectors[i]) <= dupDistance)) {
-        deduped++;
-        continue;
-      }
-
-      try {
-        const row = await prisma.sageMemory.create({
-          data: {
-            subjectType: candidate.subjectType,
-            subjectId: candidate.subjectId,
-            kind: candidate.kind,
-            content: candidate.content,
-            category: candidate.category,
-            confidence: candidate.confidence,
-            sourceType: candidate.sourceType,
-            sourceId: candidate.sourceId,
-            sourceHash: sourceHashFor(candidate),
-          },
-          select: { id: true },
-        });
-        await prisma.$executeRaw`
-          UPDATE "visionquest"."SageMemory"
-          SET embedding = ${vectorLiteral}::vector(768)
-          WHERE id = ${row.id}
+        // Semantic dedupe layer 1: rephrased versions of facts already in the
+        // DB (the hash layer only catches near-verbatim restatements).
+        const dupDistance = getDupDistance();
+        const vectorLiteral = toVectorLiteral(vectors[i]);
+        const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT id FROM "visionquest"."SageMemory"
+          WHERE "subjectType" = ${candidate.subjectType}
+            AND "subjectId" = ${candidate.subjectId}
+            AND ("validTo" IS NULL OR "suppressedByStaff" = true)
+            AND embedding IS NOT NULL
+            AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
+          LIMIT 1
         `;
-        insertedVectors.push(vectors[i]);
-        stored++;
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          deduped++; // raced with a concurrent extraction — index did its job
-        } else {
-          throw error;
+        if (semanticDup.length > 0) {
+          deduped++;
+          continue;
+        }
+
+        // Semantic dedupe layer 2: near-duplicates within this same batch
+        // (the model sometimes emits the same fact twice in one response).
+        if (insertedVectors.some((vector) => cosineDistance(vector, vectors[i]) <= dupDistance)) {
+          deduped++;
+          continue;
+        }
+
+        try {
+          const row = await prisma.sageMemory.create({
+            data: {
+              subjectType: candidate.subjectType,
+              subjectId: candidate.subjectId,
+              kind: candidate.kind,
+              content: candidate.content,
+              category: candidate.category,
+              confidence: candidate.confidence,
+              sourceType: candidate.sourceType,
+              sourceId: candidate.sourceId,
+              sourceHash: sourceHashFor(candidate),
+            },
+            select: { id: true },
+          });
+          await prisma.$executeRaw`
+            UPDATE "visionquest"."SageMemory"
+            SET embedding = ${vectorLiteral}::vector(768)
+            WHERE id = ${row.id}
+          `;
+          insertedVectors.push(vectors[i]);
+          stored++;
+        } catch (error) {
+          if (isUniqueViolation(error)) {
+            deduped++; // raced with a concurrent extraction — index did its job
+          } else {
+            throw error;
+          }
         }
       }
-    }
 
-    return { stored, deduped, rejected };
+      return { stored, deduped, rejected };
+    });
   } catch (error) {
     logger.error("Memory extraction failed (non-fatal)", {
       conversationId,

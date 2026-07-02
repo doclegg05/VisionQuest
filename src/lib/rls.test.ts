@@ -41,6 +41,8 @@ interface Fixtures {
   goalA: string;
   goalB: string;
   caseNoteA: string;
+  memoryA: string;
+  memoryB: string;
 }
 
 const SHOULD_RUN = process.env.RLS_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
@@ -68,6 +70,8 @@ if (!SHOULD_RUN) {
       goalA: "",
       goalB: "",
       caseNoteA: "",
+      memoryA: "",
+      memoryB: "",
     };
 
     /**
@@ -199,9 +203,43 @@ if (!SHOULD_RUN) {
         },
       });
       fixtures.caseNoteA = note.id;
+
+      const [memA, memB] = await Promise.all([
+        db.sageMemory.create({
+          data: {
+            subjectType: "student",
+            subjectId: sa.id,
+            kind: "semantic",
+            content: "Student A's memory",
+            category: "goal",
+            sourceType: "manual",
+            sourceHash: `rlstest-hash-a-${suffix}`,
+          },
+        }),
+        db.sageMemory.create({
+          data: {
+            subjectType: "student",
+            subjectId: sb.id,
+            kind: "semantic",
+            content: "Student B's memory",
+            category: "goal",
+            sourceType: "manual",
+            sourceHash: `rlstest-hash-b-${suffix}`,
+          },
+        }),
+      ]);
+      fixtures.memoryA = memA.id;
+      fixtures.memoryB = memB.id;
     }
 
     async function destroyFixtures(): Promise<void> {
+      // SageMemory.subjectId is a polymorphic reference (no Prisma relation /
+      // real FK to Student — see prisma/schema.prisma's SageMemory model), so
+      // it does NOT cascade-delete when the fixture Student rows are removed
+      // below. Clean it up explicitly first, or fixture rows accumulate as
+      // orphans across test runs.
+      await db.sageMemory.deleteMany({ where: { id: { in: [fixtures.memoryA, fixtures.memoryB] } } });
+
       // Cascades on Student delete clean up Conversation, Goal, CaseNote,
       // StudentClassEnrollment, etc. SpokesClassInstructor is covered by the
       // class delete cascade.
@@ -301,6 +339,48 @@ if (!SHOULD_RUN) {
           tx.caseNote.findMany({ where: { id: fixtures.caseNoteA }, select: { id: true } }),
         );
         assert.deepEqual(rows.map((r) => r.id), [fixtures.caseNoteA]);
+      });
+    });
+
+    describe("teacher role — SageMemory classroom scoping", () => {
+      it("sees managed students' SageMemory", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.sageMemory.findMany({
+            where: { id: { in: [fixtures.memoryA, fixtures.memoryB] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.id), [fixtures.memoryA]);
+      });
+
+      it("does NOT see unmanaged students' SageMemory", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.sageMemory.findMany({
+            where: { id: fixtures.memoryB },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows, []);
+      });
+
+      it("cannot UPDATE an unmanaged student's SageMemory", async () => {
+        const result = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.sageMemory.updateMany({
+            where: { id: fixtures.memoryB },
+            data: { confidence: 0.99 },
+          }),
+        );
+        assert.equal(result.count, 0, "teacher must not be able to update a memory outside their managed students");
+      });
+
+      it("cannot DELETE (archive) an unmanaged student's SageMemory", async () => {
+        const result = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.sageMemory.updateMany({
+            where: { id: fixtures.memoryB },
+            data: { validTo: new Date() },
+          }),
+        );
+        assert.equal(result.count, 0, "teacher must not be able to archive a memory outside their managed students");
       });
     });
 
