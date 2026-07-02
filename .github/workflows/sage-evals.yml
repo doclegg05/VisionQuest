@@ -72,7 +72,7 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
             exit 0
           fi
-          node scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail
+          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail
 
   sage-memory-eval:
     runs-on: ubuntu-latest
@@ -123,7 +123,7 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping full chat harness."
             exit 0
           fi
-          node scripts/sage-chat-harness.mjs --provider=gemini --judge=gemini --out=.planning/sage-chat-harness/nightly.json
+          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --judge=gemini --out=.planning/sage-chat-harness/nightly.json
 
   sage-chat-harness-ollama:
     # On-demand acceptance run against a self-hosted Ollama endpoint. No-ops
@@ -157,4 +157,4 @@ jobs:
             echo "::notice::OLLAMA_URL not set — skipping Ollama acceptance run."
             exit 0
           fi
-          node scripts/sage-chat-harness.mjs --provider=ollama --families=tool,guardrail,readability
+          npx tsx scripts/sage-chat-harness.mjs --provider=ollama --families=tool,guardrail,readability
