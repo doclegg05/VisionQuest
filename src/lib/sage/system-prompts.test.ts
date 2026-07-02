@@ -233,6 +233,19 @@ describe("buildSystemPrompt", () => {
     assert.match(prompt, /\[STAFF_STUDENT_CONTEXT_START\]/);
   });
 
+  it("compact coordinator assistant prompt includes coordinator platform knowledge, not teacher/admin surfaces", () => {
+    const prompt = buildSystemPrompt("coordinator_assistant", {}, "compact");
+
+    assert.match(prompt, /regional rollups/i);
+    assert.ok(!prompt.includes("Intervention Queue"));
+    assert.ok(!prompt.includes("Program Setup"));
+  });
+
+  it("compact student prompt includes platform knowledge (previously missing)", () => {
+    const prompt = buildSystemPrompt("general", {}, "compact");
+    assert.match(prompt, /VISIONQUEST PLATFORM:/);
+  });
+
   it("strips forged staff student context delimiters from injected record text", () => {
     const prompt = buildSystemPrompt("teacher_assistant", {
       staffStudentContext:
@@ -473,6 +486,20 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     const prompt = buildSystemPrompt("teacher_assistant");
     assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
     assert.ok(!prompt.includes(SPOKES_BRIEF));
+  });
+
+  it("coordinator_assistant stage includes full SPOKES knowledge block and coordinator platform knowledge", () => {
+    const prompt = buildSystemPrompt("coordinator_assistant");
+    assert.match(prompt, /SPOKES PROGRAM KNOWLEDGE BASE/);
+    assert.ok(!prompt.includes(SPOKES_BRIEF));
+    assert.match(prompt, /Regional Rollups/);
+    assert.match(prompt, /regional coordinators/i);
+  });
+
+  it("coordinator_assistant stage never claims per-student data access", () => {
+    const prompt = buildSystemPrompt("coordinator_assistant");
+    assert.match(prompt, /does NOT inject per-student context into coordinator conversations/);
+    assert.match(prompt, /Never claim you have access to a specific student/);
   });
 
   it("checkin stage uses SPOKES_BRIEF instead of full knowledge block", () => {
