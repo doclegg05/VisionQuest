@@ -9,6 +9,9 @@ export const SYSTEM_CONFIG_KEYS = [
   "ai_provider_model",
   "ai_provider_embedding_model",
   "ai_provider_auth_mode",
+  // "ollama" (default) | "openai" — generic OpenAI-compatible endpoint mode.
+  // See src/lib/ai/types.ts LocalAiApiStyle.
+  "ai_provider_api_style",
   "ai_provider_api_key",
   "ai_provider_cloudflare_access_client_id",
   "ai_provider_cloudflare_access_client_secret",

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 type ProviderType = "local" | "cloud";
 type LocalAuthMode = "none" | "bearer" | "cloudflare_service_token";
+type LocalApiStyle = "ollama" | "openai";
 
 interface ApiErrorResponse {
   error?: string;
@@ -50,6 +51,7 @@ export default function AiProviderPanel() {
   const [model, setModel] = useState("gemma4:26b");
   const [embeddingModel, setEmbeddingModel] = useState("nomic-embed-text");
   const [authMode, setAuthMode] = useState<LocalAuthMode>("none");
+  const [apiStyle, setApiStyle] = useState<LocalApiStyle>("ollama");
   const [numCtxInput, setNumCtxInput] = useState(""); // empty string = use default
   const [numCtxBounds, setNumCtxBounds] = useState<NumCtxBounds>(DEFAULT_NUM_CTX_BOUNDS);
   const [bearerToken, setBearerToken] = useState("");
@@ -80,6 +82,7 @@ export default function AiProviderPanel() {
               model?: string;
               embeddingModel?: string;
               authMode?: LocalAuthMode;
+              apiStyle?: LocalApiStyle;
               numCtx?: number | null;
               numCtxBounds?: NumCtxBounds;
               hasApiKey?: boolean;
@@ -110,6 +113,7 @@ export default function AiProviderPanel() {
         setModel(data.model ?? "gemma4:26b");
         setEmbeddingModel(data.embeddingModel ?? "nomic-embed-text");
         setAuthMode(data.authMode || "none");
+        setApiStyle(data.apiStyle || "ollama");
         setNumCtxInput(typeof data.numCtx === "number" ? String(data.numCtx) : "");
         if (data.numCtxBounds) setNumCtxBounds(data.numCtxBounds);
         setHasBearerToken(Boolean(data.hasApiKey));
@@ -152,6 +156,7 @@ export default function AiProviderPanel() {
       model: model || undefined,
       embeddingModel: provider === "local" ? embeddingModel || undefined : undefined,
       authMode: provider === "local" ? authMode : undefined,
+      apiStyle: provider === "local" ? apiStyle : undefined,
     };
 
     // numCtx: empty string → null (clear override), valid integer → set,
@@ -385,6 +390,29 @@ export default function AiProviderPanel() {
               {chatModelOptions.length > 0
                 ? "Suggestions come from models installed on your local AI server. You can still type any model name, even one not yet pulled."
                 : "Run Test Connection to see installed models as suggestions. Free text is always allowed."}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="local-api-style" className="mb-1 block text-sm font-medium text-[var(--ink-strong)]">
+              Server API style
+            </label>
+            <select
+              id="local-api-style"
+              value={apiStyle}
+              onChange={(e) => {
+                setApiStyle(e.target.value as LocalApiStyle);
+                resetMessages();
+              }}
+              className="field w-full px-4 py-3 text-sm"
+            >
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI-compatible (LM Studio, vLLM, llama.cpp)</option>
+            </select>
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Ollama supports both its native API and an OpenAI-compatible API, so Sage tries
+              both automatically. Choose OpenAI-compatible for servers that only expose
+              /v1/* endpoints — Sage will never attempt Ollama-only routes against them.
             </p>
           </div>
 

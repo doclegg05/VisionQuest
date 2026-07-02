@@ -261,6 +261,13 @@ export class OllamaProvider implements AIProvider {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly authConfig: LocalAIAuthConfig;
+  /**
+   * When true, this endpoint is a generic OpenAI-compatible server (LM
+   * Studio, vLLM, llama.cpp server) that only exposes /v1/*. Native /api/*
+   * calls must never be attempted — not on startup, not as an error
+   * fallback — because those routes don't exist on the target server.
+   */
+  private readonly openAiOnly: boolean;
   private apiMode: OllamaApiMode = "unknown";
 
   /**
@@ -337,12 +344,31 @@ export class OllamaProvider implements AIProvider {
       typeof explicitNumCtx === "number" && explicitNumCtx > 0
         ? explicitNumCtx
         : OllamaProvider.DEFAULT_NUM_CTX;
+    this.openAiOnly =
+      typeof authConfigOrApiKey === "object" &&
+      authConfigOrApiKey !== null &&
+      authConfigOrApiKey.apiStyle === "openai";
+    if (this.openAiOnly) {
+      this.apiMode = "openai";
+    }
   }
 
   private get headers(): Record<string, string> {
     return buildLocalAiHeaders(this.authConfig, {
       "Content-Type": "application/json",
     });
+  }
+
+  /**
+   * Honor a stream error's request to switch to the native /api/* path —
+   * unless this endpoint is configured as OpenAI-only, in which case native
+   * routes must never be attempted and we stay on the /v1/* path.
+   */
+  private requestSwitchToNative(error: unknown): boolean {
+    if (this.openAiOnly) return false;
+    if (!(error instanceof LocalAiStreamError) || !error.switchToNative) return false;
+    this.apiMode = "native";
+    return true;
   }
 
   /**
@@ -415,7 +441,9 @@ export class OllamaProvider implements AIProvider {
       return { mode: "openai", response: openAIResponse };
     }
 
-    if (!shouldTryNativeAfterOpenAiStatus(openAIResponse.status)) {
+    // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
+    // only expose /v1/* — never fall back to native /api/chat for them.
+    if (this.openAiOnly || !shouldTryNativeAfterOpenAiStatus(openAIResponse.status)) {
       return { mode: "openai", response: openAIResponse };
     }
 
@@ -742,18 +770,13 @@ export class OllamaProvider implements AIProvider {
         throw new LocalAiStreamError("Local AI stream ended without content.");
       } catch (error) {
         lastError = error;
-        if (error instanceof LocalAiStreamError && error.switchToNative) {
-          this.apiMode = "native";
-        }
+        const switchedToNative = this.requestSwitchToNative(error);
 
         const canRetry =
           !yieldedAny &&
           attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
           (!(error instanceof LocalAiStreamError) || error.retryable) &&
-          (
-            (error instanceof LocalAiStreamError && error.switchToNative) ||
-            isRetryableStartupError(error)
-          );
+          (switchedToNative || isRetryableStartupError(error));
 
         if (!canRetry) throw error;
 
@@ -826,18 +849,13 @@ export class OllamaProvider implements AIProvider {
         }
       } catch (error) {
         lastError = error;
-        if (error instanceof LocalAiStreamError && error.switchToNative) {
-          this.apiMode = "native";
-        }
+        const switchedToNative = this.requestSwitchToNative(error);
 
         const canRetry =
           !yieldedAny &&
           attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
           (!(error instanceof LocalAiStreamError) || error.retryable) &&
-          (
-            (error instanceof LocalAiStreamError && error.switchToNative) ||
-            isRetryableStartupError(error)
-          );
+          (switchedToNative || isRetryableStartupError(error));
 
         if (!canRetry) throw error;
 

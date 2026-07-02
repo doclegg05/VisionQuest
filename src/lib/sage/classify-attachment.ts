@@ -9,21 +9,30 @@
  * instead of guessing from the gist.
  *
  * Routing mirrors file-gist and honors the recorded-consent decision
- * (2026-06-09):
+ * (2026-06-09), plus a local structured-classification step inserted between
+ * the cloud path and the keyword heuristics (Task B):
  * - WITH active cloud_file_processing consent: document bytes go to Gemini for
  *   native document understanding (inline_data transport — same cloud boundary
  *   as the gist path).
- * - WITHOUT consent: local deterministic text extraction + keyword heuristics.
- *   Image-only files with no readable text fall through to method "none".
+ * - WITHOUT consent (or cloud classification failed): if a local AI provider
+ *   is configured, extracted text is classified with generateStructuredResponse
+ *   against the same schema shape as cloudClassify.
+ * - Otherwise (no local provider, or the local pass didn't parse): keyword
+ *   heuristics. Image-only files with no readable text fall through to
+ *   method "none".
  */
 
+import { z } from "zod";
 import { extractTextFromBuffer } from "./extract";
 import { logger } from "@/lib/logger";
 import { logLlmCall } from "@/lib/llm-usage";
 import { GEMINI_MODEL } from "@/lib/gemini";
+import { resolveAiProvider } from "@/lib/ai";
 
 const INLINE_CLOUD_LIMIT_BYTES = 15 * 1024 * 1024; // inline_data request ceiling
 const SUMMARY_MAX_CHARS = 400;
+/** Cap on extracted text sent to the local structured-classification prompt. */
+const LOCAL_CLASSIFY_MAX_CHARS = 4000;
 
 export const ATTACHMENT_KINDS = [
   "certificate",
@@ -65,8 +74,14 @@ export interface AttachmentClassification {
 
 export interface ClassifyAttachmentResult {
   classification: AttachmentClassification;
-  /** Which path produced the result — recorded for the AI audit trail. */
-  method: "cloud" | "local" | "none";
+  /**
+   * Which path produced the result — recorded for the AI audit trail.
+   * "local_structured": a locally-configured AI provider (ollama) produced
+   * a schema-validated JSON classification. "local": the keyword-heuristic
+   * fallback (classifyFromText) — kept distinct so the audit trail can tell
+   * a real local model pass from a plain string-match guess.
+   */
+  method: "cloud" | "local_structured" | "local" | "none";
 }
 
 const CLOUD_PROMPT =
@@ -209,6 +224,92 @@ async function cloudClassify(
   }
 }
 
+// zod mirror of AttachmentClassification, used to validate the local
+// provider's JSON before trusting it. Mirrors cloudClassify's RESPONSE_SCHEMA
+// shape/required fields; normalizeClassification (used for the cloud path)
+// is intentionally permissive, so structured validation here is what makes
+// the local path safe to trust without a second normalization pass.
+const LOCAL_CLASSIFICATION_SCHEMA = z.object({
+  kind: z.enum(ATTACHMENT_KINDS),
+  title: z.string().trim().min(1).nullable().optional(),
+  issuer: z.string().trim().min(1).nullable().optional(),
+  dateOn: z.string().trim().min(1).nullable().optional(),
+  isCompleted: z.boolean().nullable().optional(),
+  identifiers: z.array(z.string()).optional(),
+  summary: z.string().min(1),
+  confidence: z.enum(["high", "medium", "low"]),
+});
+
+const LOCAL_CLASSIFY_PROMPT =
+  "You are classifying a document a workforce-development student uploaded in chat. " +
+  "You are given the document's extracted text, not the original file. " +
+  "Identify what it is and extract key fields. Respond ONLY with JSON matching the schema. " +
+  "kind: certificate | form | resume | id_document | transcript | letter | receipt | photo | other. " +
+  "title: the credential/form/document name or null. " +
+  "issuer: the issuing organization/authority or null. " +
+  "dateOn: a date earned/issued exactly as printed, or null. " +
+  "isCompleted: true if a certificate looks awarded or a form looks signed/filled, false if blank/unsigned, null if unclear. " +
+  "identifiers: array of form numbers / certificate IDs found (empty array if none). " +
+  "summary: at most 60 words, plain text. " +
+  "confidence: high | medium | low. " +
+  'Respond with a single JSON object only, e.g. {"kind":"form","title":null,"issuer":null,"dateOn":null,"isCompleted":null,"identifiers":[],"summary":"...","confidence":"low"}';
+
+/**
+ * Local structured classification from extracted document text, using
+ * whatever local AI provider is configured for this student's chat_file_gist
+ * task. Only proceeds when the resolved provider is the local ("ollama")
+ * provider — never sends text to a cloud provider from this path, since that
+ * would bypass the consent gate that `cloudClassify` already enforces.
+ * Returns null (never throws) on any resolution, request, or validation
+ * failure so the caller can fall through to keyword heuristics.
+ */
+async function localClassify(
+  text: string,
+  studentId: string,
+): Promise<AttachmentClassification | null> {
+  if (!text.trim()) return null;
+
+  let provider;
+  try {
+    provider = await resolveAiProvider({
+      studentId,
+      task: "chat_file_gist",
+      sensitivity: "student_record",
+    });
+  } catch (error) {
+    logger.warn("Local classification provider resolution failed; falling back", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+
+  // Only a configured local provider is eligible — never route this
+  // extracted text through a cloud provider outside the consent gate above.
+  if (provider.name !== "ollama") return null;
+
+  try {
+    const raw = await provider.generateStructuredResponse(LOCAL_CLASSIFY_PROMPT, [
+      { role: "user", content: truncate(text, LOCAL_CLASSIFY_MAX_CHARS) },
+    ]);
+    if (!raw.trim()) return null;
+
+    const parsed = LOCAL_CLASSIFICATION_SCHEMA.safeParse(JSON.parse(raw));
+    if (!parsed.success) {
+      logger.warn("Local classification failed schema validation; falling back", {
+        error: parsed.error.message,
+      });
+      return null;
+    }
+
+    return normalizeClassification(parsed.data);
+  } catch (error) {
+    logger.warn("Local classification threw; falling back to keyword heuristics", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 // Keyword heuristics for the no-consent path. Order matters — earlier kinds
 // win, so the more specific signals are listed first.
 const KIND_KEYWORDS: ReadonlyArray<{ kind: AttachmentKind; terms: ReadonlyArray<string> }> = [
@@ -271,7 +372,13 @@ export async function classifyAttachment(params: {
     maxChars: 4000,
     maxPages: 3,
   });
+
   if (extraction?.text?.trim()) {
+    const localStructured = await localClassify(extraction.text, studentId);
+    if (localStructured) {
+      return { classification: localStructured, method: "local_structured" };
+    }
+
     return { classification: classifyFromText(extraction.text), method: "local" };
   }
 

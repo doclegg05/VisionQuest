@@ -7,6 +7,7 @@ export {
   DEFAULT_LOCAL_EMBEDDING_MODEL,
   readLocalAiProviderConfig,
   toLocalAiAuthConfig,
+  resolveLocalAiApiStyle,
 } from "./local-config";
 export { DEFAULT_LOCAL_AI_AUTH_MODE, resolveLocalAiAuthMode } from "./local-auth";
 export { resolveEmbeddingProvider, getActiveEmbeddingModel } from "./embedding-provider";
@@ -22,6 +23,7 @@ export type {
   DataSensitivity,
   LocalAIAuthMode,
   LocalAIAuthConfig,
+  LocalAiApiStyle,
   PromptTier,
 } from "./types";
 export type { EmbeddingProvider, EmbeddingTaskType } from "./embedding-types";

@@ -1148,4 +1148,170 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.deepEqual(captured[0].args, { id: "abc" });
     });
   });
+
+  describe("apiStyle: openai (generic OpenAI-compatible endpoint)", () => {
+    it("generateResponse throws on a 404 instead of falling back to /api/chat", async () => {
+      const openAiOnlyProvider = new OllamaProvider(
+        "http://localhost:1234",
+        "local-model",
+        { authMode: "none", apiStyle: "openai" },
+      );
+
+      mockFetch.mock.mockImplementationOnce(async () => new Response("Not Found", { status: 404 }));
+
+      await assert.rejects(
+        openAiOnlyProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        /Local AI request failed \(404\)/,
+      );
+
+      // Only the /v1 endpoint was ever called — no native fallback attempt.
+      assert.equal(mockFetch.mock.callCount(), 1);
+      assert.equal(
+        mockFetch.mock.calls[0].arguments[0],
+        "http://localhost:1234/v1/chat/completions",
+      );
+    });
+
+    it("generateStructuredResponse throws on a 502 instead of falling back to /api/chat", async () => {
+      const openAiOnlyProvider = new OllamaProvider(
+        "http://localhost:1234",
+        "local-model",
+        { authMode: "none", apiStyle: "openai" },
+      );
+
+      mockFetch.mock.mockImplementationOnce(async () => new Response("Bad Gateway", { status: 502 }));
+
+      await assert.rejects(
+        openAiOnlyProvider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
+        /Local AI structured request failed \(502\)/,
+      );
+
+      assert.equal(mockFetch.mock.callCount(), 1);
+      assert.equal(
+        mockFetch.mock.calls[0].arguments[0],
+        "http://localhost:1234/v1/chat/completions",
+      );
+    });
+
+    it("streamResponse throws instead of switching to native when the stream signals a 404", async () => {
+      const openAiOnlyProvider = new OllamaProvider(
+        "http://localhost:1234",
+        "local-model",
+        { authMode: "none", apiStyle: "openai" },
+      );
+
+      const encoder = new TextEncoder();
+      mockFetch.mock.mockImplementationOnce(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode('data: {"error":"Ollama returned 404"}\n\n'));
+                controller.close();
+              },
+            }),
+            { status: 200 },
+          ),
+      );
+
+      const chunks: string[] = [];
+      await assert.rejects(async () => {
+        for await (const chunk of openAiOnlyProvider.streamResponse("sys", [
+          { role: "user", content: "Hi" },
+        ])) {
+          chunks.push(chunk);
+        }
+      });
+
+      assert.deepEqual(chunks, []);
+      // No retry/fallback to /api/chat — exactly one request was made.
+      assert.equal(mockFetch.mock.callCount(), 1);
+      assert.equal(
+        mockFetch.mock.calls[0].arguments[0],
+        "http://localhost:1234/v1/chat/completions",
+      );
+    });
+
+    it("streamResponse never calls /api/chat even when the OpenAI stream ends without content", async () => {
+      const openAiOnlyProvider = new OllamaProvider(
+        "http://localhost:1234",
+        "local-model",
+        { authMode: "none", apiStyle: "openai" },
+      );
+
+      const encoder = new TextEncoder();
+      mockFetch.mock.mockImplementationOnce(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+              },
+            }),
+            { status: 200 },
+          ),
+      );
+
+      await assert.rejects(async () => {
+        for await (const _chunk of openAiOnlyProvider.streamResponse("sys", [
+          { role: "user", content: "Hi" },
+        ])) {
+          // drain
+        }
+      });
+
+      assert.equal(mockFetch.mock.callCount(), 1);
+      assert.equal(
+        mockFetch.mock.calls[0].arguments[0],
+        "http://localhost:1234/v1/chat/completions",
+      );
+    });
+
+    it("still retries genuinely transient connection errors (not a native-switch)", async () => {
+      const openAiOnlyProvider = new OllamaProvider(
+        "http://localhost:1234",
+        "local-model",
+        { authMode: "none", apiStyle: "openai" },
+      );
+
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          throw new Error("fetch failed: ECONNREFUSED");
+        }
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  "data: " +
+                    JSON.stringify({ choices: [{ delta: { content: "Recovered" } }] }) +
+                    "\n\n",
+                ),
+              );
+              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        );
+      });
+
+      const chunks: string[] = [];
+      for await (const chunk of openAiOnlyProvider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        chunks.push(chunk);
+      }
+
+      assert.deepEqual(chunks, ["Recovered"]);
+      assert.equal(fetchCount, 2);
+      // Both attempts hit the /v1 endpoint — never /api/chat.
+      for (const call of mockFetch.mock.calls) {
+        assert.equal(call.arguments[0], "http://localhost:1234/v1/chat/completions");
+      }
+    });
+  });
 });
