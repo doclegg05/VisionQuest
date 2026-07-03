@@ -173,4 +173,77 @@ describe("checkOllamaHealth", () => {
       error: "Chat endpoint returned 403",
     });
   });
+
+  describe("apiStyle: openai (generic OpenAI-compatible endpoint)", () => {
+    it("never calls /api/tags or /api/chat — goes straight to /v1/*", async () => {
+      const calledUrls: string[] = [];
+      mockFetch.mock.mockImplementation(async (input: string | URL | Request) => {
+        const url = String(input);
+        calledUrls.push(url);
+        if (url.endsWith("/api/tags") || url.endsWith("/api/chat")) {
+          throw new Error(`Native route must never be called in openai apiStyle: ${url}`);
+        }
+        if (url.endsWith("/v1/models")) {
+          return Response.json({ data: [{ id: "local-model" }] });
+        }
+        if (url.endsWith("/v1/chat/completions")) {
+          return Response.json({ choices: [{ message: { content: "OK" } }] });
+        }
+        throw new Error(`Unexpected URL: ${url}`);
+      });
+
+      const result = await checkOllamaHealth("http://localhost:1234", {
+        model: "local-model",
+        authConfig: { authMode: "none", apiStyle: "openai" },
+      });
+
+      assert.deepEqual(result, {
+        healthy: true,
+        models: ["local-model"],
+        apiMode: "openai",
+        chatValidated: true,
+        modelUsed: "local-model",
+      });
+      assert.ok(calledUrls.every((url) => url.includes("/v1/")));
+    });
+
+    it("reports unhealthy (not a native fallback) when /v1/chat/completions 404s", async () => {
+      mockFetch.mock.mockImplementation(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/v1/models")) {
+          return Response.json({ data: [{ id: "local-model" }] });
+        }
+        if (url.endsWith("/v1/chat/completions")) {
+          return new Response("Not Found", { status: 404 });
+        }
+        throw new Error(`Native route must never be called in openai apiStyle: ${url}`);
+      });
+
+      const result = await checkOllamaHealth("http://localhost:1234", {
+        model: "local-model",
+        authConfig: { authMode: "none", apiStyle: "openai" },
+      });
+
+      assert.equal(result.healthy, false);
+      assert.equal(result.apiMode, "openai");
+      assert.equal(result.error, "Chat endpoint returned 404");
+    });
+
+    it("reports unhealthy when /v1/models itself fails, without probing /api/tags", async () => {
+      mockFetch.mock.mockImplementation(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/v1/models")) {
+          return new Response("Server Error", { status: 500 });
+        }
+        throw new Error(`Native route must never be called in openai apiStyle: ${url}`);
+      });
+
+      const result = await checkOllamaHealth("http://localhost:1234", {
+        authConfig: { authMode: "none", apiStyle: "openai" },
+      });
+
+      assert.equal(result.healthy, false);
+      assert.equal(result.error, "Server returned 500");
+    });
+  });
 });

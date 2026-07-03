@@ -87,6 +87,7 @@ const proposeResumeEdit: AgentTool = {
     required: ["section", "operation", "value"],
   },
   requiredRoles: ["student"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const section = String(args.section ?? "") as EditableSection;
@@ -246,6 +247,7 @@ const analyzeJobMatch: AgentTool = {
     required: ["jobListingId"],
   },
   requiredRoles: ["student"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "");
@@ -275,6 +277,7 @@ const lookupSavedJobs: AgentTool = {
     description: "Jobs you've saved and their status",
   },
   requiredRoles: ["student"],
+  riskTier: "read",
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.session.id;
@@ -334,6 +337,7 @@ const prepareForInterview: AgentTool = {
     required: ["jobListingId"],
   },
   requiredRoles: ["student"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "");
@@ -368,6 +372,7 @@ const generateCoverLetter: AgentTool = {
     required: ["jobListingId"],
   },
   requiredRoles: ["student"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "");

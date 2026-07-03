@@ -1,6 +1,6 @@
 import { getConfigValue, getPlainConfigValue } from "@/lib/system-config";
 import { resolveLocalAiAuthMode } from "./local-auth";
-import type { LocalAIAuthConfig, LocalAIAuthMode } from "./types";
+import type { LocalAIAuthConfig, LocalAIAuthMode, LocalAiApiStyle } from "./types";
 
 export const DEFAULT_OLLAMA_MODEL = "gemma4:26b";
 /** Native 768-dim local embedding model; matches EMBEDDING_DIMENSIONS. */
@@ -12,6 +12,8 @@ const API_KEY_ENV_VARS = [
 ] as const;
 
 const EMBEDDING_MODEL_ENV_VARS = ["AI_PROVIDER_EMBEDDING_MODEL"] as const;
+
+const API_STYLE_ENV_VARS = ["AI_PROVIDER_API_STYLE"] as const;
 
 const CLOUDFLARE_CLIENT_ID_ENV_VARS = [
   "AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID",
@@ -31,6 +33,8 @@ export interface LocalAiProviderConfig {
   /** SystemConfig "ai_provider_embedding_model" (+ env fallback AI_PROVIDER_EMBEDDING_MODEL). */
   embeddingModel: string | null;
   authMode: LocalAIAuthMode;
+  /** SystemConfig "ai_provider_api_style" (+ env fallback AI_PROVIDER_API_STYLE). Defaults to "ollama". */
+  apiStyle: LocalAiApiStyle;
   numCtxRaw: string | null;
   apiKey: string | null;
   apiKeySource: "config" | "env" | null;
@@ -38,6 +42,12 @@ export interface LocalAiProviderConfig {
   cloudflareAccessClientIdSource: "config" | "env" | null;
   cloudflareAccessClientSecret: string | null;
   cloudflareAccessClientSecretSource: "config" | "env" | null;
+}
+
+export function resolveLocalAiApiStyle(
+  apiStyle: string | null | undefined,
+): LocalAiApiStyle {
+  return apiStyle === "openai" ? "openai" : "ollama";
 }
 
 function firstEnvValue(names: readonly string[]): string | null {
@@ -70,6 +80,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     model,
     embeddingModelConfig,
     authModeRaw,
+    apiStyleConfig,
     numCtxRaw,
     apiKeyResult,
     cloudflareAccessClientIdResult,
@@ -79,6 +90,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     getPlainConfigValue("ai_provider_model"),
     getPlainConfigValue("ai_provider_embedding_model"),
     getPlainConfigValue("ai_provider_auth_mode"),
+    getPlainConfigValue("ai_provider_api_style"),
     getPlainConfigValue("ai_provider_num_ctx"),
     getSecretConfigOrEnv("ai_provider_api_key", API_KEY_ENV_VARS),
     getSecretConfigOrEnv(
@@ -96,6 +108,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     model,
     embeddingModel: embeddingModelConfig || firstEnvValue(EMBEDDING_MODEL_ENV_VARS),
     authMode: resolveLocalAiAuthMode(authModeRaw),
+    apiStyle: resolveLocalAiApiStyle(apiStyleConfig || firstEnvValue(API_STYLE_ENV_VARS)),
     numCtxRaw,
     apiKey: apiKeyResult.value,
     apiKeySource: apiKeyResult.source,
@@ -113,6 +126,7 @@ export function toLocalAiAuthConfig(
     | "apiKey"
     | "cloudflareAccessClientId"
     | "cloudflareAccessClientSecret"
+    | "apiStyle"
   >,
   options: { numCtx?: number } = {},
 ): LocalAIAuthConfig {
@@ -122,5 +136,6 @@ export function toLocalAiAuthConfig(
     cloudflareAccessClientId: config.cloudflareAccessClientId,
     cloudflareAccessClientSecret: config.cloudflareAccessClientSecret,
     numCtx: options.numCtx,
+    apiStyle: config.apiStyle,
   };
 }
