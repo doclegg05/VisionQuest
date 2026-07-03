@@ -53,6 +53,12 @@ mock.module("@/lib/llm-usage", {
   namedExports: { logLlmCall: mockLogLlmCall },
 });
 
+mock.module("@/lib/ai/embedding-provider", {
+  namedExports: {
+    getActiveEmbeddingModel: async () => "gemini-embedding-001",
+  },
+});
+
 let extractAndStoreMemories: typeof import("./extract").extractAndStoreMemories;
 let sourceHashFor: typeof import("./schema").sourceHashFor;
 
