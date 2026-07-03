@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 const mockLogLlmCall = mock.fn<(params: unknown) => Promise<void>>();
 
@@ -12,10 +12,14 @@ mock.module("@/lib/llm-usage", {
 let detectModelCapabilities: Awaited<
   typeof import("../capabilities")
 >["detectModelCapabilities"];
+let resolveProbeTimeoutMs: Awaited<
+  typeof import("../capabilities")
+>["resolveProbeTimeoutMs"];
 
 before(async () => {
   const mod = await import("../capabilities");
   detectModelCapabilities = mod.detectModelCapabilities;
+  resolveProbeTimeoutMs = mod.resolveProbeTimeoutMs;
 });
 
 const mockFetch = mock.fn<typeof globalThis.fetch>();
@@ -223,5 +227,69 @@ describe("detectModelCapabilities", () => {
     );
     const embeddingEntry = result.installedModels.find((m) => m.name === "embeddinggemma");
     assert.equal(embeddingEntry?.likelyEmbedding, true);
+  });
+});
+
+describe("resolveProbeTimeoutMs — SAGE_CAPABILITY_PROBE_TIMEOUT_MS parsing", () => {
+  const ORIGINAL = process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS;
+
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS;
+    else process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = ORIGINAL;
+  });
+
+  it("defaults to 8000ms when unset", () => {
+    delete process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS;
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
+  });
+
+  it("defaults to 8000ms when set to an empty or whitespace-only string", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "   ";
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
+  });
+
+  it("uses a valid in-bounds override", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "15000";
+    assert.equal(resolveProbeTimeoutMs(), 15_000);
+  });
+
+  it("trims whitespace around a valid override", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "  20000  ";
+    assert.equal(resolveProbeTimeoutMs(), 20_000);
+  });
+
+  it("accepts the lower bound (1000ms)", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "1000";
+    assert.equal(resolveProbeTimeoutMs(), 1_000);
+  });
+
+  it("accepts the upper bound (120000ms)", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "120000";
+    assert.equal(resolveProbeTimeoutMs(), 120_000);
+  });
+
+  it("falls back to the default when below the lower bound", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "999";
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
+  });
+
+  it("falls back to the default when above the upper bound", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "120001";
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
+  });
+
+  it("falls back to the default when non-numeric", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "banana";
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
+  });
+
+  it("falls back to the default for NaN-producing input", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "15000ms";
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
+  });
+
+  it("falls back to the default for negative values", () => {
+    process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS = "-5000";
+    assert.equal(resolveProbeTimeoutMs(), 8_000);
   });
 });

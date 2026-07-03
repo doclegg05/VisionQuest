@@ -44,8 +44,26 @@ export interface DetectCapabilitiesConfig {
   authConfig: LocalAIAuthConfig | null;
 }
 
-/** Per-probe timeout. Keeps the admin UI responsive even against a slow/CPU-bound host. */
-const PROBE_TIMEOUT_MS = 8_000;
+/** Default per-probe timeout. Keeps the admin UI responsive even against a slow/CPU-bound host. */
+const DEFAULT_PROBE_TIMEOUT_MS = 8_000;
+/** Sane bounds for SAGE_CAPABILITY_PROBE_TIMEOUT_MS — below 1s is too flaky, above 2min blocks the admin UI too long. */
+const MIN_PROBE_TIMEOUT_MS = 1_000;
+const MAX_PROBE_TIMEOUT_MS = 120_000;
+
+/**
+ * Resolves the per-probe timeout from SAGE_CAPABILITY_PROBE_TIMEOUT_MS.
+ * Falls back to the 8s default when unset, non-numeric, or out of bounds —
+ * a cold CPU-bound local model can need 15s+ to answer its first probe, so
+ * operators can raise this instead of the probe misreporting as unreachable.
+ */
+export function resolveProbeTimeoutMs(): number {
+  const raw = process.env.SAGE_CAPABILITY_PROBE_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_PROBE_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_PROBE_TIMEOUT_MS;
+  if (parsed < MIN_PROBE_TIMEOUT_MS || parsed > MAX_PROBE_TIMEOUT_MS) return DEFAULT_PROBE_TIMEOUT_MS;
+  return parsed;
+}
 
 const EMBEDDING_NAME_HINTS = ["embed", "bge-", "gte-", "e5-"];
 
@@ -86,10 +104,11 @@ async function listInstalledModels(
   normalizedBaseUrl: string,
   apiMode: "openai" | "native",
   headers: Record<string, string>,
+  timeoutMs: number,
 ): Promise<{ models: ModelCapabilities["installedModels"]; warning: string | null }> {
   try {
     if (apiMode === "native") {
-      const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/tags`, PROBE_TIMEOUT_MS, {
+      const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/tags`, timeoutMs, {
         headers,
       });
       if (!res.ok) {
@@ -109,7 +128,7 @@ async function listInstalledModels(
       };
     }
 
-    const res = await fetchWithTimeout(`${normalizedBaseUrl}/v1/models`, PROBE_TIMEOUT_MS, {
+    const res = await fetchWithTimeout(`${normalizedBaseUrl}/v1/models`, timeoutMs, {
       headers,
     });
     if (!res.ok) {
@@ -137,12 +156,13 @@ async function probeContextLength(
   apiMode: "openai" | "native",
   model: string | null,
   headers: Record<string, string>,
+  timeoutMs: number,
 ): Promise<{ contextLength: number | null; warning: string | null }> {
   if (apiMode !== "native" || !model) {
     return { contextLength: null, warning: null };
   }
   try {
-    const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/show`, PROBE_TIMEOUT_MS, {
+    const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/show`, timeoutMs, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ model }),
@@ -168,6 +188,7 @@ async function probeToolSupport(
   apiMode: "openai" | "native",
   model: string | null,
   headers: Record<string, string>,
+  timeoutMs: number,
 ): Promise<{ supportsTools: boolean; warning: string | null }> {
   if (!model) {
     return { supportsTools: false, warning: "No model configured — skipped tool-calling probe." };
@@ -187,7 +208,7 @@ async function probeToolSupport(
     if (apiMode === "openai") {
       const res = await fetchWithTimeout(
         `${normalizedBaseUrl}/v1/chat/completions`,
-        PROBE_TIMEOUT_MS,
+        timeoutMs,
         {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
@@ -209,7 +230,7 @@ async function probeToolSupport(
       return { supportsTools: true, warning: null };
     }
 
-    const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/chat`, PROBE_TIMEOUT_MS, {
+    const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/chat`, timeoutMs, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -237,6 +258,7 @@ async function probeJsonOutput(
   apiMode: "openai" | "native",
   model: string | null,
   headers: Record<string, string>,
+  timeoutMs: number,
 ): Promise<{ supportsJsonOutput: boolean; warning: string | null }> {
   if (!model) {
     return { supportsJsonOutput: false, warning: "No model configured — skipped JSON-output probe." };
@@ -250,7 +272,7 @@ async function probeJsonOutput(
     if (apiMode === "openai") {
       const res = await fetchWithTimeout(
         `${normalizedBaseUrl}/v1/chat/completions`,
-        PROBE_TIMEOUT_MS,
+        timeoutMs,
         {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
@@ -274,7 +296,7 @@ async function probeJsonOutput(
       return parseJsonProbeResult(text);
     }
 
-    const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/chat`, PROBE_TIMEOUT_MS, {
+    const res = await fetchWithTimeout(`${normalizedBaseUrl}/api/chat`, timeoutMs, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -318,6 +340,7 @@ async function probeEmbedding(
   baseUrl: string,
   embeddingModel: string | null,
   authConfig: LocalAIAuthConfig | null,
+  timeoutMs: number,
 ): Promise<ModelCapabilities["embedding"] & { warning: string | null }> {
   if (!embeddingModel) {
     return {
@@ -333,7 +356,7 @@ async function probeEmbedding(
     const provider = new OllamaEmbeddingProvider(baseUrl, embeddingModel, authConfig);
     const vectors = await withTimeout(
       provider.embed(["capability probe"], { taskType: "RETRIEVAL_DOCUMENT" }),
-      PROBE_TIMEOUT_MS,
+      timeoutMs,
     );
     const dims = vectors[0]?.length ?? null;
     // OllamaEmbeddingProvider always L2-normalizes and asserts EMBEDDING_DIMENSIONS
@@ -395,6 +418,7 @@ export async function detectModelCapabilities(
 ): Promise<ModelCapabilities> {
   const warnings: string[] = [];
   const normalizedBaseUrl = cfg.url.replace(/\/+$/, "");
+  const timeoutMs = resolveProbeTimeoutMs();
 
   let headers: Record<string, string>;
   try {
@@ -414,7 +438,7 @@ export async function detectModelCapabilities(
   }
 
   const health = await checkOllamaHealth(cfg.url, {
-    timeoutMs: PROBE_TIMEOUT_MS,
+    timeoutMs,
     model: cfg.model,
     authConfig: cfg.authConfig,
   });
@@ -437,11 +461,11 @@ export async function detectModelCapabilities(
   const modelUsed = health.modelUsed ?? cfg.model ?? null;
 
   const [installed, contextResult, toolResult, jsonResult, embeddingResult] = await Promise.all([
-    listInstalledModels(normalizedBaseUrl, apiMode, headers),
-    probeContextLength(normalizedBaseUrl, apiMode, modelUsed, headers),
-    probeToolSupport(normalizedBaseUrl, apiMode, modelUsed, headers),
-    probeJsonOutput(normalizedBaseUrl, apiMode, modelUsed, headers),
-    probeEmbedding(cfg.url, cfg.embeddingModel, cfg.authConfig),
+    listInstalledModels(normalizedBaseUrl, apiMode, headers, timeoutMs),
+    probeContextLength(normalizedBaseUrl, apiMode, modelUsed, headers, timeoutMs),
+    probeToolSupport(normalizedBaseUrl, apiMode, modelUsed, headers, timeoutMs),
+    probeJsonOutput(normalizedBaseUrl, apiMode, modelUsed, headers, timeoutMs),
+    probeEmbedding(cfg.url, cfg.embeddingModel, cfg.authConfig, timeoutMs),
   ]);
 
   if (installed.warning) warnings.push(installed.warning);
