@@ -85,7 +85,7 @@ Read when deciding what to build, cut, simplify, or automate.
 - ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (no sleep). Verified 2026-04-29 in `render.yaml` (`plan: starter`).
 - ~~OAuth users get random password hash~~ — Fixed (2026-04-01): passwordHash is now null for OAuth users
 - ~~No CSP headers configured~~ — Fixed (2026-04-01): nonce-based CSP in `src/proxy.ts`
-- ~~docs-upload/sage-context/ is intended for RAG grounding documents~~ — Stale; that directory does not exist. Grounding documents live as `ProgramDocument` rows in Supabase Storage, curated via the teacher documents sage-context API (`src/app/api/teacher/documents/sage-context/`) and the `catalog/` OKF (org-knowledge) layer.
+- ~~docs-upload/sage-context/ is intended for RAG grounding documents~~ — Stale; that directory exists but is empty and has no bucket mapping (ingest reports it as `unmapped`). Grounding documents live as `ProgramDocument` rows in Supabase Storage, curated via the teacher documents sage-context API (`src/app/api/teacher/documents/sage-context/`) and the `catalog/` OKF (org-knowledge) layer.
 - ~~Render free tier may not execute cron jobs~~ — Resolved: cron jobs migrated to Supabase pg_cron in Phase 1 of supabase-optimization. See `prisma/migrations/20260421000000_add_pg_cron_jobs` and `docs/plans/pg-cron-setup-runbook.md`. `scripts/run-*.mjs` files are kept as manual-trigger fallbacks.
 
 ## Design Context

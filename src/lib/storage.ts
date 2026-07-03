@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import { Readable } from "stream";
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
@@ -101,15 +101,48 @@ function inferMimeType(storageKey: string): string {
   return mimeMap[ext] || "application/octet-stream";
 }
 
-// Bucket storageKeys are minted through the uploader/seeder FOLDER_MAP
-// (scripts/upload-to-supabase.mjs, scripts/seed-documents.mjs), which renames
-// some docs-upload/ top-level folders. Bundled reads must reverse those
-// renames or keys under the renamed prefixes never resolve locally.
-const BUNDLED_KEY_PREFIX_TO_LOCAL: Record<string, string> = {
-  "teachers/guides/": "teachers/",
-  "students/resources/": "students/",
-  "presentations/": "presentation/",
+// Local docs-upload/ top-level folder → bucket key prefix. This is the single
+// TS source of truth for the convention minted by scripts/upload-to-supabase.mjs
+// and scripts/seed-documents.mjs, and enforced in the live DB by the manually
+// applied CHECK constraint program_document_storage_key_shape on ProgramDocument.
+// Folders absent here (e.g. sage-context/) have no bucket convention and must
+// not be indexed.
+const LOCAL_FOLDER_TO_BUCKET_PREFIX: Record<string, string> = {
+  forms: "forms",
+  orientation: "orientation",
+  lms: "lms",
+  students: "students/resources",
+  teachers: "teachers/guides",
+  presentation: "presentations",
 };
+
+/**
+ * Map a docs-upload/-relative path (forward slashes) to its bucket storageKey.
+ * Returns null for paths under unmapped top-level folders and for root-level
+ * files — the uploader skips those, so no bucket object can exist for them.
+ */
+export function mapLocalPathToStorageKey(relativePath: string): string | null {
+  const [topFolder, ...restParts] = relativePath.split("/");
+  const prefix = LOCAL_FOLDER_TO_BUCKET_PREFIX[topFolder];
+  if (!prefix || restParts.length === 0) return null;
+  const rest = restParts.join("/");
+
+  // Handbook appendix Section 16 = certification module descriptors → lms/
+  // (same special case as the uploader/seeder scripts)
+  if (topFolder === "teachers" && rest.includes("Handbook Appendix/Section 16/")) {
+    return `lms/certifications/program-info/${restParts[restParts.length - 1]}`;
+  }
+
+  return `${prefix}/${rest}`;
+}
+
+// Bundled reads must reverse the renames or keys under the renamed prefixes
+// never resolve locally. Derived from the forward map so they cannot drift.
+const BUNDLED_KEY_PREFIX_TO_LOCAL: Record<string, string> = Object.fromEntries(
+  Object.entries(LOCAL_FOLDER_TO_BUCKET_PREFIX)
+    .filter(([local, bucket]) => local !== bucket)
+    .map(([local, bucket]) => [`${bucket}/`, `${local}/`]),
+);
 
 export async function downloadBundledFile(
   storageKey: string,
@@ -368,6 +401,32 @@ export async function deleteFile(storageKey: string): Promise<void> {
       Key: storageKey,
     })
   );
+}
+
+/** True when an S3-compatible backend (Supabase Storage or R2) is configured. */
+export function isObjectStorageConfigured(): boolean {
+  return Boolean(s3Client && BUCKET);
+}
+
+/**
+ * Check whether an object exists in the configured bucket via HeadObject.
+ * Throws if object storage is not configured — callers that need a
+ * guarantee (e.g. Sage ingest) must fail fast rather than guess.
+ */
+export async function storageObjectExists(storageKey: string): Promise<boolean> {
+  try {
+    await getS3Client().send(
+      new HeadObjectCommand({ Bucket: BUCKET, Key: storageKey })
+    );
+    return true;
+  } catch (error) {
+    const statusCode = typeof error === "object" && error && "$metadata" in error
+      ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+      : undefined;
+
+    if (statusCode === 404) return false;
+    throw error;
+  }
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB

@@ -20,7 +20,8 @@ const DRY_RUN = process.argv.includes("--dry-run");
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const INVENTORY_PATH = join(ROOT, "../docs-upload/_inventory.txt");
 
-// ─── FOLDER → STORAGE PREFIX (must match upload-to-supabase.mjs) ────────────
+// ─── FOLDER → STORAGE PREFIX (must match upload-to-supabase.mjs and ─────────
+// ─── LOCAL_FOLDER_TO_BUCKET_PREFIX in src/lib/storage.ts) ───────────────────
 const FOLDER_MAP = {
   forms:        "forms",
   orientation:  "orientation",
