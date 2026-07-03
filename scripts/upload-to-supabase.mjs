@@ -38,6 +38,8 @@ const SECRET_KEY    = process.env.STORAGE_SECRET_KEY || "";
 
 // ─── FOLDER MAPPING ──────────────────────────────────────────────────────────
 // Local folder → Supabase storage prefix
+// Must match LOCAL_FOLDER_TO_BUCKET_PREFIX in src/lib/storage.ts and
+// FOLDER_MAP in scripts/seed-documents.mjs.
 const FOLDER_MAP = {
   "forms":        "forms",
   "orientation":  "orientation",
