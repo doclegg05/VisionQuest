@@ -15,7 +15,7 @@ export function extractSections(body: string): CatalogNodeSections {
 }
 
 export function parseCatalogNode(raw: string, filePath: string): CatalogNode {
-  const { data, content } = matter(raw);
+  const { data, content } = matter(raw.replace(/\r\n?/g, "\n"));
   return {
     frontmatter: data as CatalogFrontmatter,
     sections: extractSections(content),
