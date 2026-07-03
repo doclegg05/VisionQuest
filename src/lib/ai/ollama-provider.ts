@@ -1,9 +1,13 @@
 import { randomUUID } from "crypto";
 import { buildLocalAiHeaders, DEFAULT_LOCAL_AI_AUTH_MODE } from "./local-auth";
+import { estimateTokens } from "../llm-usage-estimate";
 import type {
   AIProvider,
   ChatMessage,
+  GenerationOptions,
   LocalAIAuthConfig,
+  OnUsage,
+  TokenUsage,
   ToolCallHandler,
   ToolDeclaration,
   ToolStreamEvent,
@@ -55,12 +59,31 @@ interface AccumulatedToolCall {
   arguments: string; // accumulated JSON string
 }
 
+/**
+ * Mutable out-param streaming methods write into when they observe real
+ * usage on a chunk. AsyncGenerators can't both yield values to a `for await`
+ * loop and return a final value cleanly through every early-return path in
+ * this file's retry/fallback logic, so a shared sink is the least invasive
+ * way to surface usage from deep inside the SSE parsing loop.
+ */
+interface UsageSink {
+  usage: TokenUsage | null;
+}
+
+/** Shared usage shape across the OpenAI-compat REST surface (non-stream and final stream chunk). */
+interface OpenAIUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
 interface OpenAIChatResponse {
   choices?: Array<{
     message?: {
       content?: string;
     };
   }>;
+  usage?: OpenAIUsage;
 }
 
 interface OpenAIStreamChunk {
@@ -75,6 +98,8 @@ interface OpenAIStreamChunk {
     text?: string;
     finish_reason?: string | null;
   }>;
+  /** Present only on the final chunk when stream_options.include_usage is set. */
+  usage?: OpenAIUsage;
 }
 
 interface NativeChatResponse {
@@ -83,6 +108,9 @@ interface NativeChatResponse {
     tool_calls?: NativeToolCall[];
   };
   done?: boolean;
+  /** Present on the done:true message from Ollama's native /api/chat. */
+  prompt_eval_count?: number;
+  eval_count?: number;
 }
 
 type OllamaApiMode = "unknown" | "openai" | "native";
@@ -140,6 +168,68 @@ function shouldTryNativeAfterOpenAiStatus(status: number): boolean {
 function streamChunkContent(parsed: OpenAIStreamChunk): string | undefined {
   const choice = parsed.choices?.[0];
   return choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
+}
+
+/** Converts an OpenAI-compat `usage` object into our normalized TokenUsage. */
+function usageFromOpenAI(usage: OpenAIUsage | undefined): TokenUsage | null {
+  if (!usage) return null;
+  const inputTokens = usage.prompt_tokens ?? 0;
+  const outputTokens = usage.completion_tokens ?? 0;
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: usage.total_tokens ?? inputTokens + outputTokens,
+    source: "provider",
+  };
+}
+
+/** Converts Ollama native /api/chat's prompt_eval_count/eval_count into TokenUsage. */
+function usageFromNative(
+  promptEvalCount: number | undefined,
+  evalCount: number | undefined,
+): TokenUsage | null {
+  if (promptEvalCount === undefined && evalCount === undefined) return null;
+  const inputTokens = promptEvalCount ?? 0;
+  const outputTokens = evalCount ?? 0;
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    source: "provider",
+  };
+}
+
+function estimatedUsage(inputChars: number, outputChars: number): TokenUsage {
+  const inputTokens = estimateTokens(inputChars);
+  const outputTokens = estimateTokens(outputChars);
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    source: "estimated",
+  };
+}
+
+function inputCharsFor(systemPrompt: string, messages: ChatMessage[]): number {
+  return systemPrompt.length + messages.reduce((sum, m) => sum + m.content.length, 0);
+}
+
+/**
+ * Accumulates per-hop usage across a tool-call loop. Input tokens take the
+ * LATEST hop's value (already reflects the growing conversation history);
+ * output tokens sum across hops. Mirrors GeminiProvider's accumulateUsage.
+ */
+function accumulateHopUsage(prior: TokenUsage | null, hopUsage: TokenUsage | null): TokenUsage | null {
+  if (!hopUsage) return prior;
+  const priorOutput = prior?.source === "provider" ? prior.outputTokens : 0;
+  const inputTokens = hopUsage.inputTokens;
+  const outputTokens = priorOutput + hopUsage.outputTokens;
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    source: "provider",
+  };
 }
 
 function parseNativeChatPayload(payload: string): NativeChatResponse | null {
@@ -340,6 +430,8 @@ export class OllamaProvider implements AIProvider {
   async generateResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
     const { mode, response } = await this.postChat(
@@ -349,6 +441,7 @@ export class OllamaProvider implements AIProvider {
         stream: false,
         max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
@@ -357,6 +450,7 @@ export class OllamaProvider implements AIProvider {
         options: {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
@@ -367,14 +461,30 @@ export class OllamaProvider implements AIProvider {
     }
 
     const data = (await response.json()) as OpenAIChatResponse | NativeChatResponse;
-    return mode === "openai"
-      ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
-      : (data as NativeChatResponse).message?.content ?? "";
+    const text =
+      mode === "openai"
+        ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
+        : (data as NativeChatResponse).message?.content ?? "";
+
+    if (onUsage) {
+      const usage =
+        mode === "openai"
+          ? usageFromOpenAI((data as OpenAIChatResponse).usage)
+          : usageFromNative(
+              (data as NativeChatResponse).prompt_eval_count,
+              (data as NativeChatResponse).eval_count,
+            );
+      onUsage(usage ?? estimatedUsage(inputCharsFor(systemPrompt, messages), text.length));
+    }
+
+    return text;
   }
 
   private async *streamResponseOnce(
     systemPrompt: string,
     messages: ChatMessage[],
+    usageSink?: UsageSink,
+    options?: GenerationOptions,
   ): AsyncGenerator<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
     // Use the streaming-specific timeout (first-byte only).
@@ -387,6 +497,8 @@ export class OllamaProvider implements AIProvider {
         stream: true,
         max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
+        stream_options: { include_usage: true },
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
@@ -395,6 +507,7 @@ export class OllamaProvider implements AIProvider {
         options: {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
@@ -442,7 +555,13 @@ export class OllamaProvider implements AIProvider {
               yieldedContent = true;
               yield content;
             }
-            if (nativeParsed.done) return;
+            if (nativeParsed.done) {
+              if (usageSink) {
+                const usage = usageFromNative(nativeParsed.prompt_eval_count, nativeParsed.eval_count);
+                if (usage) usageSink.usage = usage;
+              }
+              return;
+            }
             continue;
           }
           const payload = trimmed.slice(6);
@@ -468,6 +587,10 @@ export class OllamaProvider implements AIProvider {
               switchToNative: shouldSwitchToNative(upstreamError),
             });
           }
+          if (usageSink) {
+            const usage = usageFromOpenAI(parsed.usage);
+            if (usage) usageSink.usage = usage;
+          }
           const content = streamChunkContent(parsed);
           if (content) {
             yieldedContent = true;
@@ -491,7 +614,13 @@ export class OllamaProvider implements AIProvider {
           yieldedContent = true;
           yield content;
         }
-        if (parsed.done) return;
+        if (parsed.done) {
+          if (usageSink) {
+            const usage = usageFromNative(parsed.prompt_eval_count, parsed.eval_count);
+            if (usage) usageSink.usage = usage;
+          }
+          return;
+        }
       }
     }
 
@@ -523,6 +652,10 @@ export class OllamaProvider implements AIProvider {
         if (upstreamError) throw new LocalAiStreamError(upstreamError);
         const content = nativeParsed.message?.content;
         if (content) yield content;
+        if (usageSink) {
+          const usage = usageFromNative(nativeParsed.prompt_eval_count, nativeParsed.eval_count);
+          if (usage) usageSink.usage = usage;
+        }
         return;
       }
       const payload = finalChunk.slice(6);
@@ -554,6 +687,10 @@ export class OllamaProvider implements AIProvider {
           switchToNative: shouldSwitchToNative(upstreamError),
         });
       }
+      if (usageSink) {
+        const usage = usageFromOpenAI(parsed.usage);
+        if (usage) usageSink.usage = usage;
+      }
       const content = streamChunkContent(parsed);
       if (content) yield content;
       if (!content && !yieldedContent) {
@@ -577,25 +714,39 @@ export class OllamaProvider implements AIProvider {
     }
     const content = parsed.message?.content;
     if (content) yield content;
+    if (usageSink) {
+      const usage = usageFromNative(parsed.prompt_eval_count, parsed.eval_count);
+      if (usage) usageSink.usage = usage;
+    }
   }
 
   async *streamResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): AsyncGenerator<string> {
     let lastError: unknown = null;
     let yieldedAny = false;
+    let outputChars = 0;
+    const usageSink: UsageSink = { usage: null };
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
       let yieldedThisAttempt = false;
       try {
-        for await (const chunk of this.streamResponseOnce(systemPrompt, messages)) {
+        for await (const chunk of this.streamResponseOnce(systemPrompt, messages, usageSink, options)) {
           yieldedAny = true;
           yieldedThisAttempt = true;
+          outputChars += chunk.length;
           yield chunk;
         }
 
-        if (yieldedThisAttempt) return;
+        if (yieldedThisAttempt) {
+          onUsage?.(
+            usageSink.usage ?? estimatedUsage(inputCharsFor(systemPrompt, messages), outputChars),
+          );
+          return;
+        }
         throw new LocalAiStreamError("Local AI stream ended without content.");
       } catch (error) {
         lastError = error;
@@ -667,12 +818,13 @@ export class OllamaProvider implements AIProvider {
   private async *streamHopWithStartupRetry(
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
+    temperature?: number,
   ): AsyncGenerator<string, HopResult> {
     let lastError: unknown = null;
     let yieldedAny = false;
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
-      const hopGen = this.streamHopOnce(conversation, ollamaTools);
+      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature);
 
       try {
         while (true) {
@@ -704,7 +856,7 @@ export class OllamaProvider implements AIProvider {
     }
 
     if (lastError) throw lastError;
-    return { toolCalls: [] };
+    return { toolCalls: [], usage: null };
   }
 
   /**
@@ -734,7 +886,9 @@ export class OllamaProvider implements AIProvider {
 
     // No tools registered → degrade to plain streaming.
     if (tools.length === 0) {
-      for await (const text of this.streamResponse(systemPrompt, messages)) {
+      for await (const text of this.streamResponse(systemPrompt, messages, options?.onUsage, {
+        temperature: options?.temperature,
+      })) {
         yield { kind: "text", text };
       }
       yield { kind: "done", reason: "complete" };
@@ -743,11 +897,17 @@ export class OllamaProvider implements AIProvider {
 
     const ollamaTools = tools.map(toOllamaTool);
     const conversation: OpenAIMessage[] = toOpenAIMessages(systemPrompt, messages);
+    // Accumulated across hops — one final onUsage call for the whole turn,
+    // not one per hop. Mirrors GeminiProvider.streamWithTools: input tokens
+    // take the latest hop's value (already includes growing history),
+    // output tokens sum across hops.
+    let accumulated: TokenUsage | null = null;
+    let outputChars = 0;
 
     for (let hop = 0; hop < maxHops; hop++) {
       // Stream one hop. The inner generator yields text strings as they
       // arrive and returns a final summary with collected tool calls.
-      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools);
+      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature);
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
@@ -758,10 +918,16 @@ export class OllamaProvider implements AIProvider {
           break;
         }
         accumulatedText.push(next.value);
+        outputChars += next.value.length;
         yield { kind: "text", text: next.value };
       }
 
+      accumulated = accumulateHopUsage(accumulated, hopResult.usage);
+
       if (hopResult.toolCalls.length === 0) {
+        options?.onUsage?.(
+          accumulated ?? estimatedUsage(inputCharsFor(systemPrompt, messages), outputChars),
+        );
         yield { kind: "done", reason: "complete" };
         return;
       }
@@ -815,6 +981,9 @@ export class OllamaProvider implements AIProvider {
       }
     }
 
+    options?.onUsage?.(
+      accumulated ?? estimatedUsage(inputCharsFor(systemPrompt, messages), outputChars),
+    );
     yield { kind: "done", reason: "max_hops" };
   }
 
@@ -826,6 +995,7 @@ export class OllamaProvider implements AIProvider {
   private async *streamHopOnce(
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
+    temperature?: number,
   ): AsyncGenerator<string, HopResult> {
     const openAIBody = {
       model: this.model,
@@ -834,6 +1004,8 @@ export class OllamaProvider implements AIProvider {
       tools: ollamaTools,
       max_tokens: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
       num_ctx: this.numCtx,
+      stream_options: { include_usage: true },
+      ...(temperature !== undefined ? { temperature } : {}),
     };
     const nativeBody = {
       model: this.model,
@@ -843,6 +1015,7 @@ export class OllamaProvider implements AIProvider {
       options: {
         num_ctx: this.numCtx,
         num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
+        ...(temperature !== undefined ? { temperature } : {}),
       },
       keep_alive: OllamaProvider.KEEP_ALIVE,
     };
@@ -868,6 +1041,7 @@ export class OllamaProvider implements AIProvider {
     // Native mode doesn't have a stable index per call; use insertion order.
     let nativeIndex = 0;
     let receivedModelPayload = false;
+    let usage: TokenUsage | null = null;
     const firstContentDeadlineAt =
       Date.now() + OllamaProvider.FIRST_CONTENT_TIMEOUT_MS;
 
@@ -890,7 +1064,7 @@ export class OllamaProvider implements AIProvider {
           if (!trimmed.startsWith("data: ")) continue;
           const payload = trimmed.slice(6);
           if (payload === "[DONE]") {
-            return { toolCalls: Array.from(toolCalls.values()) };
+            return { toolCalls: Array.from(toolCalls.values()), usage };
           }
 
           let parsed: OpenAIStreamChunk;
@@ -905,6 +1079,9 @@ export class OllamaProvider implements AIProvider {
               switchToNative: shouldSwitchToNative(upstreamError),
             });
           }
+
+          const parsedUsage = usageFromOpenAI(parsed.usage);
+          if (parsedUsage) usage = parsedUsage;
 
           const choice = parsed.choices?.[0];
           const text = choice?.delta?.content;
@@ -957,19 +1134,23 @@ export class OllamaProvider implements AIProvider {
         }
 
         if (parsed.done) {
-          return { toolCalls: Array.from(toolCalls.values()) };
+          const parsedUsage = usageFromNative(parsed.prompt_eval_count, parsed.eval_count);
+          if (parsedUsage) usage = parsedUsage;
+          return { toolCalls: Array.from(toolCalls.values()), usage };
         }
       }
     }
 
     // Drain any final partial line.
     buffer += decoder.decode();
-    return { toolCalls: Array.from(toolCalls.values()) };
+    return { toolCalls: Array.from(toolCalls.values()), usage };
   }
 
   async generateStructuredResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
     const { mode, response } = await this.postChat(
@@ -980,6 +1161,7 @@ export class OllamaProvider implements AIProvider {
         response_format: { type: "json_object" },
         max_tokens: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
         num_ctx: this.numCtx,
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
@@ -989,6 +1171,7 @@ export class OllamaProvider implements AIProvider {
         options: {
           num_ctx: this.numCtx,
           num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
@@ -999,9 +1182,23 @@ export class OllamaProvider implements AIProvider {
     }
 
     const data = (await response.json()) as OpenAIChatResponse | NativeChatResponse;
-    return mode === "openai"
-      ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
-      : (data as NativeChatResponse).message?.content ?? "";
+    const text =
+      mode === "openai"
+        ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
+        : (data as NativeChatResponse).message?.content ?? "";
+
+    if (onUsage) {
+      const usage =
+        mode === "openai"
+          ? usageFromOpenAI((data as OpenAIChatResponse).usage)
+          : usageFromNative(
+              (data as NativeChatResponse).prompt_eval_count,
+              (data as NativeChatResponse).eval_count,
+            );
+      onUsage(usage ?? estimatedUsage(inputCharsFor(systemPrompt, messages), text.length));
+    }
+
+    return text;
   }
 }
 
@@ -1020,6 +1217,8 @@ interface OllamaToolPayload {
 
 interface HopResult {
   toolCalls: AccumulatedToolCall[];
+  /** Real usage for this hop when the server reported it; null otherwise. */
+  usage: TokenUsage | null;
 }
 
 function toOllamaTool(tool: ToolDeclaration): OllamaToolPayload {

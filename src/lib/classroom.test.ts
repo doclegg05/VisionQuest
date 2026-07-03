@@ -9,6 +9,7 @@ import {
   normalizeClassCode,
 } from "./classroom";
 import { getRoleHomePath } from "./role-home";
+import { rlsContextFor } from "./api-error";
 
 test("normalizeClassCode creates a stable class slug", () => {
   assert.equal(normalizeClassCode("  SPOKES Class 2026 / AM  "), "spokes-class-2026-am");
@@ -107,6 +108,32 @@ test("buildManagedStudentWhere does NOT grant CDC unrestricted access", () => {
       },
     },
   });
+});
+
+test("TRIPWIRE (Slice D): unscoped coordinator where-clause is safe only while RLS collapses coordinators", () => {
+  const coordinator = {
+    id: "coord-1",
+    studentId: "coord-1",
+    displayName: "Coordinator",
+    role: "coordinator",
+  };
+
+  // App layer: coordinators get an UNSCOPED student query (no class/region
+  // narrowing) because coordinator is in STAFF_CAN_MANAGE_ANY…
+  assert.deepEqual(buildManagedStudentWhere(coordinator), { role: "student" });
+
+  // …which fails closed today ONLY because rlsContextFor collapses
+  // coordinators to role="student", so no Student-table policy branch
+  // matches. These two facts must change together.
+  assert.equal(
+    rlsContextFor(coordinator).role,
+    "student",
+    "rlsContextFor no longer collapses coordinators, but buildManagedStudentWhere " +
+      "still returns an UNSCOPED student where-clause for them. Region-scope this " +
+      "helper (mirror getCoordinatorInterventionQueue in src/lib/teacher/dashboard.ts) " +
+      "and audit its call sites before shipping coordinator RLS policies (Slice D). " +
+      "See docs/plans/rls-enforcement-runbook.md → Slice D.",
+  );
 });
 
 test("STAFF_CAN_MANAGE_ANY contains staff roles with cross-class access", () => {

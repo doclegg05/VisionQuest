@@ -16,6 +16,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { embedQuery, toVectorLiteral } from "@/lib/ai/embeddings";
+import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { tokenizeForRetrieval } from "./retrieval-tokens";
 
 export interface HybridDocResult {
@@ -139,6 +140,7 @@ export async function hybridSearchDocuments(
   }
 
   const queryText = buildWebsearchQuery(userMessage);
+  const queryModel = await getActiveEmbeddingModel();
 
   try {
     const rows = await prisma.$queryRaw<HybridSearchRow[]>`
@@ -146,6 +148,7 @@ export async function hybridSearchDocuments(
         ${vectorLiteral}::vector(768),
         ${queryText},
         ${callerRole},
+        ${queryModel},
         ${limit}::int
       )
     `;
@@ -232,6 +235,7 @@ export async function getBestChunks(
   if (documentIds.length === 0) return new Map();
   try {
     const vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage));
+    const queryModel = await getActiveEmbeddingModel();
     const rows = await prisma.$queryRaw<BestChunkRow[]>`
       SELECT "documentId", "content", "pageNumber", "sectionTitle", distance
       FROM (
@@ -247,6 +251,7 @@ export async function getBestChunks(
         FROM "visionquest"."DocumentChunk" c
         WHERE c."documentId" IN (${Prisma.join(documentIds)})
           AND c."embedding" IS NOT NULL
+          AND c."embeddingModel" = ${queryModel}
       ) ranked
       WHERE rn <= ${perDoc}
       ORDER BY "documentId", distance

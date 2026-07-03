@@ -218,6 +218,8 @@ export async function extractAndStoreMemories({
           usage: { studentId, callSite: "sage_memory_extract" },
         },
       );
+      // Provenance for the memory guard: same-model invariant as embedTexts above.
+      const activeModel = await getActiveEmbeddingModel();
 
       let stored = 0;
       const insertedVectors: number[][] = [];
@@ -267,6 +269,8 @@ export async function extractAndStoreMemories({
           await prisma.$executeRaw`
             UPDATE "visionquest"."SageMemory"
             SET embedding = ${vectorLiteral}::vector(768)
+            SET embedding = ${vectorLiteral}::vector(768),
+                "embeddingModel" = ${activeModel}
             WHERE id = ${row.id}
           `;
           insertedVectors.push(vectors[i]);

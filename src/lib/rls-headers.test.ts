@@ -14,6 +14,14 @@ function headerBag(record: Record<string, string>) {
   };
 }
 
+const SLICE_D_TRIPWIRE =
+  "The middleware header path no longer collapses coordinators to \"student\" — " +
+  "coordinator RLS policies are going live (Slice D). App-layer helpers rely on " +
+  "that collapse to fail closed; the biggest is buildManagedStudentWhere " +
+  "(src/lib/classroom.ts), which builds an UNSCOPED student where-clause for " +
+  "coordinators. Region-scope that helper and audit every call site before " +
+  "shipping. See docs/plans/rls-enforcement-runbook.md → Slice D.";
+
 describe("rls-headers", () => {
   describe("rlsHeadersFromClaims", () => {
     it("maps a student claim to user/role/studentId headers", () => {
@@ -42,6 +50,16 @@ describe("rls-headers", () => {
       const out = rlsHeadersFromClaims({ sub: "x", role: "superuser" });
       assert.equal(out[RLS_HEADER_ROLE], "student");
       assert.equal(out[RLS_HEADER_STUDENT_ID], "x");
+    });
+
+    it("TRIPWIRE (Slice D): coerces coordinator claims to the student role", () => {
+      // Unlike the generic unknown-role coercion above, this test names
+      // "coordinator" on purpose: it MUST break the day Slice D makes the
+      // header path coordinator-aware, so the developer audits the app-layer
+      // helpers that rely on today's fail-closed collapse.
+      const out = rlsHeadersFromClaims({ sub: "coord-1", role: "coordinator" });
+      assert.equal(out[RLS_HEADER_ROLE], "student", SLICE_D_TRIPWIRE);
+      assert.equal(out[RLS_HEADER_STUDENT_ID], "coord-1");
     });
   });
 
@@ -97,6 +115,17 @@ describe("rls-headers", () => {
         }),
       );
       assert.equal(ctx, null);
+    });
+
+    it("TRIPWIRE (Slice D): rejects a coordinator role header (fails closed)", () => {
+      const ctx = rlsContextFromHeaders(
+        headerBag({
+          [RLS_HEADER_USER_ID]: "coord-1",
+          [RLS_HEADER_ROLE]: "coordinator",
+          [RLS_HEADER_STUDENT_ID]: "",
+        }),
+      );
+      assert.equal(ctx, null, SLICE_D_TRIPWIRE);
     });
 
     it("returns null when role is student but studentId is empty", () => {

@@ -13,6 +13,8 @@
 
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
+import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
+import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { extractPagesFromBuffer, containsPII } from "./extract";
 import { embedProgramDocument } from "./document-embedding";
 import { chunkPages } from "./chunking";
@@ -24,6 +26,14 @@ export interface BackfillOptions {
   force?: boolean;
   /** Widen from Sage-visible docs to every active document. */
   all?: boolean;
+  /**
+   * Re-embed only rows whose stored embedding was produced by a DIFFERENT
+   * model than the currently active one (or that have no embedding yet):
+   * `embedding IS NULL OR "embeddingModel" IS DISTINCT FROM <activeModel>`.
+   * Rows already on the active model are skipped. Ignored when `force` is set
+   * (force re-embeds everything regardless of model).
+   */
+  reembed?: boolean;
   /** Per-document progress callback (used by the CLI script for logging). */
   onProgress?: (message: string) => void;
   /**
@@ -70,6 +80,8 @@ interface BackfillDocRow {
   storageKey: string;
   sageContextNote: string | null;
   hasEmbedding: boolean;
+  /** True when the stored embedding was produced by the active model. */
+  modelMatchesActive: boolean;
   chunkCount: number;
 }
 
@@ -81,17 +93,21 @@ function extOf(storageKey: string): string {
 export async function backfillProgramDocumentEmbeddings(
   options: BackfillOptions = {},
 ): Promise<BackfillTally> {
-  const { force = false, all = false, onProgress, dryRun = false } = options;
+  const { force = false, all = false, reembed = false, onProgress, dryRun = false } = options;
+
+  const activeModel = await getActiveEmbeddingModel();
 
   const docs = await prisma.$queryRawUnsafe<BackfillDocRow[]>(
     `SELECT d.id, d.title, d."storageKey", d."sageContextNote",
             (d.embedding IS NOT NULL) AS "hasEmbedding",
+            (d."embeddingModel" IS NOT DISTINCT FROM $1) AS "modelMatchesActive",
             COUNT(c.id)::int AS "chunkCount"
      FROM "visionquest"."ProgramDocument" d
      LEFT JOIN "visionquest"."DocumentChunk" c ON c."documentId" = d.id
      WHERE d."isActive" = true ${all ? "" : 'AND d."usedBySage" = true'}
      GROUP BY d.id
      ORDER BY d.title`,
+    activeModel,
   );
 
   const tally: BackfillTally = {
@@ -119,8 +135,11 @@ export async function backfillProgramDocumentEmbeddings(
     const extractable = EXTRACTABLE_EXTS.has(ext);
 
     // Idempotency: doc vector + chunks are written in one transaction, so an
-    // embedded doc is always complete. `force` re-embeds everything.
-    if (doc.hasEmbedding && !force) {
+    // embedded doc is always complete. `force` re-embeds everything. `reembed`
+    // re-embeds only rows whose model is stale — a doc already on the active
+    // model is skipped; a doc with a null/mismatched model is re-embedded.
+    const staleModel = reembed && !doc.modelMatchesActive;
+    if (doc.hasEmbedding && !force && !staleModel) {
       tally.skipped++;
       continue;
     }
@@ -251,4 +270,79 @@ export async function buildDryRunManifest(
     totalEstChunks: manifestDocs.reduce((sum, d) => sum + d.estChunks, 0),
     skipped,
   };
+}
+
+// ── SageMemory re-embed backfill ──────────────────────────────────────────────
+
+export interface MemoryBackfillTally {
+  total: number;
+  embedded: number;
+  errors: number;
+}
+
+interface MemoryRow {
+  id: string;
+  content: string;
+}
+
+const MEMORY_EMBED_BATCH = 32;
+
+/**
+ * Re-embed ACTIVE Sage memories (validTo IS NULL) whose stored embedding was
+ * produced by a model other than the currently active one — or that have no
+ * embedding yet. Selection: `embedding IS NULL OR "embeddingModel" IS DISTINCT
+ * FROM <activeModel>`. Rows already on the active model are left untouched.
+ *
+ * Batches the embed calls (MEMORY_EMBED_BATCH per embedTexts request) and
+ * writes each vector + provenance via raw SQL, mirroring the write path in
+ * memory/extract.ts (pgvector columns are Unsupported in Prisma).
+ */
+export async function backfillSageMemoryEmbeddings(options: {
+  onProgress?: (message: string) => void;
+} = {}): Promise<MemoryBackfillTally> {
+  const { onProgress } = options;
+  const activeModel = await getActiveEmbeddingModel();
+
+  const rows = await prisma.$queryRaw<MemoryRow[]>`
+    SELECT id, content
+    FROM "visionquest"."SageMemory"
+    WHERE "validTo" IS NULL
+      AND (embedding IS NULL OR "embeddingModel" IS DISTINCT FROM ${activeModel})
+    ORDER BY "createdAt"
+  `;
+
+  const tally: MemoryBackfillTally = { total: rows.length, embedded: 0, errors: 0 };
+  if (rows.length === 0) return tally;
+
+  for (let start = 0; start < rows.length; start += MEMORY_EMBED_BATCH) {
+    const batch = rows.slice(start, start + MEMORY_EMBED_BATCH);
+    try {
+      const vectors = await embedTexts(
+        batch.map((row) => row.content),
+        {
+          taskType: "RETRIEVAL_DOCUMENT",
+          usage: { studentId: null, callSite: "sage_memory_reembed" },
+        },
+      );
+      for (let i = 0; i < batch.length; i++) {
+        await prisma.$executeRaw`
+          UPDATE "visionquest"."SageMemory"
+          SET embedding = ${toVectorLiteral(vectors[i])}::vector(768),
+              "embeddingModel" = ${activeModel}
+          WHERE id = ${batch[i].id}
+        `;
+        tally.embedded++;
+      }
+      onProgress?.(
+        `[${Math.min(start + batch.length, rows.length)}/${rows.length}] re-embedded ${batch.length} memories`,
+      );
+    } catch (error) {
+      tally.errors += batch.length;
+      onProgress?.(
+        `[${start + 1}-${start + batch.length}/${rows.length}] ERROR: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return tally;
 }

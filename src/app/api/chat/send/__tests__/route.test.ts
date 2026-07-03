@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
-import { mockStudentSession, mockRequest } from "@/lib/test-helpers";
+import { mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
 
 // ---------------------------------------------------------------------------
 // Request-level tests for POST /api/chat/send.
@@ -51,6 +51,7 @@ const mockGetStudentPromptContext = mock.fn() as any;
 const mockBuildStaffStudentContext = mock.fn() as any;
 const mockShouldAttemptStaffStudentContext = mock.fn() as any;
 const mockCheckTokenQuota = mock.fn() as any;
+const mockWithUsageLogging = mock.fn() as any;
 const mockGetStudentProgramType = mock.fn() as any;
 const mockPrismaStudentFindUnique = mock.fn() as any;
 const mockFormatClustersForPrompt = mock.fn() as any;
@@ -232,6 +233,7 @@ mock.module("@/lib/spokes/career-clusters", {
 mock.module("@/lib/llm-usage", {
   namedExports: {
     checkTokenQuota: mockCheckTokenQuota,
+    withUsageLogging: mockWithUsageLogging,
   },
 });
 
@@ -349,6 +351,7 @@ function resetMocks() {
     mockBuildStaffStudentContext,
     mockShouldAttemptStaffStudentContext,
     mockCheckTokenQuota,
+    mockWithUsageLogging,
     mockGetStudentProgramType,
     mockPrismaStudentFindUnique,
     mockFormatClustersForPrompt,
@@ -377,6 +380,7 @@ function resetMocks() {
   );
   mockBuildSystemPrompt.mock.mockImplementation(() => "SYSTEM PROMPT");
   mockCheckTokenQuota.mock.mockImplementation(async () => ({ allowed: true, warning: null }));
+  mockWithUsageLogging.mock.mockImplementation((provider: unknown) => provider);
   mockRateLimit.mock.mockImplementation(async () => ({ success: true, remaining: 100, resetTime: Date.now() + 3600_000 }));
   mockRateLimitDaily.mock.mockImplementation(async () => ({ success: true, remaining: 200, resetTime: Date.now() + 3600_000 }));
   mockGetOrCreateConversation.mock.mockImplementation(async () => ({
@@ -584,6 +588,75 @@ describe("POST /api/chat/send — SSE happy path", () => {
 
     await route.POST(req as never, { params: Promise.resolve({}) } as never);
     assert.equal(toolCapturedBy_withRegistry, "sage.chat");
+  });
+
+  it("appends the crisis resource block when the model reply omits 988 on a crisis-signal message", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeFakeProvider("ollama", ["I hear you, ", "that sounds really hard."]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "I just want to end it all" },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.match(body, /988/);
+
+    // Persisted assistant message must match what the student saw (SSE + history parity).
+    const assistantCall = mockSaveMessage.mock.calls.find(
+      (call) => call.arguments[2] === "assistant",
+    );
+    assert.ok(assistantCall, "expected an assistant saveMessage call");
+    assert.match(String(assistantCall!.arguments[3]), /988/);
+  });
+
+  it("does not append the crisis block when the model reply already contains 988", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeFakeProvider("ollama", ["Please call or text 988 right now — you matter."]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "I just want to end it all" },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    const occurrences = (body.match(/988/g) ?? []).length;
+    assert.equal(occurrences, 1, "988 should appear exactly once — no duplicate safety-net block");
+  });
+
+  it("does not append the crisis block for a non-crisis message", async () => {
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hello Sage, how are you?" },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.doesNotMatch(body, /988/);
+  });
+
+  it("does not append the crisis block for staff (teacher) chat — student-only scope guard", async () => {
+    session = mockTeacherSession();
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeFakeProvider("ollama", ["I hear you, ", "that sounds really hard."]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "A student mentioned they want to end it all — how should I respond?" },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.doesNotMatch(body, /988/);
   });
 });
 

@@ -5,6 +5,36 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * Normalized token-usage record for a single provider call. Providers report
+ * real counts from the SDK/API response when available (`source: "provider"`)
+ * and fall back to the shared char/4 estimator otherwise
+ * (`source: "estimated"`) — see src/lib/llm-usage-estimate.ts.
+ */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  source: "provider" | "estimated";
+}
+
+/**
+ * Optional callback invoked once a generation/stream completes with the
+ * observed token usage. Non-breaking: existing callers that don't pass it
+ * see no behavior change.
+ */
+export type OnUsage = (usage: TokenUsage) => void;
+
+/**
+ * Optional sampling temperature override. Undefined means "use the
+ * provider's default" — production call sites never pass this, so
+ * behavior there is unchanged. Exists so deterministic eval harnesses can
+ * pin temperature (typically 0) to reduce phrasing variance across runs.
+ */
+export interface GenerationOptions {
+  temperature?: number;
+}
+
 export interface AIProvider {
   readonly name: string;
 
@@ -12,18 +42,24 @@ export interface AIProvider {
   generateResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string>;
 
   /** Streaming completion. Yields text chunks as they arrive. */
   streamResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): AsyncGenerator<string>;
 
   /** Non-streaming completion with JSON output mode enabled. Returns raw JSON string. */
   generateStructuredResponse(
     systemPrompt: string,
     messages: ChatMessage[],
+    onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string>;
 
   /**
@@ -65,6 +101,13 @@ export interface ToolParameterSchema {
 export interface ToolStreamOptions {
   /** Hard cap on round-trip tool calls. Default 5. */
   maxHops?: number;
+  /**
+   * Invoked once with the ACCUMULATED usage across all hops after the tool
+   * loop finishes (not once per hop) — see providers' streamWithTools impls.
+   */
+  onUsage?: OnUsage;
+  /** Optional sampling temperature override — see GenerationOptions. */
+  temperature?: number;
 }
 
 /**

@@ -7,6 +7,7 @@ export const SYSTEM_CONFIG_KEYS = [
   "ai_provider",
   "ai_provider_url",
   "ai_provider_model",
+  "ai_provider_embedding_model",
   "ai_provider_auth_mode",
   "ai_provider_api_key",
   "ai_provider_cloudflare_access_client_id",

@@ -16,6 +16,13 @@ mock.module("@/lib/ai/embeddings", {
   },
 });
 
+const ACTIVE_MODEL = "gemini-embedding-001";
+mock.module("@/lib/ai/embedding-provider", {
+  namedExports: {
+    getActiveEmbeddingModel: async () => ACTIVE_MODEL,
+  },
+});
+
 mock.module("../system-prompts", {
   namedExports: { sanitizeForPrompt: (text: string) => text.replaceAll("[", "(").replaceAll("]", ")") },
 });
@@ -67,6 +74,15 @@ describe("retrieveMemories", () => {
     );
     const result = await retrieveMemories("student", "stu-1", "anything", 3);
     assert.equal(result.length, 3);
+  });
+
+  it("threads the active embedding model into the cosine search filter", async () => {
+    await retrieveMemories("student", "stu-1", "career plans");
+    const params = mockQueryRaw.mock.calls[0].arguments.slice(1);
+    assert.ok(
+      params.includes(ACTIVE_MODEL),
+      `expected embeddingModel filter param, got ${JSON.stringify(params)}`,
+    );
   });
 
   it("returns [] when embedding or SQL fails", async () => {
