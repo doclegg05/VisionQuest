@@ -4,7 +4,7 @@
     "attendance-contract": {
       "formId": "attendance-contract",
       "whenToUse": "During orientation, when a new student commits to a regular attendance schedule that meets their required weekly/monthly hours.",
-      "whenNotToUse": "- NOT how daily attendance is recorded or hours are proven — that is the [Student Sign-in Sheet](./sign-in-sheet.md).\n- NOT attendance proof for the Ready to Work certificate — that is [Ready to Work Attendance Verification](./rtw-attendance.md).",
+      "whenNotToUse": "- NOT how daily attendance is recorded or hours are proven — that is the [Student Sign-in Sheet](./sign-in-sheet.md).\r\n- NOT attendance proof for the Ready to Work certificate — that is [Ready to Work Attendance Verification](./rtw-attendance.md).",
       "tags": [
         "attendance",
         "onboarding",
@@ -28,7 +28,7 @@
     "dfa-ts-12": {
       "formId": "dfa-ts-12",
       "whenToUse": "At the end of each month, to compile and submit a WV Works student's total activity hours to DoHS. The daily hours that feed this sheet come from the [Student Sign-in Sheet](./sign-in-sheet.md).",
-      "whenNotToUse": "- NOT for documenting daily attendance — that is the [Student Sign-in Sheet](./sign-in-sheet.md).\n- NOT for verifying that a student is participating in WV Works — that is the [DFA-WVW-70 Participant Form](./dfa-wvw-70.md).\n- NOT for requesting support services such as transportation or childcare — that is the [DFA-WVW-25 Support Services](./dfa-wvw-25.md).",
+      "whenNotToUse": "- NOT for documenting daily attendance — that is the [Student Sign-in Sheet](./sign-in-sheet.md).\r\n- NOT for verifying that a student is participating in WV Works — that is the [DFA-WVW-70 Participant Form](./dfa-wvw-70.md).\r\n- NOT for requesting support services such as transportation or childcare — that is the [DFA-WVW-25 Support Services](./dfa-wvw-25.md).",
       "tags": [
         "timesheet",
         "monthly",
@@ -41,7 +41,7 @@
     "dfa-wvw-25": {
       "formId": "dfa-wvw-25",
       "whenToUse": "When a student needs to submit a formal request for WV Works support services — for example, to get reimbursed for transportation costs or to request childcare assistance.",
-      "whenNotToUse": "- NOT for learning about what support services are available — first read the [Support Services Fact Sheet](./support-services-fact-sheet.md), then come back to this form to request them.\n- NOT for monthly hours tracking — that is the [DFA-TS-12 Activity Tracking](./dfa-ts-12.md).\n- NOT for participation verification — that is the [DFA-WVW-70 Participant Form](./dfa-wvw-70.md).",
+      "whenNotToUse": "- NOT for learning about what support services are available — first read the [Support Services Fact Sheet](./support-services-fact-sheet.md), then come back to this form to request them.\r\n- NOT for monthly hours tracking — that is the [DFA-TS-12 Activity Tracking](./dfa-ts-12.md).\r\n- NOT for participation verification — that is the [DFA-WVW-70 Participant Form](./dfa-wvw-70.md).",
       "tags": [
         "support-services",
         "transportation",
@@ -54,7 +54,7 @@
     "dfa-wvw-70": {
       "formId": "dfa-wvw-70",
       "whenToUse": "When documentation is needed to confirm that a student is actively participating in the WV Works program — for example, when the state or a caseworker requires participation verification.",
-      "whenNotToUse": "- NOT for reporting a student's monthly hours — that is the [DFA-TS-12 Activity Tracking](./dfa-ts-12.md) timesheet.\n- NOT for requesting support services — that is the [DFA-WVW-25 Support Services](./dfa-wvw-25.md) form.",
+      "whenNotToUse": "- NOT for reporting a student's monthly hours — that is the [DFA-TS-12 Activity Tracking](./dfa-ts-12.md) timesheet.\r\n- NOT for requesting support services — that is the [DFA-WVW-25 Support Services](./dfa-wvw-25.md) form.",
       "tags": [
         "participation",
         "wv-works",
@@ -78,7 +78,7 @@
     "dress-code": {
       "formId": "dress-code",
       "whenToUse": "During orientation, when a student needs to review and acknowledge the professional dress expectations for the classroom and any work-site visits.",
-      "whenNotToUse": "- NOT for general student rights or program rules — those are covered in [Rights and Responsibilities](./rights-responsibilities.md).\n- NOT for technology use rules — that is the [Technology Acceptable Use Policy](./tech-acceptable-use.md).",
+      "whenNotToUse": "- NOT for general student rights or program rules — those are covered in [Rights and Responsibilities](./rights-responsibilities.md).\r\n- NOT for technology use rules — that is the [Technology Acceptable Use Policy](./tech-acceptable-use.md).",
       "tags": [
         "dress-code",
         "professional",
@@ -90,7 +90,7 @@
     "media-release": {
       "formId": "media-release",
       "whenToUse": "During orientation (or whenever needed), when a student is asked whether they consent to having their photo or video used by the program in materials such as newsletters, social media, or grant reports.",
-      "whenNotToUse": "- NOT for sharing student records or personal information with outside agencies — that is the [Authorization for Release of Information](./auth-release.md) or [DoHS Release of Information](./dohs-release.md).\n- NOT a general information-release form — this is specifically about images and video.",
+      "whenNotToUse": "- NOT for sharing student records or personal information with outside agencies — that is the [Authorization for Release of Information](./auth-release.md) or [DoHS Release of Information](./dohs-release.md).\r\n- NOT a general information-release form — this is specifically about images and video.",
       "tags": [
         "media",
         "photo",
@@ -103,7 +103,7 @@
     "non-discrimination": {
       "formId": "non-discrimination",
       "whenToUse": "During orientation, when a student must be given the required federal notice of their equal-opportunity rights in the program.",
-      "whenNotToUse": "- NOT for general program rules or student expectations — those are in [Rights and Responsibilities](./rights-responsibilities.md).\n- NOT a release-of-information form — for information sharing see [Authorization for Release of Information](./auth-release.md) or [DoHS Release of Information](./dohs-release.md).",
+      "whenNotToUse": "- NOT for general program rules or student expectations — those are in [Rights and Responsibilities](./rights-responsibilities.md).\r\n- NOT a release-of-information form — for information sharing see [Authorization for Release of Information](./auth-release.md) or [DoHS Release of Information](./dohs-release.md).",
       "tags": [
         "non-discrimination",
         "equal-opportunity",
@@ -140,7 +140,7 @@
     "rights-responsibilities": {
       "formId": "rights-responsibilities",
       "whenToUse": "During orientation, when a new student needs to read and acknowledge their rights within the program and understand what is expected of them.",
-      "whenNotToUse": "- NOT for reviewing equal-opportunity or federal non-discrimination rules — that is the [Non-Discrimination Notice](./non-discrimination.md).\n- NOT for the attendance commitment specifically — that is the [Personal Attendance Contract](./attendance-contract.md).",
+      "whenNotToUse": "- NOT for reviewing equal-opportunity or federal non-discrimination rules — that is the [Non-Discrimination Notice](./non-discrimination.md).\r\n- NOT for the attendance commitment specifically — that is the [Personal Attendance Contract](./attendance-contract.md).",
       "tags": [
         "rights",
         "responsibilities",
@@ -152,7 +152,7 @@
     "rtw-attendance": {
       "formId": "rtw-attendance",
       "whenToUse": "When a student is completing the Ready to Work certification process and needs their attendance record verified to satisfy the certificate requirement.",
-      "whenNotToUse": "- NOT for recording daily classroom attendance — that is the [Student Sign-in Sheet](./sign-in-sheet.md).\n- NOT the student's one-time attendance commitment made at orientation — that is the [Personal Attendance Contract](./attendance-contract.md).\n- NOT for verifying WV Works participation hours on the state timesheet — that is [DFA-TS-12 Activity Tracking](./dfa-ts-12.md).",
+      "whenNotToUse": "- NOT for recording daily classroom attendance — that is the [Student Sign-in Sheet](./sign-in-sheet.md).\r\n- NOT the student's one-time attendance commitment made at orientation — that is the [Personal Attendance Contract](./attendance-contract.md).\r\n- NOT for verifying WV Works participation hours on the state timesheet — that is [DFA-TS-12 Activity Tracking](./dfa-ts-12.md).",
       "tags": [
         "attendance",
         "ready-to-work",
@@ -164,7 +164,7 @@
     "sign-in-sheet": {
       "formId": "sign-in-sheet",
       "whenToUse": "Every class day, to record who attended. This is the record an instructor uses to total each student's hours for the monthly timesheet.",
-      "whenNotToUse": "- NOT the one-time commitment to attend — that is the [Personal Attendance Contract](./attendance-contract.md).\n- NOT the monthly state timesheet itself — daily hours are totaled onto [DFA-TS-12 Activity Tracking](./dfa-ts-12.md).\n- NOT attendance proof for the Ready to Work certificate — that is [Ready to Work Attendance Verification](./rtw-attendance.md).",
+      "whenNotToUse": "- NOT the one-time commitment to attend — that is the [Personal Attendance Contract](./attendance-contract.md).\r\n- NOT the monthly state timesheet itself — daily hours are totaled onto [DFA-TS-12 Activity Tracking](./dfa-ts-12.md).\r\n- NOT attendance proof for the Ready to Work certificate — that is [Ready to Work Attendance Verification](./rtw-attendance.md).",
       "tags": [
         "attendance",
         "daily",
@@ -177,7 +177,7 @@
     "student-profile": {
       "formId": "student-profile",
       "whenToUse": "During orientation, when a new student is enrolling and the program needs to collect their personal background and contact information for the record.",
-      "whenNotToUse": "- NOT for recording rights or program expectations — that is the [Rights and Responsibilities](./rights-responsibilities.md) form.\n- NOT a general orientation checklist — see the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md) for the full intake sequence.",
+      "whenNotToUse": "- NOT for recording rights or program expectations — that is the [Rights and Responsibilities](./rights-responsibilities.md) form.\r\n- NOT a general orientation checklist — see the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md) for the full intake sequence.",
       "tags": [
         "intake",
         "onboarding",
@@ -202,7 +202,7 @@
     "tech-acceptable-use": {
       "formId": "tech-acceptable-use",
       "whenToUse": "During orientation, when a student needs to read and sign the rules for appropriate use of program computers and internet access before they begin using technology resources.",
-      "whenNotToUse": "- NOT for general program rules or conduct — those are in [Rights and Responsibilities](./rights-responsibilities.md).\n- NOT for dress or appearance standards — that is the [Dress Code Policy](./dress-code.md).",
+      "whenNotToUse": "- NOT for general program rules or conduct — those are in [Rights and Responsibilities](./rights-responsibilities.md).\r\n- NOT for dress or appearance standards — that is the [Dress Code Policy](./dress-code.md).",
       "tags": [
         "technology",
         "acceptable-use",
@@ -215,7 +215,7 @@
     "welcome-letter": {
       "formId": "welcome-letter",
       "whenToUse": "At the very start of orientation, when a new student is first joining the program and needs an encouraging introduction to what SPOKES is and what they can expect.",
-      "whenNotToUse": "- NOT for detailed orientation steps or required form signatures — use the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md) to guide the full intake process.\n- NOT for program rules or expectations — those are covered in [Rights and Responsibilities](./rights-responsibilities.md).",
+      "whenNotToUse": "- NOT for detailed orientation steps or required form signatures — use the [SPOKES Orientation Checklist](../documents/spokes-checklist-for-student-orientation.md) to guide the full intake process.\r\n- NOT for program rules or expectations — those are covered in [Rights and Responsibilities](./rights-responsibilities.md).",
       "tags": [
         "welcome",
         "onboarding",
