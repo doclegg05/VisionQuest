@@ -111,6 +111,12 @@ Click **Test Connection**. A short status line appears first (models
 loaded, chat path, auth mode). Below it, a **Model capabilities** panel
 shows four rows, each green (checkmark) or amber (warning triangle):
 
+Each probe times out after 8s by default — a cold, CPU-bound local model
+can take 15s+ to answer its first request and gets misreported as
+unreachable/unsupported. Warm the model first (send it one plain chat
+message before testing), or raise the ceiling with
+`SAGE_CAPABILITY_PROBE_TIMEOUT_MS` (ms, 1000-120000) for slow hosts.
+
 | Row | Green means | Amber means |
 |---|---|---|
 | **Chat** | A real chat completion round-tripped successfully against the configured model. | Model not pulled, endpoint unreachable, or the chat call errored — check the warnings list below the grid. |
