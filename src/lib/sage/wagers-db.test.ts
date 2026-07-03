@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding must accept many signatures */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
