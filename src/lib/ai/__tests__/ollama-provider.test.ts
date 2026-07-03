@@ -619,6 +619,157 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
   });
 
+  describe("temperature", () => {
+    it("omits temperature from generateResponse requests when not provided (no behavior change)", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({ choices: [{ message: { content: "ok" } }] }),
+      );
+
+      await provider.generateResponse("sys", [{ role: "user", content: "Hi" }]);
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal("temperature" in body, false);
+    });
+
+    it("sends temperature in generateResponse OpenAI-mode body when provided", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({ choices: [{ message: { content: "ok" } }] }),
+      );
+
+      await provider.generateResponse(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        undefined,
+        { temperature: 0 },
+      );
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(body.temperature, 0);
+    });
+
+    it("sends temperature in generateResponse native-mode body when provided", async () => {
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
+        return Response.json({ message: { content: "ok" } });
+      });
+
+      await provider.generateResponse(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        undefined,
+        { temperature: 0.2 },
+      );
+
+      const nativeBody = JSON.parse(
+        (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(nativeBody.options.temperature, 0.2);
+    });
+
+    it("sends temperature in generateStructuredResponse when provided", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({ choices: [{ message: { content: '{"a":1}' } }] }),
+      );
+
+      await provider.generateStructuredResponse(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        undefined,
+        { temperature: 0 },
+      );
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(body.temperature, 0);
+    });
+
+    it("sends temperature in streamResponse when provided", async () => {
+      const chunks = [
+        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hi" } }] }) + "\n\n",
+        "data: [DONE]\n\n",
+      ];
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+          controller.close();
+        },
+      });
+      mockFetch.mock.mockImplementationOnce(async () => new Response(stream, { status: 200 }));
+
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        undefined,
+        { temperature: 0 },
+      )) {
+        result.push(chunk);
+      }
+
+      assert.deepEqual(result, ["Hi"]);
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(body.temperature, 0);
+    });
+
+    it("sends temperature in streamWithTools requests when provided", async () => {
+      const tools = [
+        {
+          name: "lookup_thing",
+          description: "Look up a thing.",
+          parameters: {
+            type: "object" as const,
+            properties: { id: { type: "string" as const } },
+            required: ["id"],
+          },
+        },
+      ];
+      const chunks = [
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "Hi" } }] })}\n`,
+        `data: [DONE]\n`,
+      ];
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+          controller.close();
+        },
+      });
+      mockFetch.mock.mockImplementationOnce(async () => new Response(stream, { status: 200 }));
+
+      const onToolCall = mock.fn(async () => ({
+        response: {},
+        summary: "unused",
+        status: "success" as const,
+      }));
+
+      const events: unknown[] = [];
+      for await (const event of provider.streamWithTools(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        tools,
+        onToolCall,
+        { temperature: 0 },
+      )) {
+        events.push(event);
+      }
+
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+      );
+      assert.equal(body.temperature, 0);
+    });
+  });
+
   describe("message role mapping", () => {
     it("maps 'model' role to 'assistant' for OpenAI format", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>

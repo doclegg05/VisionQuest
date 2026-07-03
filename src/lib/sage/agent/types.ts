@@ -8,6 +8,13 @@
 import type { Session } from "@/lib/api-error";
 
 /**
+ * Risk tier for an agent tool. Ordered read → mutate_reversible →
+ * mutate_consequential by increasing blast radius. Used by flags.ts
+ * (mode gating) and rate-limit.ts (per-tier default limits).
+ */
+export type RiskTier = "read" | "mutate_reversible" | "mutate_consequential";
+
+/**
  * A tool the model is allowed to call mid-turn. The `parameters` schema is
  * Gemini-compatible (JSON Schema subset) so it can be passed straight into
  * `functionDeclarations`. The `execute` function runs server-side under the
@@ -42,6 +49,19 @@ export interface AgentTool {
 
   /** Roles allowed to invoke this tool. */
   requiredRoles: ReadonlyArray<"student" | "teacher" | "admin" | "coordinator">;
+
+  /**
+   * Risk tier that governs which agent mode may run this tool and its
+   * per-student rate limit. Ground truth (see write-tools.ts):
+   *  - "read": pure lookup/search/present/review — no state change.
+   *  - "mutate_reversible": writes a row the student can trivially undo and
+   *    that carries no HMAC confirmation gate (save_job, add_portfolio_item,
+   *    update_application_status).
+   *  - "mutate_consequential": any tool that routes through confirmationGate /
+   *    verifyConfirmationToken — the HMAC confirm-card round-trip IS the
+   *    boundary. readonly mode runs only "read" tools; full mode runs all.
+   */
+  riskTier: RiskTier;
 
   /** Sage will not call this tool unless the env feature flag enables it. */
   enabled: boolean;

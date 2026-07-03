@@ -5,6 +5,7 @@ import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
 import type {
   AIProvider,
   ChatMessage,
+  GenerationOptions,
   OnUsage,
   TokenUsage,
   ToolCallHandler,
@@ -26,11 +27,14 @@ export class GeminiProvider implements AIProvider {
     return MODEL;
   }
 
-  private getModel(systemInstruction?: string) {
+  private getModel(systemInstruction?: string, options?: GenerationOptions) {
     const genAI = new GoogleGenerativeAI(this.apiKey);
     return genAI.getGenerativeModel({
       model: MODEL,
       ...(systemInstruction ? { systemInstruction } : {}),
+      ...(options?.temperature !== undefined
+        ? { generationConfig: { temperature: options.temperature } }
+        : {}),
     });
   }
 
@@ -38,9 +42,10 @@ export class GeminiProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
-    const model = this.getModel(systemPrompt);
+    const model = this.getModel(systemPrompt, options);
     const chat = model.startChat({
       history: messages.slice(0, -1).map((m) => ({
         role: m.role,
@@ -59,9 +64,10 @@ export class GeminiProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): AsyncGenerator<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
-    const model = this.getModel(systemPrompt);
+    const model = this.getModel(systemPrompt, options);
     const chat = model.startChat({
       history: messages.slice(0, -1).map((m) => ({
         role: m.role,
@@ -89,6 +95,7 @@ export class GeminiProvider implements AIProvider {
     systemPrompt: string,
     messages: ChatMessage[],
     onUsage?: OnUsage,
+    options?: GenerationOptions,
   ): Promise<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
     const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -97,6 +104,7 @@ export class GeminiProvider implements AIProvider {
       systemInstruction: systemPrompt,
       generationConfig: {
         responseMimeType: "application/json",
+        ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
     });
 
@@ -133,6 +141,9 @@ export class GeminiProvider implements AIProvider {
       model: MODEL,
       systemInstruction: systemPrompt,
       ...(geminiTools.length ? { tools: geminiTools } : {}),
+      ...(options?.temperature !== undefined
+        ? { generationConfig: { temperature: options.temperature } }
+        : {}),
     });
 
     const chat = model.startChat({

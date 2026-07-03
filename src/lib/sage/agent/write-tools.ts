@@ -138,6 +138,7 @@ const submitForm: AgentTool = {
     required: ["fileUploadId", "orientationItemId"],
   },
   requiredRoles: ["student", "teacher", "admin"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const fileUploadId = String(args.fileUploadId ?? "");
@@ -212,6 +213,7 @@ const fileDocument: AgentTool = {
     required: ["fileUploadId", "category"],
   },
   requiredRoles: ["student", "teacher", "admin"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const fileUploadId = String(args.fileUploadId ?? "");
@@ -280,6 +282,7 @@ const updateGoalStatus: AgentTool = {
     required: ["goalId", "status"],
   },
   requiredRoles: ["student", "teacher", "admin"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const goalId = String(args.goalId ?? "");
@@ -324,6 +327,7 @@ const saveJob: AgentTool = {
     required: ["jobListingId"],
   },
   requiredRoles: ["student"],
+  riskTier: "mutate_reversible",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "");
@@ -368,6 +372,7 @@ const addPortfolioItem: AgentTool = {
     required: ["title"],
   },
   requiredRoles: ["student"],
+  riskTier: "mutate_reversible",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const title = String(args.title ?? "").trim().slice(0, 200);
@@ -422,6 +427,7 @@ const editPortfolioItem: AgentTool = {
     required: ["portfolioItemId"],
   },
   requiredRoles: ["student"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const portfolioItemId = String(args.portfolioItemId ?? "");
@@ -485,6 +491,7 @@ const deletePortfolioItem: AgentTool = {
     required: ["portfolioItemId"],
   },
   requiredRoles: ["student"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const portfolioItemId = String(args.portfolioItemId ?? "");
@@ -529,6 +536,7 @@ const bookAppointment: AgentTool = {
   },
   // Self-booking only — the backend (/api/appointments/book) is student-scoped.
   requiredRoles: ["student"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const advisorId = String(args.advisorId ?? "");
@@ -613,6 +621,7 @@ const markCertificationComplete: AgentTool = {
   },
   // Self-report only — mirrors the student-scoped POST /api/certifications.
   requiredRoles: ["student"],
+  riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const requirementId = String(args.requirementId ?? "");
@@ -692,6 +701,7 @@ const updateApplicationStatus: AgentTool = {
     required: ["jobListingId", "status"],
   },
   requiredRoles: ["student"],
+  riskTier: "mutate_reversible",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "");
