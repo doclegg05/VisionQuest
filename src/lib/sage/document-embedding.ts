@@ -16,6 +16,7 @@ import {
   toVectorLiteral,
   type EmbeddingUsageContext,
 } from "@/lib/ai/embeddings";
+import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { chunkText, chunkPages, type ChunkWithProvenance } from "./chunking";
 
 export interface EmbedProgramDocumentInput {
@@ -75,10 +76,16 @@ export async function embedProgramDocument(
   });
   const [docVector, ...chunkVectors] = vectors;
 
+  // Resolve the active model once — invariant with the provider embedTexts()
+  // used above (same SystemConfig state) — and stamp it as provenance so
+  // sage_hybrid_search only cosine-compares same-model vectors.
+  const activeModel = await getActiveEmbeddingModel();
+
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`
       UPDATE "visionquest"."ProgramDocument"
-      SET embedding = ${toVectorLiteral(docVector)}::vector(768)
+      SET embedding = ${toVectorLiteral(docVector)}::vector(768),
+          "embeddingModel" = ${activeModel}
       WHERE id = ${docId}
     `;
 
@@ -98,7 +105,8 @@ export async function embedProgramDocument(
       });
       await tx.$executeRaw`
         UPDATE "visionquest"."DocumentChunk"
-        SET embedding = ${toVectorLiteral(chunkVectors[i])}::vector(768)
+        SET embedding = ${toVectorLiteral(chunkVectors[i])}::vector(768),
+            "embeddingModel" = ${activeModel}
         WHERE id = ${created.id}
       `;
     }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { resolveAiProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
+import { withUsageLogging } from "@/lib/llm-usage";
 import { GOAL_PLANNING_STATUSES, isGoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { proposeGoal } from "@/lib/sage/propose-goal";
@@ -123,6 +124,18 @@ export async function handlePostResponse({
     task: "sage_post_response",
     sensitivity: "student_record",
   });
+
+  // Real token accounting per extractor. Distinct callSites so
+  // scripts/sage-usage-summary.mjs can break down post-response cost by
+  // extractor. extractAndStoreMemories (src/lib/sage/memory/extract.ts) is
+  // deliberately excluded — it already logs its own LlmCallLog row under
+  // callSite "sage_memory_extract" and is out of scope for this change, so
+  // it keeps using the unwrapped `provider` below to avoid double-logging.
+  const goalsProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.goals" });
+  const discoveryProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.discovery" });
+  const moodProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.mood" });
+  const classroomProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.classroom" });
+
   const providerClass = getProviderClass(provider.name);
   const postResponsePolicyDecision = policyDecisionForProvider(provider.name);
   const postResponseAllowCloud = providerClass === "cloud";
@@ -157,7 +170,7 @@ export async function handlePostResponse({
   // stops asking and this extractor has nothing to look for.
   if (!classroomConfirmedAt) {
     void detectAndRecordClassroomConfirmation(
-      provider,
+      classroomProvider,
       studentId,
       userMessage,
       fullResponse,
@@ -230,7 +243,7 @@ export async function handlePostResponse({
     try {
       const discoveryResult = await retryWithBackoff(
         () =>
-          extractDiscoverySignals(provider, [
+          extractDiscoverySignals(discoveryProvider, [
             ...allMessages,
             { role: "model" as const, content: fullResponse },
           ]),
@@ -332,7 +345,7 @@ export async function handlePostResponse({
 
   // 1. Extract goals (program-aware framing via PROGRAM_HEADERS)
   const extracted = await extractGoals(
-    provider,
+    goalsProvider,
     [...allMessages, { role: "model" as const, content: fullResponse }],
     conversationStage,
     programType,
@@ -433,7 +446,7 @@ export async function handlePostResponse({
   // 6. Extract mood scores (fire-and-forget, checkin/review stages only)
   if (conversationStage === "checkin" || conversationStage === "review") {
     const moodMessages = [...allMessages, { role: "model" as const, content: fullResponse }];
-    extractMoodFromConversation(conversationId, studentId, moodMessages, provider).catch((err) =>
+    extractMoodFromConversation(conversationId, studentId, moodMessages, moodProvider).catch((err) =>
       logger.error("Mood extraction failed", { conversationId, error: String(err) })
     );
   }

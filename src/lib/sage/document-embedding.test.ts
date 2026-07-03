@@ -14,6 +14,12 @@ mock.module("@/lib/ai/embeddings", {
   },
 });
 
+mock.module("@/lib/ai/embedding-provider", {
+  namedExports: {
+    getActiveEmbeddingModel: async () => "gemini-embedding-001",
+  },
+});
+
 const tx = {
   $executeRaw: mockExecuteRaw,
   documentChunk: {
@@ -105,6 +111,12 @@ describe("embedProgramDocument", () => {
     assert.equal(mockExecuteRaw.mock.callCount(), 2);
     // Doc update carries the doc vector literal as the first interpolated value
     assert.equal(mockExecuteRaw.mock.calls[0].arguments[1], "[1,0,0]");
+    // …and the active embedding model as the second (provenance stamp).
+    assert.equal(mockExecuteRaw.mock.calls[0].arguments[2], "gemini-embedding-001");
+    // Chunk update also stamps the model: [id-then?] the vector + model are bound.
+    const chunkArgs = mockExecuteRaw.mock.calls[1].arguments;
+    assert.equal(chunkArgs[1], "[2,0,0]"); // second embedded text → fakeVector(2)
+    assert.equal(chunkArgs[2], "gemini-embedding-001");
   });
 
   it("clears stale chunks but writes none when no text is provided", async () => {

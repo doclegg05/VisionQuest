@@ -32,6 +32,7 @@ const providerSchema = z.object({
   provider: z.enum(["local", "cloud"]),
   url: z.string().url().optional(),
   model: z.string().min(1).max(100).optional(),
+  embeddingModel: z.string().min(1).max(100).optional(),
   authMode: z.enum(["none", "bearer", "cloudflare_service_token"]).optional(),
   apiKey: z.string().max(500).optional(),
   cloudflareAccessClientId: z.string().max(500).optional(),
@@ -60,6 +61,7 @@ export const GET = withAdminAuth(async () => {
     provider: provider || "cloud",
     url: localConfig.url || "",
     model: localConfig.model || "gemma4:26b",
+    embeddingModel: localConfig.embeddingModel || "nomic-embed-text",
     authMode: localConfig.authMode,
     numCtx: validNumCtx,
     numCtxBounds: { min: NUM_CTX_MIN, max: NUM_CTX_MAX, default: 8192 },
@@ -125,6 +127,13 @@ export const PUT = withAdminAuth(async (session, req: NextRequest) => {
   }
   if (body.model !== undefined) {
     await setPlainConfigValue("ai_provider_model", body.model, session.id);
+  }
+  if (body.embeddingModel !== undefined) {
+    await setPlainConfigValue(
+      "ai_provider_embedding_model",
+      body.embeddingModel,
+      session.id,
+    );
   }
   await setPlainConfigValue("ai_provider_auth_mode", authMode, session.id);
 

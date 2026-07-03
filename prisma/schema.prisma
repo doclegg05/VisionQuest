@@ -1004,6 +1004,10 @@ model ProgramDocument {
   //     to_tsvector('english', title || ' ' || coalesce(sageContextNote, ''))
   //   - Function visionquest.sage_hybrid_search(...) — RRF hybrid retrieval
   embedding Unsupported("vector(768)")?
+  // Provenance: which embedding model produced `embedding` (and the doc's
+  // chunk vectors). Used to guard cross-model semantic search and to select
+  // stale rows for re-embedding. Null = never embedded.
+  embeddingModel String?
   chunks    DocumentChunk[]
 
   // --- Metadata ---
@@ -1031,6 +1035,8 @@ model DocumentChunk {
   chunkIndex Int
   content    String   @db.Text
   embedding  Unsupported("vector(768)")?
+  // Provenance: which embedding model produced `embedding` (see ProgramDocument).
+  embeddingModel String?
   tokenCount   Int?
   pageNumber   Int?
   sectionTitle String?
@@ -1064,6 +1070,8 @@ model SageMemory {
   kind              String // episodic | semantic | procedural
   content           String                      @db.Text
   embedding         Unsupported("vector(768)")?
+  // Provenance: which embedding model produced `embedding` (see ProgramDocument).
+  embeddingModel    String?
   category          String // goal | preference | circumstance | skill | coaching | progress | other
   confidence        Float                       @default(0.7)
   validFrom         DateTime                    @default(now())

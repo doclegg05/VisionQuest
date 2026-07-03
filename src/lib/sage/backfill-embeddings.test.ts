@@ -3,11 +3,16 @@ import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
 const mockQueryRawUnsafe = mock.fn() as any;
+const mockQueryRaw = mock.fn(async () => []) as any;
+const mockExecuteRaw = mock.fn(async () => 1) as any;
 const mockDownloadFile = mock.fn() as any;
 const mockExtractPagesFromBuffer = mock.fn() as any;
 const mockContainsPII = mock.fn(() => false) as any;
 const mockEmbedProgramDocument = mock.fn(async () => ({ chunkCount: 3 })) as any;
 const mockChunkPages = mock.fn() as any;
+const mockEmbedTexts = mock.fn(async (texts: string[]) => texts.map(() => [1, 0, 0])) as any;
+
+const ACTIVE_MODEL = "gemini-embedding-001";
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -15,7 +20,26 @@ mock.module("@/lib/db", {
       get $queryRawUnsafe() {
         return mockQueryRawUnsafe;
       },
+      get $queryRaw() {
+        return mockQueryRaw;
+      },
+      get $executeRaw() {
+        return mockExecuteRaw;
+      },
     },
+  },
+});
+
+mock.module("@/lib/ai/embeddings", {
+  namedExports: {
+    embedTexts: mockEmbedTexts,
+    toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
+  },
+});
+
+mock.module("@/lib/ai/embedding-provider", {
+  namedExports: {
+    getActiveEmbeddingModel: async () => ACTIVE_MODEL,
   },
 });
 
@@ -55,10 +79,12 @@ mock.module("./chunking", {
 });
 
 let backfillProgramDocumentEmbeddings: typeof import("./backfill-embeddings").backfillProgramDocumentEmbeddings;
+let backfillSageMemoryEmbeddings: typeof import("./backfill-embeddings").backfillSageMemoryEmbeddings;
 let buildDryRunManifest: typeof import("./backfill-embeddings").buildDryRunManifest;
 
 before(async () => {
-  ({ backfillProgramDocumentEmbeddings, buildDryRunManifest } = await import("./backfill-embeddings"));
+  ({ backfillProgramDocumentEmbeddings, backfillSageMemoryEmbeddings, buildDryRunManifest } =
+    await import("./backfill-embeddings"));
 });
 
 /** Default 3-chunk return value for mockChunkPages. */
@@ -71,6 +97,7 @@ function doc(overrides: Record<string, unknown> = {}) {
     storageKey: "docs/attendance.pdf",
     sageContextNote: null,
     hasEmbedding: false,
+    modelMatchesActive: false,
     chunkCount: 0,
     ...overrides,
   };
@@ -169,6 +196,96 @@ describe("backfillProgramDocumentEmbeddings", () => {
 
     await backfillProgramDocumentEmbeddings({ all: true });
     assert.doesNotMatch(mockQueryRawUnsafe.mock.calls[1].arguments[0], /usedBySage/);
+  });
+
+  it("passes the active model to the selection query as a bound param", async () => {
+    mockQueryRawUnsafe.mock.mockImplementation(async () => []);
+    await backfillProgramDocumentEmbeddings();
+    // $queryRawUnsafe(sql, activeModel) — the model is the sole bound param.
+    assert.match(mockQueryRawUnsafe.mock.calls[0].arguments[0], /modelMatchesActive/);
+    assert.equal(mockQueryRawUnsafe.mock.calls[0].arguments[1], ACTIVE_MODEL);
+  });
+
+  describe("reembed mode", () => {
+    it("re-embeds a doc whose stored model is stale (modelMatchesActive=false)", async () => {
+      mockQueryRawUnsafe.mock.mockImplementation(async () => [
+        doc({ hasEmbedding: true, modelMatchesActive: false, chunkCount: 3 }),
+      ]);
+      const tally = await backfillProgramDocumentEmbeddings({ reembed: true });
+      assert.equal(tally.embedded, 1, "stale-model doc must be re-embedded");
+      assert.equal(tally.skipped, 0);
+      assert.equal(mockEmbedProgramDocument.mock.callCount(), 1);
+    });
+
+    it("skips a doc already embedded on the active model", async () => {
+      mockQueryRawUnsafe.mock.mockImplementation(async () => [
+        doc({ hasEmbedding: true, modelMatchesActive: true, chunkCount: 3 }),
+      ]);
+      const tally = await backfillProgramDocumentEmbeddings({ reembed: true });
+      assert.equal(tally.embedded, 0, "active-model doc must be skipped");
+      assert.equal(tally.skipped, 1);
+      assert.equal(mockEmbedProgramDocument.mock.callCount(), 0);
+    });
+
+    it("still embeds a never-embedded doc under reembed", async () => {
+      mockQueryRawUnsafe.mock.mockImplementation(async () => [
+        doc({ hasEmbedding: false, modelMatchesActive: false }),
+      ]);
+      const tally = await backfillProgramDocumentEmbeddings({ reembed: true });
+      assert.equal(tally.embedded, 1);
+      assert.equal(mockEmbedProgramDocument.mock.callCount(), 1);
+    });
+  });
+});
+
+describe("backfillSageMemoryEmbeddings", () => {
+  beforeEach(() => {
+    mockQueryRaw.mock.resetCalls();
+    mockExecuteRaw.mock.resetCalls();
+    mockEmbedTexts.mock.resetCalls();
+    mockEmbedTexts.mock.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+  });
+
+  it("selects active, model-stale/missing rows and re-embeds each with the active model", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      { id: "mem-1", content: "Wants to become a CNA." },
+      { id: "mem-2", content: "Prefers evening classes." },
+    ]);
+    const tally = await backfillSageMemoryEmbeddings();
+    assert.deepEqual(tally, { total: 2, embedded: 2, errors: 0 });
+    // Selection filters on validTo IS NULL and model mismatch, bound to activeModel.
+    const selectSql = mockQueryRaw.mock.calls[0].arguments[0].join("");
+    assert.match(selectSql, /"validTo" IS NULL/);
+    assert.match(selectSql, /IS DISTINCT FROM/);
+    const selectParams = mockQueryRaw.mock.calls[0].arguments.slice(1);
+    assert.ok(selectParams.includes(ACTIVE_MODEL));
+    // Each row updated with vector + model provenance.
+    assert.equal(mockExecuteRaw.mock.callCount(), 2);
+    const updateParams = mockExecuteRaw.mock.calls[0].arguments.slice(1);
+    assert.ok(updateParams.includes(ACTIVE_MODEL), "update must stamp the active model");
+  });
+
+  it("returns a zero tally without embedding when nothing is stale", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => []);
+    const tally = await backfillSageMemoryEmbeddings();
+    assert.deepEqual(tally, { total: 0, embedded: 0, errors: 0 });
+    assert.equal(mockEmbedTexts.mock.callCount(), 0);
+    assert.equal(mockExecuteRaw.mock.callCount(), 0);
+  });
+
+  it("counts a failed embed batch as errors and keeps the tally", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      { id: "mem-1", content: "a" },
+      { id: "mem-2", content: "b" },
+    ]);
+    mockEmbedTexts.mock.mockImplementation(async () => {
+      throw new Error("embed API down");
+    });
+    const tally = await backfillSageMemoryEmbeddings();
+    assert.equal(tally.total, 2);
+    assert.equal(tally.embedded, 0);
+    assert.equal(tally.errors, 2);
+    assert.equal(mockExecuteRaw.mock.callCount(), 0);
   });
 });
 

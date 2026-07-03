@@ -3,11 +3,15 @@ import { resolveLocalAiAuthMode } from "./local-auth";
 import type { LocalAIAuthConfig, LocalAIAuthMode } from "./types";
 
 export const DEFAULT_OLLAMA_MODEL = "gemma4:26b";
+/** Native 768-dim local embedding model; matches EMBEDDING_DIMENSIONS. */
+export const DEFAULT_LOCAL_EMBEDDING_MODEL = "nomic-embed-text";
 
 const API_KEY_ENV_VARS = [
   "AI_PROVIDER_API_KEY",
   "OLLAMA_API_KEY",
 ] as const;
+
+const EMBEDDING_MODEL_ENV_VARS = ["AI_PROVIDER_EMBEDDING_MODEL"] as const;
 
 const CLOUDFLARE_CLIENT_ID_ENV_VARS = [
   "AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID",
@@ -24,6 +28,8 @@ const CLOUDFLARE_CLIENT_SECRET_ENV_VARS = [
 export interface LocalAiProviderConfig {
   url: string | null;
   model: string | null;
+  /** SystemConfig "ai_provider_embedding_model" (+ env fallback AI_PROVIDER_EMBEDDING_MODEL). */
+  embeddingModel: string | null;
   authMode: LocalAIAuthMode;
   numCtxRaw: string | null;
   apiKey: string | null;
@@ -62,6 +68,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
   const [
     url,
     model,
+    embeddingModelConfig,
     authModeRaw,
     numCtxRaw,
     apiKeyResult,
@@ -70,6 +77,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
   ] = await Promise.all([
     getPlainConfigValue("ai_provider_url"),
     getPlainConfigValue("ai_provider_model"),
+    getPlainConfigValue("ai_provider_embedding_model"),
     getPlainConfigValue("ai_provider_auth_mode"),
     getPlainConfigValue("ai_provider_num_ctx"),
     getSecretConfigOrEnv("ai_provider_api_key", API_KEY_ENV_VARS),
@@ -86,6 +94,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
   return {
     url,
     model,
+    embeddingModel: embeddingModelConfig || firstEnvValue(EMBEDDING_MODEL_ENV_VARS),
     authMode: resolveLocalAiAuthMode(authModeRaw),
     numCtxRaw,
     apiKey: apiKeyResult.value,

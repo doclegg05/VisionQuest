@@ -18,13 +18,32 @@
  *
  * Exit code is non-zero if ANY hard check fails.
  *
- * Usage: npm run sage:redteam:eval        (requires GEMINI_API_KEY)
+ * Provider-agnostic: drives tool selection through provider.streamWithTools
+ * with a no-op tool handler (a canned success stub — no real tool executes,
+ * no DB is touched) and maxHops 1. Defaults to Gemini; pass --provider=ollama
+ * to run against a configured Ollama server.
+ *
+ * CLI:
+ *   --provider=gemini|ollama   (default gemini)
+ *   --temperature=<n>          sampling temperature override, e.g. 0 for
+ *                               deterministic runs (default: provider default)
+ *
+ * Usage: npm run sage:redteam:eval  [-- --provider=ollama --temperature=0]
  */
 
 import { readFileSync } from "node:fs";
-import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
+import { loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
+import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
 
 loadEnvFile();
+
+const args = parseArgs();
+// Optional sampling temperature override for deterministic eval runs.
+// Undefined (flag omitted) preserves the provider's default.
+const TEMPERATURE = args.temperature !== undefined ? Number(args.temperature) : undefined;
+if (TEMPERATURE !== undefined && !Number.isFinite(TEMPERATURE)) {
+  throw new Error(`Invalid --temperature="${args.temperature}" — must be a number.`);
+}
 
 const SCENARIOS = JSON.parse(readFileSync("config/sage-redteam-eval.json", "utf8"));
 
@@ -81,13 +100,15 @@ function gradeScenario(scenario, calls, text) {
   return { hard, soft };
 }
 
+/** No-op tool handler: returns a canned success stub. Never executes a real tool or touches the DB. */
+async function noopToolHandler() {
+  return { response: { ok: true }, summary: "(eval stub — not executed)", status: "success" };
+}
+
 async function main() {
   const { buildSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
   const { getEnabledTools } = await import("../src/lib/sage/agent/tools.ts");
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY missing — the red-team eval calls the live model.");
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
+  const { provider, label } = await resolveEvalProvider();
 
   // Force agent mode on so the real tool addendum + guardrails are present.
   process.env.SAGE_AGENT_ENABLED = "true";
@@ -113,7 +134,7 @@ async function main() {
   };
 
   console.log(
-    `Red-teaming ${SCENARIOS.length} scenarios against ${model} (student + teacher personas)…\n`,
+    `Red-teaming ${SCENARIOS.length} scenarios against ${label} (student + teacher personas)${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}…\n`,
   );
 
   let hardFails = 0;
@@ -132,26 +153,19 @@ async function main() {
     let calls = [];
     let text = "";
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: userText }] }],
-            tools: [{ functionDeclarations: declarations }],
-          }),
-        },
+      const events = provider.streamWithTools(
+        systemPrompt,
+        [{ role: "user", content: userText }],
+        declarations,
+        noopToolHandler,
+        { maxHops: 1, temperature: TEMPERATURE },
       );
-      if (!res.ok) {
-        console.log(`  ?? ${scenario.id}: API error ${res.status}`);
-        continue;
+      const textParts = [];
+      for await (const event of events) {
+        if (event.kind === "tool_call") calls.push(event.name);
+        if (event.kind === "text") textParts.push(event.text);
       }
-      const json = await res.json();
-      const parts = json.candidates?.[0]?.content?.parts ?? [];
-      calls = parts.filter((p) => p.functionCall).map((p) => p.functionCall.name);
-      text = parts.map((p) => p.text ?? "").join(" ").trim();
+      text = textParts.join(" ").trim();
     } catch (err) {
       console.log(`  ?? ${scenario.id}: request failed — ${err.message}`);
       continue;

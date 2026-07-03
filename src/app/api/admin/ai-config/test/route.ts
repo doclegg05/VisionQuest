@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAdminAuth } from "@/lib/api-error";
 import { getConfigValue } from "@/lib/system-config";
 import { GEMINI_MODEL } from "@/lib/gemini";
+import { GeminiProvider } from "@/lib/ai/gemini-provider";
 
 export const POST = withAdminAuth(async () => {
   const apiKey = await getConfigValue("gemini_api_key");
@@ -13,10 +14,10 @@ export const POST = withAdminAuth(async () => {
   }
 
   try {
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    const testAI = new GoogleGenerativeAI(apiKey);
-    const model = testAI.getGenerativeModel({ model: GEMINI_MODEL });
-    await model.generateContent("Say hi in one word.");
+    const provider = new GeminiProvider(apiKey);
+    await provider.generateResponse("You are a test assistant.", [
+      { role: "user", content: "Say hi in one word." },
+    ]);
   } catch {
     return NextResponse.json(
       { error: "The stored API key didn't work. It may be invalid or credits may be exhausted." },
