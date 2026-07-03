@@ -9,9 +9,30 @@ const bundledFileExists = existsSync(
   path.join(process.cwd(), "docs-upload", BUNDLED_PDF),
 );
 
+// storageKeys under teachers/guides/ are minted by the uploader's FOLDER_MAP
+// (local docs-upload/teachers/ → bucket teachers/guides/), so the bundled
+// file lives at a different local path than the key implies.
+const REMAPPED_KEY =
+  "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf";
+const remappedFileExists = existsSync(
+  path.join(
+    process.cwd(),
+    "docs-upload",
+    "teachers/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+  ),
+);
+
 describe("downloadBundledFile", () => {
   it("loads bundled orientation PDFs from docs-upload", { skip: !bundledFileExists }, async () => {
     const result = await downloadBundledFile(BUNDLED_PDF);
+
+    assert.ok(result);
+    assert.equal(result.mimeType, "application/pdf");
+    assert.ok(result.buffer.byteLength > 0);
+  });
+
+  it("resolves teachers/guides/ keys through the uploader folder map", { skip: !remappedFileExists }, async () => {
+    const result = await downloadBundledFile(REMAPPED_KEY);
 
     assert.ok(result);
     assert.equal(result.mimeType, "application/pdf");
