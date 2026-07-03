@@ -189,6 +189,8 @@ function delay(ms: number): Promise<void> {
 export interface SyncOptions {
   geminiBudget?: number;
   onProgress?: (msg: string) => void;
+  /** Report what would change without writing to the DB, embeddings, or Gemini. */
+  dryRun?: boolean;
 }
 
 // File types the uploader never uploads (see MIME_MAP nulls in
@@ -250,7 +252,7 @@ async function collectFiles(dir: string, prefix: string = ""): Promise<string[]>
 export async function syncSageDocuments(
   options: SyncOptions = {},
 ): Promise<SyncResult> {
-  const { geminiBudget = 30, onProgress } = options;
+  const { geminiBudget = 30, onProgress, dryRun = false } = options;
   const log = onProgress ?? ((msg: string) => logger.info(msg));
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -333,6 +335,12 @@ export async function syncSageDocuments(
       if (!(await storageObjectExists(storageKey))) {
         result.missingObjects.push(relativePath);
         log(`Refused ${relativePath}: no bucket object at ${storageKey} — upload first (scripts/upload-to-supabase.mjs)`);
+        continue;
+      }
+
+      if (dryRun) {
+        if (existing) result.updated++; else result.added++;
+        log(`[DRY RUN] would ${existing ? "update" : "add"}: ${storageKey}`);
         continue;
       }
 
@@ -439,15 +447,21 @@ export async function syncSageDocuments(
 
   for (const doc of allSageDocKeys) {
     if (!seenKeys.has(doc.storageKey)) {
-      await prisma.programDocument.update({
-        where: { storageKey: doc.storageKey },
-        data: { usedBySage: false },
-      });
+      if (dryRun) {
+        log(`[DRY RUN] would unmark from Sage: ${doc.storageKey}`);
+      } else {
+        await prisma.programDocument.update({
+          where: { storageKey: doc.storageKey },
+          data: { usedBySage: false },
+        });
+      }
       result.orphaned++;
     }
   }
 
-  invalidatePrefix("sage:documents");
+  if (!dryRun) {
+    invalidatePrefix("sage:documents");
+  }
 
   log(`Sync complete: ${result.added} added, ${result.updated} updated, ${result.skipped} skipped, ${result.orphaned} orphaned, ${result.missingObjects.length} missing objects, ${result.unmapped.length} unmapped, ${result.errors.length} errors`);
 
