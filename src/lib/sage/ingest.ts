@@ -7,6 +7,7 @@ import { extractText, extractTextFromBuffer, containsPII } from "@/lib/sage/extr
 import { embedProgramDocument } from "@/lib/sage/document-embedding";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
+import { isObjectStorageConfigured, mapLocalPathToStorageKey, storageObjectExists } from "@/lib/storage";
 import type { ProgramDocCategory, ProgramDocAudience } from "@prisma/client";
 
 // ─── Overrides schema ────────────────────────────────────────────────────────
@@ -190,11 +191,19 @@ export interface SyncOptions {
   onProgress?: (msg: string) => void;
 }
 
+// File types the uploader never uploads (see MIME_MAP nulls in
+// scripts/upload-to-supabase.mjs) — indexing them would guarantee orphans.
+const NEVER_UPLOADED_EXTENSIONS = new Set([".url", ".ai"]);
+
 export interface SyncResult {
   added: number;
   updated: number;
   skipped: number;
   orphaned: number;
+  /** Local paths with no bucket key convention (unmapped folder / root file). */
+  unmapped: string[];
+  /** Mapped paths refused because no object exists in the bucket for the key. */
+  missingObjects: string[];
   errors: string[];
 }
 
@@ -212,6 +221,9 @@ async function collectFiles(dir: string, prefix: string = ""): Promise<string[]>
   const files: string[] = [];
 
   for (const entry of entries) {
+    // Mirror scripts/upload-to-supabase.mjs: _-prefixed and dotfiles are
+    // never uploaded, so they must never be indexed either.
+    if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
       files.push(...await collectFiles(path.join(dir, entry.name), rel));
@@ -247,17 +259,46 @@ export async function syncSageDocuments(
   }
   const gemini = new GeminiProvider(apiKey);
 
+  if (!isObjectStorageConfigured()) {
+    throw new Error(
+      "Object storage is not configured — Sage document sync requires STORAGE_*/R2_* credentials to verify bucket objects before indexing."
+    );
+  }
+
+  try {
+    await fs.access(DOCS_ROOT);
+  } catch {
+    throw new Error(
+      "docs-upload/ tree not found — Sage document sync must run from a checkout that includes the local docs-upload directory (it is gitignored and absent on Render)."
+    );
+  }
+
   const overrides = await loadOverrides();
   const allFiles = await collectFiles(DOCS_ROOT);
-  const result: SyncResult = { added: 0, updated: 0, skipped: 0, orphaned: 0, errors: [] };
+  const result: SyncResult = {
+    added: 0, updated: 0, skipped: 0, orphaned: 0,
+    unmapped: [], missingObjects: [], errors: [],
+  };
 
   const seenKeys = new Set<string>();
   let geminiUsed = 0;
 
   for (let i = 0; i < allFiles.length; i++) {
     const relativePath = allFiles[i];
-    // storageKey matches existing convention — no "docs-upload/" prefix
-    const storageKey = relativePath;
+
+    const ext = path.extname(relativePath).toLowerCase();
+    if (NEVER_UPLOADED_EXTENSIONS.has(ext)) {
+      result.skipped++;
+      continue;
+    }
+
+    // Bucket keys follow the uploader FOLDER_MAP convention, not raw local paths.
+    const storageKey = mapLocalPathToStorageKey(relativePath);
+    if (!storageKey) {
+      result.unmapped.push(relativePath);
+      log(`Skipped ${relativePath}: no bucket key convention for this folder`);
+      continue;
+    }
     seenKeys.add(storageKey);
 
     if (overrides.exclude.includes(relativePath)) {
@@ -273,15 +314,25 @@ export async function syncSageDocuments(
 
       const existing = await prisma.programDocument.findUnique({
         where: { storageKey },
-        select: { id: true, sizeBytes: true, fileModifiedAt: true, isActive: true },
+        select: { id: true, sizeBytes: true, fileModifiedAt: true, sageContextNote: true },
       });
 
+      // Unchanged files skip regardless of isActive/usedBySage — curation
+      // (including deliberate deactivation) is owned by humans, not the sync.
       if (
-        existing?.isActive &&
+        existing &&
         existing.sizeBytes === fileSizeBytes &&
         existing.fileModifiedAt?.getTime() === fileModifiedAt.getTime()
       ) {
         result.skipped++;
+        continue;
+      }
+
+      // Refuse to index anything without a real bucket object — a row whose
+      // download 404s in prod is worse than no row (orphan set C, 2026-07-03).
+      if (!(await storageObjectExists(storageKey))) {
+        result.missingObjects.push(relativePath);
+        log(`Refused ${relativePath}: no bucket object at ${storageKey} — upload first (scripts/upload-to-supabase.mjs)`);
         continue;
       }
 
@@ -291,7 +342,10 @@ export async function syncSageDocuments(
 
       const override = overrides.overrides[relativePath];
 
-      let sageContextNote: string | null = override?.sageContextNote ?? null;
+      // Note precedence: explicit override > existing (possibly teacher-edited)
+      // note > generated. Regeneration only happens for rows with no note yet.
+      let sageContextNote: string | null =
+        override?.sageContextNote ?? existing?.sageContextNote ?? null;
 
       if (!sageContextNote) {
         if (rule.needsGemini && geminiUsed < geminiBudget) {
@@ -323,17 +377,16 @@ export async function syncSageDocuments(
         audience: rule.audience,
         certificationId: override?.certificationId ?? rule.certificationId ?? null,
         platformId: override?.platformId ?? rule.platformId ?? null,
-        usedBySage: true,
         sageContextNote,
-        isActive: true,
       };
 
-      // Upsert handles race conditions and storageKey mismatches from prior seeds
+      // Update never touches usedBySage/isActive — those are teacher-curated
+      // via PATCH /api/teacher/documents/sage-context and must survive syncs.
       const before = existing ? "update" : "create";
       const saved = await prisma.programDocument.upsert({
         where: { storageKey },
         update: data,
-        create: data,
+        create: { ...data, usedBySage: true, isActive: true },
         select: { id: true },
       });
       if (before === "update") {
@@ -345,7 +398,6 @@ export async function syncSageDocuments(
       // Embed doc + chunks (Phase 1 semantic RAG). Failures are recorded but
       // never abort the sync loop — the keyword fallback covers unembedded docs.
       try {
-        const ext = path.extname(relativePath).toLowerCase();
         let chunkSourceText: string | null = null;
         if ([".pdf", ".docx", ".txt", ".md"].includes(ext)) {
           const buffer = await fs.readFile(fullPath);
@@ -397,7 +449,7 @@ export async function syncSageDocuments(
 
   invalidatePrefix("sage:documents");
 
-  log(`Sync complete: ${result.added} added, ${result.updated} updated, ${result.skipped} skipped, ${result.orphaned} orphaned, ${result.errors.length} errors`);
+  log(`Sync complete: ${result.added} added, ${result.updated} updated, ${result.skipped} skipped, ${result.orphaned} orphaned, ${result.missingObjects.length} missing objects, ${result.unmapped.length} unmapped, ${result.errors.length} errors`);
 
   return result;
 }

@@ -28,8 +28,15 @@ export const POST = withTeacherAuth(async (session) => {
     action: "sage.knowledge_sync",
     targetType: "program_document",
     targetId: "bulk",
-    summary: `Sage knowledge sync: ${result.added} added, ${result.updated} updated, ${result.orphaned} orphaned, ${result.errors.length} errors.`,
-    metadata: { ...result, errors: result.errors.slice(0, 10) },
+    summary: `Sage knowledge sync: ${result.added} added, ${result.updated} updated, ${result.orphaned} orphaned, ${result.missingObjects.length} missing objects, ${result.unmapped.length} unmapped, ${result.errors.length} errors.`,
+    metadata: {
+      ...result,
+      errors: result.errors.slice(0, 10),
+      missingObjects: result.missingObjects.slice(0, 10),
+      unmapped: result.unmapped.slice(0, 10),
+      missingObjectsTotal: result.missingObjects.length,
+      unmappedTotal: result.unmapped.length,
+    },
   });
 
   return NextResponse.json({ success: true, result });
