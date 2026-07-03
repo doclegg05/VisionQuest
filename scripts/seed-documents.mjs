@@ -115,19 +115,19 @@ const TITLE_OVERRIDES = {
   "teachers/guides/esea_edeval_timeline_000.pdf": "ESEA Educator Evaluation Timeline",
   "teachers/guides/Administrative_Guide_Revised_10.4.2024.pdf": "SPOKES Administrative Guide",
   "teachers/guides/Americas-Talent-Strategy-Building-the-Workforce-for-the-Golden-Age.pdf": "America's Talent Strategy — Building the Workforce",
-  "teachers/guides/Hanbook Appendix/Section 10/NWD_WV_user_flyer.pdf": "No Wrong Door WV — User Flyer",
-  "teachers/guides/Hanbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf": "Post-Secondary Verification Form",
-  "teachers/guides/Hanbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf": "Workforce Development Flyer",
-  "teachers/guides/Hanbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf": "Desktop Monitoring Reflection Tool (Fillable)",
-  "teachers/guides/Hanbook Appendix/Section 14/ESL_WIOA_2015.pptx": "ESOL & WIOA Requirements Presentation",
-  "teachers/guides/Hanbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf": "WV Standardized Data Tool — Education & Career Plan",
-  "teachers/guides/Hanbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf": "Burnout & Self-Care — WV Adult Ed Association",
-  "teachers/guides/Hanbook Appendix/Section 10/Logos/class.png": "Adult Education Classroom Image",
-  "teachers/guides/Hanbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG": "Weekly Orientation Flyer (B&W)",
-  "teachers/guides/Hanbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf": "Adult Education Fact Sheet",
-  "teachers/guides/Hanbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf": "Triple AI Datasheet — K-12 Interactive",
-  "teachers/guides/Hanbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf": "Measurable Skills Gain & Outcomes Reference",
-  "teachers/guides/Hanbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf": "Average Contact Hours Per Student",
+  "teachers/guides/Handbook Appendix/Section 10/NWD_WV_user_flyer.pdf": "No Wrong Door WV — User Flyer",
+  "teachers/guides/Handbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf": "Post-Secondary Verification Form",
+  "teachers/guides/Handbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf": "Workforce Development Flyer",
+  "teachers/guides/Handbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf": "Desktop Monitoring Reflection Tool (Fillable)",
+  "teachers/guides/Handbook Appendix/Section 14/ESL_WIOA_2015.pptx": "ESOL & WIOA Requirements Presentation",
+  "teachers/guides/Handbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf": "WV Standardized Data Tool — Education & Career Plan",
+  "teachers/guides/Handbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf": "Burnout & Self-Care — WV Adult Ed Association",
+  "teachers/guides/Handbook Appendix/Section 10/Logos/class.png": "Adult Education Classroom Image",
+  "teachers/guides/Handbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG": "Weekly Orientation Flyer (B&W)",
+  "teachers/guides/Handbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf": "Adult Education Fact Sheet",
+  "teachers/guides/Handbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf": "Triple AI Datasheet — K-12 Interactive",
+  "teachers/guides/Handbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf": "Measurable Skills Gain & Outcomes Reference",
+  "teachers/guides/Handbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf": "Average Contact Hours Per Student",
 
   // WV Adult Ed Handbook Sections
   "teachers/guides/WV Adult Ed Handbook/Section_1_2025.2026.pdf": "Handbook Section 1 — Acronyms & Definitions",
@@ -149,13 +149,13 @@ const TITLE_OVERRIDES = {
 
   // Teacher docs with raw-looking titles
   "teachers/guides/professional-growth-development-plan-form.pdf": "Professional Growth & Development Plan Form",
-  "teachers/guides/Hanbook Appendix/Section 10/Logos/free_customer_service_training.png": "Free Customer Service Training Promo",
-  "teachers/guides/Hanbook Appendix/Section 10/Logos/wvadulted.com_1.png": "WV Adult Education Website Banner",
-  "teachers/guides/Hanbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf": "Corrections Education Sign-In Sheet",
-  "teachers/guides/Hanbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf": "GED Program Tools & Resources for Student Success",
-  "teachers/guides/Hanbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf": "Preparing Students for the GED RLA Extended Response",
-  "teachers/guides/Hanbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf": "Program Files Checklist",
-  "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf": "WV Adult Education Enrollment Verification",
+  "teachers/guides/Handbook Appendix/Section 10/Logos/free_customer_service_training.png": "Free Customer Service Training Promo",
+  "teachers/guides/Handbook Appendix/Section 10/Logos/wvadulted.com_1.png": "WV Adult Education Website Banner",
+  "teachers/guides/Handbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf": "Corrections Education Sign-In Sheet",
+  "teachers/guides/Handbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf": "GED Program Tools & Resources for Student Success",
+  "teachers/guides/Handbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf": "Preparing Students for the GED RLA Extended Response",
+  "teachers/guides/Handbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf": "Program Files Checklist",
+  "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf": "WV Adult Education Enrollment Verification",
 
   // Presentations / Marketing
   "presentations/wvadulted.com_1.png": "WV Adult Education Website Screenshot",
@@ -183,8 +183,8 @@ function getStorageKey(relPath) {
 
   const rest = relPath.slice(topFolder.length + 1);
 
-  // Special case: teachers/Hanbook Appendix/Section 16/* → lms/certifications/program-info/*
-  if (topFolder === "teachers" && rest.includes("Hanbook Appendix/Section 16/")) {
+  // Special case: teachers/Handbook Appendix/Section 16/* → lms/certifications/program-info/*
+  if (topFolder === "teachers" && rest.includes("Handbook Appendix/Section 16/")) {
     const fileName = rest.split("/").pop();
     return `lms/certifications/program-info/${fileName}`;
   }

@@ -208,10 +208,10 @@
     "id": "student-role-no-teacher-sign-in-sheet",
     "question": "What form is used to record who comes to class each day?",
     "expectedStorageKeys": [
-      "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
     ],
     "acceptableStorageKeys": [
-      "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
       "orientation/SPOKES Checklist for Student Orientation.pdf"
     ],
     "forbiddenStorageKeys": [
@@ -223,14 +223,14 @@
     "id": "student-role-no-teacher-ecp-instructions",
     "question": "How do I fill out my Education and Career Plan?",
     "expectedStorageKeys": [
-      "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
+      "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
     ],
     "acceptableStorageKeys": [
-      "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+      "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
       "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
     ],
     "forbiddenStorageKeys": [
-      "teachers/guides/Hanbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf"
+      "teachers/guides/Handbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf"
     ],
     "expectedTerms": ["education", "career", "plan", "ecp"]
   },
