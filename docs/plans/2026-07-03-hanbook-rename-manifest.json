@@ -1,0 +1,3368 @@
+{
+  "generatedAt": "2026-07-03T12:59:06.393Z",
+  "rule": "replace exact phrase \"Hanbook Appendix\" with \"Handbook Appendix\" (verified: no other Hanbook variants exist in DB or bucket)",
+  "counts": {
+    "programDocumentRows": 310,
+    "bucketObjects": 296,
+    "dbRowsWithoutBucketObject": 14,
+    "targetKeyCollisions": 0
+  },
+  "db": [
+    {
+      "id": "cmmyybp5m004eeadky0yn0hzl",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 1/Commonly Used Acronyms.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 1/Commonly Used Acronyms.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybpjh004feadk5rm6a9vr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Adult_Distance_Ed-Certifications-v5.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Adult_Distance_Ed-Certifications-v5.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybpxg004geadk5mctt18v",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybrj8004keadk7xfr2uo6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Advance_Your_Career_300_250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Advance_Your_Career_300_250.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybrxd004leadk50caphug",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Advance_Your_Career_728_90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Advance_Your_Career_728_90.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybsbd004meadkdyndvlfq",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_468x60.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybspj004neadk7rh8knpm",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_728x90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_728x90.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybt3a004oeadkp6nqpi50",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_CAPS_BannerStack_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_CAPS_BannerStack_468x60.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybth6004peadkpqexo8qr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_LC_BannerLine_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_LC_BannerLine_468x60.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybtve004qeadkkbks1jmu",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_LC_BannerLine_728x90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_LC_BannerLine_728x90.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybu9m004readkhflpix39",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_LC_BannerStack_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_LC_BannerStack_468x60.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybuni004seadk94wexlf1",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/At-Risk Adult Student Identification Chart and Intervention.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/At-Risk Adult Student Identification Chart and Intervention.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybv18004teadki9wiy3id",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_1.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybvf9004ueadk7mck91pj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_2.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_2.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybvt2004veadk53qkhyfq",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_3_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_3_1.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybw7a004weadk3mcbu0tn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_4.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_4.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybwlb004xeadkbi9zccpv",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_6.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_6.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybwzc004yeadk10iw2jyt",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybxdj004zeadksvusppo8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/class.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/class.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybxu90050eadk5i23me6o",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Distance_Education_300_250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Distance_Education_300_250.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyby850051eadk4v3ndzqi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Distance_Education_728_90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Distance_Education_728_90.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybym80052eadkfv50hf2m",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Follow Up Log.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Follow Up Log.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybz030053eadkr9eldc3r",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/free_customer_service_training.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/free_customer_service_training.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybzeb0054eadk9ev5vspv",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/FREE_HSE_300_250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/FREE_HSE_300_250.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybzsv0055eadkibrfr9pt",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google_Ad-1-Small.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google_Ad-1-Small.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc0720056eadkdr4h0ub8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google-Ad-1-Large.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google-Ad-1-Large.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc0l10057eadk9ajidsfi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google-Ad-2-Large.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google-Ad-2-Large.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc0yx0058eadk298263b9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google-Ad-2-Small.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google-Ad-2-Small.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc1cy0059eadkdigrnp1e",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/HSE_Banner_300x250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/HSE_Banner_300x250.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc1qs005aeadktfbbmkio",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/IC3_Facebook_Post_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/IC3_Facebook_Post_1.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc24z005beadk4w3g4udu",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Light_Pink_Colorful_Photo_Pattern_Background_Basic_Happy_Nowruz_Spring_Theme_Inspirational_Q.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Light_Pink_Colorful_Photo_Pattern_Background_Basic_Happy_Nowruz_Spring_Theme_Inspirational_Q.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc2iw005ceadknsa5bi7q",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Microsoft_Office_2.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Microsoft_Office_2.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc2wv005deadkxzjvzxt5",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Facebook.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Facebook.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc3bb005eeadkqovt9rh4",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Instagram.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Instagram.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc3p8005feadkwd9kak6k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_LinkedIn.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_LinkedIn.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc434005geadkdvtt6dlt",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Twitter.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Twitter.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc4h4005headkinypp5kk",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_SS_WF_Email_1200x627.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_SS_WF_Email_1200x627.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc4uw005ieadkh9p49yf8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS-SS-WF-Email_1.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS-SS-WF-Email_1.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc58y005jeadkwa86neze",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/One_Step._One_Test._Big_Success.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/One_Step._One_Test._Big_Success.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc5ni005keadk9uzjfe2d",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Pink_3d_Opportunity_Is_Calling_Instagram_Post.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Pink_3d_Opportunity_Is_Calling_Instagram_Post.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc61g005leadkcys8xpzo",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/PST_Banner_2_300x250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/PST_Banner_2_300x250.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc6fg005meadkl57i2q59",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/PST_Banner_300x250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/PST_Banner_300x250.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc6tl005neadk015maeqj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/PSV_MO_Excel_Social_Finance_NowAvailable_1200x630.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/PSV_MO_Excel_Social_Finance_NowAvailable_1200x630.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc77i005oeadk4l8bygno",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Social-Ad-1.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Social-Ad-1.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc7lg005peadkf9bxv0qp",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Social-Ad-2.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Social-Ad-2.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc7za005qeadkuzzrmcae",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Step_into_Scrubs_with_Success_.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Step_into_Scrubs_with_Success_.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc8d6005readk03b9me46",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/We_have_news.JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/We_have_news.JPG",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc8qw005seadkb7fp8bi7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc94q005teadk6hstr5dg",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAdultEd_Logo_Usage_2018.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAdultEd_Logo_Usage_2018.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyc9ld005ueadkvnwjhczg",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/wvadulted.com_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/wvadulted.com_1.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37aan7005veas8f31uqmjk",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE_Virtual_Background (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE_Virtual_Background (1).png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycada005weadkj55iirm6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE_Virtual_Background.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE_Virtual_Background.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycar1005xeadk62fpdopm",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE-color-contacts.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE-color-contacts.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37abuu005yeas8xmw22cyn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE-logo2018-color.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE-logo2018-color.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycbj9005zeadkbaconp3k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE-logo2018-color.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE-logo2018-color.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycbxu0060eadkiwlbygg5",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Agency_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Agency_Needs_Assessment.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyccbq0061eadkhtggp2y1",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Community_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Community_Needs_Assessment.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyccpt0062eadkigpf3jii",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Student_Interim_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Student_Interim_Needs_Assessment.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycd420063eadkdblnzk4w",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Student_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Student_Needs_Assessment.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybqbk004headk9t3a3w5k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/NWD_WV_user_flyer.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/NWD_WV_user_flyer.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybqpj004ieadknfffrxkr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyybr54004jeadkyjluhh1t",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycdi70064eadkz4txxlih",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Adding Friends and Family Source Type.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Adding Friends and Family Source Type.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycdw80065eadkmyez7snm",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyceac0066eadkz8vmoqpc",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyceoa0067eadk442604a1",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycf2g0068eadkmlsfoucy",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycfge0069eadk6otmnnrc",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Source_Type_Report_Instructions.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Source_Type_Report_Instructions.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycfuc006aeadkwivawnun",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 11/WVAdultEd_Monitoring_Flowchart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/WVAdultEd_Monitoring_Flowchart.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycg8a006beadkgwvwynhu",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 12/DiplomaSender_TestTakerGuide.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 12/DiplomaSender_TestTakerGuide.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycgm2006ceadk1yhtr9me",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 12/Ordering__HSE_Diploma_2.24_v2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 12/Ordering__HSE_Diploma_2.24_v2.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyych00006deadku027dq02",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 13/Approved_Proxy_Hour_Chart_for_Literacy-Level_Paper-Pencil_Assignments.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/Approved_Proxy_Hour_Chart_for_Literacy-Level_Paper-Pencil_Assignments.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyychdy006eeadky9bc1lem",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 13/FDIC_How_Money_Smart_Are_You_Certificate_Proxy_Time_Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/FDIC_How_Money_Smart_Are_You_Certificate_Proxy_Time_Chart.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37ainf006feas8gd484zj4",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 13/TABE_1314_Student_Assignment_Pages (2).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/TABE_1314_Student_Assignment_Pages (2).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyci5o006geadkexvtx16y",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 13/Teacher_Checklist_for_Certiport_Exams_FY26.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/Teacher_Checklist_for_Certiport_Exams_FY26.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyciji006headkh0ly77tj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 13/Technology Loan Program.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/Technology Loan Program.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycixm006ieadk6p2t5l5z",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/Burlington_English_Placement_Chart.JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 14/Burlington_English_Placement_Chart.JPG",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycjbe006jeadkurg4gbb0",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESL_WIOA_2015.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESL_WIOA_2015.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyycjp6006keadkg23tjeqb",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Goals_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Goals_Assessment.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37al45006leas8nxiywrqp",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Independent_Training_Plan-updated_2.19.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Independent_Training_Plan-updated_2.19.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37alik006meas849n79b8t",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification_-Fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification_-Fillable.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyckuw006neadkn2ei5f5b",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37ambc006oeas8s03jotym",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025_-_Fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025_-_Fillable.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyclpi006peadky9d611et",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycm3g006qeadkij189epp",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 15/ESOL_Independent_Training_Plan-updated_2.19.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 15/ESOL_Independent_Training_Plan-updated_2.19.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycmhs006readkqqh0u2j8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycmvs006seadkdis7x9y7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycuoo007ceadkcf98jydj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Annual_Professional_Development_Requirements.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Annual_Professional_Development_Requirements.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycv2w007deadkwa29793y",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycvh4007eeadkn49zp0kh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Certification_Renewal_Chart-Oct._2025.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Certification_Renewal_Chart-Oct._2025.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycvv6007feadkx81e4w24",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Collecting Pleasant Memories.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Collecting Pleasant Memories.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycw98007geadkg2v42907",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Deep Relaxation TEchnique.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Deep Relaxation TEchnique.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycwnx007headke7ejj6jh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/GED_Study_Guide_-_Algebra_Presentation.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/GED_Study_Guide_-_Algebra_Presentation.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycx4s007ieadk5n30zoo9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Geometry_Presentation.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Geometry_Presentation.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycxiu007jeadk7mdn8wu0",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Goal_Setting_Connecting_the_Dots.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Goal_Setting_Connecting_the_Dots.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycxwo007keadkjodmq2bi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Instructor Observations-Job Shadowing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Instructor Observations-Job Shadowing.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycyaq007leadkfdfy1lie",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Maslach-Burnout-Inventory-MBI.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Maslach-Burnout-Inventory-MBI.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycyoy007meadkq0suww7u",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Professional Development Session Sign-in Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Professional Development Session Sign-in Sheet.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyycz30007neadk54t20oej",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Session Workshop Evaluation Form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Session Workshop Evaluation Form.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyczh8007oeadkc2v01wyo",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/SPOKES_Modules_2025.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/SPOKES_Modules_2025.pdf",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyczvd007peadky0konfe4",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/What_You_Need_to_Know_About_Paying_for_College_or_Training-HEPC.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/What_You_Need_to_Know_About_Paying_for_College_or_Training-HEPC.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd09m007qeadk5ntsf5se",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WV_Labor_Force_Dynamics_v2.7.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WV_Labor_Force_Dynamics_v2.7.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd0nm007readkdn6leg9k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WVAEA_Fall2025_workkeys.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WVAEA_Fall2025_workkeys.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd11q007seadkhmpn2opj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd1fp007teadkeow18on4",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd1ti007ueadk5pzbpnfg",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Characteristics of Adults with Learning Disabilities.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Characteristics of Adults with Learning Disabilities.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd27o007veadkbqjqasgp",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/First_Lesson_for_Syllable_Types.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/First_Lesson_for_Syllable_Types.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd2lm007weadkgcf83lm7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Laubach_Way_to_Reading_Literacy_Training.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Laubach_Way_to_Reading_Literacy_Training.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyd2zo007xeadko3v4dvvd",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Monitor__Repair_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Monitor__Repair_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyd3du007yeadkikgsa95r",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/National Joint Committee on Learning Disabilities.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/National Joint Committee on Learning Disabilities.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd3rs007zeadkc4dwjy98",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Specific Learning Disabilities Initiatives Definition of Learning Disabilities.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Specific Learning Disabilities Initiatives Definition of Learning Disabilities.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd45r0080eadkfub70m1m",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Syllable_Types.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Syllable_Types.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd4jp0081eadku8rkqusg",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Techniques-Working with Adults with learning Disabilites.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Techniques-Working with Adults with learning Disabilites.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd4xk0082eadkh6zdbqhy",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Vowel_Tent_Card_print_on_cardstock.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Vowel_Tent_Card_print_on_cardstock.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd5bg0083eadkkwuvdlqw",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/29050_Learning_Needs_Screener_Form-v1_1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/29050_Learning_Needs_Screener_Form-v1_1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd5ps0084eadkmz82czmt",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Authorization_for_Release_of_Information_to_External_Agencies_or_Individuals_2024.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Authorization_for_Release_of_Information_to_External_Agencies_or_Individuals_2024.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd63q0085eadk1jmha9pi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Checklist_for_Student_Orientation_and_Intake.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Checklist_for_Student_Orientation_and_Intake.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyddz4008peadk79izqlcz",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydedk008qeadk7kmo5e8w",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/PY_26_Student_Profile_fillable_updated_8.14.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/PY_26_Student_Profile_fillable_updated_8.14.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydern008readk1lfkhv1a",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Referral_for_Identifying_Disabilities_v1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Referral_for_Identifying_Disabilities_v1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydf5u008seadktj6xqnt2",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Request_for_Records_v1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Request_for_Records_v1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydfk4008teadkdbj9p29t",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Virtual_Media_Release_Form_2023.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Virtual_Media_Release_Form_2023.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydfyk008ueadkilbvpeyz",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Virtual_Student_Acceptable_Use_2023.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Virtual_Student_Acceptable_Use_2023.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydgcy008veadkjeutc209",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/WVAdultEd_Students_Rights_and_Repsonsibilities-updated_July_2024-fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/WVAdultEd_Students_Rights_and_Repsonsibilities-updated_July_2024-fillable.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd6hs0086eadkwhavuwao",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/LNS_with_Referral_4.24.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/LNS_with_Referral_4.24.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd6vo0087eadkliqu05na",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Media Release Form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Media Release Form.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd79u0088eadk0a37j872",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd7o40089eadk80hdqvv8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/PY_26_Student_Profile_updated_8.8.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/PY_26_Student_Profile_updated_8.8.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd826008aeadkgdtujhqr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/REQUEST_FOR_RECORDS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/REQUEST_FOR_RECORDS.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd8g6008beadkgqjd1kqx",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Student File Notes.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Student File Notes.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd8wv008ceadk46deuiph",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Student_Acceptable_Use_2020_v2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Student_Acceptable_Use_2020_v2.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd9b6008deadkvon9vv0u",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Virtual_Instruction_Attendance_Log.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Virtual_Instruction_Attendance_Log.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyd9p2008eeadk1uawv2tp",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Monthly Attendance Tracking Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Monthly Attendance Tracking Chart.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyda30008feadkrlzhj5qh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination Notice.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination Notice.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydagy008geadkjutalopa",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Teacher Group - Examiner Manual Forms.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Teacher Group - Examiner Manual Forms.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydav8008headkx9k3juds",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Teacher Group - Personnel Confidentiality Agreement.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Teacher Group - Personnel Confidentiality Agreement.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydb9c008ieadk9qlsqmtf",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Document_Checklist_for_Eligibility_Verfication_form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Document_Checklist_for_Eligibility_Verfication_form.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37bd5w008jeas8wr77dz28",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultED_Employee_AUP.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultED_Employee_AUP.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydc17008keadkbg24qfzl",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydcf3008leadkxihvrizj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydct4008meadkv1b39jwd",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_A.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_A.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydd74008neadkdd8t7d55",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_B.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_B.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyddl6008oeadkql1xpoxk",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Students_Rights_and_Repsonsibilities_-_Updated_7.2.24.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Students_Rights_and_Repsonsibilities_-_Updated_7.2.24.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydgqs008weadk2ooom1dy",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 5/Plan For Reducing Barriers to Success.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 5/Plan For Reducing Barriers to Success.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydh4y008xeadk48k0q1m1",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Assessment_Waiver_PY_24-25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Assessment_Waiver_PY_24-25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37bj83008yeas8gy16h67q",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines (1).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydhx8008zeadkwzl04urf",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydibr0090eadk39kppehr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_eTests_User_Guide.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_eTests_User_Guide.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydiqd0091eadkge7cr0yo",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_STEPS_NRS_Chart_for_Post_Testing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_STEPS_NRS_Chart_for_Post_Testing.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydjd30092eadkb4ikb8w4",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_Testing_Accommodations_-_Step-by-Step.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_Testing_Accommodations_-_Step-by-Step.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydjrf0093eadkgcdbv57q",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS-eTests-Proctor-Steps-for-Testing-Day.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS-eTests-Proctor-Steps-for-Testing-Day.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydk5d0094eadkco5ygopm",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS-Steps_for_Retrieving_Tests_Results.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS-Steps_for_Retrieving_Tests_Results.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydknu0095eadkbncx1xei",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Documenting_Alternative_Placement_in_LACES.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Documenting_Alternative_Placement_in_LACES.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydl1y0096eadkuzyp7ihi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/DRC_DevChck_082621.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/DRC_DevChck_082621.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydlfs0097eadkmged17hn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/DRC_INSIGHT_System_Requirements_2025_FINAL_02_20_25_TABE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/DRC_INSIGHT_System_Requirements_2025_FINAL_02_20_25_TABE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydlu00098eadkznnwmkli",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/FAQ_for_TABE_11_12.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/FAQ_for_TABE_11_12.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydm810099eadkmj4somyr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Guide_for_How_to_Install_Safe_Exam_Browser.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Guide_for_How_to_Install_Safe_Exam_Browser.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydmm1009aeadk0f1c89do",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/IDP_Report_-_Mike_Johnson.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/IDP_Report_-_Mike_Johnson.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydn00009beadkbcz4gjdv",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Individual_Profile_Sample.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Individual_Profile_Sample.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydne6009ceadk2soxdup7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Listening_STEPS_FAQs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Listening_STEPS_FAQs.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydnsh009deadkzfgw6aa7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Next_Test_Level_TABE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Next_Test_Level_TABE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydo6g009eeadkkbdrgztv",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydoko009feadktkjsb912",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydoyo009geadkvufvyghi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydpcz009headkm3de61cc",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydpr3009ieadkobhnyxlh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydq50009jeadkork7d2z6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydqj2009keadkbh7f7xbi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydqx9009leadkc8yr1s4g",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydrb2009meadkne7mgl4a",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydroy009neadk58qkk8uf",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyds2w009oeadkxymc0se0",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydsgy009peadkci5arxgl",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydsuu009qeadk6bja2uhh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Reading_STEPS_FAQs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Reading_STEPS_FAQs.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydt8w009readk6hck1e6l",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/SDO016_1314_TABE_MA_CALC.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/SDO016_1314_TABE_MA_CALC.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydtn0009seadk4tkdr9hn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/SS_by_Level_by_NRS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/SS_by_Level_by_NRS.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydu1u009teadkujb7kru3",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/State_Assessment_Guidelines_FY26.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/State_Assessment_Guidelines_FY26.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydufy009ueadkq7vjg1we",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Steps_Charts_.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Steps_Charts_.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydutx009veadktolvgi8t",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Steps_to_Register_Testing_Stations.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Steps_to_Register_Testing_Stations.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydv7u009weadkujwk405s",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Tabe Sign-in Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Tabe Sign-in Sheet.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydvm3009xeadku4favbud",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_11_12_Skills_Crosswalks.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_11_12_Skills_Crosswalks.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydvzu009yeadkomq4zo9k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13-14_Brochure.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13-14_Brochure.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydwgz009zeadk9g4dqw19",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13-14_Test_Max_Test_Times.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13-14_Test_Max_Test_Times.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydwv300a0eadklvd4cz3d",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Locator_Scores.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Locator_Scores.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydx9e00a1eadk2ol9kq01",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_A.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_A.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydxno00a2eadkwmtkhtwq",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_D.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_D.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydy2000a3eadkwdu8uktd",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_E.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_E.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydyge00a4eadkrowctifa",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_M.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_M.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydyug00a5eadkb9tr251x",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_1314_Online_Quick_Start.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_1314_Online_Quick_Start.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydz8k00a6eadktqrm2c0t",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_Best_Practice_Guide.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_Best_Practice_Guide.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyydzms00a7eadkhmt0688x",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_Code_of_Conduct_for_Remote_Testing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_Code_of_Conduct_for_Remote_Testing.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye00y00a8eadkqxxlcx78",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_Remote_Testing_Guidelines.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_Remote_Testing_Guidelines.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37c20k00a9eas8gf0ed1uo",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye0ta00aaeadkwxgt9owm",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye17l00abeadky1ut13k3",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye1ly00aceadk62jzkb4o",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37c3mp00adeas89zissbmk",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37c40z00aeeas8mw40v6kz",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye2s000afeadkc9o9k5sb",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37c4to00ageas8w01j2488",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37c58400aheas8woz1gqql",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37c5mk00aieas8fi9tdzxn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye4c700ajeadkoti48kcw",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye4qc00akeadkyh987al2",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye54n00aleadknemjt29m",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Correlation Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Correlation Sheet.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye5iz00ameadki5g3pk5t",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Sheet.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye5x000aneadk59n0yhoh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd_TABE_13_14_PostTesting_Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd_TABE_13_14_PostTesting_Chart.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye6az00aoeadkfpvr90e7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd_TABE_1314_Post_Test_Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd_TABE_1314_Post_Test_Chart.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye6p400apeadkllmbvin4",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Certificate_of_Work_Ethic_Proficiency (1).JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Certificate_of_Work_Ethic_Proficiency (1).JPG",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye73000aqeadk9skcprla",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Computer_Essentials_Certificate.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Computer_Essentials_Certificate.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye7gy00areadkrlrx1tt3",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/CSM_Certificate.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/CSM_Certificate.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye7uu00aseadkld1k54hd",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Customer_Service_Certified_Certificate_2020 (1).jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Customer_Service_Certified_Certificate_2020 (1).jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye8bm00ateadk5k3i1ztw",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Achievement.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Achievement.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye8pi00aueadk9bi9juk9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Attendance.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Attendance.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye93p00aveadkhlr8b73k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion_with_grade.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion_with_grade.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye9hm00aweadk9icbd1hh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyye9vn00axeadko9tw0b30",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_Digital_Literacy_Master_Certification (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_Digital_Literacy_Master_Certification (1).png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyea9o00ayeadkvcljh5g6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_GS6_Level_1_Certificate (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_GS6_Level_1_Certificate (1).png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeao500azeadkfnbmyimb",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_GS6_Level_2_Certificate (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_GS6_Level_2_Certificate (1).png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeb2400b0eadkm91hdl3y",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_GS6_Level_3_Certificate (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_GS6_Level_3_Certificate (1).png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyebg600b1eadkwgz6ep03",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Intuit_QuickBooks_Certified_User_Certificate (1).jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Intuit_QuickBooks_Certified_User_Certificate (1).jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyebuz00b2eadku6h1iabr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Money Essentials Certificate.png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Money Essentials Certificate.png",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyec9600b3eadkkjrmgm8s",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/MOS_Certificate.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/MOS_Certificate.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyecnq00b4eadkgulilh88",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/ServSafe_Food_Handler_Training.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/ServSafe_Food_Handler_Training.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyed1w00b5eadkwtr0jb72",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/TTCE_LEVEL_2_CERTIFICATE_2 (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/TTCE_LEVEL_2_CERTIFICATE_2 (1).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyedg500b6eadk5waley0l",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Career_Interest_Activity_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Career_Interest_Activity_FY_22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyedu000b7eadkgzzxdfjb",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/ECP_AE_and_SPOKES_Fillable_FY25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/ECP_AE_and_SPOKES_Fillable_FY25.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyee8400b8eadkvnsjecc3",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeels00b9eadk33h4nv6g",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/ESOL_ECP_-_Fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/ESOL_ECP_-_Fillable.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeezr00baeadknr6w3bvt",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/ESOL_ECP_1-15_19.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/ESOL_ECP_1-15_19.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyefe200bbeadk1y3sh6dz",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyefs200bceadkihzuzym0",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Know what you want to learn chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Know what you want to learn chart.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeg6s00bdeadk8l2wfdew",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Strengths_Inventory_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Strengths_Inventory_FY_22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyegkv00beeadk4l4foyn8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Transferable_Skills_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Transferable_Skills_FY_22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyegz000bfeadkmjto445i",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Work_Values_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Work_Values_FY_22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyehdu00bgeadkovuu5fjk",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/WV_SDT_ECP_FY22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/WV_SDT_ECP_FY22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyehrs00bheadkwy55bfjr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/WV_SDT-S_ECP_FY22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/WV_SDT-S_ECP_FY22.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyei5p00bieadkuya20i63",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Business Management and Admin.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Business Management and Admin.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeijw00bjeadkzagtaym0",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Finance and Accounting.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Finance and Accounting.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeixu00bkeadk8jmhs2gv",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Health Science.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Health Science.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyejbx00bleadkq022mgp9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/IETP Components-Admin Asst MOS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/IETP Components-Admin Asst MOS.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyejq200bmeadkzgtpd6hc",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-Basics.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-Basics.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyek7100bneadkc34o3seh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyekl000boeadkb53aitpi",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 2.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyekyy00bpeadkk6hj3hfj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 3.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 3.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeld600bqeadk22m07mva",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Manufacturing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Manufacturing.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyelr200breadkg1znqgr8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Office Clerk-Excel.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Office Clerk-Excel.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyem5400bseadklhbmbsks",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/TEAS Prep.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/TEAS Prep.pdf",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyemjs00bteadkx3l0jfz6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Transportation-Distribution-Logistics.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Transportation-Distribution-Logistics.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyemy200bueadkcol3sbol",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/WV Tourism Works - Hospitality and Tourism.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/WV Tourism Works - Hospitality and Tourism.pdf",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyenc600bveadkfstrcno7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/Documenting Integrated Education and Training Programs (IETP)-Credential Student in LACES Checklist.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/Documenting Integrated Education and Training Programs (IETP)-Credential Student in LACES Checklist.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37cpoh00bweas8s1pnuz1x",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_AE_Poster.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_AE_Poster.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37cq2k00bxeas85ab0xv35",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_Checklist.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_Checklist.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeoje00byeadksh1l0zrq",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/IETP Description of Adult Education Bridge Programs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/IETP Description of Adult Education Bridge Programs.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeoxk00bzeadkgmdi2z5l",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/McGraw-Hill_Curriculum_Crosswalk_and_Alignment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/McGraw-Hill_Curriculum_Crosswalk_and_Alignment.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyepbo00c0eadkpnmikbij",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/National_16_Career_Clusters_Framwork.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/National_16_Career_Clusters_Framwork.jpg",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyepqb00c1eadk6qac6f5x",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/When to Issue IETP Certificate of Completion.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/When to Issue IETP Certificate of Completion.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeq4k00c2eadkma5od4uy",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IEPT Certification.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IEPT Certification.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeqii00c3eadk5gqw4e26",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IETP Template.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IETP Template.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeqx100c4eadkv7hzi68k",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/A_Coherent_CurriculumSchmidt_W._Houang_R._Cogan_L.Schmidt_William._Houang_Richard._Cog.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/A_Coherent_CurriculumSchmidt_W._Houang_R._Cogan_L.Schmidt_William._Houang_Richard._Cog.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyerba00c5eadktmlr5evu",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/Alignment_GED_to_CCRS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/Alignment_GED_to_CCRS.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyerpq00c6eadk1i39wcbc",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_1_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_1_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyes3w00c7eadk4lp2jty5",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_1_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_1_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyeshz00c8eadkccyql4xd",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_2_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_2_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyesw900c9eadk676xa4wh",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_2_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_2_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyetaa00caeadkqcsit29a",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_3_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_3_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyetoq00cbeadkuavifxuy",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_3_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_3_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyeu3600cceadki41eop3j",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_4_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_4_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeuhm00cdeadkv8i7vyd9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_4_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_4_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyeuwa00ceeadknwzlmqof",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_1_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_1_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyevah00cfeadk35kqlrsn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_1_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_1_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyevor00cgeadkax1g90o1",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_2_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_2_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyew6000cheadkiozwh6ac",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_2_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_2_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmn37cyj400cieas8a3gzn2wj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials (1).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyewyp00cjeadk3ysy16hf",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyexd400ckeadk0ru1sloj",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_3_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_3_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyexr800cleadkxbhamprr",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_4_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_4_Participant_Materials.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyey5o00cmeadk2t4ivx6c",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_4_PowerPoint.pptx",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_4_PowerPoint.pptx",
+      "objectExists": false
+    },
+    {
+      "id": "cmmyyeyk200cneadkklc26uld",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCRStandardsAdultEd.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCRStandardsAdultEd.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyeyy600coeadkqynibt12",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/Employability_Skills_Framework_AE_Poster (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/Employability_Skills_Framework_AE_Poster (1).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyezcf00cpeadkyw5wyh6e",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/Employability_Skills_Framework_Checklist (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/Employability_Skills_Framework_Checklist (1).pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyezr100cqeadk9twnd200",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/GEDStandards_1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/GEDStandards_1.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf05b00creadkx2m4fies",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37d2io00cseas8x8acgmjg",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37d2x700cteas877ddxbi1",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37d3bm00cueas80nw8g1t8",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf1r600cveadkk8kvxq22",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf25a00cweadk95ei76at",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37d4if00cxeas8tx462qy7",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf2yj00cyeadkxith8unn",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf3cr00czeadkv29u3t3s",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadA.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf3r400d0eadkxtxb9qmw",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadD.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37d63d00d1eas8ixsqvalk",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadE.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmn37d6hv00d2eas89ckdl7h9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf4y600d3eadkng8s9anq",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/11__TEAL_Adult_Learning_Theory.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/11__TEAL_Adult_Learning_Theory.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf5ci00d4eadk7lnuaooo",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/4_TEAL_Metacogn.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/4_TEAL_Metacogn.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf5r400d5eadkln0aaunf",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/5_TEAL_Differentiated_Instruct.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/5_TEAL_Differentiated_Instruct.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf65700d6eadkwpz7fgcl",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/8_TEAL_Lesson_Planning.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/8_TEAL_Lesson_Planning.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf6jc00d7eadkyrg3rbnd",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/CHOOSING_METHODS_OF_INSTRUCTION_FOR_THE_CLASSROOM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/CHOOSING_METHODS_OF_INSTRUCTION_FOR_THE_CLASSROOM.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf6xv00d8eadk4bwek9b0",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Contextualized_Instruction.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Contextualized_Instruction.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf7c100d9eadkyf7wtet9",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/DESIGNING_THE_CLASSROOM_FOR_INSTRUCTION.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/DESIGNING_THE_CLASSROOM_FOR_INSTRUCTION.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf7qg00daeadkg0yl6td6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Integrated_Education_and_Training.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Integrated_Education_and_Training.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf87q00dbeadkwtl6whgg",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Lesson Plan Templates.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Lesson Plan Templates.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf8m200dceadkdnezlgs6",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Plan of Study Template.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Plan of Study Template.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf90l00ddeadkeavdy2mx",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Sharon_Bowmans_Four_Cs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Sharon_Bowmans_Four_Cs.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf9em00deeadkogl622r3",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/TABE_1314_Student_Assignment_Pages.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/TABE_1314_Student_Assignment_Pages.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyf9sy00dfeadkzdj31z1z",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/TABE_and_CLASE_Instructional_Strategies.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/TABE_and_CLASE_Instructional_Strategies.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyfa7a00dgeadk89v3p3d3",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Universal_Design_Learning.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Universal_Design_Learning.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyfale00dheadkyi0d6wy2",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Webbs_Depth_of_Knowledge_DOK.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Webbs_Depth_of_Knowledge_DOK.pdf",
+      "objectExists": true
+    },
+    {
+      "id": "cmmyyfazo00dieadkmd9rwwpu",
+      "isActive": true,
+      "from": "teachers/guides/Hanbook Appendix/Section 9/WIPPEA-Blank-Lesson-Plan.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/WIPPEA-Blank-Lesson-Plan.pdf",
+      "objectExists": true
+    }
+  ],
+  "bucket": [
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 1/Commonly Used Acronyms.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 1/Commonly Used Acronyms.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Adult_Distance_Ed-Certifications-v5.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Adult_Distance_Ed-Certifications-v5.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/AdultEd_FactSheet-rev_SA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Advance_Your_Career_300_250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Advance_Your_Career_300_250.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Advance_Your_Career_728_90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Advance_Your_Career_728_90.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_468x60.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_728x90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_CAPS_BannerLine_728x90.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_CAPS_BannerStack_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_CAPS_BannerStack_468x60.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_LC_BannerLine_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_LC_BannerLine_468x60.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_LC_BannerLine_728x90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_LC_BannerLine_728x90.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/AJC_LC_BannerStack_468x60.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/AJC_LC_BannerStack_468x60.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/At-Risk Adult Student Identification Chart and Intervention.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/At-Risk Adult Student Identification Chart and Intervention.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_1.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_2.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_2.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_3_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_3_1.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_4.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_4.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_6.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post_6.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Blue_Minimalist_Back_To_School_Instagram_Post.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/class.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/class.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Distance_Education_300_250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Distance_Education_300_250.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Distance_Education_728_90.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Distance_Education_728_90.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Follow Up Log.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Follow Up Log.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/free_customer_service_training.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/free_customer_service_training.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/FREE_HSE_300_250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/FREE_HSE_300_250.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google_Ad-1-Small.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google_Ad-1-Small.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google-Ad-1-Large.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google-Ad-1-Large.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google-Ad-2-Large.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google-Ad-2-Large.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Google-Ad-2-Small.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Google-Ad-2-Small.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/HSE_Banner_300x250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/HSE_Banner_300x250.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/IC3_Facebook_Post_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/IC3_Facebook_Post_1.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Light_Pink_Colorful_Photo_Pattern_Background_Basic_Happy_Nowruz_Spring_Theme_Inspirational_Q.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Light_Pink_Colorful_Photo_Pattern_Background_Basic_Happy_Nowruz_Spring_Theme_Inspirational_Q.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Microsoft_Office_2.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Microsoft_Office_2.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Facebook.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Facebook.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Instagram.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Instagram.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_LinkedIn.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_LinkedIn.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Twitter.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_General_SM_Posts_0124_v2_Twitter.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS_SS_WF_Email_1200x627.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS_SS_WF_Email_1200x627.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/MOS-SS-WF-Email_1.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/MOS-SS-WF-Email_1.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/One_Step._One_Test._Big_Success.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/One_Step._One_Test._Big_Success.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Pink_3d_Opportunity_Is_Calling_Instagram_Post.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Pink_3d_Opportunity_Is_Calling_Instagram_Post.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/PST_Banner_2_300x250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/PST_Banner_2_300x250.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/PST_Banner_300x250.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/PST_Banner_300x250.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/PSV_MO_Excel_Social_Finance_NowAvailable_1200x630.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/PSV_MO_Excel_Social_Finance_NowAvailable_1200x630.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Social-Ad-1.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Social-Ad-1.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Social-Ad-2.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Social-Ad-2.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Step_into_Scrubs_with_Success_.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Step_into_Scrubs_with_Success_.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/We_have_news.JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/We_have_news.JPG"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/Weekly_Orientation_BampW.JPG"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAdultEd_Logo_Usage_2018.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAdultEd_Logo_Usage_2018.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/wvadulted.com_1.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/wvadulted.com_1.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE_Virtual_Background (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE_Virtual_Background (1).png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE_Virtual_Background.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE_Virtual_Background.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE-color-contacts.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE-color-contacts.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE-logo2018-color.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE-logo2018-color.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Logos/WVAE-logo2018-color.png",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Logos/WVAE-logo2018-color.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Agency_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Agency_Needs_Assessment.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Community_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Community_Needs_Assessment.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Student_Interim_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Student_Interim_Needs_Assessment.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Needs Assessment/Student_Needs_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Needs Assessment/Student_Needs_Assessment.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/NWD_WV_user_flyer.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/NWD_WV_user_flyer.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Triple_AI_Datasheet_K-12_Interactive_Final.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 10/Workforce-Flyer-updated-06.24.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Adding Friends and Family Source Type.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Adding Friends and Family Source Type.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/All_Measurable_Skills_Gain_and_Outcomes_3.29.22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Average_Contact_Hours_Per_Student_updated.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Desktop_Monitoring_Reflection_Tool_Master_4_-_Fill4_2.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/post-sec_verification_form_9.2.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/Source_Type_Report_Instructions.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/Source_Type_Report_Instructions.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 11/WVAdultEd_Monitoring_Flowchart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 11/WVAdultEd_Monitoring_Flowchart.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 12/DiplomaSender_TestTakerGuide.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 12/DiplomaSender_TestTakerGuide.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 12/Ordering__HSE_Diploma_2.24_v2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 12/Ordering__HSE_Diploma_2.24_v2.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 13/Approved_Proxy_Hour_Chart_for_Literacy-Level_Paper-Pencil_Assignments.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/Approved_Proxy_Hour_Chart_for_Literacy-Level_Paper-Pencil_Assignments.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 13/FDIC_How_Money_Smart_Are_You_Certificate_Proxy_Time_Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/FDIC_How_Money_Smart_Are_You_Certificate_Proxy_Time_Chart.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 13/TABE_1314_Student_Assignment_Pages (2).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/TABE_1314_Student_Assignment_Pages (2).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 13/Teacher_Checklist_for_Certiport_Exams_FY26.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/Teacher_Checklist_for_Certiport_Exams_FY26.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 13/Technology Loan Program.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 13/Technology Loan Program.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/Burlington_English_Placement_Chart.JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 14/Burlington_English_Placement_Chart.JPG"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Goals_Assessment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Goals_Assessment.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Independent_Training_Plan-updated_2.19.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Independent_Training_Plan-updated_2.19.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification_-Fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification_-Fillable.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/ESOL_Learning_Needs_Screening_and_Barrier_Identification.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025_-_Fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025_-_Fillable.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 14/WVAdultEd_ESOL_Optional_Background_Interview_Tool_July_2025.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 15/ESOL_Independent_Training_Plan-updated_2.19.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 15/ESOL_Independent_Training_Plan-updated_2.19.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 15/WV_SDT_ECP_FY22 (1).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 15/WVAdultEd_Corrections_Sign_in_sheet_2_2.1.22_1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Annual_Professional_Development_Requirements.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Annual_Professional_Development_Requirements.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Burnout_SelfCare_WVAEA_4.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Certification_Renewal_Chart-Oct._2025.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Certification_Renewal_Chart-Oct._2025.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Collecting Pleasant Memories.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Collecting Pleasant Memories.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Deep Relaxation TEchnique.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Deep Relaxation TEchnique.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/GED_Study_Guide_-_Algebra_Presentation.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/GED_Study_Guide_-_Algebra_Presentation.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Geometry_Presentation.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Geometry_Presentation.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Goal_Setting_Connecting_the_Dots.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Goal_Setting_Connecting_the_Dots.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Instructor Observations-Job Shadowing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Instructor Observations-Job Shadowing.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Maslach-Burnout-Inventory-MBI.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Maslach-Burnout-Inventory-MBI.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Professional Development Session Sign-in Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Professional Development Session Sign-in Sheet.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/Session Workshop Evaluation Form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/Session Workshop Evaluation Form.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/What_You_Need_to_Know_About_Paying_for_College_or_Training-HEPC.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/What_You_Need_to_Know_About_Paying_for_College_or_Training-HEPC.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WV_Labor_Force_Dynamics_v2.7.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WV_Labor_Force_Dynamics_v2.7.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WVAEA_Fall2025_workkeys.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WVAEA_Fall2025_workkeys.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WVAEA_GED_Program_Tools_and_Resources_for_Student_Success_09.11.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 2/WVAEA_Preparing_Students_for_the_GED_RLA_Extended_Response_09.11.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Characteristics of Adults with Learning Disabilities.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Characteristics of Adults with Learning Disabilities.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/First_Lesson_for_Syllable_Types.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/First_Lesson_for_Syllable_Types.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/National Joint Committee on Learning Disabilities.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/National Joint Committee on Learning Disabilities.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Specific Learning Disabilities Initiatives Definition of Learning Disabilities.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Specific Learning Disabilities Initiatives Definition of Learning Disabilities.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Syllable_Types.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Syllable_Types.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Techniques-Working with Adults with learning Disabilites.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Techniques-Working with Adults with learning Disabilites.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 3/Vowel_Tent_Card_print_on_cardstock.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 3/Vowel_Tent_Card_print_on_cardstock.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/29050_Learning_Needs_Screener_Form-v1_1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/29050_Learning_Needs_Screener_Form-v1_1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Authorization_for_Release_of_Information_to_External_Agencies_or_Individuals_2024.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Authorization_for_Release_of_Information_to_External_Agencies_or_Individuals_2024.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Checklist_for_Student_Orientation_and_Intake.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Checklist_for_Student_Orientation_and_Intake.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/PY_26_Student_Profile_fillable_updated_8.14.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/PY_26_Student_Profile_fillable_updated_8.14.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Referral_for_Identifying_Disabilities_v1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Referral_for_Identifying_Disabilities_v1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Request_for_Records_v1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Request_for_Records_v1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Virtual_Media_Release_Form_2023.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Virtual_Media_Release_Form_2023.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Virtual_Student_Acceptable_Use_2023.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Virtual_Student_Acceptable_Use_2023.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/WVAdultEd_Students_Rights_and_Repsonsibilities-updated_July_2024-fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/WVAdultEd_Students_Rights_and_Repsonsibilities-updated_July_2024-fillable.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/LNS_with_Referral_4.24.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/LNS_with_Referral_4.24.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Media Release Form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Media Release Form.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Program_Files_Checklist_8.11.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/PY_26_Student_Profile_updated_8.8.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/PY_26_Student_Profile_updated_8.8.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/REQUEST_FOR_RECORDS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/REQUEST_FOR_RECORDS.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Student File Notes.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Student File Notes.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Student_Acceptable_Use_2020_v2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Student_Acceptable_Use_2020_v2.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/Virtual_Instruction_Attendance_Log.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/Virtual_Instruction_Attendance_Log.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Monthly Attendance Tracking Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Monthly Attendance Tracking Chart.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination Notice.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination Notice.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Teacher Group - Examiner Manual Forms.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Teacher Group - Examiner Manual Forms.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Teacher Group - Personnel Confidentiality Agreement.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Teacher Group - Personnel Confidentiality Agreement.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Document_Checklist_for_Eligibility_Verfication_form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Document_Checklist_for_Eligibility_Verfication_form.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultED_Employee_AUP.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultED_Employee_AUP.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Enrollment_Verification_1.8.25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_A.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_A.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_B.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Student_Commitment-Contract_B.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Students_Rights_and_Repsonsibilities_-_Updated_7.2.24.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Students_Rights_and_Repsonsibilities_-_Updated_7.2.24.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 5/Plan For Reducing Barriers to Success.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 5/Plan For Reducing Barriers to Success.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Assessment_Waiver_PY_24-25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Assessment_Waiver_PY_24-25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines (1).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_Accommodations_and_Accessibility_Guidelines.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_eTests_User_Guide.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_eTests_User_Guide.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_STEPS_NRS_Chart_for_Post_Testing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_STEPS_NRS_Chart_for_Post_Testing.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS_Testing_Accommodations_-_Step-by-Step.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS_Testing_Accommodations_-_Step-by-Step.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS-eTests-Proctor-Steps-for-Testing-Day.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS-eTests-Proctor-Steps-for-Testing-Day.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/CASAS-Steps_for_Retrieving_Tests_Results.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/CASAS-Steps_for_Retrieving_Tests_Results.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Documenting_Alternative_Placement_in_LACES.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Documenting_Alternative_Placement_in_LACES.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/DRC_DevChck_082621.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/DRC_DevChck_082621.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/DRC_INSIGHT_System_Requirements_2025_FINAL_02_20_25_TABE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/DRC_INSIGHT_System_Requirements_2025_FINAL_02_20_25_TABE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/FAQ_for_TABE_11_12.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/FAQ_for_TABE_11_12.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Guide_for_How_to_Install_Safe_Exam_Browser.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Guide_for_How_to_Install_Safe_Exam_Browser.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/IDP_Report_-_Mike_Johnson.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/IDP_Report_-_Mike_Johnson.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Individual_Profile_Sample.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Individual_Profile_Sample.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Listening_STEPS_FAQs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Listening_STEPS_FAQs.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Next_Test_Level_TABE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Next_Test_Level_TABE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Language_LevelM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Language_LevelM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Math_LevelM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Math_LevelM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Pretest_TABETutor_Reading_LevelM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Reading_STEPS_FAQs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Reading_STEPS_FAQs.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/SDO016_1314_TABE_MA_CALC.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/SDO016_1314_TABE_MA_CALC.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/SS_by_Level_by_NRS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/SS_by_Level_by_NRS.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/State_Assessment_Guidelines_FY26.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/State_Assessment_Guidelines_FY26.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Steps_Charts_.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Steps_Charts_.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Steps_to_Register_Testing_Stations.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Steps_to_Register_Testing_Stations.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/Tabe Sign-in Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/Tabe Sign-in Sheet.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_11_12_Skills_Crosswalks.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_11_12_Skills_Crosswalks.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13-14_Brochure.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13-14_Brochure.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13-14_Test_Max_Test_Times.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13-14_Test_Max_Test_Times.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Locator_Scores.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Locator_Scores.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_A.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_A.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_D.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_D.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_E.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_E.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_M.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_13.14_Online_Fixed_Forms_Mathematics_Reference_Sheet_Level_M.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_1314_Online_Quick_Start.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_1314_Online_Quick_Start.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_Best_Practice_Guide.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_Best_Practice_Guide.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_Code_of_Conduct_for_Remote_Testing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_Code_of_Conduct_for_Remote_Testing.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE_Remote_Testing_Guidelines.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE_Remote_Testing_Guidelines.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_LangM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_LangM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_MathM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_MathM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/TABE1314_BluePrint_ReadM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/TABE1314_BluePrint_ReadM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Correlation Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Correlation Sheet.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Sheet.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd Teacher Group - Math Reference Sheet.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd_TABE_13_14_PostTesting_Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd_TABE_13_14_PostTesting_Chart.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 6/WVAdultEd_TABE_1314_Post_Test_Chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 6/WVAdultEd_TABE_1314_Post_Test_Chart.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Certificate_of_Work_Ethic_Proficiency (1).JPG",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Certificate_of_Work_Ethic_Proficiency (1).JPG"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Computer_Essentials_Certificate.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Computer_Essentials_Certificate.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/CSM_Certificate.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/CSM_Certificate.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Customer_Service_Certified_Certificate_2020 (1).jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Customer_Service_Certified_Certificate_2020 (1).jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Achievement.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Achievement.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Attendance.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Attendance.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion_with_grade.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion_with_grade.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Edgenuity Certificate_of_Completion.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_Digital_Literacy_Master_Certification (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_Digital_Literacy_Master_Certification (1).png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_GS6_Level_1_Certificate (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_GS6_Level_1_Certificate (1).png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_GS6_Level_2_Certificate (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_GS6_Level_2_Certificate (1).png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/IC3_GS6_Level_3_Certificate (1).png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/IC3_GS6_Level_3_Certificate (1).png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Intuit_QuickBooks_Certified_User_Certificate (1).jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Intuit_QuickBooks_Certified_User_Certificate (1).jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/Money Essentials Certificate.png",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/Money Essentials Certificate.png"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/MOS_Certificate.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/MOS_Certificate.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/ServSafe_Food_Handler_Training.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/ServSafe_Food_Handler_Training.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Certificates/TTCE_LEVEL_2_CERTIFICATE_2 (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Certificates/TTCE_LEVEL_2_CERTIFICATE_2 (1).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Career_Interest_Activity_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Career_Interest_Activity_FY_22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/ECP_AE_and_SPOKES_Fillable_FY25.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/ECP_AE_and_SPOKES_Fillable_FY25.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/ESOL_ECP_-_Fillable.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/ESOL_ECP_-_Fillable.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/ESOL_ECP_1-15_19.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/ESOL_ECP_1-15_19.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Know what you want to learn chart.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Know what you want to learn chart.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Strengths_Inventory_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Strengths_Inventory_FY_22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Transferable_Skills_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Transferable_Skills_FY_22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/Work_Values_FY_22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/Work_Values_FY_22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/WV_SDT_ECP_FY22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/WV_SDT_ECP_FY22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/ECP/WV_SDT-S_ECP_FY22.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/ECP/WV_SDT-S_ECP_FY22.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Business Management and Admin.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Business Management and Admin.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Finance and Accounting.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Finance and Accounting.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Health Science.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Health Science.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/IETP Components-Admin Asst MOS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/IETP Components-Admin Asst MOS.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-Basics.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-Basics.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 2.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 2.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 3.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Information Technology-IC3 Level 3.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Manufacturing.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Manufacturing.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Office Clerk-Excel.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Office Clerk-Excel.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/IETP Component Forms/Transportation-Distribution-Logistics.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/IETP Component Forms/Transportation-Distribution-Logistics.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/Documenting Integrated Education and Training Programs (IETP)-Credential Student in LACES Checklist.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/Documenting Integrated Education and Training Programs (IETP)-Credential Student in LACES Checklist.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_AE_Poster.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_AE_Poster.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_Checklist.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/Employability_Skills_Framework_Checklist.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/IETP Description of Adult Education Bridge Programs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/IETP Description of Adult Education Bridge Programs.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/McGraw-Hill_Curriculum_Crosswalk_and_Alignment.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/McGraw-Hill_Curriculum_Crosswalk_and_Alignment.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/National_16_Career_Clusters_Framwork.jpg",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/National_16_Career_Clusters_Framwork.jpg"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/When to Issue IETP Certificate of Completion.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/When to Issue IETP Certificate of Completion.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IEPT Certification.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IEPT Certification.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IETP Template.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/WVAdultEd Teacher Group - IETP Template.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/A_Coherent_CurriculumSchmidt_W._Houang_R._Cogan_L.Schmidt_William._Houang_Richard._Cog.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/A_Coherent_CurriculumSchmidt_W._Houang_R._Cogan_L.Schmidt_William._Houang_Richard._Cog.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/Alignment_GED_to_CCRS.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/Alignment_GED_to_CCRS.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_1_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_1_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_2_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_2_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_3_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_3_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_ELA_Unit_4_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_ELA_Unit_4_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_1_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_1_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_2_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_2_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials (1).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_3_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCR_Math_Unit_4_Participant_Materials.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCR_Math_Unit_4_Participant_Materials.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/CCRStandardsAdultEd.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/CCRStandardsAdultEd.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/Employability_Skills_Framework_AE_Poster (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/Employability_Skills_Framework_AE_Poster (1).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/Employability_Skills_Framework_Checklist (1).pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/Employability_Skills_Framework_Checklist (1).pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/GEDStandards_1.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/GEDStandards_1.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_LangM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_LangM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_MathM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_MathM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadA.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadA.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadD.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadD.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadE.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadE.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 8/TABE1314_BluePrint_ReadM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 8/TABE1314_BluePrint_ReadM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/11__TEAL_Adult_Learning_Theory.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/11__TEAL_Adult_Learning_Theory.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/4_TEAL_Metacogn.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/4_TEAL_Metacogn.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/5_TEAL_Differentiated_Instruct.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/5_TEAL_Differentiated_Instruct.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/8_TEAL_Lesson_Planning.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/8_TEAL_Lesson_Planning.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/CHOOSING_METHODS_OF_INSTRUCTION_FOR_THE_CLASSROOM.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/CHOOSING_METHODS_OF_INSTRUCTION_FOR_THE_CLASSROOM.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Contextualized_Instruction.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Contextualized_Instruction.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/DESIGNING_THE_CLASSROOM_FOR_INSTRUCTION.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/DESIGNING_THE_CLASSROOM_FOR_INSTRUCTION.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Integrated_Education_and_Training.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Integrated_Education_and_Training.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Lesson Plan Templates.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Lesson Plan Templates.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Plan of Study Template.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Plan of Study Template.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Sharon_Bowmans_Four_Cs.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Sharon_Bowmans_Four_Cs.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/TABE_1314_Student_Assignment_Pages.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/TABE_1314_Student_Assignment_Pages.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/TABE_and_CLASE_Instructional_Strategies.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/TABE_and_CLASE_Instructional_Strategies.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Universal_Design_Learning.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Universal_Design_Learning.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/Webbs_Depth_of_Knowledge_DOK.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/Webbs_Depth_of_Knowledge_DOK.pdf"
+    },
+    {
+      "from": "teachers/guides/Hanbook Appendix/Section 9/WIPPEA-Blank-Lesson-Plan.pdf",
+      "to": "teachers/guides/Handbook Appendix/Section 9/WIPPEA-Blank-Lesson-Plan.pdf"
+    }
+  ]
+}
