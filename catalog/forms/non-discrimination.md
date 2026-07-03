@@ -18,7 +18,7 @@ vq_id: non-discrimination
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: >-
-  teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination
+  teachers/guides/Handbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination
   Notice.pdf
 vq_status: approved
 ---

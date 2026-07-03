@@ -101,20 +101,41 @@ function inferMimeType(storageKey: string): string {
   return mimeMap[ext] || "application/octet-stream";
 }
 
+// Bucket storageKeys are minted through the uploader/seeder FOLDER_MAP
+// (scripts/upload-to-supabase.mjs, scripts/seed-documents.mjs), which renames
+// some docs-upload/ top-level folders. Bundled reads must reverse those
+// renames or keys under the renamed prefixes never resolve locally.
+const BUNDLED_KEY_PREFIX_TO_LOCAL: Record<string, string> = {
+  "teachers/guides/": "teachers/",
+  "students/resources/": "students/",
+  "presentations/": "presentation/",
+};
+
 export async function downloadBundledFile(
   storageKey: string,
 ): Promise<{ buffer: Buffer; mimeType: string } | null> {
-  try {
-    const resolved = resolveStoragePath(BUNDLED_UPLOAD_DIR, storageKey);
-    const buffer = await fs.readFile(resolved);
-    return {
-      buffer,
-      mimeType: inferMimeType(storageKey),
-    };
-  } catch {
-    // Fallback: search content directory by filename
-    return findInContentDir(storageKey);
+  const candidates = [storageKey];
+  for (const [keyPrefix, localPrefix] of Object.entries(BUNDLED_KEY_PREFIX_TO_LOCAL)) {
+    if (storageKey.startsWith(keyPrefix)) {
+      candidates.push(localPrefix + storageKey.slice(keyPrefix.length));
+    }
   }
+
+  for (const candidate of candidates) {
+    try {
+      const resolved = resolveStoragePath(BUNDLED_UPLOAD_DIR, candidate);
+      const buffer = await fs.readFile(resolved);
+      return {
+        buffer,
+        mimeType: inferMimeType(storageKey),
+      };
+    } catch {
+      // try the next candidate path
+    }
+  }
+
+  // Fallback: search content directory by filename
+  return findInContentDir(storageKey);
 }
 
 const CONTENT_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), "content");

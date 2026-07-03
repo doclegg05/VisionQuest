@@ -16,7 +16,7 @@ timestamp: '2026-06-30'
 vq_id: sign-in-sheet
 vq_audience: BOTH
 vq_category: compliance
-vq_storage_key: teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf
+vq_storage_key: teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf
 vq_status: approved
 ---
 ## When to use

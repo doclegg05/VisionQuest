@@ -153,7 +153,7 @@ export const FORMS: SpokesForm[] = [
     category: "onboarding",
     fileName: "Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
     storageKey:
-      "teachers/guides/Hanbook Appendix/Section 4/Fillable Intake Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+      "teachers/guides/Handbook Appendix/Section 4/Fillable Intake Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
     fillable: true,
     required: true,
     audience: "student",
@@ -241,7 +241,7 @@ export const FORMS: SpokesForm[] = [
     category: "onboarding",
     fileName: "29050_Learning_Needs_Screener_Form-v1_1.pdf",
     storageKey:
-      "teachers/guides/Hanbook Appendix/Section 4/29050_Learning_Needs_Screener_Form-v1_1.pdf",
+      "teachers/guides/Handbook Appendix/Section 4/29050_Learning_Needs_Screener_Form-v1_1.pdf",
     fillable: true,
     required: true,
     audience: "student",
@@ -271,7 +271,7 @@ export const FORMS: SpokesForm[] = [
     category: "onboarding",
     fileName: "WVAdultEd Sample Non-Discrimination Notice.pdf",
     storageKey:
-      "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination Notice.pdf",
+      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd Sample Non-Discrimination Notice.pdf",
     fillable: false,
     required: true,
     audience: "student",
@@ -286,7 +286,7 @@ export const FORMS: SpokesForm[] = [
     category: "onboarding",
     fileName: "Education and Career Plan Form.pdf",
     storageKey:
-      "teachers/guides/Hanbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+      "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
     fillable: false,
     required: true,
     audience: "student",
@@ -305,7 +305,7 @@ export const FORMS: SpokesForm[] = [
     category: "compliance",
     fileName: "WVAdultEd_Sign_in_sheet_5_2023.pdf",
     storageKey:
-      "teachers/guides/Hanbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
     fillable: false,
     required: true,
     audience: "both",

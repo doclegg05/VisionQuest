@@ -16,7 +16,7 @@ vq_id: auth-release
 vq_audience: STUDENT
 vq_category: onboarding
 vq_storage_key: >-
-  teachers/guides/Hanbook Appendix/Section 4/Fillable Intake
+  teachers/guides/Handbook Appendix/Section 4/Fillable Intake
   Forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf
 vq_status: approved
 ---
