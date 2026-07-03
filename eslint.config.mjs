@@ -41,6 +41,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent worktrees (harness-managed checkouts) — repo-wide lint must not
+    // walk them; they appear and vanish mid-run.
+    ".claude/**",
   ]),
 ]);
 
