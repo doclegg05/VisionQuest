@@ -6,6 +6,8 @@ import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-dat
 import type { ReadinessBreakdown } from "@/lib/progression/readiness-score";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { AmbientPanels } from "@/components/dashboard/AmbientPanels";
+import { SagePanels } from "@/components/dashboard/sage/SagePanels";
+import { getLatestPanelSpec } from "@/lib/sage/panel-data";
 
 /**
  * Chat-first student home (Phase 4 redesign, user-approved 2026-06-09).
@@ -32,8 +34,15 @@ export default async function DashboardPage() {
   if (!session) return null;
 
   const now = new Date();
-  const [goalCount, nextAppointment, tasks, alertCount, readinessData, incompleteOrientationItems] =
-    await Promise.all([
+  const [
+    goalCount,
+    nextAppointment,
+    tasks,
+    alertCount,
+    readinessData,
+    incompleteOrientationItems,
+    sagePanel,
+  ] = await Promise.all([
       prisma.goal.count({
         where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
       }),
@@ -62,6 +71,7 @@ export default async function DashboardPage() {
         orderBy: { sortOrder: "asc" },
         take: 3,
       }),
+      getLatestPanelSpec(session.id),
     ]);
 
   const { state, readiness, hasProgressionRecord } = readinessData;
@@ -77,7 +87,8 @@ export default async function DashboardPage() {
   return (
     <div className="page-shell page-shell-wide">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:order-2 lg:col-span-1">
+        <div className="space-y-4 lg:order-2 lg:col-span-1">
+          {sagePanel && <SagePanels panel={sagePanel} showActions />}
           <AmbientPanels
             readinessScore={readiness.score}
             nextGap={findNextGap(readiness.breakdown)}

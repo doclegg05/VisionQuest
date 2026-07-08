@@ -99,6 +99,23 @@ describe("panel-spec: rejects (adversarial matrix)", () => {
   );
 });
 
+describe("panel-spec: renderer hygiene", () => {
+  it("no file under components/dashboard/sage ever uses dangerouslySetInnerHTML", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = join(process.cwd(), "src", "components", "dashboard", "sage");
+    for (const file of readdirSync(dir)) {
+      const source = readFileSync(join(dir, file), "utf8");
+      // Match actual USAGE syntax (JSX attribute / object property), so the
+      // prose comment in SagePanels.tsx that bans it can't false-positive.
+      assert.ok(
+        !/dangerouslySetInnerHTML\s*[=:]/.test(source),
+        `${file} must not use dangerouslySetInnerHTML`,
+      );
+    }
+  });
+});
+
 describe("panel-spec: route allowlist hygiene", () => {
   it("never contains a dynamic segment or staff route", () => {
     for (const route of STUDENT_PANEL_ROUTES) {

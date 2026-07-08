@@ -120,11 +120,22 @@ async function markFailed(panelId: string, failReason: string, meta: Record<stri
   });
 }
 
+export interface BriefingOptions {
+  /**
+   * Regenerate even over a dismissed panel. Only the student's explicit
+   * refresh request sets this — the cron path always honors a dismissal.
+   */
+  force?: boolean;
+}
+
 /**
  * Generate (or regenerate) today's briefing panel for one student.
  * Background-job entry point — see jobs-registry.ts ("sage_briefing").
  */
-export async function runDailyBriefing(studentId: string): Promise<void> {
+export async function runDailyBriefing(
+  studentId: string,
+  options: BriefingOptions = {},
+): Promise<void> {
   if (!isAutopilotEnabled()) {
     logger.info("briefing: autopilot disabled, skipping", { studentId });
     return;
@@ -141,7 +152,7 @@ export async function runDailyBriefing(studentId: string): Promise<void> {
     where: { studentId_panelDate: { studentId, panelDate } },
     select: { id: true, status: true },
   });
-  if (existing?.status === "dismissed") return; // student said no for today — honor it
+  if (existing?.status === "dismissed" && !options.force) return; // student said no for today — honor it
 
   const panel = await prismaAdmin.sagePanel.upsert({
     where: { studentId_panelDate: { studentId, panelDate } },

@@ -74,5 +74,5 @@ registerJobHandler("wager_diagnosis", async (payload) => {
 
 registerJobHandler("sage_briefing", async (payload) => {
   const { runDailyBriefing } = await import("./sage/briefing");
-  await runDailyBriefing(payload.studentId as string);
+  await runDailyBriefing(payload.studentId as string, { force: payload.force === true });
 });
