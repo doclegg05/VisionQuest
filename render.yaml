@@ -24,10 +24,12 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       # Risk-tiered agent enablement. "off" | "readonly" | "full".
-      # off = agent tool loop disabled entirely (today's behavior).
-      # Stage up per docs/runbooks/sage-agent-enablement.md.
+      # Stage 6a (readonly) entered 2026-07-08 per docs/runbooks/sage-agent-enablement.md:
+      # preconditions green same day (red-team --strict: 0 hard violations;
+      # chat harness tool 4/4 + guardrail 5/5 at temperature 0).
+      # Do NOT advance to "full" without the 6b preconditions + a monitoring window.
       - key: SAGE_AGENT_MODE
-        value: "off"
+        value: "readonly"
       # DEPRECATED: superseded by SAGE_AGENT_MODE. Kept only as a back-compat
       # fallback (unset MODE + this "false" still resolves to off). Remove once
       # SAGE_AGENT_MODE is the sole control.
