@@ -3,11 +3,13 @@ import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 // ── Module mocks (must precede the dynamic import of briefing.ts) ───────────
 
-const studentFindUnique = mock.fn();
-const panelFindUnique = mock.fn();
-const panelUpsert = mock.fn();
-const panelUpdate = mock.fn();
-const taskFindFirst = mock.fn();
+type AsyncMock = (...args: unknown[]) => Promise<unknown>;
+
+const studentFindUnique = mock.fn<AsyncMock>();
+const panelFindUnique = mock.fn<AsyncMock>();
+const panelUpsert = mock.fn<AsyncMock>();
+const panelUpdate = mock.fn<AsyncMock>();
+const taskFindFirst = mock.fn<AsyncMock>();
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -29,10 +31,10 @@ mock.module("@/lib/sage/system-prompts", {
   namedExports: { sanitizeForPrompt: (text: string) => text },
 });
 
-const logSageActionMock = mock.fn(async () => {});
+const logSageActionMock = mock.fn<(...args: unknown[]) => Promise<void>>(async () => {});
 mock.module("@/lib/sage/audit", { namedExports: { logSageAction: logSageActionMock } });
 
-const generateStructuredMock = mock.fn();
+const generateStructuredMock = mock.fn<(...args: unknown[]) => Promise<string>>();
 mock.module("@/lib/ai/provider", {
   namedExports: {
     resolveAiProvider: async () => ({
@@ -47,10 +49,10 @@ mock.module("@/lib/llm-usage", {
   namedExports: { withUsageLogging: (provider: unknown) => provider },
 });
 
-const agentModeMock = mock.fn(() => "readonly");
+const agentModeMock = mock.fn<() => string>(() => "readonly");
 mock.module("@/lib/sage/agent/flags", { namedExports: { agentMode: agentModeMock } });
 
-const headlessTurnMock = mock.fn();
+const headlessTurnMock = mock.fn<AsyncMock>();
 mock.module("@/lib/sage/agent/headless", {
   namedExports: { runHeadlessReadonlyTurn: headlessTurnMock },
 });

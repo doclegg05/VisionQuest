@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import type { NextRequest } from "next/server";
 import { mockStudentSession } from "@/lib/test-helpers";
 
 const session = mockStudentSession({ id: "student-a", studentId: "student-a" });
@@ -50,12 +51,12 @@ before(async () => {
   route = await import("./route");
 });
 
-function request(body: unknown): Request {
+function request(body: unknown): NextRequest {
   return new Request("http://localhost:3000/api/sage/panel/dismiss", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 describe("POST /api/sage/panel/dismiss", () => {

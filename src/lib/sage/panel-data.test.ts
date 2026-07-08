@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
-const panelFindFirst = mock.fn();
-const adminFindUnique = mock.fn();
-const adminUpdate = mock.fn(async () => ({}));
+type AsyncMock = (...args: unknown[]) => Promise<unknown>;
+
+const panelFindFirst = mock.fn<AsyncMock>();
+const adminFindUnique = mock.fn<AsyncMock>();
+const adminUpdate = mock.fn<AsyncMock>(async () => ({}));
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -18,13 +20,15 @@ mock.module("@/lib/api-error", {
   },
 });
 
-const assertStaffMock = mock.fn(async () => {});
+const assertStaffMock = mock.fn<(...args: unknown[]) => Promise<void>>(async () => {});
 mock.module("@/lib/classroom", {
   namedExports: { assertStaffCanManageStudent: assertStaffMock },
 });
 
-const enqueueCooldownMock = mock.fn(async (): Promise<string | null> => "job-1");
-const processByIdMock = mock.fn(async () => 1);
+const enqueueCooldownMock = mock.fn<(...args: unknown[]) => Promise<string | null>>(
+  async () => "job-1",
+);
+const processByIdMock = mock.fn<(...args: unknown[]) => Promise<number>>(async () => 1);
 mock.module("@/lib/jobs", {
   namedExports: {
     enqueueJobWithCooldown: enqueueCooldownMock,

@@ -33,7 +33,9 @@ mock.module("@/lib/sage/briefing", {
   namedExports: { isAutopilotEnabled: autopilotEnabledMock },
 });
 
-const refreshMock = mock.fn(async (): Promise<"queued" | "cooldown"> => "queued");
+const refreshMock = mock.fn<(studentId: string) => Promise<"queued" | "cooldown">>(
+  async () => "queued",
+);
 mock.module("@/lib/sage/panel-data", {
   namedExports: { requestPanelRefresh: refreshMock },
 });

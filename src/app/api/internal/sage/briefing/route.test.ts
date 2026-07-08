@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
-const findManyMock = mock.fn();
+const findManyMock = mock.fn<(...args: unknown[]) => Promise<unknown>>();
 mock.module("@/lib/db", {
   namedExports: { prismaAdmin: { student: { findMany: findManyMock } } },
 });
 
-const enqueueJobMock = mock.fn(async () => "job-1");
+const enqueueJobMock = mock.fn<(...args: unknown[]) => Promise<string | null>>(
+  async () => "job-1",
+);
 mock.module("@/lib/jobs", { namedExports: { enqueueJob: enqueueJobMock } });
 
 const autopilotEnabledMock = mock.fn(() => true);
