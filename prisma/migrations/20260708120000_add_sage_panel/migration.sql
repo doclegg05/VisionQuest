@@ -29,17 +29,24 @@ ALTER TABLE "visionquest"."SagePanel"
   FOREIGN KEY ("studentId") REFERENCES "visionquest"."Student"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ── RLS: students read their own panels; staff read all. ──
+-- ── RLS: students read their own panels; admins read all; teachers read
+-- only their managed students' panels (mirrors sage_memory_read in
+-- 20260701141000 — the unscoped teacher branch was a bug class already
+-- fixed once in this repo; do not reintroduce it here). ──
 ALTER TABLE "visionquest"."SagePanel" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sage_panel_read" ON "visionquest"."SagePanel";
 CREATE POLICY "sage_panel_read" ON "visionquest"."SagePanel"
   FOR SELECT TO vq_app
   USING (
-    current_setting('app.current_role', true) IN ('admin', 'teacher')
+    current_setting('app.current_role', true) = 'admin'
     OR (
       current_setting('app.current_role', true) = 'student'
       AND "studentId" = current_setting('app.current_student_id', true)
+    )
+    OR (
+      current_setting('app.current_role', true) = 'teacher'
+      AND "studentId" IN (SELECT visionquest.managed_student_ids(current_setting('app.current_user_id', true)))
     )
   );
 

@@ -152,6 +152,29 @@ describe("runDailyBriefing", () => {
     assert.equal(panelUpsert.mock.callCount(), 0);
   });
 
+  it("skips an already-ready panel on a same-day re-run (no double LLM spend)", async () => {
+    panelFindUnique.mock.mockImplementation(async () => ({ id: "panel-1", status: "ready" }));
+    await briefing.runDailyBriefing("student-a");
+    assert.equal(panelUpsert.mock.callCount(), 0);
+    assert.equal(generateStructuredMock.mock.callCount(), 0);
+  });
+
+  it("force regenerates over both ready and dismissed panels (student refresh)", async () => {
+    panelFindUnique.mock.mockImplementation(async () => ({ id: "panel-1", status: "dismissed" }));
+    await briefing.runDailyBriefing("student-a", { force: true });
+    assert.equal(panelUpsert.mock.callCount(), 1);
+  });
+
+  it("attributes autonomous runs to the system sentinel, never the student", async () => {
+    await briefing.runDailyBriefing("student-a");
+    const audit = logSageActionMock.mock.calls[0].arguments[0] as {
+      invokedBy: string;
+      studentId: string;
+    };
+    assert.equal(audit.invokedBy, "system:sage-autopilot");
+    assert.equal(audit.studentId, "student-a");
+  });
+
   it("retries once on an invalid spec, then succeeds", async () => {
     let call = 0;
     generateStructuredMock.mock.mockImplementation(async () => {

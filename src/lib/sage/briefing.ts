@@ -36,6 +36,13 @@ export function isAutopilotEnabled(): boolean {
   return process.env.SAGE_AUTOPILOT_ENABLED === "true" && agentMode() !== "off";
 }
 
+/**
+ * Audit actorId for autonomous runs. logSageAction's invokedBy contract is
+ * "the human who triggered Sage" — nobody did here (cron fired), so a
+ * sentinel keeps `actorId = studentId` audit queries truthful.
+ */
+const AUTOPILOT_ACTOR = "system:sage-autopilot";
+
 /** UTC midnight for the given instant — one panel per student per UTC day. */
 export function utcPanelDate(now: Date = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -153,6 +160,7 @@ export async function runDailyBriefing(
     select: { id: true, status: true },
   });
   if (existing?.status === "dismissed" && !options.force) return; // student said no for today — honor it
+  if (existing?.status === "ready" && !options.force) return; // already briefed today — a manual re-run must not re-bill
 
   const panel = await prismaAdmin.sagePanel.upsert({
     where: { studentId_panelDate: { studentId, panelDate } },
@@ -202,7 +210,7 @@ export async function runDailyBriefing(
     await markFailed(panel.id, `tool_violation:${turn.violation}`, baseMeta);
     await logSageAction({
       studentId,
-      invokedBy: studentId,
+      invokedBy: AUTOPILOT_ACTOR,
       action: "sage.briefing.blocked",
       targetType: "sage_panel",
       targetId: panel.id,
@@ -272,7 +280,7 @@ export async function runDailyBriefing(
 
   await logSageAction({
     studentId,
-    invokedBy: studentId,
+    invokedBy: AUTOPILOT_ACTOR,
     action: "sage.briefing.generated",
     targetType: "sage_panel",
     targetId: panel.id,
