@@ -6,18 +6,30 @@ import { MountainProgressLazy } from "@/components/ui/MountainProgressLazy";
 import { getSession } from "@/lib/auth";
 import { getStudentGoalPlanData } from "@/lib/goal-plan-data";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { getStudentNextStep } from "@/lib/progression/student-next-step";
+import { PathToEmployment } from "@/components/progression/PathToEmployment";
 
 export default async function GoalsPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [{ goals: initialGoals, goalPlans: initialGoalPlans }, { state, readiness }] = await Promise.all([
+  const [{ goals: initialGoals, goalPlans: initialGoalPlans }, { state, readiness }, nextStep] = await Promise.all([
     getStudentGoalPlanData(session.id),
     fetchStudentReadinessData(session.id),
+    getStudentNextStep(session.id),
   ]);
 
   return (
-    <div className="page-shell">
+    <div className="page-shell space-y-6">
+      <PathToEmployment
+        currentStepKey={nextStep.currentStepKey}
+        title={nextStep.title}
+        description={nextStep.description}
+        whyItMatters={nextStep.whyItMatters}
+        actionLabel={nextStep.actionLabel}
+        actionLink={nextStep.actionLink}
+        steps={nextStep.steps}
+      />
       <div className="surface-section mb-4 overflow-hidden p-0">
         <MountainProgressLazy
           readinessScore={readiness.score}

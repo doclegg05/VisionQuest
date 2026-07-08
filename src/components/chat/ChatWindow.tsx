@@ -17,7 +17,7 @@ import type { ChatRole } from "@/lib/chat/commands";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
-import { determineStage } from "@/lib/sage/system-prompts";
+import { determineStage } from "@/lib/sage/stage";
 
 interface Message {
   id: string;

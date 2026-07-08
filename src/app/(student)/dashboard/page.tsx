@@ -8,6 +8,8 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import { AmbientPanels } from "@/components/dashboard/AmbientPanels";
 import { SagePanels } from "@/components/dashboard/sage/SagePanels";
 import { getLatestPanelSpec } from "@/lib/sage/panel-data";
+import { getStudentNextStep } from "@/lib/progression/student-next-step";
+import { PathToEmployment } from "@/components/progression/PathToEmployment";
 
 /**
  * Chat-first student home (Phase 4 redesign, user-approved 2026-06-09).
@@ -84,8 +86,19 @@ export default async function DashboardPage() {
     }
   }
 
+  const nextStep = await getStudentNextStep(session.id);
+
   return (
-    <div className="page-shell page-shell-wide">
+    <div className="page-shell page-shell-wide space-y-6">
+      <PathToEmployment
+        currentStepKey={nextStep.currentStepKey}
+        title={nextStep.title}
+        description={nextStep.description}
+        whyItMatters={nextStep.whyItMatters}
+        actionLabel={nextStep.actionLabel}
+        actionLink={nextStep.actionLink}
+        steps={nextStep.steps}
+      />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:order-2 lg:col-span-1">
           {sagePanel && <SagePanels panel={sagePanel} showActions />}

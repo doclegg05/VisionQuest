@@ -57,6 +57,34 @@ export const COMMANDS: SlashCommand[] = [
     prefill: "Tell me about the ",
     roles: ["student"],
   },
+  {
+    slash: "/resume",
+    label: "Build my resume",
+    description: "Work on your professional resume with Sage",
+    prefill: "Help me build or improve my resume. Here is my experience: ",
+    roles: ["student"],
+  },
+  {
+    slash: "/proof",
+    label: "Add portfolio proof",
+    description: "Discuss work samples or certificates to add to your portfolio",
+    prefill: "I want to add a proof item to my portfolio for ",
+    roles: ["student"],
+  },
+  {
+    slash: "/job",
+    label: "Analyze a job listing",
+    description: "Check how well your skills match a specific job description",
+    prefill: "Can you help me analyze this job description: ",
+    roles: ["student"],
+  },
+  {
+    slash: "/interview",
+    label: "Practice interview answers",
+    description: "Practice answering interview questions using your STAR stories",
+    prefill: "I want to practice mock interview questions for the position of ",
+    roles: ["student"],
+  },
 
   // Teacher
   {
@@ -137,7 +165,8 @@ export const STARTER_CHIPS: Record<ChatRole, StarterChip[]> = {
   student: [
     { label: "Set a goal", prefill: "Help me set a new goal for " },
     { label: "Plan my week", prefill: "Plan my week — here's what I'm working on: " },
-    { label: "I'm stuck", prefill: "I'm stuck on " },
+    { label: "Build my resume", prefill: "Help me build or improve my resume." },
+    { label: "Practice interviews", prefill: "I want to practice mock interview questions." },
     { label: "What's next?", prefill: "What should I work on next?" },
   ],
   teacher: [

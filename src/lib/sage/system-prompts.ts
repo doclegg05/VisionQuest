@@ -95,22 +95,9 @@ export function sanitizeForPrompt(value: string): string {
 const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
 Within the first 1-2 turns of this conversation, naturally ask which classroom the student is in. When they tell you, reflect it back warmly (e.g., "Got it — you're in Mrs. Thompson's Monday class") and move on. Do not make it a big deal; this is a light check, not an interview. After they confirm, continue with the rest of onboarding.`;
 
-export type ConversationStage =
-  | "discovery"
-  | "onboarding"
-  | "bhag"
-  | "monthly"
-  | "weekly"
-  | "daily"
-  | "tasks"
-  | "checkin"
-  | "review"
-  | "orientation"
-  | "general"
-  | "teacher_assistant"
-  | "admin_assistant"
-  | "coordinator_assistant"
-  | "career_profile_review";
+import { type ConversationStage, determineStage } from "./stage";
+export type { ConversationStage };
+export { determineStage };
 
 const STAGE_PROMPTS: Record<ConversationStage, string> = {
   discovery: `CURRENT TASK: Career Discovery — conversational career assessment with a new student.
@@ -841,18 +828,4 @@ const RAG_GROUNDING_INSTRUCTION =
   "(e.g. \"Per the Administrative Guide, p.12…\"). If the passages don't cover the " +
   "question, say you couldn't find it in the available documents and suggest who to ask — do not guess.";
 
-export function determineStage(
-  goals: { level: string }[],
-  hasCompletedDiscovery?: boolean,
-): ConversationStage {
-  const levels = new Set(goals.map((g) => g.level));
-  // Discovery comes first — any student without a completed discovery
-  // and without a BHAG enters discovery mode
-  if (hasCompletedDiscovery !== true && !levels.has("bhag")) return "discovery";
-  if (!levels.has("bhag")) return "onboarding";
-  if (!levels.has("monthly")) return "monthly";
-  if (!levels.has("weekly")) return "weekly";
-  if (!levels.has("daily")) return "daily";
-  if (!levels.has("task")) return "tasks";
-  return "checkin";
-}
+

@@ -119,6 +119,11 @@
   --duration-normal: 450ms;
   --duration-slow: 800ms;
   --stagger-gap: 120ms;
+
+  /* Ruled note card variables */
+  --paper-bg: #fffdf2;
+  --paper-line: rgba(0, 123, 175, 0.06);
+  --paper-margin: rgba(239, 68, 68, 0.2);
 }
 
 [data-theme="dark"] {
@@ -216,6 +221,11 @@
   --accent-strong: var(--accent-green);
   --accent-secondary: var(--accent-blue);
   --accent-tertiary: var(--accent-gold);
+
+  /* Ruled note card variables */
+  --paper-bg: #0d1a2d;
+  --paper-line: rgba(255, 255, 255, 0.04);
+  --paper-margin: rgba(168, 85, 247, 0.2);
 }
 
 @theme inline {
@@ -908,6 +918,51 @@ a[role="button"]:active,
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+/* Organic Ruled Paper Note Card styles */
+.organic-paper-card {
+  position: relative;
+  background-color: var(--paper-bg);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.5rem 1.5rem 1.5rem 2.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-spring);
+  background-image: repeating-linear-gradient(var(--paper-bg), var(--paper-bg) 2.2rem, var(--paper-line) 2.2rem, var(--paper-line) 2.25rem);
+  background-size: 100% 2.25rem;
+  line-height: 2.25rem;
+}
+
+.organic-paper-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2rem;
+  width: 1px;
+  background-color: var(--paper-margin);
+  pointer-events: none;
+}
+
+.tape-effect {
+  position: absolute;
+  top: -0.75rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-1deg);
+  width: 6rem;
+  height: 1.5rem;
+  background-color: rgba(254, 240, 138, 0.45); /* Semi-transparent yellow tape */
+  backdrop-filter: blur(1.5px);
+  border: 1px solid rgba(254, 240, 138, 0.25);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  z-index: 10;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .tape-effect {
+  background-color: rgba(255, 255, 255, 0.12); /* Frosty tape in dark mode */
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Reduced motion preference */

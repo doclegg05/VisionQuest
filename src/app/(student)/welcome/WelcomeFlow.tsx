@@ -210,10 +210,9 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
         {step === 3 && (
           <div className="text-center">
             <p className="mb-6 text-5xl">🚀</p>
-            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your first step</h1>
+            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your path to employment</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
-              Choose where you&apos;d like to start. You can always find
-              everything on your dashboard.
+              VisionQuest is structured around one clear path to help you secure a job. Choose where you would like to start:
             </p>
             <div className="mt-8 space-y-3">
               <Link
@@ -224,9 +223,9 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                   💬
                 </span>
                 <div>
-                  <p className="font-display text-lg text-[var(--ink-strong)]">Talk to Sage</p>
+                  <p className="font-display text-lg text-[var(--ink-strong)] font-semibold">1. Discover My Career Path (Recommended)</p>
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    Start a conversation about your dreams and goals. Sage will help you turn them into a plan.
+                    Start a discovery conversation with Sage to explore your strengths, skills, and match with a career goal.
                   </p>
                 </div>
               </Link>
@@ -238,9 +237,9 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                   📋
                 </span>
                 <div>
-                  <p className="font-display text-lg text-[var(--ink-strong)]">Complete Orientation</p>
+                  <p className="font-display text-lg text-[var(--ink-strong)] font-semibold">2. Complete Onboarding Paperwork</p>
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    Review program forms and get oriented with what to expect.
+                    Review and complete required SPOKES program forms and onboarding checklist items.
                   </p>
                 </div>
               </Link>
@@ -252,9 +251,9 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
                   📊
                 </span>
                 <div>
-                  <p className="font-display text-lg text-[var(--ink-strong)]">Explore the Dashboard</p>
+                  <p className="font-display text-lg text-[var(--ink-strong)] font-semibold">3. View My Employment Journey Map</p>
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    See all the modules available and find your own path.
+                    Go directly to your dashboard to see your 7-stage path to employment.
                   </p>
                 </div>
               </Link>

@@ -10,18 +10,32 @@ import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { getStudentGoalPlanData } from "@/lib/goal-plan-data";
 import { getLearningPathway } from "@/lib/learning-pathway";
+import { getStudentNextStep } from "@/lib/progression/student-next-step";
+import { PathToEmployment } from "@/components/progression/PathToEmployment";
 
 export default async function LearningPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [{ goals, goalPlans }, pathway] = await Promise.all([
-    getStudentGoalPlanData(session.id),
-    getLearningPathway(session.id),
+  const [[{ goals, goalPlans }, pathway], nextStep] = await Promise.all([
+    Promise.all([
+      getStudentGoalPlanData(session.id),
+      getLearningPathway(session.id),
+    ]),
+    getStudentNextStep(session.id),
   ]);
 
   return (
-    <div className="page-shell">
+    <div className="page-shell space-y-6">
+      <PathToEmployment
+        currentStepKey={nextStep.currentStepKey}
+        title={nextStep.title}
+        description={nextStep.description}
+        whyItMatters={nextStep.whyItMatters}
+        actionLabel={nextStep.actionLabel}
+        actionLink={nextStep.actionLink}
+        steps={nextStep.steps}
+      />
       <PageIntro
         eyebrow="Learning"
         title="Learning"
