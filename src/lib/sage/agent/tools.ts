@@ -104,6 +104,7 @@ const presentForm: AgentTool = {
     parseArgs: (raw) => ({ query: raw.trim() }),
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
     const query = String(args.query ?? "").trim();
@@ -181,6 +182,7 @@ const searchFormsTool: AgentTool = {
     parseArgs: (raw) => ({ query: raw.trim() }),
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const query = String(args.query ?? "").trim();
@@ -285,6 +287,7 @@ const findCertification: AgentTool = {
     parseArgs: (raw) => ({ query: raw.trim() }),
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
     const query = String(args.query ?? "").trim();
@@ -352,6 +355,7 @@ const lookupCertProgress: AgentTool = {
     description: "See your Ready-to-Work checklist",
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.targetStudentId ?? ctx.session.id;
@@ -411,6 +415,7 @@ const reviewPortfolio: AgentTool = {
     description: "See your portfolio and what's missing",
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.targetStudentId ?? ctx.session.id;
@@ -484,6 +489,7 @@ const lookupAppointment: AgentTool = {
     description: "Upcoming check-ins on your schedule",
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.targetStudentId ?? ctx.session.id;
@@ -571,6 +577,7 @@ const findAppointmentSlots: AgentTool = {
     description: "See open advising slots you can book",
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
     const days = Math.min(Math.max(Number(args.withinDays) || 14, 1), 30);
@@ -680,6 +687,7 @@ const openResource: AgentTool = {
     parseArgs: (raw) => ({ resourceId: raw.trim() }),
   },
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
     const resourceId = String(args.resourceId ?? "").trim();
@@ -725,6 +733,7 @@ const lookupProgramInfo: AgentTool = {
   },
   // No slash command — this is model-driven, not user-invoked.
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
     const topic = String(args.topic ?? "").trim();
@@ -765,6 +774,7 @@ const classifyAttachment: AgentTool = {
   },
   // No slash command — model-driven when an attachment is in context.
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const fileUploadId = String(args.fileUploadId ?? "").trim();
@@ -863,6 +873,7 @@ import { WRITE_TOOLS } from "./write-tools";
 import { CAREER_TOOLS } from "./career-tools";
 import { ADMIN_TOOLS } from "./admin-tools";
 import { TEACHER_TOOLS } from "./teacher-tools";
+import { agentMode, isToolAllowedInMode, type AgentMode } from "./flags";
 
 const ALL_TOOLS: AgentTool[] = [
   presentForm,
@@ -881,10 +892,17 @@ const ALL_TOOLS: AgentTool[] = [
   ...TEACHER_TOOLS,
 ];
 
-export function getEnabledTools(role: string): AgentTool[] {
+/**
+ * Tools the model may call for a role, filtered by the active agent mode.
+ *  - mode defaults to agentMode() (env-derived); pass explicitly in tests.
+ *  - "off" yields [] (the caller should not run the agent loop at all).
+ *  - "readonly" yields read-tier tools only; "full" yields all tiers.
+ */
+export function getEnabledTools(role: string, mode: AgentMode = agentMode()): AgentTool[] {
   return ALL_TOOLS.filter(
     (tool) =>
       tool.enabled &&
+      isToolAllowedInMode(tool, mode) &&
       tool.requiredRoles.some((allowed) => allowed === role || (role === "admin" && allowed !== "student")),
   );
 }

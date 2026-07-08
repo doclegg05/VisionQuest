@@ -62,6 +62,23 @@ mock.module("../operations", {
   },
 });
 
+// The executor now enforces a per-student per-tool rate limit before execute.
+// Stub it to always allow so these confirmation tests don't hit the real
+// RateLimitEntry store (prismaAdmin / DB). Rate-limit behavior is covered by
+// rate-limit.test.ts and executor-rate-limit.test.ts.
+mock.module("./rate-limit", {
+  namedExports: {
+    checkToolRateLimit: async () => ({
+      allowed: true,
+      remaining: 99,
+      resetTime: Date.now() + 86_400_000,
+      limit: 100,
+      window: "day",
+    }),
+    rateLimitMessage: () => "rate limited",
+  },
+});
+
 let executeAgentTool: typeof import("./executor").executeAgentTool;
 let createConfirmationToken: typeof import("./confirmation").createConfirmationToken;
 

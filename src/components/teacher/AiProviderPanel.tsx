@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 type ProviderType = "local" | "cloud";
 type LocalAuthMode = "none" | "bearer" | "cloudflare_service_token";
+type LocalApiStyle = "ollama" | "openai";
 
 interface ApiErrorResponse {
   error?: string;
@@ -16,14 +17,41 @@ interface NumCtxBounds {
   default: number;
 }
 
+interface InstalledModel {
+  name: string;
+  sizeBytes?: number;
+  likelyEmbedding: boolean;
+}
+
+interface ModelCapabilities {
+  reachable: boolean;
+  apiMode: "openai" | "native" | null;
+  chatValidated: boolean;
+  supportsTools: boolean;
+  supportsJsonOutput: boolean;
+  contextLength: number | null;
+  embedding: {
+    reachable: boolean;
+    model: string | null;
+    dims: number | null;
+    matches768: boolean;
+  };
+  installedModels: InstalledModel[];
+  warnings: string[];
+}
+
 const DEFAULT_NUM_CTX_BOUNDS: NumCtxBounds = { min: 1024, max: 131072, default: 8192 };
+/** Fixed pgvector column width every embedding provider must match. Mirrors src/lib/ai/embedding-types.ts. */
+const EMBEDDING_DIMENSIONS = 768;
 
 export default function AiProviderPanel() {
   const router = useRouter();
   const [provider, setProvider] = useState<ProviderType>("cloud");
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("gemma4:26b");
+  const [embeddingModel, setEmbeddingModel] = useState("nomic-embed-text");
   const [authMode, setAuthMode] = useState<LocalAuthMode>("none");
+  const [apiStyle, setApiStyle] = useState<LocalApiStyle>("ollama");
   const [numCtxInput, setNumCtxInput] = useState(""); // empty string = use default
   const [numCtxBounds, setNumCtxBounds] = useState<NumCtxBounds>(DEFAULT_NUM_CTX_BOUNDS);
   const [bearerToken, setBearerToken] = useState("");
@@ -39,6 +67,7 @@ export default function AiProviderPanel() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [capabilities, setCapabilities] = useState<ModelCapabilities | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +80,9 @@ export default function AiProviderPanel() {
               provider?: ProviderType;
               url?: string;
               model?: string;
+              embeddingModel?: string;
               authMode?: LocalAuthMode;
+              apiStyle?: LocalApiStyle;
               numCtx?: number | null;
               numCtxBounds?: NumCtxBounds;
               hasApiKey?: boolean;
@@ -80,7 +111,9 @@ export default function AiProviderPanel() {
         setProvider(data.provider ?? "cloud");
         setUrl(data.url ?? "");
         setModel(data.model ?? "gemma4:26b");
+        setEmbeddingModel(data.embeddingModel ?? "nomic-embed-text");
         setAuthMode(data.authMode || "none");
+        setApiStyle(data.apiStyle || "ollama");
         setNumCtxInput(typeof data.numCtx === "number" ? String(data.numCtx) : "");
         if (data.numCtxBounds) setNumCtxBounds(data.numCtxBounds);
         setHasBearerToken(Boolean(data.hasApiKey));
@@ -108,6 +141,11 @@ export default function AiProviderPanel() {
     setMessage("");
   }
 
+  function resetTestState() {
+    resetMessages();
+    setCapabilities(null);
+  }
+
   async function handleSave() {
     setSaving(true);
     resetMessages();
@@ -116,7 +154,9 @@ export default function AiProviderPanel() {
       provider,
       url: url || undefined,
       model: model || undefined,
+      embeddingModel: provider === "local" ? embeddingModel || undefined : undefined,
       authMode: provider === "local" ? authMode : undefined,
+      apiStyle: provider === "local" ? apiStyle : undefined,
     };
 
     // numCtx: empty string → null (clear override), valid integer → set,
@@ -196,11 +236,17 @@ export default function AiProviderPanel() {
 
   async function handleTest() {
     setTesting(true);
-    resetMessages();
+    resetTestState();
 
     try {
       const res = await fetch("/api/admin/ai-provider/test", { method: "POST" });
-      const data = await res.json();
+      const data = (await res.json()) as ApiErrorResponse & {
+        models?: string[];
+        apiMode?: "native" | "openai";
+        chatValidated?: boolean;
+        modelUsed?: string;
+        capabilities?: ModelCapabilities;
+      };
 
       if (!res.ok) {
         setError(data.error || "Connection test failed.");
@@ -229,6 +275,7 @@ export default function AiProviderPanel() {
       setMessage(
         `Connected to local AI server. Loaded models: ${modelList}. Chat path: ${apiModeLabel}. Auth: ${authLabel}.${chatLabel}`,
       );
+      setCapabilities(data.capabilities ?? null);
     } catch {
       setError("Could not contact the server.");
     } finally {
@@ -244,6 +291,9 @@ export default function AiProviderPanel() {
     hasCloudflareClientId && hasCloudflareClientSecret && !clearCloudflareCredentials;
   const cloudflarePartial =
     (hasCloudflareClientId || hasCloudflareClientSecret) && !cloudflareConfigured;
+  const installedModels = capabilities?.installedModels ?? [];
+  const chatModelOptions = installedModels.filter((m) => !m.likelyEmbedding);
+  const embeddingModelOptions = installedModels.filter((m) => m.likelyEmbedding);
 
   return (
     <div className="space-y-4">
@@ -320,6 +370,7 @@ export default function AiProviderPanel() {
             <input
               id="ollama-model"
               type="text"
+              list="ollama-chat-model-options"
               value={model}
               onChange={(e) => {
                 setModel(e.target.value);
@@ -328,6 +379,70 @@ export default function AiProviderPanel() {
               placeholder="gemma4:26b"
               className="field w-full px-4 py-3 text-sm"
             />
+            {chatModelOptions.length > 0 && (
+              <datalist id="ollama-chat-model-options">
+                {chatModelOptions.map((m) => (
+                  <option key={m.name} value={m.name} />
+                ))}
+              </datalist>
+            )}
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              {chatModelOptions.length > 0
+                ? "Suggestions come from models installed on your local AI server. You can still type any model name, even one not yet pulled."
+                : "Run Test Connection to see installed models as suggestions. Free text is always allowed."}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="local-api-style" className="mb-1 block text-sm font-medium text-[var(--ink-strong)]">
+              Server API style
+            </label>
+            <select
+              id="local-api-style"
+              value={apiStyle}
+              onChange={(e) => {
+                setApiStyle(e.target.value as LocalApiStyle);
+                resetMessages();
+              }}
+              className="field w-full px-4 py-3 text-sm"
+            >
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI-compatible (LM Studio, vLLM, llama.cpp)</option>
+            </select>
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Ollama supports both its native API and an OpenAI-compatible API, so Sage tries
+              both automatically. Choose OpenAI-compatible for servers that only expose
+              /v1/* endpoints — Sage will never attempt Ollama-only routes against them.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="ollama-embedding-model" className="mb-1 block text-sm font-medium text-[var(--ink-strong)]">
+              Embedding model name
+            </label>
+            <input
+              id="ollama-embedding-model"
+              type="text"
+              list="ollama-embedding-model-options"
+              value={embeddingModel}
+              onChange={(e) => {
+                setEmbeddingModel(e.target.value);
+                resetMessages();
+              }}
+              placeholder="nomic-embed-text"
+              className="field w-full px-4 py-3 text-sm"
+            />
+            {embeddingModelOptions.length > 0 && (
+              <datalist id="ollama-embedding-model-options">
+                {embeddingModelOptions.map((m) => (
+                  <option key={m.name} value={m.name} />
+                ))}
+              </datalist>
+            )}
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Must return {EMBEDDING_DIMENSIONS}-dim vectors (e.g. nomic-embed-text, embeddinggemma).
+              1024-dim models like mxbai-embed-large are not supported.
+            </p>
           </div>
 
           <div>
@@ -501,6 +616,39 @@ export default function AiProviderPanel() {
           >
             {testing ? "Testing..." : "Test Connection"}
           </button>
+
+          {capabilities && (
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <p className="text-sm font-semibold text-[var(--ink-strong)]">Model capabilities</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <CapabilityRow label="Chat" ok={capabilities.chatValidated} />
+                <CapabilityRow label="Tool calling" ok={capabilities.supportsTools} />
+                <CapabilityRow label="JSON output" ok={capabilities.supportsJsonOutput} />
+                <CapabilityRow
+                  label={`Embeddings (${EMBEDDING_DIMENSIONS}-dim)`}
+                  ok={capabilities.embedding.matches768}
+                />
+              </div>
+              {capabilities.contextLength !== null && (
+                <p className="text-xs text-[var(--ink-muted)]">
+                  Detected context length: {capabilities.contextLength.toLocaleString()} tokens.
+                </p>
+              )}
+              {capabilities.warnings.length > 0 && (
+                <ul className="space-y-1">
+                  {capabilities.warnings.map((warning) => (
+                    <li
+                      key={warning}
+                      className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                    >
+                      <span aria-hidden="true">⚠</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -512,6 +660,20 @@ export default function AiProviderPanel() {
       >
         {saving ? "Saving..." : "Save Provider Settings"}
       </button>
+    </div>
+  );
+}
+
+function CapabilityRow({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span
+        aria-hidden="true"
+        className={ok ? "text-[var(--accent-strong)]" : "text-amber-600"}
+      >
+        {ok ? "✓" : "⚠"}
+      </span>
+      <span className="text-[var(--ink-strong)]">{label}</span>
     </div>
   );
 }

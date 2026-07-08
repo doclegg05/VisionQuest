@@ -34,6 +34,7 @@ const listStudentsNeedingAttention: AgentTool = {
     description: "Students who most need a check-in",
   },
   requiredRoles: ["teacher", "admin", "coordinator"],
+  riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const limit = Math.min(Math.max(Number(args.limit) || 8, 1), 20);

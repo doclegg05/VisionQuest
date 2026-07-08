@@ -140,6 +140,14 @@ export type ToolStreamEvent =
 export type AIProviderType = "cloud" | "local";
 export type LocalAIAuthMode = "none" | "bearer" | "cloudflare_service_token";
 export type PromptTier = "full" | "compact";
+/**
+ * "ollama" (default): probe/fall back between native /api/* and
+ * OpenAI-compatible /v1/* endpoints, same as always.
+ * "openai": the endpoint is a generic OpenAI-compatible server (LM Studio,
+ * vLLM, llama.cpp server) that only exposes /v1/* — native /api/* calls
+ * must never be attempted, including as a fallback.
+ */
+export type LocalAiApiStyle = "ollama" | "openai";
 
 export type AiTask =
   | "legacy"
@@ -181,6 +189,8 @@ export interface LocalAIAuthConfig {
    * provider's built-in fallback when undefined. Bounded by the caller.
    */
   numCtx?: number;
+  /** Defaults to "ollama" when undefined (existing dual-mode behavior). */
+  apiStyle?: LocalAiApiStyle;
 }
 
 export interface AIProviderConfig {
