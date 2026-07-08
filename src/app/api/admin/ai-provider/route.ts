@@ -13,6 +13,7 @@ import {
   DEFAULT_LOCAL_AI_AUTH_MODE,
   readLocalAiProviderConfig,
   resolveLocalAiAuthMode,
+  resolveLocalAiApiStyle,
 } from "@/lib/ai";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import { z } from "zod";
@@ -34,6 +35,7 @@ const providerSchema = z.object({
   model: z.string().min(1).max(100).optional(),
   embeddingModel: z.string().min(1).max(100).optional(),
   authMode: z.enum(["none", "bearer", "cloudflare_service_token"]).optional(),
+  apiStyle: z.enum(["ollama", "openai"]).optional(),
   apiKey: z.string().max(500).optional(),
   cloudflareAccessClientId: z.string().max(500).optional(),
   cloudflareAccessClientSecret: z.string().max(500).optional(),
@@ -63,6 +65,7 @@ export const GET = withAdminAuth(async () => {
     model: localConfig.model || "gemma4:26b",
     embeddingModel: localConfig.embeddingModel || "nomic-embed-text",
     authMode: localConfig.authMode,
+    apiStyle: localConfig.apiStyle,
     numCtx: validNumCtx,
     numCtxBounds: { min: NUM_CTX_MIN, max: NUM_CTX_MAX, default: 8192 },
     hasApiKey: !!localConfig.apiKey,
@@ -74,6 +77,7 @@ export const GET = withAdminAuth(async () => {
 export const PUT = withAdminAuth(async (session, req: NextRequest) => {
   const body = await parseBody(req, providerSchema);
   const authMode = resolveLocalAiAuthMode(body.authMode);
+  const apiStyle = resolveLocalAiApiStyle(body.apiStyle);
   const existingLocalConfig = await readLocalAiProviderConfig();
 
   if (body.url !== undefined && !isSafeAiProviderUrl(body.url)) {
@@ -136,6 +140,7 @@ export const PUT = withAdminAuth(async (session, req: NextRequest) => {
     );
   }
   await setPlainConfigValue("ai_provider_auth_mode", authMode, session.id);
+  await setPlainConfigValue("ai_provider_api_style", apiStyle, session.id);
 
   if (body.apiKey !== undefined) {
     if (body.apiKey === "") {

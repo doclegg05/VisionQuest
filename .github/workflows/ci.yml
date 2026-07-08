@@ -64,6 +64,19 @@ jobs:
         # (withErrorHandler + getSession() + prisma — the 2026-04-24 bug).
         run: npm run audit:api-auth
 
+      - name: Catalog integrity (hard gate — DB-free checks only)
+        # catalog:validate needs a live DB ONLY for the program_document node
+        # type (fetching ProgramDocument rows to diff title/audience/category
+        # against). Everything else — form-vs-forms.ts parity, cert/platform
+        # nodes, required fields, cross-link integrity, allowlist reverse-
+        # parity for forms/certs/platforms — is filesystem-only and gates
+        # here. --no-db explicitly skips the DB-dependent program_document
+        # checks (the fake DATABASE_URL above is a non-empty string, so it
+        # would otherwise attempt — and fail — a real connection) and prints
+        # a ::notice naming exactly what was skipped, so nothing is silently
+        # dropped. See docs/runbooks/catalog-operations.md.
+        run: npx tsx scripts/catalog/validate.mjs --no-db
+
       - name: Typecheck
         run: npm run typecheck
 

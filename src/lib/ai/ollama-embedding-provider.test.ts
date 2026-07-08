@@ -130,6 +130,44 @@ describe("OllamaEmbeddingProvider", () => {
     assert.equal(openAiCalls, 2);
   });
 
+  it("apiStyle 'openai' calls /v1/embeddings directly and never attempts /api/embed", async () => {
+    const urls: string[] = [];
+    global.fetch = (async (url: any, init: any) => {
+      urls.push(String(url));
+      const body = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({
+          data: body.input.map((_: unknown, i: number) => ({ embedding: unitVector(768, i) })),
+        }),
+        { status: 200 },
+      );
+    }) as any;
+
+    const provider = new OllamaEmbeddingProvider("http://localhost:1234", "local-embed-model", {
+      authMode: "none",
+      apiStyle: "openai",
+    });
+    const result = await provider.embed(["alpha", "beta"], { taskType: "RETRIEVAL_DOCUMENT" });
+
+    assert.deepEqual(urls, ["http://localhost:1234/v1/embeddings"]);
+    assert.equal(result.length, 2);
+    assert.equal(result[0].length, 768);
+  });
+
+  it("apiStyle 'openai' does not retry via /api/embed when /v1/embeddings 404s", async () => {
+    global.fetch = (async () => new Response("Not Found", { status: 404 })) as any;
+
+    const provider = new OllamaEmbeddingProvider("http://localhost:1234", "local-embed-model", {
+      authMode: "none",
+      apiStyle: "openai",
+    });
+
+    await assert.rejects(
+      () => provider.embed(["alpha"], { taskType: "RETRIEVAL_DOCUMENT" }),
+      /Local embedding request failed \(404\)/,
+    );
+  });
+
   it("L2-normalizes vectors client-side", async () => {
     global.fetch = (async () =>
       new Response(JSON.stringify({ embeddings: [new Array(768).fill(2)] }), { status: 200 })) as any;

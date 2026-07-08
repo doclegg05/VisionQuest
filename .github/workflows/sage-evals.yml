@@ -114,3 +114,33 @@ jobs:
             exit 0
           fi
           npm run sage:memory:eval
+
+  catalog-drift:
+    # Compares each approved catalog node's expected sageContextNote against
+    # the live ProgramDocument row. Needs a real, populated DATABASE_URL (not
+    # the ephemeral/empty CI Postgres container used elsewhere in this repo —
+    # drift is only meaningful against the actual catalog data). No such
+    # secret exists in this repo today; this job no-ops with a ::notice until
+    # an operator configures one. Scheduled/on-demand only (not on every PR —
+    # see docs/runbooks/catalog-operations.md).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Catalog drift audit (no-op without a real DATABASE_URL secret)
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::DATABASE_URL secret not configured — skipping catalog:drift."
+            exit 0
+          fi
+          npm run catalog:drift
