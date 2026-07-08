@@ -72,6 +72,7 @@ model Student {
   careerDiscovery         CareerDiscovery?
   moodEntries             MoodEntry[]
   sageInsights            SageInsight[]
+  sagePanels              SagePanel[]
   notificationPreferences NotificationPreference[]
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
@@ -164,6 +165,35 @@ model SageInsight {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@index([studentId, status, createdAt(sort: Desc)])
+  @@schema("visionquest")
+}
+
+/// Sage-authored daily dashboard panel. `spec` is a PanelSpec JSON blob
+/// (src/lib/sage/panel-spec.ts) produced by the autonomous briefing run and
+/// re-validated with Zod on every read — the renderer never trusts stored JSON.
+model SagePanel {
+  id          String    @id @default(cuid())
+  studentId   String
+  // UTC day this panel covers; one panel per student per day.
+  panelDate   DateTime  @db.Date
+  // Mirrors spec.version for querying; renderer switches on the spec itself.
+  specVersion Int       @default(1)
+  spec        Json
+  // "generating" | "ready" | "failed" | "dismissed"
+  status      String    @default("generating")
+  // Provider name that produced the spec — FERPA audit trail.
+  model       String?
+  // { toolCalls, durationMs, retries, failReason? } — observability only.
+  meta        Json?
+  dismissedAt DateTime?
+  dismissedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, panelDate])
   @@index([studentId, status, createdAt(sort: Desc)])
   @@schema("visionquest")
 }

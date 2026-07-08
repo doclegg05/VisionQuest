@@ -154,6 +154,7 @@ export type AiTask =
   | "sage_student_chat"
   | "sage_staff_chat"
   | "sage_post_response"
+  | "sage_briefing"
   | "conversation_summary"
   | "resume_assist"
   | "resume_extract"
