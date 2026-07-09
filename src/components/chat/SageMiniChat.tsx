@@ -3,14 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
+import { ActionCard } from "./ActionCard";
+import { ConfirmToolCard } from "./ConfirmToolCard";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  actions?: MiniAction[];
+}
+
+interface MiniAction {
+  action: ChatSseEvent["action"];
+  target?: string;
+  label?: string;
+  meta?: Record<string, unknown>;
 }
 
 interface SageMiniChatProps {
@@ -31,12 +42,50 @@ export function openSageWithMessage(message: string) {
   );
 }
 
+function MiniActionList({ actions }: { actions: MiniAction[] }) {
+  return (
+    <div className="ml-11 mt-2 space-y-2">
+      {actions.map((item, index) => {
+        if (item.action === "confirm_tool" && item.meta) {
+          return (
+            <ConfirmToolCard
+              key={`confirm-${index}`}
+              label={item.label || "Confirm"}
+              summary={String(item.meta.summary ?? item.label ?? "Confirm this action.")}
+              meta={item.meta}
+            />
+          );
+        }
+        if (
+          item.target &&
+          (item.action === "open_form" ||
+            item.action === "open_resource" ||
+            item.action === "navigate")
+        ) {
+          return (
+            <ActionCard
+              key={`${item.action}-${item.target}-${index}`}
+              action={item.action}
+              target={item.target}
+              label={item.label || "Open"}
+              title={typeof item.meta?.title === "string" ? item.meta.title : undefined}
+              description={typeof item.meta?.description === "string" ? item.meta.description : undefined}
+            />
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+}
+
 export function SageMiniChat({ open, onClose, role = "student", initialMessage, onInitialMessageConsumed }: SageMiniChatProps) {
   const isStaff = role === "teacher" || role === "admin";
   const { checkProgression } = useProgression();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingActions, setStreamingActions] = useState<MiniAction[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const initialMessageSentRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -100,6 +149,13 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(() => {
+      panelRef.current?.querySelector<HTMLElement>("[data-sage-mini-initial-focus]")?.focus();
+    });
+  }, [open]);
+
   const handleSend = useCallback(
     async (text: string) => {
       const userMsg: Message = {
@@ -110,6 +166,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
       setStreamingContent("");
+      setStreamingActions([]);
 
       try {
         const res = await apiFetch("/api/chat/send", {
@@ -126,28 +183,44 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
         let fullContent = "";
+        let sseBuffer = "";
+        const actions: MiniAction[] = [];
+        const applyStreamEvent = (data: ChatSseEvent) => {
+          if (data.conversationId) setConversationId(data.conversationId);
+          if (data.error) throw new Error(data.error);
+          if (data.text) {
+            fullContent += data.text;
+            setStreamingContent(fullContent);
+          }
+          if (data.type === "action") {
+            actions.push({
+              action: data.action,
+              target: data.target,
+              label: data.label,
+              meta: data.meta,
+            });
+            setStreamingActions([...actions]);
+          }
+        };
 
         if (reader) {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value);
-            for (const line of chunk.split("\n")) {
-              if (!line.startsWith("data: ")) continue;
-              let data: { conversationId?: string; error?: string; text?: string } | null = null;
-              try {
-                data = JSON.parse(line.slice(6));
-              } catch {
-                continue;
-              }
-              if (!data) continue;
-              if (data.conversationId) setConversationId(data.conversationId);
-              if (data.error) throw new Error(data.error);
-              if (data.text) {
-                fullContent += data.text;
-                setStreamingContent(fullContent);
-              }
+            const chunk = decoder.decode(value, { stream: true });
+            const parsed = parseChatSseChunk(chunk, sseBuffer);
+            sseBuffer = parsed.buffer;
+            for (const data of parsed.events) {
+              applyStreamEvent(data);
+            }
+          }
+
+          const finalChunk = decoder.decode();
+          if (finalChunk || sseBuffer.trim()) {
+            const parsed = parseChatSseChunk(`${finalChunk}\n\n`, sseBuffer);
+            for (const data of parsed.events) {
+              applyStreamEvent(data);
             }
           }
         }
@@ -158,9 +231,11 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
             id: `msg-${Date.now()}`,
             role: "assistant",
             content: fullContent || "I didn't receive a response. Please try again.",
+            actions: actions.length > 0 ? actions : undefined,
           },
         ]);
         setStreamingContent("");
+        setStreamingActions([]);
         if (!isStaff) {
           setTimeout(() => checkProgression(), 2000);
         }
@@ -191,27 +266,49 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
 
   if (!open) return null;
 
+  const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") return;
+    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable?.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
       ref={panelRef}
       role="dialog"
+      aria-modal="true"
       aria-label="Chat with Sage"
+      tabIndex={-1}
+      onKeyDown={trapFocus}
       className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_24px_64px_rgba(7,23,43,0.28)] md:bottom-6 md:right-6"
       style={{ maxHeight: "min(32rem, calc(100dvh - 7rem))" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[linear-gradient(135deg,var(--ink-strong),rgba(8,68,80,0.95))] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--chat-panel-border)] bg-[var(--chat-header-bg)] px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-xl bg-[var(--surface-raised)]/15 text-sm font-bold text-white">
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--chat-sage-mark-bg)] text-xs font-bold text-[var(--chat-sage-mark)]">
             S
           </span>
-          <span className="text-sm font-semibold text-white">Sage</span>
+          <span className="text-sm font-semibold text-[var(--ink-strong)]">Sage</span>
         </div>
         <div className="flex items-center gap-2">
           {!isStaff && (
             <a
               href="/chat"
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-white/75 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+              data-sage-mini-initial-focus
+              className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)]"
               aria-label="Open full chat"
             >
               Expand
@@ -220,7 +317,8 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
           <button
             onClick={onClose}
             type="button"
-            className="grid h-7 w-7 place-items-center rounded-lg text-white/75 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+            data-sage-mini-initial-focus={isStaff ? true : undefined}
+            className="grid h-11 w-11 place-items-center rounded-lg text-[var(--ink-muted)] transition-colors hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)]"
             aria-label="Close chat"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -253,11 +351,17 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
           )}
 
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
+            <div key={msg.id}>
+              <MessageBubble role={msg.role} content={msg.content} />
+              {msg.actions?.length ? <MiniActionList actions={msg.actions} /> : null}
+            </div>
           ))}
 
           {streamingContent && (
-            <MessageBubble role="assistant" content={streamingContent} isStreaming />
+            <div>
+              <MessageBubble role="assistant" content={streamingContent} isStreaming />
+              {streamingActions.length > 0 ? <MiniActionList actions={streamingActions} /> : null}
+            </div>
           )}
 
           {isLoading && !streamingContent && <TypingIndicator />}
