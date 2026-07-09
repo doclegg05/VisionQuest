@@ -15,6 +15,7 @@
     "test:smoke:api": "python scripts/smoke_api_routes.py",
     "test:e2e": "playwright test",
     "prisma:generate": "prisma generate",
+    "prisma:validate": "node --env-file=.env.local node_modules/prisma/build/index.js validate",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "users:promote-teacher": "node scripts/promote-teacher.mjs",
     "users:promote-admin": "node scripts/promote-admin.mjs",
