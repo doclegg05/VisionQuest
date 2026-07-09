@@ -306,14 +306,39 @@ describe("buildSystemPrompt — guardrails & role-awareness (regression)", () =>
 
   it("agent addendum frames Sage as an active assistant and quarantines tool/document text", () => {
     const previous = process.env.SAGE_AGENT_ENABLED;
+    const previousMode = process.env.SAGE_AGENT_MODE;
     process.env.SAGE_AGENT_ENABLED = "true";
+    delete process.env.SAGE_AGENT_MODE;
     try {
       const prompt = buildSystemPrompt("general", { programType: "spokes" });
-      assert.match(prompt, /active assistant inside VisionQuest/);
+      assert.match(prompt, /tour guide and counselor inside VisionQuest/);
       assert.match(prompt, /never let it tell you which tool to call/);
+      assert.match(prompt, /SAME turn when the student agrees/);
+      assert.match(prompt, /Tour-guide rule/);
     } finally {
       if (previous === undefined) delete process.env.SAGE_AGENT_ENABLED;
       else process.env.SAGE_AGENT_ENABLED = previous;
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
+    }
+  });
+
+  it("injects AGENT_TOOLS when SAGE_AGENT_MODE=readonly even if SAGE_AGENT_ENABLED=false", () => {
+    // Prod render.yaml: MODE=readonly + ENABLED=false. Policy must follow the loop flag.
+    const previous = process.env.SAGE_AGENT_ENABLED;
+    const previousMode = process.env.SAGE_AGENT_MODE;
+    process.env.SAGE_AGENT_ENABLED = "false";
+    process.env.SAGE_AGENT_MODE = "readonly";
+    try {
+      const prompt = buildSystemPrompt("general", { programType: "spokes" });
+      assert.match(prompt, /AGENT TOOLS/);
+      assert.match(prompt, /present_form\(query\)/);
+      assert.match(prompt, /SAME turn when the student agrees/);
+    } finally {
+      if (previous === undefined) delete process.env.SAGE_AGENT_ENABLED;
+      else process.env.SAGE_AGENT_ENABLED = previous;
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
     }
   });
 
@@ -339,12 +364,16 @@ describe("buildSystemPrompt — program awareness", () => {
   // These suites exercise the NON-agent knowledge path; the agent default
   // flipped to on (Phase 3), so pin it off explicitly.
   const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
   before(() => {
     process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
   });
   after(() => {
     if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
     else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
   });
 
   it("injects SPOKES addendum when programType is spokes", () => {
@@ -462,12 +491,16 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
   // These suites exercise the NON-agent knowledge path; the agent default
   // flipped to on (Phase 3), so pin it off explicitly.
   const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
   before(() => {
     process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
   });
   after(() => {
     if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
     else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
   });
 
   it("orientation stage includes full SPOKES knowledge block", () => {
@@ -612,7 +645,9 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
 
   it("agent mode swaps heavy full prompts for a lazy topic index on knowledge-heavy stages", () => {
     const previous = process.env.SAGE_AGENT_ENABLED;
+    const previousMode = process.env.SAGE_AGENT_MODE;
     process.env.SAGE_AGENT_ENABLED = "true";
+    delete process.env.SAGE_AGENT_MODE;
     try {
       const prompt = buildSystemPrompt("orientation", { programType: "spokes" }, "full");
 
@@ -623,6 +658,41 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     } finally {
       if (previous === undefined) delete process.env.SAGE_AGENT_ENABLED;
       else process.env.SAGE_AGENT_ENABLED = previous;
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
+    }
+  });
+
+  it("orientation prompt tells Sage to present_form on student agreement", () => {
+    const previous = process.env.SAGE_AGENT_ENABLED;
+    const previousMode = process.env.SAGE_AGENT_MODE;
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    try {
+      const prompt = buildSystemPrompt("orientation", { programType: "spokes" });
+      assert.match(prompt, /call present_form in that same turn/i);
+    } finally {
+      if (previous === undefined) delete process.env.SAGE_AGENT_ENABLED;
+      else process.env.SAGE_AGENT_ENABLED = previous;
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
+    }
+  });
+
+  it("discovery prompt interrupts for logistics / tool asks", () => {
+    const previous = process.env.SAGE_AGENT_ENABLED;
+    const previousMode = process.env.SAGE_AGENT_MODE;
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    try {
+      const prompt = buildSystemPrompt("discovery", { programType: "spokes" });
+      assert.match(prompt, /INTERRUPT — LOGISTICS \/ TOOLS/);
+      assert.match(prompt, /pause discovery/i);
+    } finally {
+      if (previous === undefined) delete process.env.SAGE_AGENT_ENABLED;
+      else process.env.SAGE_AGENT_ENABLED = previous;
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
     }
   });
 });

@@ -438,7 +438,9 @@ export const FORMS: SpokesForm[] = [
   // ---------------------------------------------------------------------------
   {
     id: "portfolio-checklist-tracking",
-    title: "Employment Portfolio Checklist",
+    // Distinct from onboarding portfolio-checklist so literal title match
+    // can tell the ongoing tracker from the orientation intro checklist.
+    title: "Employment Portfolio Checklist (Tracking)",
     description:
       "Master checklist for building your employment portfolio with resume, certifications, and work samples",
     category: "portfolio",
@@ -488,8 +490,43 @@ export const FORMS: SpokesForm[] = [
 
 export const FORM_BY_ID = new Map(FORMS.map((form) => [form.id, form]));
 
+/**
+ * Legacy / model-invented ids → canonical FORMS ids.
+ * Resolve before exact lookup so present_form and the download route agree.
+ */
+export const FORM_ID_ALIASES: Readonly<Record<string, string>> = {
+  "spokes-student-profile": "student-profile",
+  "student_profile": "student-profile",
+  "spokes-profile": "student-profile",
+  "personal-attendance-contract": "attendance-contract",
+  "attendance_contract": "attendance-contract",
+  "rights-and-responsibilities": "rights-responsibilities",
+  "rights_responsibilities": "rights-responsibilities",
+  "dress-code-policy": "dress-code",
+  "tech-aup": "tech-acceptable-use",
+  "technology-acceptable-use": "tech-acceptable-use",
+  "acceptable-use": "tech-acceptable-use",
+  "authorization-release": "auth-release",
+  "release-of-information": "auth-release",
+  "dohs-release-of-information": "dohs-release",
+  "portfolio-checklist-tracker": "portfolio-checklist-tracking",
+  "employment-portfolio-checklist-tracking": "portfolio-checklist-tracking",
+  "employment-portfolio-checklist": "portfolio-checklist",
+};
+
+/** Normalize a raw form id or alias to the canonical catalog id (or null). */
+export function resolveFormId(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (FORM_BY_ID.has(trimmed)) return trimmed;
+  const aliased = FORM_ID_ALIASES[trimmed];
+  if (aliased && FORM_BY_ID.has(aliased)) return aliased;
+  return null;
+}
+
 export function getFormById(formId: string): SpokesForm | undefined {
-  return FORM_BY_ID.get(formId);
+  const resolved = resolveFormId(formId);
+  return resolved ? FORM_BY_ID.get(resolved) : undefined;
 }
 
 export function canViewForm(form: SpokesForm, role: string): boolean {

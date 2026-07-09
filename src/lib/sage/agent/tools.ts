@@ -11,7 +11,12 @@
 // =============================================================================
 
 import { prisma } from "@/lib/db";
-import { FORMS, FORM_CATEGORIES, buildFormDownloadUrl } from "@/lib/spokes/forms";
+import {
+  FORMS,
+  FORM_CATEGORIES,
+  buildFormDownloadUrl,
+  resolveFormId,
+} from "@/lib/spokes/forms";
 import { searchForms } from "@/lib/spokes/form-search";
 import { getFormCatalogNote } from "@/lib/catalog/notes";
 import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
@@ -91,7 +96,7 @@ const presentForm: AgentTool = {
       query: {
         type: "string",
         description:
-          "The form id (e.g. 'spokes-student-profile') or a natural-language name (e.g. 'student profile', 'attendance contract').",
+          "The form id (e.g. 'student-profile') or a natural-language name (e.g. 'student profile', 'attendance contract').",
       },
     },
     required: ["query"],
@@ -106,21 +111,27 @@ const presentForm: AgentTool = {
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
   riskTier: "read",
   enabled: true,
-  async execute(args): Promise<AgentToolResult> {
+  async execute(args, ctx): Promise<AgentToolResult> {
     const query = String(args.query ?? "").trim();
     if (!query) {
       return { status: "error", summary: "I need a form name or id to look up." };
     }
 
-    const exact = FORMS.find(
-      (form) => form.id === query || form.title.toLowerCase() === query.toLowerCase(),
-    );
-    const match =
-      exact ??
-      FORMS
-        .map((form) => ({ form, score: scoreMatch(query, `${form.title} ${form.description}`) }))
-        .filter((entry) => entry.score > 0.3)
-        .sort((a, b) => b.score - a.score)[0]?.form;
+    // Exact id (incl. aliases) or exact title — then hybrid searchForms.
+    const resolvedId = resolveFormId(query);
+    const exact =
+      (resolvedId ? FORMS.find((form) => form.id === resolvedId) : undefined) ??
+      FORMS.find((form) => form.title.toLowerCase() === query.toLowerCase());
+
+    let match = exact;
+    if (!match) {
+      const { candidates } = await searchForms({
+        query,
+        role: ctx.session.role,
+        limit: 1,
+      });
+      match = candidates[0]?.form;
+    }
 
     if (!match) {
       return {
