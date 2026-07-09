@@ -223,7 +223,7 @@ export const CERTIFICATIONS: SpokesCertification[] = [
     name: "ACT WorkKeys NCRC",
     shortName: "WorkKeys",
     description:
-      "Nationally recognized credential measuring Applied Math, Workplace Documents, and Business Writing. Score levels map to O*NET occupations.",
+      "Nationally recognized credential measuring Applied Math, Workplace Documents, and Graphic Literacy. Score levels map to O*NET occupations.",
     category: "career-readiness",
     platforms: [],
     examProvider: "ACT",
