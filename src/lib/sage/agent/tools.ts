@@ -275,7 +275,7 @@ const searchFormsTool: AgentTool = {
 const findCertification: AgentTool = {
   name: "find_certification",
   description:
-    "Search the SPOKES certification catalog. Returns up to 5 matches with category and required-flag metadata.",
+    "Search the SPOKES certification catalog — the certifications a student can earn here in the program. Returns up to 5 matches with category and required-flag metadata.",
   parameters: {
     type: "object",
     properties: {
@@ -729,7 +729,7 @@ const openResource: AgentTool = {
 const lookupProgramInfo: AgentTool = {
   name: "lookup_program_info",
   description:
-    "Retrieve detailed program knowledge for a specific topic on demand. Call this when you need specifics that aren't in your brief overview — certification details, platform setup steps, onboarding requirements, etc.",
+    "Retrieve detailed program knowledge for a specific topic on demand. Call this when you need specifics that aren't in your brief overview — certification details, platform setup steps, onboarding requirements, etc. To search WHICH certifications are offered here, use find_certification instead.",
   parameters: {
     type: "object",
     properties: {
