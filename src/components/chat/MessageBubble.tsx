@@ -13,32 +13,41 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
   const shouldReduceMotion = useReducedMotion();
 
   return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} role="group" aria-label={`${isUser ? "Your" : "Sage's"} message`}>
+    <div
+      className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
+      role="group"
+      aria-label={`${isUser ? "Your" : "Sage's"} message`}
+    >
       <div
-        className={`flex h-10 flex-shrink-0 items-center justify-center rounded-2xl px-3 text-sm font-bold shadow-[var(--shadow-card)]
-          ${isUser
-            ? "w-10 bg-[var(--chat-bubble-user-avatar)] text-white"
-            : "bg-[linear-gradient(135deg,rgba(249,115,22,0.18),var(--chat-bubble-assistant-bg))] text-[var(--accent-strong)]"
-          }`}
+        className={[
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold",
+          isUser
+            ? "bg-[var(--chat-bubble-user-avatar)] text-white"
+            : "bg-[var(--chat-sage-mark-bg)] text-[var(--chat-sage-mark)]",
+        ].join(" ")}
+        aria-hidden="true"
       >
-        {isUser ? "You" : "Sage"}
+        {isUser ? "Y" : "S"}
       </div>
 
       <div
-        className={`max-w-[82%] rounded-[1.4rem] px-4 py-3 text-[15px] leading-7 shadow-[var(--shadow-card-lg)]
-          ${isUser
-            ? "rounded-br-md text-white"
-            : "rounded-bl-md border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] text-[var(--ink-strong)]"
-          }
-          ${isStreaming && !shouldReduceMotion ? "animate-pulse" : ""}`}
+        className={[
+          "max-w-[min(42rem,82%)] text-[15px] leading-7",
+          isUser
+            ? "rounded-2xl rounded-br-md px-4 py-2.5 text-white shadow-sm"
+            : "px-1 py-0.5 text-[var(--ink-strong)]",
+          isStreaming && !shouldReduceMotion ? "animate-pulse" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         // --chat-bubble-user-bg is a gradient; Tailwind's bg-[var(--x)]
-        // compiles to background-color which can't render gradients
-        // (causing the bubble to fall back to transparent in light mode
-        // and hide the white text). Inline `background` shorthand
-        // accepts gradients cleanly in both themes.
+        // compiles to background-color which can't render gradients.
         style={isUser ? { background: "var(--chat-bubble-user-bg)" } : undefined}
       >
-        <p className="whitespace-pre-wrap break-words">{content}{isStreaming && shouldReduceMotion ? "▍" : ""}</p>
+        <p className="whitespace-pre-wrap break-words">
+          {content}
+          {isStreaming && shouldReduceMotion ? "…" : ""}
+        </p>
       </div>
     </div>
   );

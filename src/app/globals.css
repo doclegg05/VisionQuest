@@ -95,21 +95,28 @@
   --accent-secondary: var(--accent-blue);
   --accent-tertiary: var(--accent-gold);
 
-  /* Chat surfaces — Sage message bubbles, input area, typing indicator */
-  --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
-  --chat-bubble-assistant-border: rgba(15, 154, 146, 0.25);
+  /* Chat surfaces — modern AI chrome (SPOKES blue Sage, green student) */
+  --chat-bubble-assistant-bg: transparent;
+  --chat-bubble-assistant-border: transparent;
   --chat-bubble-user-bg: linear-gradient(135deg, #2a8a3c, #1e6e30);
   --chat-bubble-user-avatar: #2a8a3c;
+  --chat-sage-mark: #007baf;
+  --chat-sage-action: #00527a;
+  --chat-sage-mark-bg: rgba(0, 123, 175, 0.12);
   --chat-panel-bg: #ffffff;
-  --chat-panel-border: rgba(18, 38, 63, 0.16);
-  --chat-input-bg: #ffffff;
-  --chat-input-border: rgba(18, 38, 63, 0.14);
-  --chat-area-bg: linear-gradient(180deg, #f8fbfc, #ffffff 100%);
-  --chat-header-bg: #ffffff;
+  --chat-panel-border: rgba(18, 38, 63, 0.10);
+  --chat-input-bg: transparent;
+  --chat-input-border: rgba(18, 38, 63, 0.12);
+  --chat-area-bg: #f7f9fb;
+  --chat-header-bg: rgba(255, 255, 255, 0.92);
+  --chat-sidebar-bg: #eef2f6;
+  --chat-sidebar-active: rgba(0, 123, 175, 0.12);
+  --chat-sidebar-hover: rgba(0, 64, 113, 0.06);
   --chat-typing-dot: var(--ink-muted);
   --chat-error-bg: #fffbeb;
   --chat-error-border: #fde68a;
   --chat-error-text: #92400e;
+  --chat-composer-focus: rgba(0, 123, 175, 0.22);
 
   /* Animation tokens */
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -197,20 +204,27 @@
   --program-ietp-text: #fdba74;
 
   /* Chat surfaces — dark mode */
-  --chat-bubble-assistant-bg: rgba(15, 154, 146, 0.15);
-  --chat-bubble-assistant-border: rgba(15, 154, 146, 0.25);
+  --chat-bubble-assistant-bg: transparent;
+  --chat-bubble-assistant-border: transparent;
   --chat-bubble-user-bg: linear-gradient(135deg, #3fcf5e, #2a8a3c);
   --chat-bubble-user-avatar: #2a8a3c;
-  --chat-panel-bg: #101d30;
-  --chat-panel-border: rgba(255, 255, 255, 0.18);
-  --chat-input-bg: #132237;
-  --chat-input-border: rgba(255, 255, 255, 0.18);
-  --chat-area-bg: linear-gradient(180deg, #0f1b2d, #111f33 100%);
-  --chat-header-bg: #101d30;
+  --chat-sage-mark: #38a8d8;
+  --chat-sage-action: #71c8ed;
+  --chat-sage-mark-bg: rgba(56, 168, 216, 0.18);
+  --chat-panel-bg: #132237;
+  --chat-panel-border: rgba(255, 255, 255, 0.12);
+  --chat-input-bg: transparent;
+  --chat-input-border: rgba(255, 255, 255, 0.14);
+  --chat-area-bg: #0f1b2d;
+  --chat-header-bg: rgba(16, 29, 48, 0.92);
+  --chat-sidebar-bg: #0c1726;
+  --chat-sidebar-active: rgba(56, 168, 216, 0.16);
+  --chat-sidebar-hover: rgba(255, 255, 255, 0.06);
   --chat-typing-dot: var(--ink-muted);
   --chat-error-bg: rgba(180, 83, 9, 0.15);
   --chat-error-border: rgba(251, 191, 36, 0.25);
   --chat-error-text: #fbbf24;
+  --chat-composer-focus: rgba(56, 168, 216, 0.28);
 
   /* Legacy aliases */
   --background: var(--surface-base);

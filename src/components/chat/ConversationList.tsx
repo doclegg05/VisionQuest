@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash } from "@phosphor-icons/react";
+import { Plus, Trash } from "@phosphor-icons/react";
 import type { ConversationSummary } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { useConfirm } from "@/components/ui/useConfirm";
@@ -91,25 +91,28 @@ export default function ConversationList({
 
   if (loading) {
     return (
-      <div className="p-5 text-sm text-white/75">Loading conversations...</div>
+      <div className="flex h-full flex-col bg-[var(--chat-sidebar-bg)] p-5 text-sm text-[var(--ink-muted)]">
+        Loading conversations...
+      </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(7,23,43,0.98),rgba(13,35,57,0.95)_52%,rgba(8,68,80,0.92))] text-white">
-      <div className="border-b border-white/10 p-4">
+    <div className="flex h-full flex-col border-r border-[var(--chat-panel-border)] bg-[var(--chat-sidebar-bg)] text-[var(--ink-strong)]">
+      <div className="border-b border-[var(--chat-panel-border)] p-3">
         <button
           onClick={onNewChat}
           type="button"
-          className="primary-button w-full px-4 py-3 text-sm"
+          className="flex w-full min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--chat-sidebar-hover)]"
         >
-          + New Conversation
+          <Plus size={16} weight="bold" aria-hidden="true" />
+          New chat
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-2">
         {conversations.length === 0 ? (
-          <div className="rounded-[1.2rem] border border-dashed border-white/12 bg-[var(--surface-raised)]/5 p-4 text-center text-sm text-white/75">
+          <div className="rounded-xl border border-dashed border-[var(--chat-panel-border)] px-3 py-6 text-center text-sm text-[var(--ink-muted)]">
             No conversations yet. Start one!
           </div>
         ) : (
@@ -120,10 +123,10 @@ export default function ConversationList({
               <div
                 key={conv.id}
                 className={[
-                  "group relative mb-2 rounded-[1.15rem] border transition-colors",
+                  "group relative mb-1 rounded-xl transition-colors",
                   isActive
-                    ? "border-white/40 bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[0_18px_36px_rgba(255,255,255,0.08)]"
-                    : "border-white/8 bg-[var(--surface-raised)]/6 text-white/82 hover:bg-[var(--surface-raised)]/10",
+                    ? "bg-[var(--chat-sidebar-active)]"
+                    : "hover:bg-[var(--chat-sidebar-hover)]",
                   isDeleting ? "opacity-50" : "",
                 ]
                   .filter(Boolean)
@@ -133,30 +136,28 @@ export default function ConversationList({
                   onClick={() => onSelect(conv.id)}
                   type="button"
                   disabled={isDeleting}
-                  className="w-full px-4 py-3.5 text-left"
+                  className="w-full px-3 py-2.5 text-left"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
                     <span
                       className={[
-                        "min-w-0 flex-1 text-xs font-semibold uppercase tracking-[0.18em]",
-                        isActive ? "text-[var(--accent-strong)]" : "text-white/75",
+                        "min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.12em]",
+                        isActive ? "text-[var(--chat-sage-action)]" : "text-[var(--ink-muted)]",
                       ].join(" ")}
                     >
                       {STAGE_LABELS[conv.stage] || conv.stage}
                     </span>
                     {conv.active && (
-                      <span className={`h-2.5 w-2.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-emerald-400"}`} />
+                      <span
+                        className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--accent-green)]"
+                        aria-label="Active conversation"
+                      />
                     )}
                   </div>
-                  <p
-                    className={[
-                      "mt-2 line-clamp-2 break-words pr-7 text-sm font-medium leading-5",
-                      isActive ? "text-[var(--ink-strong)]" : "text-white",
-                    ].join(" ")}
-                  >
+                  <p className="mt-1 line-clamp-2 break-words pr-7 text-sm font-medium leading-5 text-[var(--ink-strong)]">
                     {conv.title || "New conversation"}
                   </p>
-                  <p className={["mt-1 text-xs", isActive ? "text-[var(--ink-muted)]" : "text-white/65"].join(" ")}>
+                  <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
                     {new Date(conv.updatedAt).toLocaleDateString()}
                   </p>
                 </button>
@@ -165,9 +166,9 @@ export default function ConversationList({
                   type="button"
                   disabled={isDeleting}
                   aria-label={`Delete conversation "${conv.title || STAGE_LABELS[conv.stage] || conv.stage}"`}
-                  className="absolute right-2 top-2 rounded-full p-1.5 text-white/50 opacity-0 transition-all hover:bg-rose-500/20 hover:text-rose-300 focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+                  className="absolute right-1.5 top-1.5 rounded-lg p-1.5 text-[var(--ink-faint)] opacity-0 transition-all hover:bg-[var(--badge-error-bg)] hover:text-[var(--badge-error-text)] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
                 >
-                  <Trash size={16} weight="regular" aria-hidden="true" />
+                  <Trash size={15} weight="regular" aria-hidden="true" />
                 </button>
               </div>
             );

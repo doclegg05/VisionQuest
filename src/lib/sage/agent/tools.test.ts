@@ -29,6 +29,8 @@ describe("present_form — link target", () => {
       result.action?.target,
       "/api/forms/download?formId=education-career-plan&mode=view",
     );
+    assert.equal(result.action?.meta?.title, "Education and Career Plan");
+    assert.equal(typeof result.action?.meta?.description, "string");
   });
 
   it("fuzzy match still resolves the right form", async () => {
@@ -78,5 +80,7 @@ describe("open_resource — career-discovery redirect loop fix", () => {
     const result = await tool.execute({ resourceId: "goals" }, CTX);
     assert.equal(result.status, "success");
     assert.equal(result.action?.target, "/goals");
+    assert.equal(result.action?.meta?.title, "Goals");
+    assert.match(String(result.action?.meta?.description ?? ""), /active goals/i);
   });
 });
