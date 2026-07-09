@@ -2,14 +2,20 @@ import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { inferJobWorkMode } from "../work-mode";
 import { fetchJson, stripHtml, truncateDescription } from "./shared";
 import { getSpokesJobQueryTitles } from "../spokes-job-queries";
+import {
+  COS_API_BASE,
+  careerOneStopCredentials,
+  isCareerOneStopConfigured,
+} from "@/lib/career/careeronestop-config";
 
 /**
  * CareerOneStop "List Jobs" adapter — surfaces National Labor Exchange (NLx)
  * postings, which aggregate state job-bank listings (incl. WorkForce WV).
- * Requires COS_USER_ID and COS_API_TOKEN (free, royalty-free registration).
+ * Requires COS_USER_ID and COS_API_TOKEN (free, royalty-free registration —
+ * shared with the counseling client via @/lib/career/careeronestop-config).
  * Returns [] when unconfigured.
  */
-const COS_BASE = "https://api.careeronestop.org/v1/jobsearch";
+const COS_BASE = `${COS_API_BASE}/v1/jobsearch`;
 const MAX_RESULTS = 60;
 const PAGE_SIZE = 20;
 const RECENCY_DAYS = 30;
@@ -34,13 +40,13 @@ export const careerOneStopAdapter: JobSourceAdapter = {
   sourceType: "api",
 
   isConfigured(): boolean {
-    return Boolean(process.env.COS_USER_ID && process.env.COS_API_TOKEN);
+    return isCareerOneStopConfigured();
   },
 
   async fetchJobs(region: string, radiusMiles: number): Promise<NormalizedJob[]> {
-    const userId = process.env.COS_USER_ID;
-    const token = process.env.COS_API_TOKEN;
-    if (!userId || !token) return [];
+    const credentials = careerOneStopCredentials();
+    if (!credentials) return [];
+    const { userId, token } = credentials;
 
     const location = region.trim() || "US";
     const radius = radiusMiles > 0 ? radiusMiles : DEFAULT_RADIUS;
