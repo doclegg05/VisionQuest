@@ -37,6 +37,31 @@ describe("present_form — link target", () => {
     assert.equal(result.status, "success");
     assert.match(String(result.summary), /Education and Career Plan/);
   });
+
+  it("schema example uses the canonical student-profile id", () => {
+    const tool = getToolByName("present_form");
+    assert.ok(tool);
+    const queryDesc = String(
+      (tool.parameters.properties as { query?: { description?: string } }).query
+        ?.description ?? "",
+    );
+    assert.match(queryDesc, /student-profile/);
+    assert.ok(!queryDesc.includes("spokes-student-profile"));
+  });
+
+  it("resolves the spokes-student-profile alias to student-profile", async () => {
+    const tool = getToolByName("present_form");
+    const result = await tool!.execute({ query: "spokes-student-profile" }, CTX);
+    assert.equal(result.status, "success");
+    assert.equal(
+      (result.data as { formId?: string } | undefined)?.formId,
+      "student-profile",
+    );
+    assert.equal(
+      result.action?.target,
+      "/api/forms/download?formId=student-profile&mode=view",
+    );
+  });
 });
 
 describe("open_resource — career-discovery redirect loop fix", () => {

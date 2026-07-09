@@ -34,6 +34,8 @@ import {
   type SpokesForm,
 } from "@/lib/spokes/forms";
 import { isKnownAmbiguousForm } from "@/lib/catalog/notes";
+import { siblingScoreDelta } from "@/lib/spokes/form-sibling-rules";
+import { isAgentLoopEnabled } from "./agent/flags";
 
 export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
 You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
@@ -614,13 +616,20 @@ export function findRelevantForms(
   maxResults: number = 3,
 ): FormLinkMatch[] {
   const messageLower = userMessage.toLowerCase();
+  // Sibling deltas are calibrated for 0..1 hybrid scores; scale for the
+  // larger keyword scorer so boost/demote can reorder top matches.
+  const SIBLING_SCALE = 40;
   return FORMS
     .filter(hasDownloadableFormDocument)
-    .map((form) => ({
-      form,
-      url: buildFormDownloadUrl(form, "view"),
-      score: scoreForm(form, messageLower),
-    }))
+    .map((form) => {
+      const base = scoreForm(form, messageLower);
+      const sibling = siblingScoreDelta(userMessage, form.id) * SIBLING_SCALE;
+      return {
+        form,
+        url: buildFormDownloadUrl(form, "view"),
+        score: base + sibling,
+      };
+    })
     .filter((match) => match.score >= 6)
     .sort((left, right) => right.score - left.score)
     .slice(0, maxResults);
@@ -638,6 +647,19 @@ export function getFormContext(userMessage: string): string {
   const matches = findRelevantForms(userMessage);
   if (matches.length === 0) return "";
 
+  // When the agent loop is on, steer Sage to present_form (action card)
+  // instead of pasting markdown URLs the chat UI does not turn into buttons.
+  if (isAgentLoopEnabled()) {
+    const lines = matches.map(
+      ({ form }) =>
+        `- **${form.title}**${formatFormTags(form)} — id: \`${form.id}\``,
+    );
+    return (
+      `\n\nMATCHING FORMS (call present_form with the title or id; do not paste download URLs — the tool surfaces the Open button):\n` +
+      `${lines.join("\n")}`
+    );
+  }
+
   const lines = matches.map(
     ({ form, url }) => `- **${form.title}**${formatFormTags(form)}: ${url}`,
   );
@@ -653,7 +675,14 @@ export function messageHasFormIntent(userMessage: string): boolean {
   return FORM_INTENT_WORDS.test(userMessage);
 }
 
-export function getDirectFormAnswer(userMessage: string): string | null {
+/**
+ * High-confidence form match for deterministic shortcuts (text links or
+ * present_form). Returns null when intent is missing, no catalog hit, or the
+ * top match is an ambiguous sibling that needs the agent/search_forms path.
+ */
+export function resolveDirectFormMatch(
+  userMessage: string,
+): FormLinkMatch[] | null {
   if (!FORM_INTENT_WORDS.test(userMessage)) return null;
 
   const matches = findRelevantForms(userMessage);
@@ -685,6 +714,13 @@ export function getDirectFormAnswer(userMessage: string): string | null {
   if (!topUniquelyLiteral && matches.some(({ form }) => isKnownAmbiguousForm(form.id))) {
     return null;
   }
+
+  return matches;
+}
+
+export function getDirectFormAnswer(userMessage: string): string | null {
+  const matches = resolveDirectFormMatch(userMessage);
+  if (!matches) return null;
 
   const lines = matches.map(
     ({ form, url }) => `- [${form.title}](${url})${formatFormTags(form)}`,

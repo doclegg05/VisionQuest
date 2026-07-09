@@ -20,6 +20,7 @@ import { FORMS, FORM_CATEGORIES, canViewForm, hasDownloadableFormDocument } from
 import type { SpokesForm } from "@/lib/spokes/forms";
 import { embedQuery, embedTexts } from "@/lib/ai/embeddings";
 import { logger } from "@/lib/logger";
+import { siblingScoreDelta } from "@/lib/spokes/form-sibling-rules";
 
 // NOTE: the OKF catalog's curated notes (when-to-use / when-NOT-to-use) are
 // deliberately NOT folded into this ranking index. Measurement showed adding
@@ -202,9 +203,10 @@ export async function searchForms(params: {
   const ranked = visible
     .map((form) => {
       const kw = keyword.get(form.id) ?? 0;
-      const score = semantic
+      const base = semantic
         ? SEMANTIC_WEIGHT * (semantic.get(form.id) ?? 0) + KEYWORD_WEIGHT * kw
         : kw;
+      const score = Math.max(0, base + siblingScoreDelta(query, form.id));
       return { form, score, available: hasDownloadableFormDocument(form) };
     })
     .filter((c) => c.score >= SCORE_FLOOR)

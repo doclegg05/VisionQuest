@@ -2,10 +2,23 @@ import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
+import { promptStageForMessage } from "@/lib/sage/stage";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
 import { getMemoryContext } from "@/lib/sage/memory/retrieve";
 import { getStudentProfile } from "@/lib/sage/memory/profile";
-import { getDirectFormAnswer, getFormContext } from "@/lib/sage/knowledge-base";
+import {
+  findRelevantForms,
+  getDirectFormAnswer,
+  getFormContext,
+  resolveDirectFormMatch,
+} from "@/lib/sage/knowledge-base";
+import {
+  extractOfferedFormIds,
+  formCommitmentReply,
+  resolveFormCommitment,
+} from "@/lib/sage/form-commitment";
+import type { ChatSseEvent } from "@/lib/chat/sse";
+import type { AgentToolCallRecord } from "@/lib/sage/agent/types";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
@@ -32,7 +45,7 @@ import { prisma } from "@/lib/db";
 import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
 import { runAgentTurn } from "@/lib/sage/agent/loop";
-import { executeSlashCommand } from "@/lib/sage/agent/executor";
+import { executeAgentTool, executeSlashCommand } from "@/lib/sage/agent/executor";
 import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
@@ -91,6 +104,7 @@ class ChatSseClientClosedError extends Error {
 function createSseResponse(
   conversationId: string,
   text: string,
+  extras: ChatSseEvent[] = [],
 ): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -98,6 +112,9 @@ function createSseResponse(
       controller.enqueue(
         encoder.encode(formatChatSseEvent({ conversationId })),
       );
+      for (const event of extras) {
+        controller.enqueue(encoder.encode(formatChatSseEvent(event)));
+      }
       controller.enqueue(
         encoder.encode(formatChatSseEvent({ text })),
       );
@@ -118,6 +135,36 @@ function createSseResponse(
   });
 }
 
+/** SSE extras for a present_form tool result (action card + tool events). */
+function presentFormSseExtras(record: AgentToolCallRecord): ChatSseEvent[] {
+  const extras: ChatSseEvent[] = [
+    {
+      type: "tool_call",
+      callId: record.callId,
+      tool: record.tool,
+      args: record.args,
+      status: "pending",
+    },
+    {
+      type: "tool_result",
+      callId: record.callId,
+      status: record.result.status,
+      summary: record.result.summary,
+      data: record.result.data,
+    },
+  ];
+  if (record.result.action) {
+    extras.push({
+      type: "action",
+      action: record.result.action.action,
+      target: record.result.action.target,
+      label: record.result.action.label,
+      meta: record.result.action.meta,
+    });
+  }
+  return extras;
+}
+
 export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) => {
   const body = await parseBody(req, chatSendSchema);
   const userMessage = body.message.trim();
@@ -131,7 +178,14 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const isStaffChat = isTeacher || session.role === "coordinator";
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
-  const directFormAnswer = getDirectFormAnswer(userMessage);
+  // Deterministic form lookup — bypasses discovery/goal stage prompts so a
+  // student who asks for a form gets it even mid-onboarding.
+  const agentLoopEnabledEarly = isAgentLoopEnabled();
+  const directFormMatches = resolveDirectFormMatch(userMessage);
+  const directFormAnswer =
+    !agentLoopEnabledEarly && directFormMatches
+      ? getDirectFormAnswer(userMessage)
+      : null;
   const directSmallTalkAnswer = getDirectSmallTalkAnswer(userMessage);
 
   if (directFormAnswer) {
@@ -159,6 +213,54 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     });
 
     return createSseResponse(conversation.id, directFormAnswer);
+  }
+
+  // Agent mode: same high-confidence form match, but emit present_form action
+  // cards so the student gets an Open button (not markdown the UI ignores).
+  if (agentLoopEnabledEarly && directFormMatches && directFormMatches.length > 0) {
+    const conversation = isStaffChat
+      ? await getOrCreateTeacherConversation(session.id, conversationId)
+      : await getOrCreateConversation(session.id, conversationId, requestedStage);
+
+    await saveMessage(conversation.id, session.id, "user", userMessage);
+
+    const top = directFormMatches[0];
+    const record = await executeAgentTool({
+      session,
+      conversationId: conversation.id,
+      toolName: "present_form",
+      args: { query: top.form.id },
+    });
+    const morePending = directFormMatches.length > 1;
+    const reply =
+      record.result.status === "success"
+        ? formCommitmentReply(top.form.title, morePending)
+        : record.result.summary;
+
+    await saveMessage(conversation.id, session.id, "assistant", reply);
+    await logAiAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      route: "/api/chat/send",
+      task: "public_form_lookup",
+      sensitivity: "public_program",
+      policyDecision: "direct_no_model",
+      status: "direct",
+      targetId: conversation.id,
+      providerName: null,
+      providerClass: "none",
+      allowCloud: true,
+      inputChars: userMessage.length,
+      outputChars: reply.length,
+      reason:
+        "Matched a public blank-form request; presented via present_form action card.",
+    });
+
+    return createSseResponse(
+      conversation.id,
+      reply,
+      presentFormSseExtras(record),
+    );
   }
 
   if (directSmallTalkAnswer) {
@@ -314,6 +416,29 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     ? await getOrCreateTeacherConversation(session.id, conversationId)
     : await getOrCreateConversation(session.id, conversationId, requestedStage);
   const conversationStage = conversation.stage as ConversationStage;
+  // Per-turn prompt stage: logistics asks during discovery/onboarding use
+  // orientation/general scripts so counseling ladders don't drown the ask.
+  // Stored conversation.stage is unchanged for goal progression.
+  const promptStage = isStaffChat
+    ? conversationStage
+    : promptStageForMessage(conversationStage, userMessage, {
+        hasFormMatch: findRelevantForms(userMessage, 1).length > 0,
+      });
+
+  // Resolve form commitment against the prior assistant turn BEFORE saving
+  // the new user message into history (conversation.messages is already loaded).
+  const priorMessages = conversation.messages ?? [];
+  const lastAssistantMessage = [...priorMessages]
+    .reverse()
+    .find((m: { role: string; content: string }) => m.role === "assistant");
+  const formCommitment =
+    agentLoopEnabledEarly && lastAssistantMessage
+      ? resolveFormCommitment(userMessage, lastAssistantMessage.content)
+      : null;
+  const formCommitmentMorePending =
+    formCommitment && lastAssistantMessage
+      ? extractOfferedFormIds(lastAssistantMessage.content).length > 1
+      : false;
 
   // Save user message
   await saveMessage(conversation.id, session.id, "user", userMessage);
@@ -396,7 +521,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
     // Whole-student situational awareness. Skipped for the first-meeting
     // discovery stage (no history to summarize) and the compact tier (token
-    // budget). Cached per student; never blocks chat if it fails.
+    // budget). Cached per student; never blocks chat if it fails. Use the
+    // stored stage (not prompt override) so logistics turns still get a
+    // snapshot once the student has history.
     const situationalSnapshot =
       conversationStage !== "discovery" && promptTier !== "compact"
         ? (await getSituationalSnapshot(session.id)) ?? undefined
@@ -404,7 +531,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
     systemPrompt =
       promptContext.priorConversationContext +
-      buildSystemPrompt(conversationStage, {
+      buildSystemPrompt(promptStage, {
         studentName: session.displayName,
         programType: studentProgramType,
         classroomConfirmedAt: studentClassroomConfirmedAt,
@@ -417,7 +544,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         student_status_summary: promptContext.studentStatusSummary,
         userMessage,
         career_clusters:
-          conversationStage === "discovery"
+          promptStage === "discovery"
             ? formatClustersForPrompt()
             : undefined,
         discovery_summary: promptContext.discoverySummary,
@@ -623,14 +750,74 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           callSite: "sage_chat",
         });
 
-        const agentLoopEnabled = isAgentLoopEnabled();
+        const agentLoopEnabled = agentLoopEnabledEarly;
+
+        // Deterministic form-commitment path: student said yes/sure/etc. after
+        // Sage offered a form — present_form immediately (action card), no
+        // extra "which one?" / "can you provide it?" turn.
+        let handledFormCommitment = false;
+        if (agentLoopEnabled && formCommitment) {
+          const record = await executeAgentTool({
+            session,
+            conversationId: conversation.id,
+            toolName: "present_form",
+            args: { query: formCommitment.formId },
+            targetStudentId: staffStudentTargetId ?? undefined,
+          });
+          handledFormCommitment = true;
+          sendEvent(
+            {
+              type: "tool_call",
+              callId: record.callId,
+              tool: record.tool,
+              args: record.args,
+              status: "pending",
+            },
+            "tool_call",
+          );
+          sendEvent(
+            {
+              type: "tool_result",
+              callId: record.callId,
+              status: record.result.status,
+              summary: record.result.summary,
+              data: record.result.data,
+            },
+            "tool_result",
+          );
+          if (record.result.action) {
+            sendEvent(
+              {
+                type: "action",
+                action: record.result.action.action,
+                target: record.result.action.target,
+                label: record.result.action.label,
+                meta: record.result.action.meta,
+              },
+              "action",
+            );
+          }
+          const reply =
+            record.result.status === "success"
+              ? formCommitmentReply(
+                  formCommitment.title,
+                  formCommitmentMorePending,
+                )
+              : record.result.summary;
+          fullResponse = reply;
+          sendEvent({ type: "text", text: reply }, "text");
+        }
 
         // Slash-command fast path: invoke the tool directly without going
         // through the model when it maps to a registered tool. Unknown slash
         // prompts fall through to the regular agent loop so legacy coaching
         // prompts like "/goal" still get a real response.
         let handledSlashCommand = false;
-        if (agentLoopEnabled && userMessage.startsWith("/")) {
+        if (
+          !handledFormCommitment &&
+          agentLoopEnabled &&
+          userMessage.startsWith("/")
+        ) {
           const slashOutcome = await executeSlashCommand(
             userMessage,
             session,
@@ -694,7 +881,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }
         }
 
-        if (handledSlashCommand) {
+        if (handledFormCommitment || handledSlashCommand) {
           // Tool summary has already been emitted as the assistant response.
         } else if (agentLoopEnabled) {
           // Agent loop — model may emit tool calls mid-turn.

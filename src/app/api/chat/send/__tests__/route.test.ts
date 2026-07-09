@@ -38,6 +38,7 @@ const mockLogger = {
 const mockBuildSystemPrompt = mock.fn() as any;
 const mockGetDocumentContext = mock.fn() as any;
 const mockGetDirectFormAnswer = mock.fn() as any;
+const mockResolveDirectFormMatch = mock.fn() as any;
 const mockGetFormContext = mock.fn() as any;
 const mockRecordChatSession = mock.fn() as any;
 const mockAwardEvent = mock.fn() as any;
@@ -57,6 +58,7 @@ const mockPrismaStudentFindUnique = mock.fn() as any;
 const mockFormatClustersForPrompt = mock.fn() as any;
 const mockRunAgentTurn = mock.fn() as any;
 const mockExecuteSlashCommand = mock.fn() as any;
+const mockExecuteAgentTool = mock.fn() as any;
 const mockAssembleStudentContextBundle = mock.fn() as any;
 const mockSelfMetricLineFromBundle = mock.fn() as any;
 const mockGetSituationalSnapshot = mock.fn() as any;
@@ -163,10 +165,14 @@ mock.module("@/lib/sage/knowledge-base-server", {
   },
 });
 
+const mockFindRelevantForms = mock.fn() as any;
+
 mock.module("@/lib/sage/knowledge-base", {
   namedExports: {
     getDirectFormAnswer: mockGetDirectFormAnswer,
+    resolveDirectFormMatch: mockResolveDirectFormMatch,
     getFormContext: mockGetFormContext,
+    findRelevantForms: mockFindRelevantForms,
   },
 });
 
@@ -267,6 +273,7 @@ mock.module("@/lib/sage/agent/loop", {
 mock.module("@/lib/sage/agent/executor", {
   namedExports: {
     executeSlashCommand: mockExecuteSlashCommand,
+    executeAgentTool: mockExecuteAgentTool,
   },
 });
 
@@ -335,6 +342,8 @@ function resetMocks() {
     mockBuildSystemPrompt,
     mockGetDocumentContext,
     mockGetDirectFormAnswer,
+    mockResolveDirectFormMatch,
+    mockFindRelevantForms,
     mockGetFormContext,
     mockRecordChatSession,
     mockAwardEvent,
@@ -357,6 +366,7 @@ function resetMocks() {
     mockFormatClustersForPrompt,
     mockRunAgentTurn,
     mockExecuteSlashCommand,
+    mockExecuteAgentTool,
     mockLogger.error,
     mockLogger.warn,
     mockLogger.info,
@@ -369,6 +379,8 @@ function resetMocks() {
   toolCapturedBy_withRegistry = null;
 
   mockGetDirectFormAnswer.mock.mockImplementation(() => null);
+  mockResolveDirectFormMatch.mock.mockImplementation(() => null);
+  mockFindRelevantForms.mock.mockImplementation(() => []);
   mockGetFormContext.mock.mockImplementation(() => "");
   mockGetDocumentContext.mock.mockImplementation(async () => "");
   mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("ollama"));
@@ -443,6 +455,23 @@ function resetMocks() {
     /* default: no events */
   });
   mockExecuteSlashCommand.mock.mockImplementation(async () => null);
+  mockExecuteAgentTool.mock.mockImplementation(async () => ({
+    callId: "call-form-1",
+    tool: "present_form",
+    args: { query: "student-profile" },
+    result: {
+      status: "success",
+      summary: 'Found "SPOKES Student Profile".',
+      data: { formId: "student-profile", title: "SPOKES Student Profile" },
+      action: {
+        action: "open_form",
+        target: "/api/forms/download?formId=student-profile&mode=view",
+        label: "Open SPOKES Student Profile",
+      },
+    },
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -542,12 +571,16 @@ describe("POST /api/chat/send — SSE happy path", () => {
   // This suite drives the classic streamResponse() path; the agent default
   // flipped to on (Phase 3), so pin it off explicitly.
   const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
   before(() => {
     process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
   });
   after(() => {
     if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
     else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
   });
 
   beforeEach(() => {
@@ -728,5 +761,91 @@ describe("POST /api/chat/send — Sage self-metric wiring", () => {
     // ...and its result reaches buildSystemPrompt.
     const promptCtx = mockBuildSystemPrompt.mock.calls[0].arguments[1];
     assert.equal(promptCtx.situationalSnapshot, "SNAPSHOT_STUB");
+  });
+});
+
+describe("POST /api/chat/send — form commitment → present_form", () => {
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "readonly";
+    process.env.SAGE_AGENT_ENABLED = "false";
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("on Yes after a form offer, emits open_form action without asking for the link", async () => {
+    const conversationId = "cm1234567890abcdefghijklm";
+    mockGetOrCreateConversation.mock.mockImplementation(async () => ({
+      id: conversationId,
+      title: "test",
+      stage: "orientation",
+      messages: [
+        {
+          role: "assistant",
+          content:
+            "Would you like to start with the [SPOKES Student Profile](/api/forms/download?formId=student-profile&mode=view)?",
+        },
+      ],
+    }));
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Yes", conversationId },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+
+    const body = await readSseBody(res);
+    assert.match(body, /"type":"action"/);
+    assert.match(body, /"action":"open_form"/);
+    assert.match(body, /formId=student-profile/);
+    assert.match(body, /Open SPOKES Student Profile/);
+    assert.equal(mockExecuteAgentTool.mock.callCount(), 1);
+    assert.equal(
+      mockExecuteAgentTool.mock.calls[0].arguments[0].toolName,
+      "present_form",
+    );
+    // Must not fall through to the model agent loop.
+    assert.equal(mockRunAgentTurn.mock.callCount(), 0);
+  });
+
+  it("on an explicit form ask, presents via present_form without the model", async () => {
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      {
+        form: {
+          id: "student-profile",
+          title: "SPOKES Student Profile",
+        },
+        url: "/api/forms/download?formId=student-profile&mode=view",
+        score: 40,
+      },
+    ]);
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "show me the student profile form" },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+
+    const body = await readSseBody(res);
+    assert.match(body, /"action":"open_form"/);
+    assert.match(body, /formId=student-profile/);
+    assert.equal(mockExecuteAgentTool.mock.callCount(), 1);
+    assert.equal(mockGetDirectFormAnswer.mock.callCount(), 0);
+    assert.equal(mockRunAgentTurn.mock.callCount(), 0);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0);
   });
 });
