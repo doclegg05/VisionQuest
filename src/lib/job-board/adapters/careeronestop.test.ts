@@ -1,6 +1,7 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { careerOneStopAdapter } from "./careeronestop";
+import { logger } from "@/lib/logger";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -69,5 +70,40 @@ describe("careeronestop adapter", () => {
   it("returns [] when the API errors", async () => {
     globalThis.fetch = async () => new Response("nope", { status: 500 });
     assert.deepEqual(await careerOneStopAdapter.fetchJobs("WV", 25), []);
+  });
+
+  function assertWarnLogsAreCredentialFree(
+    warnMock: ReturnType<TestContext["mock"]["method"]>,
+  ): void {
+    assert.ok(warnMock.mock.calls.length > 0, "expected at least one warn log on failure");
+    for (const call of warnMock.mock.calls) {
+      const serialized = JSON.stringify(call.arguments);
+      assert.ok(
+        !serialized.includes("test-user"),
+        `logged payload leaked COS_USER_ID: ${serialized}`,
+      );
+      assert.ok(
+        serialized.includes("[cos-user]"),
+        `expected redacted user-id segment in logged url: ${serialized}`,
+      );
+    }
+  }
+
+  it("never logs the configured user id on a non-2xx response", async (t: TestContext) => {
+    const warnMock = t.mock.method(logger, "warn", () => {});
+    globalThis.fetch = async () => new Response("denied", { status: 403 });
+
+    assert.deepEqual(await careerOneStopAdapter.fetchJobs("WV", 25), []);
+    assertWarnLogsAreCredentialFree(warnMock);
+  });
+
+  it("never logs the configured user id when fetch throws", async (t: TestContext) => {
+    const warnMock = t.mock.method(logger, "warn", () => {});
+    globalThis.fetch = async () => {
+      throw new Error("connection reset");
+    };
+
+    assert.deepEqual(await careerOneStopAdapter.fetchJobs("WV", 25), []);
+    assertWarnLogsAreCredentialFree(warnMock);
   });
 });

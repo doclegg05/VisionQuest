@@ -20,7 +20,22 @@ const QUERY_STOPWORDS = new Set([
 
 const SHORT_QUERY_TOKENS = new Set(["ai", "bi", "c", "go", "hr", "it", "ml", "qa", "ui", "ux"]);
 
-export async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T | null> {
+interface FetchLogOptions {
+  /**
+   * Credential-free stand-in for the real URL in failure logs. Pass one when
+   * the URL embeds a secret (e.g. CareerOneStop request paths embed
+   * COS_USER_ID — see careeronestop-config.ts's never-log contract).
+   * Defaults to the real URL.
+   */
+  logUrl?: string;
+}
+
+export async function fetchJson<T>(
+  url: string,
+  init: RequestInit = {},
+  options: FetchLogOptions = {},
+): Promise<T | null> {
+  const logUrl = options.logUrl ?? url;
   try {
     const headers = new Headers(init.headers);
     if (!headers.has("user-agent")) {
@@ -32,12 +47,12 @@ export async function fetchJson<T>(url: string, init: RequestInit = {}): Promise
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
-      logger.warn("Job source request failed", { url, status: response.status });
+      logger.warn("Job source request failed", { url: logUrl, status: response.status });
       return null;
     }
     return (await response.json()) as T;
   } catch (error) {
-    logger.warn("Job source request errored", { url, error: String(error) });
+    logger.warn("Job source request errored", { url: logUrl, error: String(error) });
     return null;
   }
 }

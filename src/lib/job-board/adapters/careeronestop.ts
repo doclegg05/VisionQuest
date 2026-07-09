@@ -57,7 +57,6 @@ export const careerOneStopAdapter: JobSourceAdapter = {
       if (out.length >= MAX_RESULTS) break;
 
       const path = [
-        encodeURIComponent(userId),
         encodeURIComponent(keyword),
         encodeURIComponent(location),
         String(radius),
@@ -67,10 +66,15 @@ export const careerOneStopAdapter: JobSourceAdapter = {
         String(PAGE_SIZE),
         String(RECENCY_DAYS),
       ].join("/");
+      const search = "?source=NLx&showFilters=false";
 
       const data = await fetchJson<CareerOneStopResponse>(
-        `${COS_BASE}/${path}?source=NLx&showFilters=false`,
+        `${COS_BASE}/${encodeURIComponent(userId)}/${path}${search}`,
         { headers: { Authorization: `Bearer ${token}` } },
+        // Request paths embed COS_USER_ID, which must never be logged
+        // (careeronestop-config.ts contract) — log a redacted URL instead,
+        // mirroring careeronestop-counseling.ts's endpoint-label practice.
+        { logUrl: `${COS_BASE}/[cos-user]/${path}${search}` },
       );
 
       for (const job of data?.Jobs ?? []) {
