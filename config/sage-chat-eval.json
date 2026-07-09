@@ -17,7 +17,8 @@
     "stage": "general",
     "message": "What QuickBooks certifications can I earn here?",
     "assert": {
-      "expectedTool": "find_certification"
+      "expectedTool": "find_certification",
+      "acceptableTools": ["lookup_program_info"]
     }
   },
   {
