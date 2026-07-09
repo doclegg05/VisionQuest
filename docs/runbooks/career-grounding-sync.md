@@ -164,8 +164,9 @@ unchanged except one verified factual fix (NCRC exam list: "Business Writing"
 → "Graphic Literacy", per the staged `SPOKES_Certifications.docx`). After
 steps 2–5 verify green, reconcile in a normal gated PR:
 
-1. `src/lib/spokes/certifications.ts` line ~226 still says the NCRC measures
-   "Business Writing" — apply the same Graphic Literacy correction there.
+1. ~~`src/lib/spokes/certifications.ts` NCRC correction~~ — already applied on
+   this branch (commit `d0345b6`, alongside the knowledge-base.ts fix). No
+   post-sync action needed.
 2. Decide whether `SPOKES_KNOWLEDGE`'s 14-item certification list slims down
    to the brief + a pointer, deferring detail to the now-retrievable
    `spokes-certifications` node (token savings vs. always-on accuracy; run
@@ -190,5 +191,7 @@ Any regression (bad retrieval, wrong doc surfacing, PII scare):
    commit), then `npm run catalog:sync -- --apply` to regenerate the overlay.
 3. Bucket objects can stay (harmless without rows); removing them is an
    archive-never-delete decision for Britt.
-4. The knowledge-base annotation comments are behavior-neutral; the NCRC
-   string fix reverts with the Phase B commit if ever needed.
+4. The knowledge-base annotation comments are behavior-neutral. The NCRC
+   string fixes live in commit `d0345b6` (certifications.ts) and the Phase B
+   commit `00c91a4` (knowledge-base.ts) — revert those specifically if ever
+   needed; they are factual corrections, so reverting is not expected.
