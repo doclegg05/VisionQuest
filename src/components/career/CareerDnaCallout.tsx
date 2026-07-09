@@ -27,7 +27,7 @@ export default async function CareerDnaCallout({ studentId }: CareerDnaCalloutPr
       <aside className="surface-section p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-green)] to-[#2a8a3c] text-white">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-green)] text-white">
               {isComplete ? (
                 <Sparkle size={22} weight="fill" />
               ) : (
@@ -55,13 +55,22 @@ export default async function CareerDnaCallout({ studentId }: CareerDnaCalloutPr
               ) : null}
             </div>
           </div>
-          <Link
-            href={actionHref}
-            prefetch={false}
-            className="primary-button shrink-0 self-start px-4 py-2 text-sm"
-          >
-            {actionLabel}
-          </Link>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 self-start">
+            <Link
+              href={actionHref}
+              prefetch={false}
+              className="primary-button px-4 py-2 text-sm"
+            >
+              {actionLabel}
+            </Link>
+            <Link
+              href="/career/profile"
+              prefetch={false}
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2 text-sm font-bold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)]"
+            >
+              View Career DNA
+            </Link>
+          </div>
         </div>
       </aside>
 
