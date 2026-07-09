@@ -59,11 +59,10 @@ describe("FORMS", () => {
     assert.match(answer, /\/api\/forms\/download\?formId=attendance-contract&mode=view/);
   });
 
-  it("bypasses the direct answer when a literal title hit can't tell two same-title siblings apart", () => {
-    // portfolio-checklist and portfolio-checklist-tracking share the identical
-    // title "Employment Portfolio Checklist", so a literal title hit matches
-    // both — the no-model direct answer can't disambiguate. With both flagged
-    // ambiguous, getDirectFormAnswer must defer to the agent path (return null).
+  it("answers the tracking portfolio checklist when titles are distinct", () => {
+    // Titles are now distinct ("… Checklist" vs "… Checklist (Tracking)"), so
+    // a query that names ongoing tracking uniquely literal-matches the
+    // tracking form and must answer directly even when both are catalog-ambiguous.
     __setFormCatalogNotesForTest({
       version: 1,
       entries: {
@@ -85,7 +84,8 @@ describe("FORMS", () => {
       const answer = getDirectFormAnswer(
         "I need the employment portfolio checklist form for ongoing tracking",
       );
-      assert.equal(answer, null, "shared-title ambiguous pair should defer to the agent path");
+      assert.ok(answer, "distinct tracking title should answer directly");
+      assert.match(answer, /formId=portfolio-checklist-tracking/);
     } finally {
       __setFormCatalogNotesForTest(null);
       __resetFormCatalogNotesCache();
@@ -117,10 +117,15 @@ describe("FORMS", () => {
     }
   });
 
-  it("builds prompt context with exact form URLs", () => {
+  it("builds prompt context that steers present_form when the agent loop is on", () => {
+    // Default agent mode (unset SAGE_AGENT_MODE / SAGE_AGENT_ENABLED) enables
+    // the loop, so getFormContext must list MATCHING FORMS ids — not paste
+    // download URLs the chat UI no longer turns into buttons.
     const context = getFormContext("Where is the DFA-TS-12 form?");
 
-    assert.match(context, /FORM LINKS/);
-    assert.match(context, /\/api\/forms\/download\?formId=dfa-ts-12&mode=view/);
+    assert.match(context, /MATCHING FORMS/);
+    assert.match(context, /present_form/);
+    assert.match(context, /dfa-ts-12/);
+    assert.doesNotMatch(context, /\/api\/forms\/download/);
   });
 });

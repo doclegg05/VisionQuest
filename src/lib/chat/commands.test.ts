@@ -57,8 +57,9 @@ describe("filterCommands", () => {
 });
 
 describe("getStarterChips", () => {
-  it("returns exactly 4 chips per role", () => {
-    assert.equal(getStarterChips("student").length, 4);
+  it("returns a small fixed set of chips per role", () => {
+    // Student has 5 (resume + interview chips added with employment path).
+    assert.equal(getStarterChips("student").length, 5);
     assert.equal(getStarterChips("teacher").length, 4);
     assert.equal(getStarterChips("admin").length, 4);
   });
