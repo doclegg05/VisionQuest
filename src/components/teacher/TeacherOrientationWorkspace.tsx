@@ -303,16 +303,30 @@ export default function TeacherOrientationWorkspace() {
           </div>
 
           <div className="surface-section p-5">
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                Action forms
-              </p>
-              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">
-                Orientation Forms
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-                Open, download, upload, and re-upload onboarding forms on behalf of the selected student.
-              </p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                  Action forms
+                </p>
+                <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">
+                  Orientation Forms
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
+                  Open, download, upload, and re-upload onboarding forms on behalf of the selected student.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  // Opened synchronously on the click gesture so it isn't blocked
+                  // as a popup; the server streams a single merged PDF into the tab.
+                  window.open("/api/forms/orientation-packet", "_blank", "noopener");
+                }}
+                className="primary-button shrink-0 px-5 py-2.5 text-sm"
+                title="Open a single printable PDF of every onboarding form, ready to print for a paper orientation packet."
+              >
+                🖨️ Print all orientation forms
+              </button>
             </div>
 
             <ResourceLibrary
