@@ -59,7 +59,7 @@ export default async function CareerDnaCallout({ studentId }: CareerDnaCalloutPr
             <Link
               href={actionHref}
               prefetch={false}
-              className="primary-button px-4 py-2 text-sm"
+              className="primary-button inline-flex min-h-11 items-center justify-center px-4 py-2 text-sm"
             >
               {actionLabel}
             </Link>

@@ -36,7 +36,7 @@ export function CareerDnaHighlights({ topInterests }: CareerDnaHighlightsProps) 
               >
                 {idx + 1}
               </span>
-              <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs font-bold text-[var(--accent-strong)]">
+              <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs font-bold text-[var(--badge-success-text)]">
                 {interest.percent}%
               </span>
             </div>
