@@ -1,0 +1,21 @@
+# Decision Journal — agent/sage-career-grounding-20260709
+
+Plan: `C:\Users\Instructor\.claude\plans\i-would-like-to-cached-liskov.md` (Sage career grounding, phases A–E).
+Lane: exploration (isolated worktree, non-governed surfaces). Governed steps (live Supabase upload/sync,
+live CareerOneStop calls with real creds, merge/push/deploy) are STAGED ONLY — Britt approves.
+
+---
+
+[2026-07-09] DECISION: Branch `agent/sage-career-grounding-20260709` created from `main` (f346f45), worktree at `.claude/worktrees/sage-career-grounding` | WHY: 8 concurrent worktrees + autopilot write this repo; charter mandates isolation; main == origin/main so no fetch needed | ALTERNATIVES: branch from feat/sage-action-cards (rejected — unrelated in-flight chat work); sibling directory (rejected — .claude/worktrees is the established convention) | REVERSIBLE: `git worktree remove` + branch delete (agent-created scratch, charter §4)
+
+[2026-07-09] DECISION: Execute plan via self-paced /loop, one Ultracode workflow per phase-cluster (A first; then B-prep ∥ C ∥ D; then E gates) | WHY: Britt chose path 2 + "/loop with agent teams"; phase B depends on A's dedup manifest; C/D are independent but share the worktree, so they run after A in one coordinated run to avoid write collisions | ALTERNATIVES: single monolithic A–E workflow (rejected — no review point between discovery and code); fully parallel A∥C∥D (rejected — C/D write the worktree while A informs B's targets; sequencing costs little) | REVERSIBLE: fully — nothing leaves the branch
+
+[2026-07-09] PHASE A COMPLETE (workflow wf_45ee5ae8-32f, 5 agents, 0 errors): 15 new candidates / 17 already-in-RAG (ECP dupe CONFIRMED: RAG row "ECP AE and SPOKES", TEACHER_GUIDE/TEACHER, content-equivalent to all 4 local renditions) / 0 staged-only / 28 skipped with reasons / 12 piiRisk paths quarantined. Manifest: `.planning/career-grounding/phase-a-inventory.md`. 8 open questions (Q1–Q8) held for Britt's digest. NOTE: the RAG-rows agent left `tmp-career-a-ragrows.mjs` in the primary checkout root (matches existing tmp-*.mjs convention) + full row dump in the temp dir — flagged for digest, not cleaned (archive-never-delete).
+
+[2026-07-09] DECISION: Redacted student-named paths out of the tracked manifest into `phase-a-pii-appendix.local.md` (untracked) and appended a guard to `.git/info/exclude` (local-only, additive) | WHY: `.planning/` is NOT gitignored; manifest Appendix A named 8 student-record paths; branch commits are local but push-gated later — PII must never enter git history (stricter FERPA reading) | ALTERNATIVES: commit unredacted + pre-push reminder (rejected — safety by convention, not construction); don't commit manifest at all (rejected — it's Phase B's contract and should ride the branch) | REVERSIBLE: local appendix + exclude lines are trivially removable
+
+[2026-07-09] DECISION: `node_modules` junction from worktree → primary checkout | WHY: build/lint/test agents need deps; `prisma/schema.prisma` verified IDENTICAL between main and feat/sage-action-cards so the shared generated client is safe (known footgun only bites on schema mismatch); no schema changes planned in B/C/D | ALTERNATIVES: full `npm ci` (slower, ~GB; fallback if junction misbehaves) | REVERSIBLE: delete junction
+
+[2026-07-09] DECISION: `docs-upload/` is gitignored → Phase B stages candidate copies worktree-locally (untracked by design); the COMMITTED deliverables are catalog nodes, allowlist entries, knowledge-base reconciliation, and the governed runbook | WHY: matches PR #110-era reality (docs-upload mirrors the bucket, not git) | REVERSIBLE: fully
+
+[2026-07-09] DECISION: B∥C∥D proceeds on all 15 candidates without blocking on Q1–Q8 | WHY: staging is on-branch and reversible; Britt's decision point is the governed upload/sync gate. Leans adopted: Q3 WIOA referral → `forms/` (synthesizer's placement beside STUDENT_REFERRAL rows beats generic guidance); Q6 overlaps → cross-referenced in catalog "When NOT to use" rather than dropped; Q7 2021-dated pathway doc → staged with dated-caveat in its catalog node. Q1 (ECP student-audience restage), Q2 (4 piiRisk confirms), Q5 (interest-profiler source), Q8 (rubric -2 refresh) stay OPEN — presented as leans in the digest, not acted on | REVERSIBLE: un-stage any candidate before the governed gate
