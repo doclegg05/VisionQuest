@@ -73,6 +73,7 @@
     "next": "^16.2.4",
     "node-cache": "^5.1.2",
     "nodemailer": "8.0.7",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "prisma": "^6.19.3",
     "react": "19.2.5",
