@@ -301,6 +301,89 @@ describe("career grounding tools — execution", () => {
     assert.match(record.result.modelHint ?? "", /rather than guessing/);
   });
 
+  it("career_wages treats a 404 as a normal no-match, never a broken service", async () => {
+    scriptFetch([new Response("missing", { status: 404 })]);
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "career_wages",
+      args: { occupation: "florble wrangler" },
+    });
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /couldn't find/);
+    assert.match(record.result.modelHint ?? "", /not a service problem/);
+    assert.match(record.result.modelHint ?? "", /Never invent pay numbers/);
+    const surfaced = `${record.result.summary} ${record.result.modelHint ?? ""}`;
+    assert.ok(
+      !/career-data service|lookup failed/.test(surfaced),
+      "service-error wording must not surface on a routine no-match",
+    );
+  });
+
+  it("career_training_programs treats a 404 as a normal no-match, never a broken service", async () => {
+    scriptFetch([new Response("missing", { status: 404 })]);
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "career_training_programs",
+      args: { occupation: "florble wrangling" },
+    });
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /couldn't find training/);
+    assert.match(record.result.modelHint ?? "", /not a service problem/);
+    const data = record.result.data as { programs: unknown[]; totalCount: number };
+    assert.deepEqual(data.programs, []);
+    assert.equal(data.totalCount, 0);
+    const surfaced = `${record.result.summary} ${record.result.modelHint ?? ""}`;
+    assert.ok(
+      !/career-data service|lookup failed/.test(surfaced),
+      "service-error wording must not surface on a routine no-match",
+    );
+  });
+
+  it("career_tools_technology treats a 404 on the title search as a normal no-match", async () => {
+    const calls = scriptFetch([new Response("missing", { status: 404 })]);
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "career_tools_technology",
+      args: { occupation: "florble wrangler" },
+    });
+    assert.equal(calls.length, 1, "stops after the failed title search");
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /couldn't find an occupation/);
+    assert.match(record.result.modelHint ?? "", /not a service problem/);
+    const surfaced = `${record.result.summary} ${record.result.modelHint ?? ""}`;
+    assert.ok(
+      !/career-data service|lookup failed/.test(surfaced),
+      "service-error wording must not surface on a routine no-match",
+    );
+  });
+
+  it("career_tools_technology treats a 404 on the tools lookup itself as a normal no-match", async () => {
+    const calls = scriptFetch([
+      jsonResponse({
+        OccupationList: [{ OnetTitle: "Registered Nurses", OnetCode: "29-1141.00" }],
+      }),
+      new Response("missing", { status: 404 }),
+    ]);
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "career_tools_technology",
+      args: { occupation: "registered nurse" },
+    });
+    assert.equal(calls.length, 2);
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /couldn't find a tools list/);
+    assert.match(record.result.modelHint ?? "", /not a service problem/);
+    const surfaced = `${record.result.summary} ${record.result.modelHint ?? ""}`;
+    assert.ok(
+      !/career-data service|lookup failed/.test(surfaced),
+      "service-error wording must not surface on a routine no-match",
+    );
+  });
+
   it("career_tools_technology resolves a job title to an O*NET code first", async () => {
     const calls = scriptFetch([
       jsonResponse({

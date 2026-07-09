@@ -277,6 +277,17 @@ const careerWages: AgentTool = {
 
     const result = await fetchOccupationWages(occupation, { location });
     if (!result.configured) return notConfiguredResult();
+    if (result.error === "not_found") {
+      return {
+        status: "success",
+        summary: `I couldn't find an occupation matching "${occupation}".`,
+        data: { wages: [] },
+        modelHint:
+          `No occupation matched "${occupation}" — a normal no-match, not a service problem. ` +
+          "Ask the student to say the job a different way (a more common title works best) " +
+          "rather than guessing. Never invent pay numbers.",
+      };
+    }
     if (result.error) return serviceErrorResult(result.error);
     if (result.wages.length === 0) {
       return {
@@ -349,6 +360,17 @@ const careerTrainingPrograms: AgentTool = {
 
     const result = await fetchTrainingPrograms(occupation, { location, limit });
     if (!result.configured) return notConfiguredResult();
+    if (result.error === "not_found") {
+      return {
+        status: "success",
+        summary: `I couldn't find training matching "${occupation}" near ${location ?? "WV"}.`,
+        data: { programs: [], totalCount: 0 },
+        modelHint:
+          `No training match came back for "${occupation}" — a normal no-match, not a service ` +
+          "problem. Suggest the student try a broader or more common keyword, or a nearby " +
+          "city, rather than guessing. Never invent schools or programs.",
+      };
+    }
     if (result.error) return serviceErrorResult(result.error);
     if (result.programs.length === 0) {
       return {
@@ -413,22 +435,34 @@ const careerToolsTechnology: AgentTool = {
     if (!ONET_CODE_PATTERN.test(occupation)) {
       const search = await searchOccupations(occupation, { limit: 1 });
       if (!search.configured) return notConfiguredResult();
-      if (search.error) return serviceErrorResult(search.error);
-      if (search.occupations.length === 0) {
+      if (search.error === "not_found" || (!search.error && search.occupations.length === 0)) {
         return {
           status: "success",
           summary: `I couldn't find an occupation matching "${occupation}".`,
           data: { tools: [], technology: [] },
           modelHint:
-            `No occupation matched "${occupation}", so no tools list is available. Ask the student ` +
-            "for a more common job title rather than guessing.",
+            `No occupation matched "${occupation}", so no tools list is available — a normal ` +
+            "no-match, not a service problem. Ask the student for a more common job title " +
+            "rather than guessing.",
         };
       }
+      if (search.error) return serviceErrorResult(search.error);
       onetCode = search.occupations[0].onetCode;
     }
 
     const result = await fetchToolsAndTechnology(onetCode);
     if (!result.configured) return notConfiguredResult();
+    if (result.error === "not_found") {
+      return {
+        status: "success",
+        summary: `I couldn't find a tools list for "${occupation}".`,
+        data: { tools: [], technology: [] },
+        modelHint:
+          `CareerOneStop has no tools/technology page for "${occupation}" — a normal no-match, ` +
+          "not a service problem. Ask the student to try a different job title, or offer " +
+          "career_occupation_profile for the bigger picture instead.",
+      };
+    }
     if (result.error) return serviceErrorResult(result.error);
     if (result.tools.length === 0 && result.technology.length === 0) {
       return {
