@@ -37,6 +37,20 @@ import { isKnownAmbiguousForm } from "@/lib/catalog/notes";
 import { siblingScoreDelta } from "@/lib/spokes/form-sibling-rules";
 import { isAgentLoopEnabled } from "./agent/flags";
 
+/**
+ * Career-grounding note (2026-07-09, Phase B): the certification list and
+ * O*NET/NCRC prose below are duplicated by RAG-backed catalog nodes that land
+ * with the governed career-grounding sync (docs/runbooks/career-grounding-sync.md):
+ * - catalog/documents/spokes-certifications.md (students/resources/SPOKES_Certifications.docx)
+ *   — unified cert-access catalog; the retrieval-side source of truth once synced.
+ * - catalog/documents/region-1-demand-occupation-list-2024.md — local labor-market
+ *   demand data (the O*NET mapping lines below stay national/generic).
+ * - catalog/documents/spokes-life-and-employability-skills-curriculum.md — full
+ *   module descriptors behind "Curriculum based on..." below.
+ * Do NOT restructure this block to defer to RAG before that sync has run and
+ * been verified — zero-regression requirement; the post-sync reconciliation
+ * steps live in the runbook.
+ */
 export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
 You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
 
@@ -62,7 +76,7 @@ CERTIFICATIONS AVAILABLE (students can earn these):
    - Intuit Design for Delight Innovator
    - Free QuickBooks Online available for educators
 5. ACT WorkKeys National Career Readiness Certificate (NCRC)
-   - Tests: Applied Math, Workplace Documents, Business Writing
+   - Tests: Applied Math, Workplace Documents, Graphic Literacy
    - Score levels: Bronze, Silver, Gold, Platinum
    - Maps to O*NET occupations (Silver = 35% of profiled jobs, Gold = 65%, Platinum = 93%)
    - Students create accounts at act.org
@@ -284,9 +298,17 @@ Industry-recognized certification for Microsoft Office proficiency.
 - Required passing scores set by Microsoft
 - Full certifications list: docs.microsoft.com/en-us/learn/certifications`,
 
+  // NCRC exam list corrected 2026-07-09 ("Business Writing" → "Graphic
+  // Literacy") — verified against the staged SPOKES_Certifications.docx
+  // (bucket key students/resources/SPOKES_Certifications.docx; catalog node
+  // catalog/documents/spokes-certifications.md, which supersedes this prose
+  // as the retrieval source after the career-grounding sync). The matching
+  // fix in src/lib/spokes/certifications.ts landed in the same branch.
+  // Local demand data for the O*NET mapping lines below:
+  // catalog/documents/region-1-demand-occupation-list-2024.md.
   certifications_workkeys: `ACT WORKKEYS NATIONAL CAREER READINESS CERTIFICATE (NCRC) (detailed):
 Nationally recognized credential measuring workplace skills.
-- Three assessments: Applied Math, Workplace Documents, Business Writing
+- Three assessments: Applied Math, Workplace Documents, Graphic Literacy
 - Certificate levels based on scores:
   Bronze: Foundational workplace skills
   Silver: Qualifies for ~35% of profiled occupations
@@ -383,6 +405,12 @@ Free math and academic courses platform.
 - Individual student and activity overview reports available for tracking progress
 - Used for math skills, academic preparation, and HSE readiness`,
 
+  // The "Career discovery conversation with Sage (replaces the former CFWV
+  // Career Exploration Worksheet)" line below stays true as the ONBOARDING
+  // step — but the worksheet itself returns as an optional RAG resource via
+  // catalog/documents/cfwv-career-exploration-worksheet.md after the
+  // career-grounding sync. If Britt wants this prose to mention the worksheet
+  // again, that is a post-sync runbook decision, not a pre-sync edit.
   onboarding: `STUDENT ONBOARDING PROCESS (detailed):
 New student orientation follows a structured checklist (SPOKES Checklist for Student Orientation and Intake).
 
