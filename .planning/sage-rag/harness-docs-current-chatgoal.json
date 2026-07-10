@@ -1,0 +1,1240 @@
+{
+  "generatedAt": "2026-07-10T15:46:10.209Z",
+  "fixturePath": "config/sage-rag-eval.json",
+  "role": "student",
+  "maxResults": 3,
+  "tokenBudgetChars": 6000,
+  "legacyPassed": 20,
+  "strictPassed": 15,
+  "strictCleanPassed": 14,
+  "total": 29,
+  "expectedChecks": 20,
+  "passRate": 0.5172413793103449,
+  "top1Expected": 14,
+  "top3Expected": 15,
+  "cleanTop3": 14,
+  "unexpectedTop3Docs": 8,
+  "audienceLeakage": 0,
+  "noAnswerPassed": 8,
+  "noAnswerTotal": 9,
+  "latency": {
+    "coldFirstCallMs": 6740,
+    "p50Ms": 2351,
+    "p95Ms": 6699,
+    "maxMs": 6740
+  },
+  "missingExpectationKeys": [],
+  "results": [
+    {
+      "id": "close-confusion-ts12-fillable-vs-nonfillable",
+      "question": "Which DFA-TS-12 form do I need to fill out and sign?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": false,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 6740,
+      "documentContextChars": 2519,
+      "matchedTitles": [
+        "DFA TS 12 Rev 2 24",
+        "DFA TS 12 Rev 2 24 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya1ed0006eadkl7mt1qn2",
+          "title": "DFA TS 12 Rev 2 24",
+          "storageKey": "forms/DFA-TS-12_Rev_-2-24.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya10e0005eadkbkncyy6k",
+          "title": "DFA TS 12 Rev 2 24 Fillable",
+          "storageKey": "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "ts-12",
+        "fillable"
+      ],
+      "expectedStorageKeys": [
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+        "forms/DFA-TS-12_Rev_-2-24.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "close-confusion-wvw70-vs-wvw25",
+      "question": "I need to document my WV Works participation verification, which form is that?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2371,
+      "documentContextChars": 1858,
+      "matchedTitles": [
+        "DFA WVW 70 Rev 3 5 24 Sample"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya27a0008eadkm7k8rmlp",
+          "title": "DFA WVW 70 Rev 3 5 24 Sample",
+          "storageKey": "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "wvw-70",
+        "wvw 70",
+        "participant"
+      ],
+      "expectedStorageKeys": [
+        "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+        "forms/DFA-WVW-25_Rev_6-24.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "close-confusion-rights-vs-dress-code",
+      "question": "What document explains the rules I agreed to in the SPOKES program?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2351,
+      "documentContextChars": 3902,
+      "matchedTitles": [
+        "SPOKES Rights and Responsibilities FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmnoqeee30009eadkj4lkripv",
+          "title": "SPOKES Rights and Responsibilities FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "rights",
+        "responsibilities"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+        "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "close-confusion-attendance-vs-profile",
+      "question": "Where is the form I signed about showing up to class every day?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2365,
+      "documentContextChars": 3767,
+      "matchedTitles": [
+        "SPOKES Personal Attendance Contract FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "attendance"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "close-confusion-prc1-vs-ssp1",
+      "question": "I completed the WV Works program — what's the form that records my milestones?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": false,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": false,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyya27a0008eadkm7k8rmlp",
+          "title": "DFA WVW 70 Rev 3 5 24 Sample",
+          "storageKey": "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyba8e003ceadkm1er6sx1",
+          "title": "SPOKES Student Profile FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "latencyMs": 2428,
+      "documentContextChars": 5214,
+      "matchedTitles": [
+        "DFA WVW 70 Rev 3 5 24 Sample",
+        "SPOKES Student Profile FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya27a0008eadkm7k8rmlp",
+          "title": "DFA WVW 70 Rev 3 5 24 Sample",
+          "storageKey": "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyba8e003ceadkm1er6sx1",
+          "title": "SPOKES Student Profile FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "prc",
+        "completion"
+      ],
+      "expectedStorageKeys": [
+        "forms/DFA-PRC-1_Rev-1-24.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "forms/DFA-PRC-1_Rev-1-24.pdf",
+        "forms/DFA_-_SSP-1_1-9-24.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "close-confusion-student-aztec-vs-teacher-aztec",
+      "question": "How do I log in and use Aztec to study on my own?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2465,
+      "documentContextChars": 2697,
+      "matchedTitles": [
+        "Aztec PLUS Student Support Guide Version 9.0 1",
+        "Internet Student Handout PLUS Version 9.0 1"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya7oc000meadk43360ps0",
+          "title": "Aztec PLUS Student Support Guide Version 9.0 1",
+          "storageKey": "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya8ga000oeadkarei8d19",
+          "title": "Internet Student Handout PLUS Version 9.0 1",
+          "storageKey": "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "aztec"
+      ],
+      "expectedStorageKeys": [
+        "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+        "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Aztec/Aztec_PLUS_Student_Support_Guide__-_Version_9.0_1.pdf",
+        "lms/Aztec/Internet_Student_Handout_-_PLUS_Version_9.0_1.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "close-confusion-dohs-authorization-types",
+      "question": "I need to authorize the release of my DoHS information to the school program.",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2412,
+      "documentContextChars": 4877,
+      "matchedTitles": [
+        "WVAdultEd DoHS Release of Information FY26 Fillable",
+        "Authorization for Release of Information to External Agencies v1"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyybam8003deadk8lxvafj4",
+          "title": "WVAdultEd DoHS Release of Information FY26 Fillable",
+          "storageKey": "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9z1k0000eadkqsl45f7y",
+          "title": "Authorization for Release of Information to External Agencies v1",
+          "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "dohs",
+        "release"
+      ],
+      "expectedStorageKeys": [
+        "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/WVAdultEd_DoHS_Release_of_Information_FY26_Fillable.pdf",
+        "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+        "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "no-answer-unrelated-topic",
+      "question": "What is the capital of France?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1802,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-medical-advice",
+      "question": "Can you recommend medication for my back pain?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1789,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-outside-program-scope",
+      "question": "How do I apply for Social Security Disability Insurance benefits?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1775,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-weather",
+      "question": "What's the weather going to be like in Charleston this weekend?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1764,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-sports-trivia",
+      "question": "Who won the last Super Bowl?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1868,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-recipe",
+      "question": "Can you give me a recipe for chocolate chip cookies?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1746,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-general-trivia",
+      "question": "How many planets are in the solar system?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1777,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "no-answer-near-miss-refund-policy",
+      "question": "What is the SPOKES program refund policy?",
+      "hasContext": true,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 2354,
+      "documentContextChars": 2884,
+      "matchedTitles": [
+        "SPOKES Dress Code Policy FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb8zl0039eadkyb2luayk",
+          "title": "SPOKES Dress Code Policy FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": false
+    },
+    {
+      "id": "no-answer-near-miss-ged-schedule",
+      "question": "When is the next GED test date scheduled?",
+      "hasContext": false,
+      "matchedExpectedTerm": false,
+      "legacyPassed": false,
+      "relevancePassed": null,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": null,
+      "top3Expected": null,
+      "cleanTop3": null,
+      "unexpectedTop3": [],
+      "latencyMs": 1785,
+      "documentContextChars": 0,
+      "matchedTitles": [],
+      "matchedDocuments": [],
+      "expectedTerms": [],
+      "expectedStorageKeys": [],
+      "acceptableStorageKeys": [],
+      "audienceLeak": 0,
+      "noAnswerOk": true
+    },
+    {
+      "id": "low-literacy-orientation-forms",
+      "question": "What papers I gotta sign when I first start?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": false,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": false,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyy9zg10001eadk7g53hx7i",
+          "title": "Authorization for Release of Strictly Confidential Information v1",
+          "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9z1k0000eadkqsl45f7y",
+          "title": "Authorization for Release of Information to External Agencies v1",
+          "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "latencyMs": 2314,
+      "documentContextChars": 4105,
+      "matchedTitles": [
+        "Authorization for Release of Strictly Confidential Information v1",
+        "Authorization for Release of Information to External Agencies v1"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyy9zg10001eadk7g53hx7i",
+          "title": "Authorization for Release of Strictly Confidential Information v1",
+          "storageKey": "forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyy9z1k0000eadkqsl45f7y",
+          "title": "Authorization for Release of Information to External Agencies v1",
+          "storageKey": "forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf",
+          "category": "ORIENTATION",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "orientation",
+        "sign"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES Checklist for Student Orientation.pdf",
+        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "low-literacy-timesheet",
+      "question": "Where do I write down my hours for the state?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 6699,
+      "documentContextChars": 2519,
+      "matchedTitles": [
+        "DFA TS 12 Rev 2 24 Fillable",
+        "DFA TS 12 Rev 2 24"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya10e0005eadkbkncyy6k",
+          "title": "DFA TS 12 Rev 2 24 Fillable",
+          "storageKey": "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyya1ed0006eadkl7mt1qn2",
+          "title": "DFA TS 12 Rev 2 24",
+          "storageKey": "forms/DFA-TS-12_Rev_-2-24.pdf",
+          "category": "STUDENT_REFERRAL",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "time",
+        "hours",
+        "wv works",
+        "tanf"
+      ],
+      "expectedStorageKeys": [
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf",
+        "forms/DFA-TS-12_Rev_-2-24.pdf",
+        "forms/DFA-WVW-70_Rev-3-5-24-Sample.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "low-literacy-portfolio",
+      "question": "What stuff do I need to put in my work folder?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": false,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": false,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyba8e003ceadkm1er6sx1",
+          "title": "SPOKES Student Profile FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "latencyMs": 2308,
+      "documentContextChars": 2968,
+      "matchedTitles": [
+        "SPOKES Student Profile FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyba8e003ceadkm1er6sx1",
+          "title": "SPOKES Student Profile FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "portfolio",
+        "employment"
+      ],
+      "expectedStorageKeys": [
+        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+        "students/resources/SPOKES Life and Employability Module Rubric Record.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
+        "students/resources/SPOKES Life and Employability Module Rubric Record.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "low-literacy-dress-code",
+      "question": "What clothes am I supposed to wear to class?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2292,
+      "documentContextChars": 2884,
+      "matchedTitles": [
+        "SPOKES Dress Code Policy FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb8zl0039eadkyb2luayk",
+          "title": "SPOKES Dress Code Policy FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "dress code",
+        "appearance"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "student-role-no-teacher-admin-guide",
+      "question": "How does the SPOKES program track my attendance and participation?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": false,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyybfp4003qeadktl2bytzo",
+          "title": "SPOKES Life and Employability Module Rubric Record",
+          "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "latencyMs": 2378,
+      "documentContextChars": 5481,
+      "matchedTitles": [
+        "SPOKES Personal Attendance Contract FY26 Fillable",
+        "SPOKES Life and Employability Module Rubric Record"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyybfp4003qeadktl2bytzo",
+          "title": "SPOKES Life and Employability Module Rubric Record",
+          "storageKey": "students/resources/SPOKES Life and Employability Module Rubric Record.pdf",
+          "category": "STUDENT_RESOURCE",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "attendance"
+      ],
+      "expectedStorageKeys": [
+        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf",
+        "forms/DFA-TS-12_Rev_-2-24_Fillable.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "student-role-no-teacher-sign-in-sheet",
+      "question": "What form is used to record who comes to class each day?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": false,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": false,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyya3r9000ceadknion3ghq",
+          "title": "Ready to Work Certification Attendance Verification Form",
+          "storageKey": "forms/Ready to Work Certification Attendance Verification Form.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "latencyMs": 2981,
+      "documentContextChars": 314,
+      "matchedTitles": [
+        "Ready to Work Certification Attendance Verification Form"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyya3r9000ceadknion3ghq",
+          "title": "Ready to Work Certification Attendance Verification Form",
+          "storageKey": "forms/Ready to Work Certification Attendance Verification Form.pdf",
+          "category": "CERTIFICATION_INFO",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "sign-in",
+        "attendance",
+        "class"
+      ],
+      "expectedStorageKeys": [
+        "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
+        "orientation/SPOKES Checklist for Student Orientation.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "student-role-no-teacher-ecp-instructions",
+      "question": "How do I fill out my Education and Career Plan?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": false,
+      "strictPassed": false,
+      "strictCleanPassed": false,
+      "top1Expected": false,
+      "top3Expected": false,
+      "cleanTop3": false,
+      "unexpectedTop3": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "latencyMs": 2929,
+      "documentContextChars": 3767,
+      "matchedTitles": [
+        "SPOKES Personal Attendance Contract FY26 Fillable"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb9di003aeadkem94x1dz",
+          "title": "SPOKES Personal Attendance Contract FY26 Fillable",
+          "storageKey": "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf",
+          "category": "ORIENTATION",
+          "audience": "STUDENT",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "education",
+        "career",
+        "plan",
+        "ecp"
+      ],
+      "expectedStorageKeys": [
+        "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
+        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "platform-usa-learns-activity-report",
+      "question": "Where do I find my activity report in USA Learns?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2295,
+      "documentContextChars": 281,
+      "matchedTitles": [
+        "USA Learns Student Activity Report"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyb7fb0035eadkhdq61cj4",
+          "title": "USA Learns Student Activity Report",
+          "storageKey": "lms/USA Learns/USA Learns Student Activity Report.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "usa learns",
+        "activity report"
+      ],
+      "expectedStorageKeys": [
+        "lms/USA Learns/USA Learns Student Activity Report.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/USA Learns/USA Learns Student Activity Report.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "platform-khan-activity-report",
+      "question": "How do I get to the activity report inside Khan Academy?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2320,
+      "documentContextChars": 315,
+      "matchedTitles": [
+        "Accessing the Khan Academy Activity Report"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyayg8002ieadkl2fv89x7",
+          "title": "Accessing the Khan Academy Activity Report",
+          "storageKey": "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "khan",
+        "activity report"
+      ],
+      "expectedStorageKeys": [
+        "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf",
+        "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "platform-burlington-account-setup",
+      "question": "How do I set up my Burlington English account?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2314,
+      "documentContextChars": 334,
+      "matchedTitles": [
+        "Setting Up Burlington English Account"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyan2n001peadkosyow7hw",
+          "title": "Setting Up Burlington English Account",
+          "storageKey": "lms/Burlington English/Setting Up Burlington English Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "burlington",
+        "account"
+      ],
+      "expectedStorageKeys": [
+        "lms/Burlington English/Setting Up Burlington English Account.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Burlington English/Setting Up Burlington English Account.pdf",
+        "lms/Burlington English/02_Accessing_BE_1.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "platform-learningexpress-register",
+      "question": "How do I register for a free LearningExpress library account?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2354,
+      "documentContextChars": 366,
+      "matchedTitles": [
+        "Registering for a Free LearningExpress Library Account"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyaz7z002keadk6vq82g4b",
+          "title": "Registering for a Free LearningExpress Library Account",
+          "storageKey": "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "learningexpress",
+        "learning express",
+        "register"
+      ],
+      "expectedStorageKeys": [
+        "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "platform-khan-enroll",
+      "question": "How do students get enrolled in Khan Academy courses?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2497,
+      "documentContextChars": 299,
+      "matchedTitles": [
+        "Enrolling Students in Khan Academy Courses"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyayu2002jeadkfnd07tjt",
+          "title": "Enrolling Students in Khan Academy Courses",
+          "storageKey": "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "khan",
+        "enroll"
+      ],
+      "expectedStorageKeys": [
+        "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Khan Academy/Enrolling Students in Khan Academy Courses.pdf",
+        "lms/Khan Academy/Accessing the Khan Academy Activity Report.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    },
+    {
+      "id": "platform-burlington-accessing",
+      "question": "How do I log in and access Burlington English?",
+      "hasContext": true,
+      "matchedExpectedTerm": true,
+      "legacyPassed": true,
+      "relevancePassed": true,
+      "strictPassed": true,
+      "strictCleanPassed": true,
+      "top1Expected": true,
+      "top3Expected": true,
+      "cleanTop3": true,
+      "unexpectedTop3": [],
+      "latencyMs": 2371,
+      "documentContextChars": 4389,
+      "matchedTitles": [
+        "02 Accessing BE 1",
+        "Setting Up Burlington English Account"
+      ],
+      "matchedDocuments": [
+        {
+          "id": "cmmyyajwh001headkrxu8cay2",
+          "title": "02 Accessing BE 1",
+          "storageKey": "lms/Burlington English/02_Accessing_BE_1.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        },
+        {
+          "id": "cmmyyan2n001peadkosyow7hw",
+          "title": "Setting Up Burlington English Account",
+          "storageKey": "lms/Burlington English/Setting Up Burlington English Account.pdf",
+          "category": "LMS_PLATFORM_GUIDE",
+          "audience": "BOTH",
+          "usedBySage": true
+        }
+      ],
+      "expectedTerms": [
+        "burlington",
+        "access",
+        "log in"
+      ],
+      "expectedStorageKeys": [
+        "lms/Burlington English/02_Accessing_BE_1.pdf"
+      ],
+      "acceptableStorageKeys": [
+        "lms/Burlington English/02_Accessing_BE_1.pdf",
+        "lms/Burlington English/Setting Up Burlington English Account.pdf"
+      ],
+      "audienceLeak": 0,
+      "noAnswerOk": null
+    }
+  ]
+}

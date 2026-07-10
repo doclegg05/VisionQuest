@@ -166,3 +166,73 @@ git revert.
 [2026-07-10] GATES: npm test = 1567/1567 pass, 0 fail via BOTH PowerShell→cmd and bash (the 14
 newly-unskipped tests all pass); eslint exit 0 / 0 errors; graders otherwise untouched (only the
 `test` script line changed). CI impact: next CI run executes 1567 instead of 1553.
+---
+
+## agent/sage-chat-grounding-20260710 — chat-harness grounding goal (STOPPED: grader defect)
+
+[2026-07-10] DECISION: STOP per goal constraint ("fixture expectation wrong -> STOP and
+report") instead of coding around the grader | WHY: the 3 failing grounding cases in
+sage:chat-harness CANNOT pass with frozen graders — runGroundingCase compares the parsed
+download-link cuid directly to assert.expectCitationId, but all 3 fixtures hold STORAGE
+KEYS (since #100); the id->storageKey DB mapping that scripts/sage-rag-harness.mjs performs
+(loadDocumentsByIds -> doc.storageKey) is missing from the chat harness. Verified by
+read-only DB mapping: dress-code and rights-responsibilities retrieval is CORRECT (top
+cited cuid IS the expected doc) — pure grader-format failures; only
+teacher-orientation-checklist has a real retrieval gap (got the two release-authorization
+forms, not orientation/SPOKES Checklist for Student Orientation.pdf, id cmmyyb8ln0038eadke643r7ht)
+| ALTERNATIVES REJECTED: (a) storage-key ids in download links — breaks the RAG harness's
+loadDocumentsByIds mapping and real download URLs; (b) duplicate harness-visible Link lines —
+pollutes production context, inflates unexpectedTop3; both are grader-gaming | REVERSIBLE:
+nothing to revert — no product code changed.
+
+[2026-07-10] FINDING (second blocker): the goal's no-regression floor "40q strictPassed>=36"
+encodes the STALE pre-cleantop3 baseline (harness-cleantop3-baseline.json, captured before
+c5f42c2 merged). Current untouched main measures 34 (accepted 36->34 trade-off, journaled
+above). Verified with fresh runs: docs fixture strictPassed 15/29 (floor >=14 OK),
+40q strictPassed 34/40. Reports: .planning/sage-rag/harness-{docs,40q}-current-chatgoal.json.
+
+PROPOSED FIX (needs Britt's word — grader is frozen): mirror the RAG harness's mapping in
+runGroundingCase (~6 lines): look up parsed ref ids via prisma programDocument.findMany,
+compare doc.storageKey to expectCitationId. Then re-run; expect dress-code + rights to go
+green immediately, teacher-orientation-checklist to remain red on genuine retrieval (real
+follow-up work). Fixtures are RIGHT (stable storage keys > env-specific cuids) — fix the
+harness, not the fixtures.
+
+[2026-07-10] VERIFIED (2nd strict run, temperature=0): identical 18/21 — grounding 0/3,
+same cuids cited; all other families 18/18. The citation failure is DETERMINISTIC
+(grader-format), while the mustContainAny reply-term sub-failure is LLM-flaky (fired run 1,
+not run 2). Goal terminated on its 20-turn bound; end state unreachable under frozen
+graders + stale 40q floor (34 current vs >=36 required). Awaiting Britt: grader mapping fix.
+
+[2026-07-10] DECISION: Britt's word (AskUserQuestion, this session) resolved the goal
+deadlock — goal to be cleared; grader UNFROZEN for the mapping fix only. Applied it:
+runGroundingCase now maps parsed link cuids -> ProgramDocument.storageKey (prisma lookup,
+mirroring sage-rag-harness loadDocumentsByIds) and accepts a match on either raw id or
+storage key; failure messages print storage keys. eslint clean | REVERSIBLE: git revert.
+
+[2026-07-10] VERIFIED (2 strict runs + 1 grounding-only run post-fix): grounding-dress-code
+PASS (was FAIL since PR #100); grounding-teacher-orientation-checklist still FAIL but now
+legibly (retrieves the two release-authorization forms, not the checklist — the REAL
+retrieval gap, unchanged). grounding-rights-responsibilities: citation check now PASSES;
+case still FAIL on empty reply. ROOT CAUSE (tmp repro, 3/3 deterministic):
+finishReason=MALFORMED_FUNCTION_CALL — the "full" system prompt documents Sage's tools,
+"Where can I find..." invites a tool call, but generateResponse declares NO tools; the
+model emits a malformed call and response.text() returns "" silently. Production is
+unaffected (real chat always declares tools); the combination exists only in the harness's
+no-tools grounding family. Evidence: .planning/sage-rag/chat-grounding-debug.json (text:"").
+
+OPEN FOR BRITT (digest): (1) grounding family should declare the tool registry with the
+same no-op handler the tool family uses (small harness change — needs your word, grader);
+(2) teacher-checklist retrieval gap = follow-up product work; (3) gemini-provider swallows
+non-STOP finishReasons — generateResponse could surface them instead of returning "" (spec
+candidate); (4) branch disposition.
+
+[2026-07-10] ANOMALY + RECOVERY: a concurrent agent switched the primary checkout's HEAD to
+its new branch agent/react-hooks-compliance-20260710 mid-session; my grader-fix commit
+landed there as 4e03dec (stray). Recovered by creating worktree
+.claude/worktrees/sage-chat-grounding for THIS branch (charter worktree-per-agent rule —
+should have done this at session start) and cherry-picking -> 2b351d8. Did NOT touch the
+other branch: it is checked out with the other agent's uncommitted work (CredentialSharePanel.tsx).
+CLEANUP NEEDED AT ITS GATE: drop stray 4e03dec from agent/react-hooks-compliance-20260710
+(same patch preserved here as 2b351d8) | REVERSIBLE: yes — commits, no deletions.
+[Merged note 2026-07-10: the stray 4e03dec was dropped at the react-hooks merge gate as requested; this branch merged to main the same day.]

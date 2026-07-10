@@ -1,0 +1,82 @@
+{
+  "generatedAt": "2026-07-10T16:29:46.967Z",
+  "provider": "gemini (gemini-3.1-flash-lite)",
+  "fixturePath": "config/sage-chat-eval.json",
+  "families": [
+    "grounding"
+  ],
+  "temperature": 0,
+  "totals": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "skipped": 0
+  },
+  "byFamily": {
+    "grounding": {
+      "total": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0
+    }
+  },
+  "latency": {
+    "p50Ms": 5301,
+    "p95Ms": 8656,
+    "maxMs": 8656
+  },
+  "results": [
+    {
+      "id": "grounding-dress-code",
+      "family": "grounding",
+      "role": "student",
+      "message": "What is the SPOKES dress code?",
+      "skipped": false,
+      "pass": true,
+      "reason": null,
+      "latencyMs": 8656,
+      "text": "`lookup_program_info(topic='admin_resources')`\n\nHi Sam! The SPOKES dress code is designed to help you get ready for a professional work environment. \n\nIn short, you should aim for neat, clean, and modest clothing that doesn't distract from learning. You can find the full [SPOKES Dress Code Policy](/api/documents/download?id=cmmyyb8zl0039eadkyb2luayk&mode=view) here to review the specific details. \n\nDoes that help clarify what you were looking for, or is there a specific part you'd like to talk about?",
+      "calls": null,
+      "grade": null,
+      "judgeNote": null,
+      "matchedRefs": [
+        "cmmyyb8zl0039eadkyb2luayk"
+      ]
+    },
+    {
+      "id": "grounding-rights-responsibilities",
+      "family": "grounding",
+      "role": "student",
+      "message": "Where can I find my SPOKES rights and responsibilities?",
+      "skipped": false,
+      "pass": false,
+      "reason": "reply missing one of [rights, responsibilities]",
+      "latencyMs": 4223,
+      "text": "",
+      "calls": null,
+      "grade": null,
+      "judgeNote": null,
+      "matchedRefs": [
+        "cmnoqeee30009eadkj4lkripv"
+      ]
+    },
+    {
+      "id": "grounding-teacher-orientation-checklist",
+      "family": "grounding",
+      "role": "teacher",
+      "message": "What forms does a new student need to complete for orientation?",
+      "skipped": false,
+      "pass": false,
+      "reason": "expected citation \"orientation/SPOKES Checklist for Student Orientation.pdf\" not found (got: forms/Authorization_for_Release_of_Strictly_Confidential_Information_v1.pdf, forms/Authorization_for_Release_of_Information_to_External_Agencies_v1.pdf)",
+      "latencyMs": 5301,
+      "text": "Hello, Ms. Lee. To ensure a complete and compliant onboarding for your new students, please have them complete the following 14 forms required for the FY26 cycle:\n\n1.  **Welcome Letter**\n2.  **SPOKES Student Profile** (fillable PDF)\n3.  **Personal Attendance Contract** (fillable PDF)\n4.  **Rights and Responsibilities** (fillable PDF)\n5.  **Dress Code Policy** (fillable PDF)\n6.  **Authorization for Release of Information** (Use the *Authorization for Release of Information to External Agencies* form provided in your library)\n7.  **DoHS Release of Information** (fillable PDF)\n8.  **Media Release Form**\n9.  **Technology Acceptable Use Policy** (fillable PDF)\n10. **Employment Portfolio Checklist** (fillable PDF)\n11. **Learning Needs Screening Instrument**\n12. **CTE Learning Styles Assessment**\n13. **Non-Discrimination Notice**\n14. **Password Log Template**\n\n**A few reminders for your workflow:**\n*   **Release Forms:** You have two distinct release forms in your library. Use the *Authorization for Release of Strictly Confidential Information* for internal staff/volunteers and the *Authorization for Release of Information to External Agencies* for entities like the DoHS or Division of Rehabilitation Services.\n*   **Orientation Checklist:** Ensure you are referencing the *SPOKES Checklist for Student Orientation and Intake* to keep track of these as they are submitted.\n*   **Next Steps:** Once these are collected, don't forget to provide the student with their WorkKeys account creation instructions and the 4-week program schedule.\n\nWould you like me to help you draft a welcome email to send to your new cohort, or are you ready to review some of these submissions in the **Orientation Review** module?",
+      "calls": null,
+      "grade": null,
+      "judgeNote": null,
+      "matchedRefs": [
+        "cmmyy9zg10001eadk7g53hx7i",
+        "cmmyy9z1k0000eadkqsl45f7y"
+      ]
+    }
+  ]
+}

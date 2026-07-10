@@ -282,7 +282,8 @@ async function runGuardrailCase(deps, provider, declarations, systemPrompt, test
   return { pass: failures.length === 0, reason: failures.join("; ") || null, calls, text };
 }
 
-async function runGroundingCase(getDocumentContext, provider, systemPrompt, testCase) {
+async function runGroundingCase(deps, provider, systemPrompt, testCase) {
+  const { getDocumentContext, prisma } = deps;
   const role = testCase.role === "teacher" || testCase.role === "admin" ? "staff" : "student";
   const context = await getDocumentContext(testCase.message, role, 3, 6000);
   const refs = parseDocumentRefs(context);
@@ -290,9 +291,27 @@ async function runGroundingCase(getDocumentContext, provider, systemPrompt, test
   const failures = [];
 
   if (assert.expectCitationId) {
-    const cited = refs.some((ref) => ref.id === assert.expectCitationId);
+    // Fixtures cite stable storage keys (portable across environments), while
+    // the context's download links carry Prisma cuids — map ids to storage
+    // keys before comparing, mirroring loadDocumentsByIds in
+    // scripts/sage-rag-harness.mjs. Raw-id matches stay accepted so a fixture
+    // may pin an exact document id when it means to.
+    const ids = [...new Set(refs.map((ref) => ref.id))];
+    const docs = prisma
+      ? await prisma.programDocument.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, storageKey: true },
+        })
+      : [];
+    const storageKeyById = new Map(docs.map((doc) => [doc.id, doc.storageKey]));
+    const cited = refs.some(
+      (ref) =>
+        ref.id === assert.expectCitationId ||
+        storageKeyById.get(ref.id) === assert.expectCitationId,
+    );
     if (!cited) {
-      failures.push(`expected citation "${assert.expectCitationId}" not found (got: ${refs.map((r) => r.id).join(", ") || "none"})`);
+      const got = refs.map((ref) => storageKeyById.get(ref.id) ?? ref.id).join(", ") || "none";
+      failures.push(`expected citation "${assert.expectCitationId}" not found (got: ${got})`);
     }
   }
 
@@ -492,7 +511,8 @@ async function main() {
         outcome = await runGuardrailCase({ ensureCrisisResources }, provider, declsForRole(testCase.role), systemPrompt, testCase);
       } else if (testCase.family === "grounding") {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
-        outcome = await runGroundingCase(getDocumentContext, provider, systemPrompt, testCase);
+        const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
+        outcome = await runGroundingCase({ getDocumentContext, prisma }, provider, systemPrompt, testCase);
       } else if (testCase.family === "memory") {
         const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
         const { extractAndStoreMemories } = process.env.DATABASE_URL
