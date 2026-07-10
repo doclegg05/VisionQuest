@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { api, ApiClientError } from "@/lib/api";
 import { GOAL_LEVEL_META, goalStatusLabel } from "@/lib/goals";
@@ -151,10 +151,20 @@ export default function DashboardActionPanel({
     }
   }, [intent.kind, intent.student.id]);
 
-  useEffect(() => {
+  const [prevIntent, setPrevIntent] = useState(intent);
+  if (prevIntent !== intent) {
+    setPrevIntent(intent);
     setMessage(null);
     setTaskForm(buildTaskDraft(intent));
-    void loadContext();
+  }
+
+  const loadContextRef = useRef(loadContext);
+  useEffect(() => {
+    loadContextRef.current = loadContext;
+  });
+
+  useEffect(() => {
+    void loadContextRef.current();
   }, [intent, loadContext]);
 
   const reviewTargetLink = useMemo(() => {

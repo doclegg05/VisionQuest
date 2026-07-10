@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { GOAL_LEVEL_META, goalStatusLabel, goalCountsTowardPlan } from "@/lib/goals";
 import {
   GOAL_RESOURCE_LINK_STATUS_LABELS,
@@ -58,10 +58,11 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { dueAt: string; notes: string }>>({});
   const [linkDrafts, setLinkDrafts] = useState(() => createLinkDrafts(goalPlans));
-
-  useEffect(() => {
+  const [prevGoalPlans, setPrevGoalPlans] = useState(goalPlans);
+  if (prevGoalPlans !== goalPlans) {
+    setPrevGoalPlans(goalPlans);
     setLinkDrafts(createLinkDrafts(goalPlans));
-  }, [goalPlans]);
+  }
 
   const planningGoals = goals.filter((goal) => goalCountsTowardPlan(goal.status));
   if (planningGoals.length === 0) {

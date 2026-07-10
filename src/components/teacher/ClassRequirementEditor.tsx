@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { CERTIFICATIONS } from "@/lib/spokes/certifications";
 
 interface Requirement {
@@ -67,8 +67,13 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
     }
   }, [classId]);
 
+  const fetchRequirementsRef = useRef(fetchRequirements);
   useEffect(() => {
-    fetchRequirements();
+    fetchRequirementsRef.current = fetchRequirements;
+  });
+
+  useEffect(() => {
+    void fetchRequirementsRef.current();
   }, [fetchRequirements]);
 
   function updateStatus(idx: number, newStatus: string) {

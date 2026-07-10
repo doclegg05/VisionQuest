@@ -39,7 +39,10 @@ export function MemoryInspectorPanel({ studentId }: MemoryInspectorPanelProps) {
   }, [studentId]);
 
   useEffect(() => {
-    void load();
+    async function run() {
+      await load();
+    }
+    void run();
   }, [load]);
 
   const remove = async (memoryId: string) => {

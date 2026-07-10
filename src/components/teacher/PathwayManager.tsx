@@ -55,7 +55,9 @@ export default function PathwayManager() {
   }, []);
 
   useEffect(() => {
-    fetchPathways();
+    void (async () => {
+      await fetchPathways();
+    })();
   }, [fetchPathways]);
 
   function resetForm() {

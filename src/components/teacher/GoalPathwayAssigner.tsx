@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { GoalData } from "./student-detail/types";
 
 interface PathwaySuggestion {
@@ -68,11 +68,22 @@ export default function GoalPathwayAssigner({
     }
   }, [studentId]);
 
+  const [prevExpandedGoalId, setPrevExpandedGoalId] = useState(expandedGoalId);
+  if (prevExpandedGoalId !== expandedGoalId) {
+    setPrevExpandedGoalId(expandedGoalId);
+    if (!expandedGoalId) {
+      setSuggestions(null);
+    }
+  }
+
+  const loadSuggestionsRef = useRef(loadSuggestions);
+  useEffect(() => {
+    loadSuggestionsRef.current = loadSuggestions;
+  });
+
   useEffect(() => {
     if (expandedGoalId) {
-      loadSuggestions(expandedGoalId);
-    } else {
-      setSuggestions(null);
+      void loadSuggestionsRef.current(expandedGoalId);
     }
   }, [expandedGoalId, loadSuggestions]);
 

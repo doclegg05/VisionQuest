@@ -289,7 +289,9 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   }, [studentId]);
 
   useEffect(() => {
-    void loadData();
+    void (async () => {
+      await loadData();
+    })();
   }, [loadData]);
 
   async function handleSaveProfile() {

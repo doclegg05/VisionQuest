@@ -51,7 +51,10 @@ export default function FormTemplatesList() {
   }, [includeArchived]);
 
   useEffect(() => {
-    void fetchTemplates();
+    async function run() {
+      await fetchTemplates();
+    }
+    void run();
   }, [fetchTemplates]);
 
   async function handleArchive(templateId: string) {

@@ -196,7 +196,11 @@ export default function OrientationManager() {
     }
   }, []);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(() => {
+    void (async () => {
+      await fetchItems();
+    })();
+  }, [fetchItems]);
 
   async function handleSave(id: string | null, data: { label: string; description: string; required: boolean }) {
     const method = id ? "PUT" : "POST";

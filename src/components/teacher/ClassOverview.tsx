@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import InterventionQueue from "./InterventionQueue";
 import DetailedQueues from "./class-overview/DetailedQueues";
@@ -65,7 +65,7 @@ export default function ClassOverview({
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [actionIntent, setActionIntent] = useState<DashboardActionIntent | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [skipInitialFetch, setSkipInitialFetch] = useState(initialData !== undefined);
+  const skipInitialFetchRef = useRef(initialData !== undefined);
 
   const applyStudentPage = useCallback((data: {
     classes?: ManagedClassOption[];
@@ -108,13 +108,13 @@ export default function ClassOverview({
   }, [applyStudentPage, currentClassId, showInactive]);
 
   useEffect(() => {
-    if (skipInitialFetch) {
-      setSkipInitialFetch(false);
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
       return;
     }
 
     void fetchStudents(1);
-  }, [fetchStudents, skipInitialFetch]);
+  }, [fetchStudents]);
 
   function handleSort(key: SortKey) {
     if (sortBy === key) {

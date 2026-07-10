@@ -108,10 +108,17 @@ export default function TeacherOrientationWorkspace() {
     };
   }, [requestedClassId]);
 
-  useEffect(() => {
+  const [resetStudentsForClassId, setResetStudentsForClassId] = useState(currentClassId);
+  if (resetStudentsForClassId !== currentClassId) {
+    setResetStudentsForClassId(currentClassId);
     if (!currentClassId) {
       setStudents([]);
       setCurrentStudentId("");
+    }
+  }
+
+  useEffect(() => {
+    if (!currentClassId) {
       return;
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
@@ -183,13 +183,22 @@ export default function ClassRosterManager() {
     }
   }
 
+  const loadClassesRef = useRef(loadClasses);
   useEffect(() => {
-    void loadClasses(requestedClassId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadClassesRef.current = loadClasses;
+  });
+
+  const loadClassDetailRef = useRef(loadClassDetail);
+  useEffect(() => {
+    loadClassDetailRef.current = loadClassDetail;
+  });
+
+  useEffect(() => {
+    void loadClassesRef.current(requestedClassId);
   }, [adminMode, requestedClassId]);
 
   useEffect(() => {
-    void loadClassDetail(selectedClassId);
+    void loadClassDetailRef.current(selectedClassId);
   }, [selectedClassId]);
 
   async function createStudent() {

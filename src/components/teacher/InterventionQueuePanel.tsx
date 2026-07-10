@@ -574,6 +574,12 @@ export default function InterventionQueuePanel({
   const searchParams = useSearchParams();
   const classId = searchParams.get("classId")?.trim() || "";
 
+  const [prevClassId, setPrevClassId] = useState(classId);
+  if (classId !== prevClassId) {
+    setPrevClassId(classId);
+    setLoading(true);
+  }
+
   const fetchQueue = useCallback(async () => {
     try {
       const url = classId
@@ -590,8 +596,9 @@ export default function InterventionQueuePanel({
 
   useEffect(() => {
     if (initialQueue !== undefined && !classId) return;
-    setLoading(true);
-    void fetchQueue();
+    void (async () => {
+      await fetchQueue();
+    })();
   }, [initialQueue, fetchQueue, classId]);
 
   async function handleAlertAction(alertId: string, action: "resolve" | "snooze") {

@@ -109,7 +109,9 @@ export default function SpokesManager() {
   });
 
   const countyFilterRef = useRef(countyFilter);
-  countyFilterRef.current = countyFilter;
+  useEffect(() => {
+    countyFilterRef.current = countyFilter;
+  });
 
   const loadData = useCallback(async (selectedCounty?: string) => {
     const county = selectedCounty ?? countyFilterRef.current;
@@ -146,7 +148,9 @@ export default function SpokesManager() {
   }, []);
 
   useEffect(() => {
-    void loadData();
+    void (async () => {
+      await loadData();
+    })();
   }, [loadData]);
 
   function resetChecklistForm() {

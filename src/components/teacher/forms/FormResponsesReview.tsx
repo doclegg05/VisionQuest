@@ -82,7 +82,11 @@ export default function FormResponsesReview() {
   }, []);
 
   useEffect(() => {
-    if (selectedTemplateId) void fetchResponses(selectedTemplateId);
+    if (!selectedTemplateId) return;
+    async function run() {
+      await fetchResponses(selectedTemplateId);
+    }
+    void run();
   }, [selectedTemplateId, fetchResponses]);
 
   async function openResponse(id: string) {

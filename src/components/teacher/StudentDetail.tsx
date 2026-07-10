@@ -105,7 +105,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   }, [studentId]);
 
   useEffect(() => {
-    void loadData();
+    void (async () => {
+      await loadData();
+    })();
   }, [loadData]);
 
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
