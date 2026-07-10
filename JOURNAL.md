@@ -145,3 +145,26 @@ same cuids cited; all other families 18/18. The citation failure is DETERMINISTI
 (grader-format), while the mustContainAny reply-term sub-failure is LLM-flaky (fired run 1,
 not run 2). Goal terminated on its 20-turn bound; end state unreachable under frozen
 graders + stale 40q floor (34 current vs >=36 required). Awaiting Britt: grader mapping fix.
+
+[2026-07-10] DECISION: Britt's word (AskUserQuestion, this session) resolved the goal
+deadlock — goal to be cleared; grader UNFROZEN for the mapping fix only. Applied it:
+runGroundingCase now maps parsed link cuids -> ProgramDocument.storageKey (prisma lookup,
+mirroring sage-rag-harness loadDocumentsByIds) and accepts a match on either raw id or
+storage key; failure messages print storage keys. eslint clean | REVERSIBLE: git revert.
+
+[2026-07-10] VERIFIED (2 strict runs + 1 grounding-only run post-fix): grounding-dress-code
+PASS (was FAIL since PR #100); grounding-teacher-orientation-checklist still FAIL but now
+legibly (retrieves the two release-authorization forms, not the checklist — the REAL
+retrieval gap, unchanged). grounding-rights-responsibilities: citation check now PASSES;
+case still FAIL on empty reply. ROOT CAUSE (tmp repro, 3/3 deterministic):
+finishReason=MALFORMED_FUNCTION_CALL — the "full" system prompt documents Sage's tools,
+"Where can I find..." invites a tool call, but generateResponse declares NO tools; the
+model emits a malformed call and response.text() returns "" silently. Production is
+unaffected (real chat always declares tools); the combination exists only in the harness's
+no-tools grounding family. Evidence: .planning/sage-rag/chat-grounding-debug.json (text:"").
+
+OPEN FOR BRITT (digest): (1) grounding family should declare the tool registry with the
+same no-op handler the tool family uses (small harness change — needs your word, grader);
+(2) teacher-checklist retrieval gap = follow-up product work; (3) gemini-provider swallows
+non-STOP finishReasons — generateResponse could surface them instead of returning "" (spec
+candidate); (4) branch disposition.
