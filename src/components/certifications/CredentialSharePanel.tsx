@@ -31,30 +31,28 @@ export default function CredentialSharePanel() {
   });
 
   useEffect(() => {
+    async function load() {
+      try {
+        const response = await fetch("/api/credentials/share");
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.error || "Could not load credential settings.");
+        }
+        setData(payload);
+        setForm({
+          headline: payload.page?.headline || "",
+          summary: payload.page?.summary || "",
+          isPublic: Boolean(payload.page?.isPublic),
+        });
+        setMessage(null);
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : "Could not load credential settings.");
+      } finally {
+        setLoading(false);
+      }
+    }
     void load();
   }, []);
-
-  async function load() {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/credentials/share");
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.error || "Could not load credential settings.");
-      }
-      setData(payload);
-      setForm({
-        headline: payload.page?.headline || "",
-        summary: payload.page?.summary || "",
-        isPublic: Boolean(payload.page?.isPublic),
-      });
-      setMessage(null);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not load credential settings.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function save() {
     setSaving(true);

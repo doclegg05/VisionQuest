@@ -26,6 +26,25 @@ interface OrientationChecklistProps {
   emptyStateHint?: string;
 }
 
+async function fetchOrientationItems(targetStudentId?: string): Promise<OrientationItem[]> {
+  const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
+  const res = await fetch(`/api/orientation${params}`);
+  if (!res.ok) throw new Error("Failed to load orientation items");
+  const data = await res.json();
+  return data.items || [];
+}
+
+async function fetchOrientationFormStatuses(targetStudentId?: string): Promise<Record<string, string>> {
+  const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
+  const res = await fetch(`/api/forms/status${params}`);
+  const data = res.ok ? await res.json() : { submissions: [] };
+  const statusMap: Record<string, string> = {};
+  for (const sub of data.submissions) {
+    statusMap[sub.formId] = sub.status;
+  }
+  return statusMap;
+}
+
 function groupBySection(items: OrientationItem[]): SectionGroup[] {
   const groups: SectionGroup[] = [];
   let current: SectionGroup | null = null;
@@ -74,28 +93,16 @@ export default function OrientationChecklist({
   }, [isSelfView]);
 
   const fetchFormStatuses = useCallback(() => {
-    const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
-    fetch(`/api/forms/status${params}`)
-      .then(res => res.ok ? res.json() : { submissions: [] })
-      .then(data => {
-        const statusMap: Record<string, string> = {};
-        for (const sub of data.submissions) {
-          statusMap[sub.formId] = sub.status;
-        }
-        setFormStatuses(statusMap);
-      })
+    fetchOrientationFormStatuses(targetStudentId)
+      .then((statusMap) => setFormStatuses(statusMap))
       .catch(() => {});
   }, [targetStudentId]);
 
   const fetchItems = useCallback(async () => {
     try {
-      const params = targetStudentId ? `?studentId=${encodeURIComponent(targetStudentId)}` : "";
-      const res = await fetch(`/api/orientation${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
-        setError(null);
-      }
+      const items = await fetchOrientationItems(targetStudentId);
+      setItems(items);
+      setError(null);
     } catch (err) {
       console.error("Failed to load orientation items:", err instanceof Error ? err.message : "Unknown error");
       setError("Failed to load. Please try again.");
@@ -105,9 +112,33 @@ export default function OrientationChecklist({
   }, [targetStudentId]);
 
   useEffect(() => {
-    void fetchItems();
-    fetchFormStatuses();
-  }, [fetchFormStatuses, fetchItems, targetStudentId]);
+    let cancelled = false;
+
+    fetchOrientationItems(targetStudentId)
+      .then((items) => {
+        if (cancelled) return;
+        setItems(items);
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load orientation items:", err instanceof Error ? err.message : "Unknown error");
+        setError("Failed to load. Please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    fetchOrientationFormStatuses(targetStudentId)
+      .then((statusMap) => {
+        if (!cancelled) setFormStatuses(statusMap);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [targetStudentId]);
 
   async function toggleItem(itemId: string, completed: boolean) {
     setItems((prev) => prev.map((item) =>

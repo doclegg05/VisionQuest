@@ -39,6 +39,13 @@ function classifyStep(form: SpokesForm): StepType {
   return "read-only";
 }
 
+async function fetchOrientationWizardItems(): Promise<OrientationItem[]> {
+  const res = await fetch("/api/orientation");
+  if (!res.ok) throw new Error("Failed to load");
+  const data = await res.json();
+  return data.items || [];
+}
+
 function deriveSteps(items: OrientationItem[]): WizardStep[] {
   const steps: WizardStep[] = [];
   for (const item of items) {
@@ -94,10 +101,7 @@ export default function OrientationWizard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/orientation");
-      if (!res.ok) throw new Error("Failed to load");
-      const data = await res.json();
-      const fetchedItems: OrientationItem[] = data.items || [];
+      const fetchedItems = await fetchOrientationWizardItems();
       setItems(fetchedItems);
 
       const derivedSteps = deriveSteps(fetchedItems);
@@ -114,8 +118,29 @@ export default function OrientationWizard() {
   }, []);
 
   useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+    fetchOrientationWizardItems()
+      .then((fetchedItems) => {
+        if (cancelled) return;
+        setItems(fetchedItems);
+
+        const derivedSteps = deriveSteps(fetchedItems);
+        if (derivedSteps.length === 0) {
+          // All items already completed
+          setAllAlreadyDone(true);
+        }
+        setSteps(derivedSteps);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to load orientation. Please refresh.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function markItemComplete(itemId: string) {
     const res = await fetch("/api/orientation", {

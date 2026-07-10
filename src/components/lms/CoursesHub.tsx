@@ -10,6 +10,13 @@ import AskSageLink from "@/components/sage/AskSageLink";
 
 const ALL_CATEGORIES = Object.keys(PLATFORM_CATEGORIES) as PlatformCategory[];
 
+async function fetchPlatformsData(): Promise<{ platforms: SpokesPlatform[]; goalMatches: string[] }> {
+  const res = await fetch("/api/lms/platforms");
+  if (!res.ok) throw new Error("Failed to load platforms");
+  const data = await res.json();
+  return { platforms: data.platforms || [], goalMatches: data.goalMatches || [] };
+}
+
 export default function CoursesHub() {
   const { checkProgression } = useProgression();
   const [platforms, setPlatforms] = useState<SpokesPlatform[]>([]);
@@ -24,11 +31,9 @@ export default function CoursesHub() {
   const fetchPlatforms = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/lms/platforms");
-      if (!res.ok) throw new Error("Failed to load platforms");
-      const data = await res.json();
-      setPlatforms(data.platforms || []);
-      setGoalMatches(data.goalMatches || []);
+      const { platforms, goalMatches } = await fetchPlatformsData();
+      setPlatforms(platforms);
+      setGoalMatches(goalMatches);
       setError(null);
     } catch (err) {
       console.error("Failed to load platforms:", err instanceof Error ? err.message : "Unknown error");
@@ -39,8 +44,26 @@ export default function CoursesHub() {
   }, []);
 
   useEffect(() => {
-    fetchPlatforms();
-  }, [fetchPlatforms]);
+    let cancelled = false;
+    fetchPlatformsData()
+      .then(({ platforms, goalMatches }) => {
+        if (cancelled) return;
+        setPlatforms(platforms);
+        setGoalMatches(goalMatches);
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load platforms:", err instanceof Error ? err.message : "Unknown error");
+        setError("Failed to load platforms. Please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleVisit = useCallback((platformId: string) => {
     // Fire-and-forget: don't block UI

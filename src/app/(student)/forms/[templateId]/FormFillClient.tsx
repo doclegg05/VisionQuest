@@ -53,7 +53,10 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
   }, [templateId]);
 
   useEffect(() => {
-    void loadForm();
+    async function run() {
+      await loadForm();
+    }
+    void run();
   }, [loadForm]);
 
   if (!data && !error) return <p className="page-shell text-sm text-[var(--ink-muted)]">Loading…</p>;

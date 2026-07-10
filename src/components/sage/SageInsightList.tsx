@@ -69,7 +69,9 @@ export default function SageInsightList({
   }, [limit, studentId]);
 
   useEffect(() => {
-    void loadInsights();
+    void (async () => {
+      await loadInsights();
+    })();
   }, [loadInsights]);
 
   async function dismissInsight(insightId: string) {

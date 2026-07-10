@@ -71,7 +71,9 @@ export default function ResumeBuilder() {
   }
 
   useEffect(() => {
-    void fetchResume();
+    void (async () => {
+      await fetchResume();
+    })();
   }, []);
 
   async function handleSave() {

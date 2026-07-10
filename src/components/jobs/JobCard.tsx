@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
@@ -122,10 +122,17 @@ export function JobCard({
   const [draftNotes, setDraftNotes] = useState(savedNotes ?? "");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  // Adjust-during-render: keep the drafts in sync with the saved* props
+  // without an effect (React's documented pattern for resetting state when
+  // a prop changes on the same render pass).
+  const [prevSavedStatus, setPrevSavedStatus] = useState(savedStatus);
+  const [prevSavedNotes, setPrevSavedNotes] = useState(savedNotes);
+  if (prevSavedStatus !== savedStatus || prevSavedNotes !== savedNotes) {
+    setPrevSavedStatus(savedStatus);
+    setPrevSavedNotes(savedNotes);
     setDraftStatus(savedStatus ?? "saved");
     setDraftNotes(savedNotes ?? "");
-  }, [savedStatus, savedNotes]);
+  }
 
   async function persistTracking(update: JobTrackingUpdate) {
     if (!onSave) return;

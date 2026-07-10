@@ -79,6 +79,10 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+async function fetchRegionRollup(targetRegionId: string): Promise<RollupResponse> {
+  return api.get<RollupResponse>(`/api/coordinator/rollup/${targetRegionId}`);
+}
+
 function SageEffectivenessCard({ metrics }: { metrics: RollupResponse["sageEffectiveness"] }) {
   return (
     <section className="theme-card rounded-xl p-5">
@@ -169,7 +173,7 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<RollupResponse>(`/api/coordinator/rollup/${targetRegionId}`);
+      const res = await fetchRegionRollup(targetRegionId);
       setData(res);
     } catch {
       setError("Failed to load rollup for this region.");
@@ -178,9 +182,33 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
     }
   }, []);
 
+  // Adjust-during-render: reset loading/error the same render pass regionId
+  // changes (React's documented "adjusting state on prop/state change"
+  // pattern) since the effect below may no longer call setState synchronously.
+  const [trackedRegionId, setTrackedRegionId] = useState(regionId);
+  if (trackedRegionId !== regionId) {
+    setTrackedRegionId(regionId);
+    setLoading(true);
+    setError(null);
+  }
+
   useEffect(() => {
-    void loadRollup(regionId);
-  }, [regionId, loadRollup]);
+    if (!regionId) return;
+    let cancelled = false;
+    fetchRegionRollup(regionId)
+      .then((res) => {
+        if (!cancelled) setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to load rollup for this region.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [regionId]);
 
   return (
     <>

@@ -116,12 +116,22 @@ export default function LibraryBrowser() {
     [category, debouncedSearch],
   );
 
-  // Initial / search / category change → reset paging, fetch page 1.
-  useEffect(() => {
-    let cancelled = false;
+  // Adjust-during-render: reset paging/loading/error the same render pass
+  // category or debouncedSearch changes (React's documented "adjusting
+  // state on prop/state change" pattern), since the fetch effect below may
+  // no longer call setState synchronously.
+  const [trackedFilterKey, setTrackedFilterKey] = useState(`${category ?? ""}::${debouncedSearch}`);
+  const filterKey = `${category ?? ""}::${debouncedSearch}`;
+  if (trackedFilterKey !== filterKey) {
+    setTrackedFilterKey(filterKey);
     setLoading(true);
     setError(null);
     setOffset(0);
+  }
+
+  // Initial / search / category change → fetch page 1.
+  useEffect(() => {
+    let cancelled = false;
 
     api
       .get<ApiResponse>(buildUrl({ offset: 0 }))

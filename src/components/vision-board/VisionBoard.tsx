@@ -42,7 +42,11 @@ export default function VisionBoard() {
     }
   }, []);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(() => {
+    void (async () => {
+      await fetchItems();
+    })();
+  }, [fetchItems]);
 
   useEffect(() => {
     const timers = saveTimersRef.current;

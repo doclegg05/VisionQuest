@@ -69,7 +69,10 @@ export default function StaffMfaPanel() {
   }
 
   useEffect(() => {
-    void loadStatus();
+    async function run() {
+      await loadStatus();
+    }
+    void run();
   }, []);
 
   async function handleStartSetup() {
