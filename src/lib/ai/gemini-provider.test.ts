@@ -66,7 +66,7 @@ const TOOLS = [
   },
 ];
 
-const OK_HANDLER = async () => ({ status: "ok" as const, summary: "ok", response: { ok: true } });
+const OK_HANDLER = async () => ({ status: "success" as const, summary: "ok", response: { ok: true } });
 
 async function drain(events: AsyncGenerator<any>) {
   const out = [];
