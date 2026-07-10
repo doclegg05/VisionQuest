@@ -55,6 +55,7 @@ function hybridDoc(overrides: Record<string, unknown> = {}) {
   return {
     id: "doc-dress",
     title: "SPOKES Dress Code Policy FY26 Fillable",
+    storageKey: "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
     sageContextNote: "Explains what students can wear at SPOKES.",
     score: 0.039,
     semanticRank: 1,
@@ -68,6 +69,7 @@ function keywordDoc(overrides: Record<string, unknown> = {}) {
   return {
     id: "doc-dress",
     title: "SPOKES Dress Code Policy FY26 Fillable",
+    storageKey: "orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf",
     sageContextNote: "Explains what students can wear at SPOKES.",
     certificationId: null,
     platformId: null,
@@ -92,6 +94,18 @@ test("doc entry with passages renders page citation", () => {
   assert.match(out, /Administrative Guide, p\.12/);
   assert.match(out, /Students must attend 80%/);
   assert.doesNotMatch(out, /fallback summary/);
+});
+
+test("doc entry includes the stable storage path to disambiguate similar titles", () => {
+  const out = formatDocEntryForTest({
+    type: "doc",
+    id: "d1",
+    label: "New Student Welcome Letter",
+    storageKey: "orientation/New Student Welcome Letter.pdf",
+    score: 1,
+    content: "Welcome information.",
+  });
+  assert.match(out, /Source file: orientation\/New Student Welcome Letter\.pdf/);
 });
 
 test("doc entry with section-only passage renders section citation", () => {
@@ -155,12 +169,12 @@ describe("getDocumentContext", () => {
     assert.equal(mockHybridSearch.mock.callCount(), 0);
   });
 
-  it("formats hybrid results in the exact legacy entry format", async () => {
+  it("formats hybrid results with a stable source path", async () => {
     const context = await getDocumentContext("what is the dress code?", "student");
     assert.match(context, /PROGRAM DOCUMENT REFERENCE/);
     assert.ok(
       context.includes(
-        "[SPOKES Dress Code Policy FY26 Fillable]\nLink: /api/documents/download?id=doc-dress&mode=view\nSummary: Explains what students can wear at SPOKES.",
+        "[SPOKES Dress Code Policy FY26 Fillable]\nLink: /api/documents/download?id=doc-dress&mode=view\nSource file: orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf\nSummary: Explains what students can wear at SPOKES.",
       ),
       `unexpected format:\n${context}`,
     );

@@ -17,6 +17,7 @@ import { hybridSearchDocuments, getBestChunks } from "./hybrid-retrieval";
 interface SageDocument {
   id: string;
   title: string;
+  storageKey: string;
   sageContextNote: string | null;
   certificationId: string | null;
   platformId: string | null;
@@ -62,6 +63,7 @@ async function loadSageDocuments(callerRole: CallerRole): Promise<SageDocument[]
       select: {
         id: true,
         title: true,
+        storageKey: true,
         sageContextNote: true,
         certificationId: true,
         platformId: true,
@@ -149,6 +151,7 @@ type ScoredDoc = {
   type: "doc";
   id: string;
   label: string;
+  storageKey?: string;
   content: string;
   score: number;
   passages?: { content: string; pageNumber: number | null; sectionTitle: string | null }[];
@@ -169,6 +172,11 @@ const SNIPPET_FRAMING =
 function formatEntry(entry: ScoredEntry): string {
   if (entry.type === "doc") {
     const link = `Link: /api/documents/download?id=${entry.id}&mode=view`;
+    // The stable storage path disambiguates duplicate and near-duplicate
+    // titles without changing the human-curated document title.
+    const source = entry.storageKey
+      ? `\nSource file: ${sanitizeForPrompt(entry.storageKey)}`
+      : "";
     if (entry.passages && entry.passages.length > 0) {
       const passages = entry.passages
         .map((p) => {
@@ -181,9 +189,9 @@ function formatEntry(entry: ScoredEntry): string {
           return `${cite}\n${p.content}`;
         })
         .join("\n\n");
-      return `${link}\n${passages}`;
+      return `${link}${source}\n${passages}`;
     }
-    return `[${entry.label}]\n${link}\nSummary: ${entry.content}`;
+    return `[${entry.label}]\n${link}${source}\nSummary: ${entry.content}`;
   }
   // Staff-authored snippet: wrap in delimited tags + sanitize the content so
   // a teacher (compromised account, misconfigured snippet, or just inexperienced)
@@ -239,6 +247,7 @@ async function keywordDocumentContext(
       type: "doc" as const,
       id: doc.id,
       label: doc.title,
+      storageKey: doc.storageKey,
       content: doc.sageContextNote || doc.title,
       score: scoreDocument(doc, messageLower),
     }))
@@ -289,6 +298,7 @@ export async function getDocumentContext(
           type: "doc" as const,
           id: doc.id,
           label: doc.title,
+          storageKey: doc.storageKey,
           content: doc.sageContextNote || doc.title,
           score: doc.score,
           ...(passages && passages.length > 0
