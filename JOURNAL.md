@@ -109,3 +109,25 @@ OPEN FOR BRITT (digest): (1) merge/push — NOT done, branch only; (2) audience 
 the two teacher-doc cases above; (3) pre-existing form-harness top1 11/12 drift worth a look;
 (4) speculative follow-up (not built): lexical title-boost rerank could clean prc1-vs-ssp1
 class without touching SQL.
+
+---
+
+# Decision Journal — agent/react-hooks-compliance-20260710
+
+Slice: react-hooks 7.1.1 compliance (34 errors across 30 UI files fixed so the future lockfile
+upgrade past 7.0.1 cannot break the lint gate). Lane: exploration (isolated branch). No DB access.
+Graders untouched: eslint.config.mjs, tsconfig.json, package.json, package-lock.json.
+
+[2026-07-10] DECISION: Branched from current origin/main (71b975b) instead of the goal's pinned fb26e5e | WHY: the pin guarded against then-unpushed clean-top3 work; a fresh fetch showed it had since been pushed (fb26e5e is 71b975b's ancestor) — a stale-SHA branch would only add rebase debt | REVERSIBLE: rebase before merge.
+
+[2026-07-10] ANOMALY (flagged, not repaired): the chat-grounding agent committed 4e03dec (its Britt-approved sage-chat-harness grounding fix + journal) onto this checkout's HEAD after my branch was created — it now sits UNDER my commits and exists on NO other branch. Left in place: rebasing it away would orphan the only copy of approved work | AT MERGE: take it (it was Britt's word) or cherry-pick it out first | REVERSIBLE: history untouched.
+
+[2026-07-10] DECISION: Fanned 30 files to 5 parallel subagents with disjoint sets + a fix playbook; central gates afterward | WHY: patterned errors (28 set-state-in-effect, 3 purity, 2 refs, 1 immutability) | REVERSIBLE: git revert per commit.
+
+[2026-07-10] FINDING (empirical, confirmed by two agents independently): the 7.1.1 set-state-in-effect rule does not model await timing — it flags any direct effect-body call to a component-level function containing setState anywhere. Behavior-identical compliant patterns used: inline async closure in the effect, latest-ref indirection, full loader inlining, adjust-state-during-render for dep-change resets. Where loaders keep sync setLoading resets for event-handler call sites, those stay (legal in handlers). INTERPRETATION NOTE (not silently absorbed): for shared loaders, the inline-closure fix passes the rule while the mount call still runs one pre-await setState at runtime — accepted deliberately; restructuring shared loaders risked real regressions in untested UI for a heuristic lint win.
+
+[2026-07-10] DECISION: Removed ClassRosterManager's now-dead exhaustive-deps disable comment | WHY: after ref-indirection the directive became unused and itself warns; removing a dead directive ≠ adding a disable | REVERSIBLE: trivially.
+
+[2026-07-10] BEHAVIOR NOTES (accepted, journaled): Date.now() captured once at mount in StudentAdvisingHub/EventsHub (past/upcoming classification frozen per mount; both surfaces refresh via server props — imperceptible); OrientationChecklist gained a cancelled-guard (stale responses discarded — strict improvement); InterventionQueuePanel may show one fewer spinner flash when SSR pre-supplied the queue; ClassOverview's skip flag became a ref (drops one wasted re-render).
+
+[2026-07-10] GATES: eslint exit 0 under BOTH 7.1.1 and restored 7.0.1 (folder-swap only; package files byte-identical); tsc exit 0; full unit suite 1553/1553 exit 0; production build exit 0. Commits: ede6baf (teacher, 16 files), 6c5c023 (app surfaces, 12), 7adf942 (ui purity/refs, 3).
