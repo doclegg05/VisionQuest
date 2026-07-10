@@ -168,3 +168,12 @@ same no-op handler the tool family uses (small harness change — needs your wor
 (2) teacher-checklist retrieval gap = follow-up product work; (3) gemini-provider swallows
 non-STOP finishReasons — generateResponse could surface them instead of returning "" (spec
 candidate); (4) branch disposition.
+
+[2026-07-10] ANOMALY + RECOVERY: a concurrent agent switched the primary checkout's HEAD to
+its new branch agent/react-hooks-compliance-20260710 mid-session; my grader-fix commit
+landed there as 4e03dec (stray). Recovered by creating worktree
+.claude/worktrees/sage-chat-grounding for THIS branch (charter worktree-per-agent rule —
+should have done this at session start) and cherry-picking -> 2b351d8. Did NOT touch the
+other branch: it is checked out with the other agent's uncommitted work (CredentialSharePanel.tsx).
+CLEANUP NEEDED AT ITS GATE: drop stray 4e03dec from agent/react-hooks-compliance-20260710
+(same patch preserved here as 2b351d8) | REVERSIBLE: yes — commits, no deletions.
