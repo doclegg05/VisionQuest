@@ -27,3 +27,20 @@ live CareerOneStop calls with real creds, merge/push/deploy) are STAGED ONLY —
 [2026-07-10] MERGE+PUSH (Britt's explicit word). origin/main had advanced f346f45→8921f91 (PR #114 "Feat/sage action cards") overnight; overlap = 2 files, both benign (identical portfolio-checklist title fix on both sides; tools.ts hunks disjoint — #114 added action-card meta to 3 tools, we added registry entries + 2 description sentences). Merged main into branch (5215acf, zero conflicts). RE-GATED ON MERGED STATE: harness 9/9 (tool-cert-quickbooks passes outright; #114 independently added acceptableTools:[lookup_program_info] to that case — upstream hit the same flake), red-team 0 hard fails (8 soft heuristic warnings, consistent with prior runs), 64/64 unit tests, tsc/eslint clean. GOTCHA LOGGED: the session shell recycled mid-turn (MCP reconnect) and silently reset cwd to the primary checkout — the first post-merge gate run executed against feat/sage-action-cards@fd11191 and produced a FALSE harness failure; caught via git status showing primary-root untracked files. Lesson: prefix every gate command with an absolute cd. Main fast-forwards to the branch tip; push follows. Render auto-deploys main (code-only change, no migrations).
 
 [2026-07-09] DECISION: B∥C∥D proceeds on all 15 candidates without blocking on Q1–Q8 | WHY: staging is on-branch and reversible; Britt's decision point is the governed upload/sync gate. Leans adopted: Q3 WIOA referral → `forms/` (synthesizer's placement beside STUDENT_REFERRAL rows beats generic guidance); Q6 overlaps → cross-referenced in catalog "When NOT to use" rather than dropped; Q7 2021-dated pathway doc → staged with dated-caveat in its catalog node. Q1 (ECP student-audience restage), Q2 (4 piiRisk confirms), Q5 (interest-profiler source), Q8 (rubric -2 refresh) stay OPEN — presented as leans in the digest, not acted on | REVERSIBLE: un-stage any candidate before the governed gate
+
+---
+
+# Decision Journal — agent/sage-chunk-search-20260710
+
+Slice: Sage chunk-search + provenance (working-tree changes landed as scoped commits; gates: unit tests, typecheck, eslint, prisma validate, read-only index integrity).
+Lane: exploration (isolated branch, non-governed surfaces). No DB writes; the new migration is committed but NOT applied (applying = governed, out of scope).
+
+[2026-07-10] DECISION: Created branch `agent/sage-chunk-search-20260710` off main (a3357d5) before any write | WHY: main is shared (SPOKES Bot scheduled writer); charter §4 requires isolation | ALTERNATIVES: worktree (unnecessary — the changes already sat in this checkout's working tree) | REVERSIBLE: delete branch after digest (charter §4 carve-out).
+
+[2026-07-10] PREMISE CHECK: `SageMemory.embeddingModel` already exists in migration history (20260702200000_add_embedding_model_provenance ALTERs SageMemory) — the schema.prisma edit only catches the Prisma model up to the live column; no new ALTER migration needed | WHY: feedback rule — verify plan premises; the goal framed the column as possibly missing from the live DB | REVERSIBLE: n/a (read-only check).
+
+[2026-07-10] DECISION: Five scoped commits: (1) migration + hybrid-retrieval (SQL function's new RETURNS shape and chunk-fts ranking are consumed by the TS — splitting leaves a non-working commit), (2) knowledge-base-server source-file citation, (3) schema field + memory dedupe model guard, (4) backfill stale-chunk repair, (5) integrity script + npm script | WHY: one commit per logical layer per feedback.md rule 9 | REVERSIBLE: git revert per commit.
+
+[2026-07-10] DECISION: Verified `scripts/sage-index-integrity.mjs` is read-only before committing (SELECT-only raw queries; `--strict` only sets exit code; no INSERT/UPDATE/DELETE/DDL/executeRaw) | WHY: goal constraint — DB access only via read-only integrity script | REVERSIBLE: n/a.
+
+[2026-07-10] DECISION: No Co-Authored-By trailer on commits | WHY: `~/.claude/rules/common/git-workflow.md` — attribution disabled globally; user rules override harness default | REVERSIBLE: n/a.
