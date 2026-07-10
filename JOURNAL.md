@@ -236,3 +236,17 @@ other branch: it is checked out with the other agent's uncommitted work (Credent
 CLEANUP NEEDED AT ITS GATE: drop stray 4e03dec from agent/react-hooks-compliance-20260710
 (same patch preserved here as 2b351d8) | REVERSIBLE: yes — commits, no deletions.
 [Merged note 2026-07-10: the stray 4e03dec was dropped at the react-hooks merge gate as requested; this branch merged to main the same day.]
+
+---
+
+# Decision Journal — agent/grounding-harness-tools-20260710
+
+Slice: Britt-approved follow-up #1 (grounding harness family declares the tool registry). Lane: exploration (isolated branch). Grader change pre-authorized by Britt's "approved".
+
+[2026-07-10] DECISION: Grounding replies now go through provider.streamWithTools with declsForRole + the shared noopToolHandler, maxHops 2 | WHY: the "full" prompt documents Sage's tools; Gemini deterministically emits MALFORMED_FUNCTION_CALL (empty reply) when a prompt invites a tool call but none are declared — production always declares tools, the harness must match | REVERSIBLE: git revert.
+
+[2026-07-10] DISCOVERY (the approved harness change exposed TWO real PRODUCT bugs in GeminiProvider.streamWithTools hop 2 — never exercised by any eval, all of which run maxHops 1; production chat is the only multi-hop caller): (a) the SDK's ChatSession silently DROPS the model's function-call turn from history when the streamed response carries an empty text part (isValidResponse) → hop 2 400s "function response turn must come immediately after a function call turn"; (b) the SDK's stream aggregation strips unknown part fields — Gemini 3 thoughtSignature — → hop 2 400s "Function call is missing a thought_signature". Both reproduced deterministically at temperature 0. IMPLICATION: production tool calls that need a post-tool text reply could 400 whenever Gemini attaches an empty text part or requires signature echo — worth checking stage-6a readonly logs.
+
+[2026-07-10] DECISION: Fixed the PROVIDER, not the harness symptom — streamWithTools now manages `contents` manually (no ChatSession) and appends the model's function-call turn from the RAW wire parts (preserving thoughtSignature), dropping only lone-empty-text parts | WHY: harness-side workarounds (maxHops 1, forced-text toolConfig) would leave the prod tool loop broken; fix-the-implementation is the standing rule | ALTERNATIVES: SDK upgrade (@google/generative-ai is deprecated upstream in favor of @google/genai — a bigger migration, queued as future work); toolConfig NONE for grounding only (hides the prod bug) | REVERSIBLE: git revert.
+
+[2026-07-10] VERIFIED: 4 new wire-level regression tests (global.fetch stub — the repo's embedding-test idiom; NOTE: mock.module on bare npm specifiers does not intercept under tsx, only path-aliased/relative modules) pin the hop-2 request shape. Full battery: chat harness 20/21 strict temp 0 (grounding-rights-responsibilities PASSES for the first time; grounding-dress-code passes through the tool-declared path; sole red = teacher-checklist, the known REAL retrieval gap, follow-up #2); agent eval injection canaries 0 (tool-selection 84.4% informational); npm test 1571/1571 (incl. 4 new); eslint 0 errors; tsc clean.

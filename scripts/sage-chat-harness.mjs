@@ -283,7 +283,7 @@ async function runGuardrailCase(deps, provider, declarations, systemPrompt, test
 }
 
 async function runGroundingCase(deps, provider, systemPrompt, testCase) {
-  const { getDocumentContext, prisma } = deps;
+  const { getDocumentContext, prisma, declarations } = deps;
   const role = testCase.role === "teacher" || testCase.role === "admin" ? "staff" : "student";
   const context = await getDocumentContext(testCase.message, role, 3, 6000);
   const refs = parseDocumentRefs(context);
@@ -315,15 +315,27 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
     }
   }
 
-  // The reply itself: grounded system prompt + doc context, no tools.
+  // The reply itself: grounded system prompt + doc context, with the tool
+  // registry DECLARED via the same no-op handler the tool family uses. The
+  // "full" system prompt documents Sage's tools, and Gemini deterministically
+  // emits MALFORMED_FUNCTION_CALL (surfacing as an empty reply) when a prompt
+  // invites a tool call but none are declared — a combination production
+  // never runs (real chat always declares tools). maxHops 2 lets a
+  // tool-first turn still produce text after its no-op result.
   let reply = "";
   try {
-    reply = await provider.generateResponse(
+    const textParts = [];
+    const events = provider.streamWithTools(
       systemPrompt + context,
       [{ role: "user", content: testCase.message }],
-      undefined,
-      { temperature: TEMPERATURE },
+      declarations,
+      noopToolHandler,
+      { maxHops: 2, temperature: TEMPERATURE },
     );
+    for await (const event of events) {
+      if (event.kind === "text") textParts.push(event.text);
+    }
+    reply = textParts.join(" ");
   } catch (err) {
     failures.push(`reply generation failed — ${err.message}`);
   }
@@ -512,7 +524,12 @@ async function main() {
       } else if (testCase.family === "grounding") {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
         const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
-        outcome = await runGroundingCase({ getDocumentContext, prisma }, provider, systemPrompt, testCase);
+        outcome = await runGroundingCase(
+          { getDocumentContext, prisma, declarations: declsForRole(testCase.role) },
+          provider,
+          systemPrompt,
+          testCase,
+        );
       } else if (testCase.family === "memory") {
         const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
         const { extractAndStoreMemories } = process.env.DATABASE_URL
