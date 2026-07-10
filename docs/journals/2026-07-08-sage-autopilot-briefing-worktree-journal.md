@@ -1,0 +1,32 @@
+# Session Journal — Sage SSR question → stranded-stack recovery (2026-07-08)
+
+Branch: `claude/ai-wrapper-ssr-env-ccdbee` (this worktree) + `agent/restore-sage-stack-20260708` (recovery worktree).
+Plan: `C:\Users\Instructor\.claude\plans\is-it-possible-to-peaceful-wind.md` (Britt-approved).
+
+- [16:0x] DECISION: Interpreted "SSR" via AskUserQuestion — Britt confirmed server-side runtime for Sage + explore generative UI. | WHY: acronym ambiguous (rendering vs SSE vs runtime). | ALTERNATIVES: assume Next.js SSR. | REVERSIBLE: n/a.
+- [16:1x] DISCOVERY: PRs #102/#103/#104/#106 show MERGED on GitHub but never reached main — 2026-07-03 merge train squashed each into its stack PARENT; final squash e78dae7 landed on feat/sage-token-eval after #100 had already squash-merged. Verified: main 341766e has zero SAGE_AGENT_MODE hits. | SURFACED: in plan + digest.
+- [16:2x] DECISION: Recover by merging local `feat/sage-polish` @ 013c4d7 (full unsquashed 11-commit stack, merge-base with main = 1d882d9 = the #100 squash) instead of cherry-picking e78dae7 or merging origin/feat/sage-token-eval. | WHY: true common ancestor → conflict surface = 1 file; preserves reviewed commits; 013c4d7 verified content-identical to what GitHub reviewed (and fresher by 8 files vs e78dae7's stale fork point). | ALTERNATIVES: cherry-pick e78dae7 (stale 3-way base, 2 conflict candidates); diff|apply (no provenance). | REVERSIBLE: merge --abort / delete own branch; safety tag archive/sage-stack-original-20260703 pins 013c4d7.
+- [16:3x] EXECUTED: tag archive/sage-stack-original-20260703 @ 013c4d7; worktree restore-sage-stack + branch agent/restore-sage-stack-20260708 from origin/main (341766e); merge → sole predicted conflict .github/workflows/sage-evals.yml; resolved = main's deletions kept (no nightly full-judge step, no sage-chat-harness-ollama job) + stack's catalog-drift job appended verbatim. Secret scan of full staged diff: 0 hits. Merge commit dabf6b8.
+- [16:3x] VERIFIED (structural): 51 files, +4107/−78; probes over #105/#107/#108/#110 surfaces print nothing; Hanbook grep clean; render.yaml resolves agent OFF (SAGE_AGENT_MODE "off" + legacy "false").
+- [16:5x] VERIFIED (behavioral): restored core tests 66/66 pass (flags/executor-mode/rate-limits/capabilities/local-config); full sweep 1385 pass / 0 fail / 2 skipped (known RLS-needs-postgres skips); `npx prisma validate` valid; `npx eslint .` clean. Coverage % not measured (per testing.md amendment 1 — pass-counts only).
+- [17:0x] VERIFIED (build): `npm run build` succeeded (Next.js production build, proxy middleware compiled). Recovery branch `agent/restore-sage-stack-20260708` @ dabf6b8, working tree clean. **Session A complete — STOPPED at Britt's push/PR gate.** PR body drafted at scratchpad/recovery-pr-body.md.
+
+- [17:1x] BRITT APPROVED ALL (push/PR/merge + mode flip per runbook + Slices 1-2). EXECUTED: pushed agent/restore-sage-stack-20260708; opened PR #111; CI watch running; runbook 6a preconditions (red-team --strict + harness tool,guardrail temp-0) running live against Gemini. | NEXT: merge #111 on green → Slice 1 from fresh main → mode flip PR gated on precondition results.
+
+- [17:3x] EXECUTED: PR #111 merged (squash a2905de) after CI green (verify+sage-evals+memory-eval pass; catalog-drift correctly skips on PR). Runbook 6a preconditions PASS (red-team --strict 0 hard violations / 7 soft to review; harness 9/9 temp-0). | BLOCKED: auto-mode classifier refused the render.yaml off→readonly commit — flip staged uncommitted on agent/sage-agent-readonly-20260708, needs Britt's direct confirmation.
+- [17:5x] BUILT Slice 1 (branch agent/sage-briefing-20260708, commit 1): SagePanel model + RLS migration, guarded pg_cron sage-daily-briefing 11:00 UTC, panel-spec.ts (Zod, PLATFORM_MAP-derived href allowlist), agent/headless.ts (3-layer read-only cap: static allowlist ∩ literal-readonly tier ∩ pre-execution guardProvider), briefing.ts (wager-diagnosis quarantine pattern, sage_auto.briefing callSite, temp-0 structured phase, retry-once, dismissed-honored), internal route (Bearer, 50-cap logged). 40 new tests.
+- [18:0x] BUILT Slice 2 (same branch, commit 2 pending): panel-data.ts (48h staleness, re-validate on read, ownership-checked dismiss, 6h-cooldown force refresh), SagePanels.tsx server-rendered registry + SagePanelActions client island, dismiss/refresh routes, dashboard wiring above AmbientPanels. 18 more tests (58 total new). | DEVIATION SURFACED: teacher StudentDetail card deferred to follow-up (complex 4-tab surface; staff visibility exists via AuditTrail + RLS staff read).
+
+- [18:2x] PR #112 opened; first CI run FAILED typecheck (untyped mock.fn() vs tsc --noEmit — CI runs typecheck, next build does not; memory updated). Fixed + pushed.
+- [18:4x] SECURITY REVIEW (code-reviewer agent): verdict approve-with-fixes. HIGH: SagePanel RLS teacher branch unscoped (regression of the sage_memory class) → FIXED, now mirrors managed_student_ids. MEDIUM: autonomous audit rows attributed to student → FIXED, system:sage-autopilot sentinel. LOW: same-day re-run re-bills → FIXED (ready+!force skips). LOW noted, not changed: staff dismiss 403/404 oracle (consistent with repo convention); loop.ts declaration step uses global mode (enforcement rests on guardProvider — documented). +4 regression tests (62 new total).
+
+- [18:5x] PR #112 CI green (verify/sage-evals/memory-eval pass) → squash-merged 765bd0c. Session work complete.
+
+- [later] BRITT GAVE EXPLICIT GO ("let's implement this plan" after the three-exchange agent-mode walkthrough): stage-6a flip executed — branch rebased onto 765bd0c, committed (classifier allowed it this time), pushed, PR #113 opened. Autopilot flag HELD per the recommended sequence (enable after readonly soaks). | REVERSIBLE: one-line revert per sage-agent-rollback.md.
+
+## Final state (end of session 2026-07-08)
+- ✅ MERGED: #111 (stranded-stack recovery, a2905de) + #112 (briefing autopilot slices 1+2, 765bd0c) + #113 (stage-6a readonly flip, 08eaa4c — Britt's explicit go).
+- 🔎 6a monitoring window OPEN: staff test accounts exercise read tools; watch audit log + evals before any 6b talk. Health poll ran through the deploy window.
+- ⏳ BRITT (later): SAGE_AUTOPILOT_ENABLED=true + supervised first run per PR #112 body — deliberately held until readonly soaks.
+- Cleanup available on request: worktrees restore-sage-stack + sage-briefing and their merged remote branches.
+- Deferred (recorded in PR #112): teacher StudentDetail card, chat-inline panel variant, briefing→SageInsight writes.
