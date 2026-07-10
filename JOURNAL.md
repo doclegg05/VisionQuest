@@ -135,3 +135,34 @@ Graders untouched: eslint.config.mjs, tsconfig.json, package.json, package-lock.
 [2026-07-10] CORRECTION to the 4e03dec anomaly above: the owning agent later landed the SAME change as 2b351d8 on its own branch (agent/sage-chat-grounding-20260710) — verified byte-identical via git patch-id — and its memory note asks for 4e03dec to be dropped from this branch. Attempted `git rebase --onto 71b975b 4e03dec`; the permission classifier declined the history rewrite in auto mode. Left as-is deliberately | AT MERGE (Britt or manual run): drop 4e03dec via that exact rebase (safe — 2b351d8 is the surviving copy), or merge as-is and let the dupe no-op | REVERSIBLE: yes, nothing rewritten.
 
 [2026-07-10] MERGE GATE (second session, Britt's explicit word to drop 4e03dec + merge + push). Observed on arrival: the deferred rebase had ALREADY completed (reflog: rebase finish onto 71b975b at 13:08:19; old tip 8fcee1c → new tip 4087328) and local main was already fast-forwarded to the branch tip — only the push remained. INDEPENDENT VERIFICATION before pushing: (1) full-commit patch-ids of 4e03dec vs 2b351d8 DIFFER (JOURNAL.md context hunks differ by branch — the entry above overstates "byte-identical via patch-id"); blob-level check confirms the substantive files ARE byte-identical (scripts/sage-chat-harness.mjs blob 1f66480, chat-grounding-debug.json blob db5c178 — same in both commits), so the drop is safe as claimed; (2) re-gated the REBASED tree (delta vs gated tree = 4e03dec's non-React files reverted to main): eslint exit 0 / 0 errors under lockfile 7.0.1, eslint exit 0 under 7.1.1 (temp folder-swap, restored + verified), tsc exit 0, unit suite 1553/1553 pass; (3) no prisma/migration files in the merge diff — code-only deploy; (4) origin/main still 71b975b at fetch. FINDING (gate integrity, flag for Britt): `npm test` on Windows silently runs ZERO tests and exits 0 — the script's `$(git ls-files ...)` does not expand under npm's default cmd.exe shell; a green `npm test` here proves nothing. Ran the suite via bash with the expanded file list instead. RECOMMEND: point npm's script-shell at bash on this machine or make the test script shell-agnostic (own slice, grader change — Britt's word). Push of main (4087328) follows this journal commit; Render auto-deploys (code-only, no migrations).
+
+---
+
+# Decision Journal — agent/npm-test-shell-fix-20260710
+
+Slice: fix the `npm test` gate-integrity trap found at the react-hooks merge gate (Britt's word:
+"fix the issue you found"). Pushed main first (99683aa, the react-hooks slice) — remote noted the
+push BYPASSED branch protection (PR + required "verify" check); flagged in the digest.
+
+[2026-07-10] ROOT CAUSE (two layers, both verified by repro): (1) Windows: npm's default cmd.exe
+script-shell does not expand `$(git ls-files ...)` — tsx receives the literal string, matches
+nothing, runs 0 tests, exits 0 (silent green). (2) ALL platforms including green Linux CI: node's
+test runner treats each CLI arg as a glob, so literal paths containing `[id]`-style brackets parse
+as character classes and match nothing — `students/[id]/memories/route.test.ts` and
+`students/[id]/reassign-class/route.test.ts` (3 suites / 14 tests) have been SILENTLY SKIPPED in
+every `npm test` run to date. Repro: passing the bracket path explicitly runs 0 tests; file-set
+diff proved glob-vs-ls-files sets identical (190=190) while counts differed 1567 vs 1553.
+
+[2026-07-10] DECISION: one-line fix — `test` now passes double-quoted glob patterns
+("src/**/*.test.ts", "src/**/*.test.tsx") for node to expand internally, the same idiom test:api
+already uses | WHY: works identically under sh and cmd (quotes survive both), and node's own
+directory walk finds bracket-named dirs literally, un-skipping the 3 suites | ALTERNATIVES: node
+runner script with git-ls-files parity + zero-file guard (rejected: more surface for the same
+result; tracked-vs-untracked delta is empty today and the pattern is static); npm script-shell
+config change (rejected: machine-local, doesn't fix the bracket skip) | TRADEOFF ACCEPTED: a
+nothing-matched typo still exits 0 (pre-existing runner behavior, same as test:api) | REVERSIBLE:
+git revert.
+
+[2026-07-10] GATES: npm test = 1567/1567 pass, 0 fail via BOTH PowerShell→cmd and bash (the 14
+newly-unskipped tests all pass); eslint exit 0 / 0 errors; graders otherwise untouched (only the
+`test` script line changed). CI impact: next CI run executes 1567 instead of 1553.
