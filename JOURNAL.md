@@ -46,3 +46,66 @@ Lane: exploration (isolated branch, non-governed surfaces). No DB writes; the ne
 [2026-07-10] DECISION: No Co-Authored-By trailer on commits | WHY: `~/.claude/rules/common/git-workflow.md` — attribution disabled globally; user rules override harness default | REVERSIBLE: n/a.
 
 [2026-07-10] FINDING+FIX: `npx eslint .` failed with 34 errors, ALL pre-existing react-hooks violations in UI files untouched by this slice — yet CI (which runs the same lint) is green on main. Root cause: local node_modules drift — lockfile pins eslint-plugin-react-hooks@7.0.1 (CI-installed, green) but local had 7.1.1, whose new React-compiler rules (set-state-in-effect, purity checks) error on existing UI code. FIX: restored 7.0.1 into node_modules from the npm tarball (surgical folder swap; `npm install --no-save` hit EBUSY on the Next SWC binary held by another process). 7.1.1 copy archived to session scratchpad, not deleted. No package.json/lockfile/eslint-config change (graders frozen; lockfile parity restored, not weakened) | ALTERNATIVES: fix 34 react-hooks errors in untested UI (out of slice scope, regression risk); eslint-disable comments (gaming the gate — forbidden in spirit) | REVERSIBLE: copy 7.1.1 back from scratchpad or `npm ci`. FLAG FOR BRITT: when the lockfile eventually upgrades past react-hooks 7.1, those 34 UI errors become a real gate — queue a react-hooks compliance pass as its own slice.
+
+---
+
+# Decision Journal — agent/rag-cleantop3-20260710
+
+/goal slice: doc-RAG clean top-3 on `config/sage-rag-eval.json` from 10/20 to ≥15/20
+(the goal's "10/14" mapped to ratio ≥71.4% after the fixture grew to 20 expected checks),
+proven by `npm run sage:rag:harness`; floors: doc-eval Top-1 ≥ 13/20 baseline,
+`sage:form:harness` unregressed, `test:api` exit 0. Lane: exploration (worktree
+`.claude/worktrees/rag-cleantop3`, node_modules junctioned to primary, .env.local copied).
+Graders frozen and untouched: scripts/sage-rag-harness.mjs, config/sage-rag-top-questions.json,
+config/sage-rag-eval.json, scripts/sage-form-harness.mjs, config/sage-form-eval.json.
+
+[2026-07-10] BASELINE (first turn, before any change): doc-eval clean top-3 10/20, Top-1
+13/20, noAnswer 8/9; default 40-q fixture clean 38/40, Top-1 32/40. Recorded 6/14 was stale.
+JSONs: .planning/sage-rag/harness-docs-cleantop3-baseline.json + harness-cleantop3-baseline.json.
+
+[2026-07-10] DECISION: Diagnosed all 10 failing cases via raw sage_hybrid_search rows
+(tmp-diag-cleantop3.mjs, scratch, uncommitted). Failure classes: (a) exact RRF ties resolved
+arbitrarily (mirrored leg ranks → identical fused score), (b) same form at two storage paths
+occupying two slots (DoHS release under orientation/ AND forms/), (c) trailing sibling docs
+0.02–0.05 farther in embedding space than the answer, (d) FTS-strong true answer
+margin-dropped because the margin anchors on a semantically-closer weak row
+(low-literacy-portfolio) | WHY: fix classes, not cases | REVERSIBLE: n/a (read-only).
+
+[2026-07-10] DECISION: App-side post-processing only, all in src/lib/sage/hybrid-retrieval.ts:
+(1) distance tiebreak for exact score ties (epsilon 1e-9); (2) normalized-title dedupe;
+(3) SQL fetch widened to limit*2+2 with post-trim cap at limit so trimmed slots backfill;
+(4) relative-cutoff defaults retuned via env-override sweep: DISTANCE_MARGIN 0.04→0.02,
+MIN_SCORE_RATIO 0→0.85 | WHY: goal forbids migrations/live-DB changes; dual-leg peers sit at
+score ratio ≥0.92 vs single-leg fillers ≈0.5, genuine multi-doc peers within ~0.015 distance
+vs siblings 0.02–0.05 out | ALTERNATIVES: metadata-aware SQL rerank (Track B — needs a
+migration, out of scope); margin <0.0104 to clean admin-guide (rejected: overfitting, the
+gap to the nearest legit peer is 0.0004) | REVERSIBLE: git revert; both knobs remain
+env-overridable (SAGE_RAG_DISTANCE_MARGIN, SAGE_RAG_MIN_SCORE_RATIO).
+
+[2026-07-10] DECISION: First draft protected the top-scored row from all cutoffs; REPLACED
+with "trim all rows; if nothing survives, fall back to the fused winner alone" | WHY: the
+protection fixed low-literacy-portfolio but regressed ts12-fillable-vs-nonfillable
+(keyword-loud WRONG doc protected at top-1; at baseline the margin correctly killed it).
+Fallback semantics fix both: cutoffs trim trailing noise but can't veto the only viable
+match | REVERSIBLE: git revert.
+
+[2026-07-10] RESULT (defaults, no env overrides): doc-eval clean top-3 15/20 (was 10/20),
+Top-1 15/20 (was 13/20), noAnswer 8/9 unchanged; 40-q fixture clean 38/40 (held), Top-1
+33/40 (was 32). TRADE-OFF (no silent caps): 40-q top3Expected 36→34 and strict 36→34 —
+orientation-overview and quickbooks each lose a secondary expected doc to the tighter trim
+(legacy pass 39/40 unchanged). Remaining doc-eval dirty cases: prc1-vs-ssp1 +
+low-literacy-orientation (embedding thinks the sibling is the answer), admin-guide (0.0004
+margin gap), sign-in-sheet + ecp-instructions (expected docs are teacher-audience; a student
+caller cannot retrieve them — needs an audience or fixture decision, flagged below).
+
+[2026-07-10] VERIFIED: hybrid-retrieval tests 23/23 (6 new: tiebreak, dedupe, widened fetch,
+fallback, loud-wrong-doc trim, limit cap) + knowledge-base suites → 44/44; test:api 149/149
+exit 0; eslint clean on changed files; form harness BYTE-IDENTICAL to unmodified main
+(top3 12/12, cleanTop3 12/12, forbiddenHits 0, top1 11/12 — pre-existing on main, verified
+by running the harness on the untouched primary checkout; the recorded "12/12" predates
+corpus drift, not caused by this change).
+
+OPEN FOR BRITT (digest): (1) merge/push — NOT done, branch only; (2) audience decision for
+the two teacher-doc cases above; (3) pre-existing form-harness top1 11/12 drift worth a look;
+(4) speculative follow-up (not built): lexical title-boost rerank could clean prc1-vs-ssp1
+class without touching SQL.
