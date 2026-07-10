@@ -56,6 +56,7 @@ function dbRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "doc1",
     title: "SPOKES Dress Code Policy",
+    storage_key: "orientation/dress-code.pdf",
     sageContextNote: "Explains the dress code.",
     score: 0.03,
     semantic_rank: 1,
@@ -80,6 +81,7 @@ describe("hybridSearchDocuments", () => {
     assert.deepEqual(results[0], {
       id: "doc1",
       title: "SPOKES Dress Code Policy",
+      storageKey: "orientation/dress-code.pdf",
       sageContextNote: "Explains the dress code.",
       score: 0.03,
       semanticRank: 1,
@@ -113,6 +115,13 @@ describe("hybridSearchDocuments", () => {
       params.includes(ACTIVE_MODEL),
       `expected query_model param in chunk query, got ${JSON.stringify(params)}`,
     );
+  });
+
+  it("threads the keyword query into chunk ranking so exact passages win", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => []);
+    await getBestChunks(["d1"], "attendance policy", 2);
+    const params = mockQueryRaw.mock.calls[0].arguments.slice(1);
+    assert.ok(params.includes("attendance OR policy"));
   });
 
   it("builds an OR-joined websearch query from message keywords", async () => {

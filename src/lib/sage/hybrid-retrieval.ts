@@ -22,6 +22,7 @@ import { tokenizeForRetrieval } from "./retrieval-tokens";
 export interface HybridDocResult {
   id: string;
   title: string;
+  storageKey: string;
   sageContextNote: string | null;
   score: number;
   semanticRank: number | null;
@@ -95,6 +96,7 @@ const QUERY_EMBED_CACHE_TTL_SECONDS = 300;
 interface HybridSearchRow {
   id: string;
   title: string;
+  storage_key: string;
   sageContextNote: string | null;
   score: number;
   semantic_rank: number | null;
@@ -191,6 +193,7 @@ export async function hybridSearchDocuments(
       .map((row) => ({
         id: row.id,
         title: row.title,
+        storageKey: row.storage_key,
         sageContextNote: row.sageContextNote,
         score: row.score,
         semanticRank: row.semantic_rank,
@@ -236,6 +239,7 @@ export async function getBestChunks(
   try {
     const vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage));
     const queryModel = await getActiveEmbeddingModel();
+    const queryText = buildWebsearchQuery(userMessage);
     const rows = await prisma.$queryRaw<BestChunkRow[]>`
       SELECT "documentId", "content", "pageNumber", "sectionTitle", distance
       FROM (
@@ -246,7 +250,11 @@ export async function getBestChunks(
                (c."embedding" <=> ${vectorLiteral}::vector(768)) AS distance,
                row_number() OVER (
                  PARTITION BY c."documentId"
-                 ORDER BY c."embedding" <=> ${vectorLiteral}::vector(768)
+                 ORDER BY
+                   CASE WHEN ${queryText} <> '' THEN
+                     ts_rank_cd(c.fts, websearch_to_tsquery('english', ${queryText}))
+                   ELSE 0 END DESC,
+                   c."embedding" <=> ${vectorLiteral}::vector(768)
                ) AS rn
         FROM "visionquest"."DocumentChunk" c
         WHERE c."documentId" IN (${Prisma.join(documentIds)})
