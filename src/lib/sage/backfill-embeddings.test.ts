@@ -99,6 +99,7 @@ function doc(overrides: Record<string, unknown> = {}) {
     hasEmbedding: false,
     modelMatchesActive: false,
     chunkCount: 0,
+    staleChunkCount: 0,
     ...overrides,
   };
 }
@@ -225,6 +226,20 @@ describe("backfillProgramDocumentEmbeddings", () => {
       assert.equal(tally.embedded, 0, "active-model doc must be skipped");
       assert.equal(tally.skipped, 1);
       assert.equal(mockEmbedProgramDocument.mock.callCount(), 0);
+    });
+
+    it("re-embeds current doc vectors when any passage chunk is stale", async () => {
+      mockQueryRawUnsafe.mock.mockImplementation(async () => [
+        doc({
+          hasEmbedding: true,
+          modelMatchesActive: true,
+          chunkCount: 3,
+          staleChunkCount: 2,
+        }),
+      ]);
+      const tally = await backfillProgramDocumentEmbeddings({ reembed: true });
+      assert.equal(tally.embedded, 1, "stale chunks must make the document repairable");
+      assert.equal(tally.skipped, 0);
     });
 
     it("still embeds a never-embedded doc under reembed", async () => {

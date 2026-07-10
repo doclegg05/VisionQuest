@@ -83,6 +83,8 @@ interface BackfillDocRow {
   /** True when the stored embedding was produced by the active model. */
   modelMatchesActive: boolean;
   chunkCount: number;
+  /** Chunks that cannot participate in active-model retrieval. */
+  staleChunkCount: number;
 }
 
 function extOf(storageKey: string): string {
@@ -101,7 +103,11 @@ export async function backfillProgramDocumentEmbeddings(
     `SELECT d.id, d.title, d."storageKey", d."sageContextNote",
             (d.embedding IS NOT NULL) AS "hasEmbedding",
             (d."embeddingModel" IS NOT DISTINCT FROM $1) AS "modelMatchesActive",
-            COUNT(c.id)::int AS "chunkCount"
+            COUNT(c.id)::int AS "chunkCount",
+            COUNT(c.id) FILTER (
+              WHERE c.embedding IS NULL
+                 OR c."embeddingModel" IS DISTINCT FROM $1
+            )::int AS "staleChunkCount"
      FROM "visionquest"."ProgramDocument" d
      LEFT JOIN "visionquest"."DocumentChunk" c ON c."documentId" = d.id
      WHERE d."isActive" = true ${all ? "" : 'AND d."usedBySage" = true'}
@@ -138,7 +144,11 @@ export async function backfillProgramDocumentEmbeddings(
     // embedded doc is always complete. `force` re-embeds everything. `reembed`
     // re-embeds only rows whose model is stale — a doc already on the active
     // model is skipped; a doc with a null/mismatched model is re-embedded.
-    const staleModel = reembed && !doc.modelMatchesActive;
+    // A current doc vector does not imply its passage index is current. Older
+    // backfills could stamp the doc while leaving pre-provenance chunks behind;
+    // those chunks are filtered out by retrieval's model guard. Repair either
+    // side when --reembed is requested.
+    const staleModel = reembed && (!doc.modelMatchesActive || doc.staleChunkCount > 0);
     if (doc.hasEmbedding && !force && !staleModel) {
       tally.skipped++;
       continue;
