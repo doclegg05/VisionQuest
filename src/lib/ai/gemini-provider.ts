@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration, type Part, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type Content, type FunctionDeclaration, type Part, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
 import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
@@ -146,27 +146,36 @@ export class GeminiProvider implements AIProvider {
         : {}),
     });
 
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      })),
-      ...(geminiTools.length ? { tools: geminiTools } : {}),
-    });
+    // The tool loop manages `contents` itself instead of using ChatSession:
+    // the SDK's ChatSession silently DROPS a whole exchange from history
+    // (console.warn only) when a streamed response fails its isValidResponse
+    // check — which a function-call response with an attached empty text part
+    // does. The next hop then sends a functionResponse turn with no preceding
+    // functionCall turn and the API 400s ("function response turn must come
+    // immediately after a function call turn"). Manual contents keep the
+    // model's function-call turn verbatim, so hop N+1 is always well-formed.
+    const contents: Content[] = messages.map((m) => ({
+      role: m.role,
+      parts: [{ text: m.content }],
+    }));
 
-    let nextParts: string | Part[] = messages[messages.length - 1].content;
     // Accumulated across hops — one final onUsage call for the whole turn,
     // not one per hop.
     let accumulated: TokenUsage | null = null;
     let outputChars = 0;
 
     for (let hop = 0; hop < maxHops; hop++) {
-      const result = await chat.sendMessageStream(nextParts);
+      const result = await model.generateContentStream({ contents });
 
-      // Stream text as it arrives.
+      // Stream text as it arrives, keeping every raw part verbatim: the SDK's
+      // aggregated response copies only the fields it knows, which strips
+      // Gemini 3 thoughtSignature — and resending a functionCall part without
+      // its signature is a 400 ("Function call is missing a thought_signature").
+      const rawModelParts: Part[] = [];
       for await (const chunk of result.stream) {
         const parts = chunk.candidates?.[0]?.content?.parts ?? [];
         for (const part of parts) {
+          rawModelParts.push({ ...part });
           if (typeof part.text === "string" && part.text.length > 0) {
             outputChars += part.text.length;
             yield { kind: "text", text: part.text };
@@ -224,7 +233,22 @@ export class GeminiProvider implements AIProvider {
         });
       }
 
-      nextParts = responseParts;
+      // Append the model's function-call turn from the raw wire parts, then
+      // the function-response turn — the same roles ChatSession would have
+      // used, without its lossy validity gate. Drop only parts that carry
+      // nothing (empty object, or a lone empty text); a part whose empty text
+      // rides alongside a signature stays. Fall back to reconstructing the
+      // turn from the parsed calls if no raw parts survived.
+      const modelParts = rawModelParts.filter((part) => {
+        const keys = Object.keys(part);
+        if (keys.length === 0) return false;
+        return !(keys.length === 1 && part.text === "");
+      });
+      contents.push({
+        role: "model",
+        parts: modelParts.length > 0 ? modelParts : calls.map((call) => ({ functionCall: call })),
+      });
+      contents.push({ role: "function", parts: responseParts });
     }
 
     reportUsage(options?.onUsage, accumulated, systemPrompt, messages, undefined, outputChars);
