@@ -49,8 +49,12 @@ export function getMaxCosineDistance(): number {
  * roughly 2x a single-leg match, so this separates "the answer plus its
  * genuine peers" from plausible-but-off-target fillers. Overridable via
  * SAGE_RAG_MIN_SCORE_RATIO.
+ *
+ * 0.85 tuned 2026-07-10 against sage-rag-eval.json (clean top-3 10/20 → 15/20
+ * combined with the 0.02 margin below): dual-leg peers sit at ratio ≥ 0.92,
+ * single-leg fillers at ≈ 0.5, so 0.85 splits the two populations with slack.
  */
-const DEFAULT_MIN_SCORE_RATIO = 0;
+const DEFAULT_MIN_SCORE_RATIO = 0.85;
 
 export function getMinScoreRatio(): number {
   const raw = Number.parseFloat(process.env.SAGE_RAG_MIN_SCORE_RATIO ?? "");
@@ -65,10 +69,14 @@ export function getMinScoreRatio(): number {
  * high as the true answer; the embedding distance separates them cleanly.
  * Disabled when 0. Overridable via SAGE_RAG_DISTANCE_MARGIN.
  *
- * 0.04 tuned via harness sweep (2026-06-10): margins ≤0.035 break the
- * 100% top-3 gate; ≥0.045 lets fillers back in (clean 18/20 at 0.04).
+ * 0.04 tuned via harness sweep (2026-06-10) against the then-current fixture;
+ * re-tuned to 0.02 on 2026-07-10 against the grown sage-rag-eval.json
+ * (close-confusion cases): trailing sibling docs sit 0.02–0.05 farther than
+ * the answer, genuine multi-doc peers within ~0.015. The empty-result
+ * fallback below keeps a keyword-strong lone winner retrievable, which the
+ * 2026-06-10 sweep's tighter margins lacked.
  */
-const DEFAULT_DISTANCE_MARGIN = 0.04;
+const DEFAULT_DISTANCE_MARGIN = 0.02;
 
 export function getDistanceMargin(): number {
   const raw = Number.parseFloat(process.env.SAGE_RAG_DISTANCE_MARGIN ?? "");
@@ -102,6 +110,22 @@ interface HybridSearchRow {
   semantic_rank: number | null;
   fts_rank: number | null;
   best_distance: number | null;
+}
+
+/**
+ * RRF scores are sums of 1/(k+rank), so two docs holding mirrored ranks on the
+ * two legs (e.g. sem 1/fts 2 vs sem 2/fts 1) tie exactly. Treat differences
+ * below this as a tie and break by embedding distance instead.
+ */
+const SCORE_TIE_EPSILON = 1e-9;
+
+/**
+ * The corpus carries the same form at multiple storage paths (e.g. the DoHS
+ * release exists under both orientation/ and forms/). Collapse retrieval rows
+ * on this normalized title key so a duplicate can't occupy a second slot.
+ */
+function normalizeTitleKey(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 /**
@@ -144,6 +168,10 @@ export async function hybridSearchDocuments(
   const queryText = buildWebsearchQuery(userMessage);
   const queryModel = await getActiveEmbeddingModel();
 
+  // Fetch beyond the caller's limit so rows removed by dedupe and the relative
+  // cutoffs below can backfill from cut-survivors instead of shrinking the set.
+  const fetchLimit = limit * 2 + 2;
+
   try {
     const rows = await prisma.$queryRaw<HybridSearchRow[]>`
       SELECT * FROM visionquest.sage_hybrid_search(
@@ -151,7 +179,7 @@ export async function hybridSearchDocuments(
         ${queryText},
         ${callerRole},
         ${queryModel},
-        ${limit}::int
+        ${fetchLimit}::int
       )
     `;
 
@@ -161,7 +189,22 @@ export async function hybridSearchDocuments(
         (row.best_distance !== null && row.best_distance <= getMaxCosineDistance()),
     );
 
-    const distances = filtered
+    // Rows arrive ordered by fused score; exact RRF ties (mirrored leg ranks)
+    // are re-broken by embedding distance so the semantically closer doc wins.
+    const ordered = [...filtered].sort((a, b) => {
+      if (Math.abs(b.score - a.score) > SCORE_TIE_EPSILON) return b.score - a.score;
+      return (a.best_distance ?? Infinity) - (b.best_distance ?? Infinity);
+    });
+
+    const seenTitles = new Set<string>();
+    const deduped = ordered.filter((row) => {
+      const key = normalizeTitleKey(row.title);
+      if (seenTitles.has(key)) return false;
+      seenTitles.add(key);
+      return true;
+    });
+
+    const distances = deduped
       .map((row) => row.best_distance)
       .filter((distance): distance is number => distance !== null);
     const closestDistance = distances.length > 0 ? Math.min(...distances) : null;
@@ -175,21 +218,28 @@ export async function hybridSearchDocuments(
       return [];
     }
 
-    // Rows arrive ordered by fused score; apply relative cutoffs against the
-    // best surviving entry.
-    const topScore = filtered[0]?.score ?? 0;
+    // Relative cutoffs against the best surviving entry. When the cutoffs
+    // disagree so hard that nothing survives (the fused winner sits outside
+    // the margin anchored on a semantically-closer row AND that closer row is
+    // too weak on score), fall back to the fused winner alone rather than
+    // returning nothing — the cutoffs exist to trim trailing noise, not to
+    // veto the best match.
+    const topScore = deduped[0]?.score ?? 0;
     const minScore = topScore * getMinScoreRatio();
 
     const margin = getDistanceMargin();
     const maxAllowedDistance =
       margin > 0 && closestDistance !== null ? closestDistance + margin : Infinity;
 
-    return filtered
-      .filter(
-        (row) =>
-          row.score >= minScore &&
-          (row.best_distance === null || row.best_distance <= maxAllowedDistance),
-      )
+    const trimmed = deduped.filter(
+      (row) =>
+        row.score >= minScore &&
+        (row.best_distance === null || row.best_distance <= maxAllowedDistance),
+    );
+    const surviving = trimmed.length > 0 ? trimmed : deduped.slice(0, 1);
+
+    return surviving
+      .slice(0, limit)
       .map((row) => ({
         id: row.id,
         title: row.title,

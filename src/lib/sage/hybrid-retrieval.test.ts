@@ -90,14 +90,15 @@ describe("hybridSearchDocuments", () => {
     });
   });
 
-  it("passes role, query_model, and limit through to the SQL call", async () => {
+  it("passes role, query_model, and a widened fetch limit through to the SQL call", async () => {
     await hybridSearchDocuments("dress code", "staff", 7);
     assert.equal(mockQueryRaw.mock.callCount(), 1);
     const args = mockQueryRaw.mock.calls[0].arguments;
     // Tagged template: arguments[0] is the strings array, rest are params.
     const params = args.slice(1);
     assert.ok(params.includes("staff"), `expected role param, got ${JSON.stringify(params)}`);
-    assert.ok(params.includes(7), `expected limit param, got ${JSON.stringify(params)}`);
+    // Fetches limit*2+2 candidates so dedupe/cutoff drops can backfill.
+    assert.ok(params.includes(16), `expected widened limit param, got ${JSON.stringify(params)}`);
     // The active embedding model is threaded as the query_model guard arg.
     assert.ok(
       params.includes(ACTIVE_MODEL),
@@ -155,9 +156,9 @@ describe("hybridSearchDocuments", () => {
 
   it("filters out semantic-only results beyond the cosine distance cutoff", async () => {
     mockQueryRaw.mock.mockImplementation(async () => [
-      dbRow({ id: "close", fts_rank: null, best_distance: MAX_COSINE_DISTANCE - 0.01 }),
-      dbRow({ id: "far", fts_rank: null, best_distance: MAX_COSINE_DISTANCE + 0.1 }),
-      dbRow({ id: "fts-match", semantic_rank: null, best_distance: null, fts_rank: 1 }),
+      dbRow({ id: "close", title: "Doc A", fts_rank: null, best_distance: MAX_COSINE_DISTANCE - 0.01 }),
+      dbRow({ id: "far", title: "Doc B", fts_rank: null, best_distance: MAX_COSINE_DISTANCE + 0.1 }),
+      dbRow({ id: "fts-match", title: "Doc C", semantic_rank: null, best_distance: null, fts_rank: 1 }),
     ]);
     const results = await hybridSearchDocuments("dress code", "student", 12);
     assert.ok(results);
@@ -171,6 +172,95 @@ describe("hybridSearchDocuments", () => {
     mockQueryRaw.mock.mockImplementation(async () => []);
     const results = await hybridSearchDocuments("zzz", "student", 12);
     assert.deepEqual(results, []);
+  });
+
+  it("breaks exact RRF score ties by embedding distance", async () => {
+    // Mirrored leg ranks produce identical fused scores; the semantically
+    // closer doc must win the tie.
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "farther", title: "Doc A", score: 0.03884, semantic_rank: 2, fts_rank: 1, best_distance: 0.245 }),
+      dbRow({ id: "closer", title: "Doc B", score: 0.03884, semantic_rank: 1, fts_rank: 2, best_distance: 0.23 }),
+    ]);
+    const results = await hybridSearchDocuments("dress code", "student", 12);
+    assert.ok(results);
+    assert.deepEqual(
+      results.map((r) => r.id),
+      ["closer", "farther"],
+    );
+  });
+
+  it("collapses near-duplicate titles, keeping the strongest row", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "orig", title: "DoHS Release of Information", score: 0.039, best_distance: 0.25 }),
+      dbRow({ id: "dup", title: "DoHS  Release of Information!", score: 0.038, best_distance: 0.255 }),
+      dbRow({ id: "other", title: "Media Release Form", score: 0.037, best_distance: 0.265 }),
+    ]);
+    const results = await hybridSearchDocuments("dohs release", "student", 12);
+    assert.ok(results);
+    assert.deepEqual(
+      results.map((r) => r.id),
+      ["orig", "other"],
+    );
+  });
+
+  it("falls back to the fused winner when the relative cutoffs would empty the result", async () => {
+    // Keyword-strong winner sits embedding-far (margin drops it, anchored on
+    // the closer row); the closer row is too weak on score (ratio drops it).
+    // Rather than returning nothing, keep the fused winner alone.
+    process.env.SAGE_RAG_DISTANCE_MARGIN = "0.02";
+    process.env.SAGE_RAG_MIN_SCORE_RATIO = "0.85";
+    try {
+      mockQueryRaw.mock.mockImplementation(async () => [
+        dbRow({ id: "fts-winner", title: "Doc A", score: 0.037, fts_rank: 1, best_distance: 0.38 }),
+        dbRow({ id: "sem-close", title: "Doc B", score: 0.02, fts_rank: null, best_distance: 0.32 }),
+      ]);
+      const results = await hybridSearchDocuments("work folder", "student", 12);
+      assert.ok(results);
+      assert.deepEqual(
+        results.map((r) => r.id),
+        ["fts-winner"],
+      );
+    } finally {
+      delete process.env.SAGE_RAG_DISTANCE_MARGIN;
+      delete process.env.SAGE_RAG_MIN_SCORE_RATIO;
+    }
+  });
+
+  it("cuts a fused winner that loses the distance margin to a strong closer row", async () => {
+    // The wrong-but-keyword-loud doc scores highest while a semantically close,
+    // score-competitive doc exists: the margin trims the loud one.
+    process.env.SAGE_RAG_DISTANCE_MARGIN = "0.02";
+    process.env.SAGE_RAG_MIN_SCORE_RATIO = "0.85";
+    try {
+      mockQueryRaw.mock.mockImplementation(async () => [
+        dbRow({ id: "loud-wrong", title: "Doc A", score: 0.0385, fts_rank: 1, best_distance: 0.34 }),
+        dbRow({ id: "true-match", title: "Doc B", score: 0.0378, fts_rank: 5, best_distance: 0.26 }),
+      ]);
+      const results = await hybridSearchDocuments("which ts-12 form", "student", 12);
+      assert.ok(results);
+      assert.deepEqual(
+        results.map((r) => r.id),
+        ["true-match"],
+      );
+    } finally {
+      delete process.env.SAGE_RAG_DISTANCE_MARGIN;
+      delete process.env.SAGE_RAG_MIN_SCORE_RATIO;
+    }
+  });
+
+  it("caps returned rows at the caller's limit after filtering", async () => {
+    mockQueryRaw.mock.mockImplementation(async () =>
+      Array.from({ length: 8 }, (_, i) =>
+        dbRow({ id: `d${i}`, title: `Doc ${i}`, score: 0.039 - i * 0.0001, best_distance: 0.25 + i * 0.001 }),
+      ),
+    );
+    const results = await hybridSearchDocuments("dress code", "student", 3);
+    assert.ok(results);
+    assert.equal(results.length, 3);
+    assert.deepEqual(
+      results.map((r) => r.id),
+      ["d0", "d1", "d2"],
+    );
   });
 });
 
@@ -237,8 +327,8 @@ describe("hybridSearchDocuments abstention gate", () => {
   it("never abstains on FTS-only rows that carry no distance", async () => {
     process.env.SAGE_RAG_ABSTAIN_DISTANCE = "0.4";
     mockQueryRaw.mock.mockImplementation(async () => [
-      dbRow({ id: "fts1", semantic_rank: null, fts_rank: 1, best_distance: null }),
-      dbRow({ id: "fts2", semantic_rank: null, fts_rank: 2, best_distance: null }),
+      dbRow({ id: "fts1", title: "Doc A", semantic_rank: null, fts_rank: 1, best_distance: null }),
+      dbRow({ id: "fts2", title: "Doc B", semantic_rank: null, fts_rank: 2, best_distance: null }),
     ]);
     const results = await hybridSearchDocuments("dress code", "student", 12);
     assert.ok(results);
