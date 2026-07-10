@@ -188,6 +188,19 @@ describe("extractAndStoreMemories", () => {
     assert.equal(mockCreate.mock.callCount(), 0);
   });
 
+  it("guards semantic dedupe by the active embedding model", async () => {
+    await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+    const semanticQuery = mockQueryRaw.mock.calls[0];
+    const sql = semanticQuery.arguments[0].join("");
+    assert.match(sql, /"embeddingModel" =/);
+    assert.ok(semanticQuery.arguments.slice(1).includes("gemini-embedding-001"));
+  });
+
   it("skips near-duplicates within the same extraction batch", async () => {
     // Same vector for both candidates → second is a batch-level duplicate.
     mockEmbedTexts.mock.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0, 0]));

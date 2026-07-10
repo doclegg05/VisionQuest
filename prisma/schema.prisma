@@ -1100,6 +1100,8 @@ model SageMemory {
   kind              String // episodic | semantic | procedural
   content           String                      @db.Text
   embedding         Unsupported("vector(768)")?
+  // Provenance guard: only compare memory vectors produced by the active model.
+  embeddingModel    String?
   category          String // goal | preference | circumstance | skill | coaching | progress | other
   confidence        Float                       @default(0.7)
   validFrom         DateTime                    @default(now())

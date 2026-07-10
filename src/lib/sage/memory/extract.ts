@@ -237,6 +237,7 @@ export async function extractAndStoreMemories({
             AND "subjectId" = ${candidate.subjectId}
             AND ("validTo" IS NULL OR "suppressedByStaff" = true)
             AND embedding IS NOT NULL
+            AND "embeddingModel" = ${activeModel}
             AND (embedding <=> ${vectorLiteral}::vector(768)) <= ${dupDistance}
           LIMIT 1
         `;
