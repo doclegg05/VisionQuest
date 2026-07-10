@@ -17,7 +17,7 @@ export function StarterChips({ role, onSelect }: StarterChipsProps) {
           key={chip.label}
           type="button"
           onClick={() => onSelect(chip.prefill)}
-          className="rounded-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)]"
+          className="min-h-11 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] shadow-sm transition-colors hover:border-[var(--chat-sage-mark)] hover:bg-[var(--chat-sage-mark-bg)]"
         >
           {chip.label}
         </button>

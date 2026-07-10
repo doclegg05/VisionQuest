@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useReducedMotion } from "framer-motion";
 import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
+import { ActionCard } from "./ActionCard";
 import { ConfirmToolCard } from "./ConfirmToolCard";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
@@ -77,11 +77,28 @@ function upsertAgentEvent(events: AgentEventItem[], next: AgentEventItem) {
   }
 }
 
+function metaString(meta: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = meta?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 function AgentEventList({ events }: { events: AgentEventItem[] }) {
   if (events.length === 0) return null;
 
+  // When an action card is present, hide the matching success tool chip so the
+  // student sees one clear next step (Cursor-style) instead of status + link.
+  const hasActionCard = events.some(
+    (event) =>
+      event.kind === "action" &&
+      event.target &&
+      (event.action === "open_form" ||
+        event.action === "open_resource" ||
+        event.action === "navigate" ||
+        event.action === "confirm_tool"),
+  );
+
   return (
-    <div className="ml-12 mt-2 space-y-2">
+    <div className="ml-11 mt-2 space-y-2">
       {events.map((event) => {
         if (event.kind === "action" && event.action === "confirm_tool" && event.meta) {
           return (
@@ -93,9 +110,28 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
             />
           );
         }
+        if (
+          event.kind === "action" &&
+          event.target &&
+          event.action &&
+          (event.action === "open_form" ||
+            event.action === "open_resource" ||
+            event.action === "navigate")
+        ) {
+          return (
+            <ActionCard
+              key={event.id}
+              action={event.action}
+              target={event.target}
+              label={event.label || "Open"}
+              title={metaString(event.meta, "title")}
+              description={metaString(event.meta, "description")}
+            />
+          );
+        }
         if (event.kind === "action" && event.target) {
+          // Fallback for unknown action kinds — keep a usable link.
           const external = /^https?:\/\//i.test(event.target);
-          // Form PDFs open in a new tab so they don't replace the chat.
           const newTab = external || event.action === "open_form";
           return (
             <a
@@ -103,12 +139,17 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
               href={event.target}
               target={newTab ? "_blank" : undefined}
               rel={newTab ? "noopener noreferrer" : undefined}
-              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-semibold text-[var(--accent-strong)] shadow-sm transition-colors hover:bg-[var(--surface-interactive)]"
+              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-3 py-2 text-sm font-semibold text-[var(--chat-sage-action)] shadow-sm transition-colors hover:bg-[var(--chat-sage-mark-bg)]"
             >
               <ArrowSquareOut size={17} weight="bold" className="shrink-0" />
               <span className="truncate">{event.label || "Open"}</span>
             </a>
           );
+        }
+
+        // Suppress success tool chips when an action card already carries the CTA.
+        if (hasActionCard && event.kind === "tool" && event.status === "success") {
+          return null;
         }
 
         const Icon =
@@ -121,15 +162,15 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
                 : Wrench;
         const tone =
           event.status === "success"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+            ? "border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
             : event.status === "error"
-              ? "border-rose-200 bg-rose-50 text-rose-800"
-              : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--ink-muted)]";
+              ? "border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
+              : "border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] text-[var(--ink-muted)]";
 
         return (
           <div
             key={event.id}
-            className={`flex max-w-[34rem] items-start gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm ${tone}`}
+            className={`flex max-w-[34rem] items-start gap-2 rounded-xl border px-3 py-2 text-xs ${tone}`}
           >
             <Icon size={16} weight="bold" className="mt-0.5 shrink-0" />
             <div className="min-w-0">
@@ -153,7 +194,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       ? REQUESTED_STAGE_OPENERS[requestedStage as keyof typeof REQUESTED_STAGE_OPENERS]
       : null;
   const { checkProgression } = useProgression();
-  const shouldReduceMotion = useReducedMotion();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -172,6 +212,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const [optimisticGreeting, setOptimisticGreeting] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const latestPollIdRef = useRef(0);
+  const greetingGenerationRef = useRef(0);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   /** Tracks whether the warmup fetch has fired this session. */
   const warmupFiredRef = useRef(false);
 
@@ -268,6 +310,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   }, []);
 
   const startNewChat = () => {
+    greetingGenerationRef.current++;
     setConversationId(null);
     setMessages([]);
     setStreamingContent("");
@@ -337,6 +380,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       setIsLoading(true);
       setStreamingContent("");
       setStreamingEvents([]);
+      const greetingGeneration = ++greetingGenerationRef.current;
 
       // B4: If this is the first message of a new conversation (no conversationId
       // and no prior messages), show an optimistic greeting immediately while SSE
@@ -350,7 +394,9 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           // Derive stage asynchronously — don't await here so rendering isn't blocked.
           // The greeting will appear as soon as the stage resolves (typically <200ms).
           void deriveStageFromGoals().then((stage) => {
-            setOptimisticGreeting(STAGE_OPENERS[stage]);
+            if (greetingGenerationRef.current === greetingGeneration) {
+              setOptimisticGreeting(STAGE_OPENERS[stage]);
+            }
           });
         }
       }
@@ -405,6 +451,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           if (data.text) {
             // B4: First real token clears the optimistic greeting.
             if (!fullContent) {
+              greetingGenerationRef.current++;
               setOptimisticGreeting(null);
             }
             fullContent += data.text;
@@ -512,6 +559,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           },
         ]);
       } finally {
+        greetingGenerationRef.current++;
         setIsLoading(false);
         setStreamingEvents([]);
         // B4: Ensure optimistic greeting is always cleared when streaming ends,
@@ -550,10 +598,29 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!showSidebar) return;
+
+    const focusSidebar = () => {
+      sidebarRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSidebar(false);
+      }
+    };
+
+    requestAnimationFrame(focusSidebar);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showSidebar]);
+
   return (
-    <div className="relative flex min-h-[70dvh] overflow-hidden md:h-[72vh] md:min-h-[42rem]">
+    <div className="relative flex min-h-[70dvh] overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-area-bg)] md:h-[72vh] md:min-h-[42rem]">
       <div
-        className={`absolute z-40 h-full w-[min(19rem,calc(100vw-1.5rem))] border-r border-white/10 transition-transform md:relative md:w-[19rem]
+        ref={sidebarRef}
+        id="sage-conversations"
+        className={`absolute z-40 h-full w-[min(17.5rem,calc(100vw-1.5rem))] transition-transform md:relative md:w-[17.5rem]
           ${showSidebar ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <ConversationList
@@ -569,26 +636,34 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         />
       </div>
 
-      <div
-        className="flex min-w-0 flex-1 flex-col"
-        style={{ background: "var(--chat-area-bg)" }}
-      >
-        <div className="md:hidden flex items-center gap-3 border-b border-[var(--chat-input-border)] bg-[var(--chat-header-bg)] px-4 py-3 backdrop-blur">
+      <div className="flex min-w-0 flex-1 flex-col bg-[var(--chat-area-bg)]">
+        <div className="flex items-center gap-3 border-b border-[var(--chat-panel-border)] bg-[var(--chat-header-bg)] px-4 py-2.5 backdrop-blur">
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             type="button"
             aria-label={showSidebar ? "Hide conversations" : "Show conversations"}
-            className="rounded-2xl border border-[var(--border)] px-3 py-2 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+            aria-controls="sage-conversations"
+            aria-expanded={showSidebar}
+            className="rounded-xl border border-[var(--chat-panel-border)] px-2.5 py-2 text-[var(--ink-muted)] hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)] md:hidden"
           >
             <List aria-hidden="true" size={20} weight="bold" />
           </button>
-          <span className="text-sm font-semibold text-[var(--ink-strong)]">Chat with Sage</span>
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--chat-sage-mark-bg)] text-xs font-bold text-[var(--chat-sage-mark)]"
+            aria-hidden="true"
+          >
+            S
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--ink-strong)]">Sage</p>
+            <p className="text-xs text-[var(--ink-muted)]">Your SPOKES coach</p>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6" role="log" aria-label="Conversation with Sage" aria-live="polite">
-          <div className="mx-auto max-w-4xl space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite">
+          <div className="mx-auto max-w-3xl space-y-5">
             {messages.length === 0 && !isLoading && (
-              <div className="mt-20 text-center text-[var(--ink-muted)]">
+              <div className="mt-16 text-center text-[var(--ink-muted)]">
                 <div className="mx-auto mb-5 flex justify-center">
                   <BrandLockup
                     size="md"
@@ -597,9 +672,9 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                     align="center"
                   />
                 </div>
-                <p className="font-display text-3xl text-[var(--ink-strong)] sm:text-4xl">Welcome to VisionQuest</p>
-                <p className="mt-3 text-sm leading-6">
-                  Send a message to start talking with Sage about your goals, next steps, or what feels stuck.
+                <p className="font-display text-3xl text-[var(--ink-strong)] sm:text-4xl">Chat with Sage</p>
+                <p className="mx-auto mt-3 max-w-md text-sm leading-6">
+                  Ask about goals, forms, next steps, or what feels stuck — Sage stays with you in this chat.
                 </p>
                 <div className="mt-8">
                   <StarterChips role={role} onSelect={(prefill) => handleSend(prefill)} />
@@ -622,7 +697,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                       }
                     }}
                     type="button"
-                    className="ml-12 mt-2 text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                    className="ml-11 mt-2 text-xs font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
                   >
                     Retry response
                   </button>
@@ -634,7 +709,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             {optimisticGreeting && !streamingContent && (
               <div>
                 <MessageBubble role="assistant" content={optimisticGreeting} isStreaming />
-                <p className="ml-14 mt-1 text-[11px] text-[var(--ink-muted)]">sending…</p>
+                <p className="ml-11 mt-1 text-[11px] text-[var(--ink-muted)]">sending…</p>
               </div>
             )}
 
@@ -656,18 +731,19 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         </div>
 
         {goalToast && (
-          <div className={`absolute left-1/2 top-4 z-50 -translate-x-1/2 ${shouldReduceMotion ? "" : "animate-bounce"}`} role="alert">
-            <div className="rounded-full bg-[linear-gradient(135deg,var(--accent-secondary),var(--accent))] px-5 py-2.5 text-sm font-medium text-white shadow-[0_22px_48px_rgba(15,154,146,0.24)]">
-              🎯 {goalToast} +50 XP
+          <div className="absolute left-1/2 top-4 z-50 -translate-x-1/2" role="alert">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--toast-celebration-border)] bg-[var(--toast-celebration-bg)] px-4 py-2 text-sm font-semibold text-[var(--toast-celebration-text)] shadow-sm">
+              <CheckCircle size={16} weight="bold" aria-hidden="true" />
+              <span>{goalToast} · +50 XP</span>
             </div>
           </div>
         )}
 
         {chatError && (
-          <div className="mx-4 mb-2 rounded-[1.15rem] border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-4 py-3 text-sm text-[var(--chat-error-text)]">
+          <div role="alert" className="mx-4 mb-2 rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-4 py-3 text-sm text-[var(--chat-error-text)]">
             <p>{chatError}</p>
             {(chatError.includes("API key") || chatError.includes("Sage is not configured")) && (
-              <Link href="/settings" prefetch={false} className="mt-2 inline-block font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]">
+              <Link href="/settings" prefetch={false} className="mt-2 inline-block font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]">
                 Open Settings →
               </Link>
             )}

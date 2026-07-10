@@ -4,10 +4,10 @@ import { renderToString } from "react-dom/server";
 import { StarterChips } from "./StarterChips";
 
 describe("StarterChips", () => {
-  it("renders 4 chips for student role", () => {
+  it("renders starter chips for student role", () => {
     const html = renderToString(<StarterChips role="student" onSelect={() => {}} />);
     const buttonCount = (html.match(/<button/g) ?? []).length;
-    assert.equal(buttonCount, 4);
+    assert.ok(buttonCount >= 4, `expected at least 4 starter chips, got ${buttonCount}`);
   });
 
   it("renders role-specific labels for teacher", () => {

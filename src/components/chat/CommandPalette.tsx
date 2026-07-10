@@ -5,6 +5,7 @@ import { filterCommands, type ChatRole, type SlashCommand } from "@/lib/chat/com
 import { cn } from "@/lib/utils";
 
 interface CommandPaletteProps {
+  listboxId?: string;
   open: boolean;
   input: string;
   role: ChatRole;
@@ -13,7 +14,15 @@ interface CommandPaletteProps {
   onClose: () => void;
 }
 
-export function CommandPalette({ open, input, role, commands, onSelect, onClose }: CommandPaletteProps) {
+export function CommandPalette({
+  listboxId = "sage-command-listbox",
+  open,
+  input,
+  role,
+  commands,
+  onSelect,
+  onClose,
+}: CommandPaletteProps) {
   const [highlightIndex, setHighlightIndex] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -60,6 +69,7 @@ export function CommandPalette({ open, input, role, commands, onSelect, onClose 
       ) : (
         <ul
           ref={listRef}
+          id={listboxId}
           role="listbox"
           aria-label="Available commands"
           className="max-h-64 overflow-y-auto py-1"

@@ -156,6 +156,11 @@ const presentForm: AgentTool = {
         // keyed by DB FormTemplate ids, where catalog slugs 404.
         target: buildFormDownloadUrl(match.id, "view"),
         label: `Open ${match.title}`,
+        meta: {
+          title: match.title,
+          description: match.description,
+          formId: match.id,
+        },
       },
       modelHint: `Surfaced form "${match.title}" (${match.category}). The student now has a button to open it. Briefly tell them what the form is for and any next step.`,
     };
@@ -237,6 +242,11 @@ const searchFormsTool: AgentTool = {
         action: "open_form" as const,
         target: c.verifyUrl as string,
         label: `Verify: ${c.title}`,
+        meta: {
+          title: c.title,
+          description: c.description,
+          formId: c.id,
+        },
       }));
 
     const top = enriched[0];
@@ -716,6 +726,11 @@ const openResource: AgentTool = {
         action: "open_resource",
         target: resource.href,
         label: `Open ${resource.label}`,
+        meta: {
+          title: resource.label,
+          description: resource.summary,
+          resourceId,
+        },
       },
       modelHint: `Resource "${resource.label}" — ${resource.summary}. Tell the student briefly what's there.`,
     };
