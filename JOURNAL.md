@@ -139,3 +139,9 @@ compare doc.storageKey to expectCitationId. Then re-run; expect dress-code + rig
 green immediately, teacher-orientation-checklist to remain red on genuine retrieval (real
 follow-up work). Fixtures are RIGHT (stable storage keys > env-specific cuids) — fix the
 harness, not the fixtures.
+
+[2026-07-10] VERIFIED (2nd strict run, temperature=0): identical 18/21 — grounding 0/3,
+same cuids cited; all other families 18/18. The citation failure is DETERMINISTIC
+(grader-format), while the mustContainAny reply-term sub-failure is LLM-flaky (fired run 1,
+not run 2). Goal terminated on its 20-turn bound; end state unreachable under frozen
+graders + stale 40q floor (34 current vs >=36 required). Awaiting Britt: grader mapping fix.
