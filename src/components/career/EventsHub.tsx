@@ -27,6 +27,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
 
   async function toggleRegistration(eventId: string, registered: boolean) {
     setBusyId(eventId);
@@ -50,7 +51,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
     }
   }
 
-  const upcomingCount = events.filter((event) => new Date(event.endsAt).getTime() >= Date.now()).length;
+  const upcomingCount = events.filter((event) => new Date(event.endsAt).getTime() >= now).length;
   const registeredCount = events.filter((event) => Boolean(event.registration)).length;
 
   return (
@@ -101,7 +102,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
         <div className="space-y-4">
           {events.map((event) => {
             const isRegistered = Boolean(event.registration);
-            const eventIsPast = new Date(event.endsAt).getTime() < Date.now();
+            const eventIsPast = new Date(event.endsAt).getTime() < now;
             return (
               <div id={`event-${event.id}`} key={event.id} className="surface-section p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">

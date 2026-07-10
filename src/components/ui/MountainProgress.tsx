@@ -102,7 +102,9 @@ export default function MountainProgress({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   // Keep score ref in sync
-  scoreRef.current = readinessScore;
+  useEffect(() => {
+    scoreRef.current = readinessScore;
+  });
 
   // ─── Resize ─────────────────────────────────────────────────────────────
 

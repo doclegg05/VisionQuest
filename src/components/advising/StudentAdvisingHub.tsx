@@ -78,7 +78,7 @@ export default function StudentAdvisingHub({
 
   const openTasks = tasks.filter((task) => task.status !== "completed");
   const completedTasks = tasks.filter((task) => task.status === "completed");
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const upcomingAppointments = appointments.filter((appointment) => new Date(appointment.endsAt).getTime() >= now);
   const pastAppointments = appointments.filter((appointment) => new Date(appointment.endsAt).getTime() < now);
   const selectedAdvisor = bookableAdvisors.find((advisor) => advisor.advisorId === bookingForm.advisorId) || bookableAdvisors[0] || null;
