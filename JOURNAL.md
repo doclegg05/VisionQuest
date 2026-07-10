@@ -109,3 +109,33 @@ OPEN FOR BRITT (digest): (1) merge/push — NOT done, branch only; (2) audience 
 the two teacher-doc cases above; (3) pre-existing form-harness top1 11/12 drift worth a look;
 (4) speculative follow-up (not built): lexical title-boost rerank could clean prc1-vs-ssp1
 class without touching SQL.
+
+## agent/sage-chat-grounding-20260710 — chat-harness grounding goal (STOPPED: grader defect)
+
+[2026-07-10] DECISION: STOP per goal constraint ("fixture expectation wrong -> STOP and
+report") instead of coding around the grader | WHY: the 3 failing grounding cases in
+sage:chat-harness CANNOT pass with frozen graders — runGroundingCase compares the parsed
+download-link cuid directly to assert.expectCitationId, but all 3 fixtures hold STORAGE
+KEYS (since #100); the id->storageKey DB mapping that scripts/sage-rag-harness.mjs performs
+(loadDocumentsByIds -> doc.storageKey) is missing from the chat harness. Verified by
+read-only DB mapping: dress-code and rights-responsibilities retrieval is CORRECT (top
+cited cuid IS the expected doc) — pure grader-format failures; only
+teacher-orientation-checklist has a real retrieval gap (got the two release-authorization
+forms, not orientation/SPOKES Checklist for Student Orientation.pdf, id cmmyyb8ln0038eadke643r7ht)
+| ALTERNATIVES REJECTED: (a) storage-key ids in download links — breaks the RAG harness's
+loadDocumentsByIds mapping and real download URLs; (b) duplicate harness-visible Link lines —
+pollutes production context, inflates unexpectedTop3; both are grader-gaming | REVERSIBLE:
+nothing to revert — no product code changed.
+
+[2026-07-10] FINDING (second blocker): the goal's no-regression floor "40q strictPassed>=36"
+encodes the STALE pre-cleantop3 baseline (harness-cleantop3-baseline.json, captured before
+c5f42c2 merged). Current untouched main measures 34 (accepted 36->34 trade-off, journaled
+above). Verified with fresh runs: docs fixture strictPassed 15/29 (floor >=14 OK),
+40q strictPassed 34/40. Reports: .planning/sage-rag/harness-{docs,40q}-current-chatgoal.json.
+
+PROPOSED FIX (needs Britt's word — grader is frozen): mirror the RAG harness's mapping in
+runGroundingCase (~6 lines): look up parsed ref ids via prisma programDocument.findMany,
+compare doc.storageKey to expectCitationId. Then re-run; expect dress-code + rights to go
+green immediately, teacher-orientation-checklist to remain red on genuine retrieval (real
+follow-up work). Fixtures are RIGHT (stable storage keys > env-specific cuids) — fix the
+harness, not the fixtures.
