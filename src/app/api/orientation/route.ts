@@ -7,7 +7,16 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { parseBody } from "@/lib/schemas";
 
 const orientationToggleSchema = z.object({
-  itemId: z.string().cuid("Invalid orientation item ID."),
+  // Not .cuid(): the canonical seed (scripts/seed-data.mjs) creates items
+  // with deterministic ids like "seed-orient-70", which a cuid check
+  // rejects — breaking completion on any freshly-seeded database. The id
+  // only ever reaches parameterized Prisma lookups, so a length-capped
+  // slug shape is sufficient.
+  itemId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9_-]+$/i, "Invalid orientation item ID."),
   completed: z.boolean(),
   studentId: z.string().cuid("Invalid student ID.").optional(),
 });

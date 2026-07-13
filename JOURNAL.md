@@ -272,3 +272,59 @@ Proof instrument: `npm run test:forms:delivery` (to be built first, failing base
 [2026-07-13] SURPRISE during fix: a STATIC `.ts` import from the .mjs script dies under tsx on Node 22.19 ("does not provide an export named 'FORMS'") — Node's native type-stripping claims explicit-.ts static imports first and misreads exports in this no-"type" package; DYNAMIC import goes through the tsx loader and works. Script uses dynamic imports with a comment.
 
 [2026-07-13] GOAL REACHED, all proof shown in conversation: baseline 8/38 pass → final `npm run test:forms:delivery` 38/38 exit 0; `npm test` 1609/1609 exit 0; `npm run typecheck` exit 0; eslint 0 errors. Instrument untouched since the baseline run (frozen per goal). Commits: eeeca26 (chore: track 83 blank template PDFs), ee1da9f (test: forms-delivery gate + bundledCandidatePaths export), 4fcc057 (fix: standalone staging + presigned existence guard). NOT done (Britt's calls): merge/push; bucket uploads (25 storageKeys, list in digest); Render deploy. Worktree + branch left in place for review.
+# Decision Journal — agent/orientation-html-20260713 (goal: in-browser Student Profile orientation step)
+
+Goal: logged-in student completes the "Complete SPOKES Student Profile" orientation step in the
+browser (HTML form, not PDF iframe); answers land on SpokesRecord; OrientationItem marked complete.
+Proof: e2e/orientation-student-profile.spec.ts (written FIRST, failing baseline shown), then
+npm test + typecheck green.
+
+[2026-07-13] DECISION: E2E database = EPHEMERAL local PostgreSQL 18 cluster (initdb --auth=trust,
+port 54317, data dir in the session scratchpad), db visionquest_e2e, schema via `prisma db push`,
+demo data via `npm run db:seed`. Worktree .env.local (untracked) points at it with generated
+throwaway JWT/API-key secrets | WHY: dev .env.local points DATABASE_URL at the LIVE Supabase pooler
+(host checked, no values read) — e2e writes there would violate the no-live-service constraint; no
+Docker on this machine; the machine's resident postgres on 5432 requires credentials I don't have
+(a permission classifier correctly blocked password-guessing — right call, abandoned) | ALTERNATIVES:
+Supabase preview branch (live-service change, out of scope); reuse resident 5432 instance (no creds)
+| REVERSIBLE: pg_ctl stop + delete scratchpad dir; nothing system-level installed.
+
+[2026-07-13] DECISION: Spec self-seeds its fixture student (e2e-orientation-profile) via Prisma with
+a locally-replicated scrypt hash (auth.ts's hashPassword imports next/headers and cannot load outside
+Next; params pinned by auth.test.ts, drift surfaces as a failed login here). Fixture pre-completes
+all 23 other orientation items so the wizard opens directly on the profile step | WHY: no student
+self-registration API exists; keeps proof command self-sufficient (`npx playwright test e2e/...`)
+| REVERSIBLE: afterAll cleanup deletes fixture rows.
+
+[2026-07-13] DESIGN (implementation, after baseline): (1) src/lib/spokes/student-profile-form.ts —
+single source of truth: field defs (FormTemplateSchema types from src/lib/forms/schema.ts),
+student-appropriate SpokesRecord mapping (firstName, lastName, birthDate, county, householdType,
+gender, race, ethnicity, educationalLevel, referralEmail — NO status/milestone/wage fields), option
+lists (teacher UI is free-text; selects give the validation the adversarial tests need);
+(2) seeded official FormTemplate seed-form-student-profile in scripts/seed-data.mjs (db:seed moves
+to tsx so it can import the TS module — matches the repo's other tsx scripts); (3) /api/settings/
+profile extended (its header comment designates it) with validateAnswersAgainstSchema + explicit
+column mapping, always writes session.id; (4) OrientationWizard: new "profile-form" step type for
+form id student-profile → StudentProfileFormStep component (FieldWidget pattern), Save & Continue →
+POST profile → markItemComplete → advance. Signature/print-packet system untouched.
+
+[2026-07-13] SURPRISE (real pre-existing bug found via the spec): POST /api/orientation validated
+itemId as a cuid, but scripts/seed-data.mjs creates ids like seed-orient-70 — completion 400s on any
+freshly-seeded DB. This also explained the first implementation-run failure (the component surfaced
+its generic error because onComplete → markItemComplete threw). Fixed to a length-capped slug regex;
+flagged for Britt: worth checking whether the PRODUCTION DB's orientation items carry seed-orient-*
+ids (if so, orientation check-off has been silently broken in prod for seeded items).
+
+[2026-07-13] INFRA NOTES for reproducing the e2e run: ephemeral PG cluster (port 54317, scratchpad
+pgdata) + `prisma db push` needed two accommodations: (a) --accept-data-loss on an empty DB (vacuous
+warnings), (b) the two Sage `Unsupported("vector(768)")` embedding columns stripped from a scratch
+schema copy — pgvector isn't installed locally; those columns are raw-SQL-only (Prisma never selects
+them) and the orientation flow doesn't touch Sage retrieval. Student layout gates: fixture also
+seeds the three SecurityQuestionAnswer rows or the app forces /recovery-setup.
+
+[2026-07-13] GOAL REACHED (final proofs in conversation): baseline FAIL captured (wizard showed the
+PDF iframe rendering the download 404 JSON — Britt's original bug on screen); after implementation
+`npx playwright test e2e/orientation-student-profile.spec.ts` 1 passed (cold start verified, 15.4s);
+route tests 9/9; npm test full suite exit 0; typecheck exit 0; eslint exit 0. Commits: 83cc6fc
+(feat incl. tests), + fix(orientation) itemId, + docs journal. NOT done (Britt's calls): merge/push;
+seeding the FormTemplate + re-seeding orientation on any shared DB; deploy.
