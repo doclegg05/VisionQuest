@@ -297,6 +297,30 @@ async function seed() {
   }
   console.log(`  ✓ ${SPOKES_CHECKLIST.length} SPOKES checklist items`);
 
+  console.log("Seeding the official Student Profile form template...");
+  // Dynamic import: db:seed runs under tsx (see package.json); a static .ts
+  // import from .mjs gets claimed by Node's native type-stripping and fails.
+  const {
+    STUDENT_PROFILE_TEMPLATE_ID,
+    STUDENT_PROFILE_TEMPLATE_TITLE,
+    STUDENT_PROFILE_TEMPLATE_DESCRIPTION,
+    STUDENT_PROFILE_FIELDS,
+  } = await import(new URL("../src/lib/spokes/student-profile-form.ts", import.meta.url));
+  const templateData = {
+    title: STUDENT_PROFILE_TEMPLATE_TITLE,
+    description: STUDENT_PROFILE_TEMPLATE_DESCRIPTION,
+    schema: STUDENT_PROFILE_FIELDS,
+    programTypes: ["spokes"],
+    isOfficial: true,
+    status: "active",
+  };
+  await prisma.formTemplate.upsert({
+    where: { id: STUDENT_PROFILE_TEMPLATE_ID },
+    update: templateData,
+    create: { id: STUDENT_PROFILE_TEMPLATE_ID, ...templateData },
+  });
+  console.log("  ✓ Student Profile form template");
+
   console.log("Seeding SPOKES module templates...");
   for (const mod of SPOKES_MODULES) {
     await prisma.spokesModuleTemplate.upsert({

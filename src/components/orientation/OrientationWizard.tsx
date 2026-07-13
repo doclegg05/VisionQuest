@@ -9,6 +9,7 @@ import {
   type SpokesForm,
 } from "@/lib/spokes/forms";
 import SignaturePad from "@/components/ui/SignaturePad";
+import StudentProfileFormStep from "./StudentProfileFormStep";
 import WizardStepIndicator from "./WizardStepIndicator";
 import WizardCompletion from "./WizardCompletion";
 
@@ -21,7 +22,7 @@ interface OrientationItem {
   completed: boolean;
 }
 
-type StepType = "sign" | "acknowledge" | "read-only" | "no-pdf" | "instructor-led";
+type StepType = "sign" | "acknowledge" | "read-only" | "no-pdf" | "instructor-led" | "profile-form";
 
 interface WizardStep {
   orientationItemId: string;
@@ -33,6 +34,10 @@ interface WizardStep {
 }
 
 function classifyStep(form: SpokesForm): StepType {
+  // The Student Profile is completed as an in-browser form that writes the
+  // student's SpokesRecord — not read as a PDF (2026-07-13; the PDF stays
+  // available from the Documents page and the instructor print packet).
+  if (form.id === "student-profile") return "profile-form";
   if (!hasDownloadableFormDocument(form)) return "no-pdf";
   if (form.requiresSignature) return "sign";
   if (form.acceptsSubmission) return "acknowledge";
@@ -198,6 +203,17 @@ export default function OrientationWizard() {
     }
   }
 
+  async function handleProfileSaved() {
+    const step = steps[currentStep];
+    if (!step) return;
+    // The profile itself is already saved by the form component; here we
+    // only record orientation progress and advance.
+    if (step.isLastForItem) {
+      await markItemComplete(step.orientationItemId);
+    }
+    advanceStep({ title: step.stepTitle, type: "acknowledged" });
+  }
+
   async function handleSkipNoPdf() {
     const step = steps[currentStep];
     if (!step) return;
@@ -296,8 +312,10 @@ export default function OrientationWizard() {
         currentTitle={step.stepTitle}
       />
 
-      {/* PDF Viewer / Instructor-led placeholder */}
-      {step.type === "instructor-led" ? (
+      {/* PDF Viewer / in-browser form / instructor-led placeholder */}
+      {step.type === "profile-form" ? (
+        <StudentProfileFormStep onComplete={handleProfileSaved} />
+      ) : step.type === "instructor-led" ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] py-16 gap-3">
           <p className="text-base font-medium text-[var(--ink-strong)]">{step.stepTitle}</p>
           {step.stepDescription && (
@@ -327,7 +345,8 @@ export default function OrientationWizard() {
         </div>
       )}
 
-      {/* Action area */}
+      {/* Action area (the profile form carries its own submit button) */}
+      {step.type !== "profile-form" && (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 space-y-4">
         {/* Mark Complete button (instructor-led type) */}
         {step.type === "instructor-led" && (
@@ -419,6 +438,7 @@ export default function OrientationWizard() {
           <p className="text-sm text-red-500">{error}</p>
         )}
       </div>
+      )}
     </div>
   );
 }
