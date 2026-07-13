@@ -54,7 +54,22 @@ next-env.d.ts
 # reference documents (large PDFs)
 /SPOKES Handbook/
 /content/
-/docs-upload/
+# docs-upload/ stays untracked EXCEPT the folders holding FORMS[]-referenced
+# blank form templates (src/lib/spokes/forms.ts) — those must live in the repo
+# so the bundled-PDF fallback in src/lib/storage.ts works in production when a
+# bucket object is missing. Guarded by `npm run test:forms:delivery`.
+/docs-upload/*
+!/docs-upload/forms/
+!/docs-upload/orientation/
+!/docs-upload/students/
+!/docs-upload/teachers/
+/docs-upload/teachers/*
+!/docs-upload/teachers/Handbook Appendix/
+/docs-upload/teachers/Handbook Appendix/*
+!/docs-upload/teachers/Handbook Appendix/Section 4/
+!/docs-upload/teachers/Handbook Appendix/Section 7/
+/docs-upload/teachers/Handbook Appendix/Section 7/*
+!/docs-upload/teachers/Handbook Appendix/Section 7/ECP/
 
 # Claude Code — personal overrides (gitignored per best practices)
 CLAUDE.local.md
