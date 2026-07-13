@@ -144,17 +144,26 @@ const BUNDLED_KEY_PREFIX_TO_LOCAL: Record<string, string> = Object.fromEntries(
     .map(([local, bucket]) => [`${bucket}/`, `${local}/`]),
 );
 
-export async function downloadBundledFile(
-  storageKey: string,
-): Promise<{ buffer: Buffer; mimeType: string } | null> {
+/**
+ * Candidate docs-upload/-relative paths for a bucket storageKey, in resolution
+ * order: the key itself, then the reverse of any uploader folder rename.
+ * Shared by downloadBundledFile and the standalone asset-staging build step
+ * (scripts/prepare-standalone-assets.mjs) so the two can't drift.
+ */
+export function bundledCandidatePaths(storageKey: string): string[] {
   const candidates = [storageKey];
   for (const [keyPrefix, localPrefix] of Object.entries(BUNDLED_KEY_PREFIX_TO_LOCAL)) {
     if (storageKey.startsWith(keyPrefix)) {
       candidates.push(localPrefix + storageKey.slice(keyPrefix.length));
     }
   }
+  return candidates;
+}
 
-  for (const candidate of candidates) {
+export async function downloadBundledFile(
+  storageKey: string,
+): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  for (const candidate of bundledCandidatePaths(storageKey)) {
     try {
       const resolved = resolveStoragePath(BUNDLED_UPLOAD_DIR, candidate);
       const buffer = await fs.readFile(resolved);

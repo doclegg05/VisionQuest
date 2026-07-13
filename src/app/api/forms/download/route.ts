@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
+import { downloadFile, getPresignedDownloadUrl, storageObjectExists } from "@/lib/storage";
 import { canViewForm, FORMS, getFormById } from "@/lib/spokes/forms";
 
 export async function GET(req: Request) {
@@ -67,7 +67,18 @@ export async function GET(req: Request) {
   const presigned = await getPresignedDownloadUrl(form.storageKey, {
     contentDisposition: disposition,
   });
-  if (presigned) return NextResponse.redirect(presigned, 302);
+  if (presigned) {
+    // Redirect only when the object is actually in the bucket — a presigned
+    // URL for a missing object 302s the browser into the storage provider's
+    // raw 404, skipping the bundled-PDF fallback in downloadFile() below.
+    let objectExists = false;
+    try {
+      objectExists = await storageObjectExists(form.storageKey);
+    } catch {
+      // HeadObject failed (config/network) — fall through to downloadFile.
+    }
+    if (objectExists) return NextResponse.redirect(presigned, 302);
+  }
 
   const result = await downloadFile(form.storageKey);
   if (!result) {
