@@ -8,6 +8,8 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum
 
 const mockResumeFindUnique = mock.fn() as any;
 const mockJobFindUnique = mock.fn() as any;
+const mockJobFindFirst = mock.fn() as any;
+const mockEnrollmentFindFirst = mock.fn() as any;
 const mockCertFindMany = mock.fn() as any;
 const mockDiscoveryFindUnique = mock.fn() as any;
 const mockResumeVersionFindFirst = mock.fn() as any;
@@ -27,7 +29,11 @@ mock.module("@/lib/db", {
   namedExports: {
     prisma: {
       resumeData: { get findUnique() { return mockResumeFindUnique; } },
-      jobListing: { get findUnique() { return mockJobFindUnique; } },
+      jobListing: {
+        get findUnique() { return mockJobFindUnique; },
+        get findFirst() { return mockJobFindFirst; },
+      },
+      studentClassEnrollment: { get findFirst() { return mockEnrollmentFindFirst; } },
       certification: { get findMany() { return mockCertFindMany; } },
       careerDiscovery: { get findUnique() { return mockDiscoveryFindUnique; } },
       resumeVersion: {
@@ -119,6 +125,8 @@ beforeEach(() => {
   for (const fn of [
     mockResumeFindUnique,
     mockJobFindUnique,
+    mockJobFindFirst,
+    mockEnrollmentFindFirst,
     mockCertFindMany,
     mockDiscoveryFindUnique,
     mockResumeVersionFindFirst,
@@ -146,6 +154,9 @@ beforeEach(() => {
     salary: "$16/hr",
     clusters: ["health-science"],
   }));
+  // Happy path: the student is enrolled and the job is on their class board.
+  mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+  mockJobFindFirst.mock.mockImplementation(async () => ({ id: "job-1" }));
   mockCertFindMany.mock.mockImplementation(async () => [{ certType: "CNA" }]);
   mockDiscoveryFindUnique.mock.mockImplementation(async () => null);
   mockResumeVersionFindFirst.mock.mockImplementation(async () => null);
@@ -318,5 +329,53 @@ describe("tailor_application", () => {
     // the grounding zone and inject instructions.
     const endMarkers = userContent.match(/\[GROUNDING_DATA_END\]/g) ?? [];
     assert.equal(endMarkers.length, 1);
+  });
+
+  it("rejects a jobListingId that is not on the student's class board, even with a valid confirmation", async () => {
+    // The enrollment exists, but the job resolves to a different cohort's board,
+    // so the scoped findFirst returns nothing.
+    mockJobFindFirst.mock.mockImplementation(async () => null);
+
+    const token = createConfirmationToken(
+      { toolName: "tailor_application", args, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "tailor_application",
+      args,
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.match(record.result.summary, /job board/i);
+    // No cross-class data gathered, no model call, and nothing persisted.
+    assert.equal(mockJobFindUnique.mock.callCount(), 0);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+    assert.equal(mockResumeVersionCreate.mock.callCount(), 0);
+    assert.equal(mockCoverLetterCreate.mock.callCount(), 0);
+    assert.equal(mockTransaction.mock.callCount(), 0);
+  });
+
+  it("errors cleanly when the student has no active enrollment", async () => {
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => null);
+
+    const token = createConfirmationToken(
+      { toolName: "tailor_application", args, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "tailor_application",
+      args,
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.equal(mockJobFindFirst.mock.callCount(), 0);
+    assert.equal(mockResumeVersionCreate.mock.callCount(), 0);
+    assert.equal(mockCoverLetterCreate.mock.callCount(), 0);
   });
 });

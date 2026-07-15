@@ -428,6 +428,26 @@ const tailorApplication: AgentTool = {
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "").trim();
     const studentId = ctx.session.id;
+
+    // Class-scope guard (mirrors update_application_status / /api/jobs/save).
+    // tailor_application persists a ResumeVersion + CoverLetter against the
+    // jobListingId, so it must refuse to generate and save artifacts for another
+    // cohort's job board — unlike the read-only career tools. gatherJobAndProfile()
+    // is deliberately left unscoped because it also feeds those read tools; the
+    // ownership check lives here, on the only consequential writer. Browse-pool
+    // jobs (JobBrowseListing) are a separate table that never resolves through
+    // JobListing, so this blocks no legitimate tailoring flow.
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) return { status: "error", summary: "I couldn't find your active class enrollment." };
+    const onBoard = await prisma.jobListing.findFirst({
+      where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
+      select: { id: true },
+    });
+    if (!onBoard) return { status: "error", summary: "That job listing wasn't found on your job board." };
+
     const source = await gatherJobAndProfile(jobListingId, studentId);
     if (!source) return { status: "error", summary: "That job listing was not found." };
 
