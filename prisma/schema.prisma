@@ -528,17 +528,17 @@ model ResumeData {
 }
 
 model FileUpload {
-  id         String   @id @default(cuid())
-  studentId  String
-  filename   String
-  mimeType   String
-  sizeBytes  Int
-  storageKey String
-  category   String   @default("general")
+  id                   String    @id @default(cuid())
+  studentId            String
+  filename             String
+  mimeType             String
+  sizeBytes            Int
+  storageKey           String
+  category             String    @default("general")
   // Chat uploads (Phase 3): short description used in Sage's turn context.
   // Always produced server-side at upload time — never client-supplied.
-  gist       String?  @db.Text
-  gistMethod String? // cloud | local | none
+  gist                 String?   @db.Text
+  gistMethod           String? // cloud | local | none
   // Structured attachment-vision classification (kind, title, issuer, date,
   // identifiers, confidence). Cached so classify_attachment isn't re-run per
   // turn. A free local baseline is stored at upload; an active-consent cloud
@@ -546,7 +546,7 @@ model FileUpload {
   classification       Json?
   classificationMethod String? // cloud | local | none
   classifiedAt         DateTime?
-  uploadedAt DateTime @default(now())
+  uploadedAt           DateTime  @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -1033,12 +1033,12 @@ model ProgramDocument {
   //   - GIN expression index ProgramDocument_fts_idx on
   //     to_tsvector('english', title || ' ' || coalesce(sageContextNote, ''))
   //   - Function visionquest.sage_hybrid_search(...) — RRF hybrid retrieval
-  embedding Unsupported("vector(768)")?
+  embedding      Unsupported("vector(768)")?
   // Provenance: which embedding model produced `embedding` (and the doc's
   // chunk vectors). Used to guard cross-model semantic search and to select
   // stale rows for re-embedding. Null = never embedded.
   embeddingModel String?
-  chunks    DocumentChunk[]
+  chunks         DocumentChunk[]
 
   // --- Metadata ---
   sortOrder  Int      @default(0)
@@ -1060,22 +1060,22 @@ model ProgramDocument {
 // Manual SQL (see migrations): HNSW index DocumentChunk_embedding_hnsw_idx,
 // RLS policies mirroring program_document_read/write.
 model DocumentChunk {
-  id         String   @id @default(cuid())
-  documentId String
-  chunkIndex Int
-  content    String   @db.Text
-  embedding  Unsupported("vector(768)")?
+  id             String                      @id @default(cuid())
+  documentId     String
+  chunkIndex     Int
+  content        String                      @db.Text
+  embedding      Unsupported("vector(768)")?
   // Provenance: which embedding model produced `embedding` (see ProgramDocument).
   embeddingModel String?
-  tokenCount   Int?
-  pageNumber   Int?
-  sectionTitle String?
+  tokenCount     Int?
+  pageNumber     Int?
+  sectionTitle   String?
   // fts is a GENERATED tsvector managed in raw SQL (see add_chunk_provenance
   // migration). Prisma cannot express GENERATED columns; declared Unsupported
   // so it stays out of drift detection — do NOT accept a migrate-dev drop diff.
-  fts          Unsupported("tsvector")?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  fts            Unsupported("tsvector")?
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
 
   document ProgramDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -1433,7 +1433,7 @@ model JobClassConfig {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  class       SpokesClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class       SpokesClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
   jobListings JobListing[]
   scrapeRuns  JobScrapeRun[]
 
@@ -1489,26 +1489,26 @@ model JobScrapeSourceResult {
 }
 
 model JobListing {
-  id            String    @id @default(cuid())
-  title         String
-  company       String
-  location      String
-  workMode      String    @default("onsite")
-  salary        String?
-  salaryMin     Float?
+  id             String    @id @default(cuid())
+  title          String
+  company        String
+  location       String
+  workMode       String    @default("onsite")
+  salary         String?
+  salaryMin      Float?
   employmentType String?
-  description   String    @db.Text
-  url           String
-  source        String
-  sourceType    String
-  sourceId      String    @unique
-  clusters      String[]  @default([])
-  status        String    @default("active")
-  expiresAt     DateTime?
-  scrapeBatchId String
-  classConfigId String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  description    String    @db.Text
+  url            String
+  source         String
+  sourceType     String
+  sourceId       String    @unique
+  clusters       String[]  @default([])
+  status         String    @default("active")
+  expiresAt      DateTime?
+  scrapeBatchId  String
+  classConfigId  String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   classConfig     JobClassConfig    @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
   savedByStudents StudentSavedJob[]
@@ -1550,14 +1550,14 @@ model JobBrowseListing {
 }
 
 model StudentSavedJob {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   studentId    String
   jobListingId String
-  status       String   @default("saved")
-  notes        String?  @db.Text
-  savedAt      DateTime @default(now())
+  status       String    @default("saved")
+  notes        String?   @db.Text
+  savedAt      DateTime  @default(now())
   appliedAt    DateTime?
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime  @updatedAt
 
   student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
