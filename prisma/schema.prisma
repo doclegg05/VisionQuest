@@ -42,6 +42,8 @@ model Student {
   certifications          Certification[]
   portfolioItems          PortfolioItem[]
   resumeData              ResumeData?
+  resumeVersions          ResumeVersion[]
+  coverLetters            CoverLetter[]
   consentRecords          ConsentRecord[]
   passwordResetTokens     PasswordResetToken[]
   securityQuestionAnswers SecurityQuestionAnswer[]
@@ -524,6 +526,42 @@ model ResumeData {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@schema("visionquest")
+}
+
+model ResumeVersion {
+  id           String   @id @default(cuid())
+  studentId    String
+  jobListingId String
+  version      Int
+  content      Json
+  status       String   @default("draft")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, jobListingId, version])
+  @@index([jobListingId])
+  @@schema("visionquest")
+}
+
+model CoverLetter {
+  id           String   @id @default(cuid())
+  studentId    String
+  jobListingId String
+  version      Int
+  content      String   @db.Text
+  status       String   @default("draft")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, jobListingId, version])
+  @@index([jobListingId])
   @@schema("visionquest")
 }
 
@@ -1512,6 +1550,8 @@ model JobListing {
 
   classConfig     JobClassConfig    @relation(fields: [classConfigId], references: [id], onDelete: Cascade)
   savedByStudents StudentSavedJob[]
+  resumeVersions  ResumeVersion[]
+  coverLetters    CoverLetter[]
 
   @@index([classConfigId, status])
   @@index([classConfigId, status, workMode])

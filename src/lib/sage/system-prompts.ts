@@ -86,7 +86,7 @@ const PATHWAY_CONTEXTS: Record<ProgramType, string> = {
 export function sanitizeForPrompt(value: string): string {
   return value
     .replace(
-      /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|STUDENT_CONTEXT|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT|MEMORY)_(START|END)\s*\]/gi,
+      /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|STUDENT_CONTEXT|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT|MEMORY|GROUNDING_DATA)_(START|END)\s*\]/gi,
       "",
     )
     .replace(/<\s*\/?\s*staff_authored_snippet\s*>/gi, "");

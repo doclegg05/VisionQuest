@@ -158,6 +158,7 @@ export type AiTask =
   | "conversation_summary"
   | "resume_assist"
   | "resume_extract"
+  | "tailor_application"
   | "public_form_lookup"
   | "public_program_help"
   | "chat_file_gist";

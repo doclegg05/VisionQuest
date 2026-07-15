@@ -21,7 +21,12 @@ import {
 } from "@/lib/resume";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
+import {
+  createTailoredApplication,
+  type TailoringSource,
+} from "./tailor-application";
 import type { AgentTool, AgentToolResult } from "./types";
+import { confirmationGate, executeAndLedger } from "./write-tools";
 
 const EDITABLE_SECTIONS = ["headline", "objective", "skills", "references"] as const;
 type EditableSection = (typeof EDITABLE_SECTIONS)[number];
@@ -198,10 +203,10 @@ const proposeResumeEdit: AgentTool = {
  * prepare_for_interview, and generate_cover_letter so all three reason over
  * the SAME real data instead of hallucinating.
  */
-async function gatherJobAndProfile(
+export async function gatherJobAndProfile(
   jobListingId: string,
   studentId: string,
-): Promise<{ job: { title: string; company: string }; grounding: string } | null> {
+): Promise<TailoringSource | null> {
   const [job, stored, certs, discovery] = await Promise.all([
     prisma.jobListing.findUnique({
       where: { id: jobListingId },
@@ -232,7 +237,16 @@ async function gatherJobAndProfile(
     `Transferable skills: ${discovery?.transferableSkills ?? "(none recorded)"}`,
   ].join("\n");
 
-  return { job: { title: job.title, company: job.company }, grounding };
+  return {
+    job,
+    profile: {
+      resume,
+      completedCertifications: certs.map((cert) => cert.certType),
+      nationalClusters: discovery?.nationalClusters ?? null,
+      transferableSkills: discovery?.transferableSkills ?? null,
+    },
+    grounding,
+  };
 }
 
 const analyzeJobMatch: AgentTool = {
@@ -395,10 +409,53 @@ const generateCoverLetter: AgentTool = {
   },
 };
 
+// ─── tailor_application — persisted, grounded application packet ───────────
+
+const tailorApplication: AgentTool = {
+  name: "tailor_application",
+  description:
+    "Create and save a per-job resume version and cover letter using only exact facts from the student's stored profile and the real job posting. Requires student confirmation before generation or persistence.",
+  parameters: {
+    type: "object",
+    properties: {
+      jobListingId: { type: "string", description: "The job listing's id." },
+    },
+    required: ["jobListingId"],
+  },
+  requiredRoles: ["student"],
+  riskTier: "mutate_consequential",
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const jobListingId = String(args.jobListingId ?? "").trim();
+    const studentId = ctx.session.id;
+    const source = await gatherJobAndProfile(jobListingId, studentId);
+    if (!source) return { status: "error", summary: "That job listing was not found." };
+
+    const toolArgs = { jobListingId };
+    const gate = await confirmationGate(
+      "tailor_application",
+      toolArgs,
+      ctx,
+      `Create and save a tailored resume and cover letter for ${source.job.title} at ${source.job.company}? Sage will only use facts already in your profile.`,
+      "Create application packet",
+    );
+    if (gate) return gate;
+
+    return executeAndLedger("tailor_application", toolArgs, ctx, async () => {
+      const artifacts = await createTailoredApplication(studentId, jobListingId, source);
+      return {
+        summary: `Saved resume version ${artifacts.version} and a cover letter for ${source.job.title} at ${source.job.company}.`,
+        data: { jobListingId, ...artifacts },
+      };
+    });
+  },
+};
+
 export const CAREER_TOOLS: AgentTool[] = [
   proposeResumeEdit,
   analyzeJobMatch,
   lookupSavedJobs,
   prepareForInterview,
   generateCoverLetter,
+  tailorApplication,
 ];
