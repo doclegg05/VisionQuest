@@ -10,6 +10,7 @@ import {
   type LocalJobPriority,
 } from "@/lib/job-board/recommendation";
 import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
+import { annotateJobsWithBands } from "@/lib/job-board/job-bands-response";
 import { parseJobFilters, buildJobFilterWhere } from "@/lib/job-board/job-filters";
 import { isJobWorkMode } from "@/lib/job-board/work-mode";
 import { parseStoredResumeData } from "@/lib/resume";
@@ -73,7 +74,8 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       sort,
       searchParams: url.searchParams,
     });
-    const jobs = browseRows.map(mapBrowseRow);
+    // Browse rows carry no recommendation and no discovery context → band: null.
+    const jobs = annotateJobsWithBands(browseRows.map(mapBrowseRow), [], null);
     return NextResponse.json({
       jobs,
       hasDiscovery: false,
@@ -253,7 +255,13 @@ export const GET = withAuth(async (session: Session, req: Request) => {
 
   // Combine: class jobs first (already ranked/sorted), then browse jobs appended.
   // The Local tab won't have browse jobs because loadBrowseJobs returns [] for proximity=local.
-  const jobs = [...classJobsWithMeta, ...browseMapped];
+  // Band annotation is additive: class jobs (which have recommendations) get
+  // core/stretch/wildcard from the same rankJobs() output; browse jobs get null.
+  const jobs = annotateJobsWithBands(
+    [...classJobsWithMeta, ...browseMapped],
+    recommendations,
+    discovery,
+  );
 
   const totalLocal = classLocalCount;
   const totalRemote = classRemoteCount + browseRemoteCount;
