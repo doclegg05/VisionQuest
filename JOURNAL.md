@@ -328,3 +328,21 @@ PDF iframe rendering the download 404 JSON — Britt's original bug on screen); 
 route tests 9/9; npm test full suite exit 0; typecheck exit 0; eslint exit 0. Commits: 83cc6fc
 (feat incl. tests), + fix(orientation) itemId, + docs journal. NOT done (Britt's calls): merge/push;
 seeding the FormTemplate + re-seeding orientation on any shared DB; deploy.
+
+---
+
+# Decision Journal — agent/job-band-20260716
+
+Goal: GET /api/jobs additively exposes `band` ("core" | "stretch" | "wildcard" | null)
+per job, reusing bandRankedJobs() over the route's existing rankJobs() output.
+Fresh worktree off main (cbba00d). Exploration lane. No push, no merge.
+
+[2026-07-16] DECISION: Pure helper `annotateJobsWithBands` in src/lib/job-board/job-bands-response.ts; the route calls it once over the combined class+browse jobs array | WHY: route stays thin per code-style; browse rows fall out as `band: null` automatically because their ids never appear in recommendations | ALTERNATIVES: inline band lookup in the classJobsWithMeta map + hardcoded null in mapBrowseRow (spreads logic across the route); mutating jobs in place (violates immutability rule) | REVERSIBLE: delete helper + 3-line route revert
+
+[2026-07-16] DECISION: Band only when CareerDiscovery exists; discovery-null → every band null even when resume-skill personalization is present | WHY: the goal defines JobBandingContext strictly from CareerDiscovery (topClusters, hollandCode, transferableSkills); without it every job would collapse to wildcard — noise, not signal | ALTERNATIVES: band with an empty context | REVERSIBLE: relax the null-check
+
+[2026-07-16] DECISION: Withheld wildcard recommendations (beyond bandRankedJobs' display cap) are annotated "wildcard", not null | WHY: banded-matching.ts documents withheld jobs as still belonging to the wildcard band; the cap governs the dedicated wildcard display, not per-job identity | REVERSIBLE: filter withheld out of the band map
+
+[2026-07-16] DECISION: Route test asserts class-job bands are non-null enum members rather than pinning exact band values | WHY: exact bands flow through real rankJobs() scoring; pinning them would couple the route test to scoring weights — the helper test pins exact band semantics with controlled recommendations | REVERSIBLE: n/a (test design)
+
+[2026-07-16] ANOMALY: Shared-Prisma-client footgun (known, memorized): junctioned node_modules carried a client generated from agent/queue-unification's schema → phantom TS2339 on campaign models. Fixed with `npx prisma generate` in this worktree (superset schema, safe for the concurrent branch). Verification: typecheck 0 / lint 0 / new tests 15 pass / full suite 1650 pass, 0 fail.
