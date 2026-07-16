@@ -86,6 +86,7 @@ model Student {
   reviewedFormResponses   FormResponse[]           @relation("ReviewedFormResponses")
   regionAssignments       RegionCoordinator[]
   wagers                  Wager[]
+  careerCampaigns         CareerCampaign[]
 
   @@schema("visionquest")
 }
@@ -1265,6 +1266,44 @@ model WagerVerdict {
 
   wager Wager @relation(fields: [wagerId], references: [id], onDelete: Cascade)
 
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// Career Campaign Orchestrator — resumable DISCOVER→PREP→QUEUE→TRACK planner.
+// advanceCampaign() (src/lib/sage/campaign/) is a pure function with no I/O;
+// these models are written only by the thin recordCampaignStep() persistence
+// caller. CampaignStep.proposedActions is always a PROPOSAL — no consequential
+// action is executed by the planner itself.
+// =============================================================================
+
+model CareerCampaign {
+  id                      String   @id @default(cuid())
+  studentId               String
+  status                  String   @default("active") // active | paused | completed
+  targetClusters          String[] @default([])
+  currentStage            String   @default("discover") // discover | prep | queue | track
+  weeklyApplicationTarget Int      @default(3)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  student Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  steps   CampaignStep[]
+
+  @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+model CampaignStep {
+  id              String   @id @default(cuid())
+  campaignId      String
+  stage           String // discover | prep | queue | track
+  proposedActions Json
+  createdAt       DateTime @default(now())
+
+  campaign CareerCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, createdAt])
   @@schema("visionquest")
 }
 
