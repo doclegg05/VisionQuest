@@ -7,6 +7,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum
 const mockResumeFindUnique = mock.fn() as any;
 const mockResumeUpsert = mock.fn(async () => ({})) as any;
 const mockJobFindFirst = mock.fn() as any;
+const mockSavedJobFindMany = mock.fn(async () => []) as any;
 const mockEnrollmentFindFirst = mock.fn(async () => ({ classId: "class-1" })) as any;
 const mockCertFindMany = mock.fn(async () => []) as any;
 const mockDiscoveryFindUnique = mock.fn(async () => null) as any;
@@ -26,6 +27,11 @@ mock.module("@/lib/db", {
       jobListing: {
         get findFirst() {
           return mockJobFindFirst;
+        },
+      },
+      studentSavedJob: {
+        get findMany() {
+          return mockSavedJobFindMany;
         },
       },
       studentClassEnrollment: {
@@ -141,6 +147,80 @@ describe("propose_resume_edit", () => {
     });
     assert.equal(record.result.status, "error");
     assert.match(record.result.summary, /permission/i);
+  });
+});
+
+describe("lookup_saved_jobs", () => {
+  beforeEach(() => {
+    mockSavedJobFindMany.mock.resetCalls();
+    mockEnrollmentFindFirst.mock.resetCalls();
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+    mockSavedJobFindMany.mock.mockImplementation(async () => [
+      {
+        status: "applied",
+        jobListing: { id: "job-1", title: "CNA", company: "Beckley ARH", location: "Beckley, WV" },
+      },
+    ]);
+  });
+
+  it("lists the student's saved jobs with their pipeline status", async () => {
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "lookup_saved_jobs",
+      args: {},
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /tracking 1 job/i);
+    assert.match(record.result.modelHint ?? "", /jobListingId=job-1/);
+  });
+
+  it("only lists jobs on the student's own class board", async () => {
+    await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "lookup_saved_jobs",
+      args: {},
+    });
+
+    // Must filter through the jobListing relation, not just by studentId —
+    // otherwise it advertises ids the other career tools will refuse.
+    const where = mockSavedJobFindMany.mock.calls[0].arguments[0].where;
+    assert.equal(where.studentId, "stu-1");
+    assert.deepEqual(where.jobListing, { classConfig: { classId: "class-1" } });
+  });
+
+  it("reports an accurate empty state when nothing is saved on the current board", async () => {
+    mockSavedJobFindMany.mock.mockImplementation(async () => []);
+
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "lookup_saved_jobs",
+      args: {},
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.deepEqual(record.result.data, { jobs: [] });
+    // Must not claim they've never saved a job — they may have saves on a board
+    // they're no longer enrolled in.
+    assert.doesNotMatch(record.result.summary, /haven't saved any jobs yet/i);
+    assert.match(record.result.summary, /job board/i);
+  });
+
+  it("refuses when the student has no active enrollment", async () => {
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => null);
+
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "lookup_saved_jobs",
+      args: {},
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.equal(mockSavedJobFindMany.mock.callCount(), 0);
   });
 });
 

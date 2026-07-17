@@ -312,8 +312,20 @@ const lookupSavedJobs: AgentTool = {
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.session.id;
+
+    // Scope to the student's current class board, matching gatherJobAndProfile()
+    // and update_application_status. Without this the list can advertise a
+    // jobListingId (e.g. saved under a previous enrollment) that every other
+    // career tool then refuses as "not found" — so the pipeline only ever lists
+    // jobs the student can actually act on.
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) return { status: "error", summary: "I couldn't find your active class enrollment." };
+
     const saved = await prisma.studentSavedJob.findMany({
-      where: { studentId },
+      where: { studentId, jobListing: { classConfig: { classId: enrollment.classId } } },
       orderBy: { savedAt: "desc" },
       take: 25,
       select: {
@@ -325,7 +337,9 @@ const lookupSavedJobs: AgentTool = {
     if (saved.length === 0) {
       return {
         status: "success",
-        summary: "You haven't saved any jobs yet.",
+        // Accurate whether they've saved nothing at all or only jobs that are no
+        // longer on their board — without revealing another board's contents.
+        summary: "You don't have any saved jobs on your job board yet.",
         data: { jobs: [] },
         action: { action: "navigate", target: "/career", label: "Browse jobs" },
         modelHint:
