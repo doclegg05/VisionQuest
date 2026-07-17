@@ -5,11 +5,12 @@ import { Briefcase, BookmarkSimple, MagnifyingGlass } from "@phosphor-icons/reac
 import EventsHub from "@/components/career/EventsHub";
 import OpportunitiesHub from "@/components/career/OpportunitiesHub";
 import { JobFilters, type JobProximityFilter } from "@/components/jobs/JobFilters";
-import { JobList } from "@/components/jobs/JobList";
+import { BandedJobList } from "@/components/jobs/BandedJobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
 import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
 import AskSageLink from "@/components/sage/AskSageLink";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobBand } from "@/lib/job-board/job-bands-response";
 
 interface OpportunityItem {
   id: string;
@@ -69,6 +70,7 @@ interface JobData {
   postedAt?: string | null;
   createdAt?: string | null;
   source?: string | null;
+  band?: JobBand | null;
 }
 
 interface JobsResponse {
@@ -253,7 +255,7 @@ export default function CareerHub({
                     : "No jobs available right now. Check back after your teacher's next refresh."}
               </div>
             ) : (
-              <JobList jobs={jobsData.jobs} onSave={handleSaveJob} />
+              <BandedJobList jobs={jobsData.jobs} onSave={handleSaveJob} />
             )}
           </div>
         )}

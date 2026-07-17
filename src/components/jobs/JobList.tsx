@@ -4,7 +4,7 @@ import { JobCard } from "./JobCard";
 import type { JobTrackingUpdate } from "./JobCard";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 
-interface ListJob {
+export interface ListJob {
   id: string;
   title: string;
   company: string;
