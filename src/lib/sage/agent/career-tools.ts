@@ -200,17 +200,28 @@ const proposeResumeEdit: AgentTool = {
 /**
  * Shared read: pull a job posting + the student's resume/cert/discovery
  * profile and render grounding text. Used by analyze_job_match,
- * prepare_for_interview, and generate_cover_letter so all three reason over
- * the SAME real data instead of hallucinating.
+ * prepare_for_interview, generate_cover_letter, and tailor_application so they
+ * all reason over the SAME real data instead of hallucinating.
+ *
+ * The job lookup is scoped to the student's own class board (mirrors
+ * update_application_status / /api/jobs/save), so no career tool — read or
+ * write — can reach another cohort's posting. This is the single choke point:
+ * any future career tool built on this helper inherits the scoping. Returns
+ * null when the student has no active enrollment or the job isn't on their
+ * board; callers surface that as a plain "not found" rather than revealing that
+ * the id exists on someone else's board.
+ *
+ * Note: browse-pool jobs live in a separate table (JobBrowseListing) and never
+ * resolve through JobListing, so this scoping does not affect them.
  */
 export async function gatherJobAndProfile(
   jobListingId: string,
   studentId: string,
 ): Promise<TailoringSource | null> {
-  const [job, stored, certs, discovery] = await Promise.all([
-    prisma.jobListing.findUnique({
-      where: { id: jobListingId },
-      select: { id: true, title: true, company: true, location: true, description: true, salary: true, clusters: true },
+  const [enrollment, stored, certs, discovery] = await Promise.all([
+    prisma.studentClassEnrollment.findFirst({
+      where: { studentId, status: "active" },
+      select: { classId: true },
     }),
     prisma.resumeData.findUnique({ where: { studentId }, select: { data: true } }),
     prisma.certification.findMany({ where: { studentId, status: "completed" }, select: { certType: true } }),
@@ -219,6 +230,12 @@ export async function gatherJobAndProfile(
       select: { nationalClusters: true, transferableSkills: true },
     }),
   ]);
+  if (!enrollment) return null;
+
+  const job = await prisma.jobListing.findFirst({
+    where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
+    select: { id: true, title: true, company: true, location: true, description: true, salary: true, clusters: true },
+  });
   if (!job) return null;
 
   const resume = parseStoredResumeData(stored?.data);
@@ -428,26 +445,8 @@ const tailorApplication: AgentTool = {
   async execute(args, ctx): Promise<AgentToolResult> {
     const jobListingId = String(args.jobListingId ?? "").trim();
     const studentId = ctx.session.id;
-
-    // Class-scope guard (mirrors update_application_status / /api/jobs/save).
-    // tailor_application persists a ResumeVersion + CoverLetter against the
-    // jobListingId, so it must refuse to generate and save artifacts for another
-    // cohort's job board — unlike the read-only career tools. gatherJobAndProfile()
-    // is deliberately left unscoped because it also feeds those read tools; the
-    // ownership check lives here, on the only consequential writer. Browse-pool
-    // jobs (JobBrowseListing) are a separate table that never resolves through
-    // JobListing, so this blocks no legitimate tailoring flow.
-    const enrollment = await prisma.studentClassEnrollment.findFirst({
-      where: { studentId, status: "active" },
-      select: { classId: true },
-    });
-    if (!enrollment) return { status: "error", summary: "I couldn't find your active class enrollment." };
-    const onBoard = await prisma.jobListing.findFirst({
-      where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
-      select: { id: true },
-    });
-    if (!onBoard) return { status: "error", summary: "That job listing wasn't found on your job board." };
-
+    // gatherJobAndProfile() scopes the lookup to the student's own class board,
+    // so a cross-class jobListingId never reaches generation or persistence.
     const source = await gatherJobAndProfile(jobListingId, studentId);
     if (!source) return { status: "error", summary: "That job listing was not found." };
 

@@ -6,7 +6,8 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum
 
 const mockResumeFindUnique = mock.fn() as any;
 const mockResumeUpsert = mock.fn(async () => ({})) as any;
-const mockJobFindUnique = mock.fn() as any;
+const mockJobFindFirst = mock.fn() as any;
+const mockEnrollmentFindFirst = mock.fn(async () => ({ classId: "class-1" })) as any;
 const mockCertFindMany = mock.fn(async () => []) as any;
 const mockDiscoveryFindUnique = mock.fn(async () => null) as any;
 const mockRecordOperation = mock.fn(async () => undefined) as any;
@@ -23,8 +24,13 @@ mock.module("@/lib/db", {
         },
       },
       jobListing: {
-        get findUnique() {
-          return mockJobFindUnique;
+        get findFirst() {
+          return mockJobFindFirst;
+        },
+      },
+      studentClassEnrollment: {
+        get findFirst() {
+          return mockEnrollmentFindFirst;
         },
       },
       certification: {
@@ -140,11 +146,13 @@ describe("propose_resume_edit", () => {
 
 describe("analyze_job_match", () => {
   beforeEach(() => {
-    mockJobFindUnique.mock.resetCalls();
+    mockJobFindFirst.mock.resetCalls();
+    mockEnrollmentFindFirst.mock.resetCalls();
     mockResumeFindUnique.mock.mockImplementation(async () => ({
       data: JSON.stringify({ skills: ["Customer service"] }),
     }));
-    mockJobFindUnique.mock.mockImplementation(async () => ({
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+    mockJobFindFirst.mock.mockImplementation(async () => ({
       id: "job-1",
       title: "CNA",
       company: "Beckley ARH",
@@ -169,7 +177,7 @@ describe("analyze_job_match", () => {
   });
 
   it("errors cleanly on unknown listings", async () => {
-    mockJobFindUnique.mock.mockImplementation(async () => null);
+    mockJobFindFirst.mock.mockImplementation(async () => null);
     const record = await executeAgentTool({
       session,
       conversationId: "conv-1",
@@ -177,5 +185,48 @@ describe("analyze_job_match", () => {
       args: { jobListingId: "nope" },
     });
     assert.equal(record.result.status, "error");
+  });
+
+  it("scopes the posting lookup to the student's own class board", async () => {
+    await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "analyze_job_match",
+      args: { jobListingId: "job-1" },
+    });
+
+    const where = mockJobFindFirst.mock.calls[0].arguments[0].where;
+    assert.equal(where.id, "job-1");
+    assert.deepEqual(where.classConfig, { classId: "class-1" });
+  });
+
+  it("does not leak another cohort's posting text into the grounding", async () => {
+    // The job exists, but on a different class's board, so the scoped lookup misses.
+    mockJobFindFirst.mock.mockImplementation(async () => null);
+
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "analyze_job_match",
+      args: { jobListingId: "other-class-job" },
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.match(record.result.summary, /not found/i);
+    assert.equal(record.result.modelHint ?? "", "");
+  });
+
+  it("refuses when the student has no active enrollment", async () => {
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => null);
+
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "analyze_job_match",
+      args: { jobListingId: "job-1" },
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.equal(mockJobFindFirst.mock.callCount(), 0);
   });
 });

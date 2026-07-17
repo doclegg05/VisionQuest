@@ -7,7 +7,6 @@ import type { TailoringPlan, TailoringSource } from "./tailor-application";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum-ok!!";
 
 const mockResumeFindUnique = mock.fn() as any;
-const mockJobFindUnique = mock.fn() as any;
 const mockJobFindFirst = mock.fn() as any;
 const mockEnrollmentFindFirst = mock.fn() as any;
 const mockCertFindMany = mock.fn() as any;
@@ -29,10 +28,7 @@ mock.module("@/lib/db", {
   namedExports: {
     prisma: {
       resumeData: { get findUnique() { return mockResumeFindUnique; } },
-      jobListing: {
-        get findUnique() { return mockJobFindUnique; },
-        get findFirst() { return mockJobFindFirst; },
-      },
+      jobListing: { get findFirst() { return mockJobFindFirst; } },
       studentClassEnrollment: { get findFirst() { return mockEnrollmentFindFirst; } },
       certification: { get findMany() { return mockCertFindMany; } },
       careerDiscovery: { get findUnique() { return mockDiscoveryFindUnique; } },
@@ -124,7 +120,6 @@ before(async () => {
 beforeEach(() => {
   for (const fn of [
     mockResumeFindUnique,
-    mockJobFindUnique,
     mockJobFindFirst,
     mockEnrollmentFindFirst,
     mockCertFindMany,
@@ -145,7 +140,9 @@ beforeEach(() => {
   mockResumeFindUnique.mock.mockImplementation(async () => ({
     data: JSON.stringify(BASE_RESUME),
   }));
-  mockJobFindUnique.mock.mockImplementation(async () => ({
+  // Happy path: the student is enrolled and the job is on their class board.
+  mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+  mockJobFindFirst.mock.mockImplementation(async () => ({
     id: "job-1",
     title: "Certified Nursing Assistant",
     company: "Beckley ARH",
@@ -154,9 +151,6 @@ beforeEach(() => {
     salary: "$16/hr",
     clusters: ["health-science"],
   }));
-  // Happy path: the student is enrolled and the job is on their class board.
-  mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
-  mockJobFindFirst.mock.mockImplementation(async () => ({ id: "job-1" }));
   mockCertFindMany.mock.mockImplementation(async () => [{ certType: "CNA" }]);
   mockDiscoveryFindUnique.mock.mockImplementation(async () => null);
   mockResumeVersionFindFirst.mock.mockImplementation(async () => null);
@@ -298,7 +292,7 @@ describe("tailor_application", () => {
   });
 
   it("strips a spoofed grounding marker embedded in a malicious job posting before the model sees it", async () => {
-    mockJobFindUnique.mock.mockImplementation(async () => ({
+    mockJobFindFirst.mock.mockImplementation(async () => ({
       id: "job-1",
       title: "Certified Nursing Assistant",
       company: "Beckley ARH",
@@ -331,9 +325,28 @@ describe("tailor_application", () => {
     assert.equal(endMarkers.length, 1);
   });
 
+  it("looks the job up scoped to the student's own class board", async () => {
+    const token = createConfirmationToken(
+      { toolName: "tailor_application", args, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "tailor_application",
+      args,
+      confirmedToken: token,
+    });
+
+    // The lookup must be constrained by the enrollment's classId, not just by id.
+    const where = mockJobFindFirst.mock.calls[0].arguments[0].where;
+    assert.equal(where.id, "job-1");
+    assert.deepEqual(where.classConfig, { classId: "class-1" });
+  });
+
   it("rejects a jobListingId that is not on the student's class board, even with a valid confirmation", async () => {
-    // The enrollment exists, but the job resolves to a different cohort's board,
-    // so the scoped findFirst returns nothing.
+    // The enrollment exists, but the job belongs to a different cohort's board,
+    // so the class-scoped lookup matches nothing.
     mockJobFindFirst.mock.mockImplementation(async () => null);
 
     const token = createConfirmationToken(
@@ -349,9 +362,9 @@ describe("tailor_application", () => {
     });
 
     assert.equal(record.result.status, "error");
-    assert.match(record.result.summary, /job board/i);
-    // No cross-class data gathered, no model call, and nothing persisted.
-    assert.equal(mockJobFindUnique.mock.callCount(), 0);
+    // Generic "not found" — must not reveal that the id exists on another board.
+    assert.match(record.result.summary, /not found/i);
+    // No model call and nothing persisted.
     assert.equal(mockResolveAiProvider.mock.callCount(), 0);
     assert.equal(mockResumeVersionCreate.mock.callCount(), 0);
     assert.equal(mockCoverLetterCreate.mock.callCount(), 0);
@@ -374,7 +387,9 @@ describe("tailor_application", () => {
     });
 
     assert.equal(record.result.status, "error");
+    // Without an enrollment there is no board to scope to, so the job is never read.
     assert.equal(mockJobFindFirst.mock.callCount(), 0);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0);
     assert.equal(mockResumeVersionCreate.mock.callCount(), 0);
     assert.equal(mockCoverLetterCreate.mock.callCount(), 0);
   });
