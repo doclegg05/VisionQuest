@@ -10,7 +10,8 @@ const mockGoalFindFirst = mock.fn() as any;
 const mockGoalUpdate = mock.fn(async () => ({})) as any;
 const mockTransaction = mock.fn(async () => []) as any;
 const mockSavedJobUpsert = mock.fn(async () => ({})) as any;
-const mockListingFindUnique = mock.fn() as any;
+const mockListingFindFirst = mock.fn() as any;
+const mockSaveJobEnrollmentFindFirst = mock.fn(async () => ({ classId: "class-1" })) as any;
 const mockRecordOperation = mock.fn(async () => undefined) as any;
 
 mock.module("@/lib/db", {
@@ -37,8 +38,13 @@ mock.module("@/lib/db", {
         },
       },
       jobListing: {
-        get findUnique() {
-          return mockListingFindUnique;
+        get findFirst() {
+          return mockListingFindFirst;
+        },
+      },
+      studentClassEnrollment: {
+        get findFirst() {
+          return mockSaveJobEnrollmentFindFirst;
         },
       },
       studentSavedJob: {
@@ -278,6 +284,64 @@ describe("write tools — staff-assisted target binding", () => {
   // Note: a STUDENT supplying targetStudentId to /api/chat/tool-confirm is
   // rejected with 400 at the route itself (isStaffRole guard in
   // src/app/api/chat/tool-confirm/route.ts) before any verification runs.
+});
+
+describe("save_job — class scoping", () => {
+  beforeEach(() => {
+    mockListingFindFirst.mock.resetCalls();
+    mockSaveJobEnrollmentFindFirst.mock.resetCalls();
+    mockSavedJobUpsert.mock.resetCalls();
+    mockSaveJobEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+    mockListingFindFirst.mock.mockImplementation(async () => ({
+      id: "job-1",
+      title: "CNA",
+      company: "Beckley ARH",
+    }));
+  });
+
+  it("looks the job up scoped to the student's own class board", async () => {
+    await executeAgentTool({
+      session: { id: "stu-1", role: "student" } as any,
+      conversationId: "conv-1",
+      toolName: "save_job",
+      args: { jobListingId: "job-1" },
+    });
+
+    const where = mockListingFindFirst.mock.calls[0].arguments[0].where;
+    assert.equal(where.id, "job-1");
+    assert.deepEqual(where.classConfig, { classId: "class-1" });
+  });
+
+  it("refuses to save another cohort's job listing", async () => {
+    // The id is real, but it lives on a different class's board.
+    mockListingFindFirst.mock.mockImplementation(async () => null);
+
+    const record = await executeAgentTool({
+      session: { id: "stu-1", role: "student" } as any,
+      conversationId: "conv-1",
+      toolName: "save_job",
+      args: { jobListingId: "other-class-job" },
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.match(record.result.summary, /not found/i);
+    assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
+  });
+
+  it("refuses when the student has no active enrollment", async () => {
+    mockSaveJobEnrollmentFindFirst.mock.mockImplementation(async () => null);
+
+    const record = await executeAgentTool({
+      session: { id: "stu-1", role: "student" } as any,
+      conversationId: "conv-1",
+      toolName: "save_job",
+      args: { jobListingId: "job-1" },
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.equal(mockListingFindFirst.mock.callCount(), 0);
+    assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
+  });
 });
 
 describe("write tools — role gating at the executor", () => {

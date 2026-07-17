@@ -333,8 +333,17 @@ const saveJob: AgentTool = {
     const jobListingId = String(args.jobListingId ?? "");
     const studentId = ctx.session.id;
 
-    const listing = await prisma.jobListing.findUnique({
-      where: { id: jobListingId },
+    // Scope to the student's active class, matching /api/jobs/save and the other
+    // career tools. Without this the agent path is weaker than the HTTP path: it
+    // would save another cohort's posting to the student's pipeline.
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) return { status: "error", summary: "I couldn't find your active class enrollment." };
+
+    const listing = await prisma.jobListing.findFirst({
+      where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
       select: { id: true, title: true, company: true },
     });
     if (!listing) return { status: "error", summary: "That job listing was not found." };
