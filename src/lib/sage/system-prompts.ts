@@ -16,6 +16,11 @@ import { buildPlatformKnowledge, type PlatformRole } from "./platform-map";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import type { PromptTier } from "@/lib/ai";
 
+// Prompt-revision attribution tag. Defined in its own dependency-free module
+// (see ./prompt-revision) so logging code can import it without pulling in
+// the full prompt stack; re-exported here for prompt-stack callers.
+export { SAGE_PROMPT_REVISION } from "./prompt-revision";
+
 /**
  * Stages that need the full program knowledge base (~5,000 tokens of
  * certification/platform/form detail). All other stages receive SPOKES_BRIEF

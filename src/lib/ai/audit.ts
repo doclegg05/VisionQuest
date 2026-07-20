@@ -1,5 +1,6 @@
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { SAGE_PROMPT_REVISION } from "@/lib/sage/prompt-revision";
 import type { AiTask, DataSensitivity, PromptTier } from "./types";
 
 export type AiPolicyDecision =
@@ -23,6 +24,11 @@ export interface AiAuditEventInput {
   providerName?: string | null;
   providerClass?: "local" | "cloud" | "none" | "unknown";
   promptTier?: PromptTier | null;
+  /**
+   * Prompt-revision attribution tag. Defaults to the live
+   * SAGE_PROMPT_REVISION so every AI audit event is stamped automatically.
+   */
+  promptRevision?: string | null;
   allowCloud: boolean;
   inputChars?: number;
   outputChars?: number;
@@ -86,6 +92,7 @@ export async function logAiAuditEvent(input: AiAuditEventInput): Promise<void> {
         providerName: input.providerName ?? null,
         providerClass: input.providerClass ?? getProviderClass(input.providerName),
         promptTier: input.promptTier ?? null,
+        promptRevision: input.promptRevision ?? SAGE_PROMPT_REVISION,
         allowCloud: input.allowCloud,
         cloudBlocked:
           input.status === "blocked" ||

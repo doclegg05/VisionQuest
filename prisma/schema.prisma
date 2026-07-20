@@ -1662,6 +1662,9 @@ model LlmCallLog {
   outputTokens Int      @default(0)
   totalTokens  Int      @default(0)
   durationMs   Int?
+  // Sage prompt-revision attribution tag (SAGE_PROMPT_REVISION at call time).
+  // Nullable: rows written before QW-7 have no revision.
+  promptRevision String?
   createdAt    DateTime @default(now())
 
   student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
