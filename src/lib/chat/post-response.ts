@@ -88,7 +88,13 @@ export async function handlePostResponse({
   try {
     const signal = detectCrisisSignal(userMessage);
     if (signal.matched) {
-      await recordWellbeingConcern({ studentId, conversationId, reason: "message_signal" });
+      // Category only — never the message text (locked privacy decision).
+      await recordWellbeingConcern({
+        studentId,
+        conversationId,
+        reason: "message_signal",
+        category: signal.category,
+      });
     }
   } catch (err) {
     logger.error("Wellbeing detection failed", {

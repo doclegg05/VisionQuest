@@ -3,6 +3,13 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendNotificationWithCooldown } from "@/lib/notifications";
 import { enqueueJobWithCooldown } from "@/lib/jobs";
+import {
+  WELLBEING_ALERT_TYPE,
+  WELLBEING_MOOD_LOOKBACK_DAYS,
+  WELLBEING_RESPONSE_CHECKLIST,
+  formatWellbeingCardSummary,
+  type WellbeingMoodSnapshot,
+} from "./wellbeing-card";
 
 /**
  * Wellbeing / crisis safety-net.
@@ -14,10 +21,13 @@ import { enqueueJobWithCooldown } from "@/lib/jobs";
  * call, runs on every chat turn) plus a low-mood hook, that raise a CRITICAL
  * StudentAlert and actively notify staff.
  *
- * Privacy: NO message text is ever stored on the alert or in the notification.
- * The instructor opens the conversation to read context. The detector errs
- * toward alerting (favor recall); the instructor reviews and dismisses false
- * positives, which is cheap and safe.
+ * Privacy (locked product decision): NO message text is ever stored on the
+ * alert or in the notification, and teachers have NO transcript access. So the
+ * alert must be actionable on its own: it carries a structured crisis-context
+ * card (trigger category, detection time, recent mood if any, and a
+ * recommended-response checklist — see src/lib/sage/wellbeing-card.ts). The
+ * detector errs toward alerting (favor recall); the instructor reviews and
+ * dismisses false positives, which is cheap and safe.
  */
 
 export type CrisisCategory = "self_harm" | "harm_others" | "abuse";
@@ -59,7 +69,7 @@ export function detectCrisisSignal(text: string): CrisisDetection {
   return { matched: false, category: null };
 }
 
-const ALERT_TYPE = "wellbeing_concern";
+const ALERT_TYPE = WELLBEING_ALERT_TYPE;
 const NOTIFY_TYPE = "wellbeing.concern";
 // One open concern per student per UTC day so repeated signals in a session
 // update a single alert instead of spamming. A new day — or a staff-resolved
@@ -155,6 +165,32 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
 }
 
 /**
+ * Most recent self-reported mood within the card lookback window. Best-effort:
+ * a failed lookup only costs the mood line on the card, never the alert.
+ */
+async function findRecentMood(studentId: string, now: Date): Promise<WellbeingMoodSnapshot | null> {
+  try {
+    const lookbackStart = new Date(
+      now.getTime() - WELLBEING_MOOD_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const entry = await prisma.moodEntry.findFirst({
+      where: { studentId, extractedAt: { gte: lookbackStart } },
+      orderBy: { extractedAt: "desc" },
+      select: { score: true, extractedAt: true },
+    });
+    if (!entry) return null;
+    return { score: entry.score, recordedAt: entry.extractedAt };
+  } catch (err) {
+    logger.error("Wellbeing: mood lookup for crisis card failed", {
+      studentId,
+      alert: "wellbeing_mood_lookup_failed",
+      error: String(err),
+    });
+    return null;
+  }
+}
+
+/**
  * Raise a CRITICAL wellbeing alert for a student and actively notify staff.
  * Idempotent within a day via the alertKey. Best-effort: never throws (callers
  * are fire-and-forget on the chat path) — failures are logged loudly.
@@ -163,11 +199,17 @@ export async function recordWellbeingConcern({
   studentId,
   conversationId,
   reason,
+  category = null,
   now = new Date(),
 }: {
   studentId: string;
   conversationId: string | null;
   reason: WellbeingReason;
+  /**
+   * Trigger category from detectCrisisSignal for message_signal reasons.
+   * Category ONLY — never message text.
+   */
+  category?: CrisisCategory | null;
   now?: Date;
 }): Promise<void> {
   const alertKey = `wellbeing:${studentId}:${dayBucket(now)}`;
@@ -176,12 +218,25 @@ export async function recordWellbeingConcern({
   //    The dashboard query already scopes alerts to the teacher's managed
   //    students (RLS + studentId filter), so only the right staff see it.
   try {
+    // Structured crisis-context card (category + time + recent mood + response
+    // checklist) encoded as plain text: StudentAlert has no JSON column, and
+    // teachers have no transcript access, so the summary itself must make the
+    // alert actionable. NEVER any message text. The update branch refreshes
+    // the card too, so a repeated same-day signal keeps category/time/mood
+    // current (latest signal wins for the daily alert row).
+    const summary = formatWellbeingCardSummary({
+      category: reason === "low_mood" ? "low_mood" : category,
+      detectedAt: now,
+      mood: await findRecentMood(studentId, now),
+    });
+
     await prisma.studentAlert.upsert({
       where: { alertKey },
       update: {
         status: "open",
         severity: "critical",
         detectedAt: now,
+        summary,
         resolvedAt: null,
         snoozedUntil: null,
         snoozedBy: null,
@@ -194,11 +249,7 @@ export async function recordWellbeingConcern({
         severity: "critical",
         status: "open",
         title: "Wellbeing check-in needed",
-        // Minimal: NO quoted message text is ever stored here.
-        summary:
-          "A student may have shared something serious in a Sage conversation. " +
-          "Please check in with them directly. No message text is stored here for privacy — " +
-          "open their conversation to see the context.",
+        summary,
         sourceType: "conversation",
         sourceId: conversationId,
       },
@@ -230,6 +281,11 @@ export async function recordWellbeingConcern({
     const title = "Wellbeing check-in needed";
     const body = `${studentName} may need support based on ${reasonText(reason)}. Please check in with them directly.`;
     const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || "";
+    // Static checklist only — no category and no message text in email, which
+    // is the least-protected channel.
+    const checklistText = WELLBEING_RESPONSE_CHECKLIST.map(
+      (item, index) => `${index + 1}. ${item}`,
+    ).join("\n");
 
     await Promise.allSettled(
       recipients.map((recipient) =>
@@ -255,9 +311,10 @@ export async function recordWellbeingConcern({
               subject: `VisionQuest: ${title}`,
               text:
                 `${body}\n\n` +
+                `Recommended response:\n${checklistText}\n\n` +
                 `${baseUrl ? `Open VisionQuest: ${baseUrl}\n\n` : ""}` +
                 "This is an automated wellbeing alert. No student message text is included for privacy — " +
-                "open the student's conversation in VisionQuest to see context.",
+                "review the crisis card in VisionQuest and reach out to the student directly.",
             },
           }),
         ];

@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
 import ProgramBadge from "@/components/ui/ProgramBadge";
+import { WELLBEING_ALERT_TYPE, formatWellbeingQueueLine } from "@/lib/sage/wellbeing-card";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import {
   type InterventionQueueResponse as QueueResponse,
@@ -45,6 +46,17 @@ function topReason(signals: QueueStudent["signals"]): string {
   if (!signals.orientationComplete)
     return `Orientation ${Math.round(signals.orientationProgress * 100)}%`;
   return "Low readiness";
+}
+
+/**
+ * Compact one-line summary for a queue row. Wellbeing crisis cards are
+ * multi-line structured blocks — collapse them to "category · mood — next
+ * step" so the row stays scannable; the full card renders on student detail
+ * and the class-overview alert list.
+ */
+function primaryAlertLine(alert: NonNullable<QueueStudent["primaryAlert"]>): string {
+  if (alert.type !== WELLBEING_ALERT_TYPE) return alert.summary;
+  return formatWellbeingQueueLine(alert.summary) ?? alert.summary;
 }
 
 function buildQueueActionIntent(student: QueueStudent): DashboardActionIntent | null {
@@ -429,7 +441,7 @@ function StudentRow({
         )}
         {student.primaryAlert?.summary ? (
           <p className="mt-0.5 line-clamp-2 text-xs text-[var(--ink-muted)]">
-            {student.primaryAlert.summary}
+            {primaryAlertLine(student.primaryAlert)}
           </p>
         ) : null}
       </Link>
