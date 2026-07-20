@@ -99,6 +99,9 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           status: true,
           startedAt: true,
           completedAt: true,
+          // P1-4: cert-level verification state for the Verify control.
+          verificationStatus: true,
+          verifiedAt: true,
           requirements: {
             select: {
               id: true,

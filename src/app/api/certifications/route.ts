@@ -9,6 +9,7 @@ import { parseBody } from "@/lib/schemas";
 import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { logger } from "@/lib/logger";
+import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 
 const certUpdateSchema = z.object({
   requirementId: z.string().cuid(),
@@ -194,6 +195,19 @@ export const POST = withAuth(async (session, req: Request) => {
     where: { id: requirementId },
     data,
   });
+
+  // A student progress claim supersedes any earlier instructor sign-off on
+  // the parent certification — mirror the Sage path (cert-actions.ts).
+  if (data.completed === true) {
+    await prisma.certification.update({
+      where: { id: requirement.certificationId },
+      data: {
+        verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
+        verifiedBy: null,
+        verifiedAt: null,
+      },
+    });
+  }
 
   // Check if all required requirements are truly satisfied.
   const updatedCert = await recomputeCertificationStatus(requirement.certificationId, requirement.template.certType);

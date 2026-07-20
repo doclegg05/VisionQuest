@@ -10,6 +10,9 @@ interface ProgressTabProps {
   /** Certification verification callback */
   verifying: string | null;
   onVerify: (requirementId: string, verified: boolean) => void;
+  /** Certification outcome verification (P1-4) */
+  certOutcomeVerifying: boolean;
+  onCertOutcomeVerify: (certificationId: string) => void;
   /** Orientation honor-system verification (P1-1) */
   orientationVerifying: string | null;
   onOrientationVerify: (itemId: string, decision: "confirm" | "decline") => void;
@@ -23,6 +26,8 @@ export default function ProgressTab({
   dateFormatter,
   verifying,
   onVerify,
+  certOutcomeVerifying,
+  onCertOutcomeVerify,
   orientationVerifying,
   onOrientationVerify,
   showAllConversations,
@@ -127,6 +132,28 @@ export default function ProgressTab({
             <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Completed</span>
           )}
         </h3>
+        {/* P1-4: cert-level outcome verification — self-reported progress
+            stays flagged until an instructor verifies it, mirroring the
+            orientation honor-system verify above. */}
+        {certification.cert?.verificationStatus === "self_reported" && (
+          <div className="mb-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+              Self-reported progress {"—"} verify
+            </span>
+            <button
+              onClick={() => certification.cert && onCertOutcomeVerify(certification.cert.id)}
+              disabled={certOutcomeVerifying}
+              className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+            >
+              {certOutcomeVerifying ? "..." : "Verify"}
+            </button>
+          </div>
+        )}
+        {certification.cert?.verificationStatus === "verified" && certification.cert.verifiedAt && (
+          <p className="mb-3 text-xs text-[var(--ink-faint)]">
+            Outcome verified {new Date(certification.cert.verifiedAt).toLocaleDateString()}
+          </p>
+        )}
         {!certification.cert ? (
           <p className="text-sm text-[var(--ink-faint)]">Student hasn&apos;t started certification yet.</p>
         ) : (

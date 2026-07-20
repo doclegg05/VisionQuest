@@ -694,7 +694,13 @@ const markCertificationComplete: AgentTool = {
       }
       const notes: string[] = [];
       if (result.certCompleted) notes.push("That finishes your Ready-to-Work certification — nice work!");
-      if (result.awaitingVerification) notes.push("Your instructor still needs to verify this one.");
+      // P1-4: this write is recorded as self-reported, so the reply is honest
+      // about the verification trail instead of implying an official outcome.
+      notes.push(
+        result.awaitingVerification
+          ? "Your instructor still needs to verify this one."
+          : "I've recorded it as self-reported — your instructor can verify it.",
+      );
       return {
         summary: `Marked "${result.label}" complete.${notes.length ? " " + notes.join(" ") : ""}`,
         data: { requirementId, certCompleted: result.certCompleted, awaitingVerification: result.awaitingVerification },
@@ -769,8 +775,13 @@ const updateApplicationStatus: AgentTool = {
           appliedAt: setAppliedAt,
         },
       });
+      // P1-4 honesty note: pipeline status is the student's own report. The
+      // job-board row (StudentSavedJob) carries no verification column — the
+      // grant-reporting verification trail lives on the Application model —
+      // so the reply names the claim as self-reported instead of implying a
+      // confirmed outcome.
       return {
-        summary: `Marked "${job.title}" at ${job.company} as ${status}.`,
+        summary: `Marked "${job.title}" at ${job.company} as ${status} — logged as self-reported; your instructor can confirm the outcome.`,
         data: { jobListingId, status },
       };
     });

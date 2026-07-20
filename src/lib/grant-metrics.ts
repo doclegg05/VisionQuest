@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db";
 import { classIdsInRegion } from "@/lib/region";
 import { monthBoundsInZone } from "@/lib/timezone";
 import { APPLICATION_STATUS } from "@/lib/constants";
+import {
+  splitOutcomeVerificationCounts,
+  type OutcomeVerificationSplit,
+} from "@/lib/outcome-verification";
 
 export type GrantMetric = "enrollments" | "certifications" | "placements" | "ged_earned" | "custom";
 
@@ -35,6 +39,11 @@ export interface RegionRollup {
     activeStudents: number;
     enrollmentsInPeriod: number;
     certificationsInPeriod: number;
+    // P1-4 additive split of certificationsInPeriod. Legacy rows (null
+    // verificationStatus, written before the feature) count in the total
+    // but in neither bucket, so verified + selfReported <= total.
+    certificationsVerifiedInPeriod: number;
+    certificationsSelfReportedInPeriod: number;
     placementsInPeriod: number;
     gedEarnedInPeriod: number;
   };
@@ -124,6 +133,46 @@ export async function computeActual(
   }
 }
 
+/**
+ * P1-4: verified vs self-reported breakdown of the completed-certification
+ * count for a region/period. Uses the same filters as
+ * `computeActual("certifications")` so the split always reconciles with the
+ * headline total.
+ */
+export async function computeCertificationVerificationSplit(options: {
+  regionId: string;
+  programType: string;
+  periodStart: Date;
+  periodEnd: Date;
+}): Promise<OutcomeVerificationSplit> {
+  const classIds = await classIdsInRegion(options.regionId);
+  if (classIds.length === 0) return { verifiedCount: 0, selfReportedCount: 0 };
+
+  const programFilter =
+    options.programType === "all" ? {} : { programType: options.programType };
+
+  const groups = await prisma.certification.groupBy({
+    by: ["verificationStatus"],
+    where: {
+      status: "completed",
+      completedAt: { gte: options.periodStart, lt: options.periodEnd },
+      student: {
+        classEnrollments: {
+          some: { class: { id: { in: classIds }, ...programFilter } },
+        },
+      },
+    },
+    _count: { _all: true },
+  });
+
+  return splitOutcomeVerificationCounts(
+    groups.map((group) => ({
+      verificationStatus: group.verificationStatus,
+      count: group._count._all,
+    })),
+  );
+}
+
 function computeGoalStatus(
   actualValue: number,
   targetValue: number,
@@ -166,6 +215,7 @@ export async function getRegionRollup(
     activeStudents,
     enrollmentsInPeriod,
     certificationsInPeriod,
+    certificationVerificationSplit,
     placementsInPeriod,
     gedEarnedInPeriod,
     grantGoals,
@@ -184,6 +234,12 @@ export async function getRegionRollup(
       periodEnd: period.end,
     }),
     computeActual("certifications", {
+      regionId,
+      programType: "all",
+      periodStart: period.start,
+      periodEnd: period.end,
+    }),
+    computeCertificationVerificationSplit({
       regionId,
       programType: "all",
       periodStart: period.start,
@@ -242,6 +298,8 @@ export async function getRegionRollup(
       activeStudents,
       enrollmentsInPeriod,
       certificationsInPeriod,
+      certificationsVerifiedInPeriod: certificationVerificationSplit.verifiedCount,
+      certificationsSelfReportedInPeriod: certificationVerificationSplit.selfReportedCount,
       placementsInPeriod,
       gedEarnedInPeriod,
     },

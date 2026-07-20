@@ -36,6 +36,8 @@ export interface AlertInputs {
       lastProgressAt: Date | null;
       completedRequiredCount: number;
       requiredCount: number;
+      /** P1-4: null = legacy, "self_reported" = unverified claim, "verified". */
+      verificationStatus?: string | null;
     } | null;
     goals?: {
       id: string;
@@ -167,6 +169,27 @@ export function buildStudentAlertDescriptors({
           severity: stalledDays >= 28 ? "high" : "medium",
           title: "Certification progress has stalled",
           summary: `Certification progress has not advanced since ${formatAlertDate(referenceDate)}.`,
+          sourceType: "certification",
+          sourceId: signals?.studentId || studentKey,
+        });
+      }
+    }
+  }
+
+  // P1-4: certification progress recorded as a student self-report that no
+  // instructor has verified for 7+ days. Verification flips the status to
+  // "verified", which drops this descriptor so the sync auto-resolves it.
+  if (certification && certification.verificationStatus === "self_reported") {
+    const selfReportedSince = latestDate(certification.lastProgressAt, certification.startedAt);
+    if (selfReportedSince) {
+      const unverifiedDays = (now.getTime() - selfReportedSince.getTime()) / (1000 * 60 * 60 * 24);
+      if (unverifiedDays >= 7) {
+        alerts.push({
+          alertKey: `certification_unverified:${studentKey}`,
+          type: "certification_unverified",
+          severity: "medium",
+          title: "Self-reported certification progress needs verification",
+          summary: `Certification progress marked by the student on ${formatAlertDate(selfReportedSince)} is still waiting on instructor verification.`,
           sourceType: "certification",
           sourceId: signals?.studentId || studentKey,
         });

@@ -157,6 +157,8 @@ export function buildStudentAlertSyncPlan({
                   (requirement) => requirement.completed || Boolean(requirement.verifiedAt)
                 ).length,
                 requiredCount: requiredCertificationRequirements.length,
+                // P1-4: drives the certification_unverified alert.
+                verificationStatus: certification.verificationStatus,
               }
             : null,
         }

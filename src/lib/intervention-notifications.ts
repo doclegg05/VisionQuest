@@ -339,6 +339,13 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         href: `/teacher/students/${studentRecordId}#certification-review`,
         label: "Open certification",
       };
+    // P1-4: self-reported certification progress waiting on instructor
+    // verification — deep-link straight to the cert card's Verify control.
+    case "certification_unverified":
+      return {
+        href: `/teacher/students/${studentRecordId}#certification-review`,
+        label: "Verify certification",
+      };
     case "goal_stale":
       return {
         href: `/teacher/students/${studentRecordId}#goal-plans`,

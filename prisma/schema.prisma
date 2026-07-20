@@ -466,6 +466,12 @@ model Certification {
   status      String    @default("in_progress")
   startedAt   DateTime  @default(now())
   completedAt DateTime?
+  // P1-4 outcome verification: null = legacy row (pre-feature, provenance
+  // unknown); "self_reported" = progress recorded from a student claim;
+  // "verified" = an instructor confirmed the certification outcome.
+  verificationStatus String?
+  verifiedBy         String?
+  verifiedAt         DateTime?
 
   student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
   requirements CertRequirement[]
@@ -810,6 +816,13 @@ model Application {
   appliedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  // P1-4 outcome verification: null = legacy row (pre-feature, provenance
+  // unknown); "self_reported" = student-claimed status change; "verified" =
+  // an instructor confirmed the application outcome. Carried for grant
+  // reporting — reports split verified vs self-reported outcomes.
+  verificationStatus String?
+  verifiedBy         String?
+  verifiedAt         DateTime?
 
   student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)

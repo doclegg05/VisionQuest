@@ -9,6 +9,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 import { syncStudentAlerts } from "@/lib/advising";
 import { validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
@@ -153,6 +154,19 @@ export async function markRequirementComplete(params: {
       completed: true,
       completedAt: new Date(),
       ...(params.fileId !== undefined ? { fileId: params.fileId || null } : {}),
+    },
+  });
+
+  // P1-4: progress recorded through Sage is a student claim until an
+  // instructor verifies the certification. Stamp the parent row so grant
+  // reports can split verified vs self-reported outcomes; any prior
+  // cert-level verification is superseded by the new unverified claim.
+  await prisma.certification.update({
+    where: { id: requirement.certificationId },
+    data: {
+      verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
+      verifiedBy: null,
+      verifiedAt: null,
     },
   });
 

@@ -161,6 +161,8 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             status: true,
             startedAt: true,
             completedAt: true,
+            // P1-4: drives the certification_unverified alert.
+            verificationStatus: true,
             requirements: {
               select: {
                 templateId: true,
@@ -204,6 +206,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             "missed_appointment",
             "career_inactive",
             "certification_stalled",
+            "certification_unverified",
             "goal_needs_resource",
             "goal_resource_stale",
             "goal_review_pending",
