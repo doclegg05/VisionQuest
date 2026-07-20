@@ -51,6 +51,26 @@ async function fetchOrientationWizardItems(): Promise<OrientationItem[]> {
   return data.items || [];
 }
 
+/**
+ * Posts the idempotent orientation-completion sync and reports whether it
+ * saved. Never throws — a network failure reads the same as a non-2xx
+ * response so callers can offer a retry. Exported for tests.
+ */
+export async function postOrientationCompletion(
+  fetchFn: typeof fetch = fetch
+): Promise<boolean> {
+  try {
+    const res = await fetchFn("/api/orientation/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 function deriveSteps(items: OrientationItem[]): WizardStep[] {
   const steps: WizardStep[] = [];
   for (const item of items) {
@@ -103,6 +123,33 @@ export default function OrientationWizard() {
   const [completed, setCompleted] = useState(false);
   const [completedForms, setCompletedForms] = useState<CompletedForm[]>([]);
   const [allAlreadyDone, setAllAlreadyDone] = useState(false);
+  const [syncError, setSyncError] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  // Shared completion sync — used by the normal wizard-finish path and by the
+  // all-already-done path so the progression flag can never be left behind.
+  const syncCompletion = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(false);
+    const saved = await postOrientationCompletion();
+    setSyncing(false);
+    if (saved) {
+      // Give the server a moment to award XP before refreshing progression.
+      setTimeout(() => checkProgression(), 500);
+    } else {
+      // The completion flag did NOT save. Per-item progress is already
+      // stored, so don't block the student — surface a retry notice instead.
+      setSyncError(true);
+    }
+  }, [checkProgression]);
+
+  // If every item was finished in a prior session, the completion flag may
+  // still be unset (the original sync call could have failed). The server
+  // route is idempotent, so re-run the sync whenever this state is detected.
+  useEffect(() => {
+    if (!allAlreadyDone) return;
+    void syncCompletion();
+  }, [allAlreadyDone, syncCompletion]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -245,19 +292,13 @@ export default function OrientationWizard() {
     }
   }
 
-  async function completeOrientation(forms: CompletedForm[]) {
-    try {
-      await fetch("/api/orientation/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      setTimeout(() => checkProgression(), 500);
-    } catch {
-      // Non-critical — XP may not display but completion is saved
-    }
+  function completeOrientation(forms: CompletedForm[]) {
+    // The student finished every step — show the completion screen right
+    // away and run the sync in the background. If the sync fails the shared
+    // handler shows a non-blocking retry notice on the completion screen.
     setCompletedForms(forms);
     setCompleted(true);
+    void syncCompletion();
   }
 
   if (loading) {
@@ -283,18 +324,45 @@ export default function OrientationWizard() {
     );
   }
 
+  const syncNotice = syncError ? (
+    <div
+      role="alert"
+      className="mx-auto mb-6 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3"
+    >
+      <p className="text-sm text-amber-800">
+        We couldn&apos;t save your completion — your progress is safe.
+      </p>
+      <button
+        type="button"
+        onClick={() => void syncCompletion()}
+        disabled={syncing}
+        className="min-h-11 rounded-lg border border-amber-400 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {syncing ? "Saving..." : "Try again"}
+      </button>
+    </div>
+  ) : null;
+
   if (allAlreadyDone) {
     return (
-      <WizardCompletion
-        completedForms={items
-          .filter((i) => i.completed)
-          .map((i) => ({ title: i.label, type: "read" as const }))}
-      />
+      <div>
+        {syncNotice}
+        <WizardCompletion
+          completedForms={items
+            .filter((i) => i.completed)
+            .map((i) => ({ title: i.label, type: "read" as const }))}
+        />
+      </div>
     );
   }
 
   if (completed) {
-    return <WizardCompletion completedForms={completedForms} />;
+    return (
+      <div>
+        {syncNotice}
+        <WizardCompletion completedForms={completedForms} />
+      </div>
+    );
   }
 
   const step = steps[currentStep];
