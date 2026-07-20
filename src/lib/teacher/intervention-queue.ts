@@ -110,6 +110,7 @@ function latestDate(...values: Array<Date | null | undefined>): Date | null {
 
 const ALERT_TYPE_PRIORITY: Record<string, number> = {
   goal_missing_confirmed: 110,
+  goal_unconfirmed: 108,
   goal_review_pending: 105,
   goal_needs_resource: 100,
   goal_missing_monthly: 95,

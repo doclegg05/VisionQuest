@@ -131,6 +131,8 @@ export function buildStudentAlertSyncPlan({
             level: goal.level,
             status: goal.status,
             updatedAt: goal.updatedAt,
+            createdAt: goal.createdAt,
+            sourceMessageId: goal.sourceMessageId,
             lastReviewedAt: goal.lastReviewedAt,
             confirmedAt: goal.confirmedAt,
           })),

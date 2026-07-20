@@ -42,6 +42,8 @@ export interface AlertInputs {
       level: string;
       status: string;
       updatedAt: Date;
+      createdAt?: Date | null;
+      sourceMessageId?: string | null;
       lastReviewedAt?: Date | null;
       confirmedAt?: Date | null;
     }[];
@@ -230,6 +232,30 @@ export function buildStudentAlertDescriptors({
           sourceId: staleMonthly.goal.id,
         });
       }
+    }
+  }
+
+  // Sage-proposed goals that no instructor has confirmed yet. Students
+  // cannot self-confirm these, so a proposal sitting for a week means the
+  // confirmation loop has stalled and staff need the nudge.
+  if (signals?.goals) {
+    const unconfirmedProposals = signals.goals.filter(
+      (goal) => goal.status === "proposed" && Boolean(goal.sourceMessageId) && goal.createdAt,
+    );
+    for (const goal of unconfirmedProposals) {
+      const daysWaiting = (now.getTime() - (goal.createdAt as Date).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysWaiting < 7) continue;
+
+      const levelLabel = goal.level.charAt(0).toUpperCase() + goal.level.slice(1);
+      alerts.push({
+        alertKey: `goal_unconfirmed:${goal.id}`,
+        type: "goal_unconfirmed",
+        severity: daysWaiting >= 14 ? "high" : "medium",
+        title: "Sage-proposed goal awaiting confirmation",
+        summary: `${levelLabel} goal suggested by Sage has waited ${Math.round(daysWaiting)} days for instructor confirmation. Review it with the student to confirm or replace it.`,
+        sourceType: "goal",
+        sourceId: goal.id,
+      });
     }
   }
 

@@ -531,6 +531,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         {bhags.length > 0 ? (
           bhags.map((bhag) => (
             <div key={bhag.id} className="bg-white/80 dark:bg-black/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm">
+              {bhag.status === "proposed" && (
+                <span className="inline-block mb-2 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
+                  Awaiting instructor confirmation
+                </span>
+              )}
               {editingGoalId === bhag.id ? (
                 <form
                   onSubmit={(e) => {
@@ -673,9 +678,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         Monthly Plan
                       </span>
                       {isMProposed && (
-                        <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-3xs font-semibold">
-                          SAGE SUGGESTION
-                        </span>
+                        <>
+                          <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-3xs font-semibold">
+                            SAGE SUGGESTION
+                          </span>
+                          <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
+                            Awaiting instructor confirmation
+                          </span>
+                        </>
                       )}
                     </div>
 

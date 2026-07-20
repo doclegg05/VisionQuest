@@ -302,6 +302,7 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
     case "goal_missing_confirmed":
     case "goal_missing_monthly":
     case "goal_review_stale":
+    case "goal_unconfirmed":
       return {
         href: `/teacher/students/${studentRecordId}#goal-plans`,
         label: "Review goals",
@@ -382,6 +383,7 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
     case "goal_missing_confirmed":
     case "goal_missing_monthly":
     case "goal_review_stale":
+    case "goal_unconfirmed":
       return {
         kind: "create_task",
         label: "Add goal review task",

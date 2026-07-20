@@ -189,6 +189,83 @@ test("buildStudentAlertDescriptors flags missing and stale goal reliability stat
   assert.ok(alerts.some((alert) => alert.type === "goal_review_stale"));
 });
 
+test("buildStudentAlertDescriptors flags Sage-proposed goals awaiting confirmation for over a week", () => {
+  const now = new Date("2026-04-20T12:00:00.000Z");
+  const alerts = buildStudentAlertDescriptors({
+    now,
+    tasks: [],
+    appointments: [],
+    signals: {
+      studentId: "student-proposed",
+      studentCreatedAt: new Date("2026-03-01T12:00:00.000Z"),
+      lastActivityAt: new Date("2026-04-19T12:00:00.000Z"),
+      applicationCount: 1,
+      eventRegistrationCount: 1,
+      orientationComplete: true,
+      birthDate: new Date("2000-05-12T00:00:00.000Z"),
+      certification: null,
+      goals: [
+        {
+          // 8 days old → medium
+          id: "proposed-medium",
+          level: "monthly",
+          status: "proposed",
+          sourceMessageId: "msg-1",
+          createdAt: new Date("2026-04-12T12:00:00.000Z"),
+          updatedAt: new Date("2026-04-12T12:00:00.000Z"),
+          lastReviewedAt: null,
+          confirmedAt: null,
+        },
+        {
+          // 15 days old → high
+          id: "proposed-high",
+          level: "bhag",
+          status: "proposed",
+          sourceMessageId: "msg-2",
+          createdAt: new Date("2026-04-05T12:00:00.000Z"),
+          updatedAt: new Date("2026-04-05T12:00:00.000Z"),
+          lastReviewedAt: null,
+          confirmedAt: null,
+        },
+        {
+          // Fresh proposal → no alert yet
+          id: "proposed-fresh",
+          level: "weekly",
+          status: "proposed",
+          sourceMessageId: "msg-3",
+          createdAt: new Date("2026-04-18T12:00:00.000Z"),
+          updatedAt: new Date("2026-04-18T12:00:00.000Z"),
+          lastReviewedAt: null,
+          confirmedAt: null,
+        },
+        {
+          // Student-created proposal (no source message) → not Sage's loop
+          id: "proposed-manual",
+          level: "monthly",
+          status: "proposed",
+          sourceMessageId: null,
+          createdAt: new Date("2026-04-01T12:00:00.000Z"),
+          updatedAt: new Date("2026-04-01T12:00:00.000Z"),
+          lastReviewedAt: null,
+          confirmedAt: null,
+        },
+      ],
+    },
+  });
+
+  const unconfirmed = alerts.filter((alert) => alert.type === "goal_unconfirmed");
+  assert.equal(unconfirmed.length, 2);
+  assert.equal(
+    unconfirmed.find((alert) => alert.sourceId === "proposed-medium")?.severity,
+    "medium",
+  );
+  assert.equal(
+    unconfirmed.find((alert) => alert.sourceId === "proposed-high")?.severity,
+    "high",
+  );
+  assert.equal(unconfirmed[0]?.alertKey, `goal_unconfirmed:${unconfirmed[0]?.sourceId}`);
+});
+
 test("buildStudentAlertDescriptors flags missing monthly goal separately from confirmed direction", () => {
   const now = new Date("2026-04-20T12:00:00.000Z");
   const alerts = buildStudentAlertDescriptors({
