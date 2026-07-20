@@ -88,6 +88,7 @@ model Student {
   regionAssignments       RegionCoordinator[]
   wagers                  Wager[]
   careerCampaigns         CareerCampaign[]
+  failedExtractions       FailedExtraction[]
 
   @@schema("visionquest")
 }
@@ -1851,5 +1852,37 @@ model GrantGoal {
 
   @@index([regionId, periodStart])
   @@index([metric, periodStart])
+  @@schema("visionquest")
+}
+
+// =============================================================================
+// Dead-letter store for failed background AI extractions (P2-1).
+// When an extractor exhausts its retries, the input snapshot lands here so
+// staff can review and (for goal extraction) replay it instead of the
+// Sage-proposed data vanishing into logs. Written via
+// src/lib/sage/failed-extraction.ts; surfaced at /teacher/failed-extractions.
+// PRIVACY: `payload` contains student conversation text — the same data as
+// Message rows, in the same database, behind teacher/admin-only RLS.
+// Retention follows the chat-transcript policy in docs/DATA_RETENTION_POLICY.md.
+// =============================================================================
+
+model FailedExtraction {
+  id              String    @id @default(cuid())
+  studentId       String
+  conversationId  String?
+  sourceMessageId String? // Sage message the goal proposals attribute to — needed to replay via proposeGoal
+  extractorKey    String // "goal_extraction" | retryWithBackoff alertKey values ("mood_extraction_exhausted", ...)
+  payload         String    @db.Text // capped input snapshot the extractor needed (max 8000 chars)
+  error           String
+  attempts        Int
+  status          String    @default("open") // "open" | "replayed" | "dismissed"
+  resolvedBy      String? // staff Session.id that replayed/dismissed
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
   @@schema("visionquest")
 }

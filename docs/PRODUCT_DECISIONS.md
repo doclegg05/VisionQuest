@@ -388,3 +388,25 @@ persistent Sage conversation with an ambient vital-signs rail. Consequences for 
 
 This supersedes the 2026-04-01 decision that Vision Board, Files, and Resources are permanently
 retained as top-level nav items; all three FEATURES remain — their placement changed.
+
+## 2026-07-20 — Maturity repair decisions (owner-approved)
+
+Recorded from the maturity review and overnight repair session (full findings and shipped
+changes in [MATURITY_REVIEW.md](./MATURITY_REVIEW.md)):
+
+- **Crisis alert access:** structured context card only (trigger category, time, recent mood,
+  988 response checklist) — **no teacher transcript access**. A break-glass audited viewer may
+  be revisited only if the card proves insufficient in practice; teacher-read auditing is now
+  in place as its prerequisite.
+- **Goal confirmation:** badge + queue alert, not hard gating. Unconfirmed goals still count
+  toward momentum; students cannot self-confirm Sage-proposed goals; >7 days unconfirmed
+  raises a `goal_unconfirmed` advising alert; "confirm with your coach" surfaces as next step.
+- **Classic dashboard:** deleted (its "one release" grace period lapsed). `/dashboard/classic`
+  redirects to the chat-first home.
+- **Verification layer (Accelerate-stage, queue-routed):** instructor-led orientation steps,
+  Sage-marked certifications, and Sage-proposed goals now require human confirmation, all
+  routed through the existing intervention queue — no new staff surfaces.
+- **Automation discipline upheld:** data-retention purge, dead-letter replay beyond goals, and
+  DSAR self-serve export deliberately deferred until their manual loops are proven
+  (Step 5 Automation Readiness Test). Retention durations await OWNER-CONFIRM in
+  [DATA_RETENTION_POLICY.md](./DATA_RETENTION_POLICY.md).

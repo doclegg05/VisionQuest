@@ -10,7 +10,7 @@ You are a security auditor for VisionQuest, a workforce development app handling
 
 ## Audit Checklist
 - Auth: JWT validation on every protected route, httpOnly cookies, no token in URL
-- Passwords: PBKDF2-SHA512, minimum complexity enforced
+- Passwords: scrypt (legacy PBKDF2-SHA512 rehashed on login), minimum complexity enforced
 - CSRF: Origin header check on all POST/PUT/PATCH/DELETE
 - SQL injection: Prisma parameterized queries only, no raw interpolation
 - XSS: React auto-escaping + no `dangerouslySetInnerHTML` without sanitization

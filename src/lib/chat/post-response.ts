@@ -454,16 +454,19 @@ async function runPostResponse(
     if (plan.allows("discovery")) {
       plan.markRan("discovery");
       try {
+        const discoveryWindow = [
+          ...allMessages,
+          { role: "model" as const, content: fullResponse },
+        ];
         const discoveryResult = await retryWithBackoff(
-          () =>
-            extractDiscoverySignals(discoveryProvider, [
-              ...allMessages,
-              { role: "model" as const, content: fullResponse },
-            ]),
+          () => extractDiscoverySignals(discoveryProvider, discoveryWindow),
           {
             label: "Discovery extraction",
             alertKey: "discovery_extraction_exhausted",
             context: { conversationId, studentId },
+            studentId,
+            conversationId,
+            failurePayload: () => JSON.stringify(discoveryWindow),
           },
         );
 
@@ -569,12 +572,15 @@ async function runPostResponse(
   if (plan.allows("goals")) {
     plan.markRan("goals");
 
-    // 1. Extract goals (program-aware framing via PROGRAM_HEADERS)
+    // 1. Extract goals (program-aware framing via PROGRAM_HEADERS). The
+    // failure context lets exhausted retries dead-letter to FailedExtraction
+    // for teacher review/replay instead of vanishing into logs.
     const extracted = await extractGoals(
       goalsProvider,
       [...allMessages, { role: "model" as const, content: fullResponse }],
       conversationStage,
       programType,
+      { studentId, conversationId, sourceMessageId: proposalSourceMessageId },
     );
 
     // 2. Create proposed goal records. Sage can suggest, but a human must

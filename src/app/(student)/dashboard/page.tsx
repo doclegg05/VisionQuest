@@ -15,8 +15,8 @@ import { PathToEmployment } from "@/components/progression/PathToEmployment";
  * Chat-first student home (Phase 4 redesign, user-approved 2026-06-09).
  *
  * The Sage conversation IS the home surface; the ambient rail carries the
- * old dashboard's vital signs and deep-links into full pages. The previous
- * dashboard is preserved at /dashboard/classic for one release.
+ * old dashboard's vital signs and deep-links into full pages. The classic
+ * dashboard was retired 2026-07-20; /dashboard/classic now redirects here.
  */
 
 /** The lowest-scoring readiness dimension — the student's next gap. */
