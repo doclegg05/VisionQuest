@@ -10,12 +10,13 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { withAuth, badRequest, notFound } from "@/lib/api-error";
+import { withAuth, badRequest, notFound, rateLimited } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { isStaffRole } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 import { recordInsight } from "@/lib/sage/record-insight";
 
 const listQuerySchema = z.object({
@@ -85,6 +86,11 @@ const recordInsightSchema = z.object({
 });
 
 export const POST = withRegistry("sage.record_insight", async (session, req: NextRequest) => {
+  const rl = await rateLimit(`sage-insights:${session.id}`, 20, 60 * 60 * 1000);
+  if (!rl.success) {
+    throw rateLimited("Too many insights recorded this hour. Please wait before recording more.");
+  }
+
   const body = await parseBody(req, recordInsightSchema);
 
   // Resolve which student the insight is for. Default to self.
