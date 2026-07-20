@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { badRequest, notFound } from "@/lib/api-error";
+import { badRequest, forbidden, notFound } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
@@ -31,6 +31,7 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
       content: true,
       status: true,
       parentId: true,
+      sourceMessageId: true,
       createdAt: true,
     },
   });
@@ -73,6 +74,13 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
   // Handle confirmation: proposed Sage goals and student-entered active goals
   // both become confirmed only after a human explicitly accepts them.
   if (updates.status === "confirmed" || ("confirm" in body && body.confirm === true)) {
+    // Product rule (docs/PRODUCT_DECISIONS.md): AI may not finalize a student
+    // goal — Sage-proposed goals (sourceMessageId set) require STAFF
+    // confirmation via the teacher route. Students may still confirm goals
+    // they created themselves (sourceMessageId is null).
+    if (goal.sourceMessageId) {
+      throw forbidden("Sage suggested this goal — ask your instructor to confirm it.");
+    }
     const CONFIRMABLE_FROM = ["proposed", "active", "in_progress"];
     const effectiveStatus = updates.status && updates.status !== "confirmed"
       ? updates.status
