@@ -73,6 +73,87 @@ function reasonText(reason: WellbeingReason): string {
   return reason === "low_mood" ? "a very low mood score" : "something they said in chat";
 }
 
+interface StaffRecipient {
+  id: string;
+  email: string | null;
+}
+
+// Enrollment statuses under which a class instructor still "manages" the
+// student. Mirrors NON_ARCHIVED_ENROLLMENT_STATUSES in src/lib/classroom.ts —
+// kept local so this safety-critical module stays dependency-light. If the two
+// ever drift, the failure mode is resolving fewer (possibly zero) instructors,
+// which falls back to notifying ALL active teachers: the safe direction.
+const MANAGED_ENROLLMENT_STATUSES = ["active", "inactive", "completed", "withdrawn"] as const;
+
+/**
+ * Resolve the unique, active instructor accounts assigned to the classes the
+ * student is (non-archived) enrolled in. Returns [] when none resolve; any
+ * thrown error is handled by the caller, which falls back to all active
+ * teachers.
+ */
+async function findAssignedInstructors(studentId: string): Promise<StaffRecipient[]> {
+  const enrollments = await prisma.studentClassEnrollment.findMany({
+    where: {
+      studentId,
+      status: { in: [...MANAGED_ENROLLMENT_STATUSES] },
+    },
+    select: {
+      class: {
+        select: {
+          instructors: {
+            select: {
+              instructor: { select: { id: true, email: true, isActive: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const activeInstructors = enrollments
+    .flatMap((enrollment) => enrollment.class.instructors)
+    .map((link) => link.instructor)
+    .filter((instructor) => instructor.isActive);
+
+  return [
+    ...new Map(
+      activeInstructors.map((instructor): [string, StaffRecipient] => [
+        instructor.id,
+        { id: instructor.id, email: instructor.email },
+      ]),
+    ).values(),
+  ];
+}
+
+/**
+ * Who gets actively notified about a wellbeing concern.
+ *
+ * SAFETY: the audience must NEVER be narrower than the pre-scoping behavior
+ * (all active teachers). Assigned class instructors are preferred so the most
+ * sensitive signal in the system isn't over-disclosed program-wide, but zero
+ * resolved instructors OR any resolution failure falls back to every active
+ * teacher — over-notifying is the safe failure mode.
+ */
+async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecipient[]> {
+  let assigned: StaffRecipient[] = [];
+  try {
+    assigned = await findAssignedInstructors(studentId);
+  } catch (err) {
+    logger.error("Wellbeing: instructor resolution failed; falling back to all active teachers", {
+      studentId,
+      alert: "wellbeing_instructor_resolution_failed",
+      error: String(err),
+    });
+  }
+
+  if (assigned.length > 0) return assigned;
+
+  return prisma.student.findMany({
+    where: { role: "teacher", isActive: true },
+    select: { id: true, email: true },
+  });
+}
+
 /**
  * Raise a CRITICAL wellbeing alert for a student and actively notify staff.
  * Idempotent within a day via the alertKey. Best-effort: never throws (callers
@@ -131,20 +212,18 @@ export async function recordWellbeingConcern({
     });
   }
 
-  // 2. Actively notify staff (in-app always; email best-effort). For a crisis
-  //    signal we deliberately notify ALL active teachers — over-notifying is
-  //    the safe failure mode. (At multi-classroom scale, consider scoping to
-  //    the student's managing instructors.)
+  // 2. Actively notify staff (in-app always; email best-effort). Prefer the
+  //    student's assigned class instructors; if none resolve (unenrolled
+  //    student, data gap, or a failed lookup) fall back to ALL active teachers.
+  //    The audience is never narrower than the pre-scoping behavior — for a
+  //    crisis signal, over-notifying is the safe failure mode.
   try {
-    const [student, teachers] = await Promise.all([
+    const [student, recipients] = await Promise.all([
       prisma.student.findUnique({
         where: { id: studentId },
         select: { displayName: true, studentId: true },
       }),
-      prisma.student.findMany({
-        where: { role: "teacher", isActive: true },
-        select: { id: true, email: true },
-      }),
+      resolveWellbeingRecipients(studentId),
     ]);
 
     const studentName = student?.displayName || student?.studentId || "A student";
@@ -153,18 +232,18 @@ export async function recordWellbeingConcern({
     const baseUrl = process.env.APP_BASE_URL?.replace(/\/$/, "") || "";
 
     await Promise.allSettled(
-      teachers.map((teacher) =>
+      recipients.map((recipient) =>
         // 12h cooldown so repeated signals in a day don't re-ping, but the
         // alert itself stays open and visible on the dashboard.
-        sendNotificationWithCooldown(teacher.id, { type: NOTIFY_TYPE, title, body }, 12),
+        sendNotificationWithCooldown(recipient.id, { type: NOTIFY_TYPE, title, body }, 12),
       ),
     );
 
     await Promise.allSettled(
-      teachers.flatMap((teacher) => {
-        if (!teacher.email) return [];
+      recipients.flatMap((recipient) => {
+        if (!recipient.email) return [];
         const dedupeHash = createHash("sha1")
-          .update(`${teacher.id}:${studentId}:${NOTIFY_TYPE}:${dayBucket(now)}`)
+          .update(`${recipient.id}:${studentId}:${NOTIFY_TYPE}:${dayBucket(now)}`)
           .digest("hex");
         return [
           enqueueJobWithCooldown({
@@ -172,7 +251,7 @@ export async function recordWellbeingConcern({
             dedupeKey: `wellbeing:${dedupeHash}`,
             cooldownHours: 12,
             payload: {
-              to: teacher.email,
+              to: recipient.email,
               subject: `VisionQuest: ${title}`,
               text:
                 `${body}\n\n` +
