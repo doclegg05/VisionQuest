@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType, type Content, type FunctionDeclaration, type Part, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type FunctionDeclaration, type Part, type SafetySetting, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
 import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
@@ -14,6 +14,24 @@ import type {
   ToolStreamEvent,
   ToolStreamOptions,
 } from "./types";
+
+// Gemini's default harm filters can block legitimate crisis-coaching replies —
+// this app serves vulnerable adults and intentionally handles self-harm
+// disclosures. Relax the cloud filters to BLOCK_ONLY_HIGH on every generation
+// path; the deterministic crisis safety net (988, src/lib/chat/crisis-safety-net.ts)
+// is the enforcement layer, not Gemini's classifier.
+const SAFETY_SETTINGS: SafetySetting[] = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+  },
+];
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
@@ -31,6 +49,7 @@ export class GeminiProvider implements AIProvider {
     const genAI = new GoogleGenerativeAI(this.apiKey);
     return genAI.getGenerativeModel({
       model: MODEL,
+      safetySettings: SAFETY_SETTINGS,
       ...(systemInstruction ? { systemInstruction } : {}),
       ...(options?.temperature !== undefined
         ? { generationConfig: { temperature: options.temperature } }
@@ -102,6 +121,7 @@ export class GeminiProvider implements AIProvider {
     const model = genAI.getGenerativeModel({
       model: MODEL,
       systemInstruction: systemPrompt,
+      safetySettings: SAFETY_SETTINGS,
       generationConfig: {
         responseMimeType: "application/json",
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
@@ -140,6 +160,7 @@ export class GeminiProvider implements AIProvider {
     const model = genAI.getGenerativeModel({
       model: MODEL,
       systemInstruction: systemPrompt,
+      safetySettings: SAFETY_SETTINGS,
       ...(geminiTools.length ? { tools: geminiTools } : {}),
       ...(options?.temperature !== undefined
         ? { generationConfig: { temperature: options.temperature } }

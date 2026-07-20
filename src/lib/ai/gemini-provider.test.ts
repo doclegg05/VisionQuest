@@ -44,6 +44,18 @@ function sseResponse(parts: any[]): Response {
   });
 }
 
+/** One plain JSON response (non-streaming :generateContent) with the given text. */
+function jsonResponse(text: string): Response {
+  const body = {
+    candidates: [{ index: 0, content: { role: "model", parts: [{ text }] }, finishReason: "STOP" }],
+    usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 let capturedBodies: any[] = [];
 
 /** Stub fetch to script one SSE frame per hop and capture request bodies. */
@@ -55,6 +67,15 @@ function scriptHops(hops: any[][]) {
     const parts = hops[hop] ?? [{ text: "fallback" }];
     hop += 1;
     return sseResponse(parts);
+  }) as any;
+}
+
+/** Stub fetch to return one non-streaming JSON reply and capture request bodies. */
+function scriptJson() {
+  capturedBodies = [];
+  global.fetch = (async (_url: any, init: any) => {
+    capturedBodies.push(JSON.parse(init.body));
+    return jsonResponse("ok");
   }) as any;
 }
 
@@ -154,5 +175,61 @@ describe("GeminiProvider.streamWithTools hop-2 request shape", () => {
     assert.equal(capturedBodies.length, 1);
     assert.ok(events.some((e) => e.kind === "text" && e.text === "plain answer"));
     assert.ok(events.some((e) => e.kind === "done" && e.reason === "complete"));
+  });
+});
+
+// Gemini's default harm filters can block legitimate crisis-coaching replies;
+// the deterministic crisis safety net (988) is the enforcement layer, so the
+// provider must relax every generation path to BLOCK_ONLY_HIGH. These tests
+// pin the safetySettings the API actually receives on the wire.
+const EXPECTED_SAFETY_SETTINGS = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+];
+
+const USER_MESSAGES = [{ role: "user" as const, content: "hi" }];
+
+describe("GeminiProvider safetySettings on every generation path", () => {
+  beforeEach(() => {
+    capturedBodies = [];
+  });
+
+  it("sends BLOCK_ONLY_HIGH safetySettings on generateResponse", async () => {
+    scriptJson();
+    await new GeminiProvider("test-key").generateResponse("system", USER_MESSAGES);
+
+    assert.equal(capturedBodies.length, 1);
+    assert.deepEqual(capturedBodies[0].safetySettings, EXPECTED_SAFETY_SETTINGS);
+  });
+
+  it("sends BLOCK_ONLY_HIGH safetySettings on streamResponse", async () => {
+    scriptHops([[{ text: "hello" }]]);
+    await drain(new GeminiProvider("test-key").streamResponse("system", USER_MESSAGES));
+
+    assert.equal(capturedBodies.length, 1);
+    assert.deepEqual(capturedBodies[0].safetySettings, EXPECTED_SAFETY_SETTINGS);
+  });
+
+  it("sends BLOCK_ONLY_HIGH safetySettings on generateStructuredResponse", async () => {
+    scriptJson();
+    await new GeminiProvider("test-key").generateStructuredResponse("system", USER_MESSAGES);
+
+    assert.equal(capturedBodies.length, 1);
+    assert.deepEqual(capturedBodies[0].safetySettings, EXPECTED_SAFETY_SETTINGS);
+  });
+
+  it("sends BLOCK_ONLY_HIGH safetySettings on every streamWithTools hop", async () => {
+    scriptHops([
+      [{ functionCall: { name: "get_goals", args: {} } }],
+      [{ text: "done" }],
+    ]);
+    await run(new GeminiProvider("test-key"));
+
+    assert.equal(capturedBodies.length, 2, "expected two hops");
+    for (const body of capturedBodies) {
+      assert.deepEqual(body.safetySettings, EXPECTED_SAFETY_SETTINGS);
+    }
   });
 });
