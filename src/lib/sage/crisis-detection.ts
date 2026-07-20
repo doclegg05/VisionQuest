@@ -50,6 +50,45 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
   { category: "harm_others", pattern: /\b(want|going)\s+to\s+(hurt|kill)\s+(someone|him|her|them|people|everyone)\b/i },
   { category: "abuse", pattern: /\b(be(ing)?\s+abused|he\s+hits\s+me|she\s+hits\s+me|they\s+hit\s+me|hits?\s+me\s+at\s+home|hurt(s|ing)?\s+me\s+at\s+home|being\s+(hurt|hit)\s+at\s+home)\b/i },
+
+  // --- Spanish (es) — P2-7. Same phrase-level, case-insensitive, word-boundary
+  // style as the English set above; English entries are untouched and tested
+  // first. Accented and unaccented spellings are both matched via explicit
+  // alternations ("daño"/"dano", "mí"/"mi", "más"/"mas") because students often
+  // type without accents; no Unicode-insensitive flags are used, so existing
+  // behavior cannot shift. NOTE: JS \b is ASCII-only and fails AFTER a final
+  // accented letter ("mí", "pegó"), so those entries end with a
+  // (?![\wáéíóúüñ]) guard instead of \b. Sensitivity mirrors English — err
+  // toward alerting: idioms like "quiero morir de risa" match, exactly as
+  // "want to die" matches "I want to die laughing".
+  // self_harm (es)
+  { category: "self_harm", pattern: /\b(me\s+quiero\s+morir|(quiero|quisiera)\s+morir(me)?)\b/i },
+  { category: "self_harm", pattern: /\b(matarme|me\s+quiero\s+matar)\b/i },
+  { category: "self_harm", pattern: /\bquitarme\s+la\s+vida\b/i },
+  // Stem match — suicidio, suicida(s), suicidarme, suicidarse, suicidé, ...
+  { category: "self_harm", pattern: /\bsuicid/i },
+  { category: "self_harm", pattern: /\b(acabar|terminar)\s+con\s+mi\s+vida\b/i },
+  { category: "self_harm", pattern: /\bno\s+quiero\s+(vivir|seguir\s+viviendo)\b/i },
+  { category: "self_harm", pattern: /\b(no\s+vale\s+la\s+pena\s+vivir|la\s+vida\s+no\s+vale\s+la\s+pena)\b/i },
+  { category: "self_harm", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer)\s+da(ñ|n)o|lastimarme|cortarme\s+las\s+venas)\b/i },
+  { category: "self_harm", pattern: /\b(mejor\s+muert[oa]|quisiera\s+estar\s+muert[oa])\b/i },
+  // Ambiguous like the English "can't go on" — included per err-toward-alerting.
+  { category: "self_harm", pattern: /\b(ya\s+)?no\s+puedo\s+m(á|a)s\b/i },
+  // harm_others (es) — a person object (attached clitic or personal "a") is
+  // required, mirroring the English object list; that keeps "matar el tiempo"
+  // ("kill time") from false-positive while catching "quiero matar a mi jefe".
+  { category: "harm_others", pattern: /\bhacerles?\s+da(ñ|n)o\s+a\b/i },
+  { category: "harm_others", pattern: /\b((quiero|quisiera|voy\s+a)\s+matar(l[oa]s?|te|les?|\s+a)|(l[oa]s?|te|les?)\s+(quiero|voy\s+a)\s+matar)\b/i },
+  { category: "harm_others", pattern: /\b((quiero|voy\s+a)\s+lastimar(l[oa]s?|te|les?)?|lastimar\s+a\s+alguien)\b/i },
+  // abuse (es) — Spanish is pro-drop ("me pega" = "[he] hits me"), so unlike
+  // the English "he/she hits me" no subject pronoun is required: the
+  // subjectless form IS the natural disclosure and requiring one would miss
+  // real cases. "tengo miedo de mi ..." is bounded to partner nouns to keep
+  // precision ("tengo miedo de mi examen" must not alert).
+  { category: "abuse", pattern: /\bme\s+(peg|golpe|maltrat|amenaz)(a|an|aba|aban|aron|ó|o)(?![\wáéíóúüñ])/i },
+  { category: "abuse", pattern: /\bme\s+est(á|a)n?\s+(pegando|golpeando|maltratando|amenazando|abusando)\b/i },
+  { category: "abuse", pattern: /\babus(a|an|ó|o|aba|aban|aron|ando)\s+de\s+m[ií](?![\wáéíóúüñ])/i },
+  { category: "abuse", pattern: /\b(tengo\s+miedo\s+de|le\s+tengo\s+miedo\s+a)\s+mi\s+(pareja|esposo|esposa|marido|mujer|novio|novia)\b/i },
 ];
 
 export interface CrisisDetection {

@@ -128,6 +128,127 @@ test("detectCrisisSignal handles non-string input safely", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Spanish coverage (P2-7) — positive cases, accented AND unaccented spellings.
+// Students often type without accents ("dano", "mi", "esta", "mas"), so both
+// forms must be caught. Favor recall, same as the English set.
+// ---------------------------------------------------------------------------
+
+const SPANISH_SHOULD_MATCH: { text: string; category: string }[] = [
+  // self_harm — accented / standard spelling
+  { text: "ya no aguanto, me quiero morir", category: "self_harm" },
+  { text: "quiero morirme", category: "self_harm" },
+  { text: "quisiera morir", category: "self_harm" },
+  { text: "a veces pienso en matarme", category: "self_harm" },
+  { text: "me quiero matar", category: "self_harm" },
+  { text: "quiero quitarme la vida", category: "self_harm" },
+  { text: "he pensado en suicidarme", category: "self_harm" },
+  { text: "tengo pensamientos suicidas", category: "self_harm" },
+  { text: "quiero acabar con mi vida", category: "self_harm" },
+  { text: "voy a terminar con mi vida", category: "self_harm" },
+  { text: "no quiero vivir así", category: "self_harm" },
+  { text: "no quiero seguir viviendo", category: "self_harm" },
+  { text: "ya no vale la pena vivir", category: "self_harm" },
+  { text: "la vida no vale la pena", category: "self_harm" },
+  { text: "quiero hacerme daño", category: "self_harm" },
+  { text: "me quiero hacer daño otra vez", category: "self_harm" },
+  { text: "voy a lastimarme", category: "self_harm" },
+  { text: "quisiera estar muerta", category: "self_harm" },
+  { text: "estaría mejor muerto", category: "self_harm" },
+  // Ambiguous-but-alerting: sensitivity deliberately matched to the English
+  // "can't go on", which is equally ambiguous and included.
+  { text: "ya no puedo más", category: "self_harm" },
+  // self_harm — unaccented typing
+  { text: "quiero hacerme dano", category: "self_harm" },
+  { text: "ya no puedo mas con todo esto", category: "self_harm" },
+  { text: "estaria mejor muerta", category: "self_harm" },
+  // harm_others — accented / standard spelling
+  { text: "quiero hacerle daño a mi supervisor", category: "harm_others" },
+  { text: "quiero matar a mi jefe", category: "harm_others" },
+  { text: "lo voy a matar", category: "harm_others" },
+  { text: "quiero matarlo", category: "harm_others" },
+  { text: "voy a lastimar a alguien", category: "harm_others" },
+  { text: "quiero lastimar a alguien si no paran", category: "harm_others" },
+  // harm_others — unaccented
+  { text: "voy a hacerles dano a todos", category: "harm_others" },
+  // abuse — accented / standard spelling
+  { text: "mi esposo me pega", category: "abuse" },
+  { text: "me golpea cuando llega a casa", category: "abuse" },
+  { text: "mi pareja me maltrata", category: "abuse" },
+  // Trailing accented letter before punctuation — exercises the lookahead
+  // guard that replaces the (ASCII-only) \b after "mí".
+  { text: "mi padrastro abusa de mí.", category: "abuse" },
+  { text: "mi novio me amenaza si salgo", category: "abuse" },
+  { text: "tengo miedo de mi esposo", category: "abuse" },
+  { text: "le tengo miedo a mi pareja", category: "abuse" },
+  { text: "me está golpeando otra vez", category: "abuse" },
+  // abuse — unaccented
+  { text: "abusa de mi y no se que hacer", category: "abuse" },
+  { text: "abusaron de mi cuando era nina", category: "abuse" },
+  { text: "mi novio me pego anoche", category: "abuse" },
+  { text: "me esta pegando de nuevo", category: "abuse" },
+];
+
+for (const { text, category } of SPANISH_SHOULD_MATCH) {
+  test(`detectCrisisSignal flags (es): "${text}"`, () => {
+    const result = detectCrisisSignal(text);
+    assert.equal(result.matched, true, `expected a match for: ${text}`);
+    assert.equal(result.category, category);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Spanish negative cases — benign everyday phrasing must NOT alert.
+// ---------------------------------------------------------------------------
+
+const SPANISH_SHOULD_NOT_MATCH = [
+  "quiero vivir en una ciudad más grande algún día",
+  "estoy muerta de cansancio después del turno",
+  "me muero de hambre, ¿cuándo es el descanso?",
+  // "matar el tiempo" (kill time): the harm_others patterns require a person
+  // object (clitic or personal "a"), mirroring the English object list.
+  "voy a matar el tiempo antes de la clase",
+  // Haircut, not self-injury — the pattern requires "cortarme las venas".
+  "voy a cortarme el pelo este fin de semana",
+  "no hay que abusar del café",
+  // "tengo miedo de mi ..." is bounded to partner nouns.
+  "tengo miedo de mi examen final",
+  "quiero terminar el curso este mes",
+];
+
+for (const text of SPANISH_SHOULD_NOT_MATCH) {
+  test(`detectCrisisSignal ignores (es): "${text}"`, () => {
+    const result = detectCrisisSignal(text);
+    assert.equal(result.matched, false, `unexpected match for: ${text}`);
+    assert.equal(result.category, null);
+  });
+}
+
+// SENSITIVITY DECISION (documented, not a bug): "quiero morir de risa"
+// ("dying of laughter") DOES match. The English set has exactly the same
+// behavior — "want to die" matches "I want to die laughing" — and the module's
+// locked design errs toward alerting: a teacher dismissing a false positive is
+// cheap; a missed crisis is not. This test pins the parity in both languages.
+test("detectCrisisSignal idiom sensitivity matches English (errs toward alerting)", () => {
+  assert.equal(detectCrisisSignal("I want to die laughing at this meme").matched, true);
+  const result = detectCrisisSignal("quiero morir de risa con este video");
+  assert.equal(result.matched, true);
+  assert.equal(result.category, "self_harm");
+});
+
+test("detectCrisisSignal is case-insensitive for accented Spanish", () => {
+  assert.equal(detectCrisisSignal("ME QUIERO MORIR").matched, true);
+  assert.equal(detectCrisisSignal("MI PADRASTRO ABUSA DE MÍ").matched, true);
+});
+
+test("detectCrisisSignal classifies Spanish self-directed phrasing as self_harm, not harm_others", () => {
+  // "quiero matarme" must resolve via the earlier self_harm entry even though
+  // a harm_others "quiero matar..." pattern also exists.
+  const result = detectCrisisSignal("quiero matarme");
+  assert.equal(result.matched, true);
+  assert.equal(result.category, "self_harm");
+});
+
+// ---------------------------------------------------------------------------
 // recordWellbeingConcern — notification routing.
 // SAFETY: the audience must never be narrower than "all active teachers" on
 // any failure path. Assigned instructors are a scoping optimization only.
