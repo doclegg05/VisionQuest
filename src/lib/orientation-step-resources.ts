@@ -1,4 +1,4 @@
-import { getFormById, type SpokesForm } from "@/lib/spokes/forms";
+import { getFormById, hasDownloadableFormDocument, type SpokesForm } from "@/lib/spokes/forms";
 
 interface OrientationStepDefinition {
   aliases: string[];
@@ -337,4 +337,36 @@ export function getOrientationStepDetail(itemLabel: string): OrientationStepDeta
     ?? findByKeywordHeuristics(itemLabel);
 
   return buildDetail(definition);
+}
+
+// ---------------------------------------------------------------------------
+// Signature-requirement classification
+//
+// Mirrors the orientation wizard's step typing (`classifyStep` in
+// OrientationWizard.tsx): a form produces a `sign` step only when it is not
+// the in-browser Student Profile, has a downloadable document, and is flagged
+// `requiresSignature`. Forms that require a signature but have no digital
+// document (e.g. ai-data-consent) surface in the wizard as paper "no-pdf"
+// steps, so they do not count here.
+//
+// Used by the welcome quick-win filter and the POST /api/orientation guard so
+// students can never mark a signature-required item complete via a bare
+// "I've read this" acknowledgement (P0-1 compliance fix).
+// ---------------------------------------------------------------------------
+
+/** True when this form is completed as a `sign` wizard step (SignaturePad → /api/forms/sign). */
+export function formRequiresSignatureStep(form: SpokesForm): boolean {
+  if (form.id === "student-profile") return false;
+  if (!hasDownloadableFormDocument(form)) return false;
+  return form.requiresSignature;
+}
+
+/** The subset of an orientation item's mapped forms that must be signed. */
+export function getSignatureRequiredForms(itemLabel: string): SpokesForm[] {
+  return getOrientationStepDetail(itemLabel).forms.filter(formRequiresSignatureStep);
+}
+
+/** True when completing this orientation item requires at least one signature. */
+export function isSignatureRequiredItem(itemLabel: string): boolean {
+  return getSignatureRequiredForms(itemLabel).length > 0;
 }
