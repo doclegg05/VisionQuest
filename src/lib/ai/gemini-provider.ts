@@ -1,7 +1,8 @@
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type FunctionDeclaration, type Part, type SafetySetting, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type EnhancedGenerateContentResponse, type FunctionDeclaration, type GenerateContentStreamResult, type Part, type SafetySetting, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
 import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
+import { logger } from "@/lib/logger";
 import type {
   AIProvider,
   ChatMessage,
@@ -32,6 +33,99 @@ const SAFETY_SETTINGS: SafetySetting[] = [
     threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Transient-failure retry (cloud chat turn)
+// ---------------------------------------------------------------------------
+// The background extractors' retryWithBackoff (src/lib/sage/retry.ts) is
+// extractor-flavored: it requires monitoring alert keys and retries EVERY
+// error. The chat turn needs the opposite semantics — retry only classified
+// transient failures (429/5xx/network), never 400s, safety blocks, auth
+// errors, or aborts, and on streaming paths never after the first chunk has
+// reached the client. A small local helper keeps that explicit instead of
+// contorting the shared extractor util.
+
+/** Backoff before retry N (retry 1 → 500ms, retry 2 → 1500ms). 3 attempts total. */
+const RETRY_DELAYS_MS = [500, 1_500];
+
+/** HTTP statuses that indicate a transient Gemini failure worth retrying. */
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+/**
+ * Network-level failures that never got an HTTP status. The SDK wraps raw
+ * fetch rejections as "Error fetching from <url>: …" (GoogleGenerativeAIError,
+ * no status) and pre-first-chunk stream deaths as "Error reading from the
+ * stream". Aborts ("Request aborted …") are deliberate cancellations and
+ * intentionally do NOT match.
+ */
+const NETWORK_ERROR_RE =
+  /Error fetching from|Error reading from the stream|fetch failed|network error|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated/i;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * True for transient failures (HTTP 429/500/502/503/504 and status-less
+ * network errors). Status is checked FIRST so a GoogleGenerativeAIFetchError
+ * carrying 400/401/403 is never retried even though its message starts with
+ * "Error fetching from". Safety blocks (GoogleGenerativeAIResponseError) have
+ * neither a status nor a network-shaped message, so they fall through to false.
+ */
+function isRetryableError(error: unknown): boolean {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === "number") return RETRYABLE_STATUSES.has(status);
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return NETWORK_ERROR_RE.test(message);
+}
+
+/** Runs `fn`, retrying transient failures with 500ms/1500ms backoff (3 attempts total). */
+async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const retriesLeft = attempt < RETRY_DELAYS_MS.length;
+      if (!retriesLeft || !isRetryableError(error)) throw error;
+      logger.warn("Gemini transient failure, retrying", {
+        label,
+        attempt: attempt + 1,
+        maxAttempts: RETRY_DELAYS_MS.length + 1,
+        error: String(error),
+      });
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
+  // Unreachable — the final failed attempt throws inside the catch above.
+  throw lastError;
+}
+
+/**
+ * The retryable "establishment" window of a streaming call: send the request
+ * and await the first wire chunk. Nothing has been yielded to the client yet,
+ * so re-issuing the request cannot duplicate output. Everything after the
+ * returned `first` — including the replayed first chunk — is outside the
+ * retry boundary and propagates errors untouched.
+ */
+async function establishStream(
+  send: () => Promise<GenerateContentStreamResult>,
+  label: string,
+): Promise<{
+  result: GenerateContentStreamResult;
+  iterator: AsyncIterator<EnhancedGenerateContentResponse>;
+  first: IteratorResult<EnhancedGenerateContentResponse>;
+}> {
+  return withTransientRetry(async () => {
+    const result = await send();
+    const iterator = result.stream[Symbol.asyncIterator]();
+    const first = await iterator.next();
+    return { result, iterator, first };
+  }, label);
+}
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
@@ -64,19 +158,24 @@ export class GeminiProvider implements AIProvider {
     options?: GenerationOptions,
   ): Promise<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
-    const model = this.getModel(systemPrompt, options);
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      })),
-    });
-
     const lastMessage = messages[messages.length - 1];
-    const result = await chat.sendMessage(lastMessage.content);
-    const text = result.response.text();
-    reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
-    return text;
+
+    // Non-streaming: nothing reaches the client until the whole call
+    // succeeds, so the entire request is safely retryable.
+    return withTransientRetry(async () => {
+      const model = this.getModel(systemPrompt, options);
+      const chat = model.startChat({
+        history: messages.slice(0, -1).map((m) => ({
+          role: m.role,
+          parts: [{ text: m.content }],
+        })),
+      });
+
+      const result = await chat.sendMessage(lastMessage.content);
+      const text = result.response.text();
+      reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
+      return text;
+    }, "generateResponse");
   }
 
   async *streamResponse(
@@ -86,24 +185,32 @@ export class GeminiProvider implements AIProvider {
     options?: GenerationOptions,
   ): AsyncGenerator<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
-    const model = this.getModel(systemPrompt, options);
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      })),
-    });
-
     const lastMessage = messages[messages.length - 1];
-    const result = await chat.sendMessageStream(lastMessage.content);
+
+    // Retry covers ONLY establishment (request send + first-chunk await).
+    // A fresh ChatSession is built per attempt so no SDK-internal state
+    // leaks across retries. Once anything has been yielded, errors
+    // propagate untouched — retrying then would duplicate partial output.
+    const { result, iterator, first } = await establishStream(() => {
+      const model = this.getModel(systemPrompt, options);
+      const chat = model.startChat({
+        history: messages.slice(0, -1).map((m) => ({
+          role: m.role,
+          parts: [{ text: m.content }],
+        })),
+      });
+      return chat.sendMessageStream(lastMessage.content);
+    }, "streamResponse");
 
     let outputChars = 0;
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
+    let next = first;
+    while (!next.done) {
+      const text = next.value.text();
       if (text) {
         outputChars += text.length;
         yield text;
       }
+      next = await iterator.next();
     }
 
     const finalResponse = await result.response;
@@ -128,18 +235,22 @@ export class GeminiProvider implements AIProvider {
       },
     });
 
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      })),
-    });
-
     const lastMessage = messages[messages.length - 1];
-    const result = await chat.sendMessage(lastMessage.content);
-    const text = result.response.text();
-    reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
-    return text;
+
+    // Non-streaming: the whole call is safely retryable (see generateResponse).
+    return withTransientRetry(async () => {
+      const chat = model.startChat({
+        history: messages.slice(0, -1).map((m) => ({
+          role: m.role,
+          parts: [{ text: m.content }],
+        })),
+      });
+
+      const result = await chat.sendMessage(lastMessage.content);
+      const text = result.response.text();
+      reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
+      return text;
+    }, "generateStructuredResponse");
   }
 
   async *streamWithTools(
@@ -186,15 +297,24 @@ export class GeminiProvider implements AIProvider {
     let outputChars = 0;
 
     for (let hop = 0; hop < maxHops; hop++) {
-      const result = await model.generateContentStream({ contents });
+      // Retry covers ONLY this hop's establishment (request send +
+      // first-chunk await). A hop-2+ establishment failure has produced no
+      // client-visible output for its response either, so re-issuing is just
+      // as safe as on hop 1 — tool handlers are NOT re-run, only the model
+      // request. Once a chunk has arrived, errors propagate untouched.
+      const { result, iterator, first } = await establishStream(
+        () => model.generateContentStream({ contents }),
+        "streamWithTools",
+      );
 
       // Stream text as it arrives, keeping every raw part verbatim: the SDK's
       // aggregated response copies only the fields it knows, which strips
       // Gemini 3 thoughtSignature — and resending a functionCall part without
       // its signature is a 400 ("Function call is missing a thought_signature").
       const rawModelParts: Part[] = [];
-      for await (const chunk of result.stream) {
-        const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      let next = first;
+      while (!next.done) {
+        const parts = next.value.candidates?.[0]?.content?.parts ?? [];
         for (const part of parts) {
           rawModelParts.push({ ...part });
           if (typeof part.text === "string" && part.text.length > 0) {
@@ -202,6 +322,7 @@ export class GeminiProvider implements AIProvider {
             yield { kind: "text", text: part.text };
           }
         }
+        next = await iterator.next();
       }
 
       // After the stream completes, inspect for function calls.

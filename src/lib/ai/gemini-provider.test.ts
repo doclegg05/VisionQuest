@@ -17,6 +17,10 @@ import { mock } from "node:test";
 // The provider now manages `contents` itself from the raw wire parts; these
 // tests assert the hop-2 request body the API actually receives.
 
+// Silence the provider's retry warn logs — the retry tests below trigger
+// them deliberately and the assertions are on fetch-call counts, not logs.
+process.env.LOG_LEVEL = "error";
+
 mock.module("@/lib/gemini", {
   namedExports: { GEMINI_MODEL: "gemini-test" },
 });
@@ -56,6 +60,37 @@ function jsonResponse(text: string): Response {
   });
 }
 
+/** One non-OK JSON error response, shaped like the Gemini API's error body. */
+function httpError(status: number): Response {
+  return new Response(JSON.stringify({ error: { message: `scripted ${status}` } }), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/** An SSE response that delivers one good frame, then dies mid-stream. */
+function sseBodyErrorAfter(parts: any[]): Response {
+  const frame = {
+    candidates: [{ index: 0, content: { role: "model", parts } }],
+    usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+  };
+  const encoder = new TextEncoder();
+  // Pull-based so the frame is delivered on demand BEFORE the error: erroring
+  // a push-based stream discards any still-queued chunks.
+  let pulls = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls += 1;
+      if (pulls === 1) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\r\n\r\n`));
+      } else {
+        controller.error(new Error("socket hang up"));
+      }
+    },
+  });
+  return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
 let capturedBodies: any[] = [];
 
 /** Stub fetch to script one SSE frame per hop and capture request bodies. */
@@ -67,6 +102,18 @@ function scriptHops(hops: any[][]) {
     const parts = hops[hop] ?? [{ text: "fallback" }];
     hop += 1;
     return sseResponse(parts);
+  }) as any;
+}
+
+/** Stub fetch to return scripted response factories in call order (last repeats). */
+function scriptSequence(factories: Array<() => Response>) {
+  capturedBodies = [];
+  let call = 0;
+  global.fetch = (async (_url: any, init: any) => {
+    capturedBodies.push(JSON.parse(init.body));
+    const factory = factories[Math.min(call, factories.length - 1)];
+    call += 1;
+    return factory();
   }) as any;
 }
 
@@ -231,5 +278,72 @@ describe("GeminiProvider safetySettings on every generation path", () => {
     for (const body of capturedBodies) {
       assert.deepEqual(body.safetySettings, EXPECTED_SAFETY_SETTINGS);
     }
+  });
+});
+
+// Transient failures (429/5xx/network) on the cloud chat turn are retried,
+// but ONLY before the first streamed token reaches the client — retrying an
+// established stream would duplicate partial output. These tests pin the
+// retry boundary at the wire level via fetch-call counts.
+describe("GeminiProvider transient-failure retry", () => {
+  beforeEach(() => {
+    capturedBodies = [];
+  });
+
+  it("retries generateResponse on a 500 and succeeds on the second call", async () => {
+    scriptSequence([() => httpError(500), () => jsonResponse("recovered")]);
+    const text = await new GeminiProvider("test-key").generateResponse("system", USER_MESSAGES);
+
+    assert.equal(text, "recovered");
+    assert.equal(capturedBodies.length, 2, "500 then success = exactly two fetch calls");
+  });
+
+  it("does not retry generateResponse on a 400", async () => {
+    scriptSequence([() => httpError(400)]);
+    await assert.rejects(
+      () => new GeminiProvider("test-key").generateResponse("system", USER_MESSAGES),
+      /400/,
+    );
+
+    assert.equal(capturedBodies.length, 1, "client errors must not be retried");
+  });
+
+  it("retries streamResponse establishment on a 503", async () => {
+    scriptSequence([() => httpError(503), () => sseResponse([{ text: "hello" }])]);
+    const chunks: string[] = [];
+    for await (const chunk of new GeminiProvider("test-key").streamResponse(
+      "system",
+      USER_MESSAGES,
+    )) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, ["hello"]);
+    assert.equal(capturedBodies.length, 2, "failed establishment retried once");
+  });
+
+  it("propagates a mid-stream failure after the first chunk with no second attempt", async () => {
+    scriptSequence([() => sseBodyErrorAfter([{ text: "partial" }])]);
+    const chunks: string[] = [];
+    await assert.rejects(async () => {
+      for await (const chunk of new GeminiProvider("test-key").streamResponse(
+        "system",
+        USER_MESSAGES,
+      )) {
+        chunks.push(chunk);
+      }
+    }, /reading from the stream/i);
+
+    assert.deepEqual(chunks, ["partial"], "the first chunk reached the client before the failure");
+    assert.equal(capturedBodies.length, 1, "no retry once streaming has started");
+  });
+
+  it("retries streamWithTools hop establishment on a 500", async () => {
+    scriptSequence([() => httpError(500), () => sseResponse([{ text: "done" }])]);
+    const events = await run(new GeminiProvider("test-key"));
+
+    assert.ok(events.some((e) => e.kind === "text" && e.text === "done"));
+    assert.ok(events.some((e) => e.kind === "done" && e.reason === "complete"));
+    assert.equal(capturedBodies.length, 2, "failed establishment retried once");
   });
 });
