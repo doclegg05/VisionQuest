@@ -30,6 +30,7 @@ model Student {
   mfaVerifiedAt        DateTime? // When MFA was last verified this session
   mfaLastUsedCounter   Int? // Last accepted TOTP counter — prevents replay within 90s window
   classroomConfirmedAt DateTime? // Set once Sage has confirmed the student is in the right classroom
+  offboardedAt         DateTime? // Set by the admin-only manual offboarding flow — see docs/DATA_RETENTION_POLICY.md
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
