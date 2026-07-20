@@ -190,11 +190,13 @@ describe("POST /api/orientation (signature guard)", () => {
 
     assert.equal(res.status, 200);
     assert.equal(mockAssertStaffCanManageStudent.mock.callCount(), 1);
-    // Staff path must not run the signature guard at all.
-    assert.equal(mockItemFindUnique.mock.callCount(), 0);
+    // Staff path must not run the signature guard: the item label may be
+    // read (to decide verification semantics) but no signed-submission
+    // lookup happens.
     assert.equal(mockSubmissionFindMany.mock.callCount(), 0);
     const call = mockProgressUpsert.mock.calls[0].arguments[0];
     assert.equal(call.where.studentId_itemId.studentId, OTHER_STUDENT_ID);
+    assert.equal(call.update.completed, true);
   });
 
   it("still forbids a student from targeting another student's checklist", async () => {
@@ -204,5 +206,120 @@ describe("POST /api/orientation (signature guard)", () => {
 
     assert.equal(res.status, 403);
     assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+});
+
+// P1-1 verification flow: honor-system items (instructor-led / paper no-pdf
+// wizard steps) never complete from a bare student click — they record a
+// pending claim that the assigned teacher confirms or declines.
+describe("POST /api/orientation (verification flow)", () => {
+  beforeEach(() => {
+    currentSession = mockStudentSession();
+    mockItemFindUnique.mock.resetCalls();
+    mockProgressUpsert.mock.resetCalls();
+    mockSubmissionFindMany.mock.resetCalls();
+    mockSyncStudentAlerts.mock.resetCalls();
+    mockAssertStaffCanManageStudent.mock.resetCalls();
+
+    // A real instructor-led seed item (scripts/seed-data.mjs): no mapped
+    // forms, so the wizard renders it as a single honor-system step.
+    mockItemFindUnique.mock.mockImplementation(async () => ({
+      label: "Complete TABE entry assessment",
+    }));
+    mockSubmissionFindMany.mock.mockImplementation(async () => []);
+    mockProgressUpsert.mock.mockImplementation(async () => ({}));
+    mockSyncStudentAlerts.mock.mockImplementation(async () => undefined);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
+  });
+
+  it("stores a student's claim as pending, not completed, and flags the response", async () => {
+    const res = await route.POST(toggleRequest({ itemId: ITEM_ID, completed: true }));
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.success, true);
+    assert.equal(body.data.pendingVerification, true);
+    assert.equal(mockProgressUpsert.mock.callCount(), 1);
+    const call = mockProgressUpsert.mock.calls[0].arguments[0];
+    assert.equal(call.update.completed, false);
+    assert.equal(call.update.verificationStatus, "pending");
+    assert.equal(call.create.verificationStatus, "pending");
+    // The claim must still surface to the teacher via the alert sync.
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 1);
+  });
+
+  it("release packet: signatures on file still route through pending (paper ai-data-consent step)", async () => {
+    mockItemFindUnique.mock.mockImplementation(async () => ({
+      label: "Sign Authorization for Release of Information",
+    }));
+    mockSubmissionFindMany.mock.mockImplementation(async () => [
+      { formId: "auth-release" },
+      { formId: "dohs-release" },
+    ]);
+
+    const res = await route.POST(toggleRequest({ itemId: ITEM_ID, completed: true }));
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.data.pendingVerification, true);
+    const call = mockProgressUpsert.mock.calls[0].arguments[0];
+    assert.equal(call.update.verificationStatus, "pending");
+  });
+
+  it("staff completion of an honor-system item records verified + verifiedBy/verifiedAt", async () => {
+    currentSession = mockTeacherSession();
+
+    const res = await route.POST(
+      toggleRequest({ itemId: ITEM_ID, completed: true, studentId: OTHER_STUDENT_ID }),
+    );
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.data.verificationStatus, "verified");
+    const call = mockProgressUpsert.mock.calls[0].arguments[0];
+    assert.equal(call.update.completed, true);
+    assert.equal(call.update.verificationStatus, "verified");
+    assert.equal(call.update.verifiedBy, currentSession.id);
+    assert.ok(call.update.verifiedAt instanceof Date);
+  });
+
+  it("staff decline sends the step back: not completed, verificationStatus declined", async () => {
+    currentSession = mockTeacherSession();
+
+    const res = await route.POST(
+      toggleRequest({
+        itemId: ITEM_ID,
+        completed: false,
+        studentId: OTHER_STUDENT_ID,
+        verify: "decline",
+      }),
+    );
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.data.verificationStatus, "declined");
+    const call = mockProgressUpsert.mock.calls[0].arguments[0];
+    assert.equal(call.update.completed, false);
+    assert.equal(call.update.verificationStatus, "declined");
+    assert.equal(call.update.verifiedBy, currentSession.id);
+  });
+
+  it("rejects the verify field from students", async () => {
+    const res = await route.POST(
+      toggleRequest({ itemId: ITEM_ID, completed: true, verify: "confirm" }),
+    );
+
+    assert.equal(res.status, 403);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+
+  it("a student unchecking withdraws the pending claim entirely", async () => {
+    const res = await route.POST(toggleRequest({ itemId: ITEM_ID, completed: false }));
+
+    assert.equal(res.status, 200);
+    const call = mockProgressUpsert.mock.calls[0].arguments[0];
+    assert.equal(call.update.completed, false);
+    assert.equal(call.update.verificationStatus, null);
+    assert.equal(call.update.verifiedBy, null);
   });
 });

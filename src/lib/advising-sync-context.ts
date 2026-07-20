@@ -95,6 +95,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             itemId: true,
             completed: true,
             completedAt: true,
+            verificationStatus: true,
           },
         },
         portfolioItems: {
@@ -214,6 +215,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             "orientation_form_pending_review",
             "orientation_form_revision_needed",
             "orientation_item_incomplete",
+            "orientation_verification_pending",
             "goal_stale",
             "orientation_not_started",
             "orientation_overdue",

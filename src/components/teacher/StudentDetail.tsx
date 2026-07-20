@@ -34,6 +34,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [orientationVerifying, setOrientationVerifying] = useState<string | null>(null);
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [resetStatus, setResetStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
@@ -130,6 +131,37 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       console.error("Failed to verify:", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setVerifying(null);
+    }
+  }
+
+  async function handleOrientationVerify(itemId: string, decision: "confirm" | "decline") {
+    setOrientationVerifying(itemId);
+    try {
+      const res = await fetch("/api/orientation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId,
+          completed: decision === "confirm",
+          studentId,
+          verify: decision,
+        }),
+      });
+      if (res.ok && decision === "confirm") {
+        // If that was the last outstanding required item, this awards the
+        // orientation-complete milestone (75 XP) through the existing
+        // completion path; otherwise the server guard refuses harmlessly.
+        await fetch("/api/orientation/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ studentId }),
+        }).catch(() => undefined);
+      }
+      await loadData();
+    } catch (err) {
+      console.error("Failed to verify orientation step:", err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setOrientationVerifying(null);
     }
   }
 
@@ -484,6 +516,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               dateFormatter={dateFormatter}
               verifying={verifying}
               onVerify={handleVerify}
+              orientationVerifying={orientationVerifying}
+              onOrientationVerify={handleOrientationVerify}
               showAllConversations={showAllConversations}
               onShowAllConversations={() => setShowAllConversations(true)}
             />

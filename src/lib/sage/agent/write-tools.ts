@@ -20,6 +20,7 @@ import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } 
 import { formatCohortDateTime } from "@/lib/timezone";
 import { isValidUrl } from "@/lib/validation";
 import { normalizePortfolioItemType, PORTFOLIO_ITEM_TYPES } from "@/lib/portfolio";
+import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
 import { markRequirementComplete } from "../cert-actions";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
@@ -128,7 +129,7 @@ export async function executeAndLedger(
 const submitForm: AgentTool = {
   name: "submit_form",
   description:
-    "File a signed form the student uploaded in chat against one of their orientation checklist items, marking that item complete. Requires user confirmation.",
+    "File a signed form the student uploaded in chat against one of their orientation checklist items, marking that item complete (or sending it to the instructor to verify when the step needs sign-off). Requires user confirmation.",
   parameters: {
     type: "object",
     properties: {
@@ -169,17 +170,28 @@ const submitForm: AgentTool = {
     if (gate) return gate;
 
     return executeAndLedger("submit_form", { fileUploadId, orientationItemId }, ctx, async () => {
-      await prisma.$transaction([
-        prisma.orientationProgress.upsert({
-          where: { studentId_itemId: { studentId, itemId: orientationItemId } },
-          create: { studentId, itemId: orientationItemId, completed: true, completedAt: new Date() },
-          update: { completed: true, completedAt: new Date() },
-        }),
-        prisma.fileUpload.update({
-          where: { id: fileUploadId },
-          data: { category: "orientation_form" },
-        }),
-      ]);
+      // Always file the uploaded document, then apply the SAME completion
+      // rules as POST /api/orientation (signature guard + P1-1 verification)
+      // so chat can never bypass the wizard's compliance flow.
+      await prisma.fileUpload.update({
+        where: { id: fileUploadId },
+        data: { category: "orientation_form" },
+      });
+      const completion = await applyStudentOrientationCompletion(studentId, orientationItemId);
+      await syncStudentAlerts(studentId).catch(() => undefined);
+
+      if (completion.outcome === "signature_required") {
+        return {
+          summary: `"${file.filename}" is filed to your documents, but "${item.label}" still needs your signature — open Orientation to sign it there.`,
+          data: { orientationItemId, fileUploadId, signatureRequired: true },
+        };
+      }
+      if (completion.outcome === "pending_verification") {
+        return {
+          summary: `Done — "${file.filename}" is filed and "${item.label}" was sent to your instructor to verify. It will show complete once they confirm.`,
+          data: { orientationItemId, fileUploadId, pendingVerification: true },
+        };
+      }
       return {
         summary: `Done — "${file.filename}" is filed and "${item.label}" is marked complete.`,
         data: { orientationItemId, fileUploadId },

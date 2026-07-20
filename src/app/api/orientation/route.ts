@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
-import { getSignatureRequiredForms } from "@/lib/orientation-step-resources";
+import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
+import { isVerificationRequiredItem } from "@/lib/orientation-step-resources";
 import { parseBody } from "@/lib/schemas";
 
 const orientationToggleSchema = z.object({
@@ -20,6 +21,10 @@ const orientationToggleSchema = z.object({
     .regex(/^[a-z0-9_-]+$/i, "Invalid orientation item ID."),
   completed: z.boolean(),
   studentId: z.string().cuid("Invalid student ID.").optional(),
+  // Staff-only (P1-1): resolve a pending verification claim on an
+  // honor-system item. "confirm" completes + verifies; "decline" sends the
+  // step back to the student.
+  verify: z.enum(["confirm", "decline"]).optional(),
 });
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
@@ -46,7 +51,7 @@ export const GET = withAuth(async (session, req: Request) => {
     include: {
       progress: {
         where: { studentId: targetStudentId },
-        select: { completed: true, completedAt: true },
+        select: { completed: true, completedAt: true, verificationStatus: true, verifiedAt: true },
       },
     },
   });
@@ -59,67 +64,128 @@ export const GET = withAuth(async (session, req: Request) => {
     required: item.required,
     completed: item.progress[0]?.completed ?? false,
     completedAt: item.progress[0]?.completedAt ?? null,
+    verificationStatus: item.progress[0]?.verificationStatus ?? null,
+    verifiedAt: item.progress[0]?.verifiedAt ?? null,
   }));
 
   const total = formatted.length;
   const done = formatted.filter((i) => i.completed).length;
+  const pendingVerification = formatted.filter(
+    (i) => !i.completed && i.verificationStatus === "pending",
+  ).length;
 
-  return NextResponse.json({ items: formatted, total, done });
+  return NextResponse.json({ items: formatted, total, done, pendingVerification });
 });
 
 /**
- * Guard (P0-1): a student may not mark an item complete when its orientation
- * step requires a signature that is not yet on file. The wizard signs first
- * (POST /api/forms/sign) and then marks the item complete, so completions with
- * every required signature recorded pass through. A submission counts as
- * signed when it carries a SignaturePad image (`signatureFileId`) or staff
- * approved an uploaded signed copy. Staff completions skip this guard — the
- * `assertStaffCanManageStudent` path in `resolveTargetStudentId` already
- * vetted them, and staff override stays allowed.
+ * Student "un-mark" (completed: false): clears completion AND withdraws any
+ * outstanding verification claim so the item reads as plain incomplete.
  */
-async function assertRequiredSignaturesOnFile(studentId: string, itemId: string) {
+async function resetProgress(studentId: string, itemId: string) {
+  await prisma.orientationProgress.upsert({
+    where: { studentId_itemId: { studentId, itemId } },
+    update: {
+      completed: false,
+      completedAt: null,
+      verificationStatus: null,
+      verifiedBy: null,
+      verifiedAt: null,
+    },
+    create: { studentId, itemId, completed: false },
+  });
+}
+
+/**
+ * Staff decline (P1-1): the student's honor-system claim is rejected — the
+ * step goes back to incomplete with `verificationStatus: "declined"` so the
+ * student sees it needs redoing.
+ */
+async function declineVerification(session: Session, studentId: string, itemId: string) {
+  await prisma.orientationProgress.upsert({
+    where: { studentId_itemId: { studentId, itemId } },
+    update: {
+      completed: false,
+      completedAt: null,
+      verificationStatus: "declined",
+      verifiedBy: session.id,
+      verifiedAt: new Date(),
+    },
+    create: {
+      studentId,
+      itemId,
+      completed: false,
+      verificationStatus: "declined",
+      verifiedBy: session.id,
+      verifiedAt: new Date(),
+    },
+  });
+}
+
+/**
+ * Staff completion. The `assertStaffCanManageStudent` path in
+ * `resolveTargetStudentId` already vetted the actor, so no signature guard
+ * runs (staff override stays allowed). Honor-system items — or an explicit
+ * `verify: "confirm"` — additionally record who verified and when.
+ */
+async function completeAsStaff(session: Session, studentId: string, itemId: string, verify?: string) {
   const item = await prisma.orientationItem.findUnique({
     where: { id: itemId },
     select: { label: true },
   });
-  // Unknown item: fall through — the upsert's FK constraint rejects it as before.
-  if (!item) return;
+  const verifies = verify === "confirm" || (item ? isVerificationRequiredItem(item.label) : false);
+  const now = new Date();
+  const verificationFields = verifies
+    ? { verificationStatus: "verified", verifiedBy: session.id, verifiedAt: now }
+    : { verificationStatus: null, verifiedBy: null, verifiedAt: null };
 
-  const signForms = getSignatureRequiredForms(item.label);
-  if (signForms.length === 0) return;
-
-  const signedSubmissions = await prisma.formSubmission.findMany({
-    where: {
-      studentId,
-      formId: { in: signForms.map((form) => form.id) },
-      OR: [{ signatureFileId: { not: null } }, { status: "approved" }],
-    },
-    select: { formId: true },
+  await prisma.orientationProgress.upsert({
+    where: { studentId_itemId: { studentId, itemId } },
+    update: { completed: true, completedAt: now, ...verificationFields },
+    create: { studentId, itemId, completed: true, completedAt: now, ...verificationFields },
   });
-  const signedFormIds = new Set(signedSubmissions.map((submission) => submission.formId));
-
-  if (signForms.some((form) => !signedFormIds.has(form.id))) {
-    throw badRequest("This one needs your signature — you'll sign it in Orientation.");
-  }
+  return verifies;
 }
 
 // POST — toggle an orientation item's completion
 export const POST = withAuth(async (session, req: Request) => {
-  const { itemId, completed, studentId } = await parseBody(req, orientationToggleSchema);
+  const { itemId, completed, studentId, verify } = await parseBody(req, orientationToggleSchema);
 
   const targetStudentId = await resolveTargetStudentId(session, studentId);
+  const staff = isStaffRole(session.role);
 
-  if (completed && !isStaffRole(session.role)) {
-    await assertRequiredSignaturesOnFile(targetStudentId, itemId);
+  if (verify && !staff) {
+    throw forbidden("Only instructors can verify orientation steps.");
   }
 
-  await prisma.orientationProgress.upsert({
-    where: { studentId_itemId: { studentId: targetStudentId, itemId } },
-    update: { completed, completedAt: completed ? new Date() : null },
-    create: { studentId: targetStudentId, itemId, completed, completedAt: completed ? new Date() : null },
-  });
+  if (!staff && completed) {
+    // Student path — shared rules (signature guard P0-1 + verification P1-1).
+    const result = await applyStudentOrientationCompletion(targetStudentId, itemId);
+    if (result.outcome === "signature_required") {
+      throw badRequest(result.message);
+    }
+    await syncStudentAlerts(targetStudentId);
+    if (result.outcome === "pending_verification") {
+      return NextResponse.json({ success: true, data: { pendingVerification: true } });
+    }
+    return NextResponse.json({ ok: true });
+  }
 
+  if (staff && verify === "decline") {
+    await declineVerification(session, targetStudentId, itemId);
+    await syncStudentAlerts(targetStudentId);
+    return NextResponse.json({ success: true, data: { verificationStatus: "declined" } });
+  }
+
+  if (staff && (completed || verify === "confirm")) {
+    const verified = await completeAsStaff(session, targetStudentId, itemId, verify);
+    await syncStudentAlerts(targetStudentId);
+    if (verified) {
+      return NextResponse.json({ success: true, data: { verificationStatus: "verified" } });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  await resetProgress(targetStudentId, itemId);
   await syncStudentAlerts(targetStudentId);
-
   return NextResponse.json({ ok: true });
 });

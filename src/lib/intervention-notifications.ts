@@ -191,6 +191,16 @@ export function buildTeacherInterventionNotifications({
         body: `${studentName} (${studentId}): ${alert.summary}`,
         cooldownHours: 24,
       });
+      continue;
+    }
+
+    if (alert.type === "orientation_verification_pending") {
+      specs.push({
+        type: "teacher_nudge.orientation_verification",
+        title: "A student is waiting on orientation verification",
+        body: `${studentName} (${studentId}): ${alert.summary}`,
+        cooldownHours: 12,
+      });
     }
   }
 
@@ -261,6 +271,7 @@ export function teacherInterventionHref(type: string, studentRecordId: string) {
     case "teacher_nudge.orientation_revision":
       return `/teacher/students/${studentRecordId}#submitted-forms`;
     case "teacher_nudge.orientation_checklist":
+    case "teacher_nudge.orientation_verification":
       return `/teacher/students/${studentRecordId}#orientation-review`;
     case "teacher_nudge.goal_review":
       return `/teacher/students/${studentRecordId}#goal-evidence`;
@@ -293,6 +304,11 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
       return {
         href: `/teacher/students/${studentRecordId}#orientation-review`,
         label: "Open orientation",
+      };
+    case "orientation_verification_pending":
+      return {
+        href: `/teacher/students/${studentRecordId}#orientation-review`,
+        label: "Verify steps",
       };
     case "goal_needs_resource":
       return {

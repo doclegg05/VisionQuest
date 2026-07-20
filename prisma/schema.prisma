@@ -298,6 +298,12 @@ model OrientationProgress {
   completed   Boolean   @default(false)
   completedAt DateTime?
 
+  // Teacher sign-off for honor-system steps (P1-1). Null = not applicable;
+  // "pending" = student claims done, awaiting teacher; "verified"; "declined".
+  verificationStatus String?
+  verifiedBy         String?
+  verifiedAt         DateTime?
+
   student Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   item    OrientationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 

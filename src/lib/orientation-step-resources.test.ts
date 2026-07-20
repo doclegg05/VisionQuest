@@ -4,6 +4,7 @@ import {
   getOrientationStepDetail,
   getSignatureRequiredForms,
   isSignatureRequiredItem,
+  isVerificationRequiredItem,
 } from "./orientation-step-resources";
 
 describe("getOrientationStepDetail", () => {
@@ -124,14 +125,56 @@ describe("getSignatureRequiredForms", () => {
   });
 });
 
+// P1-1: honor-system items — the wizard renders these with an instructor-led
+// or paper "no-pdf" step, so a student's "mark done" click only files a
+// pending verification claim for the teacher.
+describe("isVerificationRequiredItem", () => {
+  const verificationRequired = [
+    // Instructor-led (no mapped forms): real program milestones done off-app.
+    "Review Class Schedule/Holidays Observed",
+    "Document disability accommodations",
+    "Complete TABE Locator assessment",
+    "Complete TABE entry assessment",
+    "Complete career interest assessment",
+    "Private student interview",
+    "Set up your Sage profile",
+    // Paper no-pdf step: ai-data-consent has no downloadable document.
+    "Sign Authorization for Release of Information",
+  ];
+
+  for (const label of verificationRequired) {
+    it(`requires instructor verification for "${label}"`, () => {
+      assert.equal(isVerificationRequiredItem(label), true);
+    });
+  }
+
+  const noVerification = SEED_ORIENTATION_LABELS.filter(
+    (label) => !verificationRequired.includes(label),
+  );
+
+  for (const label of noVerification) {
+    it(`does not require instructor verification for "${label}"`, () => {
+      assert.equal(isVerificationRequiredItem(label), false);
+    });
+  }
+
+  it("treats unrecognized custom items (no mapped forms) as instructor-led claims", () => {
+    assert.equal(isVerificationRequiredItem("Meet with the county case manager"), true);
+  });
+
+  it("keeps the in-browser Student Profile out of the verification set", () => {
+    assert.equal(isVerificationRequiredItem("Complete SPOKES Student Profile"), false);
+  });
+});
+
 describe("welcome quick-win eligibility (mirrors welcome/page.tsx filter)", () => {
-  it("only the Ready to Work attendance review survives the signature filter", () => {
+  it("only the Ready to Work attendance review survives the signature + verification filters", () => {
     const quickWinLabels = ["rights and responsibilities", "dress code", "code of conduct", "attendance"];
 
     const survivors = SEED_ORIENTATION_LABELS.filter((label) => {
       const lower = label.toLowerCase();
       if (!quickWinLabels.some((q) => lower.includes(q))) return false;
-      return !isSignatureRequiredItem(label);
+      return !isSignatureRequiredItem(label) && !isVerificationRequiredItem(label);
     });
 
     assert.deepEqual(survivors, ["Review Ready to Work Attendance Verification"]);

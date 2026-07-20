@@ -89,6 +89,8 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           itemId: true,
           completed: true,
           completedAt: true,
+          verificationStatus: true,
+          verifiedAt: true,
         },
       },
       certifications: {

@@ -379,6 +379,27 @@ export function buildStudentAlertDescriptors({
       });
     }
 
+    // P1-1: honor-system checklist items (instructor-led / paper steps) the
+    // student marked done. Their completion is blocked until the assigned
+    // teacher confirms, so this is direct teacher work — always actionable.
+    if (orientationStatus.orientationChecklist.pendingVerification.length > 0) {
+      const pendingItems = orientationStatus.orientationChecklist.pendingVerification.map(
+        (item) => item.label,
+      );
+      alerts.push({
+        alertKey: `orientation_verification_pending:${signals.studentId}`,
+        type: "orientation_verification_pending",
+        severity: "medium",
+        title: "Orientation steps need your verification",
+        summary:
+          pendingItems.length > 3
+            ? `${pendingItems.slice(0, 3).join(", ")}, and ${pendingItems.length - 3} more steps were marked done by the student and are waiting on instructor verification.`
+            : `${pendingItems.join(", ")} ${pendingItems.length === 1 ? "was" : "were"} marked done by the student and ${pendingItems.length === 1 ? "is" : "are"} waiting on instructor verification.`,
+        sourceType: "student",
+        sourceId: signals.studentId,
+      });
+    }
+
     if (
       orientationStatus.orientationChecklist.incompleteRequired.length > 0 &&
       orientationStatus.orientationChecklist.totalRequired > 0 &&

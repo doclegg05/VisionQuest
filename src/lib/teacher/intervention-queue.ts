@@ -118,6 +118,7 @@ const ALERT_TYPE_PRIORITY: Record<string, number> = {
   goal_resource_stale: 85,
   goal_platform_stale: 80,
   goal_stale: 75,
+  orientation_verification_pending: 72,
   orientation_form_pending_review: 70,
   overdue_task: 65,
   missed_appointment: 60,

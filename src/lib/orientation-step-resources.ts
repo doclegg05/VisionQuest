@@ -370,3 +370,25 @@ export function getSignatureRequiredForms(itemLabel: string): SpokesForm[] {
 export function isSignatureRequiredItem(itemLabel: string): boolean {
   return getSignatureRequiredForms(itemLabel).length > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Verification-requirement classification (P1-1)
+//
+// Mirrors the wizard's step derivation (`deriveSteps` + `classifyStep` in
+// OrientationWizard.tsx): an item with NO mapped forms renders as a single
+// `instructor-led` step, and a mapped form without a downloadable document
+// (other than the in-browser Student Profile) renders as a paper `no-pdf`
+// step. Both are honor-system claims — real program milestones (TABE
+// assessments, screenings, private interviews) completed away from the app —
+// so a student marking them done only records a "pending" verification claim
+// that the assigned instructor confirms or declines.
+// ---------------------------------------------------------------------------
+
+/** True when this item's wizard steps include an instructor-led or no-pdf step. */
+export function isVerificationRequiredItem(itemLabel: string): boolean {
+  const detail = getOrientationStepDetail(itemLabel);
+  if (detail.forms.length === 0) return true;
+  return detail.forms.some(
+    (form) => form.id !== "student-profile" && !hasDownloadableFormDocument(form),
+  );
+}
