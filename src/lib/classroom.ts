@@ -39,14 +39,27 @@ export function normalizeInstructorIds(instructorIds: string[]): string[] {
 }
 
 /**
- * ⚠️ Slice D invariant: for STAFF_CAN_MANAGE_ANY roles with no classId this
- * returns an UNSCOPED student where-clause. For coordinators that is safe
- * only because rlsContextFor (src/lib/api-error.ts) collapses coordinator
- * sessions to role="student", so every query built from this fails closed
- * under vq_app. Before shipping first-class coordinator RLS policies,
- * region-scope this helper (mirror getCoordinatorInterventionQueue in
- * src/lib/teacher/dashboard.ts). Tripwire tests in classroom.test.ts,
- * api-error.test.ts, and rls-headers.test.ts will fail to flag this.
+ * ⚠️ Slice D invariant: coordinator sessions ALWAYS fail closed here — they
+ * receive an impossible where-clause (`id: { in: [] }`) from every branch,
+ * so any query built from this helper returns zero Student rows regardless
+ * of which Prisma client runs it (including prismaAdmin). This matches the
+ * pre-existing effective behavior: rlsContextFor (src/lib/api-error.ts)
+ * collapses coordinator sessions to role="student", so the RLS-scoped
+ * client already returned zero rows under vq_app. Both layers now defend
+ * independently.
+ *
+ * Coordinator student reads must instead use explicitly region-scoped
+ * queries — mirror getCoordinatorInterventionQueue in
+ * src/lib/teacher/dashboard.ts. When Slice D ships first-class coordinator
+ * RLS policies, replace the fail-closed branch below with real region
+ * scoping and update the tripwire tests in classroom.test.ts,
+ * api-error.test.ts, and rls-headers.test.ts (they fail to flag this).
+ *
+ * Admin and teacher semantics are unchanged: with no classId they get the
+ * UNSCOPED student where-clause by design (single SPOKES staff workspace —
+ * the teacher dashboard, exports, and reports list across classes), and
+ * non-staff roles are narrowed to classes where they are an assigned
+ * instructor.
  */
 export function buildManagedStudentWhere(
   session: Session,
@@ -62,6 +75,16 @@ export function buildManagedStudentWhere(
     role: "student",
     ...(includeInactiveAccounts ? {} : { isActive: true }),
   };
+
+  // Coordinators fail closed on every branch — see the invariant note above.
+  // `id: { in: [] }` can never match a row, so the clause is impossible by
+  // construction under any Prisma client.
+  if (session.role === "coordinator") {
+    return {
+      ...baseWhere,
+      id: { in: [] as string[] },
+    };
+  }
 
   const canManageAny = canManageAnyClass(session.role);
 
