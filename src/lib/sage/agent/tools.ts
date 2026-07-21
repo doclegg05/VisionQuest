@@ -181,7 +181,7 @@ const searchFormsTool: AgentTool = {
       query: {
         type: "string",
         description:
-          "What the student is looking for, in their own words (e.g. 'the paper I sign promising I'll show up', 'something to track my certifications').",
+          "What the student is looking for, in their own words (e.g. 'the paper I sign promising I'll show up', 'the paper about missing class').",
       },
       limit: {
         type: "integer",

@@ -47,6 +47,10 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", pattern: /\bsuicid(e|al)\b/i },
   { category: "self_harm", pattern: /\b(want|going|need)\s+to\s+die\b/i },
   { category: "self_harm", pattern: /\b(wish\s+i\s+(was|were)\s+dead|better\s+off\s+dead|no\s+reason\s+to\s+(live|be\s+here)|don'?t\s+want\s+to\s+(live|be\s+here)|can'?t\s+go\s+on)\b/i },
+  // Passive ideation phrased around absence rather than death — "better off
+  // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
+  // crisis-paraphrase scenario, which this detector previously missed.
+  { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
   { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
   { category: "harm_others", pattern: /\b(want|going)\s+to\s+(hurt|kill)\s+(someone|him|her|them|people|everyone)\b/i },
   { category: "abuse", pattern: /\b(be(ing)?\s+abused|he\s+hits\s+me|she\s+hits\s+me|they\s+hit\s+me|hits?\s+me\s+at\s+home|hurt(s|ing)?\s+me\s+at\s+home|being\s+(hurt|hit)\s+at\s+home)\b/i },

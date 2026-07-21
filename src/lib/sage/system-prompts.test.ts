@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { buildSystemPrompt, determineStage, sanitizeForPrompt } from "./system-prompts";
 import { SPOKES_BRIEF } from "./knowledge-base";
+import {
+  STUDENT_PROMPT_CANARIES,
+  TEACHER_PROMPT_CANARIES,
+} from "../../../scripts/lib/sage-eval-text.mjs";
 
 describe("determineStage", () => {
   it("returns discovery when no goals and no completed discovery", () => {
@@ -180,7 +185,7 @@ describe("buildSystemPrompt", () => {
 
     // Should NOT include student-focused personality or guardrails
     assert.ok(!prompt.includes("You believe every one of them has unrealized potential"));
-    assert.ok(!prompt.includes("MOTIVATIONAL INTERVIEWING PRINCIPLES"));
+    assert.ok(!prompt.includes("MOTIVATIONAL INTERVIEWING — use these"));
     assert.ok(!prompt.includes("call 988"));
 
     // Should include platform and program knowledge
@@ -627,7 +632,7 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     assert.match(prompt, /SPOKES PROGRAM OVERVIEW \(compact\)/);
     assert.match(prompt, /CURRENT TASK: Career Discovery/);
     assert.match(prompt, /SPOKES CAREER PATHWAYS:/);
-    assert.ok(!prompt.includes("MOTIVATIONAL INTERVIEWING PRINCIPLES"));
+    assert.ok(!prompt.includes("MOTIVATIONAL INTERVIEWING — use these"));
     assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));
   });
 
@@ -724,5 +729,83 @@ describe("buildSystemPrompt — self-metric line", () => {
   it("omits the self-metric section for the admin_assistant staff stage", () => {
     const prompt = buildSystemPrompt("admin_assistant", { selfMetricsLine: LINE });
     assert.ok(!prompt.includes("YOUR RECENT GOAL-PROPOSAL TRACK RECORD"));
+  });
+});
+
+describe("eval canary freshness", () => {
+  // The live evals treat these strings as "neverContain" prompt-leak canaries:
+  // their presence in a reply is graded as a hard leak, which only works while
+  // each string still exists VERBATIM in the built prompt. A prompt rewrite
+  // that orphans one turns it into a dead canary silently — the fate of
+  // "You are Sage, a wise and calm", which sat in the eval configs detecting
+  // nothing for months after a personality rewrite. This suite fails the
+  // moment a prompt edit orphans a canary, forcing the eval configs to move
+  // in the same change.
+  //
+  // Sources kept in lockstep:
+  //   - scripts/lib/sage-eval-text.mjs   (STUDENT/TEACHER_PROMPT_CANARIES)
+  //   - config/sage-redteam-eval.json    (per-scenario neverContain)
+  //   - config/sage-chat-eval.json       (per-case assert.neverContain)
+
+  // Mirrors how the eval scripts build prompts (sage-redteam-eval.mjs resolve()
+  // and sage-chat-harness.mjs buildPromptForCase) — "full" tier, same contexts.
+  const studentPrompt = buildSystemPrompt(
+    "general",
+    { studentName: "Sam", programType: "spokes" },
+    "full",
+  );
+  const teacherPrompt = buildSystemPrompt(
+    "teacher_assistant",
+    { studentName: "Ms. Lee", userMessage: "Give me a progress summary." },
+    "full",
+  );
+  const adminPrompt = buildSystemPrompt(
+    "admin_assistant",
+    { userMessage: "What is the system status?" },
+    "full",
+  );
+  const promptForPersona = (persona?: string) =>
+    persona === "teacher" ? teacherPrompt : persona === "admin" ? adminPrompt : studentPrompt;
+
+  it("keeps every shared student canary verbatim in the full student prompt", () => {
+    for (const canary of STUDENT_PROMPT_CANARIES) {
+      assert.ok(studentPrompt.includes(canary), `stale student canary: "${canary}"`);
+    }
+  });
+
+  it("keeps every shared teacher canary verbatim in the teacher prompt", () => {
+    for (const canary of TEACHER_PROMPT_CANARIES) {
+      assert.ok(teacherPrompt.includes(canary), `stale teacher canary: "${canary}"`);
+    }
+  });
+
+  it("keeps every red-team neverContain canary verbatim in its persona's prompt", () => {
+    const scenarios = JSON.parse(readFileSync("config/sage-redteam-eval.json", "utf8"));
+    let checked = 0;
+    for (const scenario of scenarios) {
+      for (const canary of scenario.neverContain ?? []) {
+        assert.ok(
+          promptForPersona(scenario.persona).includes(canary),
+          `stale canary in red-team scenario "${scenario.id}": "${canary}"`,
+        );
+        checked++;
+      }
+    }
+    assert.ok(checked > 0, "expected at least one neverContain canary in sage-redteam-eval.json");
+  });
+
+  it("keeps every chat-eval neverContain canary verbatim in its role's prompt", () => {
+    const cases = JSON.parse(readFileSync("config/sage-chat-eval.json", "utf8"));
+    let checked = 0;
+    for (const testCase of cases) {
+      for (const canary of testCase.assert?.neverContain ?? []) {
+        assert.ok(
+          promptForPersona(testCase.role === "student" ? undefined : testCase.role).includes(canary),
+          `stale canary in chat-eval case "${testCase.id}": "${canary}"`,
+        );
+        checked++;
+      }
+    }
+    assert.ok(checked > 0, "expected at least one neverContain canary in sage-chat-eval.json");
   });
 });

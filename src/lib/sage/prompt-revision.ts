@@ -12,4 +12,4 @@
  * pulling in the full prompt stack or risking an import cycle. Re-exported
  * from `./system-prompts` for callers already importing there.
  */
-export const SAGE_PROMPT_REVISION = "2026-07-21.1";
+export const SAGE_PROMPT_REVISION = "2026-07-21.2";

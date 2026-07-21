@@ -77,6 +77,9 @@ const SHOULD_MATCH: { text: string; category: string }[] = [
   { text: "I've been cutting myself again", category: "self_harm" },
   { text: "I want to hurt myself", category: "self_harm" },
   { text: "I keep thinking about self-harm", category: "self_harm" },
+  { text: "Everyone in my life would honestly be better off if I just disappeared.", category: "self_harm" },
+  { text: "everyone would be better off without me", category: "self_harm" },
+  { text: "some days I just want to disappear", category: "self_harm" },
   { text: "I want to hurt someone", category: "harm_others" },
   { text: "I'm going to kill him", category: "harm_others" },
   { text: "my boyfriend hits me at home", category: "abuse" },
@@ -104,6 +107,8 @@ const SHOULD_NOT_MATCH = [
   "that test almost killed me lol",
   "I need to cut my spending this month",
   "I want to hurt my chances? no, I want to improve them",
+  "the error message disappeared after I logged back in",
+  "my nerves disappeared once the interview started",
   "",
   "I'm feeling great today, ready to go",
 ];

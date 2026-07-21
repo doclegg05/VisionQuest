@@ -34,6 +34,8 @@
 - Sage's system prompt includes SPOKES program rules and expectations (`src/lib/sage/personality.ts`, assembled by `src/lib/sage/system-prompts.ts`)
 - RAG is live: hybrid pgvector + full-text retrieval with reciprocal rank fusion (`src/lib/sage/hybrid-retrieval.ts`, assembled by `getDocumentContext` in `knowledge-base-server.ts`; `SAGE_RAG_ENABLED` / `SAGE_RAG_MODE=keyword` kill switches). Grounding docs are `ProgramDocument` rows curated via the teacher sage-context API plus the git-tracked `catalog/` OKF layer
 - Any Sage behavior change must keep the gating CI evals green: red-team + chat harness in `.github/workflows/sage-evals.yml` (fixtures in `config/sage-*.json` assert verbatim prompt substrings and 988 handling)
+- Prompt edits must keep the eval leak canaries fresh: every `neverContain` string in the eval fixtures must exist verbatim in the built prompt (`system-prompts.test.ts` "eval canary freshness" fails otherwise — move the fixtures in the same change). Canaries are distinctive meta-instruction fragments, never ordinary coaching vocabulary
+- Gating tool cases vote across `--samples=3` draws in CI (Gemini tool selection is not deterministic at temperature=0). A tool case that still flaps gets demoted to family `tool_watch`, which runs informationally (WATCH lines + `::warning`, never gates) — never delete a flaky case or widen its `acceptableTools` to a non-equivalent tool
 
 ## XP Integration
 - Chat interactions award XP through the progression engine
