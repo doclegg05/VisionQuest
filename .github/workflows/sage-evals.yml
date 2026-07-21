@@ -76,12 +76,14 @@ jobs:
         # temperature=0, so gating tool cases take a 2-of-3 majority verdict
         # instead of gating on a single draw (forbidden-tool hits in any sample
         # still fail outright). See runVotedToolCase in sage-chat-harness.mjs.
+        # tool_watch runs informationally: demoted flaky cases stay visible
+        # (WATCH lines + a ::warning:: annotation) without gating the run.
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
             exit 0
           fi
-          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail --temperature=0 --samples=3
+          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,tool_watch,guardrail --temperature=0 --samples=3
 
   sage-memory-eval:
     runs-on: ubuntu-latest

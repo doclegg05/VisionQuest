@@ -10,6 +10,11 @@
  *   - tool:        tool-selection via provider.streamWithTools + a no-op
  *                   handler (canned success stub — no real tool executes, no
  *                   DB write). maxHops 1.
+ *   - tool_watch:  runs exactly like tool (same runner, same majority voting)
+ *                   but NEVER gates — a failure prints as WATCH and does not
+ *                   flip --strict's exit code. Demote a flaky tool case here
+ *                   (family: "tool_watch") instead of deleting it, so it keeps
+ *                   running visibly in CI until it's stable enough to restore.
  *   - confirmation: like tool, but asserts the picked tool is
  *                   mutate_consequential — the tier that guarantees the
  *                   production HMAC confirm-card round-trip (see
@@ -588,7 +593,7 @@ async function main() {
     const startedAt = performance.now();
     let outcome;
     try {
-      if (testCase.family === "tool") {
+      if (testCase.family === "tool" || testCase.family === "tool_watch") {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
         outcome = await runVotedToolCase(provider, declsForRole(testCase.role), systemPrompt, testCase);
       } else if (testCase.family === "confirmation") {
@@ -628,9 +633,13 @@ async function main() {
 
     const skipped = Boolean(outcome.skipped);
     const pass = skipped ? null : Boolean(outcome.pass);
+    // tool_watch is informational: its failures print as WATCH and are
+    // reported, but never flip --strict's exit code.
+    const gating = testCase.family !== "tool_watch";
     results.push({
       id: testCase.id,
       family: testCase.family,
+      gating,
       role: testCase.role,
       message: testCase.message,
       skipped,
@@ -644,14 +653,15 @@ async function main() {
       matchedRefs: outcome.matchedRefs ?? null,
     });
 
-    const mark = skipped ? "SKIP" : pass ? "PASS" : "FAIL";
+    const mark = skipped ? "SKIP" : pass ? "PASS" : gating ? "FAIL" : "WATCH";
     console.log(`  ${mark} [${testCase.family}] ${testCase.id}${outcome.reason ? ` — ${outcome.reason}` : ""}`);
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   const evaluated = results.filter((r) => !r.skipped);
   const passed = evaluated.filter((r) => r.pass).length;
-  const failed = evaluated.filter((r) => !r.pass).length;
+  const failed = evaluated.filter((r) => !r.pass && r.gating).length;
+  const watchFailed = evaluated.filter((r) => !r.pass && !r.gating).length;
   const skippedCount = results.length - evaluated.length;
 
   const byFamily = {};
@@ -677,7 +687,7 @@ async function main() {
     families: FAMILIES ?? "all",
     temperature: TEMPERATURE ?? "default",
     samples: SAMPLES,
-    totals: { total: results.length, passed, failed, skipped: skippedCount },
+    totals: { total: results.length, passed, failed, watchFailed, skipped: skippedCount },
     byFamily,
     latency,
     results,
@@ -690,11 +700,18 @@ async function main() {
   }
 
   console.log(`\n=== Sage Chat Harness Summary ===`);
-  console.log(`Total: ${results.length}  Passed: ${passed}  Failed: ${failed}  Skipped: ${skippedCount}`);
+  console.log(`Total: ${results.length}  Passed: ${passed}  Failed: ${failed}${watchFailed ? `  Watch-failed (non-gating): ${watchFailed}` : ""}  Skipped: ${skippedCount}`);
   for (const [family, b] of Object.entries(byFamily)) {
     console.log(`  ${family.padEnd(12)} ${b.passed}/${b.total - b.skipped} passed${b.skipped ? ` (${b.skipped} skipped)` : ""}`);
   }
   console.log(`Latency: p50 ${latency.p50Ms}ms, p95 ${latency.p95Ms}ms, max ${latency.maxMs}ms`);
+
+  // Watch failures never gate, but they must not scroll by unseen in a green
+  // log either — surface them in the GitHub checks UI like the red-team
+  // eval's soft warnings.
+  if (watchFailed > 0 && process.env.GITHUB_ACTIONS) {
+    console.log(`::warning::Sage chat harness: ${watchFailed} tool_watch (non-gating) failure(s) — search the step log for "WATCH" and triage each.`);
+  }
 
   if (args.strict && failed > 0) {
     process.exitCode = 1;
