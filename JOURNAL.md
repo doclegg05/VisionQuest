@@ -416,3 +416,18 @@ REVERSIBLE: one-condition revert.
 reply before the next fix; red-team 0 hard throughout; chat harness 9/9 every run with
 tool-teacher-lookup-student under 3-sample majority vote. Local: 1676 unit tests, tsc, eslint
 clean. Live validation ran in CI (no local GEMINI_API_KEY — see memory note).
+
+[2026-07-21] RECONCILIATION (session 2, worktree interesting-bardeen): merged origin/main
+(5f83c27, post-#117) into this branch — it had forked pre-#117, so PR #118 sat CONFLICTING.
+Resolutions: kept this branch's audited canaries + restored gating 'tool' family for
+tool-teacher-lookup-student (supersedes main's 051d224 tool_watch demote — majority voting is
+the durable fix; a note on the case records the history); grafted main's three Spanish crisis
+scenarios into sage-redteam-eval.json unchanged; crisis-detection auto-merge verified (this
+branch's English passive-ideation pattern + #117's Spanish set coexist, 101/101 tests).
+Dropped main's "You are Sage, a calm, practical AI mentor" marker — it's the COMPACT-tier
+opener, unreachable from the full-tier prompts the evals build, and it would fail the new
+canary-freshness lock | ADDED: tool_watch informational family in the chat harness (same
+runner + majority voting as 'tool'; failures print WATCH, count as totals.watchFailed, emit a
+::warning annotation, never gate) and tool_watch joined the CI --families list — a future
+demotion stays visible instead of silently unrun, which was the gap that let the 051d224
+demote drop the case from CI entirely | REVERSIBLE: per-hunk.
