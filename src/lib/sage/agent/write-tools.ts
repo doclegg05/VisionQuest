@@ -129,7 +129,12 @@ export async function executeAndLedger(
 const submitForm: AgentTool = {
   name: "submit_form",
   description:
-    "File a signed form the student uploaded in chat against one of their orientation checklist items, marking that item complete (or sending it to the instructor to verify when the step needs sign-off). Requires user confirmation.",
+    // Selection guidance only — keep outcome branches (signature guard,
+    // pending-verification) out of this string: they are explained in the
+    // tool's reply, and enumerating them here bled "instructor/verify"
+    // vocabulary into unrelated staff tool choices (caught by the CI chat
+    // harness on 2026-07-21).
+    "File a signed form the student uploaded in chat against one of their orientation checklist items and record its completion state. Requires user confirmation.",
   parameters: {
     type: "object",
     properties: {
