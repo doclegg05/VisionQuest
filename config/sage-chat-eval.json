@@ -27,6 +27,7 @@
     "role": "teacher",
     "stage": "teacher_assistant",
     "message": "Can you pull up Jordan's certification progress?",
+    "note": "Demoted to non-gating tool_watch on 2026-07-21 (051d224) because attaching any explicit Gemini safetySettings entry flipped this borderline selection to search_forms in single-draw runs; restored to gating family 'tool' the same day once the harness gained N-sample majority voting (runVotedToolCase, --samples=3 in CI). If it flaps again, demote to family 'tool_watch' — the harness runs that family informationally, never gating.",
     "assert": {
       "acceptableTools": ["lookup_cert_progress", "review_portfolio", "list_students_needing_attention"],
       "acceptNoTool": true

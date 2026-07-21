@@ -16,11 +16,13 @@ function headerBag(record: Record<string, string>) {
 
 const SLICE_D_TRIPWIRE =
   "The middleware header path no longer collapses coordinators to \"student\" — " +
-  "coordinator RLS policies are going live (Slice D). App-layer helpers rely on " +
-  "that collapse to fail closed; the biggest is buildManagedStudentWhere " +
-  "(src/lib/classroom.ts), which builds an UNSCOPED student where-clause for " +
-  "coordinators. Region-scope that helper and audit every call site before " +
-  "shipping. See docs/plans/rls-enforcement-runbook.md → Slice D.";
+  "coordinator RLS policies are going live (Slice D). Audit the app-layer " +
+  "helpers that pair with that collapse: buildManagedStudentWhere " +
+  "(src/lib/classroom.ts) currently fails closed for coordinators (impossible " +
+  "id-in-[] clause). Replace that branch with real region scoping (mirror " +
+  "getCoordinatorInterventionQueue in src/lib/teacher/dashboard.ts) and audit " +
+  "every call site before shipping. " +
+  "See docs/plans/rls-enforcement-runbook.md → Slice D.";
 
 describe("rls-headers", () => {
   describe("rlsHeadersFromClaims", () => {

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { AIProvider, ChatMessage, TokenUsage, ToolCallHandler, ToolStreamEvent } from "./ai/types";
+import { SAGE_PROMPT_REVISION } from "./sage/prompt-revision";
 
 const mockCreate = mock.fn(async () => undefined) as any;
 
@@ -27,7 +28,7 @@ beforeEach(() => {
   mockCreate.mock.resetCalls();
 });
 
-function loggedRows(): Array<{ studentId: string | null; callSite: string; model: string; inputTokens: number; outputTokens: number; totalTokens: number }> {
+function loggedRows(): Array<{ studentId: string | null; callSite: string; model: string; inputTokens: number; outputTokens: number; totalTokens: number; promptRevision: string | null }> {
   return mockCreate.mock.calls.map((call: { arguments: unknown[] }) => (call.arguments[0] as { data: unknown }).data);
 }
 
@@ -141,6 +142,39 @@ describe("withUsageLogging", () => {
     await logged.generateResponse("sys", MESSAGES);
 
     assert.equal(loggedRows()[0].model, "gemma4:26b");
+  });
+
+  it("stamps the current Sage prompt revision on every logged row by default", async () => {
+    const provider = fakeProvider({
+      generateResponse: (mock.fn(async (_sys: string, _msgs: ChatMessage[], onUsage?: (u: TokenUsage) => void) => {
+        onUsage?.({ inputTokens: 1, outputTokens: 1, totalTokens: 2, source: "provider" });
+        return "ok";
+      }) as any),
+    });
+
+    const logged = withUsageLogging(provider, { studentId: "student-7", callSite: "sage_chat" });
+    await logged.generateResponse("sys", MESSAGES);
+
+    assert.equal(mockCreate.mock.callCount(), 1);
+    assert.equal(loggedRows()[0].promptRevision, SAGE_PROMPT_REVISION);
+  });
+
+  it("uses ctx.promptRevision to override the stamped revision when provided", async () => {
+    const provider = fakeProvider({
+      generateResponse: (mock.fn(async (_sys: string, _msgs: ChatMessage[], onUsage?: (u: TokenUsage) => void) => {
+        onUsage?.({ inputTokens: 1, outputTokens: 1, totalTokens: 2, source: "provider" });
+        return "ok";
+      }) as any),
+    });
+
+    const logged = withUsageLogging(provider, {
+      studentId: "student-8",
+      callSite: "sage_chat",
+      promptRevision: "2099-01-01.experiment",
+    });
+    await logged.generateResponse("sys", MESSAGES);
+
+    assert.equal(loggedRows()[0].promptRevision, "2099-01-01.experiment");
   });
 
   describe("streamWithTools passthrough", () => {

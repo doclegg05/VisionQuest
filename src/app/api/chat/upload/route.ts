@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, validateFile } from "@/lib/storage";
 import { logger } from "@/lib/logger";
-import { ApiError, withAuth, badRequest } from "@/lib/api-error";
+import { ApiError, withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { hasActiveConsent } from "@/lib/consent";
+import { rateLimit } from "@/lib/rate-limit";
 import { buildFileGist } from "@/lib/sage/file-gist";
 import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
@@ -17,6 +18,11 @@ import { logAiAuditEvent } from "@/lib/ai/audit";
  * by local text extraction. Either way the routing decision is AI-audited.
  */
 export const POST = withAuth(async (session, req: Request) => {
+  const rl = await rateLimit(`chat-upload:${session.id}`, 20, 60 * 60 * 1000);
+  if (!rl.success) {
+    throw rateLimited("Too many file uploads this hour. Please wait before uploading more.");
+  }
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 

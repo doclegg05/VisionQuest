@@ -36,12 +36,16 @@ export interface AlertInputs {
       lastProgressAt: Date | null;
       completedRequiredCount: number;
       requiredCount: number;
+      /** P1-4: null = legacy, "self_reported" = unverified claim, "verified". */
+      verificationStatus?: string | null;
     } | null;
     goals?: {
       id: string;
       level: string;
       status: string;
       updatedAt: Date;
+      createdAt?: Date | null;
+      sourceMessageId?: string | null;
       lastReviewedAt?: Date | null;
       confirmedAt?: Date | null;
     }[];
@@ -172,6 +176,27 @@ export function buildStudentAlertDescriptors({
     }
   }
 
+  // P1-4: certification progress recorded as a student self-report that no
+  // instructor has verified for 7+ days. Verification flips the status to
+  // "verified", which drops this descriptor so the sync auto-resolves it.
+  if (certification && certification.verificationStatus === "self_reported") {
+    const selfReportedSince = latestDate(certification.lastProgressAt, certification.startedAt);
+    if (selfReportedSince) {
+      const unverifiedDays = (now.getTime() - selfReportedSince.getTime()) / (1000 * 60 * 60 * 24);
+      if (unverifiedDays >= 7) {
+        alerts.push({
+          alertKey: `certification_unverified:${studentKey}`,
+          type: "certification_unverified",
+          severity: "medium",
+          title: "Self-reported certification progress needs verification",
+          summary: `Certification progress marked by the student on ${formatAlertDate(selfReportedSince)} is still waiting on instructor verification.`,
+          sourceType: "certification",
+          sourceId: signals?.studentId || studentKey,
+        });
+      }
+    }
+  }
+
   if (signals?.goals) {
     const confirmedLongTermGoal = signals.goals.find(
       (goal) =>
@@ -230,6 +255,30 @@ export function buildStudentAlertDescriptors({
           sourceId: staleMonthly.goal.id,
         });
       }
+    }
+  }
+
+  // Sage-proposed goals that no instructor has confirmed yet. Students
+  // cannot self-confirm these, so a proposal sitting for a week means the
+  // confirmation loop has stalled and staff need the nudge.
+  if (signals?.goals) {
+    const unconfirmedProposals = signals.goals.filter(
+      (goal) => goal.status === "proposed" && Boolean(goal.sourceMessageId) && goal.createdAt,
+    );
+    for (const goal of unconfirmedProposals) {
+      const daysWaiting = (now.getTime() - (goal.createdAt as Date).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysWaiting < 7) continue;
+
+      const levelLabel = goal.level.charAt(0).toUpperCase() + goal.level.slice(1);
+      alerts.push({
+        alertKey: `goal_unconfirmed:${goal.id}`,
+        type: "goal_unconfirmed",
+        severity: daysWaiting >= 14 ? "high" : "medium",
+        title: "Sage-proposed goal awaiting confirmation",
+        summary: `${levelLabel} goal suggested by Sage has waited ${Math.round(daysWaiting)} days for instructor confirmation. Review it with the student to confirm or replace it.`,
+        sourceType: "goal",
+        sourceId: goal.id,
+      });
     }
   }
 
@@ -348,6 +397,27 @@ export function buildStudentAlertDescriptors({
           revisionForms.length > 3
             ? `${revisionForms.slice(0, 3).join(", ")}, and ${revisionForms.length - 3} more forms were returned and still need student follow-up.`
             : `${revisionForms.join(", ")} ${revisionForms.length === 1 ? "was" : "were"} returned and still need student follow-up.`,
+        sourceType: "student",
+        sourceId: signals.studentId,
+      });
+    }
+
+    // P1-1: honor-system checklist items (instructor-led / paper steps) the
+    // student marked done. Their completion is blocked until the assigned
+    // teacher confirms, so this is direct teacher work — always actionable.
+    if (orientationStatus.orientationChecklist.pendingVerification.length > 0) {
+      const pendingItems = orientationStatus.orientationChecklist.pendingVerification.map(
+        (item) => item.label,
+      );
+      alerts.push({
+        alertKey: `orientation_verification_pending:${signals.studentId}`,
+        type: "orientation_verification_pending",
+        severity: "medium",
+        title: "Orientation steps need your verification",
+        summary:
+          pendingItems.length > 3
+            ? `${pendingItems.slice(0, 3).join(", ")}, and ${pendingItems.length - 3} more steps were marked done by the student and are waiting on instructor verification.`
+            : `${pendingItems.join(", ")} ${pendingItems.length === 1 ? "was" : "were"} marked done by the student and ${pendingItems.length === 1 ? "is" : "are"} waiting on instructor verification.`,
         sourceType: "student",
         sourceId: signals.studentId,
       });

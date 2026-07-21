@@ -38,6 +38,9 @@ export interface OrientationProgressData {
   itemId: string;
   completed: boolean;
   completedAt: string | null;
+  /** P1-1 honor-system sign-off: "pending" | "verified" | "declined" | null. */
+  verificationStatus: string | null;
+  verifiedAt: string | null;
 }
 
 export interface CertTemplateData {
@@ -253,6 +256,9 @@ export interface StudentData {
     cert: {
       id: string;
       status: string;
+      /** P1-4: null = legacy, "self_reported" = unverified claim, "verified". */
+      verificationStatus: string | null;
+      verifiedAt: string | null;
       requirements: CertRequirementData[];
     } | null;
   };

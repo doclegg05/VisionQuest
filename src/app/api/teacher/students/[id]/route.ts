@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withRegistry } from "@/lib/registry/middleware";
+import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
@@ -20,6 +21,16 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
   const { id } = await ctx.params;
   const managedStudent = await assertStaffCanManageStudent(session, id);
   const studentId = managedStudent.id;
+
+  // Read-access audit (sampled to 1/day per surface inside recordStudentView).
+  // This surface includes conversation summaries, so it covers those reads too.
+  // recordStudentView never throws; awaiting costs one indexed query at most.
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: studentId,
+    surface: "student_detail",
+  });
 
   const student = await prisma.student.findUnique({
     where: { id: studentId },
@@ -78,6 +89,8 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           itemId: true,
           completed: true,
           completedAt: true,
+          verificationStatus: true,
+          verifiedAt: true,
         },
       },
       certifications: {
@@ -86,6 +99,9 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           status: true,
           startedAt: true,
           completedAt: true,
+          // P1-4: cert-level verification state for the Verify control.
+          verificationStatus: true,
+          verifiedAt: true,
           requirements: {
             select: {
               id: true,

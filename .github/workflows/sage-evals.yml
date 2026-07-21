@@ -33,6 +33,10 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - name: Print Sage prompt revision
+        # Attribution tag for this run's results — grep the source directly so
+        # the step works before npm ci and never affects job gating.
+        run: grep -o 'SAGE_PROMPT_REVISION = "[^"]*"' src/lib/sage/prompt-revision.ts
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -102,6 +106,10 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - name: Print Sage prompt revision
+        # Attribution tag for this run's results — grep the source directly so
+        # the step works before npm ci and never affects job gating.
+        run: grep -o 'SAGE_PROMPT_REVISION = "[^"]*"' src/lib/sage/prompt-revision.ts
       - uses: actions/setup-node@v4
         with:
           node-version: 24

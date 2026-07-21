@@ -10,6 +10,7 @@ import {
   teacherDashboardReviewQuickAction,
 } from "@/lib/intervention-notifications";
 import { openSageWithMessage } from "@/components/chat/SageMiniChat";
+import { WELLBEING_ALERT_TYPE, formatWellbeingQueueLine } from "@/lib/sage/wellbeing-card";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,17 @@ interface UnifiedItem {
   category: "alert" | "inactivity" | "review";
   stageLabel?: string;
   nextStep?: string;
+}
+
+/**
+ * Compact one-line summary for grouped queue entries. Wellbeing crisis cards
+ * are multi-line structured blocks — collapse them to "category · mood — next
+ * step" here; the full card renders on student detail and the class-overview
+ * alert list.
+ */
+function itemSummaryLine(item: { type: string; summary: string }): string {
+  if (item.type !== WELLBEING_ALERT_TYPE) return item.summary;
+  return formatWellbeingQueueLine(item.summary) ?? item.summary;
 }
 
 // ─── Unify raw inputs ───────────────────────────────────────────────────────
@@ -362,12 +374,12 @@ function StudentAccordion({
                   {/* Show individual summaries if few enough */}
                   {c.count <= 3 && c.items.map((item) => (
                     <p key={item.id} className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                      {item.summary}
+                      {itemSummaryLine(item)}
                     </p>
                   ))}
                   {c.count > 3 && (
                     <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                      {c.items[0].summary} and {c.count - 1} more
+                      {itemSummaryLine(c.items[0])} and {c.count - 1} more
                     </p>
                   )}
                 </div>

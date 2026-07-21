@@ -40,18 +40,6 @@ interface GoalsPageClientProps {
 
 const STUDENT_LINK_STATUSES: GoalResourceLinkStatus[] = ["assigned", "in_progress", "completed", "blocked"];
 
-function createDraftLookup(goals: GoalRecord[]) {
-  return Object.fromEntries(
-    goals.map((goal) => [
-      goal.id,
-      {
-        content: goal.content,
-        status: goal.status,
-      },
-    ]),
-  ) as Record<string, { content: string; status: GoalStatus }>;
-}
-
 function createLinkStatusLookup(goalPlans: GoalPlanEntry[]) {
   return Object.fromEntries(
     goalPlans.flatMap((plan) => plan.links.map((link) => [link.id, link.status])),
@@ -152,7 +140,6 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   const { checkProgression } = useProgression();
   const [goals, setGoals] = useState(initialGoals);
   const [goalPlans, setGoalPlans] = useState(initialGoalPlans);
-  const [drafts, setDrafts] = useState(() => createDraftLookup(initialGoals));
   const [linkStatusDrafts, setLinkStatusDrafts] = useState(() => createLinkStatusLookup(initialGoalPlans));
   const [, setSavingGoalId] = useState<string | null>(null);
   const [savingLinkId, setSavingLinkId] = useState<string | null>(null);
@@ -308,13 +295,6 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
       const createdGoal = payload.goal as GoalRecord;
       setGoals((current) => [...current, createdGoal]);
-      setDrafts((current) => ({
-        ...current,
-        [createdGoal.id]: {
-          content: createdGoal.content,
-          status: createdGoal.status,
-        },
-      }));
       await refreshGoalPlan(createdGoal.id);
       setMessage({ tone: "success", text: `${GOAL_LEVEL_META[level].label} added.` });
       await checkProgression();
@@ -357,13 +337,6 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       setGoals((current) =>
         current.map((item) => (item.id === goalId ? updatedGoal : item)),
       );
-      setDrafts((current) => ({
-        ...current,
-        [goalId]: {
-          content: updatedGoal.content,
-          status: updatedGoal.status,
-        },
-      }));
       setEditingGoalId(null);
       setMessage({ tone: "success", text: "Goal updated." });
       await checkProgression();
@@ -403,64 +376,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       setGoals((current) =>
         current.map((item) => (item.id === goalId ? updatedGoal : item)),
       );
-      setDrafts((current) => ({
-        ...current,
-        [goalId]: {
-          content: updatedGoal.content,
-          status: updatedGoal.status,
-        },
-      }));
       await checkProgression();
     } catch (error) {
       setMessage({
         tone: "error",
         text: error instanceof Error ? error.message : "Could not update status.",
-      });
-    } finally {
-      setSavingGoalId(null);
-    }
-  }
-
-  async function handleConfirmGoal(goalId: string) {
-    const draft = drafts[goalId];
-    if (!draft) return;
-
-    setSavingGoalId(goalId);
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/goals/${goalId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: draft.content,
-          confirm: true,
-        }),
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.goal) {
-        throw new Error(payload?.error || "Could not confirm the goal.");
-      }
-
-      const updatedGoal = payload.goal as GoalRecord;
-      setGoals((current) =>
-        current.map((item) => (item.id === goalId ? updatedGoal : item)),
-      );
-      setDrafts((current) => ({
-        ...current,
-        [goalId]: {
-          content: updatedGoal.content,
-          status: updatedGoal.status,
-        },
-      }));
-      await refreshGoalPlan(updatedGoal.id);
-      setMessage({ tone: "success", text: "Goal confirmed and added to your plan." });
-      await checkProgression();
-    } catch (error) {
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Could not confirm the goal.",
       });
     } finally {
       setSavingGoalId(null);
@@ -487,13 +407,6 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       setGoals((current) =>
         current.map((item) => (item.id === goalId ? updatedGoal : item)),
       );
-      setDrafts((current) => ({
-        ...current,
-        [goalId]: {
-          content: updatedGoal.content,
-          status: updatedGoal.status,
-        },
-      }));
       setMessage({ tone: "success", text: "Goal dismissed." });
       await checkProgression();
     } catch (error) {
@@ -618,6 +531,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         {bhags.length > 0 ? (
           bhags.map((bhag) => (
             <div key={bhag.id} className="bg-white/80 dark:bg-black/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm">
+              {bhag.status === "proposed" && (
+                <span className="inline-block mb-2 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
+                  Awaiting instructor confirmation
+                </span>
+              )}
               {editingGoalId === bhag.id ? (
                 <form
                   onSubmit={(e) => {
@@ -760,9 +678,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         Monthly Plan
                       </span>
                       {isMProposed && (
-                        <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-3xs font-semibold">
-                          SAGE SUGGESTION
-                        </span>
+                        <>
+                          <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-3xs font-semibold">
+                            SAGE SUGGESTION
+                          </span>
+                          <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
+                            Awaiting instructor confirmation
+                          </span>
+                        </>
                       )}
                     </div>
 
@@ -864,15 +787,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
                 {isMProposed && (
                   <div className="mt-2 bg-indigo-50/80 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-950 text-xs text-indigo-900 dark:text-indigo-200">
-                    <p className="font-semibold">Confirm this monthly focus area?</p>
+                    <p className="font-semibold">Sage suggested this goal — ask your instructor to confirm it.</p>
+                    <p className="mt-1">Not a good fit? You can dismiss it.</p>
                     <div className="mt-2 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmGoal(monthly.id)}
-                        className="bg-indigo-600 text-white font-semibold rounded px-2.5 py-1 hover:bg-indigo-700"
-                      >
-                        Confirm
-                      </button>
                       <button
                         type="button"
                         onClick={() => handleDismissGoal(monthly.id)}

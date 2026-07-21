@@ -5,6 +5,7 @@ import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { logger } from "@/lib/logger";
+import { estimateTokens } from "@/lib/llm-usage-estimate";
 
 /**
  * Load an existing conversation or create a new one.
@@ -137,9 +138,32 @@ export async function generateConversationTitle(
 
 // ─── Session Summary Compaction ─────────────────────────────────────────────
 
+/**
+ * Estimated-token budgets for the conversation HISTORY passed to the model
+ * (recent messages + injected rolling summary). They do NOT cover the system
+ * prompt, which is budgeted separately in the chat route.
+ *
+ * Scaled to match the existing per-tier message caps (compact: 6/12 recent
+ * messages, full: 20): with the char/4 estimator, 3000 tokens ≈ 12k chars of
+ * history for small local models, 12000 tokens ≈ 48k chars for cloud models.
+ */
+export const COMPACT_HISTORY_TOKEN_BUDGET = 3000;
+export const FULL_HISTORY_TOKEN_BUDGET = 12000;
+
+/**
+ * Budget trimming never drops the current exchange: the most recent
+ * user/assistant pair always survives, even if it alone exceeds the budget
+ * (flagged via `overBudget` on the returned context).
+ */
+export const MIN_RETAINED_MESSAGES = 2;
+
 export interface ConversationContext {
   messages: { role: "user" | "model"; content: string }[];
   summaryInjected: boolean;
+  /** Messages dropped (oldest first) to fit the history token budget. */
+  droppedForBudget: number;
+  /** True when even the minimum retained history still exceeds the budget. */
+  overBudget: boolean;
 }
 
 /**
@@ -147,10 +171,15 @@ export interface ConversationContext {
  * If the conversation has a rolling summary and more messages than
  * `maxRecentMessages`, the summary is prepended as a synthetic model
  * message and only the most recent messages are returned.
+ *
+ * On top of the message-count cap, the history is trimmed oldest-first until
+ * its estimated token total (summary included) fits `historyTokenBudget`.
+ * The rolling summary always survives trimming — it is the compressed past.
  */
 export async function getConversationContext(
   conversationId: string,
   maxRecentMessages: number = 20,
+  historyTokenBudget: number = FULL_HISTORY_TOKEN_BUDGET,
 ): Promise<ConversationContext> {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -166,29 +195,83 @@ export async function getConversationContext(
   });
   messages.reverse();
 
-  const formatted = messages.map((m) => ({
-    role: (m.role === "user" ? "user" : "model") as "user" | "model",
-    content: m.content,
-  }));
-
-  // If we have a summary and there are more messages than we loaded, prepend it
+  // Summary injection rule is unchanged: only when the conversation holds
+  // more messages than the loaded window.
+  let summaryMessage: { role: "model"; content: string } | null = null;
   if (conversation?.summary) {
     const totalCount = await prisma.message.count({ where: { conversationId } });
     if (totalCount > maxRecentMessages) {
-      return {
-        messages: [
-          {
-            role: "model" as const,
-            content: `[Previous conversation summary: ${conversation.summary}]`,
-          },
-          ...formatted,
-        ],
-        summaryInjected: true,
+      summaryMessage = {
+        role: "model",
+        content: `[Previous conversation summary: ${conversation.summary}]`,
       };
     }
   }
 
-  return { messages: formatted, summaryInjected: false };
+  // Budget-aware trim: drop oldest messages until the estimated history total
+  // (summary always included and never trimmed) fits the budget, but never
+  // trim below the MIN_RETAINED_MESSAGES most recent messages.
+  const summaryTokens = summaryMessage
+    ? estimateTokens(summaryMessage.content.length)
+    : 0;
+  const perMessageTokens = messages.map((m) => estimateTokens(m.content.length));
+  let estimatedTokens =
+    summaryTokens + perMessageTokens.reduce((sum, tokens) => sum + tokens, 0);
+
+  let droppedForBudget = 0;
+  while (
+    estimatedTokens > historyTokenBudget &&
+    messages.length - droppedForBudget > MIN_RETAINED_MESSAGES
+  ) {
+    estimatedTokens -= perMessageTokens[droppedForBudget];
+    droppedForBudget += 1;
+  }
+  const overBudget = estimatedTokens > historyTokenBudget;
+  const kept = droppedForBudget > 0 ? messages.slice(droppedForBudget) : messages;
+
+  if (droppedForBudget > 0) {
+    // Dropped messages newer than summaryUpToMessageId are not represented in
+    // the rolling summary — acceptable loss for this turn, but worth counting.
+    const summaryUpToIndex = conversation?.summaryUpToMessageId
+      ? messages.findIndex((m) => m.id === conversation.summaryUpToMessageId)
+      : -1;
+    const droppedUncoveredBySummary = summaryMessage
+      ? messages
+          .slice(0, droppedForBudget)
+          .filter((_, index) => summaryUpToIndex < 0 || index > summaryUpToIndex)
+          .length
+      : droppedForBudget;
+    logger.info("sage.history.trim", {
+      conversationId,
+      budgetTokens: historyTokenBudget,
+      estTokens: estimatedTokens,
+      droppedForBudget,
+      droppedUncoveredBySummary,
+      keptMessages: kept.length,
+      summaryInjected: Boolean(summaryMessage),
+      overBudget,
+    });
+  }
+  if (overBudget) {
+    logger.warn("sage.history.over_budget", {
+      conversationId,
+      budgetTokens: historyTokenBudget,
+      estTokens: estimatedTokens,
+      keptMessages: kept.length,
+    });
+  }
+
+  const formatted = kept.map((m) => ({
+    role: (m.role === "user" ? "user" : "model") as "user" | "model",
+    content: m.content,
+  }));
+
+  return {
+    messages: summaryMessage ? [summaryMessage, ...formatted] : formatted,
+    summaryInjected: Boolean(summaryMessage),
+    droppedForBudget,
+    overBudget,
+  };
 }
 
 const COMPACTION_SYSTEM_PROMPT =

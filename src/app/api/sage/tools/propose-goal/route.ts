@@ -10,6 +10,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { rateLimited } from "@/lib/api-error";
+import { rateLimit } from "@/lib/rate-limit";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody } from "@/lib/schemas";
 import { proposeGoal } from "@/lib/sage/propose-goal";
@@ -25,6 +27,11 @@ const proposeGoalSchema = z.object({
 });
 
 export const POST = withRegistry("sage.propose_goal", async (session, req: NextRequest) => {
+  const rl = await rateLimit(`sage-propose-goal:${session.id}`, 30, 60 * 60 * 1000);
+  if (!rl.success) {
+    throw rateLimited("Too many goal proposals this hour. Please wait before proposing more.");
+  }
+
   const body = await parseBody(req, proposeGoalSchema);
 
   const result = await proposeGoal({

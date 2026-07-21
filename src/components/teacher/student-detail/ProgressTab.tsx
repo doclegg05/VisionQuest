@@ -10,6 +10,12 @@ interface ProgressTabProps {
   /** Certification verification callback */
   verifying: string | null;
   onVerify: (requirementId: string, verified: boolean) => void;
+  /** Certification outcome verification (P1-4) */
+  certOutcomeVerifying: boolean;
+  onCertOutcomeVerify: (certificationId: string) => void;
+  /** Orientation honor-system verification (P1-1) */
+  orientationVerifying: string | null;
+  onOrientationVerify: (itemId: string, decision: "confirm" | "decline") => void;
   /** Conversations show-all toggle */
   showAllConversations: boolean;
   onShowAllConversations: () => void;
@@ -20,6 +26,10 @@ export default function ProgressTab({
   dateFormatter,
   verifying,
   onVerify,
+  certOutcomeVerifying,
+  onCertOutcomeVerify,
+  orientationVerifying,
+  onOrientationVerify,
   showAllConversations,
   onShowAllConversations,
 }: ProgressTabProps) {
@@ -60,8 +70,13 @@ export default function ProgressTab({
           <div className="space-y-1">
             {orientation.items.map((item) => {
               const progressItem = orientation.progress.find((progress) => progress.itemId === item.id);
+              const pendingVerification =
+                !progressItem?.completed && progressItem?.verificationStatus === "pending";
+              const declined =
+                !progressItem?.completed && progressItem?.verificationStatus === "declined";
+              const busy = orientationVerifying === item.id;
               return (
-                <div key={item.id} className="flex items-center gap-2 text-sm">
+                <div key={item.id} className="flex items-center gap-2 text-sm flex-wrap">
                   <span className={progressItem?.completed ? "text-green-500" : "text-[var(--ink-faint)]"}>
                     {progressItem?.completed ? "\u2713" : "\u25CB"}
                   </span>
@@ -70,6 +85,37 @@ export default function ProgressTab({
                   </span>
                   {item.required && !progressItem?.completed && (
                     <span className="text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
+                  )}
+                  {pendingVerification && (
+                    <>
+                      <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+                        Student marked done \u2014 verify
+                      </span>
+                      <button
+                        onClick={() => onOrientationVerify(item.id, "confirm")}
+                        disabled={busy}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                      >
+                        {busy ? "..." : "Confirm"}
+                      </button>
+                      <button
+                        onClick={() => onOrientationVerify(item.id, "decline")}
+                        disabled={busy}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+                      >
+                        {busy ? "..." : "Decline"}
+                      </button>
+                    </>
+                  )}
+                  {declined && (
+                    <span className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">
+                      Declined \u2014 student will redo
+                    </span>
+                  )}
+                  {progressItem?.completed && progressItem.verificationStatus === "verified" && progressItem.verifiedAt && (
+                    <span className="text-xs text-[var(--ink-faint)]">
+                      Verified {new Date(progressItem.verifiedAt).toLocaleDateString()}
+                    </span>
                   )}
                 </div>
               );
@@ -86,6 +132,28 @@ export default function ProgressTab({
             <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Completed</span>
           )}
         </h3>
+        {/* P1-4: cert-level outcome verification — self-reported progress
+            stays flagged until an instructor verifies it, mirroring the
+            orientation honor-system verify above. */}
+        {certification.cert?.verificationStatus === "self_reported" && (
+          <div className="mb-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+              Self-reported progress {"—"} verify
+            </span>
+            <button
+              onClick={() => certification.cert && onCertOutcomeVerify(certification.cert.id)}
+              disabled={certOutcomeVerifying}
+              className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+            >
+              {certOutcomeVerifying ? "..." : "Verify"}
+            </button>
+          </div>
+        )}
+        {certification.cert?.verificationStatus === "verified" && certification.cert.verifiedAt && (
+          <p className="mb-3 text-xs text-[var(--ink-faint)]">
+            Outcome verified {new Date(certification.cert.verifiedAt).toLocaleDateString()}
+          </p>
+        )}
         {!certification.cert ? (
           <p className="text-sm text-[var(--ink-faint)]">Student hasn&apos;t started certification yet.</p>
         ) : (

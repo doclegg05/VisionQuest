@@ -4,6 +4,7 @@ import { assertStaffCanManageClass, buildManagedStudentWhere } from "@/lib/class
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { getCertificationProgress } from "@/lib/certifications";
+import { classifyOutcomeVerification } from "@/lib/outcome-verification";
 import { goalCountsTowardPlan } from "@/lib/goals";
 import { escapeCsvValue } from "@/lib/csv";
 
@@ -42,6 +43,8 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       certifications: {
         select: {
           status: true,
+          // P1-4: cert-level verification bucket for the CSV split column.
+          verificationStatus: true,
           requirements: { select: { templateId: true, completed: true, verifiedBy: true, fileId: true } },
         },
       },
@@ -124,6 +127,9 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     "Orientation Done",
     "Orientation Total",
     "Cert Status",
+    // P1-4 verification split: verified | self_reported | legacy (pre-feature
+    // rows with unknown provenance), blank when no cert exists.
+    "Cert Verification",
     "Cert Done",
     "Cert Total",
     "Pending Verify",
@@ -189,6 +195,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       s.orientationProgress.length,
       orientationTotal,
       cert?.status || "not_started",
+      cert ? classifyOutcomeVerification(cert.verificationStatus) : "",
       certDone,
       requiredCertCount,
       pendingVerify,

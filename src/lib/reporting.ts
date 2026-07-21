@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { classifyOutcomeVerification } from "./outcome-verification";
 
 function latestDate(...values: Array<Date | null | undefined>) {
   return values.reduce<Date | null>((latest, value) => {
@@ -109,6 +110,8 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
             where: { certType: "ready-to-work" },
             select: {
               status: true,
+              // P1-4: splits verified vs self-reported certification counts.
+              verificationStatus: true,
             },
             take: 1,
           },
@@ -210,6 +213,12 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
       (task) => task.status !== "completed" && task.dueAt && task.dueAt < now
     ).length;
     const completedCertification = student.certifications[0]?.status === "completed";
+    // P1-4 verification bucket for the completed cert. Legacy rows (null
+    // verificationStatus, written before the feature) classify as "legacy":
+    // they stay inside completedCertifications but in neither split bucket.
+    const certificationVerification = completedCertification
+      ? classifyOutcomeVerification(student.certifications[0]?.verificationStatus)
+      : null;
     const applicationsInFlight = student.applications.filter((application) =>
       ["applied", "interviewing", "offer"].includes(application.status)
     ).length;
@@ -236,6 +245,7 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
       offerCount: student.applications.filter((application) => application.status === "offer").length,
       eventRegistrationCount,
       completedCertification,
+      certificationVerification,
       publicCredentialLive: Boolean(student.publicCredentialPage?.isPublic),
     };
   });
@@ -256,6 +266,15 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
   const offerCount = studentRollups.reduce((sum, student) => sum + student.offerCount, 0);
   const completedCertificationCount = studentRollups.filter(
     (student) => student.completedCertification
+  ).length;
+  // P1-4 additive split: verified + selfReported + legacy(null rows) ==
+  // completedCertifications. The legacy remainder is intentionally not
+  // surfaced as its own field — it is the total minus the two buckets.
+  const verifiedCertificationCount = studentRollups.filter(
+    (student) => student.certificationVerification === "verified"
+  ).length;
+  const selfReportedCertificationCount = studentRollups.filter(
+    (student) => student.certificationVerification === "self_reported"
   ).length;
   const publicCredentialCount = studentRollups.filter(
     (student) => student.publicCredentialLive
@@ -290,6 +309,10 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
       upcomingEvents: upcomingEvents.length,
       eventRegistrations: totalEventRegistrations,
       completedCertifications: completedCertificationCount,
+      // P1-4: grant-integrity split. Kept alongside the existing total for
+      // continuity; legacy pre-feature rows count in the total only.
+      completedCertificationsVerified: verifiedCertificationCount,
+      completedCertificationsSelfReported: selfReportedCertificationCount,
       publicCredentialsLive: publicCredentialCount,
       studentsWithoutCareerMomentum:
         studentRollups.length - studentsWithCareerMomentum.length,

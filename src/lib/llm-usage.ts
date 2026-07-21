@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { logger } from "./logger";
 import { estimateTokens } from "./llm-usage-estimate";
+import { SAGE_PROMPT_REVISION } from "./sage/prompt-revision";
 import type {
   AIProvider,
   ChatMessage,
@@ -23,6 +24,12 @@ interface LogLlmCallParams {
   outputTokens: number;
   totalTokens: number;
   durationMs?: number;
+  /**
+   * Prompt-revision attribution tag. Defaults to the live
+   * SAGE_PROMPT_REVISION so every call is stamped automatically; pass an
+   * explicit value only when logging on behalf of a different prompt stack.
+   */
+  promptRevision?: string | null;
 }
 
 export async function logLlmCall(params: LogLlmCallParams): Promise<void> {
@@ -36,6 +43,7 @@ export async function logLlmCall(params: LogLlmCallParams): Promise<void> {
         outputTokens: params.outputTokens,
         totalTokens: params.totalTokens,
         durationMs: params.durationMs ?? null,
+        promptRevision: params.promptRevision ?? SAGE_PROMPT_REVISION,
       },
     });
   } catch (error) {
@@ -115,6 +123,8 @@ export interface WithUsageLoggingContext {
   callSite: string;
   /** Overrides provider.name in the logged row when set. */
   model?: string;
+  /** Overrides the default SAGE_PROMPT_REVISION stamp in the logged row when set. */
+  promptRevision?: string;
 }
 
 function fallbackUsage(inputChars: number, outputChars: number): TokenUsage {
@@ -159,6 +169,7 @@ export function withUsageLogging(
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       durationMs,
+      promptRevision: ctx.promptRevision,
     });
   };
 

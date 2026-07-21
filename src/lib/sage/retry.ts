@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { recordFailedExtraction } from "./failed-extraction";
 
 interface RetryOptions {
   /** Human-readable label for log lines, e.g. "Mood extraction". */
@@ -6,13 +7,38 @@ interface RetryOptions {
   /**
    * Logged as `alert: <alertKey>` when every attempt fails, so monitoring can
    * page on silent value-loop gaps (mirrors goal-extractor's
-   * `goal_extraction_exhausted`).
+   * `goal_extraction_exhausted`). Doubles as the FailedExtraction.extractorKey
+   * when the exhausted failure is dead-lettered.
    */
   alertKey: string;
   /** Total attempts including the first. Defaults to 3. */
   maxAttempts?: number;
   /** Extra structured context merged into every log line (ids, etc.). */
   context?: Record<string, unknown>;
+  /**
+   * When set, an exhausted failure is dead-lettered to the FailedExtraction
+   * table (see src/lib/sage/failed-extraction.ts) for staff review. Call
+   * sites without a studentId in scope simply omit it — persistence is
+   * skipped and behavior is unchanged.
+   */
+  studentId?: string;
+  conversationId?: string;
+  /**
+   * Lazily builds the input snapshot persisted alongside the failure
+   * (capped at 8000 chars by recordFailedExtraction). Only invoked on
+   * exhaustion, and only when `studentId` is set.
+   */
+  failurePayload?: () => string;
+}
+
+/** A throwing payload builder must not mask the original extractor error. */
+function buildPayloadSafely(failurePayload?: () => string): string {
+  if (!failurePayload) return "";
+  try {
+    return failurePayload();
+  } catch (error: unknown) {
+    return `payload unavailable: ${String(error)}`;
+  }
 }
 
 /**
@@ -29,7 +55,7 @@ interface RetryOptions {
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  { label, alertKey, maxAttempts = 3, context = {} }: RetryOptions,
+  { label, alertKey, maxAttempts = 3, context = {}, studentId, conversationId, failurePayload }: RetryOptions,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -49,8 +75,20 @@ export async function retryWithBackoff<T>(
     }
   }
 
-  // All retries exhausted. TODO: persist to a failure table for instructor
-  // review (matches the goal-extractor TODO; needs a schema migration).
+  // All retries exhausted. Dead-letter the failure for staff review via
+  // recordFailedExtraction (src/lib/sage/failed-extraction.ts) when the call
+  // site gave us a studentId; it never throws, so the caller's "never
+  // bubble" contract is preserved either way.
+  if (studentId) {
+    await recordFailedExtraction({
+      studentId,
+      conversationId,
+      extractorKey: alertKey,
+      payload: buildPayloadSafely(failurePayload),
+      error: String(lastError),
+      attempts: maxAttempts,
+    });
+  }
   logger.error(`${label} failed after retries`, {
     attempts: maxAttempts,
     ...context,

@@ -1,7 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import ReadinessScore from "@/components/ui/ReadinessScore";
 import { MoodSparkline } from "@/components/progression/MoodSparkline";
+import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
+import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
 import type {
   StudentData,
   MoodEntryData,
@@ -73,6 +78,48 @@ export default function OverviewTab({
   const activeApplications = applications.filter((application) =>
     ["applied", "interviewing", "offer"].includes(application.status)
   );
+
+  // Discovery manual override — local state only; the card flips to
+  // "Complete" immediately on success without a full reload.
+  const [confirmDiscoveryOverride, setConfirmDiscoveryOverride] = useState(false);
+  const [overridingDiscovery, setOverridingDiscovery] = useState(false);
+  const [discoveryOverridden, setDiscoveryOverridden] = useState(false);
+  const [discoveryOverrideError, setDiscoveryOverrideError] = useState<string | null>(null);
+
+  const discoveryStatus = discoveryOverridden
+    ? "complete"
+    : careerDiscovery?.status ?? "not_started";
+
+  async function handleDiscoveryOverride() {
+    setOverridingDiscovery(true);
+    setDiscoveryOverrideError(null);
+    try {
+      const res = await fetch(`/api/teacher/students/${student.id}/discovery`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "complete" }),
+      });
+      if (!res.ok) {
+        const payload: unknown = await res.json().catch(() => null);
+        const message =
+          payload &&
+          typeof payload === "object" &&
+          "error" in payload &&
+          typeof (payload as { error?: unknown }).error === "string"
+            ? (payload as { error: string }).error
+            : "Could not mark discovery complete.";
+        throw new Error(message);
+      }
+      setDiscoveryOverridden(true);
+      setConfirmDiscoveryOverride(false);
+    } catch (error: unknown) {
+      setDiscoveryOverrideError(
+        error instanceof Error ? error.message : "Could not mark discovery complete.",
+      );
+    } finally {
+      setOverridingDiscovery(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -281,7 +328,11 @@ export default function OverviewTab({
                     {alert.severity}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-[var(--ink-muted)]">{alert.summary}</p>
+                {alert.type === WELLBEING_ALERT_TYPE ? (
+                  <WellbeingCrisisCard summary={alert.summary} className="mt-2" />
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--ink-muted)]">{alert.summary}</p>
+                )}
                 <p className="mt-2 text-xs text-[var(--ink-faint)]">
                   Detected {dateFormatter.format(new Date(alert.detectedAt))}
                 </p>
@@ -291,37 +342,83 @@ export default function OverviewTab({
         </div>
       )}
 
-      {/* Career Discovery Summary */}
-      {careerDiscovery && (
-        <div className="theme-card rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
-            Career Discovery
-            {careerDiscovery.status === "complete" && (
-              <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Complete</span>
-            )}
-            {careerDiscovery.status === "in_progress" && (
-              <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">In Progress</span>
-            )}
-          </h3>
-          <div className="space-y-3">
-            {careerDiscovery.sageSummary && (
-              <p className="text-sm text-[var(--ink-strong)]">{careerDiscovery.sageSummary}</p>
-            )}
-            {careerDiscovery.topClusters.length > 0 && (
-              <div>
-                <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {careerDiscovery.topClusters.map((cluster) => (
-                    <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
-                      {cluster.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                    </span>
-                  ))}
-                </div>
+      {/* Career Discovery Summary — always rendered so staff can override a
+          stalled discovery even when the extractor never created a record. */}
+      <div className="theme-card rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
+          Career Discovery
+          {discoveryStatus === "complete" && (
+            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Complete</span>
+          )}
+          {discoveryStatus === "in_progress" && (
+            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">In Progress</span>
+          )}
+          {discoveryStatus === "not_started" && (
+            <span className="ml-2 text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">Not Started</span>
+          )}
+        </h3>
+        <div className="space-y-3">
+          {careerDiscovery?.sageSummary && (
+            <p className="text-sm text-[var(--ink-strong)]">{careerDiscovery.sageSummary}</p>
+          )}
+          {careerDiscovery && careerDiscovery.topClusters.length > 0 && (
+            <div>
+              <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {careerDiscovery.topClusters.map((cluster) => (
+                  <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
+                    {cluster.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </span>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+          {discoveryOverridden && (
+            <p className="text-xs text-green-700">Discovery marked complete by staff.</p>
+          )}
+          {discoveryStatus !== "complete" && (
+            <div className="pt-1">
+              {!confirmDiscoveryOverride ? (
+                <button
+                  onClick={() => {
+                    setDiscoveryOverrideError(null);
+                    setConfirmDiscoveryOverride(true);
+                  }}
+                  className="rounded-lg border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                >
+                  Mark discovery complete
+                </button>
+              ) : (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-sm text-emerald-900">
+                    This unblocks the student&apos;s next step when Sage never marked
+                    discovery complete automatically. The override is recorded in the
+                    audit log.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={handleDiscoveryOverride}
+                      disabled={overridingDiscovery}
+                      className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {overridingDiscovery ? "Saving..." : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDiscoveryOverride(false)}
+                      className="theme-card-subtle rounded-lg px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              {discoveryOverrideError && (
+                <p className="mt-2 text-xs text-red-500">{discoveryOverrideError}</p>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Motivation Trend */}
       {moodEntries.length > 0 && (
