@@ -431,3 +431,19 @@ runner + majority voting as 'tool'; failures print WATCH, count as totals.watchF
 ::warning annotation, never gate) and tool_watch joined the CI --families list — a future
 demotion stays visible instead of silently unrun, which was the gap that let the 051d224
 demote drop the case from CI entirely | REVERSIBLE: per-hunk.
+
+[2026-07-21] FINDING+FIX (session 2): the restored gating case FAILED on the merged tree —
+run 29836751204 drew search_forms 2/2 at temperature=0, confirming the flip is
+near-deterministic under production SAFETY_SETTINGS (this branch's three green pre-merge runs
+had validated against the pre-#117 provider, which carried no safetySettings). Majority voting
+alone cannot rescue a consistent mis-route, so the ROOT CAUSE finally came out: search_forms'
+query-parameter example said 'something to track my certifications' — the certification
+attractor the 2026-07-09 fragility note identified, which three rounds of description/addendum
+steering (44435eb, 13e9304, 828a7ce) worked around but never removed. Example replaced with
+'the paper about missing class' (vocabulary the tools addendum already uses for search_forms);
+prompt revision 2026-07-21.2. RESULT: run 29837156143 on the merged tree — red-team 0 hard /
+0 soft, chat harness 9/9 with tool-teacher-lookup-student passing OUTRIGHT (no split vote) as
+gating family 'tool', families tool,tool_watch,guardrail | WHY this and not tool_watch
+demotion: a permanently-red gate is not precision, and a permanently-demoted case is not a
+gate; the attractor removal fixes the actual routing defect the eval was catching |
+REVERSIBLE: revert c7b72c0 (but the case goes red again).
