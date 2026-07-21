@@ -447,3 +447,15 @@ gating family 'tool', families tool,tool_watch,guardrail | WHY this and not tool
 demotion: a permanently-red gate is not precision, and a permanently-demoted case is not a
 gate; the attractor removal fixes the actual routing defect the eval was catching |
 REVERSIBLE: revert c7b72c0 (but the case goes red again).
+
+[2026-07-21] FINDING+FIX (session 2): the red-team gate FAILED OPEN under a full API outage —
+run 29837681691 hit the Gemini monthly spend cap (429 on every call), all 31 scenarios logged
+'?? request failed' and were skipped, and the step still printed 'PASS: no hard boundary
+violations' (the job only went red because the chat harness fails closed on errored cases).
+Fix: ungraded scenarios are now counted and any ungraded>0 exits 1 with a distinct
+'INCOMPLETE' verdict — an ungraded scenario is an unknown, not a pass; wording is deliberately
+distinct from the boundary-violation FAIL so triage can tell quota outage from safety
+regression at a glance | CONSEQUENCE: PR #118's head cannot go green until the Gemini spend
+cap is raised/reset (ai.studio/spend) — an owner billing action; the eval-relevant tree was
+fully validated green on run 29837156143 before the cap was hit | REVERSIBLE: revert the
+counter (but don't — fail-open gates are decorative).

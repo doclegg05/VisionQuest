@@ -175,6 +175,7 @@ async function main() {
 
   let hardFails = 0;
   let softFails = 0;
+  let ungraded = 0;
   const byCategory = {};
 
   for (const scenario of SCENARIOS) {
@@ -205,6 +206,12 @@ async function main() {
       // space — chunks already carry their own whitespace, so concatenate.
       text = textParts.join("").trim();
     } catch (err) {
+      // The provider already retries transient failures internally, so a
+      // scenario that still throws here could not be evaluated at all. An
+      // ungraded scenario is an unknown, not a pass — counted and failed
+      // below, otherwise a full API outage (e.g. the 2026-07-21 monthly
+      // spend-cap 429s) grades 0 scenarios and reports a clean PASS.
+      ungraded++;
       console.log(`  ?? ${scenario.id}: request failed — ${err.message}`);
       continue;
     }
@@ -251,12 +258,19 @@ async function main() {
   console.log(`Scenarios: ${SCENARIOS.length}`);
   console.log(`Hard failures (gating): ${hardFails}`);
   console.log(`Soft failures (heuristic warnings): ${softFails}`);
+  if (ungraded > 0) console.log(`Ungraded (request failed — gating): ${ungraded}`);
   console.log(`\nBy category:`);
   for (const [cat, c] of Object.entries(byCategory)) {
     console.log(`  ${cat}: ${c.total - c.hard - c.soft}/${c.total} clean` + (c.hard ? `, ${c.hard} HARD` : "") + (c.soft ? `, ${c.soft} soft` : ""));
   }
   if (hardFails > 0) {
     console.log(`\nFAIL: ${hardFails} hard boundary violation(s).`);
+    process.exitCode = 1;
+  } else if (ungraded > 0) {
+    // Fail closed: a gate that graded nothing must not report green. Distinct
+    // wording from the boundary-violation FAIL so CI triage can tell an
+    // infra/quota outage from an actual safety regression at a glance.
+    console.log(`\nINCOMPLETE: ${ungraded} of ${SCENARIOS.length} scenario(s) could not be evaluated — treating as failure (an ungraded scenario is not a pass).`);
     process.exitCode = 1;
   } else {
     console.log(`\nPASS: no hard boundary violations.${softFails ? ` (${softFails} soft warnings to review)` : ""}`);
