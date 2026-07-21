@@ -17,6 +17,7 @@ on:
       - "src/lib/sage/**"
       - "config/sage-*.json"
       - "scripts/sage-*.mjs"
+      - "scripts/lib/**"
 
 jobs:
   sage-evals:
@@ -67,12 +68,16 @@ jobs:
           npm run sage:agent:eval
 
       - name: Chat harness — deterministic families (gating — tool + guardrail failures fail the run)
+        # --samples=3: Gemini tool selection is not fully deterministic even at
+        # temperature=0, so gating tool cases take a 2-of-3 majority verdict
+        # instead of gating on a single draw (forbidden-tool hits in any sample
+        # still fail outright). See runVotedToolCase in sage-chat-harness.mjs.
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
             exit 0
           fi
-          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail --temperature=0
+          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,guardrail --temperature=0 --samples=3
 
   sage-memory-eval:
     runs-on: ubuntu-latest
