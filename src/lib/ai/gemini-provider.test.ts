@@ -225,14 +225,14 @@ describe("GeminiProvider.streamWithTools hop-2 request shape", () => {
   });
 });
 
-// Gemini's default harm filters can block legitimate crisis-coaching replies;
-// the deterministic crisis safety net (988) is the enforcement layer, so the
-// provider must relax every generation path to BLOCK_ONLY_HIGH. These tests
-// pin the safetySettings the API actually receives on the wire.
+// Gemini's default harm filters can block legitimate crisis-coaching replies
+// (self-harm disclosures fall under DANGEROUS_CONTENT); the deterministic
+// crisis safety net (988) is the enforcement layer, so the provider relaxes
+// exactly that category on every generation path. The other categories stay
+// at model defaults on purpose — explicit settings for all four shifted
+// unrelated generation behavior (see provider comment, 2026-07-21). These
+// tests pin the safetySettings the API actually receives on the wire.
 const EXPECTED_SAFETY_SETTINGS = [
-  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
   { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
 ];
 

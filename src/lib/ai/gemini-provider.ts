@@ -18,16 +18,15 @@ import type {
 
 // Gemini's default harm filters can block legitimate crisis-coaching replies —
 // this app serves vulnerable adults and intentionally handles self-harm
-// disclosures. Relax the cloud filters to BLOCK_ONLY_HIGH on every generation
-// path; the deterministic crisis safety net (988, src/lib/chat/crisis-safety-net.ts)
-// is the enforcement layer, not Gemini's classifier.
+// disclosures, which fall under DANGEROUS_CONTENT. Relax ONLY that category
+// to BLOCK_ONLY_HIGH; the deterministic crisis safety net (988,
+// src/lib/chat/crisis-safety-net.ts) is the enforcement layer, not Gemini's
+// classifier. The other categories stay at model defaults deliberately:
+// attaching explicit settings for all four measurably shifted unrelated
+// generation behavior (tool selection flipped on a gating harness case,
+// isolated via request-payload diff on 2026-07-21) — keep the footprint
+// minimal. Owner-approved scoping decision, 2026-07-21.
 const SAFETY_SETTINGS: SafetySetting[] = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  {
-    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-    threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-  },
   {
     category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
     threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
