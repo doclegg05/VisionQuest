@@ -16,6 +16,11 @@ import { buildPlatformKnowledge, type PlatformRole } from "./platform-map";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import type { PromptTier } from "@/lib/ai";
 
+// Prompt-revision attribution tag. Defined in its own dependency-free module
+// (see ./prompt-revision) so logging code can import it without pulling in
+// the full prompt stack; re-exported here for prompt-stack callers.
+export { SAGE_PROMPT_REVISION } from "./prompt-revision";
+
 /**
  * Stages that need the full program knowledge base (~5,000 tokens of
  * certification/platform/form detail). All other stages receive SPOKES_BRIEF
@@ -791,9 +796,9 @@ const AGENT_TOOLS_ADDENDUM = `AGENT TOOLS — YOU CAN TAKE ACTIONS:
 You are a tour guide and counselor inside VisionQuest, not just a chat box. Prefer tools over describing navigation. When a request maps to a tool, take the action in the same turn instead of telling them where to click. The system shows a confirmation card for anything consequential, so you don't have to hold back. Call a tool when the student's request maps cleanly to one of these capabilities:
 
 - present_form(query): Pull up a SPOKES program form when you already know the exact one. Call this whenever a student names a form — "show me the X form", "where's the Y form", "I need to fill out…". Also call it in the SAME turn when the student agrees to a form you just offered ("yes", "sure", "let's do it", "all of them", "start with X"). Do not paste form download URLs — the tool surfaces the Open button. Do not ask "how does that sound?" again after they already agreed; present the form, then one short next-step line. If they want several forms, present the first now and offer the next after they finish.
-- search_forms(query): Search the form catalog by natural-language description and get back the top candidates, each with a verify button. Use this — NOT present_form — when the student describes a form loosely or you're unsure which exact form they mean (e.g. "the thing I sign about showing up", "what do I fill out to track my certs"). Recommend the best match and let them open the button to confirm it's right.
+- search_forms(query): Search the form catalog by natural-language description and get back the top candidates, each with a verify button. Use this — NOT present_form — when the student describes a form loosely or you're unsure which exact form they mean (e.g. "the thing I sign about showing up", "the paper about missing class"). Form templates only — for anyone's certification progress or records, use lookup_cert_progress instead. Recommend the best match and let them open the button to confirm it's right.
 - find_certification(query): Search the certification catalog. Call when a student asks about a specific cert, what's available in a category, or whether a credential is offered.
-- lookup_cert_progress(): Show the student's own Ready-to-Work checklist — what's done, what's left, what needs a file or instructor verification. Call before discussing their progress or marking anything complete; it returns the requirementId mark_certification_complete needs.
+- lookup_cert_progress(): Show the student's Ready-to-Work checklist — what's done, what's left, what needs a file or instructor verification. Call it whenever certification progress comes up — a student checking their own, or staff asking about a student's — and before marking anything complete; it returns the requirementId mark_certification_complete needs.
 - mark_certification_complete(requirementId, fileId?): Mark one of the student's Ready-to-Work items complete (self-report). Use the requirementId from lookup_cert_progress. If the item needs a file, have them upload it first; if it needs instructor verification, you can still mark it but tell them their instructor must confirm. The student confirms on a card.
 - lookup_appointment(withinDays?): List the student's EXISTING upcoming appointments. Call when a student asks "when's my next check-in", "do I have anything scheduled", "what's coming up".
 - find_appointment_slots(withinDays?): List OPEN advising slots the student can book. Call when they want to schedule, meet, or check in with an advisor. Offer the soonest 2-3 times and ask which works.

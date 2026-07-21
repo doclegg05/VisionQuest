@@ -274,11 +274,12 @@ function sessionWith(role: string): Session {
 
 const SLICE_D_TRIPWIRE =
   "rlsContextFor no longer collapses this role to \"student\" — coordinator/cdc " +
-  "RLS policies are going live (Slice D). App-layer helpers rely on that collapse " +
-  "to fail closed; the biggest is buildManagedStudentWhere (src/lib/classroom.ts), " +
-  "which builds an UNSCOPED student where-clause for coordinators. Region-scope " +
-  "that helper (mirror getCoordinatorInterventionQueue in " +
-  "src/lib/teacher/dashboard.ts) and audit every call site before shipping. " +
+  "RLS policies are going live (Slice D). Audit the app-layer helpers that pair " +
+  "with this collapse: buildManagedStudentWhere (src/lib/classroom.ts) currently " +
+  "fails closed for coordinators (impossible id-in-[] clause). Replace that " +
+  "fail-closed branch with real region scoping (mirror " +
+  "getCoordinatorInterventionQueue in src/lib/teacher/dashboard.ts) and audit " +
+  "every call site before shipping. " +
   "See docs/plans/rls-enforcement-runbook.md → Slice D.";
 
 test("rlsContextFor passes teacher sessions through with empty studentId", () => {

@@ -20,6 +20,7 @@ import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } 
 import { formatCohortDateTime } from "@/lib/timezone";
 import { isValidUrl } from "@/lib/validation";
 import { normalizePortfolioItemType, PORTFOLIO_ITEM_TYPES } from "@/lib/portfolio";
+import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
 import { markRequirementComplete } from "../cert-actions";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
@@ -128,7 +129,12 @@ export async function executeAndLedger(
 const submitForm: AgentTool = {
   name: "submit_form",
   description:
-    "File a signed form the student uploaded in chat against one of their orientation checklist items, marking that item complete. Requires user confirmation.",
+    // Selection guidance only — keep outcome branches (signature guard,
+    // pending-verification) out of this string: they are explained in the
+    // tool's reply, and enumerating them here bled "instructor/verify"
+    // vocabulary into unrelated staff tool choices (caught by the CI chat
+    // harness on 2026-07-21).
+    "File a signed form the student uploaded in chat against one of their orientation checklist items and record its completion state. Requires user confirmation.",
   parameters: {
     type: "object",
     properties: {
@@ -169,17 +175,28 @@ const submitForm: AgentTool = {
     if (gate) return gate;
 
     return executeAndLedger("submit_form", { fileUploadId, orientationItemId }, ctx, async () => {
-      await prisma.$transaction([
-        prisma.orientationProgress.upsert({
-          where: { studentId_itemId: { studentId, itemId: orientationItemId } },
-          create: { studentId, itemId: orientationItemId, completed: true, completedAt: new Date() },
-          update: { completed: true, completedAt: new Date() },
-        }),
-        prisma.fileUpload.update({
-          where: { id: fileUploadId },
-          data: { category: "orientation_form" },
-        }),
-      ]);
+      // Always file the uploaded document, then apply the SAME completion
+      // rules as POST /api/orientation (signature guard + P1-1 verification)
+      // so chat can never bypass the wizard's compliance flow.
+      await prisma.fileUpload.update({
+        where: { id: fileUploadId },
+        data: { category: "orientation_form" },
+      });
+      const completion = await applyStudentOrientationCompletion(studentId, orientationItemId);
+      await syncStudentAlerts(studentId).catch(() => undefined);
+
+      if (completion.outcome === "signature_required") {
+        return {
+          summary: `"${file.filename}" is filed to your documents, but "${item.label}" still needs your signature — open Orientation to sign it there.`,
+          data: { orientationItemId, fileUploadId, signatureRequired: true },
+        };
+      }
+      if (completion.outcome === "pending_verification") {
+        return {
+          summary: `Done — "${file.filename}" is filed and "${item.label}" was sent to your instructor to verify. It will show complete once they confirm.`,
+          data: { orientationItemId, fileUploadId, pendingVerification: true },
+        };
+      }
       return {
         summary: `Done — "${file.filename}" is filed and "${item.label}" is marked complete.`,
         data: { orientationItemId, fileUploadId },
@@ -682,7 +699,13 @@ const markCertificationComplete: AgentTool = {
       }
       const notes: string[] = [];
       if (result.certCompleted) notes.push("That finishes your Ready-to-Work certification — nice work!");
-      if (result.awaitingVerification) notes.push("Your instructor still needs to verify this one.");
+      // P1-4: this write is recorded as self-reported, so the reply is honest
+      // about the verification trail instead of implying an official outcome.
+      notes.push(
+        result.awaitingVerification
+          ? "Your instructor still needs to verify this one."
+          : "I've recorded it as self-reported — your instructor can verify it.",
+      );
       return {
         summary: `Marked "${result.label}" complete.${notes.length ? " " + notes.join(" ") : ""}`,
         data: { requirementId, certCompleted: result.certCompleted, awaitingVerification: result.awaitingVerification },
@@ -757,8 +780,13 @@ const updateApplicationStatus: AgentTool = {
           appliedAt: setAppliedAt,
         },
       });
+      // P1-4 honesty note: pipeline status is the student's own report. The
+      // job-board row (StudentSavedJob) carries no verification column — the
+      // grant-reporting verification trail lives on the Application model —
+      // so the reply names the claim as self-reported instead of implying a
+      // confirmed outcome.
       return {
-        summary: `Marked "${job.title}" at ${job.company} as ${status}.`,
+        summary: `Marked "${job.title}" at ${job.company} as ${status} — logged as self-reported; your instructor can confirm the outcome.`,
         data: { jobListingId, status },
       };
     });

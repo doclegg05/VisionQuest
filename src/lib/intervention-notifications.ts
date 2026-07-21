@@ -191,6 +191,16 @@ export function buildTeacherInterventionNotifications({
         body: `${studentName} (${studentId}): ${alert.summary}`,
         cooldownHours: 24,
       });
+      continue;
+    }
+
+    if (alert.type === "orientation_verification_pending") {
+      specs.push({
+        type: "teacher_nudge.orientation_verification",
+        title: "A student is waiting on orientation verification",
+        body: `${studentName} (${studentId}): ${alert.summary}`,
+        cooldownHours: 12,
+      });
     }
   }
 
@@ -261,6 +271,7 @@ export function teacherInterventionHref(type: string, studentRecordId: string) {
     case "teacher_nudge.orientation_revision":
       return `/teacher/students/${studentRecordId}#submitted-forms`;
     case "teacher_nudge.orientation_checklist":
+    case "teacher_nudge.orientation_verification":
       return `/teacher/students/${studentRecordId}#orientation-review`;
     case "teacher_nudge.goal_review":
       return `/teacher/students/${studentRecordId}#goal-evidence`;
@@ -294,6 +305,11 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         href: `/teacher/students/${studentRecordId}#orientation-review`,
         label: "Open orientation",
       };
+    case "orientation_verification_pending":
+      return {
+        href: `/teacher/students/${studentRecordId}#orientation-review`,
+        label: "Verify steps",
+      };
     case "goal_needs_resource":
       return {
         href: `/teacher/students/${studentRecordId}#goal-plans`,
@@ -302,6 +318,7 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
     case "goal_missing_confirmed":
     case "goal_missing_monthly":
     case "goal_review_stale":
+    case "goal_unconfirmed":
       return {
         href: `/teacher/students/${studentRecordId}#goal-plans`,
         label: "Review goals",
@@ -321,6 +338,13 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
       return {
         href: `/teacher/students/${studentRecordId}#certification-review`,
         label: "Open certification",
+      };
+    // P1-4: self-reported certification progress waiting on instructor
+    // verification — deep-link straight to the cert card's Verify control.
+    case "certification_unverified":
+      return {
+        href: `/teacher/students/${studentRecordId}#certification-review`,
+        label: "Verify certification",
       };
     case "goal_stale":
       return {
@@ -382,6 +406,7 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
     case "goal_missing_confirmed":
     case "goal_missing_monthly":
     case "goal_review_stale":
+    case "goal_unconfirmed":
       return {
         kind: "create_task",
         label: "Add goal review task",

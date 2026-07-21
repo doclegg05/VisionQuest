@@ -16,14 +16,14 @@ VisionQuest is an AI-coach-driven portal for the SPOKES workforce development pr
 - TypeScript 5
 - Prisma 6 with PostgreSQL
 - Supabase PostgreSQL and Supabase Storage (S3-compatible)
-- Google Gemini 2.5 Flash Lite by default
+- Google Gemini 3.1 Flash Lite by default (cloud), with an optional local Ollama provider routed by data sensitivity
 - Tailwind CSS 4
 - Sentry for optional error tracking
 
 ## Architecture At A Glance
 
 - Auth uses JWTs stored in `httpOnly` cookies with SameSite strict protection
-- Passwords use PBKDF2-SHA512 hashing; OAuth users now store `null` password hashes
+- Passwords use scrypt hashing (legacy PBKDF2-SHA512 records are rehashed transparently on login); OAuth users store `null` password hashes
 - Student routes live under [`src/app/(student)`](/Users/brittlegg/visionquest/src/app/(student))
 - Teacher routes live under [`src/app/(teacher)`](/Users/brittlegg/visionquest/src/app/(teacher))
 - API routes live under [`src/app/api`](/Users/brittlegg/visionquest/src/app/api)

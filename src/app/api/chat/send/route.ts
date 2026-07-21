@@ -25,7 +25,7 @@ import { logger } from "@/lib/logger";
 import { isStaffRole } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
-import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary } from "@/lib/chat/conversation";
+import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { ensureCrisisResources } from "@/lib/chat/crisis-safety-net";
 import {
@@ -662,6 +662,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const conversationContext = await getConversationContext(
     conversation.id,
     maxRecentMessages,
+    promptTier === "compact"
+      ? COMPACT_HISTORY_TOKEN_BUDGET
+      : FULL_HISTORY_TOKEN_BUDGET,
   );
   const allMessages = [
     ...conversationContext.messages,

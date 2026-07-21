@@ -174,7 +174,7 @@ const presentForm: AgentTool = {
 const searchFormsTool: AgentTool = {
   name: "search_forms",
   description:
-    "Search the SPOKES form catalog with natural language and return the top matching forms, each with a link the student can open to verify it's the right one. Use this when the student describes a form loosely or you're not sure which exact form they mean — it ranks candidates semantically. When you already know the exact form, use present_form instead.",
+    "Search the SPOKES form catalog with natural language and return the top matching forms, each with a link the student can open to verify it's the right one. Use this when the student describes a form loosely or you're not sure which exact form they mean — it ranks candidates semantically. When you already know the exact form, use present_form instead. Form templates only — never use this to look up a student's progress, records, or certifications.",
   parameters: {
     type: "object",
     properties: {
@@ -368,7 +368,7 @@ const findCertification: AgentTool = {
 const lookupCertProgress: AgentTool = {
   name: "lookup_cert_progress",
   description:
-    "Show the student's Ready-to-Work certification checklist — which requirements are done, which are left, and which need a file or instructor verification. Call this when a student asks about their cert progress or wants to mark something complete; the returned requirementId is what mark_certification_complete needs.",
+    "Show the student's Ready-to-Work certification checklist — which requirements are done, which are left, and which need a file or instructor verification. Call this whenever anyone asks about certification progress — a student checking their own, or a teacher asking about a student's — or when marking something complete; the returned requirementId is what mark_certification_complete needs.",
   parameters: { type: "object", properties: {} },
   slashCommand: {
     command: "/certprogress",

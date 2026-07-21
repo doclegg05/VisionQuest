@@ -7,20 +7,26 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
-Chat-first rebuild milestone COMPLETE (PRs #66–#75) and post-launch loose ends merged (PR #77, 2026-06-10). Prod healthy on the new deploy.
+Maturity repair session COMPLETE (2026-07-20, overnight autonomous session on branch `claude/sage-maturity-review-06d785` — draft PR pending owner review). All 20 findings of the five-area maturity review repaired: verification layer (orientation sign-off, goal confirmation, cert provenance), crisis context cards + Spanish detection, data lifecycle v1, extraction dead-letter, chat retry/truncation, classic dashboard removed. See docs/MATURITY_REVIEW.md.
 
 ## Last Session
-- **Date**: 2026-06-10 (afternoon)
-- **What we worked on**: Post-launch loose ends (PR #77): staff-assisted tool confirmations (targetStudentId bound into HMAC end-to-end), one-curl prod embedding backfill (`POST /api/internal/rag/backfill`, Bearer CRON_SECRET), Lighthouse a11y measurement + fixes (all public pages 100), classic-dashboard removal scheduled as issue #76
-- **What we decided**: Authed-page a11y honestly recorded as unscored (no seeded login exists); backfill loop extracted to `src/lib/sage/backfill-embeddings.ts` shared by script + route
-- **Where we left off**: PR #77 squash-merged, CI green, prod 200, new backfill route confirmed live (403 without bearer, as designed)
+- **Date**: 2026-07-20 (overnight)
+- **What we worked on**: Full maturity review (3 explorer agents) → owner-approved repair plan → 24 items across 6 batches via parallel agents, 25 commits. Five additive migrations authored (prompt revision, offboardedAt, orientation + outcome verification, FailedExtraction). ~250 new tests; suite 1945 pass / 1 known pre-existing fail (forms-delivery bundled-PDF, environmental).
+- **What we decided**: Crisis alerts = context card only, NO transcript access; goal confirmation = badge + 7-day queue alert, not hard gating; classic dashboard deleted (issue #76 satisfied); crisis routing scoped to assigned instructors with all-teacher fallback; retention durations left OWNER-CONFIRM.
+- **Where we left off**: Draft PR being prepared from the worktree branch; morning checklist in docs/MATURITY_REVIEW.md "Needs owner action".
 
 ## Open Items
+- [ ] **USER**: review + merge the maturity-repair draft PR (migrations apply on deploy)
+- [ ] **USER**: run `scripts/backfill-unsigned-orientation-items.mjs` against prod (dry-run first, then --apply) to re-open bypassed signature items
+- [ ] **USER**: confirm retention durations in docs/DATA_RETENTION_POLICY.md (OWNER-CONFIRM markers)
+- [ ] Product call: exempt or supply a PDF for `ai-data-consent` (release-of-information packet now ends pending-verification)
+- [ ] Decide whether StudentSavedJob should carry verification fields (Application is covered)
+- [ ] Add `/teacher/failed-extractions` to teacher nav (URL-only today)
 - [ ] **USER**: trigger prod backfill once: `curl -X POST https://visionquest.onrender.com/api/internal/rag/backfill -H "Authorization: Bearer $CRON_SECRET"` (idempotent; needs CRON_SECRET)
 - [ ] Optional: COS_USER_ID/COS_API_TOKEN in Render for WV state jobs
-- [ ] Remove `/dashboard/classic` ~2026-07-10 — tracked as GitHub issue #76
 - [ ] A11y for authenticated pages: seed a test user, add @axe-core/playwright to existing e2e specs (see docs/superpowers/plans/2026-06-10-a11y-results.md)
 - [ ] Dark-mode contrast sweep: hardcoded `bg-white` + ink tokens in StaffMfaPanel.tsx (same bug class fixed on /forgot-password)
+- [ ] RAG corpus triage: 463 inactive ProgramDocuments need human review before embedding
 
 ## Key Decisions Log
 | Date | Decision | Rationale |

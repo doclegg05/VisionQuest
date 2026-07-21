@@ -25,7 +25,17 @@ mock.module("@/lib/api-error", {
         }
       },
     notFound: (message: string) => makeHttpError(404, message),
+    rateLimited: (message: string) => makeHttpError(429, message),
   },
+});
+
+const rateLimitMock = mock.fn(async () => ({
+  success: true,
+  remaining: 29,
+  resetTime: Date.now() + 3600_000,
+}));
+mock.module("@/lib/rate-limit", {
+  namedExports: { rateLimit: rateLimitMock },
 });
 
 const autopilotEnabledMock = mock.fn(() => true);
@@ -49,6 +59,12 @@ describe("POST /api/sage/panel/refresh", () => {
   beforeEach(() => {
     activeSession = mockStudentSession({ id: "student-a", studentId: "student-a" });
     autopilotEnabledMock.mock.mockImplementation(() => true);
+    rateLimitMock.mock.resetCalls();
+    rateLimitMock.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 29,
+      resetTime: Date.now() + 3600_000,
+    }));
     refreshMock.mock.resetCalls();
     refreshMock.mock.mockImplementation(async () => "queued");
   });
@@ -80,5 +96,29 @@ describe("POST /api/sage/panel/refresh", () => {
     const res = await route.POST();
     assert.equal(res.status, 404);
     assert.equal(refreshMock.mock.callCount(), 0);
+  });
+
+  it("returns 429 without queueing when the rate limiter rejects", async () => {
+    rateLimitMock.mock.mockImplementation(async () => ({
+      success: false,
+      remaining: 0,
+      resetTime: Date.now() + 3600_000,
+    }));
+    const res = await route.POST();
+    assert.equal(res.status, 429);
+    assert.equal(refreshMock.mock.callCount(), 0);
+  });
+
+  it("rate limits per student with an hourly window", async () => {
+    await route.POST();
+    assert.equal(rateLimitMock.mock.callCount(), 1);
+    const [key, limit, windowMs] = rateLimitMock.mock.calls[0].arguments as unknown as [
+      string,
+      number,
+      number,
+    ];
+    assert.equal(key, "sage-panel-refresh:student-a");
+    assert.equal(limit, 30);
+    assert.equal(windowMs, 60 * 60 * 1000);
   });
 });

@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  isSignatureRequiredItem,
+  isVerificationRequiredItem,
+} from "@/lib/orientation-step-resources";
 import WelcomeFlow from "./WelcomeFlow";
 
 export default async function WelcomePage() {
@@ -34,7 +38,14 @@ export default async function WelcomePage() {
   const quickWinItems = orientationItems
     .filter((item) => {
       const label = item.label.toLowerCase();
-      return quickWinLabels.some((q) => label.includes(q)) && !item.progress[0]?.completed;
+      if (!quickWinLabels.some((q) => label.includes(q))) return false;
+      if (item.progress[0]?.completed) return false;
+      // Items that require a signature must go through the Orientation
+      // wizard's SignaturePad — never the bare "I've read this" button.
+      // Honor-system items (instructor-led / paper steps) need teacher
+      // verification and belong in the wizard too. Only pure read/acknowledge
+      // items are quick-win eligible.
+      return !isSignatureRequiredItem(item.label) && !isVerificationRequiredItem(item.label);
     })
     .slice(0, 3)
     .map((item) => ({ id: item.id, label: item.label, description: item.description }));

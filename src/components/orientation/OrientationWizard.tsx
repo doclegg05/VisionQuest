@@ -20,6 +20,7 @@ interface OrientationItem {
   section: string | null;
   required: boolean;
   completed: boolean;
+  verificationStatus: string | null;
 }
 
 type StepType = "sign" | "acknowledge" | "read-only" | "no-pdf" | "instructor-led" | "profile-form";
@@ -31,6 +32,8 @@ interface WizardStep {
   stepTitle: string;
   stepDescription: string | null;
   isLastForItem: boolean;
+  /** The instructor declined this item's earlier claim — student redoes it. */
+  needsRedo?: boolean;
 }
 
 function classifyStep(form: SpokesForm): StepType {
@@ -51,10 +54,33 @@ async function fetchOrientationWizardItems(): Promise<OrientationItem[]> {
   return data.items || [];
 }
 
+/**
+ * Posts the idempotent orientation-completion sync and reports whether it
+ * saved. Never throws — a network failure reads the same as a non-2xx
+ * response so callers can offer a retry. Exported for tests.
+ */
+export async function postOrientationCompletion(
+  fetchFn: typeof fetch = fetch
+): Promise<boolean> {
+  try {
+    const res = await fetchFn("/api/orientation/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 function deriveSteps(items: OrientationItem[]): WizardStep[] {
   const steps: WizardStep[] = [];
   for (const item of items) {
-    if (item.completed) continue;
+    // Pending-verification items were already claimed by the student and are
+    // waiting on the instructor — no step to redo, and never a blocker.
+    if (item.completed || item.verificationStatus === "pending") continue;
+    const needsRedo = item.verificationStatus === "declined";
     const detail = getOrientationStepDetail(item.label);
     if (detail.forms.length === 0) {
       steps.push({
@@ -63,6 +89,7 @@ function deriveSteps(items: OrientationItem[]): WizardStep[] {
         stepTitle: item.label,
         stepDescription: item.description || detail.note,
         isLastForItem: true,
+        needsRedo,
       });
       continue;
     }
@@ -75,6 +102,7 @@ function deriveSteps(items: OrientationItem[]): WizardStep[] {
         stepTitle: form.title,
         stepDescription: form.description,
         isLastForItem: false,
+        needsRedo,
       });
     }
     if (formSteps.length > 0) {
@@ -103,38 +131,82 @@ export default function OrientationWizard() {
   const [completed, setCompleted] = useState(false);
   const [completedForms, setCompletedForms] = useState<CompletedForm[]>([]);
   const [allAlreadyDone, setAllAlreadyDone] = useState(false);
+  const [syncError, setSyncError] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  // Items claimed done and waiting on instructor verification (P1-1) —
+  // seeded from the server, grown as the student marks honor-system steps.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  // Non-null once every remaining step is finished but N items still await
+  // instructor verification — renders the "Almost there" end state.
+  const [awaitingCount, setAwaitingCount] = useState<number | null>(null);
+  // Transient "✓ sent" notice shown after an honor-system step is marked.
+  const [justSentTitle, setJustSentTitle] = useState<string | null>(null);
+
+  // Shared completion sync — used by the normal wizard-finish path and by the
+  // all-already-done path so the progression flag can never be left behind.
+  const syncCompletion = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(false);
+    const saved = await postOrientationCompletion();
+    setSyncing(false);
+    if (saved) {
+      // Give the server a moment to award XP before refreshing progression.
+      setTimeout(() => checkProgression(), 500);
+    } else {
+      // The completion flag did NOT save. Per-item progress is already
+      // stored, so don't block the student — surface a retry notice instead.
+      setSyncError(true);
+    }
+  }, [checkProgression]);
+
+  // If every item was finished in a prior session, the completion flag may
+  // still be unset (the original sync call could have failed). The server
+  // route is idempotent, so re-run the sync whenever this state is detected.
+  useEffect(() => {
+    if (!allAlreadyDone) return;
+    void syncCompletion();
+  }, [allAlreadyDone, syncCompletion]);
+
+  // Shared by initial load and retry: seeds items, pending-verification
+  // state, derived steps, and the correct empty-steps end state.
+  const applyFetchedItems = useCallback((fetchedItems: OrientationItem[]) => {
+    setItems(fetchedItems);
+
+    const pending = fetchedItems.filter(
+      (item) => !item.completed && item.verificationStatus === "pending",
+    );
+    setPendingIds(new Set(pending.map((item) => item.id)));
+
+    const derivedSteps = deriveSteps(fetchedItems);
+    if (derivedSteps.length === 0) {
+      if (pending.length > 0) {
+        // Nothing left for the student — the instructor still has to verify.
+        setAwaitingCount(pending.length);
+      } else {
+        // All items already completed
+        setAllAlreadyDone(true);
+      }
+    }
+    setSteps(derivedSteps);
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
       const fetchedItems = await fetchOrientationWizardItems();
-      setItems(fetchedItems);
-
-      const derivedSteps = deriveSteps(fetchedItems);
-      if (derivedSteps.length === 0) {
-        // All items already completed
-        setAllAlreadyDone(true);
-      }
-      setSteps(derivedSteps);
+      applyFetchedItems(fetchedItems);
     } catch {
       setError("Failed to load orientation. Please refresh.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyFetchedItems]);
 
   useEffect(() => {
     let cancelled = false;
     fetchOrientationWizardItems()
       .then((fetchedItems) => {
         if (cancelled) return;
-        setItems(fetchedItems);
-
-        const derivedSteps = deriveSteps(fetchedItems);
-        if (derivedSteps.length === 0) {
-          // All items already completed
-          setAllAlreadyDone(true);
-        }
-        setSteps(derivedSteps);
+        applyFetchedItems(fetchedItems);
       })
       .catch(() => {
         if (!cancelled) setError("Failed to load orientation. Please refresh.");
@@ -145,9 +217,9 @@ export default function OrientationWizard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyFetchedItems]);
 
-  async function markItemComplete(itemId: string) {
+  async function markItemComplete(itemId: string): Promise<{ pendingVerification: boolean }> {
     const res = await fetch("/api/orientation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -156,6 +228,33 @@ export default function OrientationWizard() {
     if (!res.ok) {
       throw new Error("Failed to save progress");
     }
+    const body = (await res.json().catch(() => ({}))) as {
+      data?: { pendingVerification?: boolean };
+    };
+    return { pendingVerification: Boolean(body?.data?.pendingVerification) };
+  }
+
+  /**
+   * Finish the current step: mark the item complete when this is its last
+   * step, record pending-verification claims, and advance. Never blocks —
+   * honor-system steps advance immediately with a "✓ sent" notice.
+   */
+  async function finishStep(step: WizardStep, completedForm: CompletedForm) {
+    setJustSentTitle(null);
+    let pendingCount = pendingIds.size;
+    let form: CompletedForm | null = completedForm;
+
+    if (step.isLastForItem) {
+      const { pendingVerification } = await markItemComplete(step.orientationItemId);
+      if (pendingVerification) {
+        const nextPending = new Set(pendingIds).add(step.orientationItemId);
+        setPendingIds(nextPending);
+        pendingCount = nextPending.size;
+        form = null;
+        setJustSentTitle(step.stepTitle);
+      }
+    }
+    advanceStep(form, pendingCount);
   }
 
   async function handleSign(dataUrl: string) {
@@ -174,10 +273,7 @@ export default function OrientationWizard() {
         setError(data.error || "Signature submission failed.");
         return;
       }
-      if (step.isLastForItem) {
-        await markItemComplete(step.orientationItemId);
-      }
-      advanceStep({ title: step.stepTitle, type: "signed" });
+      await finishStep(step, { title: step.stepTitle, type: "signed" });
     } catch {
       setError("Submission failed. Please try again.");
     } finally {
@@ -191,11 +287,8 @@ export default function OrientationWizard() {
     setSubmitting(true);
     setError(null);
     try {
-      if (step.isLastForItem) {
-        await markItemComplete(step.orientationItemId);
-      }
       const type = step.type === "acknowledge" ? "acknowledged" : "read";
-      advanceStep({ title: step.stepTitle, type });
+      await finishStep(step, { title: step.stepTitle, type });
     } catch {
       setError("Failed to save. Please try again.");
     } finally {
@@ -208,10 +301,7 @@ export default function OrientationWizard() {
     if (!step) return;
     // The profile itself is already saved by the form component; here we
     // only record orientation progress and advance.
-    if (step.isLastForItem) {
-      await markItemComplete(step.orientationItemId);
-    }
-    advanceStep({ title: step.stepTitle, type: "acknowledged" });
+    await finishStep(step, { title: step.stepTitle, type: "acknowledged" });
   }
 
   async function handleSkipNoPdf() {
@@ -219,10 +309,7 @@ export default function OrientationWizard() {
     if (!step) return;
     setSubmitting(true);
     try {
-      if (step.isLastForItem) {
-        await markItemComplete(step.orientationItemId);
-      }
-      advanceStep({ title: step.stepTitle, type: "read" });
+      await finishStep(step, { title: step.stepTitle, type: "read" });
     } catch {
       setError("Failed to save. Please try again.");
     } finally {
@@ -230,34 +317,34 @@ export default function OrientationWizard() {
     }
   }
 
-  function advanceStep(completedForm: CompletedForm) {
-    const newCompleted = [...completedForms, completedForm];
+  function advanceStep(completedForm: CompletedForm | null, pendingCount: number) {
+    const newCompleted = completedForm ? [...completedForms, completedForm] : completedForms;
     setCompletedForms(newCompleted);
     setHasRead(false);
     setShowSignature(false);
     setError(null);
 
     if (currentStep + 1 >= steps.length) {
-      // All done — fire completion
-      completeOrientation(newCompleted);
+      if (pendingCount > 0) {
+        // Every remaining item is waiting on instructor verification — show
+        // the "Almost there" end state instead of the completion celebration.
+        setAwaitingCount(pendingCount);
+      } else {
+        // All done — fire completion
+        completeOrientation(newCompleted);
+      }
     } else {
       setCurrentStep(currentStep + 1);
     }
   }
 
-  async function completeOrientation(forms: CompletedForm[]) {
-    try {
-      await fetch("/api/orientation/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      setTimeout(() => checkProgression(), 500);
-    } catch {
-      // Non-critical — XP may not display but completion is saved
-    }
+  function completeOrientation(forms: CompletedForm[]) {
+    // The student finished every step — show the completion screen right
+    // away and run the sync in the background. If the sync fails the shared
+    // handler shows a non-blocking retry notice on the completion screen.
     setCompletedForms(forms);
     setCompleted(true);
+    void syncCompletion();
   }
 
   if (loading) {
@@ -283,18 +370,82 @@ export default function OrientationWizard() {
     );
   }
 
+  const syncNotice = syncError ? (
+    <div
+      role="alert"
+      className="mx-auto mb-6 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3"
+    >
+      <p className="text-sm text-amber-800">
+        We couldn&apos;t save your completion — your progress is safe.
+      </p>
+      <button
+        type="button"
+        onClick={() => void syncCompletion()}
+        disabled={syncing}
+        className="min-h-11 rounded-lg border border-amber-400 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {syncing ? "Saving..." : "Try again"}
+      </button>
+    </div>
+  ) : null;
+
   if (allAlreadyDone) {
     return (
-      <WizardCompletion
-        completedForms={items
-          .filter((i) => i.completed)
-          .map((i) => ({ title: i.label, type: "read" as const }))}
-      />
+      <div>
+        {syncNotice}
+        <WizardCompletion
+          completedForms={items
+            .filter((i) => i.completed)
+            .map((i) => ({ title: i.label, type: "read" as const }))}
+        />
+      </div>
+    );
+  }
+
+  if (awaitingCount !== null) {
+    return (
+      <div className="mx-auto max-w-xl text-center py-10">
+        <div className="text-5xl mb-4">⏳</div>
+        <h2 className="font-display text-2xl font-bold text-[var(--ink-strong)]">
+          Almost there!
+        </h2>
+        <p className="mt-3 text-sm text-[var(--ink-muted)]">
+          You&apos;ve done your part — your instructor is verifying{" "}
+          <span className="font-semibold text-[var(--ink-strong)]">
+            {awaitingCount} {awaitingCount === 1 ? "step" : "steps"}
+          </span>
+          . You&apos;ll be marked Onboarded as soon as they confirm.
+        </p>
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2">
+            Waiting on your instructor
+          </p>
+          <div className="space-y-1.5">
+            {items
+              .filter((item) => pendingIds.has(item.id))
+              .map((item) => (
+                <p key={item.id} className="flex items-center gap-2 text-sm text-amber-800">
+                  <span aria-hidden>✓</span>
+                  <span className="truncate">{item.label}</span>
+                  <span className="ml-auto shrink-0 text-xs text-amber-600">sent</span>
+                </p>
+              ))}
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-[var(--ink-faint)]">
+          No need to wait here — keep exploring VisionQuest and check back later.
+        </p>
+      </div>
     );
   }
 
   if (completed) {
-    return <WizardCompletion completedForms={completedForms} />;
+    return (
+      <div>
+        {syncNotice}
+        <WizardCompletion completedForms={completedForms} />
+      </div>
+    );
   }
 
   const step = steps[currentStep];
@@ -306,6 +457,18 @@ export default function OrientationWizard() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {justSentTitle && (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+        >
+          <span className="text-emerald-600" aria-hidden>✓</span>
+          <p className="text-sm text-emerald-800">
+            Sent — your instructor will verify &ldquo;{justSentTitle}&rdquo;.
+          </p>
+        </div>
+      )}
+
       <WizardStepIndicator
         totalSteps={steps.length}
         currentStep={currentStep}
@@ -321,6 +484,11 @@ export default function OrientationWizard() {
           {step.stepDescription && (
             <p className="text-sm text-[var(--ink-muted)] text-center max-w-md">{step.stepDescription}</p>
           )}
+          {step.needsRedo && (
+            <p className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+              Your instructor asked you to redo this step.
+            </p>
+          )}
           <p className="mt-2 text-xs text-[var(--ink-faint)]">
             Your instructor will lead this step.
           </p>
@@ -333,6 +501,11 @@ export default function OrientationWizard() {
           <p className="mt-1 text-xs text-[var(--ink-faint)]">
             Your instructor will provide a paper copy.
           </p>
+          {step.needsRedo && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+              Your instructor asked you to redo this step.
+            </p>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
@@ -348,7 +521,8 @@ export default function OrientationWizard() {
       {/* Action area (the profile form carries its own submit button) */}
       {step.type !== "profile-form" && (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 space-y-4">
-        {/* Mark Complete button (instructor-led type) */}
+        {/* Mark-done button (instructor-led type) — records a pending
+            verification claim; the instructor confirms it later. */}
         {step.type === "instructor-led" && (
           <button
             type="button"
@@ -356,7 +530,7 @@ export default function OrientationWizard() {
             disabled={submitting}
             className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Saving..." : "Mark Complete & Continue →"}
+            {submitting ? "Sending..." : "Mark done — your instructor will verify"}
           </button>
         )}
 
@@ -422,7 +596,8 @@ export default function OrientationWizard() {
           </button>
         )}
 
-        {/* Skip button (no-pdf type) */}
+        {/* Skip / mark-done button (no-pdf type). When this paper step is the
+            item's last step, marking it files a pending verification claim. */}
         {step.type === "no-pdf" && (
           <button
             type="button"
@@ -430,7 +605,11 @@ export default function OrientationWizard() {
             disabled={submitting}
             className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Saving..." : "Skip & Continue →"}
+            {submitting
+              ? step.isLastForItem ? "Sending..." : "Saving..."
+              : step.isLastForItem
+                ? "Mark done — your instructor will verify"
+                : "Skip & Continue →"}
           </button>
         )}
 

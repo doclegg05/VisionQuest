@@ -1,6 +1,11 @@
 import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
+import {
+  GOAL_EXTRACTION_KEY,
+  recordFailedExtraction,
+  serializeGoalExtractionPayload,
+} from "./failed-extraction";
 
 const BASE_EXTRACTION_PROMPT = `You analyze conversations between Sage (an AI mentor) and a student in a goal-setting program.
 
@@ -53,11 +58,24 @@ export interface ExtractionResult {
   stage_complete: boolean;
 }
 
+/**
+ * Identifiers needed to dead-letter an exhausted extraction (and later replay
+ * it via proposeGoal). Optional so existing callers keep compiling — a call
+ * site that omits it skips persistence and keeps today's behavior.
+ */
+export interface GoalExtractionFailureContext {
+  studentId: string;
+  conversationId?: string;
+  /** Sage message id the proposals would attribute to — proposeGoal requires it on replay. */
+  sourceMessageId?: string;
+}
+
 export async function extractGoals(
   provider: AIProvider,
   messages: { role: "user" | "model"; content: string }[],
   currentStage: string,
   programType: ProgramType | string | null = null,
+  failureContext?: GoalExtractionFailureContext,
 ): Promise<ExtractionResult> {
   // Use the last 10 messages for context efficiency
   const recent = messages.slice(-10);
@@ -111,8 +129,26 @@ export async function extractGoals(
     }
   }
 
-  // All retries exhausted. TODO: persist to a goal_extraction_failure table
-  // for instructor review (needs a schema migration).
+  // All retries exhausted. Dead-letter the input window for staff
+  // review/replay via recordFailedExtraction
+  // (src/lib/sage/failed-extraction.ts) instead of losing the
+  // Sage-proposed goals silently. Never throws. Skipped when the caller
+  // gave no failureContext (no studentId in scope).
+  if (failureContext) {
+    await recordFailedExtraction({
+      studentId: failureContext.studentId,
+      conversationId: failureContext.conversationId,
+      sourceMessageId: failureContext.sourceMessageId,
+      extractorKey: GOAL_EXTRACTION_KEY,
+      payload: serializeGoalExtractionPayload(
+        recent,
+        currentStage,
+        typeof programType === "string" ? programType : null,
+      ),
+      error: String(lastError),
+      attempts: MAX_ATTEMPTS,
+    });
+  }
   logger.error("Goal extraction failed after retries — no goals created this turn", {
     attempts: MAX_ATTEMPTS,
     error: String(lastError),

@@ -8,6 +8,8 @@ import {
   teacherDashboardReviewAction,
   teacherDashboardReviewQuickAction,
 } from "@/lib/intervention-notifications";
+import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
+import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
 import type { DashboardActionIntent } from "../DashboardActionPanel";
 import type {
   DashboardAlert,
@@ -126,7 +128,11 @@ export default function DetailedQueues({
                             {alert.severity}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                        {alert.type === WELLBEING_ALERT_TYPE ? (
+                          <WellbeingCrisisCard summary={alert.summary} className="mt-2" />
+                        ) : (
+                          <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                        )}
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                           <p className="text-xs text-[var(--ink-muted)]">
                             Detected {relativeTime(alert.detectedAt)}

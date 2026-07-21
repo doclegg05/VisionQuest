@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MoodCheckIn } from "./MoodCheckIn";
 
 /**
  * Ambient vital-signs rail for the chat-first home (Phase 4).
@@ -86,6 +87,8 @@ export function AmbientPanels({
         </Card>
       )}
 
+      <MoodCheckIn />
+
       {!orientationComplete && incompleteOrientationItems.length > 0 && (
         <Card href="/orientation" eyebrow="Orientation">
           <p className="font-semibold">
@@ -131,12 +134,6 @@ export function AmbientPanels({
           </p>
         </Card>
       )}
-
-      <p className="px-1 text-right text-xs text-[var(--ink-faint)]">
-        <Link href="/dashboard/classic" className="hover:text-[var(--ink-muted)]">
-          Classic view →
-        </Link>
-      </p>
     </div>
   );
 }

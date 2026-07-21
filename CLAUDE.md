@@ -44,12 +44,16 @@ Read when deciding what to build, cut, simplify, or automate.
 - **Live URL**: https://visionquest.onrender.com
 
 ## Architecture Notes
-- Auth: JWT in httpOnly cookies (SameSite=strict), PBKDF2-SHA512 password hashing
-- Chat: SSE streaming from `/api/chat/send`, two-call pattern (conversation + async goal extraction)
-- Gemini: systemInstruction set at `getGenerativeModel()` level, MODEL_NAME constant in `src/lib/gemini.ts`
+- Auth: JWT in httpOnly cookies (SameSite=strict), scrypt password hashing (legacy PBKDF2 rehashed on login), TOTP MFA, `sessionVersion` invalidation
+- AI providers: `src/lib/ai/` abstraction — Gemini (cloud) + Ollama (local), routed by data sensitivity (`resolveAiProvider`; student_record/staff_entered are local-only per FERPA policy); explicit safetySettings; transient-failure retry pre-first-token; prompt revisions stamped via `SAGE_PROMPT_REVISION`
+- Chat: SSE streaming from `/api/chat/send` (heartbeats, disconnect handling), two-call pattern (conversation + prioritized async extraction in `src/lib/chat/post-response.ts`); token-budget-aware history trimming
+- RAG: live hybrid pgvector + FTS retrieval with RRF (`src/lib/sage/hybrid-retrieval.ts`), `ProgramDocument` corpus + `catalog/` OKF layer, gating red-team/guardrail evals in CI (`.github/workflows/sage-evals.yml`)
+- Safety: deterministic crisis detection (English + Spanish) with 988 safety net, structured crisis context cards to assigned instructors, failed extractions dead-lettered for teacher review
+- Verification layer: orientation instructor-led steps, Sage-proposed goals, and certifications require human confirmation (intervention-queue-driven); staff reads of student data are audited
 - File storage: local `./uploads/` in dev, Supabase Storage (S3-compatible) in prod
-- CSRF: Origin header validation middleware for all POST/PUT/PATCH/DELETE to /api/*
+- CSRF: Origin header validation middleware for all POST/PUT/PATCH/DELETE to /api/*; Postgres RLS with spoofable-header stripping in `src/proxy.ts`
 - Student routes: `(student)` route group, Teacher routes: `(teacher)` route group
+- Data lifecycle: retention policy in `docs/DATA_RETENTION_POLICY.md` (durations pending OWNER-CONFIRM), admin-only offboarding with export-before-deactivate
 
 ## Production Environment
 - **Render Start Command**: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
@@ -80,6 +84,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | 2026-05-07 | Phase 2 and Phase 3 outcomes tracked as GitHub milestones | Single source of truth between `docs/PRODUCT_GUIDE.md` 90-Day Outcomes and the issue tracker. Milestones #1 (Phase 2, due 2026-05-17) and #2 (Phase 3, due 2026-06-21) with tracking issues #37–#40 carry outcome-style "definition of done" so risk-scout can flag slippage |
 | 2026-06-10 | Chat-first student home (Phase 4) | Sage conversation is the home surface; ambient rail carries vitals; classic dashboard at /dashboard/classic for one release |
 | 2026-05-07 | Project Autopilot installed locally | Read-only Claude Code orchestrator at `project-autopilot/` (gitignored) generates morning digests, weekly reviews, and triage sweeps over the GitHub repo. Deny list blocks all `gh` writes; agents propose, humans apply |
+| 2026-07-20 | Maturity repair session (see docs/MATURITY_REVIEW.md) | Verification layer added across orientation/goals/certs; crisis alerts get context cards (no transcript access — owner decision); classic dashboard deleted; crisis routing scoped to assigned instructors; data lifecycle v1; extraction dead-letter; Spanish crisis patterns |
 
 ## Known Issues
 - ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (no sleep). Verified 2026-04-29 in `render.yaml` (`plan: starter`).

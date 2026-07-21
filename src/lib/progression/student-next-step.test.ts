@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialState } from "./engine";
 import {
+  DISCOVERY_STALL_ASSISTANT_TURNS,
   resolveStudentNextStep,
   type StudentNextStepSignals,
 } from "./student-next-step";
@@ -20,6 +21,8 @@ function makeSignals(
     applicationCount: 0,
     openAlertCount: 0,
     openTaskCount: 0,
+    sageProposedUnconfirmedGoalCount: 0,
+    discoveryAssistantTurnCount: 0,
     ...overrides,
   };
 }
@@ -91,6 +94,74 @@ test("students with proof and resume move to job search", () => {
   assert.equal(stepStatus(result, "prepare"), "complete");
   assert.equal(stepStatus(result, "apply"), "active");
   assert.equal(result.actionLink, "/career");
+});
+
+test("goals that are all unconfirmed Sage proposals surface coach confirmation as the current action", () => {
+  const result = resolveStudentNextStep(
+    makeSignals({
+      hasCompletedDiscovery: true,
+      goalCount: 2,
+      sageProposedUnconfirmedGoalCount: 2,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "goal");
+  assert.equal(result.title, "Confirm this goal with your coach");
+  assert.equal(result.actionLink, "/goals");
+  assert.equal(stepStatus(result, "goal"), "active");
+  // Phase gating is unchanged: learn stays unlocked, just not the current action.
+  assert.equal(stepStatus(result, "learn"), "available");
+});
+
+test("a single confirmed or student-created goal keeps the normal learn progression", () => {
+  const result = resolveStudentNextStep(
+    makeSignals({
+      hasCompletedDiscovery: true,
+      goalCount: 2,
+      sageProposedUnconfirmedGoalCount: 1,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "learn");
+  assert.equal(stepStatus(result, "goal"), "complete");
+  assert.equal(stepStatus(result, "learn"), "active");
+});
+
+test("unconfirmed Sage proposals do not stall students who already show learning progress", () => {
+  const result = resolveStudentNextStep(
+    makeSignals({
+      hasCompletedDiscovery: true,
+      goalCount: 2,
+      sageProposedUnconfirmedGoalCount: 2,
+      completedMilestoneCount: 1,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "prove");
+  assert.equal(stepStatus(result, "goal"), "complete");
+});
+
+test("a long discovery conversation surfaces the coach-review nudge without changing the step", () => {
+  const result = resolveStudentNextStep(
+    makeSignals({
+      discoveryAssistantTurnCount: DISCOVERY_STALL_ASSISTANT_TURNS,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "discover");
+  assert.equal(result.actionLink, "/chat");
+  assert.match(result.description, /Ask your coach to review your discovery/);
+});
+
+test("a short discovery conversation does not show the coach-review nudge", () => {
+  const result = resolveStudentNextStep(
+    makeSignals({
+      discoveryAssistantTurnCount: DISCOVERY_STALL_ASSISTANT_TURNS - 1,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "discover");
+  assert.doesNotMatch(result.description, /review your discovery/);
 });
 
 test("open advising work blocks the follow-up step after applications start", () => {

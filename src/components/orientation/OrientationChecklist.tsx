@@ -14,6 +14,7 @@ interface OrientationItem {
   required: boolean;
   completed: boolean;
   completedAt: string | null;
+  verificationStatus: string | null;
 }
 
 interface SectionGroup {
@@ -161,6 +162,26 @@ export default function OrientationChecklist({
             : item
         ));
         return;
+      }
+
+      const body = (await res.json().catch(() => ({}))) as {
+        data?: { pendingVerification?: boolean; verificationStatus?: string };
+      };
+      if (body?.data?.pendingVerification) {
+        // Honor-system step (P1-1): the claim was filed, not completed —
+        // show the waiting state and never fire the completion call.
+        setItems((prev) => prev.map((item) =>
+          item.id === itemId
+            ? { ...item, completed: false, completedAt: null, verificationStatus: "pending" }
+            : item
+        ));
+        return;
+      }
+      if (!completed) {
+        // Un-marking also withdraws any pending/declined verification state.
+        setItems((prev) => prev.map((item) =>
+          item.id === itemId ? { ...item, verificationStatus: null } : item
+        ));
       }
 
       setItems((prev) => {
@@ -336,6 +357,16 @@ export default function OrientationChecklist({
                         </p>
                         {item.description && (
                           <p className="text-sm text-[var(--ink-muted)] mt-0.5">{item.description}</p>
+                        )}
+                        {!item.completed && item.verificationStatus === "pending" && (
+                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            ✓ Sent — waiting on your instructor
+                          </p>
+                        )}
+                        {!item.completed && item.verificationStatus === "declined" && (
+                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                            Your instructor asked you to redo this step
+                          </p>
                         )}
                       </div>
 

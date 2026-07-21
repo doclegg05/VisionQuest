@@ -5,9 +5,11 @@
 - Server components by default — `"use client"` only when interactivity required
 - Route groups: `(student)`, `(teacher)`, `(admin)` — each has its own layout
 
-## Navigation (Post-Simplification)
-- Student: Dashboard, Chat, Goals, Learning (merged Courses+Certs), Career (merged Jobs+Events), Orientation, Portfolio, Appointments, Settings, **Vision Board, Files, Resources** (retained per 2026-04-01 product decision — see `docs/PRODUCT_DECISIONS.md`)
-- Teacher: Dashboard, Classes, Student Detail
+## Navigation (Chat-First, 2026-06-10 decision)
+- Student home is the Sage conversation (`/dashboard`) with an ambient vitals rail (readiness, alerts, orientation nudge, daily mood check-in, tasks, next appointment); the classic dashboard was retired 2026-07-20 (`/dashboard/classic` redirects)
+- Primary student nav is phase-gated (`src/lib/nav-items.ts` + `nav-progression.ts`): Goals, Learning (merged Courses+Certs), Career (merged Jobs+Events), Advising, Portfolio — Portfolio unlocks at phase 2, Career/Advising at phase 3
+- Secondary nav: Vision Board and **Documents** (the renamed Files feature); Resources is out of nav (reachable via Learning's Resource Center card); Orientation appears only AFTER completion as a read-only archive
+- Teacher: Dashboard (intervention queue focus), Classes, Student Detail (4 tabs: Overview, Goals & Plan, Progress, Operations)
 - Out of active scope: SPOKES page (deprecated in favor of integrated SPOKES tab on Student Detail)
 
 ## Component Conventions

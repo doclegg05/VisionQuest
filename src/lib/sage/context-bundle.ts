@@ -251,7 +251,7 @@ export async function assembleStudentContextBundle(
     }),
     prisma.orientationProgress.findMany({
       where: { studentId },
-      select: { itemId: true, completed: true, completedAt: true },
+      select: { itemId: true, completed: true, completedAt: true, verificationStatus: true },
     }),
     prisma.progressionEvent.findMany({
       where: { studentId, occurredAt: { gte: recentSince } },
@@ -348,6 +348,7 @@ export async function assembleStudentContextBundle(
       itemId: p.itemId,
       completed: p.completed,
       completedAt: p.completedAt ? p.completedAt.toISOString() : null,
+      verificationStatus: p.verificationStatus ?? null,
     })),
   });
 

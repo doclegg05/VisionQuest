@@ -45,7 +45,30 @@ export interface StudentNextStepSignals {
   applicationCount: number;
   openAlertCount: number;
   openTaskCount: number;
+  /**
+   * Planning-status goals that are Sage proposals still awaiting instructor
+   * confirmation (sourceMessageId set, never confirmed). When every planning
+   * goal is one of these, the next-step surfaces "confirm with your coach"
+   * instead of silently advancing. Phase gating (hasGoals) is unchanged.
+   */
+  sageProposedUnconfirmedGoalCount: number;
+  /**
+   * Assistant turns across the student's discovery-stage conversations.
+   * Used only to surface a "ask your coach to review" nudge when discovery
+   * never completes despite a long-running conversation.
+   */
+  discoveryAssistantTurnCount: number;
 }
+
+/**
+ * Assistant turns in discovery-stage conversations after which an incomplete
+ * discovery is treated as stalled and the student is nudged to ask their
+ * coach for a manual review.
+ */
+export const DISCOVERY_STALL_ASSISTANT_TURNS = 10;
+
+const DISCOVERY_STALL_NUDGE =
+  "Been chatting for a while? Ask your coach to review your discovery and mark it complete.";
 
 function buildStep(
   key: PathStepKey,
@@ -73,16 +96,31 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
     signals.openAlertCount > 0 ||
     signals.openTaskCount > 0;
 
+  // Every planning goal is an unconfirmed Sage proposal — the student has a
+  // plan on paper, but no instructor has confirmed any of it yet. Keep the
+  // phase unlocked (hasGoals stays true) but make confirmation the current
+  // action instead of silently advancing past it.
+  const goalsAwaitConfirmationOnly =
+    !signals.bhagCompleted &&
+    signals.goalCount > 0 &&
+    signals.sageProposedUnconfirmedGoalCount >= signals.goalCount;
+  const interceptForGoalConfirmation =
+    signals.hasCompletedDiscovery && hasGoals && goalsAwaitConfirmationOnly && !hasLearningProgress;
+
   const discoverStatus: PathStepStatus = signals.hasCompletedDiscovery ? "complete" : "active";
   const goalStatus: PathStepStatus = hasGoals
-    ? "complete"
+    ? interceptForGoalConfirmation
+      ? "active"
+      : "complete"
     : signals.hasCompletedDiscovery
       ? "active"
       : "locked";
   const learnStatus: PathStepStatus = hasLearningProgress
     ? "complete"
     : hasGoals
-      ? "active"
+      ? interceptForGoalConfirmation
+        ? "available"
+        : "active"
       : "locked";
   const proveStatus: PathStepStatus = hasPortfolioItems
     ? "complete"
@@ -115,6 +153,21 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
 
   if (!signals.hasCompletedDiscovery) {
     currentStepKey = "discover";
+    if (signals.discoveryAssistantTurnCount >= DISCOVERY_STALL_ASSISTANT_TURNS) {
+      // The discovery conversation has run long without completing —
+      // usually the automatic extractor never fired. Keep chatting as the
+      // primary action, but tell the student a coach can unblock them.
+      description = `${description} ${DISCOVERY_STALL_NUDGE}`;
+    }
+  } else if (interceptForGoalConfirmation) {
+    currentStepKey = "goal";
+    title = "Confirm this goal with your coach";
+    description =
+      "Sage suggested your current goals. Ask your instructor to look them over and confirm they fit your plan.";
+    whyItMatters =
+      "A quick check-in makes your plan official and keeps you and your coach working toward the same target.";
+    actionLabel = "Review My Goals";
+    actionLink = "/goals";
   } else if (!hasGoals) {
     currentStepKey = "goal";
     title = "Set and confirm your goals";
@@ -199,10 +252,18 @@ export async function getStudentNextStep(studentId: string): Promise<StudentNext
   const readinessData = await fetchStudentReadinessData(studentId);
   const { state, bhagCompleted } = readinessData;
 
+  // Planning statuses that can still be awaiting instructor confirmation —
+  // "confirmed" and "completed" goals are settled by definition.
+  const unconfirmablePlanningStatuses = GOAL_PLANNING_STATUSES.filter(
+    (status) => status !== "confirmed" && status !== "completed",
+  );
+
   const [
     careerDiscovery,
     goalCount,
     monthlyGoalsCount,
+    sageProposedUnconfirmedCount,
+    discoveryAssistantTurns,
     completedMilestonesCount,
     savedJobsCount,
     applicationsCount,
@@ -221,6 +282,21 @@ export async function getStudentNextStep(studentId: string): Promise<StudentNext
         studentId,
         level: "monthly",
         status: { in: [...GOAL_PLANNING_STATUSES] },
+      },
+    }),
+    prisma.goal.count({
+      where: {
+        studentId,
+        status: { in: unconfirmablePlanningStatuses },
+        sourceMessageId: { not: null },
+        confirmedAt: null,
+      },
+    }),
+    prisma.message.count({
+      where: {
+        studentId,
+        role: "assistant",
+        conversation: { stage: "discovery" },
       },
     }),
     prisma.goal.count({
@@ -246,6 +322,8 @@ export async function getStudentNextStep(studentId: string): Promise<StudentNext
     hasCompletedDiscovery: careerDiscovery?.status === "complete",
     goalCount,
     monthlyGoalCount: monthlyGoalsCount,
+    sageProposedUnconfirmedGoalCount: sageProposedUnconfirmedCount,
+    discoveryAssistantTurnCount: discoveryAssistantTurns,
     completedMilestoneCount: completedMilestonesCount,
     savedJobCount: savedJobsCount,
     applicationCount: applicationsCount,

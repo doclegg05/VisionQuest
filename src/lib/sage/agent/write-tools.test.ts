@@ -13,6 +13,12 @@ const mockSavedJobUpsert = mock.fn(async () => ({})) as any;
 const mockListingFindFirst = mock.fn() as any;
 const mockSaveJobEnrollmentFindFirst = mock.fn(async () => ({ classId: "class-1" })) as any;
 const mockRecordOperation = mock.fn(async () => undefined) as any;
+// submit_form now routes through applyStudentOrientationCompletion (P1-1):
+// the progress upsert is the write sentinel, and the signature guard reads
+// formSubmission rows ("Dress Code Policy" is a sign-step form, so the
+// default fixture has its signed submission on file).
+const mockProgressUpsert = mock.fn(async () => ({})) as any;
+const mockSubmissionFindMany = mock.fn(async () => [{ formId: "dress-code" }]) as any;
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -28,7 +34,16 @@ mock.module("@/lib/db", {
           return mockItemFindUnique;
         },
       },
-      orientationProgress: { upsert: mock.fn(async () => ({})) },
+      orientationProgress: {
+        get upsert() {
+          return mockProgressUpsert;
+        },
+      },
+      formSubmission: {
+        get findMany() {
+          return mockSubmissionFindMany;
+        },
+      },
       goal: {
         get findFirst() {
           return mockGoalFindFirst;
@@ -107,9 +122,12 @@ describe("write tools — confirmation enforcement", () => {
     mockRecordOperation.mock.resetCalls();
     mockGoalFindFirst.mock.resetCalls();
     mockGoalUpdate.mock.resetCalls();
+    mockProgressUpsert.mock.resetCalls();
+    mockSubmissionFindMany.mock.resetCalls();
     mockFileFindFirst.mock.mockImplementation(async () => ({ id: "file-1", filename: "signed-form.pdf" }));
     mockItemFindUnique.mock.mockImplementation(async () => ({ id: "item-1", label: "Dress Code Policy" }));
     mockGoalFindFirst.mock.mockImplementation(async () => ({ id: "goal-1", content: "Finish CNA prep", status: "active" }));
+    mockSubmissionFindMany.mock.mockImplementation(async () => [{ formId: "dress-code" }]);
   });
 
   it("unconfirmed submit_form returns a proposal card and writes NOTHING", async () => {
@@ -122,7 +140,7 @@ describe("write tools — confirmation enforcement", () => {
 
     assert.equal(record.result.status, "success");
     assert.equal(record.result.action?.action, "confirm_tool");
-    assert.equal(mockTransaction.mock.callCount(), 0); // no DB mutation
+    assert.equal(mockProgressUpsert.mock.callCount(), 0); // no DB mutation
     // Proposal is ledgered
     assert.equal(mockRecordOperation.mock.calls[0].arguments[0].status, "proposed");
   });
@@ -136,7 +154,7 @@ describe("write tools — confirmation enforcement", () => {
     });
     // Unknown args are stripped by schema validation OR ignored — either way
     // execution must not happen without a server-issued token.
-    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
     assert.notEqual(record.result.summary.includes("Done"), true);
   });
 
@@ -155,9 +173,52 @@ describe("write tools — confirmation enforcement", () => {
 
     assert.equal(record.result.status, "success");
     assert.match(record.result.summary, /Done/);
-    assert.equal(mockTransaction.mock.callCount(), 1);
+    assert.equal(mockProgressUpsert.mock.callCount(), 1);
     const statuses = mockRecordOperation.mock.calls.map((c: any) => c.arguments[0].status);
     assert.ok(statuses.includes("executed"));
+  });
+
+  it("submit_form against an unsigned sign-step item refuses completion (P0-1 via shared helper)", async () => {
+    mockSubmissionFindMany.mock.mockImplementation(async () => []); // nothing signed
+    const token = createConfirmationToken(
+      { toolName: "submit_form", args: SUBMIT_ARGS, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session: studentSession(),
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /needs your signature/i);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+
+  it("submit_form on an honor-system item reports pending instructor verification (P1-1)", async () => {
+    mockItemFindUnique.mock.mockImplementation(async () => ({
+      id: "item-1",
+      label: "Complete TABE entry assessment",
+    }));
+    const token = createConfirmationToken(
+      { toolName: "submit_form", args: SUBMIT_ARGS, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    const record = await executeAgentTool({
+      session: studentSession(),
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /instructor to verify/i);
+    const upsert = mockProgressUpsert.mock.calls[0].arguments[0];
+    assert.equal(upsert.update.completed, false);
+    assert.equal(upsert.update.verificationStatus, "pending");
   });
 
   it("a token issued for different args is rejected — proposal again, no write", async () => {
@@ -203,8 +264,11 @@ describe("write tools — staff-assisted target binding", () => {
     mockFileFindFirst.mock.resetCalls();
     mockTransaction.mock.resetCalls();
     mockRecordOperation.mock.resetCalls();
+    mockProgressUpsert.mock.resetCalls();
+    mockSubmissionFindMany.mock.resetCalls();
     mockFileFindFirst.mock.mockImplementation(async () => ({ id: "file-1", filename: "signed-form.pdf" }));
     mockItemFindUnique.mock.mockImplementation(async () => ({ id: "item-1", label: "Dress Code Policy" }));
+    mockSubmissionFindMany.mock.mockImplementation(async () => [{ formId: "dress-code" }]);
   });
 
   it("a token bound to targetStudentId cannot confirm without it — proposal again, no write", async () => {
@@ -227,7 +291,7 @@ describe("write tools — staff-assisted target binding", () => {
       confirmedToken: token,
     });
     assert.equal(record.result.action?.action, "confirm_tool");
-    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
   });
 
   it("teacher round-trip with targetStudentId executes against the TARGET student", async () => {
@@ -252,10 +316,13 @@ describe("write tools — staff-assisted target binding", () => {
 
     assert.equal(record.result.status, "success");
     assert.match(record.result.summary, /Done/);
-    assert.equal(mockTransaction.mock.callCount(), 1);
+    assert.equal(mockProgressUpsert.mock.callCount(), 1);
     // Ownership lookup must be scoped to the target student, not the teacher.
     const fileWhere = mockFileFindFirst.mock.calls[0].arguments[0].where;
     assert.equal(fileWhere.studentId, "stu-2");
+    // The progress write lands on the target student too.
+    const progressWhere = mockProgressUpsert.mock.calls[0].arguments[0].where;
+    assert.equal(progressWhere.studentId_itemId.studentId, "stu-2");
   });
 
   it("a token bound to one target cannot confirm for a different target", async () => {
@@ -278,7 +345,7 @@ describe("write tools — staff-assisted target binding", () => {
       confirmedToken: token,
     });
     assert.equal(record.result.action?.action, "confirm_tool");
-    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
   });
 
   // Note: a STUDENT supplying targetStudentId to /api/chat/tool-confirm is
@@ -394,6 +461,6 @@ describe("write tools — injection resistance", () => {
       args: { fileUploadId: "someone-elses-file", orientationItemId: "item-1" },
     });
     assert.equal(record.result.status, "error");
-    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
   });
 });

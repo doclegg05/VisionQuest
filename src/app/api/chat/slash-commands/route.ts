@@ -9,11 +9,17 @@
 // =============================================================================
 
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-error";
+import { withAuth, rateLimited } from "@/lib/api-error";
+import { rateLimit } from "@/lib/rate-limit";
 import { getSlashCommandsForRole } from "@/lib/sage/agent/tools";
 import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
 
 export const GET = withAuth(async (session) => {
+  const rl = await rateLimit(`chat-slash-commands:${session.id}`, 60, 60 * 60 * 1000);
+  if (!rl.success) {
+    throw rateLimited("Too many requests this hour. Please wait before trying again.");
+  }
+
   if (!isAgentLoopEnabled()) {
     return NextResponse.json({ commands: [], agentEnabled: false });
   }

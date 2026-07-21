@@ -38,18 +38,20 @@ Read when deciding what to build, cut, simplify, or automate.
 ## Project Overview
 - **Name**: VisionQuest
 - **Description**: AI-coach-driven program portal for SPOKES workforce development (adults on TANF/SNAP). AI coach named "Sage" guides students through goal-setting, orientation, certification tracking, portfolio building, and employability skills.
-- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 2.5 Flash, Tailwind CSS 4, Sentry
-- **Hosting**: Render.com (free tier)
+- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 3.1 Flash Lite (+ optional local Ollama provider), Tailwind CSS 4, Sentry
+- **Hosting**: Render.com (Starter plan — no instance sleep)
 - **Repo**: https://github.com/doclegg05/VisionQuest.git
 - **Live URL**: https://visionquest.onrender.com
 
 ## Architecture Notes
-- Auth: JWT in httpOnly cookies (SameSite=strict), PBKDF2-SHA512 password hashing
-- Chat: SSE streaming from `/api/chat/send`, two-call pattern (conversation + async goal extraction)
-- Gemini: systemInstruction set at `getGenerativeModel()` level, MODEL_NAME constant in `src/lib/gemini.ts`
+- Auth: JWT in httpOnly cookies (SameSite=strict), scrypt password hashing (legacy PBKDF2 rehashed on login), TOTP MFA, `sessionVersion` invalidation
+- AI providers: `src/lib/ai/` abstraction — Gemini cloud + Ollama local, routed by data sensitivity (FERPA-sensitive classes are local-only by policy); systemInstruction set at `getGenerativeModel()` level (`DEFAULT_GEMINI_MODEL` in `src/lib/gemini.ts`)
+- Chat: SSE streaming from `/api/chat/send`, two-call pattern (conversation + prioritized async extraction); deterministic crisis safety net (988, English + Spanish patterns)
+- RAG: live hybrid pgvector + full-text retrieval (`src/lib/sage/hybrid-retrieval.ts`) over `ProgramDocument` rows + the `catalog/` OKF layer; gating red-team evals in CI
 - File storage: local `./uploads/` in dev, Supabase Storage (S3-compatible) in prod
-- CSRF: Origin header validation middleware for all POST/PUT/PATCH/DELETE to /api/*
+- CSRF: Origin header validation middleware for all POST/PUT/PATCH/DELETE to /api/*; Postgres RLS with spoofable-header stripping
 - Student routes: `(student)` route group, Teacher routes: `(teacher)` route group
+- CLAUDE.md (same repo) carries the fuller, more current architecture notes — when the two disagree, trust CLAUDE.md
 
 ## Production Environment
 - **Render Start Command**: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
@@ -58,7 +60,7 @@ Read when deciding what to build, cut, simplify, or automate.
 
 ## Product Scope Authority
 - **Authoritative doc**: `docs/PRODUCT_DECISIONS.md` — governs all product scope decisions (5-step framework: Question → Delete → Simplify → Accelerate → Automate)
-- **Key decision (April 1, 2026)**: Vision Board, Files, and Resources are permanently **retained** and must be restored to student navigation.
+- **Key decision (April 1, 2026, superseded June 10, 2026)**: Vision Board, Files, and Resources features are retained; the chat-first redesign moved Resources out of nav (reachable via Learning) and renamed Files to "Documents". See the 2026-06-10 and 2026-07-20 entries in `docs/PRODUCT_DECISIONS.md`.
 
 ## Key Decisions Log
 | Date | Decision | Rationale |
@@ -79,11 +81,11 @@ Read when deciding what to build, cut, simplify, or automate.
 | 2026-04-01 | CSP headers with nonce-based scripts/styles | Hardened via `src/proxy.ts`; Gemini, Credly, Sentry, Google Fonts whitelisted |
 
 ## Known Issues
-- Free tier Render instances sleep after inactivity (30-60s cold start)
+- ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (verified 2026-04-29 in `render.yaml`)
 - ~~OAuth users get random password hash~~ — Fixed (2026-04-01): passwordHash is now null for OAuth users
 - ~~No CSP headers configured~~ — Fixed (2026-04-01): nonce-based CSP in `src/proxy.ts`
-- docs-upload/sage-context/ is intended for RAG grounding documents but is not yet populated or integrated into Sage AI
-- Render free tier may not execute cron jobs (3 declared in render.yaml — verify)
+- ~~docs-upload/sage-context/ intended for RAG grounding~~ — Stale: that directory is empty and unmapped. Grounding documents live as `ProgramDocument` rows curated via the teacher sage-context API plus the `catalog/` OKF layer; RAG is live
+- ~~Render free tier may not execute cron jobs~~ — Resolved: cron jobs run in Supabase pg_cron (see `docs/plans/pg-cron-setup-runbook.md`)
 
 ## Design Context
 - **Full design context**: See [.impeccable.md](./.impeccable.md) for complete design principles, color system, typography, and accessibility requirements

@@ -3,6 +3,7 @@ import { syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
+import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 import { logger } from "@/lib/logger";
 import { deleteFile } from "@/lib/storage";
 import { parseBody, opportunityApplicationSchema } from "@/lib/schemas";
@@ -105,11 +106,18 @@ export const POST = withAuth(async (session, req: Request) => {
         opportunityId,
       },
     },
+    // P1-4: every status change through this route is a student claim. Stamp
+    // it self-reported (clearing any prior instructor verification, which the
+    // new claim supersedes) so grant reports can split verified vs
+    // self-reported outcomes.
     update: {
       status,
       notes: notes || null,
       resumeFileId: resumeFileId || null,
       appliedAt: status === "applied" ? new Date() : undefined,
+      verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
+      verifiedBy: null,
+      verifiedAt: null,
     },
     create: {
       studentId: session.id,
@@ -118,6 +126,7 @@ export const POST = withAuth(async (session, req: Request) => {
       notes: notes || null,
       resumeFileId: resumeFileId || null,
       appliedAt: status === "applied" ? new Date() : null,
+      verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
     },
   });
 

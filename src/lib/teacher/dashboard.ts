@@ -642,6 +642,7 @@ export async function getTeacherDashboardPage(
               "goal_missing_confirmed",
               "goal_missing_monthly",
               "goal_review_stale",
+              "goal_unconfirmed",
             ],
           },
         },

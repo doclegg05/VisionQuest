@@ -48,6 +48,10 @@ export async function extractMoodFromConversation(
         label: "Mood extraction",
         alertKey: "mood_extraction_exhausted",
         context: { conversationId, studentId },
+        // Dead-letter on exhaustion so the input survives for staff review.
+        studentId,
+        conversationId,
+        failurePayload: () => conversationText,
       },
     );
 

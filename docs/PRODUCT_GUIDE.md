@@ -1,8 +1,16 @@
 # VisionQuest Product Guide
 
-Status: Active  
-Effective window: March 23, 2026 through June 21, 2026  
+Status: Window lapsed — charter content remains authoritative until the next 90-day window is authored  
+Effective window: March 23, 2026 through June 21, 2026 (ended; successor window not yet defined)  
 Audience: AI agents, coding agents, and development contributors
+
+> **2026-07-20 status note:** The full-project maturity review and repair session is recorded in
+> [MATURITY_REVIEW.md](./MATURITY_REVIEW.md) — it seeds the next window. The "Next" priority
+> "Verify Sage quality against the jobs it is supposed to support" now has standing
+> infrastructure: gating red-team/guardrail CI evals, prompt-revision stamping, and per-call
+> token accounting. The verification/truth layer (orientation sign-off, goal confirmation
+> nudges, cert verification) shipped in that session. Authoring the next 90-day charter is
+> owner work.
 
 This is the single product reference for VisionQuest. It consolidates the mission, charter, and current gap assessment. Agents working on product-shaping changes should read this before starting.
 

@@ -18,6 +18,8 @@ export interface StudentStatusOrientationProgress {
   itemId: string;
   completed: boolean;
   completedAt?: Date | string | null;
+  /** P1-1 honor-system sign-off: "pending" | "verified" | "declined" | null. */
+  verificationStatus?: string | null;
 }
 
 export interface StudentStatusFormItem {
@@ -45,6 +47,8 @@ export interface StudentStatusSignals {
     totalRequired: number;
     completedRequired: number;
     incompleteRequired: StudentStatusOrientationItemStatus[];
+    /** Items (required or not) the student marked done, awaiting teacher sign-off. */
+    pendingVerification: StudentStatusOrientationItemStatus[];
   };
 }
 
@@ -117,9 +121,23 @@ export function buildStudentStatusSignals({
     requiredForms.pendingReview.push(item);
   }
 
+  const isPendingVerification = (itemId: string) => {
+    const progress = progressByItemId.get(itemId);
+    return !progress?.completed && progress?.verificationStatus === "pending";
+  };
+
+  // Any item (required or not) the student marked done that now waits on
+  // instructor sign-off (P1-1) — surfaced to teachers, not nagged at students.
+  const pendingVerification = orientationItems
+    .filter((item) => isPendingVerification(item.id))
+    .map((item) => ({ id: item.id, label: item.label }));
+
   const requiredOrientationItems = orientationItems.filter((item) => item.required);
+  const completedRequired = requiredOrientationItems.filter(
+    (item) => progressByItemId.get(item.id)?.completed,
+  ).length;
   const incompleteRequired = requiredOrientationItems
-    .filter((item) => !progressByItemId.get(item.id)?.completed)
+    .filter((item) => !progressByItemId.get(item.id)?.completed && !isPendingVerification(item.id))
     .map((item) => ({
       id: item.id,
       label: item.label,
@@ -129,8 +147,9 @@ export function buildStudentStatusSignals({
     requiredForms,
     orientationChecklist: {
       totalRequired: requiredOrientationItems.length,
-      completedRequired: requiredOrientationItems.length - incompleteRequired.length,
+      completedRequired,
       incompleteRequired,
+      pendingVerification,
     },
   };
 }
@@ -172,11 +191,18 @@ export function buildStudentStatusSummary(
     );
   }
 
+  if (signals.orientationChecklist.pendingVerification.length > 0) {
+    lines.push(
+      `Orientation steps marked done by the student, awaiting instructor verification: ${formatList(signals.orientationChecklist.pendingVerification.map((item) => item.label))}.`,
+    );
+  }
+
   const hasOutstandingWork =
     signals.requiredForms.missing.length > 0 ||
     signals.requiredForms.pendingReview.length > 0 ||
     signals.requiredForms.needsRevision.length > 0 ||
-    signals.orientationChecklist.incompleteRequired.length > 0;
+    signals.orientationChecklist.incompleteRequired.length > 0 ||
+    signals.orientationChecklist.pendingVerification.length > 0;
 
   if (!hasOutstandingWork && !options.includePositiveSummary) {
     return null;
