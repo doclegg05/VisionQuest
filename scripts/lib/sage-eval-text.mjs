@@ -77,7 +77,9 @@ const REFUSAL_MARKER_ALTERNATIVES = [
     "stay focused on",
     "i(?:'?m| am) sage",
     "i'?ll (?:continue|stay)",
-    "my role is",
+    "my (?:role|job|focus) is",
+    "i'?m here to (?:help|support)",
+    "off[\\s-]?topic",
     "pass on th(?:at|e)",
     "i'?d love to help you with",
 ];
