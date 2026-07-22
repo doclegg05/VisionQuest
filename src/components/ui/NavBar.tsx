@@ -16,18 +16,25 @@ import {
   UserCircle,
   SignOut,
   Books,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
 import NotificationBell from "./NotificationBell";
 import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
-const STAFF_ITEMS: NavItem[] = [
+export const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/teacher", label: "Students", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
   { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
+  {
+    href: "/teacher/failed-extractions",
+    label: "AI Review",
+    icon: WarningCircle,
+    phase: 1,
+  },
 ];
 
 const COORDINATOR_ITEMS: NavItem[] = [
