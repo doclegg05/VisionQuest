@@ -124,6 +124,22 @@ agent). Build/Test fix-loops run inline so the fixer retains memory of prior
 attempts. (Rejected: subagent-per-stage — cleaner isolation but each fix-loop
 would start context-blind and token cost balloons.)
 
+**Named reusable agents** (added 2026-07-22): the workflow's roles are extracted
+as named project agents in `.claude/agents/` so future `<gate>-pipeline`
+workflows reuse them instead of rebuilding similar agents:
+
+- `scout.md` — read-only recon; Ticket block in, five-section scout report out.
+- `builder.md` — plan execution contract: tests-first, wiring proof, repo
+  conventions, fix-loop instruction handling. Runs inline in `/ci-pipeline`.
+- `gate-runner.md` — ordered gate-list execution contract: PASS/FAIL per
+  command, failing output verbatim, no fixing while in role. Parameterized by
+  gate list, so each `<gate>-pipeline` supplies its own. Runs inline.
+- `code-reviewer.md` — pre-existing project agent, used as-is for the pre-push
+  review pass.
+
+Plan is deliberately NOT an agent: it owns the single human approval gate, so
+it stays with the orchestrator.
+
 ## Failure and safety posture
 
 - Retry caps everywhere (3 local, 2 CI); caps produce reports, not thrash.
@@ -148,3 +164,6 @@ would start context-blind and token cost balloons.)
    PRs to `main`), uses `gh pr checks --watch`, and specifies
    `gh run view --log-failed` as the fail-loop input.
 6. Draft-PR stage forbids merging and includes the `Closes #<n>` linkage rule.
+7. The command references the named reusable agents by their
+   `.claude/agents/` paths (scout, builder, gate-runner, code-reviewer) so the
+   roles are identifiable and shareable across the `<gate>-pipeline` family.

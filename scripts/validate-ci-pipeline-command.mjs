@@ -95,6 +95,15 @@ const contentChecks = [
     "ship: never merges, links issue via Closes #",
     (t) => /never merge/i.test(t) && t.includes("Closes #"),
   ],
+  [
+    "agents: named reusable agents referenced by path (scout, builder, gate-runner)",
+    (t) =>
+      [
+        ".claude/agents/scout.md",
+        ".claude/agents/builder.md",
+        ".claude/agents/gate-runner.md",
+      ].every((path) => t.includes(path)),
+  ],
 ];
 
 const results = [

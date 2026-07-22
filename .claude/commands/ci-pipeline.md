@@ -28,7 +28,8 @@ merge. Spec: `docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md`.
 
 ## Stage 2 — Planning (Scout, then Plan — the only gate)
 
-1. **Scout.** Dispatch a read-only Explore subagent with the Ticket block as input.
+1. **Scout.** Dispatch the **scout** agent (`.claude/agents/scout.md`) — a read-only
+   Explore subagent primed with that definition — with the Ticket block as input.
    It must return a scout report containing:
    - Relevant files with exact paths.
    - Existing patterns to follow — never invent a new pattern when one exists in the repo.
@@ -51,6 +52,9 @@ merge. Spec: `docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md`.
 
 ## Stage 3 — Building
 
+Assume the **builder** role for this stage: follow `.claude/agents/builder.md`
+inline (no subagent — fix-loops must keep memory of prior attempts).
+
 1. Create branch `ci-pipeline/<short-slug>` off an up-to-date `main`.
 2. **Tests first.** Write the acceptance tests mapped one-to-one to the approved
    acceptance criteria. Run them and show them failing before any implementation —
@@ -69,6 +73,10 @@ merge. Spec: `docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md`.
 
 ## Stage 4 — Testing (local fail-loop)
 
+Run the gates under the **gate-runner** contract (`.claude/agents/gate-runner.md`),
+inline: report PASS/FAIL per command, failing output verbatim, no fixing or
+gate-editing while in this role.
+
 1. Run the local gate — the CI-equivalent checks — in this order:
    1. `npm run lint`
    2. `npm run typecheck`
@@ -82,7 +90,7 @@ merge. Spec: `docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md`.
    hit, stop and write an honest failure report — what failed, what was tried, and the
    current branch state. Never push a red branch.
 3. **Automated review pass.** Once the local gate is green, run the project
-   `code-reviewer` agent on the branch diff. CRITICAL and HIGH findings must be fixed
+   `code-reviewer` agent (`.claude/agents/code-reviewer.md`) on the branch diff. CRITICAL and HIGH findings must be fixed
    (then re-run the full local gate); record MEDIUM and LOW findings for the PR body.
 
 ## Stage 5 — CI/CD (remote fail-loop)
