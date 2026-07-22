@@ -81,7 +81,7 @@ All additive; `prisma migrate deploy` runs them on the next Render deploy.
 2. **Confirm retention durations** in [DATA_RETENTION_POLICY.md](./DATA_RETENTION_POLICY.md) (every `OWNER-CONFIRM` marker) — TANF/SNAP grant record-retention rules needed from the program side.
 3. **Product call**: "Sign Authorization for Release of Information" now ends in pending-verification even after digital signatures, because its `ai-data-consent` companion form has no PDF and can't be collected digitally. Either exempt it or supply the missing document.
 4. **Schema decision**: should `StudentSavedJob` (the Sage `update_application_status` target) also carry verification fields? Reports count `Application`, which is covered.
-5. **Nav link**: `/teacher/failed-extractions` is reachable by URL only; add to teacher nav if wanted.
+5. ~~**Nav link**: `/teacher/failed-extractions` is reachable by URL only; add to teacher nav if wanted.~~ Resolved 2026-07-22: "AI Review" entry appended to the teacher nav (`STAFF_ITEMS` in `src/components/ui/NavBar.tsx`).
 6. **Optional flag**: set `SAGE_POST_RESPONSE_MAX_CALLS` after reviewing `sage.post_response.summary` logs (default off = unchanged behavior).
 
 ## Deliberately deferred (framework discipline — manual first)

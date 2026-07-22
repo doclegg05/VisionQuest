@@ -2,10 +2,11 @@ import PageIntro from "@/components/ui/PageIntro";
 import { FailedExtractionsPanel } from "@/components/teacher/FailedExtractionsPanel";
 
 /**
- * Standalone dead-letter review surface (P2-1). Lists Sage background
- * extractions that exhausted their retries so staff can replay goal
- * extractions or dismiss the failure. Kept off the main dashboard on
- * purpose — this is a low-traffic operations page.
+ * Dead-letter review surface (P2-1). Lists Sage background extractions
+ * that exhausted their retries so staff can replay goal extractions or
+ * dismiss the failure. Reachable from the teacher nav ("AI Review",
+ * last entry in STAFF_ITEMS) — a low-traffic operations page, but a
+ * discoverable one.
  */
 export default function FailedExtractionsPage() {
   return (
