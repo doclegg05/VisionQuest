@@ -64,6 +64,14 @@ jobs:
         # (withErrorHandler + getSession() + prisma — the 2026-04-24 bug).
         run: npm run audit:api-auth
 
+      - name: Validate /ci-pipeline command conformance
+        # 13-check static gate keeping .claude/commands/ci-pipeline.md in sync
+        # with its spec (docs/superpowers/specs/2026-07-22-ci-pipeline-command-
+        # design.md): one plan-approval STOP gate, CI-equivalent local gate
+        # list, fail-loop caps, draft-PR-before-CI-watch ordering, never-merge
+        # language, named agent references. DB-free, no Prisma client needed.
+        run: npm run ci-pipeline:validate
+
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
         # type (fetching ProgramDocument rows to diff title/audience/category
