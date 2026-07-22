@@ -1,0 +1,632 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import PageIntro from "@/components/ui/PageIntro";
+import StaffMfaPanel from "@/components/auth/StaffMfaPanel";
+import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
+import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
+import { ConsentSection } from "@/components/settings/ConsentSection";
+
+const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
+
+interface SettingsViewProps {
+  // Server-known session role. Lets the staff route render StaffMfaPanel on
+  // first paint instead of flashing student-only sections while the
+  // /api/auth/session fetch resolves; the fetch still confirms it afterwards.
+  initialRole?: string | null;
+}
+
+export function SettingsView({ initialRole = null }: SettingsViewProps) {
+  const [sessionRole, setSessionRole] = useState<string | null>(initialRole);
+  const [apiKey, setApiKey] = useState("");
+  const [hasKey, setHasKey] = useState(false);
+  const [keyHint, setKeyHint] = useState<string | null>(null);
+  const [platformKeyConfigured, setPlatformKeyConfigured] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [showTutorial, setShowTutorial] = useState(true);
+
+  const [securityQuestions, setSecurityQuestions] = useState(createEmptySecurityQuestionAnswers());
+  const [recoveryConfigured, setRecoveryConfigured] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [recoveryError, setRecoveryError] = useState("");
+
+  // Notification preferences state
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [notifStatus, setNotifStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [notifError, setNotifError] = useState("");
+
+  // Profile state (student-only)
+  const [birthDate, setBirthDate] = useState("");
+  const [savedBirthDate, setSavedBirthDate] = useState<string | null>(null);
+  const [profileStatus, setProfileStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [profileError, setProfileError] = useState("");
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const [sessionRes, apiKeyRes, notifRes] = await Promise.all([
+          fetch("/api/auth/session"),
+          fetch("/api/settings/api-key"),
+          fetch("/api/notifications/preferences"),
+        ]);
+
+        const [sessionData, apiKeyData, notifData] = await Promise.all([
+          sessionRes.json(),
+          apiKeyRes.json(),
+          notifRes.json(),
+        ]);
+
+        const role = sessionData?.student?.role ?? "student";
+        setSessionRole(role);
+
+        setHasKey(apiKeyData.hasKey);
+        setKeyHint(apiKeyData.keyHint);
+        setPlatformKeyConfigured(Boolean(apiKeyData.platformKeyConfigured));
+        if (apiKeyData.hasKey || apiKeyData.platformKeyConfigured) setShowTutorial(false);
+
+        if (notifData) {
+          setEmailEnabled(Boolean(notifData.email?.enabled));
+          setSmsEnabled(Boolean(notifData.sms?.enabled));
+          setPhoneNumber(notifData.sms?.destination ?? "");
+        }
+
+        if (role !== "teacher" && role !== "admin") {
+          const [recoveryRes, profileRes] = await Promise.all([
+            fetch("/api/settings/security-questions"),
+            fetch("/api/settings/profile"),
+          ]);
+          const recoveryData = await recoveryRes.json();
+          if (recoveryRes.ok) {
+            setRecoveryConfigured(Boolean(recoveryData.configured));
+          }
+          if (profileRes.ok) {
+            const profileData = (await profileRes.json()) as { birthDate: string | null };
+            setBirthDate(profileData.birthDate ?? "");
+            setSavedBirthDate(profileData.birthDate);
+          }
+        }
+      } catch {
+        setErrorMsg("We could not load your current settings.");
+      }
+    }
+
+    void loadSettings();
+  }, []);
+
+  const saveNotificationPreferences = async (
+    overrides: { email?: boolean; sms?: boolean; phone?: string } = {},
+  ) => {
+    const resolvedEmail = overrides.email ?? emailEnabled;
+    const resolvedSms = overrides.sms ?? smsEnabled;
+    const resolvedPhone = overrides.phone ?? phoneNumber;
+
+    if (resolvedSms && resolvedPhone && !PHONE_REGEX.test(resolvedPhone)) {
+      setPhoneError("Enter a valid phone number, e.g. +12125551234");
+      return;
+    }
+    setPhoneError("");
+    setNotifStatus("saving");
+    setNotifError("");
+
+    try {
+      const res = await fetch("/api/notifications/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: { enabled: resolvedEmail },
+          sms: {
+            enabled: resolvedSms,
+            ...(resolvedPhone ? { phoneNumber: resolvedPhone } : {}),
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setNotifStatus("error");
+        setNotifError(data.error ?? "Could not save notification preferences.");
+        return;
+      }
+
+      setNotifStatus("success");
+      setTimeout(() => setNotifStatus("idle"), 3000);
+    } catch {
+      setNotifStatus("error");
+      setNotifError("Could not contact the server. Please try again.");
+    }
+  };
+
+  const handleSave = async () => {
+    setStatus("saving");
+    setErrorMsg("");
+
+    const res = await fetch("/api/settings/api-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setStatus("success");
+      setTimeout(() => setStatus("idle"), 3000);
+      setHasKey(true);
+      setKeyHint("..." + apiKey.slice(-4));
+      setApiKey("");
+    } else {
+      setStatus("error");
+      setErrorMsg(data.error);
+    }
+  };
+
+  const handleRemove = async () => {
+    const res = await fetch("/api/settings/api-key", { method: "DELETE" });
+    if (res.ok) {
+      setHasKey(false);
+      setKeyHint(null);
+      setStatus("idle");
+    }
+  };
+
+  const handleSaveBirthdate = async () => {
+    setProfileStatus("saving");
+    setProfileError("");
+
+    try {
+      const res = await fetch("/api/settings/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ birthDate: birthDate || null }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setProfileStatus("error");
+        setProfileError(data.error || "We could not save your birthdate.");
+        return;
+      }
+
+      const data = (await res.json()) as { birthDate: string | null };
+      setSavedBirthDate(data.birthDate);
+      setProfileStatus("success");
+      setTimeout(() => setProfileStatus("idle"), 3000);
+    } catch {
+      setProfileStatus("error");
+      setProfileError("We could not contact the server. Please try again.");
+    }
+  };
+
+  const handleSaveRecovery = async () => {
+    setRecoveryStatus("saving");
+    setRecoveryError("");
+
+    try {
+      const res = await fetch("/api/settings/security-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ securityQuestions }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setRecoveryStatus("error");
+        setRecoveryError(data.error || "We could not save your classroom recovery questions.");
+        return;
+      }
+
+      setRecoveryConfigured(true);
+      setRecoveryStatus("success");
+      setSecurityQuestions(createEmptySecurityQuestionAnswers());
+      setTimeout(() => setRecoveryStatus("idle"), 3000);
+    } catch {
+      setRecoveryStatus("error");
+      setRecoveryError("We could not contact the server. Please try again.");
+    }
+  };
+
+  return (
+    <div className="page-shell">
+      <PageIntro
+        eyebrow="Configuration"
+        title="Settings"
+        description={
+          sessionRole === "teacher" || sessionRole === "admin"
+            ? "Manage staff account security and your personal Sage access."
+            : "Manage Sage access and the classroom-only recovery questions used for internal password resets."
+        }
+      />
+
+      {(sessionRole === "teacher" || sessionRole === "admin") && (
+        <div className="mb-6">
+          <StaffMfaPanel />
+        </div>
+      )}
+
+      {sessionRole !== "teacher" && sessionRole !== "admin" && (
+        <div className="surface-section mb-6 p-6">
+          <div className="mb-4">
+            <p className="page-eyebrow text-[var(--ink-muted)]">Profile</p>
+            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal info</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+              Your birthdate helps your teacher report enrollment accurately to DoHS.
+              It&apos;s only shared with SPOKES program staff.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1">
+              <label
+                htmlFor="birthdate-input"
+                className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]"
+              >
+                Birthdate
+              </label>
+              <input
+                id="birthdate-input"
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="field w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveBirthdate}
+              disabled={
+                profileStatus === "saving" ||
+                // Disable when there's nothing to save (empty + nothing stored,
+                // or value equals what's already on file).
+                (!birthDate && !savedBirthDate) ||
+                birthDate === (savedBirthDate ?? "")
+              }
+              className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {profileStatus === "saving" ? "Saving..." : "Save"}
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            {profileStatus === "success" && (
+              <p className="text-sm text-[var(--success)]">Birthdate saved.</p>
+            )}
+            {profileStatus === "error" && (
+              <p className="text-sm text-[var(--error)]">{profileError}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {sessionRole !== "teacher" && sessionRole !== "admin" && (
+      <div className="surface-section mb-6 p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="page-eyebrow text-[var(--ink-muted)]">Classroom recovery</p>
+            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
+              Recovery questions
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+              This lower-security reset option is meant only for your classroom deployment. If you forget your password, you can answer these questions and choose a new one without email.
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+              recoveryConfigured
+                ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
+                : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
+            }`}
+          >
+            {recoveryConfigured ? "Configured" : "Not set up yet"}
+          </span>
+        </div>
+
+        {recoveryConfigured && (
+          <p className="mt-4 text-sm text-[var(--ink-muted)]">
+            Updating the questions here replaces your previous classroom recovery answers. You will need to enter all three answers again to save changes.
+          </p>
+        )}
+
+        <div className="mt-6">
+          <SecurityQuestionAnswerFields
+            answers={securityQuestions}
+            onChange={setSecurityQuestions}
+            idPrefix="settings-security-question"
+            title="Save your three recovery answers"
+            description="Keep the answers memorable but not obvious. Answers are stored as hashes, not plain text."
+          />
+        </div>
+
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleSaveRecovery}
+            disabled={recoveryStatus === "saving"}
+            type="button"
+            className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {recoveryStatus === "saving"
+              ? "Saving..."
+              : recoveryConfigured
+                ? "Update recovery questions"
+                : "Save recovery questions"}
+          </button>
+
+          {recoveryStatus === "success" && (
+            <p className="text-sm text-[var(--success)]">Recovery questions saved.</p>
+          )}
+          {recoveryStatus === "error" && (
+            <p className="text-sm text-[var(--error)]">{recoveryError}</p>
+          )}
+        </div>
+      </div>
+      )}
+
+      {(hasKey || platformKeyConfigured) && (
+        <div className="surface-section mb-6 flex items-center justify-between gap-4 p-5">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--success)]">Sage is active</p>
+            <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">
+              {hasKey ? "Personal API key connected" : "Platform API key connected"}
+            </p>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
+              {hasKey
+                ? `Stored key ending in ${keyHint}`
+                : "Students can chat with Sage without adding their own API key."}
+            </p>
+          </div>
+          {hasKey && (
+            <button
+              onClick={handleRemove}
+              type="button"
+              className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+            >
+              Remove key
+            </button>
+          )}
+        </div>
+      )}
+
+      <ConsentSection />
+
+      <div className="surface-section p-6">
+        <div className="mb-6">
+          <button
+            onClick={() => setShowTutorial(!showTutorial)}
+            type="button"
+            className="flex items-center gap-3 text-left"
+          >
+            <span
+              className={[
+                "grid h-9 w-9 place-items-center rounded-2xl",
+                "bg-[var(--surface-muted)]",
+                "text-[var(--ink-strong)]",
+                "transition-transform",
+                showTutorial ? "rotate-90" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              ▶
+            </span>
+            <div>
+              <p className="page-eyebrow text-[var(--ink-muted)]">Quick guide</p>
+              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">How to get your API key</h2>
+            </div>
+          </button>
+        </div>
+
+        {showTutorial && (
+          <div className="mb-8 grid gap-4 md:grid-cols-2">
+            {[
+              {
+                step: "1",
+                title: "Check the default setup",
+                body: platformKeyConfigured
+                  ? "Your program already configured Sage for everyone. You only need a personal key if you want to override it."
+                  : "If your program has not configured Sage yet, you can add a personal Gemini API key here.",
+              },
+              {
+                step: "2",
+                title: "Open Google AI Studio",
+                body: "Go to aistudio.google.com/apikey and sign in with your Google account.",
+              },
+              {
+                step: "3",
+                title: "Create a key",
+                body: "Choose “Create API key”. If prompted, create it in a new project.",
+              },
+              {
+                step: "4",
+                title: "Copy and save it",
+                body: "Gemini keys usually begin with AIza. Paste it below and VisionQuest will verify it before saving.",
+              },
+            ].map((item) => (
+              <div key={item.step} className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+                <div className="mb-3 flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[var(--accent-strong)] text-sm font-bold text-white">
+                    {item.step}
+                  </span>
+                  <h3 className="font-semibold text-[var(--ink-strong)]">{item.title}</h3>
+                </div>
+                <p className="text-sm leading-6 text-[var(--ink-muted)]">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
+          {platformKeyConfigured && (
+            <p className="mb-3 text-sm text-[var(--ink-muted)]">
+              A program-managed Gemini key is already active. Adding a personal key here is optional and will override the shared setup for your account.
+            </p>
+          )}
+
+          <label htmlFor="api-key" className="mb-2 block text-sm font-medium text-[var(--ink-strong)]">
+            {hasKey
+              ? "Update your personal API key"
+              : platformKeyConfigured
+                ? "Add a personal Gemini key (optional)"
+                : "Enter your Gemini API key"}
+          </label>
+          <div className="flex flex-col gap-3 md:flex-row">
+            <input
+              id="api-key"
+              type="password"
+              value={apiKey}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                setStatus("idle");
+                setErrorMsg("");
+              }}
+              placeholder="AIza..."
+              className="field flex-1 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+            />
+            <button
+              onClick={handleSave}
+              disabled={!apiKey || status === "saving"}
+              type="button"
+              className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {status === "saving" ? "Testing..." : hasKey ? "Update key" : "Save key"}
+            </button>
+          </div>
+
+          {status === "success" && (
+            <p className="mt-3 text-sm text-[var(--success)]">
+              Key saved successfully. Sage is ready to chat.
+            </p>
+          )}
+          {status === "error" && (
+            <p className="mt-3 text-sm text-[var(--error)]">{errorMsg}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="surface-section mt-6 p-6">
+        <div className="mb-6">
+          <p className="page-eyebrow text-[var(--ink-muted)]">Alerts &amp; reminders</p>
+          <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
+            Notification Preferences
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
+            Choose how you want to receive daily coaching prompts and reminders from Sage.
+          </p>
+        </div>
+
+        <div className="divide-y divide-[var(--border)]">
+          {/* Email toggle */}
+          <div className="flex items-start justify-between gap-4 py-4">
+            <div>
+              <p className="text-sm font-semibold text-[var(--ink-strong)]">Email Notifications</p>
+              <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                Receive daily coaching prompts and reminders by email
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailEnabled}
+              onClick={() => {
+                const next = !emailEnabled;
+                setEmailEnabled(next);
+                void saveNotificationPreferences({ email: next });
+              }}
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
+                emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  emailEnabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* SMS toggle + phone field */}
+          <div className="py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">SMS Notifications</p>
+                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                  Receive daily coaching prompts via text message
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={smsEnabled}
+                onClick={() => {
+                  const next = !smsEnabled;
+                  setSmsEnabled(next);
+                  void saveNotificationPreferences({ sms: next });
+                }}
+                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
+                  smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    smsEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {smsEnabled && (
+              <div className="mt-4">
+                <label
+                  htmlFor="phone-number"
+                  className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]"
+                >
+                  Phone number
+                </label>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <input
+                    id="phone-number"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => {
+                      setPhoneNumber(e.target.value);
+                      setPhoneError("");
+                    }}
+                    placeholder="+12125551234"
+                    className="field flex-1 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveNotificationPreferences()}
+                    disabled={!phoneNumber || notifStatus === "saving"}
+                    className="primary-button px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {notifStatus === "saving" ? "Saving..." : "Save number"}
+                  </button>
+                </div>
+                {phoneError && (
+                  <p className="mt-1.5 text-xs text-[var(--error)]">{phoneError}</p>
+                )}
+                <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
+                  Standard messaging rates may apply. Use international format, e.g. +12125551234.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          {notifStatus === "success" && (
+            <p className="text-sm text-[var(--success)]">Notification preferences saved.</p>
+          )}
+          {notifStatus === "error" && (
+            <p className="text-sm text-[var(--error)]">{notifError}</p>
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+}
