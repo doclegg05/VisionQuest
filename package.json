@@ -43,7 +43,8 @@
     "sage:chat:harness": "tsx scripts/sage-chat-harness.mjs",
     "sage:usage:summary": "node scripts/sage-usage-summary.mjs",
     "postinstall": "prisma generate",
-    "audit:api-auth": "node scripts/audit-api-auth.mjs"
+    "audit:api-auth": "node scripts/audit-api-auth.mjs",
+    "ci-pipeline:validate": "node scripts/validate-ci-pipeline-command.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1042.0",
