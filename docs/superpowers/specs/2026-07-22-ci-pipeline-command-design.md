@@ -27,7 +27,7 @@ Personal commands (`/bug`, `/chore`, `/feature`) remain local-only per
 
 Mirrors the reference diagram: Ticket → Prompt → Planning (Scout, Plan) →
 Building (Build) → Testing (Test, fail-loop) → CI/CD (fail-loop) → Engineer
-Review → Ship.
+Review → Ship. Rendered flowchart: `docs/diagrams/ci-pipeline.md`.
 
 ### 1. Intake (Kanban Ticket → Engineer Prompt)
 
