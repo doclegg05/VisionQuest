@@ -246,7 +246,7 @@ export default function StaffMfaPanel() {
 
         {enabled && (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                 Backup codes remaining
               </p>
@@ -254,7 +254,7 @@ export default function StaffMfaPanel() {
                 {backupCodesRemaining}
               </p>
             </div>
-            <div className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                 Last verified
               </p>
@@ -279,7 +279,7 @@ export default function StaffMfaPanel() {
         )}
 
         {setupSecret && (
-          <div className="mt-5 space-y-4 rounded-[1.4rem] border border-[var(--border)] bg-white p-5">
+          <div className="mt-5 space-y-4 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Step 1: Add this secret to your authenticator app</p>
@@ -362,7 +362,7 @@ export default function StaffMfaPanel() {
         )}
 
         {enabled && pendingAction && (
-          <div className="mt-5 rounded-[1.4rem] border border-[var(--border)] bg-white p-5">
+          <div className="mt-5 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">
               {pendingAction === "disable"
                 ? "Enter a current 6-digit code to disable MFA"
@@ -416,7 +416,7 @@ export default function StaffMfaPanel() {
             These codes are shown once. Copy or print them before you leave this screen. Each code works a single time.
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-2xl bg-white px-4 py-4 text-sm font-semibold leading-7 text-[var(--ink-strong)]">
+          <pre className="mt-4 overflow-x-auto rounded-2xl bg-[var(--surface-raised)] px-4 py-4 text-sm font-semibold leading-7 text-[var(--ink-strong)]">
             {backupCodeText}
           </pre>
 
