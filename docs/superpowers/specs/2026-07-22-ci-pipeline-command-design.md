@@ -1,4 +1,4 @@
-# `/pipeline` Command — Autonomous Ticket-to-Draft-PR Workflow
+# `/ci-pipeline` Command — Autonomous Ticket-to-Draft-PR Workflow
 
 **Date:** 2026-07-22
 **Status:** Approved (design), pending implementation
@@ -16,11 +16,11 @@ overnight-session working pattern.
 
 ## Deliverable
 
-One committed command file: `.claude/commands/pipeline.md`.
+One committed command file: `.claude/commands/ci-pipeline.md`.
 No application code changes. No CI changes.
 
 Personal commands (`/bug`, `/chore`, `/feature`) remain local-only per
-`.git/info/exclude`; `/pipeline` is a shared project command like `/review` and
+`.git/info/exclude`; `/ci-pipeline` is a shared project command like `/review` and
 `/deploy`, so it is tracked.
 
 ## Stage machine
@@ -31,8 +31,8 @@ Review → Ship.
 
 ### 1. Intake (Kanban Ticket → Engineer Prompt)
 
-- `$ARGUMENTS` is a GitHub issue number (`/pipeline 123`) or freeform text
-  (`/pipeline "fix the flaky login test"`).
+- `$ARGUMENTS` is a GitHub issue number (`/ci-pipeline 123`) or freeform text
+  (`/ci-pipeline "fix the flaky login test"`).
 - Issue number → `gh issue view <n> --json title,body,labels,url` becomes the
   ticket; freeform text is the ticket verbatim.
 - Normalized Ticket block: **goal**, **context**, **source** (issue URL or
@@ -59,7 +59,7 @@ Review → Ship.
 
 ### 3. Status: Building
 
-- Branch `pipeline/<short-slug>` off up-to-date `main`.
+- Branch `ci-pipeline/<short-slug>` off up-to-date `main`.
 - Tests first: acceptance tests mapped one-to-one to acceptance criteria,
   run and shown failing before implementation (proves tests are real).
 - Implement in small increments; conventional commits at each working state.
@@ -118,7 +118,7 @@ Review → Ship.
 
 ## Implementation shape
 
-Orchestrator-driven: the main session executes `pipeline.md` directly,
+Orchestrator-driven: the main session executes `ci-pipeline.md` directly,
 delegating only Scout (Explore subagent) and the review pass (`code-reviewer`
 agent). Build/Test fix-loops run inline so the fixer retains memory of prior
 attempts. (Rejected: subagent-per-stage — cleaner isolation but each fix-loop
@@ -135,10 +135,10 @@ would start context-blind and token cost balloons.)
 
 ## Acceptance criteria for this deliverable
 
-1. `.claude/commands/pipeline.md` exists, is git-tracked, and passes a dry
+1. `.claude/commands/ci-pipeline.md` exists, is git-tracked, and passes a dry
    read-through: every stage above is present with its gate, loop caps, and
    guardrails.
-2. `/pipeline 123` intake path specifies the exact `gh issue view` invocation;
+2. `/ci-pipeline 123` intake path specifies the exact `gh issue view` invocation;
    freeform path requires no `gh` call.
 3. The command instructs exactly one STOP (plan approval) — no other
    mid-pipeline questions.

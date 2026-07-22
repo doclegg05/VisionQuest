@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Conformance gate for .claude/commands/pipeline.md against the approved spec:
-// docs/superpowers/specs/2026-07-22-pipeline-command-design.md
+// Conformance gate for .claude/commands/ci-pipeline.md against the approved spec:
+// docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md
 //
 // Prints one PASS/FAIL line per acceptance check and `OVERALL: n/m`; exits 0
 // only when every check passes. Static text checks only — no network, no DB.
 //
-// Encoding notes for authors of pipeline.md:
+// Encoding notes for authors of ci-pipeline.md:
 // - Check 4 counts case-sensitive `STOP` tokens and requires exactly ONE
 //   (the plan-approval gate). Failure-cap language must use lowercase
 //   ("stop and report") to avoid counting as a second gate.
@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const COMMAND_PATH = ".claude/commands/pipeline.md";
+const COMMAND_PATH = ".claude/commands/ci-pipeline.md";
 
 function readCommandText() {
   try {

@@ -9,14 +9,14 @@ The ticket: $ARGUMENTS
 You are working in VisionQuest (Next.js / Prisma / PostgreSQL). This is the autonomous
 counterpart to `/feature`: after a single plan-approval gate, you run unattended through
 build, test, CI, and finish by delivering a **draft PR** for Engineer Review. You never
-merge. Spec: `docs/superpowers/specs/2026-07-22-pipeline-command-design.md`.
+merge. Spec: `docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md`.
 
 ## Stage 1 — Intake (Ticket → Engineer Prompt)
 
 1. Interpret `$ARGUMENTS`:
-   - **Issue number** (e.g. `/pipeline 123`): fetch the ticket with exactly
+   - **Issue number** (e.g. `/ci-pipeline 123`): fetch the ticket with exactly
      `gh issue view <n> --json title,body,labels,url`.
-   - **Freeform text** (e.g. `/pipeline "fix the flaky login test"`): the text IS the
+   - **Freeform text** (e.g. `/ci-pipeline "fix the flaky login test"`): the text IS the
      ticket verbatim — make no `gh` call.
 2. Normalize into a Ticket block with three fields:
    - **goal** — what done looks like, in one or two sentences.
@@ -51,7 +51,7 @@ merge. Spec: `docs/superpowers/specs/2026-07-22-pipeline-command-design.md`.
 
 ## Stage 3 — Building
 
-1. Create branch `pipeline/<short-slug>` off an up-to-date `main`.
+1. Create branch `ci-pipeline/<short-slug>` off an up-to-date `main`.
 2. **Tests first.** Write the acceptance tests mapped one-to-one to the approved
    acceptance criteria. Run them and show them failing before any implementation —
    this proves the tests are real.
@@ -87,7 +87,7 @@ merge. Spec: `docs/superpowers/specs/2026-07-22-pipeline-command-design.md`.
 
 ## Stage 5 — CI/CD (remote fail-loop)
 
-1. Push the branch with `git push -u origin pipeline/<short-slug>`, then
+1. Push the branch with `git push -u origin ci-pipeline/<short-slug>`, then
    **immediately open the draft PR** to `main`:
    `gh pr create --draft --base main --title "..." --body "..."`.
    The CI workflow triggers on `pull_request` to `main` only, so the PR is what starts
