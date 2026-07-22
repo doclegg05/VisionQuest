@@ -129,6 +129,11 @@ gate-editing while in this role.
    - `Closes #<n>` when the ticket came from an issue.
 2. The PR stays a **draft**; this pipeline **never merges**. Marking the PR ready and
    merging is the owner's Ship action — Render auto-deploys `main` after merge.
+3. Once the owner has marked the PR ready, arming `gh pr merge <n> --auto --squash`
+   is the sanctioned way to complete Ship without babysitting: repo auto-merge is
+   enabled and `main` requires the `verify` check, so GitHub merges server-side only
+   when CI is green. GitHub never auto-merges a draft, so the ready-mark remains the
+   owner's gate.
 
 ## Failure and safety posture
 
