@@ -7,17 +7,17 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
-`/ci-pipeline` merged to main (PR #121, squash `93056fe`): command + spec + 13-check conformance validator (`npm run ci-pipeline:validate`) + named reusable agents (scout, builder, gate-runner new; code-reviewer pre-existing since PR #21) + mermaid stage-flow diagram (docs/diagrams/ci-pipeline.md). The workflow was exercised end-to-end on real issue #76 before merge; that live run shipped PR #122 (`6c43995`) and closed the issue. Merged branches and the lint-cicd worktree are removed. Prior state unchanged and stable: eval-gate stabilization merged (PR #118), maturity repair merged + deployed (PR #117); see docs/MATURITY_REVIEW.md.
+`/ci-pipeline` fully closed out: merged to main (PR #121, squash `93056fe`) — command + spec + 13-check conformance validator + named reusable agents + mermaid stage-flow diagram (docs/diagrams/ci-pipeline.md); live-tested end-to-end on real issue #76 pre-merge (shipped PR #122); validator now CI-enforced in the `verify` job (PR #124); agents carry frontmatter as dispatchable types with per-role model pins (PR #125). Merge flow note: two GitHub-side merge attempts silently failed before an explicit `Bash(gh pr merge *)` allow rule was added to Claude's project-local settings — verify merges against the API, not reports. Prior state unchanged and stable: eval-gate stabilization merged (PR #118), maturity repair merged + deployed (PR #117); see docs/MATURITY_REVIEW.md.
 
 ## Last Session
 - **Date**: 2026-07-22 (goal-run + live-test + hardening session, worktree pipeline-engineering-workflow-89c949, alongside the lint-cicd-4eabbd session)
 - **What we worked on**: (1) Goal run authored the command file to 12/12 against the frozen validator. (2) Live end-to-end `/pipeline` test on issue #76: intake → scout → plan gate (owner chose Option A) → build with failing-first checks → local gate green first pass (1955/1955 tests) → review pass → draft PR #122 → CI green → finalized draft PR. Scout caught that the ticket was stale (2 of 3 scope items already done; DashboardClient still used by the teacher route). (3) Hardening from what the live run exposed: review pass made registry-independent and severity-aligned to code-reviewer.md (`e7348ba`), fallback dispatch labeled `code-reviewer` (`86a0928`). (4) Both PRs squash-merged; branches and the merged worktree cleaned up.
 - **What we decided**: see 2026-07-22 rows in the decisions log (issue-#76 disposition; registry-independent review pass).
-- **Where we left off**: main at `93056fe` (both merges), Render auto-deploying; docs/tooling only, no runtime change. Remaining follow-up: wire `ci-pipeline:validate` into the CI verify job.
+- **Where we left off**: all `/ci-pipeline` work merged (#121–#125), no in-flight branches, Render auto-deploying; docs/tooling only, no runtime change. No remaining follow-ups for this workstream — next: build sibling `<gate>-pipeline` workflows (a11y, security) reusing scout/builder/gate-runner.
 
 ## Open Items
 - [x] Eval stabilization — DONE in PR #118 (2026-07-21): case restored to gating with 3-sample majority voting + search_forms attractor removed; canaries audited into `neverContain` with a freshness unit lock; soft warnings root-caused 9→0; tool_watch family runs informationally in CI
-- [ ] Wire `ci-pipeline:validate` into the CI verify job (validator exists on main, not yet CI-enforced)
+- [x] Wire `ci-pipeline:validate` into the CI verify job — DONE in PR #124 (2026-07-22): runs with the DB-free static scans, right after the API-auth audit
 - [ ] **USER**: confirm retention durations in docs/DATA_RETENTION_POLICY.md (OWNER-CONFIRM markers)
 - [ ] Product call: exempt or supply a PDF for `ai-data-consent` (release-of-information packet now ends pending-verification)
 - [ ] Decide whether StudentSavedJob should carry verification fields (Application is covered)
