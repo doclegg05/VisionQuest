@@ -92,9 +92,11 @@ gate-editing while in this role.
 3. **Automated review pass.** Once the local gate is green, review the branch diff
    with the project `code-reviewer` definition (`.claude/agents/code-reviewer.md`):
    use the registered `code-reviewer` agent type if this session has one; otherwise
-   dispatch a general-purpose subagent primed with that file — the definition is
-   git-tracked, so the pass never depends on the session's agent registry, and it is
-   never skipped because the named type is absent. The definition grades findings
+   dispatch a general-purpose subagent primed with that file, and name the spawned
+   subagent `code-reviewer` so the role is identifiable in transcripts and progress
+   output regardless of which runner executes it. The definition is git-tracked, so
+   the pass never depends on the session's agent registry, and it is never skipped
+   because the named type is absent. The definition grades findings
    CRITICAL / WARNING / SUGGESTION: CRITICAL and WARNING findings must be fixed
    (then re-run the full local gate); record SUGGESTION findings for the PR body.
 
