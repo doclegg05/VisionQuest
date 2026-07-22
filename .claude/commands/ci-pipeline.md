@@ -89,9 +89,14 @@ gate-editing while in this role.
    re-run the full local gate from the top. Allow **max 3 fix loops**. If the cap is
    hit, stop and write an honest failure report — what failed, what was tried, and the
    current branch state. Never push a red branch.
-3. **Automated review pass.** Once the local gate is green, run the project
-   `code-reviewer` agent (`.claude/agents/code-reviewer.md`) on the branch diff. CRITICAL and HIGH findings must be fixed
-   (then re-run the full local gate); record MEDIUM and LOW findings for the PR body.
+3. **Automated review pass.** Once the local gate is green, review the branch diff
+   with the project `code-reviewer` definition (`.claude/agents/code-reviewer.md`):
+   use the registered `code-reviewer` agent type if this session has one; otherwise
+   dispatch a general-purpose subagent primed with that file — the definition is
+   git-tracked, so the pass never depends on the session's agent registry, and it is
+   never skipped because the named type is absent. The definition grades findings
+   CRITICAL / WARNING / SUGGESTION: CRITICAL and WARNING findings must be fixed
+   (then re-run the full local gate); record SUGGESTION findings for the PR body.
 
 ## Stage 5 — CI/CD (remote fail-loop)
 
@@ -118,7 +123,7 @@ gate-editing while in this role.
    - Self-review checklist, answered explicitly: hardcoded values or secrets? routes
      without auth checks? unvalidated input reaching the database? dead code?
      weakened/skipped/deleted tests?
-   - Remaining MEDIUM/LOW review findings from Stage 4.
+   - Remaining SUGGESTION-level review findings from Stage 4.
    - `Closes #<n>` when the ticket came from an issue.
 2. The PR stays a **draft**; this pipeline **never merges**. Marking the PR ready and
    merging is the owner's Ship action — Render auto-deploys `main` after merge.
