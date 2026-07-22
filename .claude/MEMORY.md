@@ -7,16 +7,17 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
-`/ci-pipeline` autonomous engineering workflow command shipped to PR (branch `claude/engineering-workflow-lint-cicd-4eabbd`): spec (docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md) → conformance validator (`npm run ci-pipeline:validate`, 12 checks) → committed `.claude/commands/ci-pipeline.md`. Verified 12/12, grader untouched. Awaiting owner review/merge. Prior state unchanged and stable: eval-gate stabilization merged (PR #118) and maturity repair merged + deployed (PR #117); see docs/MATURITY_REVIEW.md.
+`/ci-pipeline` merged to main (PR #121, squash `93056fe`): command + spec + 13-check conformance validator (`npm run ci-pipeline:validate`) + named reusable agents (scout, builder, gate-runner new; code-reviewer pre-existing since PR #21) + mermaid stage-flow diagram (docs/diagrams/ci-pipeline.md). The workflow was exercised end-to-end on real issue #76 before merge; that live run shipped PR #122 (`6c43995`) and closed the issue. Merged branches and the lint-cicd worktree are removed. Prior state unchanged and stable: eval-gate stabilization merged (PR #118), maturity repair merged + deployed (PR #117); see docs/MATURITY_REVIEW.md.
 
 ## Last Session
-- **Date**: 2026-07-22 (engineering-workflow session, worktree engineering-workflow-lint-cicd-4eabbd)
-- **What we worked on**: Built the `/ci-pipeline` command — the autonomous sibling of `/feature`, modeled on Britt's agent-workflow diagram (ticket → Scout → Plan gate → Build → local test fail-loop → code-reviewer pass → push + draft PR → CI watch fail-loop → Engineer Review). Flow: brainstormed design → committed spec → goal-coach built `ci-pipeline:validate` conformance gate (12 content checks, red baseline 0/12) → a separate goal-runner agent authored `.claude/commands/ci-pipeline.md` to 12/12 → independently re-verified (validator output, grader diff empty, coherence read-through). Updated memory, pushed branch, opened PR.
-- **What we decided**: `/ci-pipeline` is a committed team command (unlike personal /bug /chore /feature); exactly one human gate (plan approval); retry caps 3 local / 2 CI; draft PR opens BEFORE CI watch (CI only triggers on PRs to main); pipeline never merges. Prompt artifacts get validator-script conformance gates (falsifiable proof for goal runs).
-- **Where we left off**: PR open from `claude/engineering-workflow-lint-cicd-4eabbd` awaiting owner review/merge (3 commits: spec, validator, command; plus memory update). Goal-runner's stray worktree `.claude/worktrees/pipeline-engineering-workflow-89c949` is clean at base and can be `git worktree remove`d. Optional follow-up: wire `ci-pipeline:validate` into the CI verify job.
+- **Date**: 2026-07-22 (goal-run + live-test + hardening session, worktree pipeline-engineering-workflow-89c949, alongside the lint-cicd-4eabbd session)
+- **What we worked on**: (1) Goal run authored the command file to 12/12 against the frozen validator. (2) Live end-to-end `/pipeline` test on issue #76: intake → scout → plan gate (owner chose Option A) → build with failing-first checks → local gate green first pass (1955/1955 tests) → review pass → draft PR #122 → CI green → finalized draft PR. Scout caught that the ticket was stale (2 of 3 scope items already done; DashboardClient still used by the teacher route). (3) Hardening from what the live run exposed: review pass made registry-independent and severity-aligned to code-reviewer.md (`e7348ba`), fallback dispatch labeled `code-reviewer` (`86a0928`). (4) Both PRs squash-merged; branches and the merged worktree cleaned up.
+- **What we decided**: see 2026-07-22 rows in the decisions log (issue-#76 disposition; registry-independent review pass).
+- **Where we left off**: main at `93056fe` (both merges), Render auto-deploying; docs/tooling only, no runtime change. Remaining follow-up: wire `ci-pipeline:validate` into the CI verify job.
 
 ## Open Items
 - [x] Eval stabilization — DONE in PR #118 (2026-07-21): case restored to gating with 3-sample majority voting + search_forms attractor removed; canaries audited into `neverContain` with a freshness unit lock; soft warnings root-caused 9→0; tool_watch family runs informationally in CI
+- [ ] Wire `ci-pipeline:validate` into the CI verify job (validator exists on main, not yet CI-enforced)
 - [ ] **USER**: confirm retention durations in docs/DATA_RETENTION_POLICY.md (OWNER-CONFIRM markers)
 - [ ] Product call: exempt or supply a PDF for `ai-data-consent` (release-of-information packet now ends pending-verification)
 - [ ] Decide whether StudentSavedJob should carry verification fields (Application is covered)
@@ -46,6 +47,8 @@
 | 2026-07-22 | Prompt artifacts gated by conformance validators (ci-pipeline:validate) | "Command matches spec" is unverifiable for a goal evaluator; a 12-check content gate makes it falsifiable, with the grader frozen during the goal run |
 | 2026-07-22 | Workflow family naming: `<gate>-pipeline` (renamed /pipeline → /ci-pipeline pre-merge) | Owner plans more workflows testing other gates/lints; naming each by the gate it runs (a11y-pipeline, security-pipeline, …) keeps them differentiable |
 | 2026-07-22 | Workflow roles extracted as named project agents: scout, builder, gate-runner (.claude/agents/) | Owner call: agents must be identifiable and reusable across the `<gate>-pipeline` family rather than rebuilt per workflow; gate-runner is parameterized by gate list; Plan stays with the orchestrator (owns the human gate) |
+| 2026-07-22 | Issue #76 closed as satisfied-by-redirect (plan-gate Option A, PR #122) | Scout showed the ticket predated the 2026-07-20 redirect decision; PRODUCT_DECISIONS.md is scope authority; redirect stubs are the repo's retired-route pattern (/jobs, /profile); DashboardClient stays — teacher student-detail route imports it |
+| 2026-07-22 | Review pass primed from tracked `.claude/agents/code-reviewer.md`; fallback dispatch labeled `code-reviewer` | Live test showed a session's agent registry may omit project agents; the pass must never be skipped or run anonymously; findings graded in the definition's CRITICAL/WARNING/SUGGESTION vocabulary, not an invented scale |
 
 ## Architecture Notes
 - Sage agent: `src/lib/sage/agent/` — registry, executor (role-gated), HMAC confirm cards (`confirmation.ts`), write tools, career tools; every write ledgered in SageOperation + AuditLog
@@ -56,3 +59,4 @@
 ## Known Issues
 - block-no-verify commit hook false-positives when a `git commit` command shares a Bash line with any `-n` flag (grep -n, sed -n) — split commands
 - Port 3000 often occupied by an unrelated local app — e2e: use BASE_URL/PORT overrides
+- `gh pr checks --watch` races fresh pushes: exits "no checks reported" if launched before GitHub registers the new check run (retry after ~10s), and a trailing `echo` on the same Bash line masks the non-zero exit
