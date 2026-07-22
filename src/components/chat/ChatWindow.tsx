@@ -14,6 +14,7 @@ import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
+import { getRoleSettingsPath } from "@/lib/role-home";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
@@ -187,6 +188,7 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
 }
 
 function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
+  const settingsHref = getRoleSettingsPath(role);
   const searchParams = useSearchParams();
   const requestedStage = searchParams.get("stage");
   const requestedStageOpener =
@@ -742,8 +744,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         {chatError && (
           <div role="alert" className="mx-4 mb-2 rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-4 py-3 text-sm text-[var(--chat-error-text)]">
             <p>{chatError}</p>
-            {(chatError.includes("API key") || chatError.includes("Sage is not configured")) && (
-              <Link href="/settings" prefetch={false} className="mt-2 inline-block font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]">
+            {settingsHref && (chatError.includes("API key") || chatError.includes("Sage is not configured")) && (
+              <Link href={settingsHref} prefetch={false} className="mt-2 inline-block font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]">
                 Open Settings →
               </Link>
             )}
