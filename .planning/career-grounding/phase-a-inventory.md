@@ -1,6 +1,6 @@
 # Phase A Inventory — Sage Career-Grounding Ingestion Manifest
 
-**Date:** 2026-07-09
+**Date:** 2026-07-09 (amended 2026-07-23 — F4 bridge-descriptor comparison)
 **Author:** Phase A dedup/manifest synthesizer (subagent)
 **Status:** DRAFT — contract for Phase B; nothing uploaded, synced, or committed
 **Inputs merged:** (1) machine sweep, (2) VisionQuest-orientation-packet worktree scan, (3) live ProgramDocument enumeration (513 rows; full dataset at `C:/Users/INSTRU~1/AppData/Local/Temp/claude/ragrows-out.json` + `ragrows-lines.jsonl`, reproducible via `node tmp-career-a-ragrows.mjs` from the VisionQuest root), (4) repo staging state (docs-upload/, catalog/, allowlist, ingest-pipeline brief).
@@ -8,6 +8,7 @@
 **Verification performed by this synthesizer (read-only):**
 - Fuzzy-matched all high/medium discovered files against the FULL 513-row RAG dataset (not just the 260-row truncated payload) via grep over `ragrows-lines.jsonl`.
 - SHA256 + page-count + text-extraction comparison of the two local ECP FY25 renditions (program form — not student PII, permitted to inspect).
+- **Amendment 2026-07-23:** SHA256 + text-extract (DOCX) + page-image inspection (PDF) comparison of `Career_Pathways_Bridge_Descriptors2020.docx` vs RAG/staged `IETP Description of Adult Education Bridge Programs.pdf` — program descriptors, not student PII.
 - No piiRisk-flagged file contents were opened (FERPA) — path/metadata only.
 - **Redaction (2026-07-09):** student-named record paths are withheld from this tracked file; full paths live in `phase-a-pii-appendix.local.md` (untracked, guarded by `.git/info/exclude`).
 
@@ -18,7 +19,7 @@
 | Bucket | Count | Notes |
 |---|---|---|
 | newCandidates | 15 | genuinely RAG-worthy career-counseling material, absent from RAG and docs-upload |
-| alreadyInRag | 17 | incl. the hinted ECP fuzzy duplicate (confirmed) |
+| alreadyInRag | 18 | incl. the hinted ECP fuzzy duplicate (confirmed) + Bridge Programs PDF (§2.18 / F4) |
 | alreadyStaged (only) | 0 | every staged match also has a live ProgramDocument row, so they land in alreadyInRag |
 | skipped | 28 entries (some grouped) | each with an explicit reason — no silent drops |
 | piiRisk paths (appendix) | 12 | metadata only, never ingestable without Britt's review |
@@ -41,7 +42,7 @@ Folder names are the REAL docs-upload folders (`students` → bucket `students/r
 | 8 | `C:\Users\Instructor\Dev\curriculum\Employability Skills Curriculum\lesson-interview-skills\Handouts\ChatGPT Interview Practice Prompts.pdf` (453,906 B, 2026-03-05) | students | `ai-interview-practice-prompts` | STUDENT | AI interview-practice prompt set — directly consumable by an AI coach; no equivalent in RAG. |
 | 9 | `C:\Users\Instructor\OneDrive - WV Department of Education\Desktop\Student Folder\WIOA\New WIOA Fact Sheet 7.11.24.pdf` (110,643 B) | students | `wioa-fact-sheet-2024` | BOTH | Current student-facing WIOA overview. RAG's only WIOA docs are teacher-side (34 CFR 463.20(d) considerations; 2015 ESOL/WIOA pptx). |
 | 10 | `C:\Users\Instructor\OneDrive - WV Department of Education\Desktop\Student Folder\WIOA\WIOA Referral Form.pdf` (103,204 B, blank) | forms | `wioa-referral-form` | BOTH | Blank WIOA partner referral form; no WIOA referral row exists. Proposed `forms/` (NOT students/) so it sits beside the existing STUDENT_REFERRAL DFA rows — deviation from the students/-or-presentation/ guidance, flagged in Open Questions. |
-| 11 | `C:\Users\Instructor\OneDrive - WV Department of Education\Documents\IETP Development\Not needed for presentation\Career_Pathways_Bridge_Descriptors2020.docx` (1,659,576 B) | students | `career-pathways-bridge-descriptors-2020` | BOTH | Substantial WV AE career-pathways bridge descriptors. RAG's `IETP Description of Adult Education Bridge Programs` is a different, shorter doc — possible partial overlap flagged in Open Questions. |
+| 11 | `C:\Users\Instructor\OneDrive - WV Department of Education\Documents\IETP Development\Not needed for presentation\Career_Pathways_Bridge_Descriptors2020.docx` (1,659,576 B, sha256 `5BCC4104…9DB478`) | students | `career-pathways-bridge-descriptors-2020` | BOTH | **Same content as RAG PDF (F4), but the only text-extractable rendition.** Word source of the 8-level bridge continuum (Pre-Bridge → IELCE IET). Keep as candidate because the live RAG copy is an image-only Schoology print with **zero extractable text** — Sage cannot ground on it today. Prefer staging this DOCX (or a fresh text-PDF export) over re-ingesting the image PDF. Filename says 2020; PDF footer is "Revised April 2023" — content structure matches page-for-page; currency delta is revision date only (see §5 F4). |
 | 12 | `C:\Users\Instructor\OneDrive - WV Department of Education\Documents\IETP Development\IET Workshop\Nicholas_County_IET_Food_Service_Management_with_CTE_Career_Pathway (1) (1).docx` (41,564 B, 2021) | students | `nicholas-county-iet-food-service-pathway` | BOTH | Concrete LOCAL career-pathway example (Nicholas County = Britt's Summersville site). Dated 2021 — currency check flagged in Open Questions. |
 | 13 | `C:\Users\Instructor\Dev\curriculum\Career Pathways and Integrated Education and Training Programs Update\fy27-updates-video\transcripts\fy27-updates-final-transcript.md` (3,746 B, 2026-06-24) | presentation | `fy27-career-pathways-updates-transcript` | BOTH | Text-ready transcript of the FY27 career-pathways/IETP policy update — newest pathway policy content anywhere in the corpus. Supersedes ingesting the pptx draft. |
 | 14 | `C:\Users\Instructor\Dev\curriculum\SPOKES Goal Setting Project\Student Portfolios\Certifications\SPOKES\SPOKES_Certifications.docx` (54,743 B) | students | `spokes-certifications-catalog` | BOTH | Single catalog of SPOKES certification tracks — core coaching reference. RAG has per-cert Module Descriptors + `SPOKES Modules 2025` (teacher-side) but no unified student-facing catalog. Must be reconciled with the hardcoded cert list in `src/lib/sage/knowledge-base.ts` (Open Questions). |
@@ -72,6 +73,7 @@ Phase B per candidate: copy into `docs-upload/<folder>/`, author `catalog/docume
 | 15 | `...\Certifications\Ready to Work\Ready_To_Work_Certificate_Sample.docx` (277,564 B) | Ready to Work Certficate (`lms/Ready to Work/...`, 214,507 B) | fuzzy: same sample-certificate purpose | MEDIUM |
 | 16 | `...\Certifications\SPOKES\Sample_SPOKES_Schedule_Class_Management_Options.docx` (31,079 B) | Sample SPOKES Schedule Class Management Options (`lms/certifications/program-info/...`) | exact-title, different format | HIGH |
 | 17 | `...\Certifications\Customer Service\Customer_Service_Part_1_and_2.docx` (184,934 B) | TTCE suite: Part 1/2 Descriptors + Customer Service Part 1 and 2 Certificate (`lms/Through the Customer's Eyes.../...`) | fuzzy: cert-track content fully covered by the TTCE row set | MEDIUM |
+| 18 | `docs-upload\teachers\Handbook Appendix\Section 7\Integrated Education and Training Program\IETP Description of Adult Education Bridge Programs.pdf` (1,715,367 B, sha256 `FED2B82D…EBE9AE`; staged mirror of live bucket) | **IETP Description of Adult Education Bridge Programs** (`teachers/guides/Handbook Appendix/Section 7/Integrated Education and Training Program/IETP Description of Adult Education Bridge Programs.pdf`, id `cmmyyeoje00byeadksh1l0zrq`, TEACHER_GUIDE / TEACHER, active) | exact-title + staged path; content-verified identical to candidate #11 Word source (see §5 F4) | HIGH on identity; **LOW on RAG usability** (image-only PDF — no text layer) |
 
 ---
 
@@ -131,7 +133,27 @@ Inherited exclusions from the discovery agents (VUB financial-readiness records,
 
 **F3 — Other fuzzy matches** (details in §2): FY25 portfolio checklist → FY26 row (#10); "Rubric Record-2" → Rubric Record rows (#5); WorkKeys account guides docx/pdf → one teacher row (#6–7); Documentation Benchmarks docx pair → "Checklist for Documentation of Benchmarks..." rows (#13–14); Customer Service Part 1&2 docx → TTCE suite (#17).
 
-**F4 — Near-miss checked and rejected:** `Career_Pathways_Bridge_Descriptors2020.docx` vs RAG `IETP Description of Adult Education Bridge Programs` — related topic, different document (title tokens and scale differ; 1.66 MB descriptor compendium vs a single description doc). Kept as candidate #11 with an overlap flag.
+**F4 — CORRECTED (2026-07-23): same document, two renditions — prior "different doc" call was wrong.**
+
+Side-by-side of the two files Britt asked to compare:
+
+| | Local Word source (candidate #11) | Staged / RAG PDF (§2.18) |
+|---|---|---|
+| Path | `...\IETP Development\Not needed for presentation\Career_Pathways_Bridge_Descriptors2020.docx` | `docs-upload\teachers\...\IETP Description of Adult Education Bridge Programs.pdf` (+ live ProgramDocument row) |
+| Size / hash | 1,659,576 B · sha256 `5BCC410434AEB335148ADE20CEAD1E574DA3C90B3E1678FC5DFB532DA29DB478` | 1,715,367 B · sha256 `FED2B82D2599AAA622B417562B1DB01C5E95BFB76409E216CFC8F4416FEBE9AE` |
+| Format | DOCX (full extractable text — 201 non-empty lines) | PDF, **8 pages, image-only** (Chrome/Skia print from Schoology "WVAdultEd Teacher Group - Resources"; each page = one 816×1056 RGB image; `pypdf` text extract = empty) |
+| Title on face | "Descriptions of Adult Education Bridge programs" | "DESCRIPTIONS OF ADULT EDUCATION BRIDGE PROGRAMS" (same string) |
+| Revision cue | Filename says 2020; filesystem mtime 2021-11-29 | Footer on every page: **"Revised April 2023"**; PDF CreationDate 2026-03-18 (download/print date, not content date) |
+| Structure | Pre-Bridge → Bridge Prep → Bridge I → Bridge II → IETP → IELCE IET | Same continuum, one level per page (pp. 1–8); p.8 ends on Jefferson County IELCE IETP Healthcare Careers |
+| Sample identity checks | Intro sentence, Pre-Bridge EFL 1–6 / ESL 7–12 entry points, Bridge Prep "Earn by Day Learn by Night" / "The Details of Retail", Bridge II county LPN models, IELCE close | Page-image OCR of pp. 1–2 + 8 matches those passages verbatim |
+
+**Verdict:** content-equivalent descriptor set (not two different docs). The PDF is the newer-dated *layout* (Apr 2023); the DOCX is the older-named *text source*. Bytes are not identical (expected — Word vs image PDF).
+
+**Consequence for Phase B:**
+1. Do **not** treat candidate #11 as net-new counseling prose — it is the text twin of §2.18.
+2. **Do** still stage the DOCX (or export a text PDF from it) because the live RAG PDF contributes **no extractable text** today — Sage cannot retrieve bridge-level / EFL / next-step facts from it.
+3. Audience gap mirrors F1: RAG row is TEACHER_GUIDE / TEACHER; student-facing coach grounding wants a STUDENT (or BOTH) row under `students/`.
+4. Catalog node `catalog/documents/career-pathways-bridge-descriptors2020.md` still says the PDF is "a different, shorter description document" — that claim is stale and should be corrected when Phase B touches the OKF node (governed; not edited in this Phase A pass).
 
 ---
 
@@ -142,7 +164,7 @@ Inherited exclusions from the discovery agents (VUB financial-readiness records,
 3. **WIOA Referral Form folder:** proposed `forms/` (beside the existing STUDENT_REFERRAL DFA rows) instead of the plan's students/-or-presentation/ guidance — approve the deviation?
 4. **Audience mechanics:** `classifyFile()` assigns category/audience from the folder; `students/` likely yields STUDENT_RESOURCE/STUDENT. Several candidates are proposed audience BOTH (demand list, WIOA fact sheet, cert catalog) — accept folder-derived audience, or does Phase B need a per-doc override?
 5. **Interest-assessment gap:** no O*NET Interest Profiler / RIASEC instrument exists anywhere on disk; the ECP itself points students at CareerOneStop's free profiler. Fill via Phase C CareerOneStop APIs (existing COS_USER_ID/COS_API_TOKEN credential pair), or source a printable instrument (outward-facing fetch = governed)?
-6. **Overlap adjudications:** candidate #11 vs RAG's Bridge-Programs doc (F4); candidate #14 (`SPOKES_Certifications.docx`) vs `SPOKES Modules 2025` row AND the hand-maintained cert list in `src/lib/sage/knowledge-base.ts` — Phase B should reconcile, not double-load.
+6. **Bridge descriptors (F4, corrected 2026-07-23):** candidate #11 DOCX and RAG PDF `IETP Description of Adult Education Bridge Programs` are the **same** continuum (not two docs). Approve staging the DOCX under `students/` as the text-extractable / student-audience fix for the image-only TEACHER PDF? Also approve correcting the stale "different document" claim in `catalog/documents/career-pathways-bridge-descriptors2020.md`? Separate adjudication still open for candidate #14 (`SPOKES_Certifications.docx`) vs `SPOKES Modules 2025` + `src/lib/sage/knowledge-base.ts`.
 7. **Currency check:** candidate #12 (Nicholas County IET food-service pathway) is dated 2021 — still valid for FY26/27 counseling?
 8. **Rubric Record revision:** discovered "-2" rubric (722,000 B) vs RAG copy (687,818 B) — if "-2" is the newer revision, does Britt want it refreshed in the bucket?
 
