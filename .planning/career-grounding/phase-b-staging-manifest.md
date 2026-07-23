@@ -3,7 +3,22 @@
 **Date:** 2026-07-09
 **Author:** Phase B ingest-prep agent (subagent)
 **Contract:** `.planning/career-grounding/phase-a-inventory.md` (§1 15 candidates; Q1–Q8 honored, not resolved)
-**Status:** staged + cataloged + allowlisted; NOTHING uploaded, synced, or committed. Governed steps: `docs/runbooks/career-grounding-sync.md`.
+**Status:** staged + cataloged + allowlisted on Windows (2026-07-09); **decision delta 2026-07-23** below — re-path before upload. NOTHING uploaded, synced, or committed. Governed steps: `docs/runbooks/career-grounding-sync.md`.
+
+## 0. Decision delta (2026-07-23) — re-stage before upload
+
+Phase A §6 closed on Mac; these change the 2026-07-09 staging layout:
+
+| # | Change | New staged path | New storageKey | Audience |
+|---|--------|-----------------|----------------|----------|
+| 10 | WIOA Referral: instructor-only | `teachers/WIOA Referral Form.pdf` | `teachers/guides/WIOA Referral Form.pdf` | TEACHER |
+| 9 | WIOA Fact Sheet: instructor/policy | `teachers/New WIOA Fact Sheet 7.11.24.pdf` | `teachers/guides/New WIOA Fact Sheet 7.11.24.pdf` | TEACHER |
+| — | ECP FY25 (Q1) | dual-stage `students/` + `orientation/` | TBD at staging | STUDENT |
+| — | Rubric Record "-2" (Q8) | refresh existing RAG object | existing Rubric Record key | (keep) |
+
+Catalog nodes + allowlist already updated for #9/#10 path moves. Binary moves still need the Windows `docs-upload/` tree (or a copy onto this Mac).
+
+**Mac blockers (2026-07-23):** career-batch binaries not present in this checkout's `docs-upload/`; `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` / `STORAGE_ENDPOINT` empty in `.env.local`. Upload/sync remain Britt-governed per runbook.
 
 ## 1. Staged files — sha256 verified against sources (15/15)
 

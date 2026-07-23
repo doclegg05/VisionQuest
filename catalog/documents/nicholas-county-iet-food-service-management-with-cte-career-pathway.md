@@ -25,8 +25,8 @@ vq_status: approved
 When illustrating what a local IET career pathway looks like in practice — minimum 4–6 weeks / 130 class hours, entry at EFL 4 and above (with or without a diploma), intake and assessment steps, and integrated career exploration (Bring Your A-Game, SMART goals, self-sufficiency planning).
 
 ## When NOT to use
-- 2021-dated, currency unconfirmed (Phase A open question Q7) — do NOT present this as a currently enrolling course; use it as a structural example only.
 - Source-document caveat: its course-description line says "Nursing Assistant Certification" while the course is Food Service Manager (a template copy artifact) — treat unverified details with caution.
+- Do NOT present this as a currently enrolling open course without local confirmation; use it as a **still-valid structural example** for Summersville/Nicholas County counseling (Phase A Q7, 2026-07-23 — keep).
 
 ## Related
 The bridge/IET program models this course instantiates: [Career Pathways Bridge Descriptors2020](./career-pathways-bridge-descriptors2020.md). Current policy framing: [fy27 updates final transcript](./fy27-updates-final-transcript.md). Local demand context: [Region 1 Demand Occupation List 2024](./region-1-demand-occupation-list-2024.md).
