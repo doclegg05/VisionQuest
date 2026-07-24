@@ -52,6 +52,32 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // crisis-paraphrase scenario, which this detector previously missed.
   { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
   { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
+
+  // --- Informal register (VQ-R-004). The patterns above all require formal
+  // "want to" constructions, but the product targets adults at a ~6th-grade
+  // reading level who text in contractions and euphemism. Every phrase in
+  // crisis-detection-informal.test.ts was a verified MISS before these entries.
+  // Same recall-first policy as the rest of this list; the companion test also
+  // pins the false-positive guards ("wanna die my hair", "took my medication"),
+  // because an alert stream staff learn to ignore is a dead safety net.
+  // Contractions of the die/disappear family.
+  { category: "self_harm", pattern: /\b(wanna|gonna|needa)\s+die\b(?!\s+my\s+hair)/i },
+  { category: "self_harm", pattern: /\bdon'?t\s+wanna\s+(live|be\s+here)\b/i },
+  { category: "self_harm", pattern: /\bwanna\s+(just\s+)?disappear\b/i },
+  // Filter-evading euphemism, common in online/text register.
+  { category: "self_harm", pattern: /\bunaliv(e|ed|ing)\b/i },
+  // Abbreviations. "kms" as kilometres is implausible for this US cohort, and
+  // recall wins per the module policy above.
+  { category: "self_harm", pattern: /\b(kms|ksy)\b/i },
+  // "ending things" — the formal pattern only covered "my life" / "it all".
+  { category: "self_harm", pattern: /\bend(ing)?\s+things\b/i },
+  { category: "self_harm", pattern: /\bbetter\s+off\s+if\s+i\s+(wasn'?t|was\s+not|weren'?t)\s+here\b/i },
+  // Method-adjacent disclosure: a stated plan or a past act outranks ideation.
+  // Both are bounded so third-person mentions ("that overdose documentary")
+  // and ordinary adherence ("took my medication this morning") stay silent.
+  { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+(od|overdose)\b/i },
+  { category: "self_harm", pattern: /\boverdos(e|ed|ing)\s+(on|myself)\b/i },
+  { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
   { category: "harm_others", pattern: /\b(want|going)\s+to\s+(hurt|kill)\s+(someone|him|her|them|people|everyone)\b/i },
   { category: "abuse", pattern: /\b(be(ing)?\s+abused|he\s+hits\s+me|she\s+hits\s+me|they\s+hit\s+me|hits?\s+me\s+at\s+home|hurt(s|ing)?\s+me\s+at\s+home|being\s+(hurt|hit)\s+at\s+home)\b/i },
 

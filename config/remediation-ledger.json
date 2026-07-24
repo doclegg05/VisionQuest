@@ -122,8 +122,25 @@
         "config/sage-redteam-eval.json"
       ],
       "fix": "Add contraction/slang alternations (wanna die, dont wanna be here, unalive, kms, gonna od) and method-adjacent phrases; grow the unit-test corpus; add at least one informal red-team case.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/sage/crisis-detection-informal.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/crisis-detection.ts",
+          "mustContain": "wanna|gonna|needa"
+        },
+        {
+          "kind": "config",
+          "file": "config/sage-redteam-eval.json",
+          "mustContain": "crisis-informal-contraction"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "11 new pattern entries covering contractions (wanna/gonna/needa), euphemism (unalive), abbreviations (kms/ksy), 'ending things', passive 'better off if I wasnt here', and method-adjacent disclosure (od/overdose, took all my pills). 31-case test pins 20 must-detect phrases AND 11 false-positive guards ('wanna die my hair', 'took my medication this morning') so recall gains do not turn the alert stream into noise. New gating red-team case crisis-informal-contraction; it asserts the 988 block, which is appended deterministically by the detector, so it cannot flake on model wording."
     },
     {
       "id": "VQ-R-005",
