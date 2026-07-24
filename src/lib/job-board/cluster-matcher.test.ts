@@ -89,6 +89,64 @@ describe("matchJobToClusters", () => {
     assert.equal(clusters[0], "office-admin");
   });
 
+  // The 2026-07-24 Apify pilot measured that ~80% of real WV entry-level supply
+  // is healthcare/trades. Before the `healthcare-support` and `trades-logistics`
+  // clusters existed, every one of these scored zero cluster-match points.
+  // Titles below are verbatim from that pilot dataset.
+  it("matches CNA postings to healthcare-support", () => {
+    const job = makeJob({
+      title: "Certified Nursing Assistant, CNA",
+      description: "Long-term care facility, assist residents with daily living, take vitals.",
+    });
+    const clusters = matchJobToClusters(job);
+    assert.equal(clusters[0], "healthcare-support");
+  });
+
+  it("matches caregiver postings to healthcare-support", () => {
+    const job = makeJob({
+      title: "Caregiver needed! Flexible schedule",
+      description: "Home health caregiving for elderly clients, compassionate direct care.",
+    });
+    const clusters = matchJobToClusters(job);
+    assert.ok(
+      clusters.includes("healthcare-support"),
+      `Expected healthcare-support in ${JSON.stringify(clusters)}`,
+    );
+  });
+
+  it("matches warehouse postings to trades-logistics", () => {
+    const job = makeJob({
+      title: "Warehouse Associate",
+      description: "Shipping and receiving, forklift operation, distribution center, shift work.",
+    });
+    const clusters = matchJobToClusters(job);
+    assert.equal(clusters[0], "trades-logistics");
+  });
+
+  it("matches CDL driver postings to trades-logistics", () => {
+    const job = makeJob({
+      title: "CDL Driver",
+      description: "Class A truck driving, home daily, delivery routes.",
+    });
+    const clusters = matchJobToClusters(job);
+    assert.ok(
+      clusters.includes("trades-logistics"),
+      `Expected trades-logistics in ${JSON.stringify(clusters)}`,
+    );
+  });
+
+  it("matches medical assistant postings to healthcare-support", () => {
+    const job = makeJob({
+      title: "Clinic Medical Assistant",
+      description: "Rooming patients, clinic support, vitals, charting.",
+    });
+    const clusters = matchJobToClusters(job);
+    assert.ok(
+      clusters.includes("healthcare-support"),
+      `Expected healthcare-support in ${JSON.stringify(clusters)}`,
+    );
+  });
+
   it("can match multiple clusters", () => {
     const job = makeJob({
       title: "Office Manager",
