@@ -1,7 +1,7 @@
 # Data Retention & Offboarding Policy
 
-**Status**: Draft — retention durations marked `OWNER-CONFIRM` are proposals awaiting program-owner sign-off.
-**Last updated**: 2026-07-20 (P0-4, first slice of the data-lifecycle/privacy layer)
+**Status**: Draft — retention durations marked `OWNER-CONFIRM` are proposals awaiting program-owner sign-off. One class is now confirmed: uploaded documents & signed compliance forms are kept **5 years** (owner, 2026-07-24). The remaining seven are still proposals.
+**Last updated**: 2026-07-24 (file/document retention confirmed at 5 years)
 **Applies to**: All VisionQuest production data. Students are TANF/SNAP recipients — treat every class below as sensitive.
 
 ## Purpose & Scope
@@ -15,7 +15,7 @@ VisionQuest stores personal data about adults in a public-assistance workforce p
 | Account & profile (name, email, credentials, MFA) | `Student` row | 12 months after program exit `OWNER-CONFIRM` | Anonymize (keep row for referential integrity; strip name/email/credentials) |
 | Goals & progression (goals, XP, progression events) | `Goal`, `Progression`, `ProgressionEvent` | Grant-required outcome-reporting period `OWNER-CONFIRM` | Anonymize into aggregate outcome records, then purge row-level data |
 | Chat transcripts (Sage conversations) | `Conversation`, `Message` | 12 months after program exit `OWNER-CONFIRM` | Purge |
-| Uploaded documents & signed compliance forms | `FileUpload`, `FormSubmission`, `FormResponse` + Supabase Storage | Grant-required period `OWNER-CONFIRM` | Purge after export (signed forms go in the export bundle first) |
+| Uploaded documents & signed compliance forms | `FileUpload`, `FormSubmission`, `FormResponse` + Supabase Storage | **5 years after program exit** (owner-confirmed 2026-07-24) | Purge after export (signed forms go in the export bundle first) |
 | Mood entries | `MoodEntry` | 12 months after program exit `OWNER-CONFIRM` | Purge |
 | AI audit & LLM call logs | `LlmCallLog`, `SageInsight`, safety-report records | 24 months `OWNER-CONFIRM` | Purge |
 | Staff audit logs (who did what) | `AuditLog` | 3 years `OWNER-CONFIRM` | Purge |
