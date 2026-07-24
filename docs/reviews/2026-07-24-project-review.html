@@ -1,0 +1,1696 @@
+<title>VisionQuest — Critical Project Review, 24 July 2026</title>
+
+<style>
+  :root {
+    --paper: #F1F4F4;
+    --panel: #FFFFFF;
+    --sunk: #E4EAEA;
+    --rule: #C9D4D4;
+    --rule-soft: #DCE4E4;
+    --ink: #101C1F;
+    --ink-2: #37484C;
+    --ink-3: #61757A;
+    --accent: #0E6B76;
+    --accent-soft: #D8E9EB;
+    --moss: #2C6B4E;
+    --sev-critical: #A11D1A;
+    --sev-high: #AC5314;
+    --sev-medium: #6F6118;
+    --sev-low: #4C5D62;
+    --sev-critical-bg: #F6DEDC;
+    --sev-high-bg: #F8E5D6;
+    --sev-medium-bg: #F1EDD6;
+    --sev-low-bg: #E3E9EA;
+
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-body: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --font-data: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --measure: 74ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0B1416;
+      --panel: #121F22;
+      --sunk: #17272B;
+      --rule: #2A3D41;
+      --rule-soft: #1F3236;
+      --ink: #E8EFEF;
+      --ink-2: #B4C4C6;
+      --ink-3: #8199A930;
+      --ink-3: #86999D;
+      --accent: #5BC8D4;
+      --accent-soft: #12363B;
+      --moss: #6FCF9A;
+      --sev-critical: #FF8A7E;
+      --sev-high: #EFA45F;
+      --sev-medium: #D4C36A;
+      --sev-low: #93A7AC;
+      --sev-critical-bg: #3A1714;
+      --sev-high-bg: #35220F;
+      --sev-medium-bg: #2C2810;
+      --sev-low-bg: #1D2A2D;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0B1416;
+    --panel: #121F22;
+    --sunk: #17272B;
+    --rule: #2A3D41;
+    --rule-soft: #1F3236;
+    --ink: #E8EFEF;
+    --ink-2: #B4C4C6;
+    --ink-3: #86999D;
+    --accent: #5BC8D4;
+    --accent-soft: #12363B;
+    --moss: #6FCF9A;
+    --sev-critical: #FF8A7E;
+    --sev-high: #EFA45F;
+    --sev-medium: #D4C36A;
+    --sev-low: #93A7AC;
+    --sev-critical-bg: #3A1714;
+    --sev-high-bg: #35220F;
+    --sev-medium-bg: #2C2810;
+    --sev-low-bg: #1D2A2D;
+  }
+
+  :root[data-theme="light"] {
+    --paper: #F1F4F4;
+    --panel: #FFFFFF;
+    --sunk: #E4EAEA;
+    --rule: #C9D4D4;
+    --rule-soft: #DCE4E4;
+    --ink: #101C1F;
+    --ink-2: #37484C;
+    --ink-3: #61757A;
+    --accent: #0E6B76;
+    --accent-soft: #D8E9EB;
+    --moss: #2C6B4E;
+    --sev-critical: #A11D1A;
+    --sev-high: #AC5314;
+    --sev-medium: #6F6118;
+    --sev-low: #4C5D62;
+    --sev-critical-bg: #F6DEDC;
+    --sev-high-bg: #F8E5D6;
+    --sev-medium-bg: #F1EDD6;
+    --sev-low-bg: #E3E9EA;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead { display: flex; flex-direction: column; gap: 1.25rem; }
+  .stamp {
+    font-family: var(--font-data);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--ink);
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.08;
+    font-weight: 400;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .verdict {
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+    line-height: 1.45;
+    color: var(--ink-2);
+    max-width: var(--measure);
+    text-wrap: pretty;
+  }
+  .verdict strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- stat row ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 2px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule);
+  }
+  .stat { background: var(--panel); padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.15rem; }
+  .stat-n {
+    font-family: var(--font-data);
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .stat-l {
+    font-family: var(--font-data);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    line-height: 1.35;
+  }
+
+  /* ---------- severity bar ---------- */
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+  figcaption {
+    font-family: var(--font-data);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sevbar { display: flex; gap: 2px; height: 2.4rem; }
+  .sevbar > div {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-data); font-size: 0.78rem; font-variant-numeric: tabular-nums;
+    color: var(--ink); white-space: nowrap; overflow: hidden;
+  }
+  .seg-critical { background: var(--sev-critical-bg); box-shadow: inset 3px 0 0 var(--sev-critical); }
+  .seg-high     { background: var(--sev-high-bg);     box-shadow: inset 3px 0 0 var(--sev-high); }
+  .seg-medium   { background: var(--sev-medium-bg);   box-shadow: inset 3px 0 0 var(--sev-medium); }
+  .seg-low      { background: var(--sev-low-bg);      box-shadow: inset 3px 0 0 var(--sev-low); }
+  .sevkey {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem;
+    font-family: var(--font-data); font-size: 0.7rem; color: var(--ink-2);
+  }
+  .sevkey span { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .swatch { width: 0.7rem; height: 0.7rem; flex: none; }
+
+  /* ---------- sections ---------- */
+  section { display: flex; flex-direction: column; gap: 1.5rem; scroll-margin-top: 1rem; }
+  .sec-head { display: flex; flex-direction: column; gap: 0.5rem; border-top: 2px solid var(--ink); padding-top: 0.9rem; }
+  .sec-eyebrow {
+    font-family: var(--font-data); font-size: 0.68rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  h2 {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(1.5rem, 3.2vw, 2rem); line-height: 1.15; margin: 0; text-wrap: balance;
+  }
+  .sec-intro { color: var(--ink-2); max-width: var(--measure); margin: 0; }
+  h3 {
+    font-family: var(--font-body); font-size: 0.82rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2);
+    margin: 1.25rem 0 0; padding-bottom: 0.4rem; border-bottom: 1px solid var(--rule);
+  }
+  .cluster-note { color: var(--ink-3); font-size: 0.92rem; max-width: var(--measure); margin: -0.6rem 0 0; }
+
+  /* ---------- ledger ---------- */
+  .ledger { display: flex; flex-direction: column; }
+  .entry {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 0 1.6rem;
+    padding: 1.15rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .entry:first-of-type { border-top: 1px solid var(--rule); }
+  .gutter { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+  .sev {
+    font-family: var(--font-data); font-size: 0.64rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 0.12rem 0.4rem; font-weight: 700;
+  }
+  .sev.critical { color: var(--sev-critical); background: var(--sev-critical-bg); }
+  .sev.high     { color: var(--sev-high);     background: var(--sev-high-bg); }
+  .sev.medium   { color: var(--sev-medium);   background: var(--sev-medium-bg); }
+  .sev.low      { color: var(--sev-low);      background: var(--sev-low-bg); }
+  .sev.good     { color: var(--moss);         background: var(--accent-soft); }
+  .slug {
+    font-family: var(--font-data); font-size: 0.7rem; color: var(--ink-3);
+    word-break: break-word; line-height: 1.35;
+  }
+  .verified {
+    font-family: var(--font-data); font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--moss); border: 1px solid var(--moss);
+    padding: 0.05rem 0.3rem;
+  }
+  .body { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
+  .body h4 {
+    font-family: var(--font-body); font-size: 1.02rem; font-weight: 650;
+    line-height: 1.35; margin: 0; color: var(--ink); text-wrap: pretty;
+  }
+  .body p { margin: 0; color: var(--ink-2); font-size: 0.95rem; max-width: var(--measure); }
+  .fix { color: var(--ink) !important; }
+  .fix b {
+    font-family: var(--font-data); font-size: 0.68rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent); font-weight: 700; margin-right: 0.4rem;
+  }
+  .ev {
+    font-family: var(--font-data); font-size: 0.72rem; color: var(--ink-3);
+    line-height: 1.7; word-break: break-word; margin: 0.15rem 0 0;
+    display: flex; flex-wrap: wrap; gap: 0.15rem 0.75rem;
+  }
+  .ev code { background: var(--sunk); padding: 0.05rem 0.3rem; }
+
+  /* ---------- callout ---------- */
+  .callout {
+    background: var(--panel); border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent); padding: 1.1rem 1.25rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .callout h4 {
+    font-family: var(--font-data); font-size: 0.7rem; letter-spacing: 0.12em;
+    text-transform: uppercase; margin: 0; color: var(--accent);
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 0.93rem; max-width: var(--measure); }
+  .callout strong { color: var(--ink); }
+
+  /* ---------- ordered focus ---------- */
+  .steps { display: flex; flex-direction: column; gap: 0; counter-reset: step; }
+  .step {
+    display: grid; grid-template-columns: 3.2rem 1fr; gap: 0 1.4rem;
+    padding: 1.2rem 0; border-bottom: 1px solid var(--rule-soft);
+  }
+  .step:first-child { border-top: 1px solid var(--rule); }
+  .step-n {
+    font-family: var(--font-data); font-size: 1.6rem; color: var(--accent);
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .step-n::before { counter-increment: step; content: counter(step, decimal-leading-zero); }
+  .payoff { font-size: 0.9rem; color: var(--ink-3) !important; }
+  .payoff b { color: var(--moss); font-weight: 650; }
+
+  /* ---------- coverage matrix ---------- */
+  .matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 2px; background: var(--rule-soft); border: 1px solid var(--rule); }
+  .cell { background: var(--panel); padding: 0.7rem 0.8rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .cell-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .cell-slug { font-family: var(--font-data); font-size: 0.72rem; color: var(--ink); }
+  .state {
+    font-family: var(--font-data); font-size: 0.6rem; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 0.1rem 0.35rem; font-weight: 700; flex: none;
+  }
+  .state.strong { color: var(--moss); background: var(--accent-soft); }
+  .state.solid  { color: var(--sev-low); background: var(--sev-low-bg); }
+  .state.mixed  { color: var(--sev-medium); background: var(--sev-medium-bg); }
+  .state.weak   { color: var(--sev-high); background: var(--sev-high-bg); }
+  .cell p { margin: 0; font-size: 0.82rem; color: var(--ink-3); line-height: 1.45; }
+
+  .scroller { overflow-x: auto; }
+  footer {
+    border-top: 1px solid var(--rule); padding-top: 1.25rem;
+    font-family: var(--font-data); font-size: 0.7rem; color: var(--ink-3);
+    display: flex; flex-direction: column; gap: 0.4rem;
+  }
+  a { color: var(--accent); }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (max-width: 46rem) {
+    .entry { grid-template-columns: 1fr; gap: 0.6rem; }
+    .gutter { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .step { grid-template-columns: 1fr; gap: 0.4rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="stamp">
+      <span>Critical project review</span>
+      <span>24 July 2026</span>
+      <span>Branch: claude/project-review-planning-96d907</span>
+      <span>147K LOC / 908 files audited</span>
+    </div>
+    <h1>VisionQuest is a well-engineered system running without a steering wheel.</h1>
+    <p class="verdict">
+      The code is <strong>materially more mature than the project's own documentation admits</strong> — the security core,
+      the Sage agent's confirmation boundary, and the July verification work are genuinely above grade for a solo alpha.
+      What has failed is the operating loop around it: the 90-day charter lapsed 33 days ago with no successor, the
+      headline outcomes were never measurable, and a recurring pattern has set in where <strong>safety-critical policy
+      degrades silently to the permissive side</strong> whenever a config row or a CI secret is missing. The build quality
+      is not the risk. The absence of a current definition of "done" is.
+    </p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><span class="stat-n">62</span><span class="stat-l">Weaknesses</span></div>
+    <div class="stat"><span class="stat-n">12</span><span class="stat-l">Strengths recorded</span></div>
+    <div class="stat"><span class="stat-n">184</span><span class="stat-l">API routes</span></div>
+    <div class="stat"><span class="stat-n">84</span><span class="stat-l">Prisma models</span></div>
+    <div class="stat"><span class="stat-n">223</span><span class="stat-l">Test files, 0% measured</span></div>
+    <div class="stat"><span class="stat-n">33</span><span class="stat-l">Days charter lapsed</span></div>
+  </div>
+
+  <figure>
+    <figcaption>Findings by severity</figcaption>
+    <div class="sevbar" role="img" aria-label="Severity distribution of 62 weaknesses: 1 critical, 28 high, 29 medium, 4 low">
+      <div class="seg-critical" style="flex: 1 1 0; min-width: 0.6rem"></div>
+      <div class="seg-high" style="flex: 28 1 0">28 high</div>
+      <div class="seg-medium" style="flex: 29 1 0">29 medium</div>
+      <div class="seg-low" style="flex: 4 1 0; min-width: 2.4rem">4 low</div>
+    </div>
+    <div class="sevkey">
+      <span><i class="swatch" style="background: var(--sev-critical)"></i>Critical — 1 (crisis pipeline placement)</span>
+      <span><i class="swatch" style="background: var(--sev-high)"></i>High — 28</span>
+      <span><i class="swatch" style="background: var(--sev-medium)"></i>Medium — 29</span>
+      <span><i class="swatch" style="background: var(--sev-low)"></i>Low — 4</span>
+    </div>
+  </figure>
+
+  <div class="callout">
+    <h4>Method, and what it does not prove</h4>
+    <p>
+      Seven independent reviewers audited one slice each — Sage conversation core, Sage agent and registry, security and
+      the teacher surface, the employment pipeline, the student experience, infrastructure and quality, and product docs
+      versus reality — reading code rather than documentation, with every cited path verified to exist.
+    </p>
+    <p>
+      <strong>The adversarial verification pass did not complete.</strong> Of 44 planned refutation checks, 4 ran before
+      the run hit a spend limit. All 4 survived — three confirmed outright, one confirmed with a detail correction after
+      the reviewer reproduced the failure locally — and they are marked <span class="verified">verified</span> below.
+      The other 66 weaknesses and cut candidates are <strong>single-reviewer claims with cited evidence but no
+      independent second read</strong>. Treat the file paths as reliable, since every one was checked to exist, and the
+      severity grades as provisional. Confirm a finding before acting on it, starting with the critical one.
+    </p>
+  </div>
+
+  <!-- ======================= STRENGTHS ======================= -->
+  <section id="section-strengths">
+    <div class="sec-head">
+      <span class="sec-eyebrow">What is genuinely good</span>
+      <h2>Strengths</h2>
+      <p class="sec-intro">
+        These are not participation trophies. Each one is a place where the implementation is more careful than the
+        surrounding project maturity would predict, and each is worth protecting during any refactor.
+      </p>
+    </div>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="strengths" data-area="rls-rbac" data-evidence="src/proxy.ts:82, scripts/audit-api-auth.mjs:99, src/lib/rls.test.ts, src/lib/api-error.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">rls-rbac</span></div>
+        <div class="body">
+          <h4>Row-level security is real defense in depth, with a CI gate that proves coverage</h4>
+          <p>The proxy unconditionally strips inbound <code>x-vq-*</code> headers before deriving them from the verified JWT, so a forged <code>x-vq-role: admin</code> cannot reach a handler. Every auth wrapper runs its handler inside an RLS context, and a bespoke CI scanner fails the build on the exact query-without-context footgun that caused a real bug in April. This is the single most important regression gate for a TANF/SNAP population, and it exists.</p>
+          <p class="ev"><code>src/proxy.ts:82</code><code>scripts/audit-api-auth.mjs:99</code><code>src/lib/rls.test.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="auth-security" data-evidence="src/lib/auth.ts:112, src/lib/mfa.ts:120, src/app/api/auth/mfa/challenge/route.ts:125, src/lib/session-token.ts:37">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">auth-security</span></div>
+        <div class="body">
+          <h4>Authentication is thorough in the details that usually get skipped</h4>
+          <p>scrypt with tuned parameters and constant-time comparison; a precomputed dummy hash runs the key derivation even for non-existent accounts, killing timing-based account enumeration; legacy PBKDF2 hashes are transparently rehashed on login. TOTP replay is genuinely closed — the challenge route persists the matched counter, so a captured code cannot be reused inside its window. JWT verification pins HS256, blocking algorithm-confusion forgery.</p>
+          <p class="ev"><code>src/lib/auth.ts:112</code><code>src/lib/mfa.ts:120</code><code>src/lib/session-token.ts:37</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="sage-agent-tools" data-evidence="src/lib/sage/agent/confirmation.ts, src/app/api/chat/tool-confirm/route.ts, src/lib/sage/agent/write-tools.test.ts, src/lib/sage/agent/headless.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>The agent's confirm-before-write boundary is the best-engineered surface in the repo</h4>
+          <p>Write tools gate on an HMAC token over the tool, canonicalized arguments, session, conversation, target student and expiry, with timing-safe comparison and a short TTL. The confirm route re-verifies against the caller's own session and refuses a staff-supplied target from a non-staff caller; the executor re-verifies again rather than trusting the loop. Background briefing runs intersect a static allowlist with the registry filtered to the read-only tier, and the tests include hallucinated tool names and injection-shaped prompts.</p>
+          <p class="ev"><code>src/lib/sage/agent/confirmation.ts</code><code>src/app/api/chat/tool-confirm/route.ts</code><code>src/lib/sage/agent/headless.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="crisis-safety" data-evidence="src/lib/chat/crisis-safety-net.ts:20, src/lib/sage/crisis-detection.ts:181, src/lib/sage/crisis-detection.ts:241">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">crisis-safety</span></div>
+        <div class="body">
+          <h4>Crisis handling is deliberately model-independent and privacy-locked</h4>
+          <p>A pure regex detector — not the model — drives both the student-facing 988 resource block and the staff alert. The resource block is appended only when the reply lacks one and is folded into the persisted text so history matches what the student actually saw. The alert carries a structured context card with the category only, never message text, prefers the assigned instructor, and falls back to all active teachers on any resolution failure. Over-notifying is the chosen failure mode, which is the right choice.</p>
+          <p class="ev"><code>src/lib/chat/crisis-safety-net.ts:20</code><code>src/lib/sage/crisis-detection.ts:181</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="sage-memory" data-evidence="src/lib/sage/memory/extract.ts:110, src/lib/sage/retry.ts:82, src/app/api/teacher/failed-extractions/[id]/route.ts, src/lib/sage/goal-extractor.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">sage-memory</span></div>
+        <div class="body">
+          <h4>Memory extraction is production-grade, and the dead-letter is wired end to end</h4>
+          <p>Extraction serializes per student with a Postgres advisory lock and dedupes at three layers — source hash, semantic distance against active memories, and intra-batch cosine — with an unusually honest comment about what the lock does and does not cover. All four post-response extractors persist their input snapshot on retry exhaustion, and the teacher route implements real replay through the idempotent proposal path, so a replay cannot double-propose. The July dead-letter work was not just documentation.</p>
+          <p class="ev"><code>src/lib/sage/memory/extract.ts:110</code><code>src/lib/sage/retry.ts:82</code><code>src/app/api/teacher/failed-extractions/[id]/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="rag-knowledge" data-evidence="src/lib/sage/hybrid-retrieval.ts:39, src/lib/sage/knowledge-base-server.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">rag-knowledge</span></div>
+        <div class="body">
+          <h4>Hybrid retrieval is textbook-correct and honestly tuned</h4>
+          <p>The SQL function implements reciprocal rank fusion properly — weight over rank-plus-k, summed across the vector and full-text legs — with an embedding-model guard on both. The TypeScript layer adds distance tie-breaking, title dedupe, an abstention gate that ships off by default, and relative cutoffs with a fall-back-to-winner rule. The tuning history is recorded rather than asserted.</p>
+          <p class="ev"><code>src/lib/sage/hybrid-retrieval.ts:39</code><code>src/lib/sage/knowledge-base-server.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="sage-evals" data-evidence="scripts/sage-redteam-eval.mjs:266, src/lib/sage/system-prompts.test.ts:735, config/sage-chat-eval.json">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">sage-evals</span></div>
+        <div class="body">
+          <h4>The red-team eval fails closed, and its leak canaries cannot go stale</h4>
+          <p>The gating harness counts scenarios it could not evaluate and exits non-zero on them — an outage cannot masquerade as a clean run, a failure mode most eval suites have. Separately, a unit test binds every "must never contain" canary in the fixtures to verbatim text in the built prompt, so a prompt edit that orphans a canary fails CI immediately instead of silently defanging the live check. The flaky-case watch tier exists and is currently empty; nothing is rotting in it.</p>
+          <p class="ev"><code>scripts/sage-redteam-eval.mjs:266</code><code>src/lib/sage/system-prompts.test.ts:735</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="orientation" data-evidence="src/lib/orientation-completion.ts:67, src/app/api/orientation/complete/route.ts:29, src/components/orientation/OrientationWizard.tsx">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">orientation</span></div>
+        <div class="body">
+          <h4>Orientation is the pattern the rest of the student surface should copy</h4>
+          <p>One shared completion module serves both the student route and Sage's form tool, so the two entry points cannot drift. It enforces a signature guard — items with signature-required forms cannot complete until a signed submission exists — and routes honor-system items into an explicit verification state rather than trusting self-report. Tests sit at the seam where the two callers meet.</p>
+          <p class="ev"><code>src/lib/orientation-completion.ts:67</code><code>src/app/api/orientation/complete/route.ts:29</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="job-board" data-evidence="src/lib/job-board/banded-matching.ts, src/lib/job-board/duplicates.ts, src/lib/job-board/spokes-job-queries.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>The matching core is deep, tested, and not the dead config it looked like</h4>
+          <p>Banded matching is real and wired end to end: ranked output partitions into Core, Stretch and Wildcard with an auditable withheld cap, every response row is stamped, and the UI renders plain-language sections. The dedup pipeline normalizes company suffixes, expands state abbreviations, collapses remote synonyms and picks the primary copy by a documented priority. The West Virginia query seeding deliberately supplements the taxonomy with the healthcare and trades titles it misses, and says so.</p>
+          <p class="ev"><code>src/lib/job-board/banded-matching.ts</code><code>src/lib/job-board/duplicates.ts</code><code>src/lib/job-board/spokes-job-queries.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="forms-engine" data-evidence="src/lib/spokes/forms-delivery.s3fallback.test.ts, src/lib/forms/schema.ts, src/lib/spokes/orientation-packet.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">forms-engine</span></div>
+        <div class="body">
+          <h4>The storage-fallback test is a model integration test, and the forms lifecycle is schema-locked</h4>
+          <p>Rather than mocking the AWS SDK, the test stands up a real loopback server answering S3-style 404s, exercises the actual object-get path, and asserts byte-for-byte fallback to the bundled PDF — including a path-traversal rejection case. Templates are locked by a discriminated-union schema with duplicate-key refinement and a field cap; student answers are validated per field with unknown keys stripped, so renaming a field cannot corrupt old responses.</p>
+          <p class="ev"><code>src/lib/spokes/forms-delivery.s3fallback.test.ts</code><code>src/lib/forms/schema.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="documents-files" data-evidence="src/lib/storage.ts:442, src/app/api/files/download/route.ts:22, src/app/api/files/route.ts">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">documents-files</span></div>
+        <div class="body">
+          <h4>File handling closes the holes that matter</h4>
+          <p>Uploads validate against a tight MIME allowlist that excludes SVG and HTML, closing stored-XSS-via-inline-render. Deletes remove the storage object first, with a comment explaining the recovery ordering. Downloads scope students to their own files and staff through the classroom-management check, with a sanitized content-disposition header. Small surface, no loose ends.</p>
+          <p class="ev"><code>src/lib/storage.ts:442</code><code>src/app/api/files/download/route.ts:22</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="strengths" data-area="product-docs" data-evidence="docs/PRODUCT_DECISIONS.md:77, src/lib/nav-items.ts:23, docs/MATURITY_REVIEW.md, JOURNAL.md">
+        <div class="gutter"><span class="sev good">Strength</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>Scope decisions were actually executed, and the decision journal corrects itself</h4>
+          <p>Every deletion the decisions doc ordered is verifiably done — all five redirect-only student routes are gone, ahead of their grace window. Navigation code matches the documented information architecture exactly, phase gates included. The maturity review is a model closeout artifact: findings-to-repairs tables, an honestly disclosed pre-existing test failure, and a struck-through owner item with its resolution date. The journal even corrects its own earlier claims.</p>
+          <p class="ev"><code>docs/PRODUCT_DECISIONS.md:77</code><code>src/lib/nav-items.ts:23</code><code>docs/MATURITY_REVIEW.md</code></p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ======================= WEAKNESSES ======================= -->
+  <section id="section-weaknesses">
+    <div class="sec-head">
+      <span class="sec-eyebrow">What is broken, grouped by why</span>
+      <h2>Weaknesses</h2>
+      <p class="sec-intro">
+        Clustered by failure pattern rather than by subsystem, because the patterns repeat across subsystems and the
+        pattern is the thing worth fixing. Severity grades are provisional except where marked verified.
+      </p>
+    </div>
+
+    <h3>Pattern one — safety policy that degrades quietly to the permissive side</h3>
+    <p class="cluster-note">The most consequential cluster. In each case the safe behavior is documented as enforced, and the code does the less safe thing when something is merely absent.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="crisis-safety" data-sev="critical" data-evidence="src/app/api/chat/send/route.ts:956, src/app/api/chat/send/route.ts:1020, src/app/api/chat/send/route.ts:297, src/lib/chat/post-response.ts">
+        <div class="gutter"><span class="sev critical">Critical</span><span class="slug">crisis-safety</span></div>
+        <div class="body">
+          <h4>The crisis scan and staff alert run only after a fully successful model stream</h4>
+          <p>Both the 988 resource injection and the staff wellbeing alert sit inside the success path of the streaming response. If the local provider is down and the route returns 503, if the model errors mid-stream, or if the student closes the tab, a message containing explicit suicidal intent is saved to the database and <em>no alert is ever raised</em> — the deterministic detector never runs. The failure modes that suppress the alert are exactly the ones most likely to co-occur with a student in distress retrying a broken app.</p>
+          <p class="body fix"><b>Fix</b>Run the detector on the user's message and fire the alert immediately after that message is saved, before provider resolution. The detector is pure and synchronous, so this costs nothing; keep the reply-side resource block where it is.</p>
+          <p class="ev"><code>src/app/api/chat/send/route.ts:956</code><code>route.ts:1020</code><code>route.ts:297</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-chat" data-sev="high" data-evidence="src/lib/ai/provider.ts, src/lib/ai/embedding-provider.ts, CLAUDE.md, .claude/rules/sage-ai.md">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">sage-chat</span></div>
+        <div class="body">
+          <h4>The FERPA "local-only" guarantee is not what the code enforces</h4>
+          <p>Both <code>CLAUDE.md</code> and the Sage rules state that student-record and staff-entered prompts are local-only by FERPA policy. The resolver routes those sensitivities to the local provider <em>only</em> when a system config row explicitly says <code>local</code> — and an unset row defaults to cloud. So a fresh environment, a wiped config, or a mis-set value silently sends student-record content to Gemini while the documentation claims it cannot happen. Embedding routing shares the same fail-open default.</p>
+          <p class="body fix"><b>Fix</b>Pick one truth and make the code the authority. Either fail closed for those sensitivities — 503 when no local provider, with an explicit owner-acknowledged cloud override flag — or rewrite both docs to describe cloud-by-default with consent as the basis.</p>
+          <p class="ev"><code>src/lib/ai/provider.ts</code><code>src/lib/ai/embedding-provider.ts</code><code>CLAUDE.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="career-resume" data-sev="high" data-evidence="src/app/api/resume/upload/route.ts, src/lib/resume-ai.ts, src/lib/ai/provider.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">career-resume</span></div>
+        <div class="body">
+          <h4>Full resume text — names, addresses, employment history — inherits that same cloud default</h4>
+          <p>The resume routes do everything right locally: they declare student-record sensitivity, log a complete AI audit trail with provider class and character counts, rate-limit per student, and return honest 503s when local AI is required but unavailable. But they resolve through the same fail-open router, so in the default configuration a TANF/SNAP recipient's uploaded resume goes to a cloud model. This is the highest-volume PII path in the product.</p>
+          <p class="body fix"><b>Fix</b>Resolved by the provider-routing decision above; until then, treat the resume upload path as the first surface to gate.</p>
+          <p class="ev"><code>src/app/api/resume/upload/route.ts</code><code>src/lib/resume-ai.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="crisis-safety" data-sev="high" data-evidence="src/lib/sage/crisis-detection.ts, config/sage-redteam-eval.json">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">crisis-safety</span></div>
+        <div class="body">
+          <h4>The crisis detector misses the phrasings this population actually types</h4>
+          <p>The English patterns require formal "want to" constructions, while the product explicitly targets adults reading at a sixth-grade level who text informally. Checked against the live regexes, all of these pass through undetected: "i wanna die", "i dont wanna be here anymore", "kms", "im gonna od tonight", "i took all my pills", "thinking about ending things". The detector's own comment says it errs toward recall; it does not.</p>
+          <p class="body fix"><b>Fix</b>Add contraction and slang alternations plus method-adjacent phrases, grow the unit-test corpus from real informal phrasing, and add at least one informal case to the red-team fixtures so the gate protects it.</p>
+          <p class="ev"><code>src/lib/sage/crisis-detection.ts</code><code>config/sage-redteam-eval.json</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-evals" data-sev="medium" data-evidence=".github/workflows/sage-evals.yml, src/lib/chat/crisis-safety-net.ts, src/lib/ai/gemini-provider.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">sage-evals</span></div>
+        <div class="body">
+          <h4>The eval gate has two silent bypasses — including for the files it exists to protect</h4>
+          <p>Every gating step exits zero with a notice when the Gemini key is absent, which is precisely the state of a fork pull request or a rotated secret: the gate reports green having run nothing. Separately, the path filter covers the Sage library, config and scripts — but not <code>src/lib/chat/</code>, which is where the crisis safety net and post-response extraction live, nor the provider layer. A change to the crisis net does not trigger the crisis evals.</p>
+          <p class="body fix"><b>Fix</b>Extend the filter to the chat, AI and chat-API paths; fail rather than skip when the key is missing on scheduled runs and same-repo pull requests, keeping the silent skip only for true forks.</p>
+          <p class="ev"><code>.github/workflows/sage-evals.yml</code><code>src/lib/chat/crisis-safety-net.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="rag-knowledge" data-sev="medium" data-evidence="src/lib/sage/knowledge-base-server.ts, src/lib/sage/system-prompts.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">rag-knowledge</span></div>
+        <div class="body">
+          <h4>Staff-authored document notes reach the prompt unsanitized</h4>
+          <p>The snippet branch of the context formatter defends against teacher-authored injection with framing text, wrapper tags and sanitization on both label and content, explicitly citing a compromised-staff-account threat. The document branch of the same function injects the title and the curated context note raw — equally teacher-authored, through the same API — sanitizing only the storage key. The threat model is right; it is applied to one of two branches.</p>
+          <p class="body fix"><b>Fix</b>Apply the same sanitizer to label and content in the document branch, and to chunk passage text.</p>
+          <p class="ev"><code>src/lib/sage/knowledge-base-server.ts</code><code>src/lib/sage/system-prompts.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-chat" data-sev="medium" data-evidence="src/lib/sage/system-prompts.ts, src/app/api/goals/route.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">sage-chat</span></div>
+        <div class="body">
+          <h4>Goal text is the one untrusted field that skips the injection sanitizer</h4>
+          <p>The prompt builder brackets goal fields in delimiters explicitly "to mitigate prompt injection", but unlike student name, discovery summary, skill-gap, pathway, snapshot and staff context, the five goal substitutions never pass through the sanitizer. A student can write arbitrary content into a goal, and goals are the most prominent student-authored text in the prompt.</p>
+          <p class="body fix"><b>Fix</b>Wrap all five substitutions in the sanitizer, switch to a replacer function so dollar-patterns cannot be interpreted, and add a red-team case that plants a bracket escape in a confirmed goal.</p>
+          <p class="ev"><code>src/lib/sage/system-prompts.ts</code><code>src/app/api/goals/route.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+
+    <h3>Pattern two — the verification layer still leaks where it matters</h3>
+    <p class="cluster-note">July's repair session added human confirmation across orientation, goals and certifications. Each fix landed with a sibling door left open, and the gamification layer now mints artifacts with real-world weight.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="goals" data-sev="high" data-evidence="src/app/api/goals/[id]/route.ts, src/components/goals/GoalsPageClient.tsx">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">goals</span></div>
+        <div class="body">
+          <h4>Students cannot self-confirm a Sage-proposed goal, but they can self-complete one</h4>
+          <p>The patch handler forbids setting status to <code>confirmed</code> on a goal that came from Sage — and accepts every other status on that same goal, including <code>completed</code>. The interface makes this the default path: proposed weekly and task rows render live checkboxes with no proposal badge, since badges exist only for the top two levels. One tap drives an AI-generated goal to completed with no instructor ever involved, which is the exact loop the verification layer was built to close.</p>
+          <p class="body fix"><b>Fix</b>Restrict student transitions on Sage-sourced goals to dismissal until confirmed, render the proposal badge and disable the checkbox at every level, and add route tests for proposed-to-completed.</p>
+          <p class="ev"><code>src/app/api/goals/[id]/route.ts</code><code>src/components/goals/GoalsPageClient.tsx</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="progression-xp" data-sev="high" data-evidence="src/app/api/progression/route.ts, src/components/progression/ProgressionProvider.tsx, src/lib/progression/engine.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">progression-xp</span></div>
+        <div class="body">
+          <h4>A GET request mints experience points, so "attendance" measures page opens</h4>
+          <p>The progression GET handler awards the daily check-in event and advances the streak unconditionally, and the provider that calls it is mounted in the student layout — so it fires on every page mount and after every goal action. A seven-day streak of opening the website unlocks an attendance tier, which is presented as a downloadable Certificate of Attendance in a workforce program where attendance has funding consequences. The same aggregation also re-fetches readiness three or four times per page.</p>
+          <p class="body fix"><b>Fix</b>Make the GET read-only and move the check-in award to an explicit POST behind a real action — the mood check-in is the natural trigger. Pass one fetched readiness result down instead of re-fetching.</p>
+          <p class="ev"><code>src/app/api/progression/route.ts</code><code>src/components/progression/ProgressionProvider.tsx</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="goals" data-sev="high" data-evidence="src/components/goals/GoalsPageClient.tsx, src/app/api/chat/send/route.ts, src/lib/chat/post-response.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">goals</span></div>
+        <div class="body">
+          <h4>"Ask Sage" on the goals page writes fabricated messages into the student's real conversation</h4>
+          <p>The helper posts a canned first-person message to the live chat endpoint, which persists it as something the student said, persists the reply, triggers post-response extraction that can propose new goals from the synthetic exchange, spends the student's model budget, and awards chat experience points. The student later opens their conversation and finds words they never wrote. A button that looks like a read-only helper is a full authenticated chat turn.</p>
+          <p class="body fix"><b>Fix</b>Route scaffolding calls through a non-persisting endpoint, or tag them as system-initiated and render them as such in the transcript.</p>
+          <p class="ev"><code>src/components/goals/GoalsPageClient.tsx</code><code>src/app/api/chat/send/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="goals" data-sev="high" data-evidence="src/components/goals/GoalsPageClient.tsx, src/app/api/goals/route.ts, src/lib/goals.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">goals</span></div>
+        <div class="body">
+          <h4>The goal hierarchy is mis-wired: some goals count toward progress but are never rendered</h4>
+          <p>Three defects compound. Tasks attached directly to a monthly goal are included in the progress denominator, but the branch meant to render them filters a collection that by construction excludes anything with a monthly ancestor — so they are counted and invisible, and the progress bar can never reach 100%. Children of orphan weeklies never render. And the create endpoint validates no level lattice, so any shape can be stored.</p>
+          <p class="body fix"><b>Fix</b>Extract a pure tree-building module with unit tests and make the renderer total — every active goal renders exactly once regardless of shape — then enforce the lattice at write time.</p>
+          <p class="ev"><code>src/components/goals/GoalsPageClient.tsx</code><code>src/app/api/goals/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="progression-xp" data-sev="medium" data-evidence="src/app/api/vision-board/route.ts, src/app/api/portfolio/route.ts, src/lib/progression/readiness-score.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">progression-xp</span></div>
+        <div class="body">
+          <h4>Experience points, item counts and readiness are farmable with a create-delete loop</h4>
+          <p>Vision-board pins and portfolio items use the freshly created row id as the idempotency key, and deletion neither decrements the counters nor revokes the award. Create, delete, repeat mints unbounded points, levels, achievements and up to eight readiness points. Readiness feeds teacher intervention triage and monthly reports, so this inflates the numbers staff use to decide who needs help.</p>
+          <p class="body fix"><b>Fix</b>Key collection awards to a monotonic per-student counter with a cap, or recompute counts from live rows in the snapshot builder the way certifications already do.</p>
+          <p class="ev"><code>src/app/api/vision-board/route.ts</code><code>src/lib/progression/readiness-score.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="progression-xp" data-sev="medium" data-evidence="src/lib/academic-kpi.ts, src/lib/class-progress.ts, src/lib/teacher/readiness-snapshot.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">progression-xp</span></div>
+        <div class="body">
+          <h4>Readiness unification is incomplete in exactly the views staff use to compare students</h4>
+          <p>The shared snapshot builder is real and widely adopted, but the academic KPI report passes zeroed orientation progress — discarding up to ten points of partial credit that the student's own view includes — and class progress computes from raw progression state without the snapshot's reconciliation against certification records. A student sees one readiness number; their instructor's roster shows another.</p>
+          <p class="body fix"><b>Fix</b>Give class progress and academic KPIs a batch variant of the snapshot builder; the inputs are already bulk-fetchable, so both surfaces share one formula and one input pipeline.</p>
+          <p class="ev"><code>src/lib/academic-kpi.ts</code><code>src/lib/class-progress.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="certifications" data-sev="medium" data-evidence="src/lib/progression/engine.ts, src/lib/progression/readiness-score.ts, src/lib/spokes/certifications.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">certifications</span></div>
+        <div class="body">
+          <h4>The certification economy assumes nineteen certificates; one is actually earnable</h4>
+          <p>The engine hardcodes an all-earned achievement at nineteen and readiness defaults its denominator to nineteen, while the only certificate type reachable through student or Sage flows is ready-to-work. Certifications are the largest readiness category at twenty-five points, so as shipped it maxes out near one point — quietly deflating every readiness score in the product, including the ones driving intervention triage.</p>
+          <p class="body fix"><b>Fix</b>Reconcile the denominator with teacher-created certificate types, or re-scale the category to what is actually attainable.</p>
+          <p class="ev"><code>src/lib/progression/engine.ts</code><code>src/lib/spokes/certifications.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="progression-xp" data-sev="medium" data-evidence="src/lib/nav-progression.ts, src/lib/goal-plan.ts, src/app/(student)/layout.tsx">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">progression-xp</span></div>
+        <div class="body">
+          <h4>Phase gating is cosmetic — hidden pages stay reachable and get recommended to locked students</h4>
+          <p>The phase computation only hides navigation entries; the career, portfolio and appointment pages perform no server-side check, so any phase-one student can deep-link straight in. The recommendation engine actively does it for them, linking those pages from any goal mentioning a job or a resume regardless of phase. The half-state confuses the student's mental model and provides no real gate.</p>
+          <p class="body fix"><b>Fix</b>Decide whether phases are real. If real, enforce in the gated layouts with a friendly "unlocks when" interstitial and phase-filter the recommendations; if presentational, show locked items with unlock hints and stop pretending.</p>
+          <p class="ev"><code>src/lib/nav-progression.ts</code><code>src/lib/goal-plan.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="orientation" data-sev="medium" data-evidence="src/lib/orientation-completion.ts, src/lib/orientation-step-resources.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">orientation</span></div>
+        <div class="body">
+          <h4>Orientation's guards hang on fuzzy matching of display labels</h4>
+          <p>Whether an item requires signed forms or instructor verification is decided by normalizing the item's display label and matching it against hardcoded alias lists. Teachers manage these items in program setup, so renaming "Review Code of Conduct &amp; Dress Code" to anything outside the alias net silently reclassifies it as directly completable — turning off the signature guard with a typo.</p>
+          <p class="body fix"><b>Fix</b>Move form ids and verification-required onto the orientation item as columns, seeded from the current alias map; keep label matching only as a migration fallback that warns on unmatched required items.</p>
+          <p class="ev"><code>src/lib/orientation-completion.ts</code><code>src/lib/orientation-step-resources.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="mood-checkins" data-sev="low" data-evidence="src/lib/mood.ts, src/lib/progression/engine.ts, src/app/api/progression/route.ts">
+        <div class="gutter"><span class="sev low">Low</span><span class="slug">mood-checkins</span></div>
+        <div class="body">
+          <h4>Day boundaries are server-UTC for an Eastern-time cohort</h4>
+          <p>"Today" flips at 8pm Eastern. A student who checks in at 9pm Monday sees no mood card until 8pm Tuesday, and streak keys carry the same skew — an evening-then-morning usage pattern collapses into one day, stalling the streak.</p>
+          <p class="body fix"><b>Fix</b>Store a program timezone and compute day keys with it on both the mood gate and the streak path, keeping the event key derivation identical to the state-day derivation.</p>
+          <p class="ev"><code>src/lib/mood.ts</code><code>src/lib/progression/engine.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+
+    <h3>Pattern three — agent tool contract breaks at the seams</h3>
+    <p class="cluster-note">The authorization architecture is sound; the invariants it advertises are each already violated once, with no automated guard. At 24 tools and growing, these need enforcement rather than convention.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="high" data-evidence="src/lib/sage/agent/tools.ts, src/lib/sage/cert-actions.ts, src/lib/sage/agent/types.ts, src/lib/sage/agent/headless.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>A read-tier tool mutates: it creates certification rows and awards experience points</h4>
+          <p>The certificate-progress lookup is declared read tier — "pure lookup, no state change" — and calls a helper that creates a certification row plus all its requirement rows and awards 25 points when none exists. The write is therefore reachable in read-only agent mode and sits inside the headless briefing allowlist whose own header claims it never mutates. Background briefing runs can create records.</p>
+          <p class="body fix"><b>Fix</b>Split the ensure-or-create path out so the lookup returns "not started", and put creation behind an explicit start action. Then add a test asserting no read-tier tool writes.</p>
+          <p class="ev"><code>src/lib/sage/agent/tools.ts</code><code>src/lib/sage/cert-actions.ts</code><code>src/lib/sage/agent/headless.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="high" data-evidence="src/lib/sage/agent/loop.ts, src/lib/ai/gemini-provider.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>Parallel tool calls cross-wire their results into the wrong response</h4>
+          <p>The provider runs multi-call hops concurrently, so transcript records are pushed in completion order — but the loop attaches the <em>last completed</em> record to every result event instead of matching by call id. With two parallel calls, which the provider's own comment gives as the example case, the data payload and action card from one tool can be attached to the other's result. The student sees a card belonging to a different question.</p>
+          <p class="body fix"><b>Fix</b>Key transcript records by call id — the executor already accepts one — and look up the matching record per event. Add a two-parallel-call test asserting attribution.</p>
+          <p class="ev"><code>src/lib/sage/agent/loop.ts</code><code>src/lib/ai/gemini-provider.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="high" data-evidence="src/lib/sage/agent/write-tools.ts, src/app/api/goals/[id]/route.ts, src/app/api/goals/route.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>Agent goal writes skip the experience, progression and cache effects the HTTP route performs</h4>
+          <p>The route awards completion points, recomputes plan progression and invalidates the goals cache. The agent tool re-implements the same mutation as a bare database update with none of it — so completing a long-term goal through Sage awards nothing, violating the project's own rule that goal completion via chat triggers experience events, and leaves stale cached data behind. Two implementations of one domain operation have already drifted.</p>
+          <p class="body fix"><b>Fix</b>Extract the transition — update, progression, award, invalidate — into one library helper called by both, then audit the remaining write tools for the same route-versus-tool drift.</p>
+          <p class="ev"><code>src/lib/sage/agent/write-tools.ts</code><code>src/app/api/goals/[id]/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="high" data-evidence="src/lib/sage/agent/executor.ts, src/lib/sage/agent/rate-limit.ts, src/lib/rate-limit.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>The consequential rate limit double-counts, so the block lands after the student clicks confirm</h4>
+          <p>Every executor call consumes a unit, and a confirmed write passes through twice — once for the model's proposal, once for the confirmation. With a default of five per day per tool, a student gets two completed flows; on the third the proposal succeeds, the confirmation card renders, and their confirm click is rejected with a generic limit message. Being asked to approve something and then refused is the worst possible ordering.</p>
+          <p class="body fix"><b>Fix</b>Do not consume a unit for the proposal leg, or refund it when the gate returns a proposal. At minimum, check without consuming at confirm time so an approved card never fails on quota alone.</p>
+          <p class="ev"><code>src/lib/sage/agent/executor.ts</code><code>src/lib/sage/agent/rate-limit.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="medium" data-evidence="src/lib/sage/agent/executor.ts, src/lib/sage/agent/loop.ts, src/app/api/chat/send/route.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>Raw thrown error text, including database internals, streams into student chat</h4>
+          <p>The executor's catch returns the error message verbatim as the result summary; the loop passes it through and the route emits it in the tool-result event, and it also feeds back into the model's context. Read tools run unwrapped database queries, so a connection hiccup can surface hostnames or invalid-argument dumps to a student — and violates the convention that raw errors never reach clients.</p>
+          <p class="body fix"><b>Fix</b>Log the real error server-side and return a generic summary, mirroring what the ledger path already does, optionally with a hint that the failure was transient.</p>
+          <p class="ev"><code>src/lib/sage/agent/executor.ts</code><code>src/lib/sage/agent/loop.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="medium" data-evidence="src/lib/sage/agent/confirmation.ts, src/lib/sage/operations.ts, src/lib/sage/agent/career-tools.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>Confirmation tokens are replayable for ten minutes, resting on an unwritten invariant</h4>
+          <p>Tokens carry no nonce and are not marked used, so a confirmed token can be replayed until it expires. Today every consequential tool happens to tolerate replay — availability is re-validated, deletes refetch, status sets are idempotent — but that invariant is written nowhere, so the first tool that appends or increments becomes silently replayable.</p>
+          <p class="body fix"><b>Fix</b>Mark tokens used via an operation row keyed by token hash, or state replay-tolerance as a hard requirement in the write-tool contract with a test template. Fix the inaccurate idempotency claim in the operations module either way.</p>
+          <p class="ev"><code>src/lib/sage/agent/confirmation.ts</code><code>src/lib/sage/operations.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-agent-tools" data-sev="low" data-evidence="src/lib/sage/agent/flags.ts, src/lib/sage/agent/validation.ts">
+        <div class="gutter"><span class="sev low">Low</span><span class="slug">sage-agent-tools</span></div>
+        <div class="body">
+          <h4>Agent mode defaults to full write access when unset, while its own header says otherwise</h4>
+          <p>With neither environment variable set, mode falls back to full — every write tool live — while the module header describes off as matching the production default. A fresh deploy that forgets both flags ships all write tools, and a rollback operator reading the header draws the wrong conclusion. Separately, argument validation has no string length bounds, and full arguments are persisted into audit and ledger rows.</p>
+          <p class="body fix"><b>Fix</b>Make the unset default read-only, assert the intended default in a test, and add a conservative per-string length cap enforced centrally.</p>
+          <p class="ev"><code>src/lib/sage/agent/flags.ts</code><code>src/lib/sage/agent/validation.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+
+    <h3>Pattern four — the teacher surface has the right primitives, applied unevenly</h3>
+    <p class="cluster-note">Seventy-one routes, 39% of the API. In each case a correct shared helper exists and most routes do not use it.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="teacher-console" data-sev="high" data-evidence="src/lib/audit.ts, src/app/api/teacher/students/[id]/mood/route.ts, src/app/api/teacher/students/[id]/memories/route.ts, src/app/api/teacher/students/[id]/notes/route.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">teacher-console</span></div>
+        <div class="body">
+          <h4>Read-auditing is wired into one of roughly thirteen student-data endpoints</h4>
+          <p>The project's security rules mandate recording a view event on every staff read of student data. It happens in exactly one route. Sibling endpoints returning mood scores with free-text context, Sage's stored memories, counselor case notes, usage and form answers all perform the ownership check and record nothing. For a TANF/SNAP population, who looked at what is the audit question that matters, and the answer is mostly unlogged.</p>
+          <p class="body fix"><b>Fix</b>Fold the view record into the shared ownership-check helper so auditing is automatic for every student-data read, then delete or wire the unused surfaces the enum already declares.</p>
+          <p class="ev"><code>src/lib/audit.ts</code><code>students/[id]/mood/route.ts</code><code>students/[id]/memories/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="teacher-console" data-sev="high" data-evidence="src/lib/forms/export.ts, src/lib/csv.ts, src/app/api/teacher/forms/[templateId]/export/route.ts, src/app/api/coordinator/reports/monthly/[regionId]/route.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">teacher-console</span></div>
+        <div class="body">
+          <h4>A formula-safe CSV escaper exists; two of four export paths bypass it</h4>
+          <p>The repository has a tested escaper that neutralizes leading equals, plus, minus and at signs. The general teacher export and the grant report use it. The forms-response export and the coordinator monthly report use a different function that does quoting only — so student-controlled free-text answers flow into a downloadable spreadsheet where a crafted value executes as a formula when a teacher opens it in Excel.</p>
+          <p class="body fix"><b>Fix</b>Delete the second escaper and route both exports through the hardened one, extending it to cover the answer-formatting cases. Add a fixture proving the dangerous prefixes are neutralized.</p>
+          <p class="ev"><code>src/lib/forms/export.ts</code><code>src/lib/csv.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="teacher-console" data-sev="medium" data-evidence="src/app/api/teacher/students/[id]/notes/route.ts, src/lib/classroom.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">teacher-console</span></div>
+        <div class="body">
+          <h4>Case notes are returned with no visibility filter and no read record</h4>
+          <p>The paginated notes endpoint returns full counselor-authored note bodies for any student a staff member can manage, ignoring the visibility field on the model entirely and recording no view event. These are free-text notes about vulnerable adults; if any visibility value is meant to restrict who reads a note, that intent is not enforced here.</p>
+          <p class="body fix"><b>Fix</b>Filter explicitly by the intended visibility set rather than returning every row, and record the read like the detail view does.</p>
+          <p class="ev"><code>src/app/api/teacher/students/[id]/notes/route.ts</code><code>src/lib/classroom.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="teacher-console" data-sev="medium" data-evidence="src/app/api/teacher/classes/route.ts, .claude/rules/api-conventions.md, src/components/teacher/SpokesStudentWorkspace.tsx">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">teacher-console</span></div>
+        <div class="body">
+          <h4>Schema validation reaches about ten of fifty-one teacher routes, and three components break the size cap</h4>
+          <p>The API conventions require parsing bodies with a schema helper; forty-one teacher routes still hand-roll JSON parsing with ad-hoc type guards, and this is the dominant pattern on the largest slice of the API. Meanwhile three of the densest components — the SPOKES workspace, the SPOKES manager and the roster manager — exceed the project's own 800-line ceiling while mixing fetching, mutation and presentation of student PII.</p>
+          <p class="body fix"><b>Fix</b>Convert the mutating routes first and add a lint check that flags new raw JSON parsing so the ratio cannot worsen. Extract hooks and sub-panels from the three oversized components.</p>
+          <p class="ev"><code>src/app/api/teacher/classes/route.ts</code><code>.claude/rules/api-conventions.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="coordinator" data-sev="medium" data-evidence="src/app/api/teacher/students/[id]/reassign-class/route.ts, src/lib/classroom.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">coordinator</span></div>
+        <div class="body">
+          <h4>The class-reassignment route's authorization comment is inverted from what it enforces</h4>
+          <p>The header says admin or coordinator only. The guard admits anyone who can manage any class, which includes teachers — and coordinators are blocked not by design but as an accident of row-level security collapsing their role, which surfaces as a 404 rather than a refusal. The comment describes a policy the code does not implement, in a route that moves students between classes.</p>
+          <p class="body fix"><b>Fix</b>Replace the broad check with the precise allowed-role set. If coordinators should ever be permitted, add an explicit region check against both the student's current region and the target class region rather than relying on a side effect.</p>
+          <p class="ev"><code>src/app/api/teacher/students/[id]/reassign-class/route.ts</code><code>src/lib/classroom.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="rls-rbac" data-sev="medium" data-evidence="src/lib/classroom.ts, src/lib/rbac.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">rls-rbac</span></div>
+        <div class="body">
+          <h4>An unreachable scoping branch advertises least-privilege that does not exist</h4>
+          <p>The managed-student query carries a sub-clause scoping non-privileged staff to their own classes. It cannot execute: coordinators short-circuit above it, and every staff role returns true from the can-manage-any check. It reads like enforced class-level least privilege while the reality is that any staff member can reach any student — a dangerous thing to be wrong about when reasoning at the call site.</p>
+          <p class="body fix"><b>Fix</b>Delete the branch and its mirror, or annotate it explicitly as reserved for a future restricted role, and make the actual access model plain where it is used.</p>
+          <p class="ev"><code>src/lib/classroom.ts</code><code>src/lib/rbac.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="auth-security" data-sev="low" data-evidence="src/lib/auth.ts, src/app/api/teacher/students/[id]/route.ts">
+        <div class="gutter"><span class="sev low">Low</span><span class="slug">auth-security</span></div>
+        <div class="body">
+          <h4>The session-cache invalidator is dead code, so correctness rests on remembering to bump a version</h4>
+          <p>Sessions cache the role and active flag for ten seconds. The function written to evict that cache on a role change is never called anywhere, so correctness depends entirely on every privilege-affecting mutation incrementing the session version. Today's two callers do; the next one may not, and the failure would be a stale elevated role served for ten seconds.</p>
+          <p class="body fix"><b>Fix</b>Either call the invalidator from every role and active-flag mutation, or delete it and document the version bump as mandatory — with a test proving a role change without a bump does not leak the old role.</p>
+          <p class="ev"><code>src/lib/auth.ts</code><code>src/app/api/teacher/students/[id]/route.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+
+    <h3>Pattern five — the employment pipeline invests in matching while the journey stays open</h3>
+    <p class="cluster-note">This is the product's reason to exist, and it is the cluster where a student notices first.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="job-board" data-sev="high" data-evidence="src/lib/job-board/browse-sources.ts, src/lib/job-board/adapters/ats.ts, src/app/api/jobs/route.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>The default browse pool serves senior big-tech roles to TANF/SNAP students</h4>
+          <p>The browse sources include adapters whose hardcoded boards are Anthropic, OpenAI, Stripe, Coinbase, Figma, Linear and Ramp — overwhelmingly senior software and fintech roles in expensive metros. That pool is the <em>only</em> content an unenrolled student sees, and it merges into the remote and all tabs for everyone. No seniority filter exists anywhere in the pipeline. The first thing a new student sees is a wall of jobs they cannot apply for.</p>
+          <p class="body fix"><b>Fix</b>Remove those boards from the default pool — keep them opt-in per class if wanted — and add a seniority heuristic on title tokens to the quality filter or the scorer.</p>
+          <p class="ev"><code>src/lib/job-board/browse-sources.ts</code><code>src/lib/job-board/adapters/ats.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="job-board" data-sev="high" data-evidence="src/app/api/jobs/save/route.ts, src/components/jobs/JobCard.tsx, src/components/career/CareerHub.tsx">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>The save button silently fails for every browse job and every unenrolled student</h4>
+          <p>Saving requires an active enrollment and a listing in the student's class configuration. Browse rows live in a different table, so they can never be saved, and an unenrolled student's entire feed is browse rows. The card renders the save button unconditionally and both handlers ignore failure — refresh on success, nothing at all otherwise. The student taps save, the star does not stick, and no error is ever shown.</p>
+          <p class="body fix"><b>Fix</b>Either support saving browse listings by snapshotting the row, or hide the affordance for unsaveable rows and unenrolled students. Either way, surface non-OK responses to the user.</p>
+          <p class="ev"><code>src/app/api/jobs/save/route.ts</code><code>src/components/jobs/JobCard.tsx</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="career-resume" data-sev="high" data-evidence="src/app/api/jobs/save/route.ts, src/components/career/OpportunitiesHub.tsx, src/lib/spokes.ts, handoff.md">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">career-resume</span></div>
+        <div class="body">
+          <h4>Two parallel application trackers, and neither reaches the employment outcome record</h4>
+          <p>Scraped listings and teacher-posted opportunities use separate tables with divergent status vocabularies — one says "offered", the other "offer" — and both render on the same career page. Neither feeds the SPOKES unsubsidized-employment field, which a teacher still types by hand, so the program's headline outcome is disconnected from every signal the product already collects. The handoff document's "the employment journey is implied, not explicit" is confirmed in code.</p>
+          <p class="body fix"><b>Fix</b>Unify the two trackers on one status vocabulary and raise a teacher-facing signal when a student reaches applied, interviewing or offered, so staff can verify and record the outcome from that same event.</p>
+          <p class="ev"><code>src/app/api/jobs/save/route.ts</code><code>src/components/career/OpportunitiesHub.tsx</code><code>src/lib/spokes.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="job-board" data-sev="high" data-evidence="prisma/schema.prisma, src/lib/job-board/scrape-engine.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>A globally unique source id means the second class's scrape overwrites the first class's rows</h4>
+          <p>Listings belong to a class configuration, but the uniqueness constraint is global on source id and the upsert's update branch never sets the class. With two classes sharing any source — which the platform explicitly supports — the second class's scrape refreshes the first class's row under the wrong class, and students in the second class never see the listing. The scrape engine has no test file at all.</p>
+          <p class="body fix"><b>Fix</b>Make the key compound on class plus source id, mirroring the browse table, and key the upsert on it. Add a two-configuration overlap test.</p>
+          <p class="ev"><code>prisma/schema.prisma</code><code>src/lib/job-board/scrape-engine.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="job-board" data-sev="high" data-evidence="src/lib/job-board/adapters/adzuna.ts, src/lib/job-board/scrape-engine.ts, src/app/api/internal/jobs/browse-refresh/route.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>Three of four default adapters have no fetch timeout, so one stalled API hangs the whole job</h4>
+          <p>The keyed adapters call fetch with no abort signal, unlike every keyless adapter which goes through a helper with a thirty-second timeout. A hung connection stalls the settle indefinitely, leaving the scrape run stuck in processing and the cron request hanging. The per-configuration loop also has no error isolation, so one class's failure aborts the rest.</p>
+          <p class="body fix"><b>Fix</b>Route all three through the timeout helper, and wrap the per-configuration loop so one class's failure is recorded on its own run without aborting the others.</p>
+          <p class="ev"><code>src/lib/job-board/adapters/adzuna.ts</code><code>src/lib/job-board/scrape-engine.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="forms-engine" data-sev="high" data-evidence="src/app/api/forms/download/route.ts, src/lib/storage.ts, src/lib/spokes/forms-delivery.s3fallback.test.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">forms-engine</span></div>
+        <div class="body">
+          <h4>Forms delivery degrades invisibly and can serve the wrong document</h4>
+          <p>The download route swallows presign and head-object failures in a bare catch with no logging; storage then falls back to bundled repository copies, and then to a recursive scan that serves any file whose normalized basename substring-matches in <em>either</em> direction. None of it logs. If bucket credentials rot, students silently receive git-bundled copies of compliance forms — possibly the wrong ones — and nobody finds out until an auditor does.</p>
+          <p class="body fix"><b>Fix</b>Log a warning with the storage key and fallback tier every time a fallback serves a request in production, add a Sentry breadcrumb, and restrict the fuzzy scan to development builds.</p>
+          <p class="ev"><code>src/app/api/forms/download/route.ts</code><code>src/lib/storage.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="job-board" data-sev="medium" data-evidence="src/lib/job-board/adapters/shared.ts, src/lib/job-board/scrape-engine.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>Adapter failures are recorded as successful source runs</h4>
+          <p>The fetch helpers swallow every HTTP and network error, returning null after a warning, and one adapter catches its own errors and returns an empty list. Adapters therefore almost never throw, which is the only path to marking a source failed. A total outage across all sixteen boards produces a completed run with zero fetched and no error — and the teacher-facing source-health view reports it as fine.</p>
+          <p class="body fix"><b>Fix</b>Return a discriminated result from the fetch helpers or count per-run failures, mark a source degraded when nothing succeeded, and surface a zero-fetch warning in the status interface.</p>
+          <p class="ev"><code>src/lib/job-board/adapters/shared.ts</code><code>src/lib/job-board/scrape-engine.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="job-board" data-sev="medium" data-evidence="src/app/api/jobs/route.ts, src/lib/job-board/recommendation.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>"Recommended" ranks only the hundred most recent jobs</h4>
+          <p>The endpoint fetches up to five hundred rows by recency, dedupes, filters by proximity, slices to the newest hundred, and only then ranks. With a healthy pool, a strong match older than the newest hundred can never surface no matter how well it scores — so the best-fits band is drawn from a recency sample rather than the student's actual best matches. Scoring is pure and cheap; the cut is in the wrong place.</p>
+          <p class="body fix"><b>Fix</b>When sorting by recommendation, rank the full filtered set and slice the top hundred by score, keeping the recency slice for the recent sort.</p>
+          <p class="ev"><code>src/app/api/jobs/route.ts</code><code>src/lib/job-board/recommendation.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="spokes" data-sev="medium" data-evidence="src/lib/spokes/goal-matcher.ts, src/app/api/lms/platforms/route.ts, src/lib/goal-plan.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">spokes</span></div>
+        <div class="body">
+          <h4>Substring keyword matching produces false recommendations students actually see</h4>
+          <p>Goal-to-platform matching lowercases keywords and tests plain substring containment with no word boundaries. So "art" matches "start" — a goal to start a business suggests an Adobe certification — "ai" matches "maintain" and "training", "it" matches nearly any sentence, producing computer-literacy suggestions for everything. These feed student platform recommendations, teacher pathway suggestions and job scoring.</p>
+          <p class="body fix"><b>Fix</b>Tokenize with word boundaries using the existing tokenizer and require whole-token matches for short keywords, with regression tests for "start", "maintain" and "it".</p>
+          <p class="ev"><code>src/lib/spokes/goal-matcher.ts</code><code>src/lib/goal-plan.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="spokes" data-sev="medium" data-evidence="src/app/api/teacher/students/[id]/spokes/follow-up/route.ts, src/lib/spokes.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">spokes</span></div>
+        <div class="body">
+          <h4>Employment follow-ups accept values the official report then miscounts</h4>
+          <p>The endpoint validates only positive-integer and non-empty-string, so a checkpoint at month two or twelve is stored but invisible to a schedule that recognizes only one, three and six — while still occupying that slot's unique key. Any status string is accepted, and the schedule counts a checkpoint complete purely because a row exists. A logged failed contact attempt reads as a completed follow-up in the grant report.</p>
+          <p class="body fix"><b>Fix</b>Constrain the checkpoint to the three valid months and the status to a defined enum, then decide which statuses count as complete versus attempted and reflect that in the schedule and the report.</p>
+          <p class="ev"><code>src/app/api/teacher/students/[id]/spokes/follow-up/route.ts</code><code>src/lib/spokes.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="vision-board" data-sev="medium" data-evidence="src/app/api/vision-board/route.ts, .claude/rules/api-conventions.md">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">vision-board</span></div>
+        <div class="body">
+          <h4>The vision-board API takes unbounded input straight to the database</h4>
+          <p>All three mutating handlers parse raw JSON with hand-rolled checks, against the convention that touched routes adopt schema validation — and this file was touched in recent performance work. Note content has no length cap, so a multi-megabyte string persists and is re-served to the corkboard; rotation and z-index accept arbitrary numbers that reach the database as-is.</p>
+          <p class="body fix"><b>Fix</b>Define a schema per verb — content capped, rotation and z-index bounded, colors as enums — and route through the shared parse helper the way the mood endpoint already does.</p>
+          <p class="ev"><code>src/app/api/vision-board/route.ts</code><code>.claude/rules/api-conventions.md</code></p>
+        </div>
+      </article>
+
+    </div>
+
+    <h3>Pattern six — instruments built and never wired</h3>
+    <p class="cluster-note">The most fixable cluster: the sunk cost already exists, and four of these were independently verified.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="ci-cd" data-sev="high" data-evidence=".github/workflows/ci.yml, .github/workflows/sage-evals.yml">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">ci-cd</span><span class="verified">Verified</span></div>
+        <div class="body">
+          <h4>No security scanning at all, on an application holding benefits-recipient PII</h4>
+          <p>Neither workflow runs a dependency audit, static analysis or a secret scanner, and there is no automated dependency-update configuration. The project's own security rules mandate secret checks and dependency hygiene; nothing enforces either. With forty-two production dependencies including a PDF parser, a DOCX converter and an archiver all operating on student-uploaded files, discovery of a known vulnerability currently happens by incident.</p>
+          <p class="body fix"><b>Fix</b>Three cheap steps: a dependency audit at high severity, a secret-scanning action, and a dependency-update config for both the package and actions ecosystems. Minutes of work.</p>
+          <p class="ev"><code>.github/workflows/ci.yml</code><code>.github/workflows/sage-evals.yml</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="testing-instruments" data-sev="high" data-evidence="package.json, .github/workflows/ci.yml">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">testing-instruments</span><span class="verified">Verified</span></div>
+        <div class="body">
+          <h4>Two hundred twenty-three test files, zero coverage measurement</h4>
+          <p>The test script runs with no coverage flag, no coverage tool exists anywhere in the tree, and CI has no coverage step — while the workspace rules mandate 80% minimum. No instrument exists that could confirm or refute any number, so nobody can distinguish the well-tested subsystems from the untested ones, and a coverage regression is invisible by construction. Components and pages are effectively untested.</p>
+          <p class="body fix"><b>Fix</b>Add a coverage script around the existing runner, publish the summary in CI, and set the initial threshold at whatever today's true number is rather than the aspirational 80 — a ratchet beats a target nobody meets.</p>
+          <p class="ev"><code>package.json</code><code>.github/workflows/ci.yml</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="ci-cd" data-sev="high" data-evidence="e2e/orientation-student-profile.spec.ts, playwright.config.ts, e2e/a11y.spec.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">ci-cd</span><span class="verified">Verified</span></div>
+        <div class="body">
+          <h4>The end-to-end and accessibility suites run in no workflow — and the best spec cannot run in CI at all</h4>
+          <p>Neither workflow ever invokes Playwright; CI's only browser coverage is a Python public-routes smoke. Five TypeScript specs, including the accessibility gate and the only database-seeded full login flow, exist solely for manual local runs. Worse, that orientation spec reads the database URL by parsing a local environment file directly and throws if it is absent, so the deepest test in the repository is structurally unable to run in CI.</p>
+          <p class="body fix"><b>Fix</b>Add a job that migrates the existing Postgres service container, seeds, builds and runs Playwright against the standalone server; switch the spec to read the environment variable with the file as a local fallback.</p>
+          <p class="ev"><code>e2e/orientation-student-profile.spec.ts</code><code>playwright.config.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="dependencies-build" data-sev="high" data-evidence="sentry.client.config.ts, next.config.ts, src/instrumentation.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">dependencies-build</span></div>
+        <div class="body">
+          <h4>Client-side error tracking is probably dead under this build</h4>
+          <p>The browser Sentry init lives in a config file injected by the webpack plugin — a mechanism that does not exist under Turbopack, which is the default bundler for the production build in Next 16 and is explicitly configured here. Sentry 10 requires a client instrumentation file instead, and none exists. The likely net effect is that browser errors from the student population are not being reported at all, which would make the error dashboard quietly misleading.</p>
+          <p class="body fix"><b>Fix</b>Add the client instrumentation file with the current init plus the router-transition hook, export the request-error handler from server instrumentation, then confirm by throwing a test error and watching it arrive.</p>
+          <p class="ev"><code>sentry.client.config.ts</code><code>next.config.ts</code><code>src/instrumentation.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="data-lifecycle" data-sev="high" data-evidence="scripts/run-browse-refresh.mjs, src/app/api/internal/jobs/browse-refresh/route.ts, docs/plans/pg-cron-setup-runbook.md">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">data-lifecycle</span></div>
+        <div class="body">
+          <h4>A scheduled job that was never scheduled, with a code comment asserting it is</h4>
+          <p>The browse-refresh script's header states its scheduled run is handled by a database cron job. No migration schedules any such job — the seven real ones are named elsewhere — and the setup runbook never mentions it. So the browse pool, which is the only content unenrolled students see, is refreshed by nothing, and a false comment prevents anyone from noticing.</p>
+          <p class="body fix"><b>Fix</b>Schedule the job the way the others are scheduled and verify through the run-details table, or descope the browse pool explicitly in the decisions doc and delete both the endpoint and the script. A false claim is worse than either.</p>
+          <p class="ev"><code>scripts/run-browse-refresh.mjs</code><code>src/app/api/internal/jobs/browse-refresh/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="catalog-registry" data-sev="high" data-evidence="src/lib/registry/tools.ts, src/lib/registry/middleware.ts, src/lib/rbac.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">catalog-registry</span></div>
+        <div class="body">
+          <h4>The 2,217-line endpoint registry is 92% unenforced and two months stale</h4>
+          <p>It declares 193 capabilities; sixteen ids are actually enforced. Sixty-eight of 184 real route files have no entry at all — the entire MFA suite, the coordinator namespace, teacher forms, offboarding, every internal cron route. The rate-limit and token-budget fields are read by nothing, so declared limits are decorative. It is the repository's largest file, functioning as documentation that actively misleads: wrong goal semantics, no coordinator role, no agent tools.</p>
+          <p class="body fix"><b>Fix</b>Decide what it is. Either shrink it to the sixteen enforced entries and grow enforcement route by route, or generate it from the route tree in CI with a parity check. Delete the unread fields and the dead helpers either way.</p>
+          <p class="ev"><code>src/lib/registry/tools.ts</code><code>src/lib/registry/middleware.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="testing-instruments" data-sev="medium" data-evidence="e2e/a11y.spec.ts, e2e/student-login-chat.spec.ts, scripts/validate-a11y-pipeline-command.mjs">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">testing-instruments</span></div>
+        <div class="body">
+          <h4>The accessibility scan covers three public pages; the specs oversell what they test</h4>
+          <p>Axe runs against the landing, teacher-register and forgot-password routes. Every authenticated surface — the chat home, goals, learning, the orientation wizard, the teacher queue — is unscanned, which is precisely the population the WCAG-AA charter exists for. Meanwhile the login-and-chat spec contains no chat and no successful login, and the dashboard spec never renders a dashboard. The product's home surface has no browser test anywhere.</p>
+          <p class="body fix"><b>Fix</b>Reuse the orientation spec's self-seeding pattern to authenticate fixture users, extend the route list into an authenticated matrix, and rename the specs to what they actually assert.</p>
+          <p class="ev"><code>e2e/a11y.spec.ts</code><code>e2e/student-login-chat.spec.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="dependencies-build" data-sev="medium" data-evidence="package.json, render.yaml, Dockerfile">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">dependencies-build</span></div>
+        <div class="body">
+          <h4>All forty-two dependencies ship as production, and the Node version differs in three places</h4>
+          <p>ESLint, TypeScript, Playwright, the axe integration, the runner and nine type packages are production dependencies — a documented workaround for the host setting production mode before build. The cost is that every deploy installs the whole toolchain and a production-only vulnerability triage becomes meaningless, since tooling and runtime findings are indistinguishable. Separately CI tests on Node 24, the Dockerfile builds on 20, types target 20, and production is unpinned entirely.</p>
+          <p class="body fix"><b>Fix</b>Restore a real development-dependency split and tell the host to include them at build time. Pick one long-term-support version and pin it in the engines field and a version file so the version tested is the version served.</p>
+          <p class="ev"><code>package.json</code><code>render.yaml</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="data-lifecycle" data-sev="medium" data-evidence="docs/DATA_RETENTION_POLICY.md, src/lib/rate-limit.ts, prisma/schema.prisma">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">data-lifecycle</span></div>
+        <div class="body">
+          <h4>Retention is all proposal while data accumulates, and operational tables have no policy at all</h4>
+          <p>Every duration is awaiting owner confirmation, purge automation is explicitly deferred, and no student data has a real clock running. That is a defensible manual-first stance — but the policy table omits operational data entirely: rate-limit rows are never deleted, background jobs persist forever, model call logs grow with every chat turn, and cron run details accumulate unbounded. Those need no privacy debate to clean up.</p>
+          <p class="body fix"><b>Fix</b>Get sign-off on the durations — it is one conversation — add an operational-data row to the policy, and schedule one low-risk janitor job for the mechanical tables.</p>
+          <p class="ev"><code>docs/DATA_RETENTION_POLICY.md</code><code>src/lib/rate-limit.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="notifications" data-sev="medium" data-evidence="src/app/api/notifications/stream/route.ts, src/components/ui/NotificationProvider.tsx">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">notifications</span></div>
+        <div class="body">
+          <h4>Reconnect replay is dead code, so notifications sent during a blip are lost</h4>
+          <p>The stream implements a last-id replay parameter and its docstring promises clients will not miss events during brief disconnections. The only consumer creates a bare event source with no last id, and the server never emits event ids, so the browser's native resume cannot work either. Anything sent while a connection is down — a restart, a network blip — vanishes from the live feed.</p>
+          <p class="body fix"><b>Fix</b>Track the newest seen id in the provider and reconnect with it, or emit event ids and rely on the native header. If neither, delete the replay path so it stops implying a guarantee.</p>
+          <p class="ev"><code>src/app/api/notifications/stream/route.ts</code><code>src/components/ui/NotificationProvider.tsx</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="notifications" data-sev="medium" data-evidence="src/lib/notifications.ts, src/lib/sage/crisis-detection.ts, src/app/api/mood/route.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">notifications</span></div>
+        <div class="body">
+          <h4>Notification fan-out has no write timeout, and a wedged client can stall the crisis path</h4>
+          <p>Delivery awaits each connection's write sequentially. A stalled but un-aborted consumer — a suspended laptop, a half-open connection — eventually fills its buffer, after which writes pend forever. The wellbeing alert flow waits for every one of those promises to settle, so a single wedged browser can hang the low-mood alert that a staff member is supposed to receive.</p>
+          <p class="body fix"><b>Fix</b>Race each write against a short timeout and evict writers that exceed it, or make in-app push fire-and-forget after the database write, since the stored row is already the source of truth.</p>
+          <p class="ev"><code>src/lib/notifications.ts</code><code>src/app/api/mood/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-memory" data-sev="low" data-evidence="src/lib/sage/mood-extractor.ts, src/lib/sage/goal-extractor.ts, src/lib/sage/retry.ts">
+        <div class="gutter"><span class="sev low">Low</span><span class="slug">sage-memory</span></div>
+        <div class="body">
+          <h4>One extractor parses outside its retry, so the most common local-model failure is not retried</h4>
+          <p>The retry helper advertises protection against malformed JSON, and the goal extractor parses inside the retried attempt. The mood extractor retries only the model call and parses outside the loop, so a malformed reply — the most common failure with a local model — fails immediately with no retry and no dead-letter entry, silently dropping a wellbeing signal.</p>
+          <p class="body fix"><b>Fix</b>Move the parse and validate inside the retried closure so malformed output triggers another attempt and, on exhaustion, the existing dead-letter path.</p>
+          <p class="ev"><code>src/lib/sage/mood-extractor.ts</code><code>src/lib/sage/goal-extractor.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+
+    <h3>Pattern seven — documentation decayed while the code got better</h3>
+    <p class="cluster-note">This repository's onboarding contract says agents must follow the documentation map. That map now routes to misinformation, which makes it a code-quality problem rather than a tidiness problem.</p>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="weaknesses" data-area="product-docs" data-sev="high" data-evidence="docs/PRODUCT_GUIDE.md, docs/PRODUCT_DECISIONS.md, handoff.md">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>The charter lapsed thirty-three days ago and its outcome loop is provably dead</h4>
+          <p>The window ended 21 June with the successor explicitly punted to the owner. Its own declared source of truth for outcomes — two GitHub milestones — are both past due and still open, with none of the four outcome issues closed. The twice-weekly and monthly approval cadence, including the monthly kill review that was supposed to cut features, has no record of running. The governance system was genuinely good and it simply stopped.</p>
+          <p class="body fix"><b>Fix</b>One owner session: author the next window — the handoff document and the maturity review's deferred list are most of the draft — then close or retarget the milestones and issues with an explicit verdict per item.</p>
+          <p class="ev"><code>docs/PRODUCT_GUIDE.md</code><code>handoff.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="product-docs" data-sev="high" data-evidence="CLAUDE.md, docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md, .gitignore, AGENTS.md">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>The mandated reading path delivers misinformation</h4>
+          <p>The map routes goal and evidence work to a roadmap last touched in March that asserts the goals API is read-only when it has a create endpoint, and lists three schema fields as future ideas when all three shipped in April. It routes to a "SPOKES content reference" inside a directory that is git-ignored and was never committed, so the target cannot exist in any clone or CI checkout. And the deployment runbook describes three cron services that no longer exist, which would lead a deployer to recreate them alongside the real scheduler.</p>
+          <p class="body fix"><b>Fix</b>Treat the map as production config. Give every routed target a status header, repoint or delete the dead rows, and add a sweep that fails when a routed document's cited paths no longer exist.</p>
+          <p class="ev"><code>CLAUDE.md</code><code>docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md</code><code>.gitignore</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="product-docs" data-sev="high" data-evidence="src/lib/academic-kpi.ts, src/lib/goals.ts, docs/PRODUCT_GUIDE.md, src/lib/stale-goal-rules.ts">
+        <div class="gutter"><span class="sev high">High</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>The headline outcomes are unmeasurable, and the KPI funnel overstates the one it does report</h4>
+          <p>The charter's first outcome — 90% of active students with a confirmed long-term goal reviewed within fourteen days — has no aggregate instrument: the KPI module never reads the confirmation or review timestamps. Worse, its funnel step labeled "Confirmed BHAG" counts any long-term goal whose status passes a plan-counting predicate, which includes active, in progress, blocked and completed. Confirmation is not checked at all, so the report staff read overstates the thing the verification layer was built to guarantee.</p>
+          <p class="body fix"><b>Fix</b>Either rename the step to "Active BHAG" — a five-minute honesty fix — or make it count confirmation properly, then add the two missing aggregate measures. Both fields already exist.</p>
+          <p class="ev"><code>src/lib/academic-kpi.ts</code><code>src/lib/goals.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="product-docs" data-sev="medium" data-evidence="docs/audits/2026-04-09-project-audit.md, src/app/api/admin/ai-provider/route.ts, src/lib/validation.ts, docs/STRATEGIC_ASSESSMENT_2026-04-01.md">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>Point-in-time reports were never annotated, so a fixed critical still reads as open</h4>
+          <p>The April audit presents its first critical finding — a plaintext provider key — as open with immediate action required, but the code now uses the encrypted config path; its request-forgery finding is fixed by private-range blocking and its tooling mismatch is gone. Zero annotations record any of it. The April strategic assessment has the same problem across nearly every claim. Anyone reading either document draws conclusions that were true four months ago.</p>
+          <p class="body fix"><b>Fix</b>Add a resolution table at the top of the audit mapping each finding to where it was fixed, and a supersession banner on the assessment. Adopt the strikethrough convention the main instructions file already uses for resolved issues.</p>
+          <p class="ev"><code>docs/audits/2026-04-09-project-audit.md</code><code>src/app/api/admin/ai-provider/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="product-docs" data-sev="medium" data-evidence="handoff.md, docs/PRODUCT_DECISIONS.md, src/components/progression/PathToEmployment.tsx, src/lib/progression/student-next-step.ts">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>An ungoverned document at the repository root has become the de facto charter</h4>
+          <p>The employment-workflow handoff defines a six-phase product arc with acceptance criteria and metrics, and its first two phases are already built at the exact paths it suggested. It has no status, no owner, and no row in the documentation map — while the decisions doc's own rule says no planning artifact is active scope until it is charter-referenced and owner-assigned. The project is executing precisely the failure mode it wrote a rule against.</p>
+          <p class="body fix"><b>Fix</b>Promote it. Fold its phases into the next window with owners and measurable outcomes, mark the shipped phases with dates, and move it into governed planning with a map row.</p>
+          <p class="ev"><code>handoff.md</code><code>src/components/progression/PathToEmployment.tsx</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="product-docs" data-sev="medium" data-evidence="docs/superpowers/plans/2026-03-30-frontend-redesign.md, docs/plans/2026-07-03-hanbook-rename-manifest.json, docs/archive/GAMIFICATION_BACKLOG.md">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>The plans corpus has fossilized: about fifty of fifty-nine documents carry no lifecycle status</h4>
+          <p>Thirty-seven of thirty-nine implementation plans have no status marker, and executed plans retain unchecked task boxes, so completion is unknowable from the document itself. A 161KB applied one-shot manifest still sits in the active plans directory. Meanwhile the archive directory that exists for exactly this purpose holds two files. Nothing distinguishes live scope from fossil.</p>
+          <p class="body fix"><b>Fix</b>Adopt a one-line status header for new plans and run a single archival sweep moving executed plans out with an outcome note each. One recent sprint document already shows the pattern.</p>
+          <p class="ev"><code>docs/superpowers/plans/2026-03-30-frontend-redesign.md</code><code>docs/archive/GAMIFICATION_BACKLOG.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="rag-knowledge" data-sev="medium" data-evidence="src/lib/sage/knowledge-base.ts, src/lib/sage/platform-map.ts, .github/workflows/sage-evals.yml, scripts/catalog/drift.mjs">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">rag-knowledge</span></div>
+        <div class="body">
+          <h4>Program knowledge lives in three drifting layers, with a drift checker that cannot run</h4>
+          <p>Factual grounding is split across hardcoded TypeScript constants, curated database rows served by retrieval, and the git-tracked catalog. Knowledge-heavy prompts inject the static dump <em>and</em> retrieved passages in the same turn, so a stale hardcoded certification detail can contradict a freshly curated document within one prompt. The job meant to catch database drift requires a secret that, by its own comment, does not exist — it has never run.</p>
+          <p class="body fix"><b>Fix</b>Declare the curated corpus authoritative, migrate the static facts into documents and shrink the constants to a brief plus the lazy index — agent mode already proves the pattern. Then either configure the drift secret or delete the job.</p>
+          <p class="ev"><code>src/lib/sage/knowledge-base.ts</code><code>scripts/catalog/drift.mjs</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="weaknesses" data-area="sage-chat" data-sev="medium" data-evidence="src/app/api/chat/send/route.ts, src/components/chat/ChatWindow.tsx">
+        <div class="gutter"><span class="sev medium">Medium</span><span class="slug">sage-chat</span></div>
+        <div class="body">
+          <h4>The trivial-message shortcut strips grounding from exactly the queries this audience types</h4>
+          <p>Any message of three tokens or fewer without a question mark is treated as trivial, and the trivial path skips document retrieval, form context and the entire memory block. The product targets adults reading at a sixth-grade level who type tersely: "ged classes", "dress code rules", "tabe test" are real information-seeking questions that get an ungrounded reply with no memory. Separately, a mid-stream disconnect discards the assistant turn server-side, so the conversation reloads showing an unanswered question.</p>
+          <p class="body fix"><b>Fix</b>Drop the token-count rule or exempt messages overlapping any knowledge-base keyword, and add retrieval-harness cases for terse queries. Persist the accumulated reply on disconnect, marked truncated.</p>
+          <p class="ev"><code>src/app/api/chat/send/route.ts</code><code>src/components/chat/ChatWindow.tsx</code></p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ======================= DIRECTION ======================= -->
+  <section id="section-direction">
+    <div class="sec-head">
+      <span class="sec-eyebrow">Where this is actually heading</span>
+      <h2>Direction</h2>
+      <p class="sec-intro">
+        Trajectory read from the code and the commit record, not from the plans. Two of these are on a good path; three
+        are drifting in ways that compound.
+      </p>
+    </div>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="direction" data-area="sage-chat" data-evidence="src/lib/sage/retry.ts, src/lib/sage/system-prompts.test.ts, docs/MATURITY_REVIEW.md">
+        <div class="gutter"><span class="sev good">Investing</span><span class="slug">sage-chat</span></div>
+        <div class="body">
+          <h4>Safety engineering is becoming a real culture, not a checklist</h4>
+          <p>The July work — extraction dead-letters with teacher replay, canary freshness enforced by unit test, abstention gates, fail-closed eval grading, structured crisis cards that deliberately exclude transcript text — is the behavior of someone building for audit rather than for demo. That trajectory is the project's biggest asset and the reason the critical finding above is worth fixing immediately rather than filing.</p>
+          <p class="ev"><code>src/lib/sage/retry.ts</code><code>docs/MATURITY_REVIEW.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="direction" data-area="product-docs" data-evidence="docs/PRODUCT_GUIDE.md, docs/PRODUCT_DECISIONS.md, docs/STRATEGIC_ASSESSMENT_2026-04-01.md">
+        <div class="gutter"><span class="sev high">Diverging</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>Code truth and document truth are now moving in opposite directions</h4>
+          <p>The July repair made the implementation notably more honest while the routed documentation decayed unannotated. Because this repository's stated onboarding model requires agents to read that map first, every future contributor — human or otherwise — starts from stale premises. The gap is not cosmetic; it is the input to every subsequent decision, and it widens on its own.</p>
+          <p class="ev"><code>docs/PRODUCT_GUIDE.md</code><code>docs/STRATEGIC_ASSESSMENT_2026-04-01.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="direction" data-area="career-resume" data-evidence="handoff.md, src/lib/progression/student-next-step.ts, src/lib/spokes.ts">
+        <div class="gutter"><span class="sev medium">Shifting</span><span class="slug">career-resume</span></div>
+        <div class="body">
+          <h4>The real product direction has quietly moved to employment, outside the charter process</h4>
+          <p>The de facto roadmap is now the employment-workflow arc in an unrouted root document, with two phases built. That is probably the <em>right</em> direction — it is the program's actual outcome — but it is being executed outside the governance the project designed for itself, so it has no owner, no acceptance criteria in force, and no measurement. Direction without governance is how the earlier feature sprawl happened.</p>
+          <p class="ev"><code>handoff.md</code><code>src/lib/progression/student-next-step.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="direction" data-area="job-board" data-evidence="src/lib/job-board/banded-matching.ts, src/lib/job-board/browse-sources.ts, src/lib/spokes.ts">
+        <div class="gutter"><span class="sev medium">Mis-aimed</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>Matching sophistication is outrunning audience fit and outcome capture</h4>
+          <p>Banding, fusion-quality dedup and proximity multipliers are getting real investment while the default pool still ships senior big-tech roles to benefits recipients, and while application never bridges to the employment record the grant actually reports. The next increment of matching cleverness is worth less than a seniority filter and one outcome bridge.</p>
+          <p class="ev"><code>src/lib/job-board/browse-sources.ts</code><code>src/lib/job-board/banded-matching.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="direction" data-area="testing-instruments" data-evidence="package.json, e2e/a11y.spec.ts, .github/workflows/ci.yml">
+        <div class="gutter"><span class="sev medium">Stalling</span><span class="slug">testing-instruments</span></div>
+        <div class="body">
+          <h4>The repository is accumulating instruments faster than it wires them</h4>
+          <p>Two hundred twenty-three test files with no coverage meter, five end-to-end specs in zero workflows, an accessibility scanner gating three public pages, eval gates that green-light without their secret, and a drift job that cannot run. The pattern optimizes for the appearance of coverage. Every one of these is closer to done than to started, which is what makes the pattern worth naming.</p>
+          <p class="ev"><code>package.json</code><code>e2e/a11y.spec.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="direction" data-area="intervention-queue" data-evidence="src/lib/teacher/intervention-queue.ts, src/components/teacher/InterventionQueuePanel.tsx, src/lib/academic-kpi.ts">
+        <div class="gutter"><span class="sev low">Sound but fed badly</span><span class="slug">intervention-queue</span></div>
+        <div class="body">
+          <h4>The teacher triage surface is clean; the numbers flowing into it are not</h4>
+          <p>The intervention queue itself is well guarded and had no findings. But its urgency ordering consumes readiness scores that are farmable, deflated by an unreachable certification denominator, and computed differently in the roster view than in the student's own. The surface staff trust most is downstream of the least trustworthy arithmetic in the product.</p>
+          <p class="ev"><code>src/lib/teacher/intervention-queue.ts</code><code>src/lib/academic-kpi.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ======================= NEEDS ======================= -->
+  <section id="section-needs">
+    <div class="sec-head">
+      <span class="sec-eyebrow">What is missing</span>
+      <h2>What this project needs</h2>
+      <p class="sec-intro">
+        Ordered by consequence. The first three are decisions only the owner can make; the rest is work that follows from them.
+      </p>
+    </div>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="needs" data-area="product-docs" data-evidence="docs/PRODUCT_GUIDE.md, handoff.md, docs/MATURITY_REVIEW.md">
+        <div class="gutter"><span class="sev high">Owner decision</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>A current definition of done — the next ninety-day window</h4>
+          <p>Everything else in this review is easier to prioritize once there is a window with owners, measurable outcomes and a kill review. The draft largely exists: the employment handoff supplies the arc, the maturity review supplies the deferred list. Without it, work continues to be chosen by whatever is most interesting rather than by what the program needs.</p>
+          <p class="ev"><code>docs/PRODUCT_GUIDE.md</code><code>handoff.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="sage-chat" data-evidence="src/lib/ai/provider.ts, CLAUDE.md, .claude/rules/sage-ai.md">
+        <div class="gutter"><span class="sev high">Owner decision</span><span class="slug">sage-chat</span></div>
+        <div class="body">
+          <h4>One truth about where student data is allowed to go</h4>
+          <p>Right now the documentation promises local-only processing for student records and the code sends them to the cloud by default. Both positions are defensible; holding both is not, because the written promise is what a grant auditor or a student consent conversation would rely on. This needs an explicit decision, and then the code or the documents must change to match it.</p>
+          <p class="ev"><code>src/lib/ai/provider.ts</code><code>CLAUDE.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="data-lifecycle" data-evidence="docs/DATA_RETENTION_POLICY.md, src/app/api/admin/students/[id]/offboard/route.ts">
+        <div class="gutter"><span class="sev high">Owner decision</span><span class="slug">data-lifecycle</span></div>
+        <div class="body">
+          <h4>Signed-off retention durations, and a policy line for operational data</h4>
+          <p>Eight data classes are awaiting confirmation against the funding rules, and until they are confirmed nothing can be purged, so the alpha keeps accumulating benefits-recipient data with no clock. The offboarding path is already built and tested correctly — it is waiting on numbers. Operational tables need no privacy debate at all and can be cleaned immediately.</p>
+          <p class="ev"><code>docs/DATA_RETENTION_POLICY.md</code><code>src/app/api/admin/students/[id]/offboard/route.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="testing-instruments" data-evidence="package.json, e2e/orientation-student-profile.spec.ts, .github/workflows/ci.yml">
+        <div class="gutter"><span class="sev high">Wiring</span><span class="slug">testing-instruments</span></div>
+        <div class="body">
+          <h4>A coverage number, and the browser suites running where they can fail the build</h4>
+          <p>Not higher coverage — a <em>measured</em> one, with the threshold set to today's reality and ratcheted. Then the existing end-to-end and accessibility specs in CI, with the environment fix that lets the best of them run there at all. This converts sunk cost into actual gates without writing a single new test.</p>
+          <p class="ev"><code>package.json</code><code>e2e/orientation-student-profile.spec.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="ci-cd" data-evidence=".github/workflows/ci.yml, .github/workflows/sage-evals.yml">
+        <div class="gutter"><span class="sev high">Wiring</span><span class="slug">ci-cd</span></div>
+        <div class="body">
+          <h4>Dependency and secret scanning, and eval gates that cannot green without running</h4>
+          <p>Three small additions close the scanning gap entirely. Separately, the Sage gates need to fail rather than skip when their key is absent on scheduled runs and same-repo pull requests, and their path filter needs to include the crisis and provider code they exist to protect. A gate that reports success without executing is worse than no gate, because it is trusted.</p>
+          <p class="ev"><code>.github/workflows/ci.yml</code><code>.github/workflows/sage-evals.yml</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="goals" data-evidence="src/components/goals/GoalsPageClient.tsx, src/app/api/goals/[id]/route.ts, src/lib/goals.ts">
+        <div class="gutter"><span class="sev high">Structural</span><span class="slug">goals</span></div>
+        <div class="body">
+          <h4>The goals page decomposed, with the tree logic extracted and tested</h4>
+          <p>1,385 lines mixing a hand-rolled particle engine on module-scope mutable state, five near-identical edit forms, an embedded chat client, text-to-speech, and the tree builder that currently hides a real rendering bug — with zero tests. This is the single file most likely to produce the next student-facing defect, and it guards the verification layer's weakest door.</p>
+          <p class="ev"><code>src/components/goals/GoalsPageClient.tsx</code><code>src/lib/goals.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="catalog-registry" data-evidence="src/lib/registry/tools.ts, src/lib/catalog/overlay-freshness.test.ts, scripts/catalog/drift.mjs">
+        <div class="gutter"><span class="sev medium">Structural</span><span class="slug">catalog-registry</span></div>
+        <div class="body">
+          <h4>A decision about what the endpoint registry is for</h4>
+          <p>2,217 hand-maintained lines describing 193 capabilities of which sixteen are enforced, missing sixty-eight real routes and an entire role. Either it is generated and checked for parity, or it shrinks to what is enforced. The curated catalog next door shows the project already knows how to do this well — its overlay freshness test is exactly the right pattern.</p>
+          <p class="ev"><code>src/lib/registry/tools.ts</code><code>src/lib/catalog/overlay-freshness.test.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="needs" data-area="admin" data-evidence="src/app/api/admin/students/[id]/offboard/route.ts, src/lib/audit.ts, src/app/api/admin/ai-provider/route.ts">
+        <div class="gutter"><span class="sev medium">Operational</span><span class="slug">admin</span></div>
+        <div class="body">
+          <h4>The administrative surface needs its audit story finished, not rebuilt</h4>
+          <p>All twelve admin routes are uniformly wrapped and offboarding correctly exports before deactivating — this area had no defects. What it lacks is the other half of the audit picture: staff reads are recorded on one endpoint out of thirteen, so the export-and-deactivate trail is solid while the who-looked-at-what trail is mostly absent.</p>
+          <p class="ev"><code>src/app/api/admin/students/[id]/offboard/route.ts</code><code>src/lib/audit.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ======================= CUTS ======================= -->
+  <section id="section-cuts">
+    <div class="sec-head">
+      <span class="sec-eyebrow">What should go</span>
+      <h2>Cuts</h2>
+      <p class="sec-intro">
+        Deletion candidates, strongest case first. Nearly all of these are dangerous rather than merely untidy — each
+        one currently implies a guarantee, a schedule, or a capability that does not exist.
+      </p>
+    </div>
+
+    <div class="ledger">
+
+      <article class="entry" data-finding="cuts" data-area="dependencies-build" data-evidence="Dockerfile, package.json, DEPLOY.md">
+        <div class="gutter"><span class="sev high">Delete</span><span class="slug">dependencies-build</span><span class="verified">Verified</span></div>
+        <div class="body">
+          <h4>The Dockerfile, which has never been able to build</h4>
+          <p>Empirically reproduced: the install step runs the Prisma generate hook before the schema directory is copied, so the build fails at the first instruction with a missing-schema error. It also predates the real start path, omitting the standalone asset staging that bundles form PDFs and config. Untouched since March, referenced by no document, never built in CI, and broken by construction — it can only mislead the next person who tries it.</p>
+          <p class="body fix"><b>Then</b>Delete it, or fix the ordering and add a build step in CI so it cannot silently rot again.</p>
+          <p class="ev"><code>Dockerfile</code><code>package.json</code><code>DEPLOY.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="ci-cd" data-evidence=".github/workflows/sage-evals.yml, scripts/catalog/drift.mjs, src/lib/catalog/drift-audit.ts">
+        <div class="gutter"><span class="sev high">Delete or wire</span><span class="slug">ci-cd</span></div>
+        <div class="body">
+          <h4>The catalog-drift CI job, which no-ops on every run</h4>
+          <p>It requires a database secret that, by its own comment, does not exist in this repository — so it has never done anything but print a notice. A check that structurally cannot run is worse than none, because it reads as coverage in the workflow list. The same argument applies to the confirmation eval family: three authored cases that no CI family list includes and no local run can execute.</p>
+          <p class="body fix"><b>Then</b>Configure the read-only secret and make its absence fail after a grace period, or delete the job and record drift-checking as a manual runbook step. Add the confirmation family to the workflow or remove the fixtures.</p>
+          <p class="ev"><code>.github/workflows/sage-evals.yml</code><code>scripts/catalog/drift.mjs</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="data-lifecycle" data-evidence="prisma/schema.prisma, src/lib/sage/memory/extract.ts">
+        <div class="gutter"><span class="sev medium">Delete</span><span class="slug">data-lifecycle</span></div>
+        <div class="body">
+          <h4>The memory-edge table, which has no readers and no writers</h4>
+          <p>A shipped table with row-level-security surface and migration weight that stores nothing and serves nothing — no code creates, queries or traverses an edge. Schema sprawl has real carrying cost at eighty-four models in a single-organization alpha; this is the clearest instance.</p>
+          <p class="body fix"><b>Then</b>Drop it, along with the edge concept, until the memory-graph feature actually lands.</p>
+          <p class="ev"><code>prisma/schema.prisma</code><code>src/lib/sage/memory/extract.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="testing-instruments" data-evidence="scripts/uat_auth_chat.py, scripts/ui_layout_audit.py, scripts/smoke_public_routes.py, e2e/public-routes.spec.ts">
+        <div class="gutter"><span class="sev medium">Archive</span><span class="slug">testing-instruments</span></div>
+        <div class="body">
+          <h4>The one-shot Python tooling, and one of the two duplicate browser stacks</h4>
+          <p>Two manual user-acceptance scripts, a 330-line layout audit that needs a companion script to clean up the teacher accounts it leaves behind, and a finished one-time codemod — none referenced by any script entry or workflow, all requiring a Python environment nothing provisions. Separately, two parallel Playwright stacks verify the same public pages, and CI installs the entire second toolchain solely for that.</p>
+          <p class="body fix"><b>Then</b>Archive the unwired tooling and consolidate on the TypeScript stack, which can absorb the smoke assertions and already carries the accessibility and seeded specs.</p>
+          <p class="ev"><code>scripts/ui_layout_audit.py</code><code>scripts/smoke_public_routes.py</code><code>e2e/public-routes.spec.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="job-board" data-evidence="src/lib/job-board/adapters/ats.ts, src/lib/job-board/browse-sources.ts, prisma/schema.prisma">
+        <div class="gutter"><span class="sev high">Delete</span><span class="slug">job-board</span></div>
+        <div class="body">
+          <h4>The hardcoded elite-tech board lists in the default browse pool</h4>
+          <p>Senior software and fintech roles in expensive metros, served by default to a West Virginia workforce program for adults on benefits. This is a product-fit defect wearing the costume of a configuration default. The schema's stale default source list — a single keyed provider that is likely unconfigured — belongs in the same sweep.</p>
+          <p class="body fix"><b>Then</b>Cut them from the browse sources, keeping them opt-in per class if there is ever a reason, and align the schema default with the real one.</p>
+          <p class="ev"><code>src/lib/job-board/adapters/ats.ts</code><code>src/lib/job-board/browse-sources.ts</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="product-docs" data-evidence="docs/STRATEGIC_ASSESSMENT_2026-04-01.md, docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md, CLAUDE.md, docs/plans/2026-07-03-hanbook-rename-manifest.json">
+        <div class="gutter"><span class="sev medium">Archive</span><span class="slug">product-docs</span></div>
+        <div class="body">
+          <h4>Three stale routed documents, and about thirty-five executed plans</h4>
+          <p>The April assessment should be archived with a supersession banner — its successor already exists and nearly every claim in it is now false. The March roadmap should be rewritten or archived and its map row repointed. The dead content-reference row should be deleted or repointed at the catalog layer that actually serves that purpose. And the executed implementation plans, including a 161KB applied manifest, belong in the archive with one-line outcomes.</p>
+          <p class="body fix"><b>Then</b>One archival sweep, plus a status header convention for new plans so this does not re-accumulate.</p>
+          <p class="ev"><code>docs/STRATEGIC_ASSESSMENT_2026-04-01.md</code><code>CLAUDE.md</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="sage-chat" data-evidence="src/app/api/chat/send/route.ts, config/sage-rag-curated-notes.json, src/lib/sage/knowledge-base.ts">
+        <div class="gutter"><span class="sev low">Delete</span><span class="slug">sage-chat</span></div>
+        <div class="body">
+          <h4>Dead code and expired instrumentation in the most safety-critical route</h4>
+          <p>A constant hardcoded to false makes a whole non-streaming branch unreachable, and the prompt-size logging carries an explicit note to remove it once baseline data was collected — weeks ago. Two one-time retrieval curation batches sit in the config directory beside the gating eval fixtures, inviting confusion about which files are authoritative. Small items, but they are in the file that most needs to be readable.</p>
+          <p class="body fix"><b>Then</b>Delete the dead branch, decide whether the metric is permanent, and move the applied curation batches out of config.</p>
+          <p class="ev"><code>src/app/api/chat/send/route.ts</code><code>config/sage-rag-curated-notes.json</code></p>
+        </div>
+      </article>
+
+      <article class="entry" data-finding="cuts" data-area="progression-xp" data-evidence="src/lib/goals.ts, src/lib/nav-items.ts, src/components/goals/GoalsPageClient.tsx">
+        <div class="gutter"><span class="sev low">Merge or build</span><span class="slug">progression-xp</span></div>
+        <div class="body">
+          <h4>The "daily" goal level, and a nav filter for an item that cannot exist</h4>
+          <p>The daily level has its own metadata, a 50-point award and an achievement, but no interface path to create one, and any that exist render identically to tasks. Only Sage extraction can mint them, yet they pad the all-five-levels requirement for a participation tier. Separately, the nav helper filters out an orientation entry that the array never contains — and a test asserts it never does.</p>
+          <p class="body fix"><b>Then</b>Merge daily into task or build real support for it; the half-state only inflates a tier. Delete the impossible filter clause.</p>
+          <p class="ev"><code>src/lib/goals.ts</code><code>src/lib/nav-items.ts</code></p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ======================= FOCUS ======================= -->
+  <section id="section-focus">
+    <div class="sec-head">
+      <span class="sec-eyebrow">Where to spend the next ninety days</span>
+      <h2>Focus</h2>
+      <p class="sec-intro">
+        In order. Each step is scoped to be finishable, and each unlocks the judgment needed for the next.
+      </p>
+    </div>
+
+    <div class="steps">
+
+      <div class="step" data-finding="focus" data-area="crisis-safety" data-evidence="src/app/api/chat/send/route.ts, src/lib/sage/crisis-detection.ts, config/sage-redteam-eval.json">
+        <span class="step-n"></span>
+        <div class="body">
+          <h4>Move the crisis scan ahead of the model call, and widen the detector — this week</h4>
+          <p>Two changes in one sitting. Run the deterministic detector on the student's message the moment it is saved, before provider resolution, so no provider outage or disconnect can suppress an alert. Then add the informal phrasings this population actually types, with red-team fixtures to hold the line. Nothing else in this review outranks the possibility of a missed alert.</p>
+          <p class="body payoff"><b>Payoff</b>The one finding here with irreversible consequences stops being reachable.</p>
+          <p class="ev"><code>src/app/api/chat/send/route.ts</code><code>src/lib/sage/crisis-detection.ts</code></p>
+        </div>
+      </div>
+
+      <div class="step" data-finding="focus" data-area="product-docs" data-evidence="docs/PRODUCT_GUIDE.md, handoff.md, src/lib/academic-kpi.ts">
+        <span class="step-n"></span>
+        <div class="body">
+          <h4>Write the next ninety-day window, and make its outcomes countable</h4>
+          <p>One owner session. Author the window from the employment handoff and the deferred list, assign owners, close or retarget the two milestones and four issues with an explicit verdict each. Critically, only adopt outcomes something can measure: fix the mislabeled funnel step and add the two aggregate measures whose underlying fields already exist. An outcome nothing can count is a wish.</p>
+          <p class="body payoff"><b>Payoff</b>Everything downstream gets a priority order, and staff reports stop overstating progress.</p>
+          <p class="ev"><code>docs/PRODUCT_GUIDE.md</code><code>src/lib/academic-kpi.ts</code></p>
+        </div>
+      </div>
+
+      <div class="step" data-finding="focus" data-area="rls-rbac" data-evidence="src/lib/ai/provider.ts, src/lib/audit.ts, src/lib/csv.ts, docs/DATA_RETENTION_POLICY.md">
+        <span class="step-n"></span>
+        <div class="body">
+          <h4>Close the compliance triangle: provider routing, read-auditing, and the exports</h4>
+          <p>Three fixes that share one theme — the promise and the enforcement must match. Decide the data-residency question and make the code the authority. Fold read-recording into the shared ownership check so every student-data read is audited automatically rather than by memory. Delete the second CSV escaper so no export path can emit a live formula. Then get the retention durations signed off, since the purge machinery is already built and waiting.</p>
+          <p class="body payoff"><b>Payoff</b>The claims a grant auditor would test become claims the code actually keeps.</p>
+          <p class="ev"><code>src/lib/ai/provider.ts</code><code>src/lib/audit.ts</code><code>src/lib/csv.ts</code></p>
+        </div>
+      </div>
+
+      <div class="step" data-finding="focus" data-area="ci-cd" data-evidence=".github/workflows/ci.yml, package.json, e2e/orientation-student-profile.spec.ts">
+        <span class="step-n"></span>
+        <div class="body">
+          <h4>Spend one week wiring what already exists — write no new tests</h4>
+          <p>Add coverage measurement with a ratchet at today's real number. Run the end-to-end and accessibility suites in CI, with the environment fix that lets the seeded spec run there. Add dependency and secret scanning. Make the Sage gates fail rather than skip without their key, and extend their path filter to the crisis and provider code. Delete or fix the Dockerfile and the drift job. Schedule or descope the browse refresh.</p>
+          <p class="body payoff"><b>Payoff</b>Six months of accumulated instrument-building converts into gates that can actually fail.</p>
+          <p class="ev"><code>.github/workflows/ci.yml</code><code>package.json</code></p>
+        </div>
+      </div>
+
+      <div class="step" data-finding="focus" data-area="goals" data-evidence="src/components/goals/GoalsPageClient.tsx, src/app/api/goals/[id]/route.ts, src/app/api/progression/route.ts">
+        <span class="step-n"></span>
+        <div class="body">
+          <h4>Finish the verification layer and stop the experience system from inflating itself</h4>
+          <p>Restrict student transitions on Sage-proposed goals to dismissal until an instructor confirms, and show the proposal badge at every level. Make the progression GET read-only so streaks stop counting page loads. Key collection awards to a capped counter so pins and portfolio items cannot be farmed. Then decompose the goals page, extracting the tree builder with tests — the rendering bug lives there and so will the next one.</p>
+          <p class="body payoff"><b>Payoff</b>Readiness scores, attendance certificates and triage order become numbers worth trusting.</p>
+          <p class="ev"><code>src/components/goals/GoalsPageClient.tsx</code><code>src/app/api/progression/route.ts</code></p>
+        </div>
+      </div>
+
+      <div class="step" data-finding="focus" data-area="career-resume" data-evidence="src/app/api/jobs/save/route.ts, src/lib/spokes.ts, src/lib/job-board/browse-sources.ts">
+        <span class="step-n"></span>
+        <div class="body">
+          <h4>Close the employment loop — the reason the product exists</h4>
+          <p>Cut the elite-tech boards and add a seniority filter so the default feed matches the audience. Fix the save path so the button works for the rows students are actually shown. Unify the two application trackers on one status vocabulary, then bridge it: when a student reaches applied, interviewing or offered, raise a teacher signal so staff can verify and record the employment outcome from that event instead of typing it in from memory.</p>
+          <p class="body payoff"><b>Payoff</b>Goal to job becomes one traceable path, and the grant's headline number stops being hand-entered.</p>
+          <p class="ev"><code>src/app/api/jobs/save/route.ts</code><code>src/lib/spokes.ts</code></p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ======================= COVERAGE ======================= -->
+  <section id="section-coverage">
+    <div class="sec-head">
+      <span class="sec-eyebrow">Audit coverage</span>
+      <h2>All thirty areas, assessed</h2>
+      <p class="sec-intro">
+        Every inventoried area, including those where nothing was found — an area with no findings is a result, not a gap
+        in the audit.
+      </p>
+    </div>
+
+    <div class="scroller">
+      <div class="matrix">
+
+        <div class="cell" data-area="sage-chat">
+          <div class="cell-top"><span class="cell-slug">sage-chat</span><span class="state mixed">Mixed</span></div>
+          <p>Sound per-layer engineering in a 1,090-line route, but all safety-critical work sits after a fallible stream and provider routing fails open.</p>
+        </div>
+
+        <div class="cell" data-area="crisis-safety">
+          <div class="cell-top"><span class="cell-slug">crisis-safety</span><span class="state mixed">Mixed</span></div>
+          <p>Genuinely strong layered design on the happy path; pipeline placement and regex recall leave the highest-liability scenarios uncovered.</p>
+        </div>
+
+        <div class="cell" data-area="sage-memory">
+          <div class="cell-top"><span class="cell-slug">sage-memory</span><span class="state strong">Strong</span></div>
+          <p>Advisory-lock serialization, three dedupe layers, circuit breakers and a working dead-letter with replay. One retry-placement inconsistency.</p>
+        </div>
+
+        <div class="cell" data-area="rag-knowledge">
+          <div class="cell-top"><span class="cell-slug">rag-knowledge</span><span class="state mixed">Mixed</span></div>
+          <p>Retrieval is provably correct and honestly tuned; knowledge lives in three overlapping layers with a drift check that cannot run.</p>
+        </div>
+
+        <div class="cell" data-area="sage-evals">
+          <div class="cell-top"><span class="cell-slug">sage-evals</span><span class="state solid">Solid</span></div>
+          <p>Unusually mature — fail-closed grading, majority voting, canary freshness tests — but the gate no-ops without its key and misses key paths.</p>
+        </div>
+
+        <div class="cell" data-area="sage-agent-tools">
+          <div class="cell-top"><span class="cell-slug">sage-agent-tools</span><span class="state solid">Solid</span></div>
+          <p>The best-architected surface here, with real adversarial tests, undermined by contract breaks at the seams: tier purity, parallel attribution, route parity.</p>
+        </div>
+
+        <div class="cell" data-area="catalog-registry">
+          <div class="cell-top"><span class="cell-slug">catalog-registry</span><span class="state mixed">Mixed</span></div>
+          <p>The curated catalog and overlay pipeline are disciplined and CI-guarded; the 2,217-line endpoint registry is 92% unenforced and stale.</p>
+        </div>
+
+        <div class="cell" data-area="teacher-console">
+          <div class="cell-top"><span class="cell-slug">teacher-console</span><span class="state weak">Uneven</span></div>
+          <p>Consistent ownership checks and server-side layout gating, but audit-on-read, schema validation and safe CSV escaping are applied inconsistently across 71 routes.</p>
+        </div>
+
+        <div class="cell" data-area="intervention-queue">
+          <div class="cell-top"><span class="cell-slug">intervention-queue</span><span class="state strong">Strong</span></div>
+          <p>Clean and well-guarded — auth wrapper, validated class id, ownership check before scoping. No findings; its inputs are the problem, not the surface.</p>
+        </div>
+
+        <div class="cell" data-area="rls-rbac">
+          <div class="cell-top"><span class="cell-slug">rls-rbac</span><span class="state strong">Strong</span></div>
+          <p>Header stripping, context on every wrapper, database policies and a CI footgun gate — the best-tested code in the repository. One unreachable branch misleads.</p>
+        </div>
+
+        <div class="cell" data-area="auth-security">
+          <div class="cell-top"><span class="cell-slug">auth-security</span><span class="state strong">Strong</span></div>
+          <p>Enumeration-resistant hashing, TOTP replay closed, algorithm pinning, layered rate limits. One latent session-cache eviction gap worth tightening.</p>
+        </div>
+
+        <div class="cell" data-area="admin">
+          <div class="cell-top"><span class="cell-slug">admin</span><span class="state strong">Strong</span></div>
+          <p>All twelve routes uniformly wrapped, export-before-deactivate offboarding, server-side-only error logging. No defects found.</p>
+        </div>
+
+        <div class="cell" data-area="coordinator">
+          <div class="cell-top"><span class="cell-slug">coordinator</span><span class="state solid">Solid</span></div>
+          <p>Region scoping enforced per route with an explicit fail-closed read invariant; one route blocks coordinators only as an implicit side effect its comment contradicts.</p>
+        </div>
+
+        <div class="cell" data-area="goals">
+          <div class="cell-top"><span class="cell-slug">goals</span><span class="state weak">Weak</span></div>
+          <p>Feature-rich and recently hardened, but a 1,385-line client hides rendering bugs, proposed goals remain self-completable, and the five-level ladder is three.</p>
+        </div>
+
+        <div class="cell" data-area="orientation">
+          <div class="cell-top"><span class="cell-slug">orientation</span><span class="state strong">Strong</span></div>
+          <p>The model the rest of the student surface should copy — one shared rule module, signature and verification gating — but guards hang on fuzzy label matching.</p>
+        </div>
+
+        <div class="cell" data-area="certifications">
+          <div class="cell-top"><span class="cell-slug">certifications</span><span class="state solid">Solid</span></div>
+          <p>Requirement gating genuinely resists self-report inflation; the engine assumes a nineteen-certificate economy where one is earnable, deflating readiness.</p>
+        </div>
+
+        <div class="cell" data-area="progression-xp">
+          <div class="cell-top"><span class="cell-slug">progression-xp</span><span class="state weak">Weak</span></div>
+          <p>The idempotent event ledger is solid engineering; the semantics around it are not — page loads mint streaks, collections are farmable, readiness still diverges.</p>
+        </div>
+
+        <div class="cell" data-area="spokes">
+          <div class="cell-top"><span class="cell-slug">spokes</span><span class="state mixed">Mixed</span></div>
+          <p>Catalogs, packet derivation and progress math are clean and tested; weak follow-up validation and substring matching make official numbers less trustworthy than they look.</p>
+        </div>
+
+        <div class="cell" data-area="job-board">
+          <div class="cell-top"><span class="cell-slug">job-board</span><span class="state mixed">Mixed</span></div>
+          <p>A deep, well-tested matching core with 120 passing tests, undermined at the edges: audience-misaligned sources, silent adapter failures, a save flow that dead-ends.</p>
+        </div>
+
+        <div class="cell" data-area="career-resume">
+          <div class="cell-top"><span class="cell-slug">career-resume</span><span class="state mixed">Mixed</span></div>
+          <p>The most defensively engineered code in its slice — validated vendor payloads, full AI audit trail — but the FERPA guarantee is not enforced and the journey is fragmented.</p>
+        </div>
+
+        <div class="cell" data-area="forms-engine">
+          <div class="cell-top"><span class="cell-slug">forms-engine</span><span class="state mixed">Mixed</span></div>
+          <p>Schema-locked templates and an exemplary loopback-S3 test; the production delivery failure path is completely unobservable and can serve the wrong document.</p>
+        </div>
+
+        <div class="cell" data-area="notifications">
+          <div class="cell-top"><span class="cell-slug">notifications</span><span class="state solid">Solid</span></div>
+          <p>Sensible connection caps, eviction and heartbeats; the advertised reconnect replay is dead code, and delivery has no write timeout on a path safety flows await.</p>
+        </div>
+
+        <div class="cell" data-area="mood-checkins">
+          <div class="cell-top"><span class="cell-slug">mood-checkins</span><span class="state solid">Solid</span></div>
+          <p>Small, validated, rate-limited and correctly wired into the same crisis net as chat. The weak point is UTC day boundaries for an Eastern-time cohort.</p>
+        </div>
+
+        <div class="cell" data-area="vision-board">
+          <div class="cell-top"><span class="cell-slug">vision-board</span><span class="state solid">Solid</span></div>
+          <p>A genuinely finished corkboard — drag, resize, z-order, debounced saves, goal and file linking. Not a toy. Its API bypasses the validation convention.</p>
+        </div>
+
+        <div class="cell" data-area="documents-files">
+          <div class="cell-top"><span class="cell-slug">documents-files</span><span class="state strong">Strong</span></div>
+          <p>The healthiest small surface audited: MIME allowlist, storage-first delete ordering with written rationale, staff access scoped through classroom management.</p>
+        </div>
+
+        <div class="cell" data-area="dependencies-build">
+          <div class="cell-top"><span class="cell-slug">dependencies-build</span><span class="state mixed">Mixed</span></div>
+          <p>Fresh lockfile and modern majors with deliberate artifact pruning, but everything ships as production deps, Node diverges three ways, and client error tracking is likely dead.</p>
+        </div>
+
+        <div class="cell" data-area="testing-instruments">
+          <div class="cell-top"><span class="cell-slug">testing-instruments</span><span class="state weak">Weak</span></div>
+          <p>223 unit-test files and a real cross-tenant integration suite, with zero coverage measurement, specs that oversell their names, and two duplicate browser stacks.</p>
+        </div>
+
+        <div class="cell" data-area="ci-cd">
+          <div class="cell-top"><span class="cell-slug">ci-cd</span><span class="state mixed">Mixed</span></div>
+          <p>A solid multi-gate pipeline including RLS against real Postgres, undermined by zero security scanning, no browser suites, and eval gates that green without running.</p>
+        </div>
+
+        <div class="cell" data-area="data-lifecycle">
+          <div class="cell-top"><span class="cell-slug">data-lifecycle</span><span class="state mixed">Mixed</span></div>
+          <p>Offboarding faithfully implements the written policy and is tested; the policy is a draft, purge does not exist, and one scheduled job was never scheduled.</p>
+        </div>
+
+        <div class="cell" data-area="product-docs">
+          <div class="cell-top"><span class="cell-slug">product-docs</span><span class="state weak">Weak</span></div>
+          <p>A genuinely disciplined governance system — charter, scope framework, superseding entries, model closeout — whose operating loop stopped at the June charter boundary.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>Critical project review — VisionQuest — 24 July 2026</div>
+    <div>Seven-slice multi-agent audit of 908 files / 146,764 lines. 62 weaknesses, 12 strengths, 8 cut candidates, 6 focus directives, 30 areas assessed. 4 findings independently verified; 66 single-reviewer.</div>
+    <div>Completeness enforced by <code>npm run review:gate</code> (scripts/validate-project-review.mjs).</div>
+  </footer>
+
+</div>
