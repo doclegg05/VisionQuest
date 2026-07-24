@@ -51,8 +51,30 @@
       ],
       "fix": "Apply the locked FERPA decision: hard-gate student_record/staff_entered on the upload paths to local (503 when unavailable); allow chat on cloud with consent + audit; rewrite the two docs to describe the split.",
       "decision": "ferpa",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/ai/__tests__/document-local-only.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/ai/provider.ts",
+          "mustContain": "DOCUMENT_LOCAL_ONLY_TASKS"
+        },
+        {
+          "kind": "doc",
+          "file": "CLAUDE.md",
+          "mustContain": "DOCUMENT_LOCAL_ONLY_TASKS"
+        },
+        {
+          "kind": "doc",
+          "file": ".claude/rules/sage-ai.md",
+          "mustContain": "Hard-gated to local, fails closed"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "Two-tier routing: DOCUMENT_LOCAL_ONLY_TASKS hard-gate to local and throw when unconfigured; chat keeps the configured provider. Gated by task, not sensitivity, because sage_staff_chat carries staff_entered and a sensitivity gate would have taken staff chat offline. CLAUDE.md, AGENTS.md and .claude/rules/sage-ai.md rewritten to describe the real split."
     },
     {
       "id": "VQ-R-003",
@@ -65,8 +87,30 @@
       ],
       "fix": "Covered by the FERPA decision: resume upload and assist are the hard-gated paths. Return 503 when no local provider is available rather than falling through to cloud.",
       "decision": "ferpa",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/ai/__tests__/document-local-only.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/ai/provider.ts",
+          "mustContain": "DOCUMENT_LOCAL_ONLY_TASKS"
+        },
+        {
+          "kind": "doc",
+          "file": "CLAUDE.md",
+          "mustContain": "DOCUMENT_LOCAL_ONLY_TASKS"
+        },
+        {
+          "kind": "doc",
+          "file": ".claude/rules/sage-ai.md",
+          "mustContain": "Hard-gated to local, fails closed"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "Covered by the same gate: resume_extract and resume_assist are in DOCUMENT_LOCAL_ONLY_TASKS, and both routes already audited as blocked and returned 503 on a throw, so no route change was needed. tailor_application added too (it generates from stored resume text); its errors are genericized by executeAndLedger so the operator-facing message never reaches a student."
     },
     {
       "id": "VQ-R-004",
