@@ -10,6 +10,14 @@ describe("determineStage", () => {
   it("returns discovery when no BHAG and discovery incomplete", () => {
     assert.equal(determineStage([], false), "discovery");
   });
+
+  it("returns career_planning after discovery without a confirmed plan", () => {
+    assert.equal(determineStage([], true, false), "career_planning");
+  });
+
+  it("returns onboarding after discovery with a confirmed plan", () => {
+    assert.equal(determineStage([], true, true), "onboarding");
+  });
 });
 
 describe("messageHasLogisticsIntent", () => {

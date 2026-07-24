@@ -302,6 +302,24 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           completedAt: true,
         },
       },
+      careerEducationPlan: {
+        select: {
+          id: true,
+          terminalOutcome: true,
+          targetClusters: true,
+          targetIndustries: true,
+          onetCodes: true,
+          assessmentResults: true,
+          ecpStatus: true,
+          status: true,
+          summary: true,
+          pathwayId: true,
+          confirmedAt: true,
+          confirmedBy: true,
+          lastReviewedAt: true,
+          updatedAt: true,
+        },
+      },
     },
   });
 
@@ -525,6 +543,24 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           workValues: safeJsonParse(student.careerDiscovery.workValues),
           assessmentSummary: student.careerDiscovery.assessmentSummary,
           completedAt: student.careerDiscovery.completedAt,
+        }
+      : null,
+    careerEducationPlan: student.careerEducationPlan
+      ? {
+          id: student.careerEducationPlan.id,
+          terminalOutcome: student.careerEducationPlan.terminalOutcome,
+          targetClusters: student.careerEducationPlan.targetClusters,
+          targetIndustries: student.careerEducationPlan.targetIndustries,
+          onetCodes: student.careerEducationPlan.onetCodes,
+          assessmentResults: student.careerEducationPlan.assessmentResults,
+          ecpStatus: student.careerEducationPlan.ecpStatus,
+          status: student.careerEducationPlan.status,
+          summary: student.careerEducationPlan.summary,
+          pathwayId: student.careerEducationPlan.pathwayId,
+          confirmedAt: student.careerEducationPlan.confirmedAt,
+          confirmedBy: student.careerEducationPlan.confirmedBy,
+          lastReviewedAt: student.careerEducationPlan.lastReviewedAt,
+          updatedAt: student.careerEducationPlan.updatedAt,
         }
       : null,
   });

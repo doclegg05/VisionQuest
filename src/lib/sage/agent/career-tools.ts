@@ -394,11 +394,12 @@ const prepareForInterview: AgentTool = {
       summary: `Pulled the ${result.job.title} posting to build interview prep.`,
       modelHint:
         result.grounding +
-        "\n\nNow coach the student for this interview in plain, encouraging language: " +
-        "(1) 5-6 likely interview questions tailored to THIS role, including 1-2 behavioral ones they can answer from their experience/certs above; " +
-        "(2) 2-3 strong questions for them to ask the employer; " +
-        "(3) 3 quick prep tips (what to research, what to bring, logistics like arriving early/dress). " +
-        "Keep it concrete to this job and this student — don't give generic advice that ignores the posting.",
+        "\n\nNow coach the student for this interview using the STAR method (Situation, Task, Action, Result) in plain, encouraging language: " +
+        "(1) Start with ONE practice question tailored to THIS role (behavioral or job-specific). Wait for their answer before the next. " +
+        "(2) After they answer, coach briefly: what was strong, what to add for Situation/Task/Action/Result — do not overwhelm. " +
+        "(3) Offer 2-3 questions they can ask the employer, and 3 quick prep tips (research, what to bring, logistics). " +
+        "Keep it concrete to this job and this student — don't give generic advice that ignores the posting. " +
+        "If the STAR Interview Worksheet appears in program documents, mention they can open it for practice notes.",
     };
   },
 };

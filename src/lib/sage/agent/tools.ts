@@ -898,6 +898,7 @@ const classifyAttachment: AgentTool = {
 import { WRITE_TOOLS } from "./write-tools";
 import { CAREER_TOOLS } from "./career-tools";
 import { CAREER_GROUNDING_TOOLS } from "./career-grounding-tools";
+import { CURRICULUM_TOOLS } from "./curriculum-tools";
 import { ADMIN_TOOLS } from "./admin-tools";
 import { TEACHER_TOOLS } from "./teacher-tools";
 import { agentMode, isToolAllowedInMode, type AgentMode } from "./flags";
@@ -916,6 +917,7 @@ const ALL_TOOLS: AgentTool[] = [
   ...WRITE_TOOLS,
   ...CAREER_TOOLS,
   ...CAREER_GROUNDING_TOOLS,
+  ...CURRICULUM_TOOLS,
   ...ADMIN_TOOLS,
   ...TEACHER_TOOLS,
 ];

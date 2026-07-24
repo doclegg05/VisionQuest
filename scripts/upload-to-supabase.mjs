@@ -62,6 +62,7 @@ const MIME_MAP = {
   ".mp3":  "audio/mpeg",
   ".avi":  "video/x-msvideo",
   ".txt":  "text/plain",
+  ".md":   "text/markdown",
   ".url":  null,  // skip .url shortcut files
   ".ai":   null,  // skip Illustrator source files
 };
