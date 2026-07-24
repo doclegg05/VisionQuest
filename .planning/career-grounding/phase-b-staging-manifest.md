@@ -13,12 +13,25 @@ Phase A §6 closed on Mac; these change the 2026-07-09 staging layout:
 |---|--------|-----------------|----------------|----------|
 | 10 | WIOA Referral: instructor-only | `teachers/WIOA Referral Form.pdf` | `teachers/guides/WIOA Referral Form.pdf` | TEACHER |
 | 9 | WIOA Fact Sheet: instructor/policy | `teachers/New WIOA Fact Sheet 7.11.24.pdf` | `teachers/guides/New WIOA Fact Sheet 7.11.24.pdf` | TEACHER |
-| — | ECP FY25 (Q1) | dual-stage `students/` + `orientation/` | TBD at staging | STUDENT |
+| — | ECP FY25 (Q1) | dual-stage `students/` + `orientation/` | see §0a below | STUDENT |
 | — | Rubric Record "-2" (Q8) | refresh existing RAG object | existing Rubric Record key | (keep) |
 
 Catalog nodes + allowlist already updated for #9/#10 path moves. Binary moves still need the Windows `docs-upload/` tree (or a copy onto this Mac).
 
 **Mac blockers (2026-07-23):** career-batch binaries not present in this checkout's `docs-upload/`; `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` / `STORAGE_ENDPOINT` empty in `.env.local`. Upload/sync remain Britt-governed per runbook.
+
+## 0a. ECP student + orientation staging (2026-07-23 Phase B+)
+
+Q1 dual-stage copies prepared from teacher SoT
+`docs-upload/teachers/Handbook Appendix/Section 7/ECP/ECP_AE_and_SPOKES_Fillable_FY25.pdf`
+(320,361 bytes; sha256 `2A3D4E541BE72AB8CE680411CDDD7A10D9317A17DC39AF06228396437B12759D`).
+
+| Staged path | Bucket storageKey | Audience | Catalog node |
+|---|---|---|---|
+| `students/ECP_AE_and_SPOKES_Fillable_FY25.pdf` | `students/resources/ECP_AE_and_SPOKES_Fillable_FY25.pdf` | STUDENT | `catalog/documents/ecp-ae-and-spokes-fillable-fy25.md` |
+| `orientation/ECP_AE_and_SPOKES_Fillable_FY25_Orientation.pdf` | `orientation/ECP_AE_and_SPOKES_Fillable_FY25_Orientation.pdf` | STUDENT / ORIENTATION | `catalog/documents/ecp-ae-and-spokes-fillable-fy25-orientation.md` |
+
+Both keys added to `config/catalog-allowlist.json`. Upload + RAG + catalog apply remain **Britt-governed** per `docs/runbooks/career-grounding-sync.md`.
 
 ## 1. Staged files — sha256 verified against sources (15/15)
 

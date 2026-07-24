@@ -285,4 +285,20 @@ export interface StudentData {
     circumstances: string[];
     completedAt: string | null;
   } | null;
+  careerEducationPlan: {
+    id: string;
+    terminalOutcome: string | null;
+    targetClusters: string[];
+    targetIndustries: string[];
+    onetCodes: string[];
+    assessmentResults: string | null;
+    ecpStatus: string;
+    status: string;
+    summary: string | null;
+    pathwayId: string | null;
+    confirmedAt: string | null;
+    confirmedBy: string | null;
+    lastReviewedAt: string | null;
+    updatedAt: string;
+  } | null;
 }

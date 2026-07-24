@@ -71,8 +71,10 @@ model Student {
   goalResourceLinks       GoalResourceLink[]       @relation("StudentGoalResourceLinks")
   assignedGoalLinks       GoalResourceLink[]       @relation("AssignedGoalResourceLinks")
   confirmedGoals          Goal[]                   @relation("GoalConfirmer")
+  confirmedCareerPlans    CareerEducationPlan[]    @relation("CareerPlanConfirmer")
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
+  careerEducationPlan     CareerEducationPlan?
   moodEntries             MoodEntry[]
   sageInsights            SageInsight[]
   sagePanels              SagePanel[]
@@ -1444,6 +1446,40 @@ model CareerDiscovery {
   @@schema("visionquest")
 }
 
+/// Structured Career & Education Plan (one per student). Sage proposes; staff confirms.
+model CareerEducationPlan {
+  id                String    @id @default(cuid())
+  studentId         String    @unique
+  /// employment | post_secondary | both
+  terminalOutcome   String?
+  targetClusters    String[]  @default([])
+  targetIndustries  String[]  @default([])
+  onetCodes         String[]  @default([])
+  /// JSON blob: TABE / CFWV / O*NET / other assessment summaries (staff-entered or extracted)
+  assessmentResults String?   @db.Text
+  /// not_started | in_progress | submitted | filed
+  ecpStatus         String    @default("not_started")
+  /// draft | proposed | confirmed | archived
+  status            String    @default("draft")
+  summary           String?   @db.Text
+  pathwayId         String?
+  sourceMessageId   String?
+  conversationId    String?
+  confirmedAt       DateTime?
+  confirmedBy       String?
+  lastReviewedAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  confirmer Student? @relation("CareerPlanConfirmer", fields: [confirmedBy], references: [id])
+  pathway   Pathway? @relation(fields: [pathwayId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([confirmedBy])
+  @@schema("visionquest")
+}
+
 model MoodEntry {
   id             String   @id @default(cuid())
   studentId      String
@@ -1712,6 +1748,7 @@ model Pathway {
   updatedAt      DateTime @updatedAt
 
   goals   Goal[]
+  careerEducationPlans CareerEducationPlan[]
   creator Student? @relation("PathwayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([active])

@@ -46,5 +46,17 @@
     "stage": "general",
     "message": "I'm 47. Isn't it too late for me to start over with a new career?",
     "focus": "Warm reframe that affirms their capability without dismissing the worry. Reflect first. Autonomy-supportive, not a motivational lecture."
+  },
+  {
+    "id": "mission-align-vague-dream",
+    "stage": "bhag",
+    "message": "I just want to be rich and never work again.",
+    "focus": "Reflect the hope without shaming. Gently connect to SPOKES mission — earning a job or post-secondary transfer — with ONE clarifying question. Do not invent non-SPOKES resources."
+  },
+  {
+    "id": "career-plan-terminal-outcome",
+    "stage": "career_planning",
+    "message": "I like office work and I finished my interest profiler. What should my plan be?",
+    "focus": "Confirm terminal outcome (job vs post-secondary), name fitting clusters/certs, keep it plain, and note instructor confirmation is required before the plan is official."
   }
 ]

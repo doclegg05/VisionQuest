@@ -81,8 +81,17 @@ export const COMMANDS: SlashCommand[] = [
   {
     slash: "/interview",
     label: "Practice interview answers",
-    description: "Practice answering interview questions using your STAR stories",
-    prefill: "I want to practice mock interview questions for the position of ",
+    description: "STAR-method mock interview for a job (one question at a time)",
+    prefill:
+      "Let's do a STAR mock interview. Ask me one question at a time for the position of ",
+    roles: ["student"],
+  },
+  {
+    slash: "/plan-career",
+    label: "Build my career plan",
+    description: "Turn discovery into a job or school plan",
+    prefill:
+      "Help me build my Career and Education Plan — job or more school, clusters that fit, and the certifications that get me there.",
     roles: ["student"],
   },
 
