@@ -4,10 +4,10 @@
   "createdAt": "2026-07-24",
   "maxDeferred": 3,
   "decisionsLocked": {
-    "ferpa": "Fail closed for uploads only — resume upload/assist and staff_entered hard-gate to the local provider (503 when unavailable); chat may use cloud with consent + audit. Rewrite CLAUDE.md and .claude/rules/sage-ai.md to describe exactly this split. Owner, 2026-07-24.",
+    "ferpa": "Fail closed for uploads only \u2014 resume upload/assist and staff_entered hard-gate to the local provider (503 when unavailable); chat may use cloud with consent + audit. Rewrite CLAUDE.md and .claude/rules/sage-ai.md to describe exactly this split. Owner, 2026-07-24.",
     "kpi": "Relabel the funnel step to 'Active BHAG' AND add two aggregate measures: percent with a confirmed BHAG reviewed within 14 days, and percent with a pathway linked to a confirmed goal. Owner, 2026-07-24.",
     "registry": "Generate the endpoint registry from the src/app/api route tree with a CI parity check that fails on drift, modeled on the catalog overlay-freshness test. Owner, 2026-07-24.",
-    "trackers": "Unify application tracking on the Application model (it already carries verificationStatus/verifiedBy/verifiedAt and is read by four teacher surfaces). Migrate StudentSavedJob into it and bridge applied/interviewing/offer to a teacher signal that records the SPOKES employment outcome. StudentSavedJob does NOT gain verification fields — it stops being the pipeline. Owner, 2026-07-24."
+    "trackers": "Unify application tracking on the Application model (it already carries verificationStatus/verifiedBy/verifiedAt and is read by four teacher surfaces). Migrate StudentSavedJob into it and bridge applied/interviewing/offer to a teacher signal that records the SPOKES employment outcome. StudentSavedJob does NOT gain verification fields \u2014 it stops being the pipeline. Owner, 2026-07-24."
   },
   "findings": [
     {
@@ -15,17 +15,40 @@
       "area": "crisis-safety",
       "severity": "critical",
       "title": "Crisis scan and staff alert run only after a fully successful model stream",
-      "evidence": ["src/app/api/chat/send/route.ts", "src/lib/chat/post-response.ts"],
+      "evidence": [
+        "src/app/api/chat/send/route.ts",
+        "src/lib/chat/post-response.ts"
+      ],
       "fix": "Run detectCrisisSignal on the user message and fire recordWellbeingConcern immediately after the message is saved, before provider resolution. Keep the reply-side 988 block where it is.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/chat/crisis-alert.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/app/api/chat/send/__tests__/route.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/chat/send/route.ts",
+          "mustContain": "raiseCrisisAlertIfSignalled"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "Extracted the scan into src/lib/chat/crisis-alert.ts (one shared, never-throwing helper) and called it before provider resolution and before all three direct-answer early returns. post-response.ts now calls the same helper as a backstop, and its false header claim that a provider outage 'can never suppress' the scan was corrected."
     },
     {
       "id": "VQ-R-002",
       "area": "sage-chat",
       "severity": "high",
       "title": "FERPA local-only routing fails open to cloud",
-      "evidence": ["src/lib/ai/provider.ts", "src/lib/ai/embedding-provider.ts", "CLAUDE.md"],
+      "evidence": [
+        "src/lib/ai/provider.ts",
+        "src/lib/ai/embedding-provider.ts",
+        "CLAUDE.md"
+      ],
       "fix": "Apply the locked FERPA decision: hard-gate student_record/staff_entered on the upload paths to local (503 when unavailable); allow chat on cloud with consent + audit; rewrite the two docs to describe the split.",
       "decision": "ferpa",
       "status": "open",
@@ -36,7 +59,10 @@
       "area": "career-resume",
       "severity": "high",
       "title": "Resume PII flows to Gemini cloud by default",
-      "evidence": ["src/app/api/resume/upload/route.ts", "src/lib/resume-ai.ts"],
+      "evidence": [
+        "src/app/api/resume/upload/route.ts",
+        "src/lib/resume-ai.ts"
+      ],
       "fix": "Covered by the FERPA decision: resume upload and assist are the hard-gated paths. Return 503 when no local provider is available rather than falling through to cloud.",
       "decision": "ferpa",
       "status": "open",
@@ -47,7 +73,10 @@
       "area": "crisis-safety",
       "severity": "high",
       "title": "Crisis detector misses the informal phrasings this population types",
-      "evidence": ["src/lib/sage/crisis-detection.ts", "config/sage-redteam-eval.json"],
+      "evidence": [
+        "src/lib/sage/crisis-detection.ts",
+        "config/sage-redteam-eval.json"
+      ],
       "fix": "Add contraction/slang alternations (wanna die, dont wanna be here, unalive, kms, gonna od) and method-adjacent phrases; grow the unit-test corpus; add at least one informal red-team case.",
       "status": "open",
       "verification": []
@@ -57,7 +86,10 @@
       "area": "goals",
       "severity": "high",
       "title": "Students can self-complete Sage-proposed goals",
-      "evidence": ["src/app/api/goals/[id]/route.ts", "src/components/goals/GoalsPageClient.tsx"],
+      "evidence": [
+        "src/app/api/goals/[id]/route.ts",
+        "src/components/goals/GoalsPageClient.tsx"
+      ],
       "fix": "Restrict student transitions on sourceMessageId goals to dismissal until confirmed; render the proposal badge and disable the checkbox at every level; add route tests for proposed to completed.",
       "status": "open",
       "verification": []
@@ -67,7 +99,10 @@
       "area": "progression-xp",
       "severity": "high",
       "title": "GET /api/progression mints XP, so attendance streaks measure page loads",
-      "evidence": ["src/app/api/progression/route.ts", "src/components/progression/ProgressionProvider.tsx"],
+      "evidence": [
+        "src/app/api/progression/route.ts",
+        "src/components/progression/ProgressionProvider.tsx"
+      ],
       "fix": "Make the GET read-only; move the daily check-in award to an explicit POST behind a real action (mood check-in). Pass one fetched readiness result down instead of re-fetching.",
       "status": "open",
       "verification": []
@@ -77,7 +112,10 @@
       "area": "goals",
       "severity": "high",
       "title": "Goals-page Ask Sage injects fabricated messages into the real conversation",
-      "evidence": ["src/components/goals/GoalsPageClient.tsx", "src/app/api/chat/send/route.ts"],
+      "evidence": [
+        "src/components/goals/GoalsPageClient.tsx",
+        "src/app/api/chat/send/route.ts"
+      ],
       "fix": "Route scaffolding calls through a non-persisting endpoint, or tag them as system-initiated and render them as such in the transcript.",
       "status": "open",
       "verification": []
@@ -87,7 +125,10 @@
       "area": "goals",
       "severity": "high",
       "title": "Goal hierarchy mis-wired: goals counted in progress but never rendered",
-      "evidence": ["src/components/goals/GoalsPageClient.tsx", "src/app/api/goals/route.ts"],
+      "evidence": [
+        "src/components/goals/GoalsPageClient.tsx",
+        "src/app/api/goals/route.ts"
+      ],
       "fix": "Extract a pure buildGoalTree module with unit tests and make the renderer total (every active goal renders exactly once); enforce the level lattice at write time.",
       "status": "open",
       "verification": []
@@ -97,7 +138,11 @@
       "area": "sage-agent-tools",
       "severity": "high",
       "title": "Read-tier lookup_cert_progress mutates: creates cert rows and awards XP",
-      "evidence": ["src/lib/sage/agent/tools.ts", "src/lib/sage/cert-actions.ts", "src/lib/sage/agent/headless.ts"],
+      "evidence": [
+        "src/lib/sage/agent/tools.ts",
+        "src/lib/sage/cert-actions.ts",
+        "src/lib/sage/agent/headless.ts"
+      ],
       "fix": "Split the ensure-or-create path out so the lookup returns not-started; put creation behind an explicit start action. Add a test asserting no read-tier tool writes.",
       "status": "open",
       "verification": []
@@ -107,7 +152,10 @@
       "area": "sage-agent-tools",
       "severity": "high",
       "title": "Parallel tool calls cross-wire results into the wrong response",
-      "evidence": ["src/lib/sage/agent/loop.ts", "src/lib/ai/gemini-provider.ts"],
+      "evidence": [
+        "src/lib/sage/agent/loop.ts",
+        "src/lib/ai/gemini-provider.ts"
+      ],
       "fix": "Key transcript records by callId and look up the matching record per tool_result event; add a two-parallel-call attribution test.",
       "status": "open",
       "verification": []
@@ -117,7 +165,10 @@
       "area": "sage-agent-tools",
       "severity": "high",
       "title": "Agent goal writes skip XP, progression and cache invalidation",
-      "evidence": ["src/lib/sage/agent/write-tools.ts", "src/app/api/goals/[id]/route.ts"],
+      "evidence": [
+        "src/lib/sage/agent/write-tools.ts",
+        "src/app/api/goals/[id]/route.ts"
+      ],
       "fix": "Extract the goal-status transition (update + progression + XP + cache invalidation) into one lib helper called by both the route and the tool; audit remaining write tools for the same drift.",
       "status": "open",
       "verification": []
@@ -127,7 +178,10 @@
       "area": "sage-agent-tools",
       "severity": "high",
       "title": "Consequential rate limit double-counts; the block lands after confirm",
-      "evidence": ["src/lib/sage/agent/executor.ts", "src/lib/sage/agent/rate-limit.ts"],
+      "evidence": [
+        "src/lib/sage/agent/executor.ts",
+        "src/lib/sage/agent/rate-limit.ts"
+      ],
       "fix": "Do not consume a mutate-tier unit for the proposal leg (or refund it); check-without-consume at confirm time so an approved card never fails on quota alone.",
       "status": "open",
       "verification": []
@@ -137,7 +191,11 @@
       "area": "teacher-console",
       "severity": "high",
       "title": "Read-auditing wired into 1 of ~13 student-data GETs",
-      "evidence": ["src/lib/audit.ts", "src/app/api/teacher/students/[id]/mood/route.ts", "src/app/api/teacher/students/[id]/memories/route.ts"],
+      "evidence": [
+        "src/lib/audit.ts",
+        "src/app/api/teacher/students/[id]/mood/route.ts",
+        "src/app/api/teacher/students/[id]/memories/route.ts"
+      ],
       "fix": "Fold recordStudentView into the shared assertStaffCanManageStudent path so read-auditing is automatic for every student-data GET; wire the missing surfaces; delete unused StudentViewSurface values.",
       "status": "open",
       "verification": []
@@ -147,7 +205,11 @@
       "area": "teacher-console",
       "severity": "high",
       "title": "CSV formula injection: two of four export paths bypass the safe escaper",
-      "evidence": ["src/lib/forms/export.ts", "src/lib/csv.ts", "src/app/api/teacher/forms/[templateId]/export/route.ts"],
+      "evidence": [
+        "src/lib/forms/export.ts",
+        "src/lib/csv.ts",
+        "src/app/api/teacher/forms/[templateId]/export/route.ts"
+      ],
       "fix": "Delete csvEscape and route the forms-response and coordinator monthly exports through escapeCsvValue; add a fixture proving = + - @ prefixes are neutralized.",
       "status": "open",
       "verification": []
@@ -157,7 +219,10 @@
       "area": "job-board",
       "severity": "high",
       "title": "Default browse pool serves senior big-tech roles to TANF/SNAP students",
-      "evidence": ["src/lib/job-board/browse-sources.ts", "src/lib/job-board/adapters/ats.ts"],
+      "evidence": [
+        "src/lib/job-board/browse-sources.ts",
+        "src/lib/job-board/adapters/ats.ts"
+      ],
       "fix": "Remove the hardcoded elite-tech boards from BROWSE_SOURCES (keep opt-in per class if wanted) and add a seniority heuristic on title tokens to job-quality or scoring.",
       "status": "open",
       "verification": []
@@ -167,7 +232,10 @@
       "area": "job-board",
       "severity": "high",
       "title": "Save button silently fails for every browse job and unenrolled student",
-      "evidence": ["src/app/api/jobs/save/route.ts", "src/components/jobs/JobCard.tsx"],
+      "evidence": [
+        "src/app/api/jobs/save/route.ts",
+        "src/components/jobs/JobCard.tsx"
+      ],
       "fix": "Covered by the tracker decision: saving a browse row creates an Application. Also surface non-OK save responses to the user instead of ignoring them.",
       "decision": "trackers",
       "status": "open",
@@ -178,7 +246,11 @@
       "area": "career-resume",
       "severity": "high",
       "title": "Two parallel application trackers, neither reaching the employment outcome",
-      "evidence": ["src/app/api/jobs/save/route.ts", "src/components/career/OpportunitiesHub.tsx", "src/lib/spokes.ts"],
+      "evidence": [
+        "src/app/api/jobs/save/route.ts",
+        "src/components/career/OpportunitiesHub.tsx",
+        "src/lib/spokes.ts"
+      ],
       "fix": "Apply the locked tracker decision: unify on Application, migrate StudentSavedJob, and bridge applied/interviewing/offer to a teacher signal that records the SPOKES employment outcome.",
       "decision": "trackers",
       "status": "open",
@@ -189,7 +261,10 @@
       "area": "job-board",
       "severity": "high",
       "title": "Globally unique sourceId lets one class's scrape overwrite another's rows",
-      "evidence": ["prisma/schema.prisma", "src/lib/job-board/scrape-engine.ts"],
+      "evidence": [
+        "prisma/schema.prisma",
+        "src/lib/job-board/scrape-engine.ts"
+      ],
       "fix": "Make the unique key compound on (classConfigId, sourceId) and key the upsert on it; add a two-configuration overlap test (scrape-engine has no test file today).",
       "status": "open",
       "verification": []
@@ -199,7 +274,10 @@
       "area": "job-board",
       "severity": "high",
       "title": "Three of four default adapters have no fetch timeout",
-      "evidence": ["src/lib/job-board/adapters/adzuna.ts", "src/lib/job-board/scrape-engine.ts"],
+      "evidence": [
+        "src/lib/job-board/adapters/adzuna.ts",
+        "src/lib/job-board/scrape-engine.ts"
+      ],
       "fix": "Route adzuna, usajobs and jsearch through fetchJson (or add AbortSignal.timeout); wrap the per-config loop so one class's failure does not abort the rest.",
       "status": "open",
       "verification": []
@@ -209,7 +287,10 @@
       "area": "forms-engine",
       "severity": "high",
       "title": "Forms delivery degrades invisibly and can serve the wrong document",
-      "evidence": ["src/app/api/forms/download/route.ts", "src/lib/storage.ts"],
+      "evidence": [
+        "src/app/api/forms/download/route.ts",
+        "src/lib/storage.ts"
+      ],
       "fix": "Log a warning with storageKey and fallback tier every time a bundled or content-dir fallback serves a request in production; add a Sentry breadcrumb; restrict the fuzzy content-dir scan to dev builds.",
       "status": "open",
       "verification": []
@@ -219,7 +300,9 @@
       "area": "ci-cd",
       "severity": "high",
       "title": "Zero security scanning in CI for a FERPA-sensitive app",
-      "evidence": [".github/workflows/ci.yml"],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ],
       "fix": "Add a dependency audit at high severity, a secret-scanning step, and a dependency-update config for the npm and github-actions ecosystems.",
       "status": "open",
       "verification": []
@@ -229,7 +312,10 @@
       "area": "testing-instruments",
       "severity": "high",
       "title": "223 test files, zero coverage measurement",
-      "evidence": ["package.json", ".github/workflows/ci.yml"],
+      "evidence": [
+        "package.json",
+        ".github/workflows/ci.yml"
+      ],
       "fix": "Add a test:coverage script around the existing runner, publish the summary in CI, and set the initial threshold at today's real number as a ratchet.",
       "status": "open",
       "verification": []
@@ -239,7 +325,11 @@
       "area": "ci-cd",
       "severity": "high",
       "title": "E2E and a11y suites run in no workflow; the deepest spec cannot run in CI",
-      "evidence": ["e2e/orientation-student-profile.spec.ts", "playwright.config.ts", ".github/workflows/ci.yml"],
+      "evidence": [
+        "e2e/orientation-student-profile.spec.ts",
+        "playwright.config.ts",
+        ".github/workflows/ci.yml"
+      ],
       "fix": "Add a CI job that migrates the existing Postgres service container, seeds, builds and runs playwright; switch the orientation spec to read process.env.DATABASE_URL with .env.local as a local fallback.",
       "status": "open",
       "verification": []
@@ -249,7 +339,11 @@
       "area": "dependencies-build",
       "severity": "high",
       "title": "Client-side Sentry is likely dead under the Turbopack build",
-      "evidence": ["sentry.client.config.ts", "next.config.ts", "src/instrumentation.ts"],
+      "evidence": [
+        "sentry.client.config.ts",
+        "next.config.ts",
+        "src/instrumentation.ts"
+      ],
       "fix": "Create src/instrumentation-client.ts with the current client init plus onRouterTransitionStart, export onRequestError from instrumentation.ts, and confirm a browser error actually arrives.",
       "status": "open",
       "verification": []
@@ -259,7 +353,10 @@
       "area": "data-lifecycle",
       "severity": "high",
       "title": "browse-refresh cron was never scheduled; the code comment claiming it is false",
-      "evidence": ["scripts/run-browse-refresh.mjs", "src/app/api/internal/jobs/browse-refresh/route.ts"],
+      "evidence": [
+        "scripts/run-browse-refresh.mjs",
+        "src/app/api/internal/jobs/browse-refresh/route.ts"
+      ],
       "fix": "Schedule a browse-refresh pg_cron job mirroring the daily-coaching pattern, or descope the browse pool explicitly and delete the endpoint plus script. Either way the false comment goes.",
       "status": "open",
       "verification": []
@@ -269,7 +366,10 @@
       "area": "catalog-registry",
       "severity": "high",
       "title": "The 2,217-line endpoint registry is 92% unenforced and two months stale",
-      "evidence": ["src/lib/registry/tools.ts", "src/lib/registry/middleware.ts"],
+      "evidence": [
+        "src/lib/registry/tools.ts",
+        "src/lib/registry/middleware.ts"
+      ],
       "fix": "Apply the locked registry decision: generate the registry from the src/app/api route tree with a CI parity check that fails on drift. Delete the never-read rateLimit/tokenBudget fields and dead helpers.",
       "decision": "registry",
       "status": "open",
@@ -280,7 +380,10 @@
       "area": "product-docs",
       "severity": "high",
       "title": "Charter lapsed 33 days with its outcome loop provably dead",
-      "evidence": ["docs/PRODUCT_GUIDE.md", "handoff.md"],
+      "evidence": [
+        "docs/PRODUCT_GUIDE.md",
+        "handoff.md"
+      ],
       "fix": "Draft the successor 90-day window in docs/PRODUCT_GUIDE.md with dates, single accountable owners, and measurable outcomes (the handoff employment arc plus the maturity deferred list are most of the draft). Closing the GitHub milestones and issues #37-#40 is an owner action outside this branch.",
       "status": "open",
       "verification": []
@@ -290,7 +393,12 @@
       "area": "product-docs",
       "severity": "high",
       "title": "The mandated reading path delivers misinformation",
-      "evidence": ["CLAUDE.md", "docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md", "AGENTS.md", "DEPLOY.md"],
+      "evidence": [
+        "CLAUDE.md",
+        "docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md",
+        "AGENTS.md",
+        "DEPLOY.md"
+      ],
       "fix": "Give every routed doc a status header (current / superseded-by / archived), delete or repoint the dead content/_INDEX.md row, archive or rewrite the March roadmap, and fix DEPLOY.md's cron topology.",
       "status": "open",
       "verification": []
@@ -300,7 +408,11 @@
       "area": "product-docs",
       "severity": "high",
       "title": "Headline outcomes unmeasurable; KPI funnel overstates Confirmed BHAG",
-      "evidence": ["src/lib/academic-kpi.ts", "src/lib/goals.ts", "docs/PRODUCT_GUIDE.md"],
+      "evidence": [
+        "src/lib/academic-kpi.ts",
+        "src/lib/goals.ts",
+        "docs/PRODUCT_GUIDE.md"
+      ],
       "fix": "Apply the locked KPI decision: relabel the funnel step to Active BHAG and add the two aggregate measures (confirmed BHAG reviewed within 14 days percent, pathway-linked-to-confirmed percent).",
       "decision": "kpi",
       "status": "open",

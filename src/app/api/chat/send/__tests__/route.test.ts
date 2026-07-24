@@ -26,6 +26,7 @@ let toolCapturedBy_withRegistry: string | null = null;
 const mockRateLimit = mock.fn() as any;
 const mockRateLimitDaily = mock.fn() as any;
 const mockResolveAiProvider = mock.fn() as any;
+const mockRaiseCrisisAlertIfSignalled = mock.fn() as any;
 const mockGetPromptTier = mock.fn() as any;
 const mockGetProviderClass = mock.fn() as any;
 const mockLogAiAuditEvent = mock.fn() as any;
@@ -135,6 +136,12 @@ mock.module("@/lib/ai", {
   namedExports: {
     resolveAiProvider: mockResolveAiProvider,
     getPromptTier: mockGetPromptTier,
+  },
+});
+
+mock.module("@/lib/chat/crisis-alert", {
+  namedExports: {
+    raiseCrisisAlertIfSignalled: mockRaiseCrisisAlertIfSignalled,
   },
 });
 
@@ -335,6 +342,7 @@ function resetMocks() {
     mockRateLimit,
     mockRateLimitDaily,
     mockResolveAiProvider,
+    mockRaiseCrisisAlertIfSignalled,
     mockGetPromptTier,
     mockGetProviderClass,
     mockLogAiAuditEvent,
@@ -384,6 +392,7 @@ function resetMocks() {
   mockGetFormContext.mock.mockImplementation(() => "");
   mockGetDocumentContext.mock.mockImplementation(async () => "");
   mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("ollama"));
+  mockRaiseCrisisAlertIfSignalled.mock.mockImplementation(async () => false);
   mockGetPromptTier.mock.mockImplementation(() => "compact");
   mockGetProviderClass.mock.mockImplementation(() => "local");
   mockLogAiAuditEvent.mock.mockImplementation(async () => undefined);
@@ -847,5 +856,89 @@ describe("POST /api/chat/send — form commitment → present_form", () => {
     assert.equal(mockGetDirectFormAnswer.mock.callCount(), 0);
     assert.equal(mockRunAgentTurn.mock.callCount(), 0);
     assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VQ-R-001 — the crisis scan must not depend on a successful model stream.
+//
+// Before the fix, the only caller on this path was handlePostResponse, invoked
+// at the tail of the post-stream try block. These tests pin the scan ahead of
+// provider resolution so a 503 (or any earlier return) can no longer suppress
+// the staff alert.
+// ---------------------------------------------------------------------------
+describe("POST /api/chat/send — early crisis scan (VQ-R-001)", () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  function crisisRequest(message: string) {
+    return mockRequest("/api/chat/send", { method: "POST", body: { message } });
+  }
+
+  it("scans before provider resolution, so a provider failure cannot suppress the alert", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => {
+      throw new Error("Local AI server unavailable");
+    });
+
+    const res = await route.POST(
+      crisisRequest("i dont want to be here anymore") as never,
+      { params: Promise.resolve({}) } as never,
+    );
+
+    // The turn fails for the student with the provider-unavailable status...
+    assert.equal(res.status, 503);
+    // ...but resolveAiProvider was reached, and the scan ran before it.
+    assert.equal(mockResolveAiProvider.mock.callCount(), 1);
+    assert.equal(
+      mockRaiseCrisisAlertIfSignalled.mock.callCount(),
+      1,
+      "crisis scan must run before resolveAiProvider",
+    );
+    // The post-response backstop never ran, proving the early call is the only
+    // thing that covered this turn.
+    assert.equal(mockHandlePostResponse.mock.callCount(), 0);
+
+    const args = mockRaiseCrisisAlertIfSignalled.mock.calls[0].arguments[0];
+    assert.equal(args.userMessage, "i dont want to be here anymore");
+    assert.equal(args.studentId, session.id);
+    assert.equal(args.isStaffChat, false);
+  });
+
+  it("scans before the deterministic form fast-path returns early", async () => {
+    mockGetDirectFormAnswer.mock.mockImplementation(() => "Here is the Dress Code Policy.");
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      { form: { id: "dress-code", title: "Dress Code Policy" } },
+    ]);
+
+    const res = await route.POST(
+      crisisRequest("i want to die") as never,
+      { params: Promise.resolve({}) } as never,
+    );
+
+    assert.equal(res.status, 200);
+    // The form fast path returned without ever resolving a provider...
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+    // ...and the scan still ran.
+    assert.equal(
+      mockRaiseCrisisAlertIfSignalled.mock.callCount(),
+      1,
+      "an early return must not skip the crisis scan",
+    );
+  });
+
+  it("marks staff turns so the helper can decline to alert on them", async () => {
+    session = mockTeacherSession();
+
+    await route.POST(
+      crisisRequest("the student says he wants to die") as never,
+      { params: Promise.resolve({}) } as never,
+    );
+
+    assert.equal(mockRaiseCrisisAlertIfSignalled.mock.callCount(), 1);
+    assert.equal(
+      mockRaiseCrisisAlertIfSignalled.mock.calls[0].arguments[0].isStaffChat,
+      true,
+    );
   });
 });

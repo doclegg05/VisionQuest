@@ -28,6 +28,7 @@ import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { ensureCrisisResources } from "@/lib/chat/crisis-safety-net";
+import { raiseCrisisAlertIfSignalled } from "@/lib/chat/crisis-alert";
 import {
   assembleStudentContextBundle,
   selfMetricLineFromBundle,
@@ -187,6 +188,24 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       ? getDirectFormAnswer(userMessage)
       : null;
   const directSmallTalkAnswer = getDirectSmallTalkAnswer(userMessage);
+
+  // VQ-R-001: deterministic crisis scan runs HERE — before provider resolution
+  // and before every direct-answer early return below. Previously the only
+  // caller on this path was handlePostResponse (further down, inside the
+  // post-stream try block), so a provider 503, a mid-stream model error, a
+  // client disconnect, or a crisis message that happened to match the
+  // form/small-talk fast paths persisted the message and raised no alert at
+  // all. The scan is a pure synchronous regex pass, so running it this early
+  // costs nothing. Fire-and-forget to keep the reply latency unchanged — same
+  // durability as before, but now on a path nothing can skip. handlePostResponse
+  // calls the same helper later; the alert upserts one row per student per day,
+  // so the two calls collapse into one.
+  void raiseCrisisAlertIfSignalled({
+    userMessage,
+    studentId: session.id,
+    conversationId,
+    isStaffChat,
+  });
 
   if (directFormAnswer) {
     const conversation = isStaffChat
