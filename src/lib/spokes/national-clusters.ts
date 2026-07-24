@@ -27,22 +27,22 @@ export const NATIONAL_CAREER_CLUSTERS = [
 export type NationalCluster = (typeof NATIONAL_CAREER_CLUSTERS)[number];
 
 export const NATIONAL_TO_SPOKES_MAP: Record<NationalCluster, string[]> = {
-  "Agriculture, Food & Natural Resources": ["career-readiness"],
-  "Architecture & Construction": ["career-readiness"],
+  "Agriculture, Food & Natural Resources": ["trades-logistics", "career-readiness"],
+  "Architecture & Construction": ["trades-logistics", "career-readiness"],
   "Arts, A/V Technology & Communications": ["creative-design"],
   "Business Management & Administration": ["office-admin", "finance-bookkeeping"],
   "Education & Training": ["customer-service", "career-readiness"],
   "Finance": ["finance-bookkeeping"],
   "Government & Public Administration": ["office-admin", "career-readiness"],
-  "Health Science": ["career-readiness"],
+  "Health Science": ["healthcare-support", "career-readiness"],
   "Hospitality & Tourism": ["customer-service"],
-  "Human Services": ["customer-service", "language-esl"],
+  "Human Services": ["healthcare-support", "customer-service", "language-esl"],
   "Information Technology": ["tech-digital"],
   "Law, Public Safety, Corrections & Security": ["career-readiness"],
-  "Manufacturing": ["career-readiness"],
+  "Manufacturing": ["trades-logistics", "career-readiness"],
   "Marketing": ["creative-design", "customer-service"],
   "Science, Technology, Engineering & Mathematics": ["tech-digital"],
-  "Transportation, Distribution & Logistics": ["career-readiness"],
+  "Transportation, Distribution & Logistics": ["trades-logistics", "career-readiness"],
 };
 
 export function formatNationalClustersForPrompt(): string {

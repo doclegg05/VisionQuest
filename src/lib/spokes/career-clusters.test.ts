@@ -44,6 +44,25 @@ describe("CAREER_CLUSTERS", () => {
       assert.ok(cluster.signalKeywords.length > 0, `Cluster "${cluster.id}" has no signalKeywords`);
     }
   });
+
+  it("every cluster pathwayOrder step references an existing certification", () => {
+    for (const cluster of CAREER_CLUSTERS) {
+      for (const id of cluster.pathwayOrder) {
+        assert.ok(
+          certIds.has(id),
+          `Cluster "${cluster.id}" pathwayOrder references unknown cert "${id}"`,
+        );
+      }
+    }
+  });
+
+  it("covers the healthcare and trades supply that dominates the WV market", () => {
+    // Added 2026-07-24 after the Apify pilot measured ~80% of real WV
+    // entry-level postings as healthcare/trades with no cluster to match into.
+    for (const id of ["healthcare-support", "trades-logistics"]) {
+      assert.ok(getClusterById(id), `Missing cluster "${id}"`);
+    }
+  });
 });
 
 describe("getClusterById", () => {
