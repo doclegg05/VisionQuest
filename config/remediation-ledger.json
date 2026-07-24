@@ -186,8 +186,20 @@
         "src/components/progression/ProgressionProvider.tsx"
       ],
       "fix": "Make the GET read-only; move the daily check-in award to an explicit POST behind a real action (mood check-in). Pass one fetched readiness result down instead of re-fetching.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/app/api/progression/__tests__/checkin-award.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/mood/route.ts",
+          "mustContain": "daily_checkin"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "GET /api/progression is now XP-neutral: the daily_checkin award (+15 XP + streak day) moved to POST /api/mood, a deliberate once-a-day act, keyed on the day so a second check-in is a no-op via awardEvent's unique constraint, and wrapped so a progression failure cannot lose the mood entry or its wellbeing alert. Also collapsed the route's read-write-read into a single readiness fetch. Deliberate deviation from the stated fix: the zero-XP readiness-achievement reconciliation STAYS in the GET, because this route is its only trigger anywhere in the codebase \u2014 removing it would have meant readiness achievements were never granted at all. It awards no XP and never touches a streak."
     },
     {
       "id": "VQ-R-007",

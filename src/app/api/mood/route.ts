@@ -6,6 +6,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody } from "@/lib/schemas";
 import { recordWellbeingConcern } from "@/lib/sage/crisis-detection";
+import { awardEvent } from "@/lib/progression/events";
+import { recordDailyCheckin } from "@/lib/progression/engine";
+import { logger } from "@/lib/logger";
 
 // A self-reported mood score at or below this (out of 10) raises a wellbeing
 // concern for staff review — same threshold as Sage's chat extraction
@@ -81,6 +84,30 @@ export const POST = withRegistry("learning.mood", async (session, req) => {
       studentId: session.id,
       conversationId: null,
       reason: "low_mood",
+    });
+  }
+
+  // VQ-R-006: the daily check-in award lives here, on a deliberate student act.
+  // It used to fire from GET /api/progression, which ProgressionProvider calls
+  // on every page mount — so the "attendance" streak behind the Certificate of
+  // Attendance was really counting page loads. sourceId is the day key, so
+  // awardEvent's unique constraint makes a second check-in a no-op.
+  //
+  // Wrapped: the mood entry and its wellbeing alert matter more than the XP, so
+  // a progression failure must never turn a successful check-in into an error.
+  try {
+    await awardEvent({
+      studentId: session.id,
+      eventType: "daily_checkin",
+      sourceType: "checkin",
+      sourceId: new Date().toISOString().slice(0, 10),
+      xp: 15,
+      mutate: (state) => recordDailyCheckin(state),
+    });
+  } catch (error) {
+    logger.error("Daily check-in award failed", {
+      studentId: session.id,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 
