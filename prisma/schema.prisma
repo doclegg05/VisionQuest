@@ -16,6 +16,10 @@ model Student {
   passwordHash         String?
   email                String?   @unique
   authProvider         String?
+  // Google OAuth subject (stable account id) — preferred lookup over email
+  googleSub            String?   @unique
+  // AES-256-GCM blob via src/lib/crypto.ts (API_KEY_ENCRYPTION_KEY)
+  googleRefreshTokenEncrypted String?
   geminiApiKey         String?
   credlyUsername       String?
   // Last-good Credly badges (Phase 5): survives restarts and Credly outages.

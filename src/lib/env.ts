@@ -107,6 +107,8 @@ export const env = {
   GOOGLE_CLIENT_ID: optional("GOOGLE_CLIENT_ID"),
   GOOGLE_CLIENT_SECRET: optional("GOOGLE_CLIENT_SECRET"),
   GOOGLE_REDIRECT_URI: optional("GOOGLE_REDIRECT_URI"),
+  // Comma-separated email domains allowed for Google sign-in (empty = any domain)
+  GOOGLE_ALLOWED_DOMAINS: optional("GOOGLE_ALLOWED_DOMAINS"),
 
   // Email (optional — password reset disabled without it)
   SMTP_HOST: optional("SMTP_HOST"),

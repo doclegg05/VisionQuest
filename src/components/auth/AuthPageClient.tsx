@@ -12,8 +12,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   oauth_invalid: "Google sign-in returned an invalid response. Please try again or use the form below.",
   oauth_state_mismatch: "Google sign-in session expired. Please try again or use the form below.",
   oauth_token_failed: "Google sign-in failed to authenticate. Please try again or use the form below.",
+  oauth_token_invalid: "Google sign-in could not be verified. Please try again or use the form below.",
   oauth_userinfo_failed: "Could not retrieve your Google account info. Please try again or use the form below.",
+  oauth_email_unverified: "Your Google email is not verified. Verify it with Google, then try again.",
+  oauth_domain_denied: "That Google account is not allowed for this program. Use an approved email or the form below.",
+  oauth_link_required:
+    "That email already has a VisionQuest account. Sign in with your password, then link Google from settings — or ask your instructor for help.",
   oauth_failed: "Google sign-in failed. Please try again or use the form below.",
+  account_deactivated: "This account has been deactivated. Contact your program staff for help.",
   auth_failed: "Google sign-in failed. Please try again or use the form below.",
 };
 
