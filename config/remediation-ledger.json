@@ -152,8 +152,29 @@
         "src/components/goals/GoalsPageClient.tsx"
       ],
       "fix": "Restrict student transitions on sourceMessageId goals to dismissal until confirmed; render the proposal badge and disable the checkbox at every level; add route tests for proposed to completed.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/goals-proposal-guard.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/app/api/goals/[id]/__tests__/route.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/goals.ts",
+          "mustContain": "isAwaitingInstructorConfirmation"
+        },
+        {
+          "kind": "config",
+          "file": "src/components/goals/GoalsPageClient.tsx",
+          "mustContain": "isAwaitingInstructorConfirmation"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "Extracted isAwaitingInstructorConfirmation into src/lib/goals.ts as the single definition, used by both the PATCH guard (server authority) and the UI, so the interface can never offer an action the API rejects. API: student status transitions on an unconfirmed Sage proposal are 403 except 'abandoned' (dismissal stays available) and 'confirmed' (the pre-existing, more specific guard owns that message). Content edits still allowed. Discovered the route's select omitted confirmedAt, which would have made the guard misfire. UI: GoalRecord was missing sourceMessageId/confirmedAt entirely (the server already sent them via include), so the client could not distinguish a suggestion from the student's own goal; now declared, checkboxes disabled with an aria-label at weekly and task level, an 'Awaiting instructor' badge added where none existed, and a guard at the single handleToggleGoalStatus choke point covering all five call sites."
     },
     {
       "id": "VQ-R-006",

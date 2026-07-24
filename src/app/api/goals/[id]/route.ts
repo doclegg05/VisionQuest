@@ -4,7 +4,12 @@ import { withRegistry } from "@/lib/registry/middleware";
 import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
-import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
+import {
+  goalCountsTowardPlan,
+  isAwaitingInstructorConfirmation,
+  isGoalLevel,
+  isGoalStatus,
+} from "@/lib/goals";
 import { recordBhagCompleted } from "@/lib/progression/engine";
 import { updateProgression } from "@/lib/progression/service";
 
@@ -32,6 +37,8 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
       status: true,
       parentId: true,
       sourceMessageId: true,
+      // Needed by the unconfirmed-Sage-proposal guard below (VQ-R-005).
+      confirmedAt: true,
       createdAt: true,
     },
   });
@@ -69,6 +76,28 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
     if (status !== goal.status) {
       updates.status = status;
     }
+  }
+
+  // VQ-R-005: a Sage-proposed goal is not the student's to advance until an
+  // instructor confirms it. Blocking only "confirmed" left every other
+  // transition open — including "completed" — so a student could drive an
+  // AI-generated goal to done with no human in the loop, which is the exact
+  // loop the verification layer exists to close. Dismissal stays available so a
+  // student is never stuck with a suggestion they did not want. Content edits
+  // are unaffected: refining the wording of a suggestion before an instructor
+  // reviews it is the intended flow.
+  const isUnconfirmedSageProposal = isAwaitingInstructorConfirmation(goal);
+  // "confirmed" is deliberately excluded here so the dedicated confirmation
+  // guard below owns that case and keeps its more specific message.
+  if (
+    isUnconfirmedSageProposal &&
+    updates.status &&
+    updates.status !== "abandoned" &&
+    updates.status !== "confirmed"
+  ) {
+    throw forbidden(
+      "Sage suggested this goal — ask your instructor to confirm it before updating its progress.",
+    );
   }
 
   // Handle confirmation: proposed Sage goals and student-entered active goals

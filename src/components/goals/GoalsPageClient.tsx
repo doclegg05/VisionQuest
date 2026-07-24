@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import {
   GOAL_LEVEL_META,
+  isAwaitingInstructorConfirmation,
   type GoalLevel,
   type GoalStatus,
 } from "@/lib/goals";
@@ -31,6 +32,13 @@ interface GoalRecord {
   status: GoalStatus;
   parentId: string | null;
   createdAt: string;
+  // VQ-R-005: the server already sends these (getStudentGoalPlanData uses
+  // `include`, not a narrowed `select`); they were simply undeclared here, so
+  // the UI could not tell a Sage suggestion from a goal the student wrote and
+  // rendered a live checkbox on both. Optional so older cached payloads and
+  // the /api/goals refresh shape both type-check.
+  sourceMessageId?: string | null;
+  confirmedAt?: string | null;
 }
 
 interface GoalsPageClientProps {
@@ -351,8 +359,22 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   }
 
   async function handleToggleGoalStatus(goalId: string, currentStatus: GoalStatus, event?: React.MouseEvent) {
+    // VQ-R-005: a Sage suggestion is not the student's to complete until an
+    // instructor confirms it. Guarding at this single choke point covers all
+    // five checkbox call sites (BHAG, monthly, weekly, task, orphan) — the API
+    // now rejects these transitions, and without this the student would get a
+    // raw 403 and a stray confetti burst for a tap that never had any effect.
+    const target = goals.find((item) => item.id === goalId);
+    if (target && isAwaitingInstructorConfirmation(target)) {
+      setMessage({
+        tone: "error",
+        text: "Sage suggested this goal — your instructor needs to confirm it before you can mark it done. You can dismiss it if it is not right for you.",
+      });
+      return;
+    }
+
     const nextStatus: GoalStatus = currentStatus === "completed" ? "active" : "completed";
-    
+
     if (nextStatus === "completed" && event) {
       triggerConfetti(event.clientX, event.clientY);
     }
@@ -813,11 +835,20 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                     <div key={weekly.id} className="pl-1">
                       {/* Weekly Goal Line */}
                       <div className="flex items-start gap-2.5 group">
+                        {/* VQ-R-005: badges existed only at BHAG and monthly, so
+                            a proposed weekly read as an ordinary checkbox. */}
                         <button
                           type="button"
+                          disabled={isAwaitingInstructorConfirmation(weekly)}
                           onClick={(e) => handleToggleGoalStatus(weekly.id, weekly.status, e)}
-                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center"
-                          aria-label={weekly.status === "completed" ? "Mark incomplete" : "Mark complete"}
+                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--ink-muted)]"
+                          aria-label={
+                            isAwaitingInstructorConfirmation(weekly)
+                              ? "Awaiting instructor confirmation — cannot be completed yet"
+                              : weekly.status === "completed"
+                                ? "Mark incomplete"
+                                : "Mark complete"
+                          }
                         >
                           {weekly.status === "completed" ? (
                             <CheckSquare size={18} weight="fill" className="text-[var(--accent-strong)] animate-scale-pop" />
@@ -850,6 +881,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               <span className={`text-sm font-semibold leading-relaxed break-words ${weekly.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                                 {weekly.content}
                               </span>
+                              {isAwaitingInstructorConfirmation(weekly) && (
+                                <span className="ml-2 shrink-0 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
+                                  Awaiting instructor
+                                </span>
+                              )}
                               <div className="opacity-0 group-hover/wline:opacity-100 flex gap-1.5 ml-2 shrink-0">
                                 <button
                                   onClick={() => {
@@ -882,9 +918,16 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                             <div key={task.id} className="flex items-start gap-2 group/task">
                               <button
                                 type="button"
+                                disabled={isAwaitingInstructorConfirmation(task)}
                                 onClick={(e) => handleToggleGoalStatus(task.id, task.status, e)}
-                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center"
-                                aria-label={task.status === "completed" ? "Mark incomplete" : "Mark complete"}
+                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--ink-muted)]"
+                                aria-label={
+                                  isAwaitingInstructorConfirmation(task)
+                                    ? "Awaiting instructor confirmation — cannot be completed yet"
+                                    : task.status === "completed"
+                                      ? "Mark incomplete"
+                                      : "Mark complete"
+                                }
                               >
                                 {task.status === "completed" ? (
                                   <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)] animate-scale-pop" />
