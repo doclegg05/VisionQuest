@@ -211,8 +211,25 @@
         "src/app/api/chat/send/route.ts"
       ],
       "fix": "Route scaffolding calls through a non-persisting endpoint, or tag them as system-initiated and render them as such in the transcript.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/app/api/sage/scaffold/__tests__/route.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/sage/scaffold/route.ts",
+          "mustContain": "deliberately amnesiac"
+        },
+        {
+          "kind": "config",
+          "file": "src/components/goals/GoalsPageClient.tsx",
+          "mustContain": "/api/sage/scaffold"
+        }
+      ],
+      "fixedAt": "2026-07-24",
+      "notes": "New ephemeral POST /api/sage/scaffold: streams a reply, persists no message, opens no conversation, triggers no extraction, awards no XP \u2014 but still records the AI audit event, because not persisting the turn must not mean losing the data-path trail. Takes goalId instead of prompt text so the browser cannot choose the words sent to the model, and the goal lookup is scoped by studentId. Tests use tripwire mocks on saveMessage/handlePostResponse/awardEvent so a future regression that reintroduces persistence fails loudly. Also fixed the SSE client bug the review flagged: the parser decoded each chunk standalone without stream:true and without carrying a partial line, so any data: frame split across a network boundary was silently dropped."
     },
     {
       "id": "VQ-R-008",

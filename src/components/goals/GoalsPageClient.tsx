@@ -202,26 +202,40 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     setSageResponse("");
 
     try {
-      const promptText = `I have set a monthly goal: "${goal.content}". Can you suggest 3 to 4 actionable weekly milestones or tasks I can check off to achieve this goal? Please speak in encouraging, plain language suitable for a student.`;
-      const res = await apiFetch("/api/chat/send", {
+      // VQ-R-007: /api/sage/scaffold is ephemeral — it streams a reply and
+      // persists nothing. This used to POST a canned first-person message to
+      // /api/chat/send, which saved it as something the student had said,
+      // persisted the reply, ran goal extraction on the synthetic exchange,
+      // spent the student's LLM budget and awarded chat XP. Sending only the
+      // goal id also means the prompt is built server-side.
+      const res = await apiFetch("/api/sage/scaffold", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: promptText }),
+        body: JSON.stringify({ goalId: goal.id }),
       });
 
       if (!res.ok) throw new Error("Could not contact Sage");
 
       const reader = res.body?.getReader();
+      // `stream: true` and the `buffer` carry-over matter: a data: frame can be
+      // split across two network chunks, and the previous parser decoded each
+      // chunk standalone and split on newlines, so any frame straddling a
+      // boundary was silently dropped mid-sentence.
       const decoder = new TextDecoder();
+      let buffer = "";
       let accumulated = "";
 
       if (reader) {
-        while (true) {
+        for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          for (const line of chunk.split("\n")) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          // Keep the last element: it may be a partial line.
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             try {
               const data = JSON.parse(line.slice(6));
