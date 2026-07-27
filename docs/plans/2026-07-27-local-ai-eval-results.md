@@ -74,7 +74,10 @@ compat fallback. Full suite 2,132/2,132 after the provider-test rewrite.
 | Cold load | **11.2s** | ✓ (≤60s) |
 | Decode | **34.5 tok/s** | ✓ (≥12–15) |
 | S1 quality screen | **7/8 replies, FK avg 4.7, 0 over grade-8** — noticeably richer than the 8B (picks up scenario details like the transportation barrier), still comfortably plain-language | ✓ |
-| S2 agent / S3 harness / S4 redteam | **NOT YET RUN** — the session ended mid-battery (8B finished, candidate had not started) | — |
+| **S2 agent eval** | **82.2% tool selection (37/45)** — 0 injection-canary failures | ✗ **misses the ≥85% gate by 1.3 pts** (2 more hits = 86.7%) |
+| S3 chat harness | 11/14 — **tool 4/4, guardrail 7/7 (perfect on both valid families)**; grounding 0/3 INVALID (DB) | ✓ on valid families |
+| **S4 redteam** | **PASS — no hard boundary violations**, 4 soft warnings (8B had 8). crisis 7/7, tool_injection 3/3, data_exfiltration 5/5 | ✓ (hard gate) |
+| Latency (in-harness, whole response incl. tool loops) | **p50 20.1s, p95 84.2s** | ✗ vs the ≤5s first-token target — needs a first-token-specific measurement |
 
 ### Baseline — `gemma4:latest` (8B incumbent control)
 
@@ -84,7 +87,7 @@ compat fallback. Full suite 2,132/2,132 after the provider-test rewrite.
 | S1 quality screen | 7/8 replies, FK avg 3.2, 0 over grade-8 — serviceable but flatter, misses scenario specifics |
 | **S2 agent eval** | **66.7% tool selection (30/45) — FAILS the ≥85% gate.** 0 injection-canary failures. 15 misses incl. save_job/prepare_for_interview/propose_resume_edit → "no tool", and submit_form → classify_attachment confusion |
 | S3 chat harness | 9/14 — tool 3/4, guardrail 6/7, **grounding 0/3 INVALID (see DB caveat)**. Latency p50 **16.9s**, p95 28.2s — well past the ≤5s first-token target |
-| S4 redteam | started, did not finish before session end |
+| S4 redteam | PASS — no hard violations, but **8 soft warnings**; benefits_advice 0/3 clean, data_exfiltration 4/5, off_topic 0/1 |
 
 **The 8B baseline empirically fails the agent lane** (66.7% vs an 85% gate) and
 is far too slow (p50 16.9s). That is the owner's "too weak / too slow"
@@ -109,6 +112,38 @@ differentiator.
 
 Hardware placement/posture (never-sleep, FileVault-vs-unattended-boot, UPS, ethernet); model sign-off; degraded-mode option A/B/C; latency acceptance; Gemini judge in CI; Spanish product bar; LoRA (deferred).
 
+## Verdict after S0–S4 (both models, 2026-07-27)
+
+The candidate beats the incumbent on every axis that was validly measured —
+tool selection 82.2% vs 66.7%, a clean sweep of the valid harness families
+(tool 4/4, guardrail 7/7 vs 3/4 and 6/7), and half the redteam soft warnings
+(4 vs 8, fixing benefits_advice and data_exfiltration outright). Both models
+pass the S4 hard gate with zero boundary violations and 7/7 crisis handling.
+
+**But it does not yet clear S2 (82.2% vs an 85% gate), and it is slow.**
+Neither is a reason to reject it; both are specific, addressable findings:
+
+1. **Six of the eight S2 misses are two confusable tool pairs, not model
+   weakness.** `classify_attachment` swallows `submit_form` ×2,
+   `add_portfolio_item`, and `file_document`; `lookup_saved_jobs` swallows
+   `save_job` ×2. That is a tool-description attractor problem — the same
+   class of bug the repo already fixed once by de-certifying the
+   `search_forms` query example (PR #118). Disambiguating those two pairs
+   plausibly moves 82.2% → ≥86.7% without touching the model. **Do this
+   before ordering a different model.**
+2. **Latency needs an honest re-measure.** p50 20.1s / p95 84.2s is
+   whole-response wall time including multi-hop tool loops, NOT the ≤5s
+   first-token metric the gate actually names — and raw decode on this
+   machine was 34.5 tok/s with an 11.2s cold load. Measure first-token
+   directly (and with a warm model) before treating this as disqualifying.
+
+**Recommendation to carry forward:** keep `gemma4:26b-a4b-it-qat` as the
+leading candidate, fix the tool-description attractors, re-run S2, and
+re-measure first-token latency. Only if S2 still misses after
+disambiguation should the fallback ladder (`qwen3:30b-a3b`, then
+`gpt-oss:20b`) be pulled. The owner's model sign-off should wait for that
+second S2 run.
+
 ## Resume here (next session)
 
 Prereqs: `ollama serve` running (models already pulled: `gemma4:26b-a4b-it-qat`,
@@ -117,22 +152,28 @@ for grounding/memory stages.
 
 ```bash
 export OLLAMA_URL=http://localhost:11434
-export OLLAMA_MODEL=gemma4:26b-a4b-it-qat     # the candidate — run these FIRST
+export OLLAMA_MODEL=gemma4:26b-a4b-it-qat
 
-npm run sage:agent:eval   -- --provider=ollama                                    # S2 — gate ≥85%, 0 forbidden
-npm run sage:chat:harness -- --provider=ollama --families=tool,guardrail,grounding --strict --temperature=0   # S3
-npm run sage:redteam:eval -- --provider=ollama                                    # S4 — 0 hard failures
+# 1. AFTER disambiguating the classify_attachment / lookup_saved_jobs tool
+#    descriptions (see Verdict above), re-run the gate that failed:
+npm run sage:agent:eval   -- --provider=ollama                                    # S2 — gate ≥85%
+
+# 2. Stages that never ran or were environment-invalid (need a local Postgres):
+npm run sage:chat:harness -- --provider=ollama --families=grounding --strict --temperature=0   # S3 grounding only
 npm run sage:memory:eval                                                          # S5 — needs DATABASE_URL
+
+# 3. Not yet attempted at all:
+#    S6 document UAT — 3-5 synthetic resumes through /api/resume/upload
+#    S7 — Gemini-judged quality delta (CI; Gemini credits are restored as of 15:33)
 ```
 
-The decisive question: **does the candidate clear ≥85% tool selection where
-the 8B managed 66.7%?** If it does, it also has to clear S4 with zero hard
-failures. If it clears both, the model recommendation is settled and the work
-moves to migration (M0–M5: launchd daemons, tunnel, Render env, cutover).
-If it fails S2, fall back to `qwen3:30b-a3b` (best open tool/JSON in class)
-then `gpt-oss:20b`, same battery.
+Already done and NOT worth re-running unless something changes: S0 capability
+probe, S1 quality screen, S2/S3/S4 on the 8B baseline, S4 on the candidate.
 
-Also unresolved: p50 latency was measured on the 8B at 16.9s inside the
-harness (vs 34.5 tok/s raw on the candidate) — measure the candidate's
-harness-level first-token latency explicitly against the ≤5s target before
-recommending it for interactive chat.
+The decisive question is now narrower: **does tool-description
+disambiguation carry the candidate from 82.2% to ≥85%?** It already passes
+the S4 hard gate and sweeps the valid S3 families. If disambiguation works,
+the model recommendation is settled and work moves to migration (M0–M5:
+launchd daemons, tunnel, Render env, cutover). If it does not, pull the
+fallback ladder — `qwen3:30b-a3b`, then `gpt-oss:20b` — and run the same
+battery.
