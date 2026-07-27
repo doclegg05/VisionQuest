@@ -73,6 +73,27 @@ export async function rateLimit(
 }
 
 /**
+ * Read-only view of a rate-limit key: reports whether one more unit would be
+ * allowed WITHOUT consuming anything. Used by two-leg flows (propose →
+ * confirm) where the unit is consumed only when the confirmed action actually
+ * runs (VQ-R-012).
+ */
+export async function peekRateLimit(key: string, limit: number): Promise<RateLimitResult> {
+  const now = new Date();
+  const existing = await prisma.rateLimitEntry.findUnique({ where: { key } });
+
+  if (!existing || existing.resetTime <= now) {
+    return { success: true, remaining: limit, resetTime: existing?.resetTime.getTime() ?? 0 };
+  }
+
+  return {
+    success: existing.count < limit,
+    remaining: Math.max(limit - existing.count, 0),
+    resetTime: existing.resetTime.getTime(),
+  };
+}
+
+/**
  * Daily rate limit with calendar-day window (resets at midnight UTC).
  * Returns the same RateLimitResult shape as rateLimit().
  */

@@ -16,7 +16,7 @@
 // this caps *tool invocations* per tool. Both must pass.
 // =============================================================================
 
-import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
+import { peekRateLimit, rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import type { RiskTier } from "./types";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -84,6 +84,30 @@ export async function checkToolRateLimit(
     window === "day"
       ? await rateLimitDaily(key, limit)
       : await rateLimit(key, limit, HOUR_MS);
+
+  return {
+    allowed: result.success,
+    remaining: result.remaining,
+    resetTime: result.resetTime,
+    limit,
+    window,
+  };
+}
+
+/**
+ * Read-only variant of checkToolRateLimit: reports whether one more call
+ * would be allowed WITHOUT consuming a unit. The executor uses this on the
+ * PROPOSAL leg of consequential tools; the single unit is consumed only after
+ * the confirmed action executes (VQ-R-012).
+ */
+export async function peekToolRateLimit(
+  studentId: string,
+  toolName: string,
+  tier: RiskTier,
+): Promise<ToolRateLimitDecision> {
+  const { window, limit } = limitForTier(tier);
+  const key = keyFor(studentId, toolName, window);
+  const result = await peekRateLimit(key, limit);
 
   return {
     allowed: result.success,

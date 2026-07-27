@@ -323,8 +323,24 @@
         "src/lib/sage/agent/rate-limit.ts"
       ],
       "fix": "Do not consume a mutate-tier unit for the proposal leg (or refund it); check-without-consume at confirm time so an approved card never fails on quota alone.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/sage/agent/executor-confirm-rate-limit.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/lib/sage/agent/rate-limit.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/agent/executor.ts",
+          "mustContain": "peekToolRateLimit"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Interpretation recorded (the prescription's two clauses conflict if read literally — no leg would ever consume): the PROPOSAL leg peeks (new peekRateLimit store read + peekToolRateLimit wrapper, no consumption) and may block; the CONFIRMED leg never blocks on quota — an approved HMAC card always runs — and consumes exactly one unit after the tool executes successfully (not on tool error). Net effect: one action = one unit, and the block can only ever land before the student is asked to confirm. Read/reversible tiers keep the original single-leg consume. Five existing test mocks of ./rate-limit gained the new export."
     },
     {
       "id": "VQ-R-013",

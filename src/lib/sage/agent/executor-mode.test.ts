@@ -13,6 +13,7 @@ import type { Session } from "@/lib/api-error";
 
 mock.module("./rate-limit", {
   namedExports: {
+    peekToolRateLimit: async () => ({ allowed: true, remaining: 99, resetTime: 1_000, limit: 100, window: "day" }),
     checkToolRateLimit: async () => ({
       allowed: true,
       remaining: 1,
