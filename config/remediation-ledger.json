@@ -64,7 +64,7 @@
         },
         {
           "kind": "doc",
-          "file": "CLAUDE.md",
+          "file": ".claude/MEMORY.md",
           "mustContain": "DOCUMENT_LOCAL_ONLY_TASKS"
         },
         {
@@ -100,7 +100,7 @@
         },
         {
           "kind": "doc",
-          "file": "CLAUDE.md",
+          "file": ".claude/MEMORY.md",
           "mustContain": "DOCUMENT_LOCAL_ONLY_TASKS"
         },
         {
@@ -264,7 +264,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "New pure src/lib/goal-tree.ts (buildGoalTree forest + buildGoalsPageModel + flattenGoalRows + isValidGoalParentLevel). Ownership cuts at monthly/bhag boundaries; missing parents and cycles degrade to visible orphan rows. Totality pinned by hand-built pathologies (depth-4 task, direct monthly task, weekly-under-bhag, dangling parent, 2-cycle) AND a 40-iteration seeded hostile random-forest sweep asserting every goal renders exactly once. Renderer swaps its seven filter passes for the model: monthly cards render+count identical row sets (the always-empty mDirectTasks bug and depth-3 drops are gone), weekly sub-rows include all depths, and the orphan card renders every orphan with indentation instead of filtering to weekly-or-parentless. POST /api/goals now rejects mis-leveled nesting (lattice: bhag→monthly→weekly→daily→task, tasks/dailies also directly under monthly); PATCH does not accept parentId/level changes so no guard was needed there."
+      "notes": "New pure src/lib/goal-tree.ts (buildGoalTree forest + buildGoalsPageModel + flattenGoalRows + isValidGoalParentLevel). Ownership cuts at monthly/bhag boundaries; missing parents and cycles degrade to visible orphan rows. Totality pinned by hand-built pathologies (depth-4 task, direct monthly task, weekly-under-bhag, dangling parent, 2-cycle) AND a 40-iteration seeded hostile random-forest sweep asserting every goal renders exactly once. Renderer swaps its seven filter passes for the model: monthly cards render+count identical row sets (the always-empty mDirectTasks bug and depth-3 drops are gone), weekly sub-rows include all depths, and the orphan card renders every orphan with indentation instead of filtering to weekly-or-parentless. POST /api/goals now rejects mis-leveled nesting (lattice: bhag\u2192monthly\u2192weekly\u2192daily\u2192task, tasks/dailies also directly under monthly); PATCH does not accept parentId/level changes so no guard was needed there."
     },
     {
       "id": "VQ-R-009",
@@ -295,7 +295,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "lookup_cert_progress now calls new read-only getStudentCertProgress: no create, no cert_started XP, no status recompute — this also stops the nightly headless briefing (which allowlists the tool) from silently starting certifications across students. Never-started students get a not_started view keyed by TEMPLATE ids; markRequirementComplete (the explicit start action, consequential tier, confirmation-carded) accepts a template id, runs ensureStudentCertification, and resolves the freshly created requirement — so the model's lookup-then-mark flow is unchanged and no tool schema changed. Tripwire tests assert the read performs zero writes; bridge tests cover start-on-mark and nonsense-id rejection."
+      "notes": "lookup_cert_progress now calls new read-only getStudentCertProgress: no create, no cert_started XP, no status recompute \u2014 this also stops the nightly headless briefing (which allowlists the tool) from silently starting certifications across students. Never-started students get a not_started view keyed by TEMPLATE ids; markRequirementComplete (the explicit start action, consequential tier, confirmation-carded) accepts a template id, runs ensureStudentCertification, and resolves the freshly created requirement \u2014 so the model's lookup-then-mark flow is unchanged and no tool schema changed. Tripwire tests assert the read performs zero writes; bridge tests cover start-on-mark and nonsense-id rejection."
     },
     {
       "id": "VQ-R-010",
@@ -350,7 +350,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "New src/lib/goal-status.ts: applyGoalStatusEffects (cache invalidation + ensureGoalLevelProgression for plan-counting statuses + BHAG-completion XP) shared by PATCH /api/goals/[id] and the update_goal_status tool, which now calls transitionGoalStatus instead of a bare prisma.goal.update. Write-tool drift audit: save_job also writes outside its HTTP route's effect set — deliberately deferred to VQ-R-017, which replaces the StudentSavedJob pipeline entirely (cross-referenced there); the other write tools (submit_form via applyStudentOrientationCompletion, mark_certification_complete via cert-actions, book_appointment, update_application_status) already share their route-side helpers."
+      "notes": "New src/lib/goal-status.ts: applyGoalStatusEffects (cache invalidation + ensureGoalLevelProgression for plan-counting statuses + BHAG-completion XP) shared by PATCH /api/goals/[id] and the update_goal_status tool, which now calls transitionGoalStatus instead of a bare prisma.goal.update. Write-tool drift audit: save_job also writes outside its HTTP route's effect set \u2014 deliberately deferred to VQ-R-017, which replaces the StudentSavedJob pipeline entirely (cross-referenced there); the other write tools (submit_form via applyStudentOrientationCompletion, mark_certification_complete via cert-actions, book_appointment, update_application_status) already share their route-side helpers."
     },
     {
       "id": "VQ-R-012",
@@ -379,7 +379,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Interpretation recorded (the prescription's two clauses conflict if read literally — no leg would ever consume): the PROPOSAL leg peeks (new peekRateLimit store read + peekToolRateLimit wrapper, no consumption) and may block; the CONFIRMED leg never blocks on quota — an approved HMAC card always runs — and consumes exactly one unit after the tool executes successfully (not on tool error). Net effect: one action = one unit, and the block can only ever land before the student is asked to confirm. Read/reversible tiers keep the original single-leg consume. Five existing test mocks of ./rate-limit gained the new export."
+      "notes": "Interpretation recorded (the prescription's two clauses conflict if read literally \u2014 no leg would ever consume): the PROPOSAL leg peeks (new peekRateLimit store read + peekToolRateLimit wrapper, no consumption) and may block; the CONFIRMED leg never blocks on quota \u2014 an approved HMAC card always runs \u2014 and consumes exactly one unit after the tool executes successfully (not on tool error). Net effect: one action = one unit, and the block can only ever land before the student is asked to confirm. Read/reversible tiers keep the original single-leg consume. Five existing test mocks of ./rate-limit gained the new export."
     },
     {
       "id": "VQ-R-013",
@@ -410,7 +410,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "recordStudentView now fires inside assertStaffCanManageStudent itself — the gate all ~46 teacher-facing call sites already pass — with default surface \"student_data\", caller override (student-detail route passes \"student_detail\" and dropped its now-duplicate direct call), and an explicit null opt-out for flows audited more precisely elsewhere. Denied access never audits; auditing is fire-and-forget and can never block access. Mutations passing the gate also log a sampled view — accepted noise, bounded by the existing 1/(actor,student,surface)/day sampling. Unused surface values \"conversations\"/\"export\" deleted; \"student_data\" added."
+      "notes": "recordStudentView now fires inside assertStaffCanManageStudent itself \u2014 the gate all ~46 teacher-facing call sites already pass \u2014 with default surface \"student_data\", caller override (student-detail route passes \"student_detail\" and dropped its now-duplicate direct call), and an explicit null opt-out for flows audited more precisely elsewhere. Denied access never audits; auditing is fire-and-forget and can never block access. Mutations passing the gate also log a sampled view \u2014 accepted noise, bounded by the existing 1/(actor,student,surface)/day sampling. Unused surface values \"conversations\"/\"export\" deleted; \"student_data\" added."
     },
     {
       "id": "VQ-R-014",
@@ -441,7 +441,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "csvEscape deleted from forms/export.ts; new csvCell wrapper in src/lib/csv.ts coerces unknown cells (null → empty, arrays → semicolon-joined) then applies the formula-safe escapeCsvValue, so all four export paths share one escaper. Forms export rows and the coordinator monthly report both route through it. Fixture pins = + - @ neutralization including a formula hidden behind quote-triggering characters."
+      "notes": "csvEscape deleted from forms/export.ts; new csvCell wrapper in src/lib/csv.ts coerces unknown cells (null \u2192 empty, arrays \u2192 semicolon-joined) then applies the formula-safe escapeCsvValue, so all four export paths share one escaper. Forms export rows and the coordinator monthly report both route through it. Fixture pins = + - @ neutralization including a formula hidden behind quote-triggering characters."
     },
     {
       "id": "VQ-R-015",
@@ -475,7 +475,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "The hardcoded elite-tech board lists (DEFAULT_GREENHOUSE/DEFAULT_LEVER/DEFAULT_ASHBY: airbnb, anthropic, stripe, openai, ...) are gone. Boards are opt-in via comma-separated GREENHOUSE_BOARDS / LEVER_BOARDS / ASHBY_BOARDS env vars (documented in .env.example), read at call time; with none set the adapters report isConfigured()=false, which removes them from the default browse pool and from class scrapes through the existing isConfigured() plumbing — BROWSE_SOURCES still names the sources so an explicit opt-in flows with zero further changes. Seniority heuristic added to job-quality's rejectionReason (reason: 'senior-level title'): word-boundary, case-insensitive tokens senior/staff/principal/lead/director/vp/head of/architect, so it guards every source (class scrapes and browse refresh both run filterQualityJobs). Interpretation calls: (1) 'lead' matches 'Team Lead' but never 'Leader'/'Leadership' (word boundary); (2) elder-care titles ('Senior Care Assistant', 'Senior Living Caregiver') are carved out by neutralizing only the 'senior <care-context>' phrase — 'Senior Living Community Director' still rejects; (3) 'staff' follows the prescribed token list even though it also catches 'Staff Accountant'-style titles — acceptable for this audience; (4) DEFAULT_SMARTRECRUITERS (Visa/Bosch/McDonalds/LVMH) left as-is: mass employers, not the elite-tech finding, and the new seniority filter now screens their senior roles too."
+      "notes": "The hardcoded elite-tech board lists (DEFAULT_GREENHOUSE/DEFAULT_LEVER/DEFAULT_ASHBY: airbnb, anthropic, stripe, openai, ...) are gone. Boards are opt-in via comma-separated GREENHOUSE_BOARDS / LEVER_BOARDS / ASHBY_BOARDS env vars (documented in .env.example), read at call time; with none set the adapters report isConfigured()=false, which removes them from the default browse pool and from class scrapes through the existing isConfigured() plumbing \u2014 BROWSE_SOURCES still names the sources so an explicit opt-in flows with zero further changes. Seniority heuristic added to job-quality's rejectionReason (reason: 'senior-level title'): word-boundary, case-insensitive tokens senior/staff/principal/lead/director/vp/head of/architect, so it guards every source (class scrapes and browse refresh both run filterQualityJobs). Interpretation calls: (1) 'lead' matches 'Team Lead' but never 'Leader'/'Leadership' (word boundary); (2) elder-care titles ('Senior Care Assistant', 'Senior Living Caregiver') are carved out by neutralizing only the 'senior <care-context>' phrase \u2014 'Senior Living Community Director' still rejects; (3) 'staff' follows the prescribed token list even though it also catches 'Staff Accountant'-style titles \u2014 acceptable for this audience; (4) DEFAULT_SMARTRECRUITERS (Visa/Bosch/McDonalds/LVMH) left as-is: mass employers, not the elite-tech finding, and the new seniority filter now screens their senior roles too."
     },
     {
       "id": "VQ-R-016",
@@ -515,7 +515,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Save path: POST /api/jobs/save now requires enrollment ONLY to validate a class-scoped jobListingId (that check is unchanged); a browse save (browseListingId, added in VQ-R-017) succeeds for any student including the unenrolled and creates an Application through trackJobInterest — route tests pin the unenrolled browse save, the enrolled-only class save, and the cross-class rejection. UI: new shared src/components/jobs/save-job-client.ts postJobSave sends the id field matching the row's listingKind (GET /api/jobs emits it; JobCard threads it through the onSave contract as a third arg) and returns { ok, error } with the server's message or a plain-language fallback; CareerHub and JobBoardWidget set an inline role=\"alert\" error (red text, cleared on the next attempt) instead of ignoring !res.ok — matching the existing PortfolioGrid inline-alert idiom, no new deps. Component-level note: the house style tests components render-only (renderToString), so the error branch is pinned at the extracted fetch handler (save-job-client.test.ts: server-message passthrough, unusable-body fallback, thrown-fetch connection message, kind-to-id-field mapping) exactly as the plan prescribed. JobCard itself has no fetch path — its Save/Update buttons call the parent handler, so the two handlers cover every save surface; JobBoardWidget is currently unmounted (no importers) but was fixed as named in the finding."
+      "notes": "Save path: POST /api/jobs/save now requires enrollment ONLY to validate a class-scoped jobListingId (that check is unchanged); a browse save (browseListingId, added in VQ-R-017) succeeds for any student including the unenrolled and creates an Application through trackJobInterest \u2014 route tests pin the unenrolled browse save, the enrolled-only class save, and the cross-class rejection. UI: new shared src/components/jobs/save-job-client.ts postJobSave sends the id field matching the row's listingKind (GET /api/jobs emits it; JobCard threads it through the onSave contract as a third arg) and returns { ok, error } with the server's message or a plain-language fallback; CareerHub and JobBoardWidget set an inline role=\"alert\" error (red text, cleared on the next attempt) instead of ignoring !res.ok \u2014 matching the existing PortfolioGrid inline-alert idiom, no new deps. Component-level note: the house style tests components render-only (renderToString), so the error branch is pinned at the extracted fetch handler (save-job-client.test.ts: server-message passthrough, unusable-body fallback, thrown-fetch connection message, kind-to-id-field mapping) exactly as the plan prescribed. JobCard itself has no fetch path \u2014 its Save/Update buttons call the parent handler, so the two handlers cover every save surface; JobBoardWidget is currently unmounted (no importers) but was fixed as named in the finding."
     },
     {
       "id": "VQ-R-017",
@@ -565,7 +565,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Unified per the locked tracker decision. New src/lib/job-applications.ts trackJobInterest is the single student write path: resolves the source (class JobListing or browse JobBrowseListing), find-or-creates an Opportunity deduped by url (oldest wins; no unique on url so a concurrency duplicate is inert), upserts the Application on (studentId, opportunityId), stamps appliedAt once on first applied-family status, and records student-driven changes self_reported with instructor sign-off cleared (P1-4); a bare re-save with neither status nor notes is a no-op touch that preserves verification. Writers swapped: POST /api/jobs/save (also gains browseListingId, exactly-one-of schema) and the save_job / update_application_status agent tools; save_job passes no status so re-saving an applied job cannot downgrade it. Readers swapped: GET /api/jobs marks saved state on class AND browse rows by opportunity-url match (rows also gain listingKind for the client), interaction-profile signals now come from url-matched Applications, totalSaved counts Applications; student-next-step counts saved-status Applications for savedJobCount (applicationCount already counted all); lookup_saved_jobs lists Applications+Opportunity and attaches class-board jobListingIds by url (browse saves listed without ids, unenrolled students no longer refused). Vocabulary decision: Application rows store the Application-model vocabulary — job-board 'offered' is normalized to 'offer' on write and mapped back on read (applicationStatusForJobBoard) — so reporting.ts (in: applied/interviewing/offer), teacher export, students/[id], and outcomes-verify consume unified rows natively with NO reader changes; verified outcomes-verify reads Application by id with no status filter. Migration scripts/migrate-saved-jobs-to-applications.mjs: dry-run by default, --apply to write; richest status wins (existing Application beats saved-job on ties), oldest appliedAt kept, existing notes preferred, StudentSavedJob rows never deleted, idempotent; must be run once at deploy before students with legacy-only saves see their apply-step progress. Superseded test: jobs-save.test.ts pinned the retired StudentSavedJob route internals and was replaced by strictly broader coverage (save/route.test.ts 7 cases + job-applications.test.ts 11 cases — appliedAt-once and class-scope pins carried over). Residual legacy reads left deliberately (non-pipeline, outside plan scope): JobListing._count.savedByStudents dedupe tie-break in scrape-engine and the teacher jobs-results savedCount analytics still count legacy StudentSavedJob rows; campaign-orchestrator's SavedJobPipelineEntry is an un-wired pure-input type with no callers."
+      "notes": "Unified per the locked tracker decision. New src/lib/job-applications.ts trackJobInterest is the single student write path: resolves the source (class JobListing or browse JobBrowseListing), find-or-creates an Opportunity deduped by url (oldest wins; no unique on url so a concurrency duplicate is inert), upserts the Application on (studentId, opportunityId), stamps appliedAt once on first applied-family status, and records student-driven changes self_reported with instructor sign-off cleared (P1-4); a bare re-save with neither status nor notes is a no-op touch that preserves verification. Writers swapped: POST /api/jobs/save (also gains browseListingId, exactly-one-of schema) and the save_job / update_application_status agent tools; save_job passes no status so re-saving an applied job cannot downgrade it. Readers swapped: GET /api/jobs marks saved state on class AND browse rows by opportunity-url match (rows also gain listingKind for the client), interaction-profile signals now come from url-matched Applications, totalSaved counts Applications; student-next-step counts saved-status Applications for savedJobCount (applicationCount already counted all); lookup_saved_jobs lists Applications+Opportunity and attaches class-board jobListingIds by url (browse saves listed without ids, unenrolled students no longer refused). Vocabulary decision: Application rows store the Application-model vocabulary \u2014 job-board 'offered' is normalized to 'offer' on write and mapped back on read (applicationStatusForJobBoard) \u2014 so reporting.ts (in: applied/interviewing/offer), teacher export, students/[id], and outcomes-verify consume unified rows natively with NO reader changes; verified outcomes-verify reads Application by id with no status filter. Migration scripts/migrate-saved-jobs-to-applications.mjs: dry-run by default, --apply to write; richest status wins (existing Application beats saved-job on ties), oldest appliedAt kept, existing notes preferred, StudentSavedJob rows never deleted, idempotent; must be run once at deploy before students with legacy-only saves see their apply-step progress. Superseded test: jobs-save.test.ts pinned the retired StudentSavedJob route internals and was replaced by strictly broader coverage (save/route.test.ts 7 cases + job-applications.test.ts 11 cases \u2014 appliedAt-once and class-scope pins carried over). Residual legacy reads left deliberately (non-pipeline, outside plan scope): JobListing._count.savedByStudents dedupe tie-break in scrape-engine and the teacher jobs-results savedCount analytics still count legacy StudentSavedJob rows; campaign-orchestrator's SavedJobPipelineEntry is an un-wired pure-input type with no callers."
     },
     {
       "id": "VQ-R-018",
@@ -595,7 +595,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Migration 20260727120000_job_listing_source_id_per_class drops the global JobListing_sourceId_key and creates the compound unique — strictly weaker, so existing rows all satisfy it (no data change, safe deploy). Upsert extracted into exported upsertScrapedJob keyed on classConfigId_sourceId; scrape-engine gains its first test file, pinning that two classes scraping the same sourceId address distinct rows and that the update payload can never rewrite an existing row's owning class."
+      "notes": "Migration 20260727120000_job_listing_source_id_per_class drops the global JobListing_sourceId_key and creates the compound unique \u2014 strictly weaker, so existing rows all satisfy it (no data change, safe deploy). Upsert extracted into exported upsertScrapedJob keyed on classConfigId_sourceId; scrape-engine gains its first test file, pinning that two classes scraping the same sourceId address distinct rows and that the update payload can never rewrite an existing row's owning class."
     },
     {
       "id": "VQ-R-019",
@@ -664,7 +664,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "warnDegradedDelivery logs {storageKey, tier, matched} via the shared logger on every bundled / content-dir / fuzzy serve and adds a Sentry breadcrumb (Sentry imported lazily so the standalone asset-staging script's import of this module never pulls it in). The pass-2 fuzzy substring match is gated behind allowFuzzy (defaults to IS_DEV) — production returns null instead of risking the wrong document. findInContentDir gained baseDir/allowFuzzy options and an export for temp-dir fixture tests, which pin the normalized-collision case (spaces-vs-hyphens filename) both ways."
+      "notes": "warnDegradedDelivery logs {storageKey, tier, matched} via the shared logger on every bundled / content-dir / fuzzy serve and adds a Sentry breadcrumb (Sentry imported lazily so the standalone asset-staging script's import of this module never pulls it in). The pass-2 fuzzy substring match is gated behind allowFuzzy (defaults to IS_DEV) \u2014 production returns null instead of risking the wrong document. findInContentDir gained baseDir/allowFuzzy options and an export for temp-dir fixture tests, which pin the normalized-collision case (spaces-vs-hyphens filename) both ways."
     },
     {
       "id": "VQ-R-021",
@@ -719,7 +719,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Measured today with node:test's built-in coverage through the existing tsx runner (no new dependency): 81.5% lines / 82.8% branches / 83.8% functions. test:coverage wraps the same glob with --experimental-test-coverage and a --test-coverage-lines=80 floor — just under the measured number so ordinary churn doesn't flake, but coverage can never silently sink below where it stood when first measured. CI's test step now runs the coverage variant, so one full-suite run gates failures and the ratchet together and prints the per-file table in the log."
+      "notes": "Measured today with node:test's built-in coverage through the existing tsx runner (no new dependency): 81.5% lines / 82.8% branches / 83.8% functions. test:coverage wraps the same glob with --experimental-test-coverage and a --test-coverage-lines=80 floor \u2014 just under the measured number so ordinary churn doesn't flake, but coverage can never silently sink below where it stood when first measured. CI's test step now runs the coverage variant, so one full-suite run gates failures and the ratchet together and prints the per-file table in the log."
     },
     {
       "id": "VQ-R-023",
@@ -746,7 +746,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "e2e + a11y steps added to the verify job AFTER build/smoke, reusing the already-migrated hermetic Postgres service: seed (db:seed against the service), npx playwright install chromium --with-deps, then npm run test:e2e with the service DATABASE_URL, a CI JWT secret, and BASE_URL/PORT 3100 (Playwright's webServer boots the app itself; reuseExistingServer is already CI-aware). The orientation spec resolves DATABASE_URL from the environment first with .env.local as the local fallback — it previously threw anywhere without that file, which is why the deepest spec could never run in CI. Deliberately continue-on-error until proven stable: PROMOTION RULE recorded here — remove continue-on-error after two consecutive green runs on main."
+      "notes": "e2e + a11y steps added to the verify job AFTER build/smoke, reusing the already-migrated hermetic Postgres service: seed (db:seed against the service), npx playwright install chromium --with-deps, then npm run test:e2e with the service DATABASE_URL, a CI JWT secret, and BASE_URL/PORT 3100 (Playwright's webServer boots the app itself; reuseExistingServer is already CI-aware). The orientation spec resolves DATABASE_URL from the environment first with .env.local as the local fallback \u2014 it previously threw anywhere without that file, which is why the deepest spec could never run in CI. Deliberately continue-on-error until proven stable: PROMOTION RULE recorded here \u2014 remove continue-on-error after two consecutive green runs on main."
     },
     {
       "id": "VQ-R-024",
@@ -777,7 +777,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Client init moved verbatim (same DSN gate, sample rates, scrubPii) from the never-bundled root sentry.client.config.ts into src/instrumentation-client.ts — the only location Turbopack builds load — plus the onRouterTransitionStart export; instrumentation.ts exports onRequestError = Sentry.captureRequestError for RSC request errors; the dead root file is deleted and a static test pins all three so a rename can't silently kill client tracking again. OWNER ACTION post-deploy: trigger one browser error and confirm it arrives in Sentry (recorded here, not a deferral)."
+      "notes": "Client init moved verbatim (same DSN gate, sample rates, scrubPii) from the never-bundled root sentry.client.config.ts into src/instrumentation-client.ts \u2014 the only location Turbopack builds load \u2014 plus the onRouterTransitionStart export; instrumentation.ts exports onRequestError = Sentry.captureRequestError for RSC request errors; the dead root file is deleted and a static test pins all three so a rename can't silently kill client tracking again. OWNER ACTION post-deploy: trigger one browser error and confirm it arrives in Sentry (recorded here, not a deferral)."
     },
     {
       "id": "VQ-R-025",
@@ -803,7 +803,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Scheduled (not descoped — the browse pool UI is live). Migration clones the guarded pg_cron+pg_net pattern from add_sage_briefing_cron: cron.schedule upsert by jobname, vault CRON_SECRET, graceful degradation without extensions or privileges. Slot 09:30 UTC (5:30 AM ET), offset from the 06:xx sage jobs, 11:00 briefing, and 13:00 daily-coaching. Script header rewritten to reference the real job. OWNER ACTION at deploy: confirm prod Supabase has app.base_url set and vault CRON_SECRET, and that 09:30 UTC suits the program day."
+      "notes": "Scheduled (not descoped \u2014 the browse pool UI is live). Migration clones the guarded pg_cron+pg_net pattern from add_sage_briefing_cron: cron.schedule upsert by jobname, vault CRON_SECRET, graceful degradation without extensions or privileges. Slot 09:30 UTC (5:30 AM ET), offset from the 06:xx sage jobs, 11:00 briefing, and 13:00 daily-coaching. Script header rewritten to reference the real job. OWNER ACTION at deploy: confirm prod Supabase has app.base_url set and vault CRON_SECRET, and that 09:30 UTC suits the program day."
     },
     {
       "id": "VQ-R-026",
@@ -833,7 +833,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "Implementation nuance within the locked decision: descriptions/roles/audit levels can't be derived statically, so the GENERATED artifact is the route inventory (config/endpoint-inventory.generated.json — 185 routes, 13 wired, shared walker in scripts/lib/endpoint-inventory.mjs, deterministic output) and the parity test enforces correspondence three ways: committed inventory === live tree (drift fails CI with the regenerate command), every wired withRegistry id exists in the registry, and every enabled registry endpoint points at a real route+method. That last check caught and fixed 45 stale Express-style ':id' paths on first run — after normalization all 189 hand-authored entries correspond to real routes. Never-read rateLimit/tokenBudget fields deleted from types + all entries; dead getAiTools helper deleted. The test runs inside npm test, so it gates CI with no new workflow step."
+      "notes": "Implementation nuance within the locked decision: descriptions/roles/audit levels can't be derived statically, so the GENERATED artifact is the route inventory (config/endpoint-inventory.generated.json \u2014 185 routes, 13 wired, shared walker in scripts/lib/endpoint-inventory.mjs, deterministic output) and the parity test enforces correspondence three ways: committed inventory === live tree (drift fails CI with the regenerate command), every wired withRegistry id exists in the registry, and every enabled registry endpoint points at a real route+method. That last check caught and fixed 45 stale Express-style ':id' paths on first run \u2014 after normalization all 189 hand-authored entries correspond to real routes. Never-read rateLimit/tokenBudget fields deleted from types + all entries; dead getAiTools helper deleted. The test runs inside npm test, so it gates CI with no new workflow step."
     },
     {
       "id": "VQ-R-027",
@@ -859,7 +859,7 @@
         }
       ],
       "fixedAt": "2026-07-27",
-      "notes": "DRAFT successor window (proposed 2026-08-04 → 2026-10-30) appended to PRODUCT_GUIDE.md and cross-linked from the status header, sourced from the maturity deferred list, the employment-workflow handoff, and the whole-project review's focus items. Theme: one clear path to employment, measured — no new surfaces. Five outcomes all measurable with instruments that now exist (goalIntegrity aggregates, queue instrumentation to be built this window, verified-outcome reporting, backfill/retention operational acts, corpus triage). Owners default to Project Owner / Instructor per the charter's own rule; every date, owner, and target carries OWNER-CONFIRM. Ratification + closing milestones #1/#2 and issues #37-#40 remain owner actions outside the branch."
+      "notes": "DRAFT successor window (proposed 2026-08-04 \u2192 2026-10-30) appended to PRODUCT_GUIDE.md and cross-linked from the status header, sourced from the maturity deferred list, the employment-workflow handoff, and the whole-project review's focus items. Theme: one clear path to employment, measured \u2014 no new surfaces. Five outcomes all measurable with instruments that now exist (goalIntegrity aggregates, queue instrumentation to be built this window, verified-outcome reporting, backfill/retention operational acts, corpus triage). Owners default to Project Owner / Instructor per the charter's own rule; every date, owner, and target carries OWNER-CONFIRM. Ratification + closing milestones #1/#2 and issues #37-#40 remain owner actions outside the branch."
     },
     {
       "id": "VQ-R-028",
