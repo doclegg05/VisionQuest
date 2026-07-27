@@ -19,8 +19,10 @@
 
 ## Open Items
 - [ ] **PR #136 is merge-CONFLICTING with main** — rebase/merge before it can land (it carries the outage-proof crisis scan; production still runs the old code)
-- [ ] Disambiguate the `classify_attachment` and `lookup_saved_jobs` tool descriptions, then re-run S2 on the candidate (82.2% → needs ≥85%); only pull the fallback ladder (qwen3:30b-a3b → gpt-oss:20b) if that fails
-- [ ] Re-measure candidate FIRST-TOKEN latency (warm) against the ≤5s gate — the 20.1s p50 on record is whole-response with tool loops
+- [x] Tool-description disambiguation DONE (4dfce23, SAGE_PROMPT_REVISION 2026-07-27.1) — classify_attachment attractor eliminated (4 misses → 0 on candidate, also fixed cases on the 8B). Two lessons: negative instructions ("do NOT call X first") achieved nothing; the fix that worked was supplying missing data
+- [x] `job-save`/`job-save-2` were UNWINNABLE fixtures — expected save_job while supplying no context, so its required jobListingId existed nowhere. Repaired in the job-match-cna style; expectedTool untouched. Second broken fixture found today (after info-certs) — **audit the rest of the eval suite for scenarios whose expected tool is uncallable**
+- [ ] Candidate S2 on the repaired suite: run 1 = **95.6% (43/45), 0 injection failures** — clears the ≥85% gate; runs 2-3 pending confirmation. Both remaining misses are the "no tool" hesitancy mode introduced by the added conditional language — if stable across runs, trim the hedging
+- [ ] Re-measure candidate FIRST-TOKEN latency (warm) against the ≤5s gate — the 20.1s p50 on record is whole-response with tool loops. NOTE: run this when no other eval is using the GPU, or both numbers are corrupted
 - [ ] Workstream B stages never attempted: S6 document UAT (synthetic resumes via /api/resume/upload), S7 Gemini-judged delta (CI; credits restored)
 - [ ] Start a local Postgres + DATABASE_URL before rerunning S3/S5 (grounding + memory stages need it)
 - [ ] Measure the candidate's in-harness first-token latency against the ≤5s target (raw decode was 34.5 tok/s; the 8B measured p50 16.9s in-harness)
