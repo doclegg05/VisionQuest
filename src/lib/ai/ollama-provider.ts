@@ -165,6 +165,16 @@ function shouldTryNativeAfterOpenAiStatus(status: number): boolean {
   );
 }
 
+/**
+ * The native path is tried FIRST when the mode is unknown (it is the only
+ * path where `think: false` works). Fall back to /v1 only when the server
+ * clearly has no native route — 404/405 — not on gateway errors, which would
+ * fail on either path.
+ */
+function shouldTryOpenAiAfterNativeStatus(status: number): boolean {
+  return [404, 405].includes(status);
+}
+
 function streamChunkContent(parsed: OpenAIStreamChunk): string | undefined {
   const choice = parsed.choices?.[0];
   return choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
@@ -436,23 +446,34 @@ export class OllamaProvider implements AIProvider {
       return { mode: "native", response };
     }
 
+    // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
+    // only expose /v1/* — never attempt native /api/chat for them.
+    if (this.openAiOnly || this.apiMode === "openai") {
+      const openAIResponse = await this.postOpenAIChat(openAIBody, timeoutMs);
+      if (openAIResponse.ok) {
+        this.apiMode = "openai";
+      }
+      return { mode: "openai", response: openAIResponse };
+    }
+
+    // Mode unknown and native allowed: prefer the NATIVE path. It is the only
+    // path where thinking-capable models honor `think: false` — the /v1
+    // compat layer ignores the flag and burns the output budget on hidden
+    // reasoning (empty content under num_predict caps). Fall back to the
+    // compat path only when the server has no native route at all.
+    const nativeResponse = await this.postNativeChat(nativeBody, timeoutMs);
+    if (nativeResponse.ok || !shouldTryOpenAiAfterNativeStatus(nativeResponse.status)) {
+      if (nativeResponse.ok) {
+        this.apiMode = "native";
+      }
+      return { mode: "native", response: nativeResponse };
+    }
+
     const openAIResponse = await this.postOpenAIChat(openAIBody, timeoutMs);
     if (openAIResponse.ok) {
       this.apiMode = "openai";
-      return { mode: "openai", response: openAIResponse };
     }
-
-    // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
-    // only expose /v1/* — never fall back to native /api/chat for them.
-    if (this.openAiOnly || !shouldTryNativeAfterOpenAiStatus(openAIResponse.status)) {
-      return { mode: "openai", response: openAIResponse };
-    }
-
-    const nativeResponse = await this.postNativeChat(nativeBody, timeoutMs);
-    if (nativeResponse.ok) {
-      this.apiMode = "native";
-    }
-    return { mode: "native", response: nativeResponse };
+    return { mode: "openai", response: openAIResponse };
   }
 
   async generateResponse(
@@ -480,6 +501,11 @@ export class OllamaProvider implements AIProvider {
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
+        // Thinking-capable models (gemma4 a4b, qwen3) burn the entire output
+        // budget on a hidden reasoning channel unless told not to; the /v1
+        // compat layer IGNORES this flag, which is why postChat prefers the
+        // native path. Harmless on non-thinking models.
+        think: false,
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
     );
@@ -537,6 +563,11 @@ export class OllamaProvider implements AIProvider {
           num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
+        // Thinking-capable models (gemma4 a4b, qwen3) burn the entire output
+        // budget on a hidden reasoning channel unless told not to; the /v1
+        // compat layer IGNORES this flag, which is why postChat prefers the
+        // native path. Harmless on non-thinking models.
+        think: false,
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
@@ -1035,6 +1066,7 @@ export class OllamaProvider implements AIProvider {
         num_predict: OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS,
         ...(temperature !== undefined ? { temperature } : {}),
       },
+      think: false,
       keep_alive: OllamaProvider.KEEP_ALIVE,
     };
 
@@ -1191,6 +1223,11 @@ export class OllamaProvider implements AIProvider {
           num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
+        // Thinking-capable models (gemma4 a4b, qwen3) burn the entire output
+        // budget on a hidden reasoning channel unless told not to; the /v1
+        // compat layer IGNORES this flag, which is why postChat prefers the
+        // native path. Harmless on non-thinking models.
+        think: false,
         keep_alive: OllamaProvider.KEEP_ALIVE,
       },
     );
