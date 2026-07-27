@@ -30,8 +30,9 @@ export function CareerDnaEmptyState({ completeness }: CareerDnaEmptyStateProps) 
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
             Career DNA is a picture of what you like, what you are good at, and what matters to
-            you in a job. Sage builds it with you in a short chat — no test, no wrong answers.
-            When it is done, you will see career paths that fit you.
+            you in a job. Take the Interest Profiler for a formal interest map, import scores you
+            already have, or keep chatting with Sage — when it is done, you will see career paths
+            that fit you.
           </p>
 
           {started && (
@@ -58,14 +59,30 @@ export function CareerDnaEmptyState({ completeness }: CareerDnaEmptyStateProps) 
             </div>
           )}
 
-          <Link
-            href="/chat?stage=discovery"
-            prefetch={false}
-            className="primary-button mt-5 px-5 py-3 text-sm"
-          >
-            <ChatCircleDots size={18} weight="bold" aria-hidden="true" />
-            {started ? "Continue with Sage" : "Start with Sage"}
-          </Link>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="/career/interest-profiler"
+              prefetch={false}
+              className="primary-button px-5 py-3 text-sm"
+            >
+              Take Interest Profiler
+            </Link>
+            <Link
+              href="/career/interest-profiler/import"
+              prefetch={false}
+              className="secondary-button px-5 py-3 text-sm"
+            >
+              Import scores
+            </Link>
+            <Link
+              href="/chat?stage=discovery"
+              prefetch={false}
+              className="secondary-button px-5 py-3 text-sm"
+            >
+              <ChatCircleDots size={18} weight="bold" aria-hidden="true" />
+              {started ? "Continue with Sage" : "Start with Sage"}
+            </Link>
+          </div>
         </div>
       </div>
     </section>

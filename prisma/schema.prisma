@@ -73,6 +73,7 @@ model Student {
   confirmedGoals          Goal[]                   @relation("GoalConfirmer")
   progressionEvents       ProgressionEvent[]
   careerDiscovery         CareerDiscovery?
+  careerAssessmentSnapshots CareerAssessmentSnapshot[]
   moodEntries             MoodEntry[]
   sageInsights            SageInsight[]
   sagePanels              SagePanel[]
@@ -1428,8 +1429,12 @@ model CareerDiscovery {
   clusterScores      String?   @db.Text
   topClusters        String[]  @default([])
   sageSummary        String?   @db.Text
-  riasecScores       String?   @db.Text // JSON: {realistic, investigative, artistic, social, enterprising, conventional}
+  riasecScores       String?   @db.Text // JSON: {realistic, investigative, artistic, social, enterprising, conventional} — live coaching uses 0..1
   hollandCode        String? // e.g., "SEC"
+  // Provenance for formal Interest Profiler writes (chat discovery must not clobber these)
+  riasecSource       String? // sage_chat | onet_mini_ip | manual_entry
+  riasecInstrument   String? // e.g. onet_mini_ip_30
+  riasecAssessedAt   DateTime?
   nationalClusters   String?   @db.Text // JSON: [{cluster_name, score, spokes_mapping}]
   transferableSkills String?   @db.Text // JSON: [{skill, category, evidence}]
   workValues         String?   @db.Text // JSON: [{value, importance}]
@@ -1441,6 +1446,24 @@ model CareerDiscovery {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@schema("visionquest")
+}
+
+/// Immutable formal assessment submissions (Interest Profiler, etc.) for audit reprint.
+model CareerAssessmentSnapshot {
+  id                     String   @id @default(cuid())
+  studentId              String
+  instrument             String // e.g. onet_mini_ip_30
+  source                 String // onet_mini_ip | manual_entry
+  hollandCode            String?
+  riasecScoresRaw        String   @db.Text // JSON — O*NET integers or as-entered
+  riasecScoresNormalized String   @db.Text // JSON — 0..1 floats for Career DNA
+  note                   String?  @db.Text
+  createdAt              DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
   @@schema("visionquest")
 }
 

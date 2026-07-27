@@ -283,6 +283,10 @@ export interface StudentData {
     problems: string[];
     values: string[];
     circumstances: string[];
+    hollandCode?: string | null;
+    riasecSource?: string | null;
+    riasecInstrument?: string | null;
+    riasecAssessedAt?: string | null;
     completedAt: string | null;
   } | null;
 }

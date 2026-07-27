@@ -36,6 +36,7 @@
  *   (per-call token usage already lands in LlmCallLog via withUsageLogging).
  */
 import { prisma } from "@/lib/db";
+import { isFormalRiasecLocked } from "@/lib/career/riasec-lock";
 import { resolveAiProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { withUsageLogging } from "@/lib/llm-usage";
@@ -470,7 +471,15 @@ async function runPostResponse(
           },
         );
 
-        // Upsert CareerDiscovery record with latest signals
+        // Upsert CareerDiscovery record with latest signals.
+        // Formal Interest Profiler scores (onet_mini_ip / manual_entry) must not
+        // be overwritten by chat extraction.
+        const existingDiscovery = await prisma.careerDiscovery.findUnique({
+          where: { studentId },
+          select: { riasecSource: true },
+        });
+        const riasecLocked = isFormalRiasecLocked(existingDiscovery);
+
         const upsertData = {
           interests: JSON.stringify(discoveryResult.interests),
           strengths: JSON.stringify(discoveryResult.strengths),
@@ -480,13 +489,18 @@ async function runPostResponse(
           circumstances: JSON.stringify(discoveryResult.circumstances),
           clusterScores: JSON.stringify(discoveryResult.cluster_scores),
           sageSummary: discoveryResult.summary || null,
-          riasecScores: JSON.stringify(discoveryResult.riasec_scores),
-          hollandCode: discoveryResult.holland_code || null,
           nationalClusters: JSON.stringify(discoveryResult.national_career_clusters),
           transferableSkills: JSON.stringify(discoveryResult.transferable_skills),
           workValues: JSON.stringify(discoveryResult.work_values),
           assessmentSummary: discoveryResult.assessment_summary || null,
           conversationId,
+          ...(riasecLocked
+            ? {}
+            : {
+                riasecScores: JSON.stringify(discoveryResult.riasec_scores),
+                hollandCode: discoveryResult.holland_code || null,
+                riasecSource: "sage_chat" as const,
+              }),
         };
 
         if (discoveryResult.stage_complete) {

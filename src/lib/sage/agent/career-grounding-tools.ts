@@ -498,8 +498,54 @@ const careerToolsTechnology: AgentTool = {
   },
 };
 
+const recommendInterestProfiler: AgentTool = {
+  name: "recommend_interest_profiler",
+  description:
+    "Recommend the in-app O*NET Mini Interest Profiler (or score import) when the student " +
+    "needs a formal RIASEC / Holland interest assessment. Prefer this over sending them to " +
+    "CareerOneStop for results — CareerOneStop does not return scores to VisionQuest automatically. " +
+    "Do NOT confuse with career_skills_match (Skills Matcher is a different instrument).",
+  parameters: {
+    type: "object",
+    properties: {
+      prefer_import: {
+        type: "boolean",
+        description:
+          "If true, point at the import form for students who already have CareerOneStop/My Next Move scores.",
+      },
+    },
+  },
+  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  riskTier: "read",
+  enabled: true,
+  async execute(args): Promise<AgentToolResult> {
+    const preferImport = args.prefer_import === true;
+    const target = preferImport
+      ? "/career/interest-profiler/import"
+      : "/career/interest-profiler";
+    const label = preferImport ? "Import Interest Profiler scores" : "Take Interest Profiler";
+    return {
+      status: "success",
+      summary: preferImport
+        ? "Opened the score import path for Interest Profiler results."
+        : "Opened the in-app Interest Profiler.",
+      data: { target, preferImport },
+      modelHint:
+        "Invite the student to complete the Interest Profiler in VisionQuest. After they finish, " +
+        "their Career DNA updates and you should ground later advice on those formal scores. " +
+        "Do not claim CareerOneStop will send results back automatically.",
+      action: {
+        action: "navigate",
+        target,
+        label,
+      },
+    };
+  },
+};
+
 export const CAREER_GROUNDING_TOOLS: AgentTool[] = [
   careerSkillsMatch,
+  recommendInterestProfiler,
   careerOccupationProfile,
   careerWages,
   careerTrainingPrograms,

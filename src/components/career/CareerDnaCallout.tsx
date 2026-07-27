@@ -15,12 +15,14 @@ export default async function CareerDnaCallout({ studentId }: CareerDnaCalloutPr
   const isComplete = discovery?.status === "complete";
   const skillGapAnalysis = isComplete ? await analyzeSkillGaps(studentId) : null;
   const statusLabel = isComplete ? "Ready" : discovery ? "In progress" : "Not started";
-  const actionHref = isComplete ? "/chat?stage=career_profile_review" : "/chat?stage=discovery";
+  const actionHref = isComplete
+    ? "/chat?stage=career_profile_review"
+    : "/career/interest-profiler";
   const actionLabel = isComplete
     ? "Discuss with Sage"
     : discovery
-      ? "Continue with Sage"
-      : "Start with Sage";
+      ? "Take Interest Profiler"
+      : "Take Interest Profiler";
 
   return (
     <section id="career-dna" className="scroll-mt-28 space-y-4">
