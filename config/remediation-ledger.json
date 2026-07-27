@@ -703,8 +703,21 @@
         "handoff.md"
       ],
       "fix": "Draft the successor 90-day window in docs/PRODUCT_GUIDE.md with dates, single accountable owners, and measurable outcomes (the handoff employment arc plus the maturity deferred list are most of the draft). Closing the GitHub milestones and issues #37-#40 is an owner action outside this branch.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "doc",
+          "file": "docs/PRODUCT_GUIDE.md",
+          "mustContain": "Proposed Successor 90-Day Window"
+        },
+        {
+          "kind": "doc",
+          "file": "docs/PRODUCT_GUIDE.md",
+          "mustContain": "OWNER-CONFIRM"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "DRAFT successor window (proposed 2026-08-04 → 2026-10-30) appended to PRODUCT_GUIDE.md and cross-linked from the status header, sourced from the maturity deferred list, the employment-workflow handoff, and the whole-project review's focus items. Theme: one clear path to employment, measured — no new surfaces. Five outcomes all measurable with instruments that now exist (goalIntegrity aggregates, queue instrumentation to be built this window, verified-outcome reporting, backfill/retention operational acts, corpus triage). Owners default to Project Owner / Instructor per the charter's own rule; every date, owner, and target carries OWNER-CONFIRM. Ratification + closing milestones #1/#2 and issues #37-#40 remain owner actions outside the branch."
     },
     {
       "id": "VQ-R-028",
@@ -756,8 +769,25 @@
       ],
       "fix": "Apply the locked KPI decision: relabel the funnel step to Active BHAG and add the two aggregate measures (confirmed BHAG reviewed within 14 days percent, pathway-linked-to-confirmed percent).",
       "decision": "kpi",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/academic-kpi.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/academic-kpi.ts",
+          "mustContain": "goalIntegrity"
+        },
+        {
+          "kind": "doc",
+          "file": "docs/PRODUCT_GUIDE.md",
+          "mustContain": "goalIntegrity"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Code half (commit 98127b9): funnel step relabeled Active BHAG (it counts existence); new goalIntegrity aggregates report percent with a confirmed BHAG reviewed within 14 days and percent with a pathway linked to a confirmed goal, computed against the report's `now` for determinism; KPI route selects the three needed Goal fields. Doc half: the draft successor window in PRODUCT_GUIDE.md adopts the aggregates as its goal-integrity outcome with OWNER-CONFIRM targets, replacing the old unmeasurable headline claims going forward."
     }
   ]
 }

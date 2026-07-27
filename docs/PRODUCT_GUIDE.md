@@ -1,7 +1,7 @@
 # VisionQuest Product Guide
 
-Status: Window lapsed — charter content remains authoritative until the next 90-day window is authored  
-Effective window: March 23, 2026 through June 21, 2026 (ended; successor window not yet defined)  
+Status: Window lapsed — charter content remains authoritative until the owner ratifies the successor window drafted below  
+Effective window: March 23, 2026 through June 21, 2026 (ended; successor DRAFT at [Proposed Successor Window](#proposed-successor-90-day-window-draft--pending-owner-ratification), pending ratification)  
 Audience: AI agents, coding agents, and development contributors
 
 > **2026-07-20 status note:** The full-project maturity review and repair session is recorded in
@@ -274,3 +274,59 @@ Ask these questions before making a product-shaping change:
 5. Does this preserve VisionQuest as a SPOKES-specific operational portal rather than drifting into a generic platform?
 
 If the answer to most of these is no, slow down and reconsider.
+
+---
+
+## Proposed Successor 90-Day Window (DRAFT — pending owner ratification)
+
+Drafted 2026-07-27 (VQ-R-027) from the maturity review's deferred list, the
+2026-07-08 employment-workflow handoff, and the 2026-07-24 whole-project
+review. **Nothing below is active scope until the owner ratifies dates,
+owners, and targets.** Every OWNER-CONFIRM marker is a decision only the
+owner can make.
+
+**Proposed window:** August 4, 2026 through October 30, 2026 (OWNER-CONFIRM).
+
+### Theme
+
+One clear path to employment, measured. The pieces exist (Sage, goals,
+learning, portfolio, resume, job board, advising, verification layer); this
+window connects them into a workflow a student can navigate and the program
+can measure — no new surfaces.
+
+### Outcomes (all now measurable with instruments that exist)
+
+1. **Goal integrity:** ≥ OWNER-CONFIRM% of active students have a confirmed
+   BHAG reviewed within 14 days, and ≥ OWNER-CONFIRM% have a pathway linked
+   to a confirmed goal — reported by the `goalIntegrity` aggregates in the
+   academic KPI report (the funnel step is "Active BHAG"; existence and
+   confirmation are no longer conflated).
+2. **Intervention speed:** median time from detected stall to
+   teacher-assigned next action under OWNER-CONFIRM days, instrumented on
+   the intervention queue (the one cycle-time metric this window builds).
+3. **Verified outcomes:** every completed certification and every
+   applied/interviewing/offered application is verified or explicitly
+   self-reported in grant reporting — zero unverified outcome claims.
+4. **Operational trust:** the signature backfill has been run against
+   production and the re-opened items resolved through the queue; retention
+   durations confirmed and recorded in DATA_RETENTION_POLICY.md.
+5. **Corpus quality:** the 463 inactive ProgramDocuments triaged
+   (activate / archive / delete) and the production embedding backfill run.
+
+### Owners (single accountable owner per workstream — OWNER-CONFIRM each)
+
+| Workstream | Default owner (per charter rule) |
+|---|---|
+| Employment path & advising loop | Project Owner / Instructor |
+| Goal integrity & queue metrics | Project Owner / Instructor |
+| Data lifecycle & compliance | Project Owner / Instructor |
+| Sage corpus & local-AI host | Project Owner / Instructor |
+
+### Kill conditions
+
+- Any workstream with no measurable movement by the monthly outcome review
+  is cut or rewritten (existing charter rule; the review dates are the
+  window's three month boundaries).
+- Gamification and platform abstractions remain out of scope; the
+  chat-first surface and the four-role model are ceilings, not floors.
+
