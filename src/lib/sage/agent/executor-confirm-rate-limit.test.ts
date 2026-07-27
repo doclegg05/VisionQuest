@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding must accept many signatures */
 // =============================================================================
 // VQ-R-012 — consequential rate limiting must count actions, not legs.
 //
