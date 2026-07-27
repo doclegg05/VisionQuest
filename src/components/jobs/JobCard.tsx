@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
-import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobListingKind, JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
 
@@ -10,6 +10,16 @@ export interface JobTrackingUpdate {
   status?: SavedJobStatus;
   notes?: string;
 }
+
+/**
+ * Save callback contract: `kind` tells the handler which id field the save
+ * API needs (class jobListingId vs browse browseListingId — VQ-R-016/017).
+ */
+export type JobSaveHandler = (
+  jobId: string,
+  updates?: JobTrackingUpdate,
+  kind?: JobListingKind,
+) => void | Promise<void>;
 
 interface JobCardProps {
   id: string;
@@ -30,8 +40,9 @@ interface JobCardProps {
   postedAt?: string | null;
   createdAt?: string | null;
   source?: string | null;
+  listingKind?: JobListingKind;
   compact?: boolean;
-  onSave?: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  onSave?: JobSaveHandler;
 }
 
 const CLUSTER_COLORS: Record<string, string> = {
@@ -113,6 +124,7 @@ export function JobCard({
   postedAt,
   createdAt,
   source,
+  listingKind,
   compact = false,
   onSave,
 }: JobCardProps) {
@@ -138,7 +150,7 @@ export function JobCard({
     if (!onSave) return;
     setSaving(true);
     try {
-      await onSave(id, update);
+      await onSave(id, update, listingKind);
     } finally {
       setSaving(false);
     }

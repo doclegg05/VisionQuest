@@ -1,8 +1,8 @@
 "use client";
 
 import { JobCard } from "./JobCard";
-import type { JobTrackingUpdate } from "./JobCard";
-import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobSaveHandler } from "./JobCard";
+import type { JobListingKind, JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 
 interface RecommendedJob {
   id: string;
@@ -23,11 +23,12 @@ interface RecommendedJob {
   postedAt?: string | null;
   createdAt?: string | null;
   source?: string | null;
+  listingKind?: JobListingKind;
 }
 
 interface JobRecommendationsProps {
   jobs: RecommendedJob[];
-  onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  onSave: JobSaveHandler;
 }
 
 export function JobRecommendations({ jobs, onSave }: JobRecommendationsProps) {

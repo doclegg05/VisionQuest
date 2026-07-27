@@ -8,8 +8,9 @@ import { JobFilters, type JobProximityFilter } from "@/components/jobs/JobFilter
 import { BandedJobList } from "@/components/jobs/BandedJobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
 import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
+import { postJobSave } from "@/components/jobs/save-job-client";
 import AskSageLink from "@/components/sage/AskSageLink";
-import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobListingKind, JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import type { JobBand } from "@/lib/job-board/job-bands-response";
 
 interface OpportunityItem {
@@ -70,6 +71,7 @@ interface JobData {
   postedAt?: string | null;
   createdAt?: string | null;
   source?: string | null;
+  listingKind?: JobListingKind;
   band?: JobBand | null;
 }
 
@@ -138,16 +140,21 @@ export default function CareerHub({
     };
   }, [cluster, proximity, sort, debouncedKeyword, postedWithinDays, minPay, jobType, refreshKey]);
 
-  const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
-    const res = await fetch("/api/jobs/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
-    });
-    if (res.ok) {
-      setRefreshKey((key) => key + 1);
-    }
-  }, []);
+  // VQ-R-016: failed saves must be visible, not silently ignored.
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSaveJob = useCallback(
+    async (jobId: string, updates?: JobTrackingUpdate, kind?: JobListingKind) => {
+      setSaveError(null);
+      const result = await postJobSave(jobId, updates, kind);
+      if (result.ok) {
+        setRefreshKey((key) => key + 1);
+      } else {
+        setSaveError(result.error);
+      }
+    },
+    [],
+  );
 
   const matchedCount =
     jobsData?.jobs.filter((job) => job.matchScore >= 50).length ?? 0;
@@ -184,6 +191,12 @@ export default function CareerHub({
             <p className="text-xs text-[var(--text-secondary)]">Saved</p>
           </div>
         </div>
+
+        {saveError && (
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {saveError}
+          </p>
+        )}
 
         {jobsLoading && (
           <div className="py-12 text-center text-[var(--text-secondary)]">

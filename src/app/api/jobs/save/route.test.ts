@@ -177,3 +177,58 @@ describe("POST /api/jobs/save (VQ-R-017)", () => {
     assert.ok(String(audit.summary).includes("interviewing"));
   });
 });
+
+// =============================================================================
+// VQ-R-016 — the save button silently failed for every browse job and every
+// unenrolled student: the route required an active class enrollment even when
+// the save had nothing to do with a class board. Enrollment is now required
+// only to validate a class-scoped jobListingId; a browse save by an
+// unenrolled student creates an Application.
+// =============================================================================
+describe("POST /api/jobs/save browse + unenrolled saves (VQ-R-016)", () => {
+  beforeEach(() => {
+    currentSession = mockStudentSession();
+    mockEnrollmentFindFirst.mock.resetCalls();
+    mockJobListingFindFirst.mock.resetCalls();
+    mockTrackJobInterest.mock.resetCalls();
+    mockLogAuditEvent.mock.resetCalls();
+
+    // No active enrollment at all.
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => null);
+    mockJobListingFindFirst.mock.mockImplementation(async () => null);
+    mockTrackJobInterest.mock.mockImplementation(async () => ({
+      ok: true,
+      application: { id: "app-2", status: "saved" },
+      opportunity: { id: "opp-2", title: "Remote Data Entry Clerk", company: "Remotely Inc" },
+    }));
+    mockLogAuditEvent.mock.mockImplementation(async () => undefined);
+  });
+
+  it("a browse save by an unenrolled student succeeds and creates an Application", async () => {
+    const res = await route.POST(saveRequest({ browseListingId: BROWSE_LISTING_ID }));
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.application.id, "app-2");
+    assert.equal(mockTrackJobInterest.mock.callCount(), 1);
+    const input = mockTrackJobInterest.mock.calls[0].arguments[0] as Record<string, unknown>;
+    assert.deepEqual(input.source, { kind: "browse", browseListingId: BROWSE_LISTING_ID });
+  });
+
+  it("a class-listing save still requires an active enrollment", async () => {
+    const res = await route.POST(saveRequest({ jobListingId: JOB_LISTING_ID }));
+
+    assert.equal(res.status, 400);
+    assert.equal(mockTrackJobInterest.mock.callCount(), 0);
+  });
+
+  it("a class-listing id outside the student's class is still rejected when enrolled", async () => {
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+    mockJobListingFindFirst.mock.mockImplementation(async () => null);
+
+    const res = await route.POST(saveRequest({ jobListingId: JOB_LISTING_ID }));
+
+    assert.equal(res.status, 400);
+    assert.equal(mockTrackJobInterest.mock.callCount(), 0);
+  });
+});

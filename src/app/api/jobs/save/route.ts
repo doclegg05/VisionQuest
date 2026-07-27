@@ -36,16 +36,17 @@ export const POST = withAuth(async (session: Session, req: Request) => {
   const { jobListingId, browseListingId, status, notes } = await parseBody(req, saveJobSchema);
   const saveStatus = status ?? "saved";
 
-  const enrollment = await prisma.studentClassEnrollment.findFirst({
-    where: { studentId: session.id, status: "active" },
-    select: { classId: true },
-  });
-  if (!enrollment) {
-    throw badRequest("No active class enrollment found");
-  }
-
   let source: JobInterestSource;
   if (jobListingId) {
+    // Enrollment is required only to validate a class-scoped listing
+    // (VQ-R-016): the class board is the only thing enrollment gates.
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId: session.id, status: "active" },
+      select: { classId: true },
+    });
+    if (!enrollment) {
+      throw badRequest("No active class enrollment found");
+    }
     // Verify the class listing belongs to the student's active class before
     // tracking it — a student must not track another cohort's board rows.
     const job = await prisma.jobListing.findFirst({
@@ -60,7 +61,8 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     }
     source = { kind: "listing", jobListingId };
   } else {
-    // browseListingId is guaranteed by the schema refine; existence is
+    // Browse rows are program-wide: any student may track one, enrolled or
+    // not. browseListingId is guaranteed by the schema refine; existence is
     // verified by trackJobInterest when it resolves the row.
     source = { kind: "browse", browseListingId: browseListingId! };
   }

@@ -4,8 +4,9 @@ import { useState, useCallback } from "react";
 import { Briefcase } from "@phosphor-icons/react";
 import { JobCard } from "./JobCard";
 import Link from "next/link";
+import { postJobSave } from "./save-job-client";
 import type { JobTrackingUpdate } from "./JobCard";
-import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
+import type { JobListingKind, JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 
 interface WidgetJob {
   id: string;
@@ -23,6 +24,7 @@ interface WidgetJob {
   savedNotes?: string | null;
   savedAppliedAt?: string | null;
   url: string;
+  listingKind?: JobListingKind;
 }
 
 interface JobBoardWidgetProps {
@@ -34,17 +36,21 @@ export function JobBoardWidget({ jobs, hasDiscovery }: JobBoardWidgetProps) {
   const [savedIds, setSavedIds] = useState<Set<string>>(
     new Set(jobs.filter((j) => j.savedStatus).map((j) => j.id)),
   );
+  // VQ-R-016: failed saves must be visible, not silently ignored.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSave = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
-    const res = await fetch("/api/jobs/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
-    });
-    if (res.ok) {
-      setSavedIds((prev) => new Set([...prev, jobId]));
-    }
-  }, []);
+  const handleSave = useCallback(
+    async (jobId: string, updates?: JobTrackingUpdate, kind?: JobListingKind) => {
+      setSaveError(null);
+      const result = await postJobSave(jobId, updates, kind);
+      if (result.ok) {
+        setSavedIds((prev) => new Set([...prev, jobId]));
+      } else {
+        setSaveError(result.error);
+      }
+    },
+    [],
+  );
 
   if (jobs.length === 0) return null;
 
@@ -69,6 +75,12 @@ export function JobBoardWidget({ jobs, hasDiscovery }: JobBoardWidgetProps) {
       {!hasDiscovery && (
         <p className="text-sm text-[var(--text-secondary)] mb-3">
           Complete your career assessment to get personalized job recommendations.
+        </p>
+      )}
+
+      {saveError && (
+        <p role="alert" className="mb-3 text-sm text-red-600">
+          {saveError}
         </p>
       )}
 

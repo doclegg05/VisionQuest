@@ -488,8 +488,34 @@
       ],
       "fix": "Covered by the tracker decision: saving a browse row creates an Application. Also surface non-OK save responses to the user instead of ignoring them.",
       "decision": "trackers",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/app/api/jobs/save/route.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/components/jobs/save-job-client.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/jobs/save/route.ts",
+          "mustContain": "browseListingId"
+        },
+        {
+          "kind": "config",
+          "file": "src/components/jobs/JobBoardWidget.tsx",
+          "mustContain": "postJobSave"
+        },
+        {
+          "kind": "config",
+          "file": "src/components/career/CareerHub.tsx",
+          "mustContain": "role=\"alert\""
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Save path: POST /api/jobs/save now requires enrollment ONLY to validate a class-scoped jobListingId (that check is unchanged); a browse save (browseListingId, added in VQ-R-017) succeeds for any student including the unenrolled and creates an Application through trackJobInterest — route tests pin the unenrolled browse save, the enrolled-only class save, and the cross-class rejection. UI: new shared src/components/jobs/save-job-client.ts postJobSave sends the id field matching the row's listingKind (GET /api/jobs emits it; JobCard threads it through the onSave contract as a third arg) and returns { ok, error } with the server's message or a plain-language fallback; CareerHub and JobBoardWidget set an inline role=\"alert\" error (red text, cleared on the next attempt) instead of ignoring !res.ok — matching the existing PortfolioGrid inline-alert idiom, no new deps. Component-level note: the house style tests components render-only (renderToString), so the error branch is pinned at the extracted fetch handler (save-job-client.test.ts: server-message passthrough, unusable-body fallback, thrown-fetch connection message, kind-to-id-field mapping) exactly as the plan prescribed. JobCard itself has no fetch path — its Save/Update buttons call the parent handler, so the two handlers cover every save surface; JobBoardWidget is currently unmounted (no importers) but was fixed as named in the finding."
     },
     {
       "id": "VQ-R-017",
