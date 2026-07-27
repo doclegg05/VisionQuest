@@ -1,5 +1,7 @@
 # Supabase Pre-Rollout Optimization Plan (v3)
 
+Status: current — phased plan; Phase 1 (pg_cron migration) executed, later phases as scheduled.
+
 **Created:** 2026-04-01
 **Revised:** 2026-04-01 (v2: Codex review #1; v3: Codex review #2)
 **Target:** June 2026 (before 11-classroom rollout)

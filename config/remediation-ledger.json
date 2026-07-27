@@ -718,8 +718,31 @@
         "DEPLOY.md"
       ],
       "fix": "Give every routed doc a status header (current / superseded-by / archived), delete or repoint the dead content/_INDEX.md row, archive or rewrite the March roadmap, and fix DEPLOY.md's cron topology.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "doc",
+          "file": "CLAUDE.md",
+          "mustContain": "catalog/index.md"
+        },
+        {
+          "kind": "doc",
+          "file": "AGENTS.md",
+          "mustContain": "catalog/index.md"
+        },
+        {
+          "kind": "doc",
+          "file": "DEPLOY.md",
+          "mustContain": "pg_cron"
+        },
+        {
+          "kind": "doc",
+          "file": "docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md",
+          "mustContain": "Status: archived reference"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "The dead content/_INDEX.md row in CLAUDE.md and AGENTS.md now routes to the real SPOKES knowledge locations (catalog/index.md OKF layer + src/lib/spokes.ts staff record). DEPLOY.md's four Render-cron claims corrected to the actual Supabase pg_cron topology with the runbook cross-reference and cron.job_run_details verification queries. Status headers added to every routed doc that lacked one: the March roadmap (archived reference, PRODUCT_DECISIONS wins on conflict), the two shipped superpowers plans (historical), supabase-optimization (current, Phase 1 executed), funding options and the tunnel doc (current references), and DEPLOY.md itself."
     },
     {
       "id": "VQ-R-029",

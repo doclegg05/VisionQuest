@@ -1,5 +1,7 @@
 # Deployment Runbook — VisionQuest
 
+Status: current — corrected 2026-07-27 (VQ-R-028): scheduled work runs on Supabase pg_cron, not Render cron services.
+
 This runbook covers the supported production path: Render for app hosting plus Supabase for PostgreSQL and file storage.
 
 ## Prerequisites
@@ -17,11 +19,11 @@ This runbook covers the supported production path: Render for app hosting plus S
 [`render.yaml`](/Users/brittlegg/visionquest/render.yaml) provisions:
 
 - 1 web service named `visionquest`
-- 3 cron services
 
-  - `visionquest-appointment-reminders`
-  - `visionquest-job-processor`
-  - `visionquest-daily-coaching`
+Scheduled work does NOT run on Render. All recurring jobs run as Supabase
+pg_cron jobs created by Prisma migrations (see
+`docs/plans/pg-cron-setup-runbook.md` for the job list and operations). The
+`scripts/run-*.mjs` files are manual triggers / rollback fallbacks only.
 
 The web service runs:
 
@@ -138,13 +140,12 @@ If you do not use the blueprint:
    - Start command: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
    - Health check path: `/api/health`
 
-3. Create three cron jobs:
+3. Scheduled jobs need no Render setup — pg_cron jobs are created by the
+   Prisma migrations on deploy. Confirm in Supabase that `app.base_url` is
+   set and the vault holds `CRON_SECRET`
+   (see `docs/plans/pg-cron-setup-runbook.md`).
 
-   - `node scripts/run-appointment-reminders.mjs`
-   - `node scripts/run-job-processor.mjs`
-   - `node scripts/run-daily-coaching.mjs`
-
-4. Each cron service needs:
+4. The manual fallback scripts (`scripts/run-*.mjs`), when run by hand, need:
 
    - `APP_BASE_URL`
    - `CRON_SECRET`
@@ -235,7 +236,7 @@ DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 
 - `GET /api/health` returns 200
 - Web service boots without migration failure
-- All three cron jobs show successful runs
+- Supabase pg_cron jobs show successful runs (`select * from cron.job_run_details order by start_time desc;`)
 
 ### Student flow
 
@@ -272,7 +273,7 @@ curl https://your-app.onrender.com/api/health
 
 ### Logs
 
-- Use the Render dashboard for web and cron service logs
+- Use the Render dashboard for web service logs; pg_cron run history lives in Supabase (`cron.job_run_details`)
 - Use Supabase logs for database and storage issues
 - Use Sentry for client and server exception tracking if enabled
 

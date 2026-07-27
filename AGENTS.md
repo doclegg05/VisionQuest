@@ -29,7 +29,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | Job board implementation | [docs/superpowers/plans/2026-03-31-job-board.md](./docs/superpowers/plans/2026-03-31-job-board.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
-| SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| SPOKES program knowledge (Sage grounding) | [catalog/index.md](./catalog/index.md) — git-tracked OKF layer; staff record logic in `src/lib/spokes.ts` |
 
 ### Archived (do not read unless explicitly asked)
 - `docs/archive/GAMIFICATION_BACKLOG.md` — frozen planning artifact
