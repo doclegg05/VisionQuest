@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
 import { badRequest, forbidden, notFound } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
-import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
-import { ensureGoalLevelProgression } from "@/lib/goal-progression";
-import {
-  goalCountsTowardPlan,
-  isAwaitingInstructorConfirmation,
-  isGoalLevel,
-  isGoalStatus,
-} from "@/lib/goals";
-import { recordBhagCompleted } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { applyGoalStatusEffects } from "@/lib/goal-status";
+import { isAwaitingInstructorConfirmation, isGoalStatus } from "@/lib/goals";
 
 async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {
@@ -136,16 +128,9 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
     data: updates,
   });
 
-  invalidatePrefix(`goals:${session.id}`);
-
-  if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
-    await ensureGoalLevelProgression(session.id, [updatedGoal.level]);
-  }
-
-  // When a BHAG is marked completed, award XP and check tier unlocks
-  if (updatedGoal.level === "bhag" && updatedGoal.status === "completed") {
-    await updateProgression(session.id, recordBhagCompleted);
-  }
+  // Shared with Sage's update_goal_status tool so status side effects
+  // (cache, level progression, BHAG XP) can never drift (VQ-R-011).
+  await applyGoalStatusEffects(session.id, updatedGoal);
 
   return NextResponse.json({ goal: updatedGoal });
 });

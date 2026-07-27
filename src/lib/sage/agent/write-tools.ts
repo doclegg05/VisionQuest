@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { transitionGoalStatus } from "@/lib/goal-status";
 import { logger } from "@/lib/logger";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
 import { formatCohortDateTime } from "@/lib/timezone";
@@ -325,7 +326,9 @@ const updateGoalStatus: AgentTool = {
     if (gate) return gate;
 
     return executeAndLedger("update_goal_status", { goalId, status }, ctx, async () => {
-      await prisma.goal.update({ where: { id: goalId }, data: { status } });
+      // Same transition path as PATCH /api/goals/[id] — cache invalidation,
+      // level progression, and BHAG-completion XP included (VQ-R-011).
+      await transitionGoalStatus({ studentId: ctx.session.id, goalId, status });
       return { summary: `Goal updated to ${status}.`, data: { goalId, status } };
     });
   },

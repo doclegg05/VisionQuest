@@ -310,8 +310,25 @@
         "src/app/api/goals/[id]/route.ts"
       ],
       "fix": "Extract the goal-status transition (update + progression + XP + cache invalidation) into one lib helper called by both the route and the tool; audit remaining write tools for the same drift.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/goal-status.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/goal-status.ts",
+          "mustContain": "transitionGoalStatus"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/agent/write-tools.ts",
+          "mustContain": "transitionGoalStatus"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "New src/lib/goal-status.ts: applyGoalStatusEffects (cache invalidation + ensureGoalLevelProgression for plan-counting statuses + BHAG-completion XP) shared by PATCH /api/goals/[id] and the update_goal_status tool, which now calls transitionGoalStatus instead of a bare prisma.goal.update. Write-tool drift audit: save_job also writes outside its HTTP route's effect set — deliberately deferred to VQ-R-017, which replaces the StudentSavedJob pipeline entirely (cross-referenced there); the other write tools (submit_form via applyStudentOrientationCompletion, mark_certification_complete via cert-actions, book_appointment, update_application_status) already share their route-side helpers."
     },
     {
       "id": "VQ-R-012",
