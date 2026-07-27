@@ -193,6 +193,21 @@ export interface LocalAIAuthConfig {
   numCtx?: number;
   /** Defaults to "ollama" when undefined (existing dual-mode behavior). */
   apiStyle?: LocalAiApiStyle;
+  /**
+   * Let a reasoning ("thinking") model emit its reasoning channel.
+   *
+   * Defaults to FALSE. Reasoning tokens are drawn from the same output
+   * budget as the visible reply, so on a long system prompt a thinking
+   * model can spend the entire budget reasoning and return nothing — see
+   * the thinking-model regression suite. Turning this on generally needs
+   * `maxOutputTokens` raised to match.
+   */
+  reasoning?: boolean;
+  /**
+   * Override the per-request output-token cap (num_predict / max_tokens).
+   * Defaults to the provider's built-in fallback. Bounded by the caller.
+   */
+  maxOutputTokens?: number;
 }
 
 export interface AIProviderConfig {
