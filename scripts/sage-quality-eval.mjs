@@ -28,6 +28,7 @@
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
 import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { withScenarioContext } from "./lib/sage-quality-eval-prompt.mjs";
 
 loadEnvFile();
 
@@ -105,7 +106,14 @@ async function main() {
   for (const scenario of SCENARIOS) {
     let reply = "";
     try {
-      const systemPrompt = buildSystemPrompt(scenario.stage, { studentName: "Sam", programType: "spokes" }, "full");
+      // A scenario may supply `context` — the facts a retrieval hit would have
+      // provided in production. Without it, a program-facts question is
+      // unanswerable here: agent mode puts that knowledge behind
+      // lookup_program_info, and this harness generates with no tools.
+      const systemPrompt = withScenarioContext(
+        buildSystemPrompt(scenario.stage, { studentName: "Sam", programType: "spokes" }, "full"),
+        scenario.context,
+      );
       reply = await provider.generateResponse(systemPrompt, [{ role: "user", content: scenario.message }]);
     } catch (err) {
       console.log(`  ?? ${scenario.id}: Sage call failed — ${err.message}`);
@@ -136,6 +144,10 @@ async function main() {
     try {
       const judgePrompt =
         `SCENARIO — student said: "${scenario.message}"\n\n` +
+        (scenario.context
+          ? `FACTS SAGE WAS GIVEN (she was expected to answer from these, not from memory — ` +
+            `judge accuracy against them):\n"""${scenario.context}"""\n\n`
+          : "") +
         `WHAT A GREAT REPLY DOES HERE: ${scenario.focus}\n\n` +
         `RUBRIC (score each 1-5):\n${rubricText}\n\n` +
         `SAGE'S REPLY:\n"""${reply}"""\n\n` +
