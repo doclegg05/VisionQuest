@@ -29,6 +29,9 @@ function makeGoal(
     level: overrides.level ?? "bhag",
     status: overrides.status ?? "active",
     createdAt: overrides.createdAt ?? new Date("2026-01-10"),
+    confirmedAt: overrides.confirmedAt ?? null,
+    lastReviewedAt: overrides.lastReviewedAt ?? null,
+    pathwayId: overrides.pathwayId ?? null,
     resourceLinks: overrides.resourceLinks ?? [],
   };
 }
@@ -285,7 +288,7 @@ describe("computeAcademicKpis", () => {
     assert.equal(result.academicFunnel[0].value, 3);
     assert.equal(result.academicFunnel[1].label, "First Sage conversation");
     assert.equal(result.academicFunnel[1].value, 2);
-    assert.equal(result.academicFunnel[2].label, "Confirmed BHAG");
+    assert.equal(result.academicFunnel[2].label, "Active BHAG");
     assert.equal(result.academicFunnel[2].value, 2);
     assert.equal(result.academicFunnel[3].label, "Active monthly plan");
     assert.equal(result.academicFunnel[3].value, 1);
@@ -324,5 +327,45 @@ describe("computeAcademicKpis", () => {
     assert.equal(result.readinessDistribution.studentsAbove75, 2);
     assert.equal(result.readinessDistribution.studentsAbove50Pct, 67);
     assert.equal(result.readinessDistribution.studentsAbove75Pct, 67);
+  });
+});
+
+// VQ-R-029: the funnel step reports BHAG existence (relabeled "Active BHAG");
+// confirmation health lives in the goalIntegrity aggregates.
+describe("goal integrity aggregates (VQ-R-029)", () => {
+  it("relabels the funnel step to Active BHAG", () => {
+    const result = computeAcademicKpis([makeStudent({ goals: [makeGoal()] })]);
+    assert.equal(result.academicFunnel[2].label, "Active BHAG");
+  });
+
+  it("counts confirmed BHAGs reviewed within 14 days and pathway-linked confirmed goals", () => {
+    const now = Date.now();
+    const students = [
+      // Confirmed + recently reviewed BHAG, pathway on a confirmed monthly.
+      makeStudent({
+        id: "s1",
+        goals: [
+          makeGoal({ id: "g1", level: "bhag", confirmedAt: new Date(now - 40 * 86400000), lastReviewedAt: new Date(now - 3 * 86400000) }),
+          makeGoal({ id: "g2", level: "monthly", confirmedAt: new Date(now - 10 * 86400000), pathwayId: "path-1" }),
+        ],
+      }),
+      // Confirmed BHAG but stale review; pathway on an UNCONFIRMED goal.
+      makeStudent({
+        id: "s2",
+        goals: [
+          makeGoal({ id: "g3", level: "bhag", confirmedAt: new Date(now - 40 * 86400000), lastReviewedAt: new Date(now - 20 * 86400000) }),
+          makeGoal({ id: "g4", level: "monthly", pathwayId: "path-2" }),
+        ],
+      }),
+      // Active but unconfirmed BHAG — counts in the funnel, not in integrity.
+      makeStudent({ id: "s3", goals: [makeGoal({ id: "g5", level: "bhag" })] }),
+    ];
+
+    const result = computeAcademicKpis(students);
+    assert.equal(result.academicFunnel[2].value, 3);
+    assert.equal(result.goalIntegrity.confirmedBhagReviewed14d, 1);
+    assert.equal(result.goalIntegrity.confirmedBhagReviewed14dPct, 33);
+    assert.equal(result.goalIntegrity.pathwayLinkedToConfirmedGoal, 1);
+    assert.equal(result.goalIntegrity.pathwayLinkedToConfirmedGoalPct, 33);
   });
 });
