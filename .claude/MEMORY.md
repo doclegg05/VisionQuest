@@ -23,8 +23,8 @@ Newest: the memory-system review shipped as PR #137 (2026-07-27, squash `0bc2dba
 - [ ] Product call: exempt or supply a PDF for `ai-data-consent` (release-of-information packet now ends pending-verification)
 - [ ] Decide whether StudentSavedJob should carry verification fields (Application is covered)
 - [ ] Career-grounding Phase B upload/sync (owner-governed per `docs/runbooks/career-grounding-sync.md`): re-stage the 15 candidates on Windows with the 2026-07-23 path/audience delta, then run the governed upload — blocked on the Mac checkout, which has neither the `docs-upload/` binaries nor `STORAGE_ACCESS_KEY`/`STORAGE_SECRET_KEY`/`STORAGE_ENDPOINT`
-- [ ] **USER**: Ship draft PRs #138 (docs-corpus routing) and #142 (ProgressionEdge) — mark ready, then `gh pr merge <n> --auto --squash`
-- [ ] **USER**: after #142 merges, run `npm run db:seed:progression` against prod (not urgent — static fallback keeps behavior identical until it runs)
+- [x] Ship draft PRs #138 and #142 — DONE 2026-07-27: both squash-merged (`af57cc3`, `53f9eb9`), verified via GitHub API + content checks on main
+- [x] Prod seed after #142 — DONE 2026-07-27: 12 edges live in prod ProgressionEdge (read-back verified, second run proved idempotent: 0 pruned). Caught in the act: the shipped `.mjs` seed entry couldn't link its named `.ts` import under tsx — replaced with a `.ts` entry (fix PR)
 - [ ] Follow-up to #142 after soak: remove the static `prerequisites` arrays from `certifications.ts` (table becomes sole source) and give `areTransitivePrerequisitesMet` its first production consumer (teacher-editable pathways)
 - [ ] Memory-review rev 3 remainders: MemPalace documented-but-unwired (wire or mark deferred), CodeGraph `codegraph init` never run (run or drop from Ouroboros P-1), auto-memory durability — count `~/.claude/projects/*/memory/*.md` on the Windows machine to settle the 35-vs-19 question
 - [ ] **USER**: trigger prod backfill once: `curl -X POST https://visionquest.onrender.com/api/internal/rag/backfill -H "Authorization: Bearer $CRON_SECRET"` (idempotent; needs CRON_SECRET)

@@ -6,12 +6,16 @@
  * the (fromId, toId, kind) unique key, then prunes rows no longer present in
  * the static set, so the table always mirrors the arrays exactly.
  *
+ * A .ts entry (run via tsx, like the test suite): a .mjs entry importing a
+ * named export from a .ts module fails to link under the repo's tsx/Node
+ * loader combination.
+ *
  * Usage:
  *   DATABASE_URL="..." npm run db:seed:progression
  */
 
 import { PrismaClient } from "@prisma/client";
-import { syncProgressionEdges } from "../src/lib/progression-edges.ts";
+import { syncProgressionEdges } from "../src/lib/progression-edges";
 
 const prisma = new PrismaClient();
 
