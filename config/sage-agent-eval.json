@@ -128,7 +128,8 @@
       "filename": "signed-dress-code.pdf",
       "gist": "SPOKES Dress Code Policy FY26, filled out and signed by the student, dated this week."
     },
-    "expectedTool": "submit_form"
+    "expectedTool": "submit_form",
+    "context": "STUDENT'S ORIENTATION CHECKLIST (incomplete items):\n- orientationItemId dress-code: Dress Code Policy (signature required)\n- orientationItemId rights-responsibilities: Rights and Responsibilities (signature required)\n- orientationItemId attendance-contract: Attendance Contract (signature required)"
   },
   {
     "id": "submit-signed-rights",
@@ -138,7 +139,8 @@
       "filename": "rights-responsibilities-signed.pdf",
       "gist": "SPOKES Rights and Responsibilities FY26 form with student signature on the final page."
     },
-    "expectedTool": "submit_form"
+    "expectedTool": "submit_form",
+    "context": "STUDENT'S ORIENTATION CHECKLIST (incomplete items):\n- orientationItemId dress-code: Dress Code Policy (signature required)\n- orientationItemId rights-responsibilities: Rights and Responsibilities (signature required)\n- orientationItemId attendance-contract: Attendance Contract (signature required)"
   },
   {
     "id": "file-cert-evidence",
