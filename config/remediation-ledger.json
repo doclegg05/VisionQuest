@@ -499,8 +499,20 @@
         "src/lib/storage.ts"
       ],
       "fix": "Log a warning with storageKey and fallback tier every time a bundled or content-dir fallback serves a request in production; add a Sentry breadcrumb; restrict the fuzzy content-dir scan to dev builds.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/storage.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/storage.ts",
+          "mustContain": "warnDegradedDelivery"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "warnDegradedDelivery logs {storageKey, tier, matched} via the shared logger on every bundled / content-dir / fuzzy serve and adds a Sentry breadcrumb (Sentry imported lazily so the standalone asset-staging script's import of this module never pulls it in). The pass-2 fuzzy substring match is gated behind allowFuzzy (defaults to IS_DEV) — production returns null instead of risking the wrong document. findInContentDir gained baseDir/allowFuzzy options and an export for temp-dir fixture tests, which pin the normalized-collision case (spaces-vs-hyphens filename) both ways."
     },
     {
       "id": "VQ-R-021",
