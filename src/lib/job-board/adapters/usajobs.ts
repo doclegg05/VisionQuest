@@ -1,6 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
+import { fetchJson } from "./shared";
 import { logger } from "@/lib/logger";
 
 /**
@@ -30,6 +31,10 @@ interface USAJobsSearchItem {
   MatchedObjectDescriptor: USAJobsDescriptor;
 }
 
+interface USAJobsResponse {
+  SearchResult?: { SearchResultItems?: USAJobsSearchItem[] };
+}
+
 export const usajobsAdapter: JobSourceAdapter = {
   source: "usajobs",
   sourceType: "api",
@@ -50,20 +55,19 @@ export const usajobsAdapter: JobSourceAdapter = {
         ResultsPerPage: "50",
       });
 
-      const res = await fetch(`${USAJOBS_BASE}?${params}`, {
+      // shared fetchJson carries the 30s AbortSignal timeout and failure
+      // logging — a raw fetch here can hang a scrape run forever (VQ-R-019).
+      // The USAJobs User-Agent (contact email per ToS) survives: fetchJson
+      // only sets a user-agent when the caller did not provide one.
+      const json = await fetchJson<USAJobsResponse>(`${USAJOBS_BASE}?${params}`, {
         headers: {
           "Authorization-Key": apiKey,
           "User-Agent": email,
           Host: "data.usajobs.gov",
         },
       });
+      if (!json) return [];
 
-      if (!res.ok) {
-        logger.error("USAJobs API error", { status: res.status });
-        return [];
-      }
-
-      const json = await res.json();
       const items: USAJobsSearchItem[] =
         json.SearchResult?.SearchResultItems ?? [];
 

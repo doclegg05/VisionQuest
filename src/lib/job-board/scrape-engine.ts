@@ -412,8 +412,14 @@ export async function runScrapeForConfig(
 
 /**
  * Run scrape for all auto-refresh configs. Called by cron.
+ *
+ * Each config's scrape is isolated: one class's failure is logged and the
+ * sweep continues with the remaining classes instead of aborting the whole
+ * cron run (VQ-R-019). `scrapeConfig` is injectable for tests only.
  */
-export async function runAllAutoRefreshScrapes(): Promise<number> {
+export async function runAllAutoRefreshScrapes(
+  scrapeConfig: (configId: string) => Promise<number> = runScrapeForConfig,
+): Promise<number> {
   const configs = await prisma.jobClassConfig.findMany({
     where: { autoRefresh: true },
     select: { id: true },
@@ -421,7 +427,14 @@ export async function runAllAutoRefreshScrapes(): Promise<number> {
 
   let total = 0;
   for (const config of configs) {
-    total += await runScrapeForConfig(config.id);
+    try {
+      total += await scrapeConfig(config.id);
+    } catch (error) {
+      logger.error("Auto-refresh scrape failed for config", {
+        configId: config.id,
+        error: errorMessage(error),
+      });
+    }
   }
   return total;
 }

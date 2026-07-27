@@ -525,8 +525,39 @@
         "src/lib/job-board/scrape-engine.ts"
       ],
       "fix": "Route adzuna, usajobs and jsearch through fetchJson (or add AbortSignal.timeout); wrap the per-config loop so one class's failure does not abort the rest.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/job-board/adapters/api-adapters.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/lib/job-board/scrape-engine.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/adapters/adzuna.ts",
+          "mustContain": "fetchJson<AdzunaResponse>"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/adapters/usajobs.ts",
+          "mustContain": "fetchJson<USAJobsResponse>"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/adapters/jsearch.ts",
+          "mustContain": "fetchJson<JSearchResponse>"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/scrape-engine.ts",
+          "mustContain": "Auto-refresh scrape failed for config"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Adzuna, USAJobs and JSearch now route through shared fetchJson, which carries the 30s AbortSignal timeout, the Job Scout user-agent default, and warn-level failure logging; each adapter returns [] when fetchJson reports failure (null). USAJobs keeps its ToS-required User-Agent email because fetchJson only defaults the header when absent. runAllAutoRefreshScrapes wraps each config's scrape in try/catch + logger.error so one class's throw no longer aborts the remaining classes' cron sweep; the per-config scrape function is injectable (defaults to runScrapeForConfig) purely so the isolation loop is testable without mocking the whole engine."
     },
     {
       "id": "VQ-R-020",

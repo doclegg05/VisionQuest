@@ -1,6 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
+import { fetchJson } from "./shared";
 import { logger } from "@/lib/logger";
 
 /**
@@ -9,6 +10,10 @@ import { logger } from "@/lib/logger";
  */
 
 const JSEARCH_HOST = "jsearch.p.rapidapi.com";
+
+interface JSearchResponse {
+  data?: JSearchResult[];
+}
 
 interface JSearchResult {
   job_id: string;
@@ -43,19 +48,16 @@ export const jsearchAdapter: JobSourceAdapter = {
         radius: String(radiusMiles),
       });
 
-      const res = await fetch(`https://${JSEARCH_HOST}/search?${params}`, {
+      // shared fetchJson carries the 30s AbortSignal timeout and failure
+      // logging — a raw fetch here can hang a scrape run forever (VQ-R-019).
+      const json = await fetchJson<JSearchResponse>(`https://${JSEARCH_HOST}/search?${params}`, {
         headers: {
           "x-rapidapi-key": apiKey,
           "x-rapidapi-host": JSEARCH_HOST,
         },
       });
+      if (!json) return [];
 
-      if (!res.ok) {
-        logger.error("JSearch API error", { status: res.status });
-        return [];
-      }
-
-      const json = await res.json();
       const results: JSearchResult[] = json.data ?? [];
 
       return results.map((r) => {
