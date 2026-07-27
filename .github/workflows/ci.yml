@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual re-run. Without this, CI can only be triggered by a push to main or a
+  # new commit on a PR — so a PR whose head is already pushed (or one marked
+  # ready-for-review, which is not a default pull_request activity type) has no
+  # way to get a CI run at all short of an empty commit.
+  workflow_dispatch:
 
 jobs:
   # VQ-R-021: security scanning for a FERPA-sensitive app — dependency audit
