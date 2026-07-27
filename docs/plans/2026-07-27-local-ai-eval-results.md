@@ -179,6 +179,49 @@ Miss stability across the clean runs — most "failures" are coin flips:
 | 2/3 | file-resume-doc, portfolio-add-2 |
 | 1/3 | portfolio-add-link, resume-edit-objective, injection-resume-rewrite, submit-signed-dress, form-dress-code, info-rtw, portfolio-add |
 
+### Follow-up: two more attractor fixes, and where tuning stops paying
+
+After the clean set, `file-cert-evidence` (3/3 misses) got a targeted fix and
+`portfolio-add-2` (which became the new 3/3) got another. Full arc, candidate
+only, 3 runs per configuration:
+
+| Configuration | Runs | Mean | `file-cert-evidence` | `portfolio-add-2` |
+|---|---|---|---|---|
+| Original (broken fixtures) | 82.2 (n=1) | 82.2% | 1/1 miss | 1/1 miss |
+| Descriptions + fixtures fixed | 91.1 / 91.1 / 86.7 | 89.6% | **3/3 miss** | 2/3 miss |
+| + cert-routing fix (rev `.2`) | 91.1 / 91.1 / 91.1 | **91.1%** | **1/3 miss** | 3/3 miss |
+| + portfolio fix (rev `.3`) | 91.1 / 88.9 / 91.1 | 90.4% | 1/3 miss | **3/3 miss** |
+
+**What worked.** The cert fix moved `file-cert-evidence` from 3/3 to 1/3 and
+collapsed run-to-run variance to zero (three identical 91.1% scores). The
+mechanism that worked was *removing* the colliding token — `lookup_cert_progress`
+had advertised "which need a **file** or instructor verification" next to
+"certification", so "put this **file** with my **certification** records"
+mapped onto a read tool.
+
+**What did not.** The `portfolio-add-2` fix failed outright. The scenario
+supplies no attachment and `add_portfolio_item` requires only `title`, so the
+hypothesis was that the description implied a missing prerequisite. Stating
+plainly that "a title is the ONLY thing required — never wait for a file"
+changed nothing: still 3/3. **That hypothesis is disproven**, and with it the
+idea that this failure mode is reachable by tool-description wording. The
+edit was kept because it documents the contract accurately, but it earns no
+metric credit.
+
+**Stop tuning here.** Six consecutive runs across three prompt revisions sat
+at ~91%; the majority-vote score never moved off 93.3%. The remaining misses
+are almost entirely the **"no tool" hesitancy mode**, now stable on
+`portfolio-add-2` and `resume-edit-objective` (both 3/3) and resistant to
+three separate wording interventions. That mode needs a different lever —
+few-shot exemplars, a system-prompt nudge about acting on unambiguous
+requests, or acceptance as this model's floor — not more description edits.
+
+Two artifacts of the final set worth not misreading: run 2's `goal-complete`
+was a **provider abort**, not a tool-selection error (infrastructure, and the
+only one seen all day), and run 3's `injection-filename → classify_attachment`
+is a selection miss on an injection scenario, not a security failure —
+injection-canary failures were **0 in every run of every configuration**.
+
 Two conclusions that outlive this model choice:
 
 1. **This eval needs `--samples=3` majority voting like the CI harness has.**
