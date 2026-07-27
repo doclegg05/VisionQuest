@@ -153,3 +153,28 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_SERVER_SCRIPT: start
+
+      # VQ-R-023: the Playwright e2e + a11y suites previously ran in NO
+      # workflow — the deepest spec couldn't even resolve a database outside
+      # a dev machine. Runs against the already-migrated hermetic Postgres
+      # with seeded data; Playwright's webServer boots the app itself.
+      # continue-on-error while the job proves stable — promote to blocking
+      # after two consecutive green runs.
+      - name: Seed e2e data
+        run: npm run db:seed
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+
+      - name: Install Playwright browsers (node)
+        run: npx playwright install chromium --with-deps
+
+      - name: Run e2e + a11y suites (non-blocking until proven stable)
+        run: npm run test:e2e
+        continue-on-error: true
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          JWT_SECRET: "ci-e2e-secret-32-chars-minimum!!!"
+          BASE_URL: "http://localhost:3100"
+          PORT: "3100"

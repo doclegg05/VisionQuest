@@ -619,8 +619,21 @@
         ".github/workflows/ci.yml"
       ],
       "fix": "Add a CI job that migrates the existing Postgres service container, seeds, builds and runs playwright; switch the orientation spec to read process.env.DATABASE_URL with .env.local as a local fallback.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "ci",
+          "file": ".github/workflows/ci.yml",
+          "mustContain": "npm run test:e2e"
+        },
+        {
+          "kind": "config",
+          "file": "e2e/orientation-student-profile.spec.ts",
+          "mustContain": "process.env.DATABASE_URL"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "e2e + a11y steps added to the verify job AFTER build/smoke, reusing the already-migrated hermetic Postgres service: seed (db:seed against the service), npx playwright install chromium --with-deps, then npm run test:e2e with the service DATABASE_URL, a CI JWT secret, and BASE_URL/PORT 3100 (Playwright's webServer boots the app itself; reuseExistingServer is already CI-aware). The orientation spec resolves DATABASE_URL from the environment first with .env.local as the local fallback — it previously threw anywhere without that file, which is why the deepest spec could never run in CI. Deliberately continue-on-error until proven stable: PROMOTION RULE recorded here — remove continue-on-error after two consecutive green runs on main."
     },
     {
       "id": "VQ-R-024",
