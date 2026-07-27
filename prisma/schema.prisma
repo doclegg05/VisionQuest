@@ -1201,6 +1201,25 @@ model SageMemoryEdge {
   @@schema("visionquest")
 }
 
+// Certification/platform progression structure as data (issue #140).
+// fromId depends on toId (kind "prerequisite"). Endpoints are static ids
+// from src/lib/spokes/{certifications,platforms}.ts — no FK targets exist,
+// so referential integrity is locked by progression-edges.test.ts instead.
+// Program-wide reference data: read-open, admin-only writes (RLS Pattern L).
+model ProgressionEdge {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  kind      String   @default("prerequisite")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromId, toId, kind])
+  @@index([fromId])
+  @@index([toId])
+  @@schema("visionquest")
+}
+
 // Recorded student consent (Phase 3). Active consent = grantedAt set and
 // revokedAt null for the scope. History preserved: revocation closes the row;
 // re-granting creates a new one. scope: cloud_file_processing (Gemini Files

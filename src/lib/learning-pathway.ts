@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { prisma } from "./db";
+import { loadPrerequisiteMap } from "./progression-edges";
 import { CAREER_CLUSTERS, getClusterById } from "./spokes/career-clusters";
 import { CERTIFICATIONS } from "./spokes/certifications";
 import { PLATFORMS } from "./spokes/platforms";
@@ -58,6 +59,10 @@ export async function getLearningPathway(
     select: { certType: true, status: true },
   });
 
+  // Prerequisite structure now lives in ProgressionEdge rows (issue #140);
+  // an empty table falls back to the static arrays inside the loader.
+  const prereqMap = await loadPrerequisiteMap();
+
   const certStatusMap = new Map<string, "complete" | "in_progress">();
   for (const record of dbCertRecords) {
     const status = record.status === "completed" ? "complete" : "in_progress";
@@ -82,7 +87,7 @@ export async function getLearningPathway(
       name = certMeta.shortName;
       description = certMeta.description;
       estimatedHours = certMeta.estimatedHours;
-      prerequisites = certMeta.prerequisites;
+      prerequisites = prereqMap.get(stepId) ?? [];
       type = "certification";
     } else if (platformMeta) {
       name = platformMeta.name;
