@@ -7,15 +7,22 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
-Remediation of the 2026-07-24 whole-project review is COMPLETE: all 29 critical/high findings fixed (zero deferrals) on `remediation/critical-high`, `npm run remediation:gate` → RESOLVED: 29/29 with the full suite green (2,131 tests), coverage measured 81.5% lines with a new 80% CI ratchet. Draft PR #136 updated to the final state; CI running post-push. New standing instruments: security CI job (npm audit high+ / gitleaks / dependabot), generated endpoint inventory + parity test (`npm run registry:generate`), e2e+a11y in CI (non-blocking until 2 green runs), coverage ratchet. Local-AI Workstream B (32GB iMac M4 model evaluation + host migration) is planned and NOT started — see the approved plan in ~/.claude/plans/let-s-build-a-plan-twinkly-mochi.md.
+**Two threads in flight.** (1) Remediation of the 2026-07-24 review is CODE-COMPLETE: 29/29 critical/high findings fixed, zero deferrals, `npm run remediation:gate` PASS with the full suite green. PR #136 is OPEN and **out of draft**, Sage Evals now **passes** (manual workflow_dispatch run 2026-07-27 15:33 — the earlier failure was depleted Gemini prepayment credits, not code), CI green — but the PR is **MERGE-CONFLICTING with main** and must be rebased before merge. (2) Workstream B (local-AI on the iMac M4 32GB) is mid-evaluation on branch `local-ai/32gb-eval` — see docs/plans/2026-07-27-local-ai-eval-results.md, which carries results, caveats, and exact resume commands.
+
+**Several sibling sessions landed branches the same day**: `bug/spanish-crisis-parity` (Spanish method-adjacent crisis detection + localized 988 block — pushed), `bug/english-method-intent-parity`, `docs/route-plans-corpus`, and a `ci-trigger` worktree that added `workflow_dispatch` to ci.yml. Check `git worktree list` and branch dates before assuming any worktree↔branch mapping.
 
 ## Last Session
-- **Date**: 2026-07-27 (remediation completion, worktree interesting-sutherland-f1c945)
-- **What we worked on**: Fixed the remaining 22 findings (VQ-R-008..029): Sage agent cluster (callId attribution, read-only cert lookup, peek/consume rate limiting, shared goal-status transition), job board (per-class sourceId, tracker unification on Application, browse-pool seniority screen, fetch timeouts), teacher console (gate-level read auditing, formula-safe CSV), forms delivery observability, goal-tree totality + write-time lattice, KPI goal-integrity aggregates, Sentry-under-Turbopack, browse-refresh cron, CI security/coverage/e2e, registry inventory parity (caught 45 stale paths), doc-routing repair, draft successor charter. A builder subagent delivered 015/016/017/019 in an isolated worktree; cherry-picked clean.
-- **What we decided**: see Key Decisions Log 2026-07-27 rows.
-- **Where we left off**: PR #136 (draft) carries the full branch; CI running. Deploy needs: saved-jobs migration dry-run then --apply; confirm Supabase app.base_url + vault CRON_SECRET + 09:30 UTC slot; post-deploy Sentry browser-error check. Owner: ratify the draft charter in PRODUCT_GUIDE.md; close milestones #1/#2 + issues #37-#40; promote the e2e CI job after two green runs. Next engineering: Workstream B local-AI evaluation on this iMac (Ollama not yet installed).
+- **Date**: 2026-07-27 (remediation completion + Workstream B kickoff, worktree interesting-sutherland-f1c945)
+- **What we worked on**: Closed the remaining 22 remediation findings (a builder subagent delivered the 4 job-board ones in an isolated worktree; cherry-picked clean). Then started the local-AI evaluation: installed Ollama 0.32.4, pulled `gemma4:26b-a4b-it-qat` / `gemma4:latest` / `nomic-embed-text`, ran S0+S1 on both models, and fixed a real provider bug S0 uncovered.
+- **Key technical find**: `gemma4:26b-a4b` is a THINKING model — without `think:false` it spends the whole `num_predict` budget on a hidden reasoning channel and returns EMPTY content; the `/v1` compat layer ignores that flag and the provider's negotiation preferred exactly that path. Fixed on `local-ai/32gb-eval`: native bodies send `think:false`, negotiation is native-first with 404/405 compat fallback (OpenAI-only `apiStyle` configs unchanged). Provider tests rewritten to the new contract; full suite 2,132/2,132.
+- **Where we left off**: S2-S4 battery was running when the session ended — the 8B baseline finished (66.7% tool selection, FAILS the 85% gate; p50 16.9s), the CANDIDATE's battery never ran. Grounding cases in S3 failed on a missing local Postgres, NOT model behavior. Resume commands are in the eval doc.
 
 ## Open Items
+- [ ] **PR #136 is merge-CONFLICTING with main** — rebase/merge before it can land (it carries the outage-proof crisis scan; production still runs the old code)
+- [ ] Workstream B S2-S5 on `gemma4:26b-a4b-it-qat` — the decisive gate is ≥85% tool selection (8B scored 66.7%); fallback ladder qwen3:30b-a3b → gpt-oss:20b
+- [ ] Start a local Postgres + DATABASE_URL before rerunning S3/S5 (grounding + memory stages need it)
+- [ ] Measure the candidate's in-harness first-token latency against the ≤5s target (raw decode was 34.5 tok/s; the 8B measured p50 16.9s in-harness)
+- [ ] Decide what happens to sibling branches: bug/spanish-crisis-parity (pushed), bug/english-method-intent-parity, docs/route-plans-corpus
 - [ ] **DEPLOY**: run `node scripts/migrate-saved-jobs-to-applications.mjs` dry-run against prod, review, re-run with `--apply` (legacy savers keep apply-step progress)
 - [ ] **DEPLOY**: confirm Supabase `app.base_url` + vault `CRON_SECRET`; confirm 09:30 UTC browse-refresh slot
 - [ ] **USER**: post-deploy, trigger one browser error and confirm it arrives in Sentry (VQ-R-024 close-out)
@@ -63,6 +70,8 @@ Remediation of the 2026-07-24 whole-project review is COMPLETE: all 29 critical/
 | 2026-07-27 | Registry: generate the route INVENTORY + parity test; hand-authored metadata stays | Descriptions/roles can't be derived statically; correspondence is what's enforceable — first run caught 45 stale :id paths (VQ-R-026, locked decision honored) |
 | 2026-07-27 | Application vocabulary wins: job-board "offered" normalizes to "offer" on write | Unified rows flow to all four teacher surfaces with zero reader changes (VQ-R-017, builder) |
 | 2026-07-27 | e2e CI lands continue-on-error with a written promotion rule (2 green runs) | Non-blocking trial beats a flaky gate; the rule lives in the ledger so it can't be forgotten |
+| 2026-07-27 | Local Ollama calls send `think:false` and negotiate native-first | Thinking models return empty content under num_predict caps otherwise, and /v1 compat ignores the flag; OpenAI-only endpoints keep compat-only behavior |
+| 2026-07-27 | 8B incumbent confirmed unfit for the agent lane by measurement, not vibes | 66.7% tool selection vs an 85% gate + p50 16.9s in-harness — the owner's 'too weak/too slow' complaint reproduced as numbers |
 
 ## Architecture Notes
 - Sage agent: `src/lib/sage/agent/` — registry, executor (role-gated), HMAC confirm cards (`confirmation.ts`), write tools, career tools; every write ledgered in SageOperation + AuditLog
