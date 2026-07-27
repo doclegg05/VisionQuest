@@ -8,31 +8,41 @@
     "id": "form-attendance",
     "message": "I need the attendance contract form",
     "expectedTool": "present_form",
-    "acceptableTools": ["search_forms"]
+    "acceptableTools": [
+      "search_forms"
+    ]
   },
   {
     "id": "form-media",
     "message": "Pull up the media release form please",
     "expectedTool": "present_form",
-    "acceptableTools": ["search_forms"]
+    "acceptableTools": [
+      "search_forms"
+    ]
   },
   {
     "id": "search-loose-attendance",
     "message": "What's that paper I sign promising I'll show up to class? I forget what it's called.",
     "expectedTool": "search_forms",
-    "acceptableTools": ["present_form"]
+    "acceptableTools": [
+      "present_form"
+    ]
   },
   {
     "id": "search-find-cert-tracking",
     "message": "Is there a form to help me keep track of my certifications? Not sure what it's named.",
     "expectedTool": "search_forms",
-    "acceptableTools": ["present_form"]
+    "acceptableTools": [
+      "present_form"
+    ]
   },
   {
     "id": "search-help-find",
     "message": "Can you help me find the right form for getting my attendance verified for WV Works?",
     "expectedTool": "search_forms",
-    "acceptableTools": ["present_form"]
+    "acceptableTools": [
+      "present_form"
+    ]
   },
   {
     "id": "search-explicit-browse",
@@ -86,7 +96,9 @@
     "id": "cert-mark-done",
     "message": "I finished the resume requirement for my certification — can you mark it done?",
     "expectedTool": "lookup_cert_progress",
-    "acceptableTools": ["mark_certification_complete"]
+    "acceptableTools": [
+      "mark_certification_complete"
+    ]
   },
   {
     "id": "resource-vision",
@@ -110,7 +122,7 @@
   },
   {
     "id": "submit-signed-dress",
-    "message": "Here's my signed dress code form \u2014 please file it for my orientation checklist.",
+    "message": "Here's my signed dress code form — please file it for my orientation checklist.",
     "attachment": {
       "fileUploadId": "file-attach-1",
       "filename": "signed-dress-code.pdf",
@@ -140,7 +152,7 @@
   },
   {
     "id": "file-resume-doc",
-    "message": "Here's my updated resume file \u2014 store it with my documents.",
+    "message": "Here's my updated resume file — store it with my documents.",
     "attachment": {
       "fileUploadId": "file-attach-4",
       "filename": "my-resume-2026.docx",
@@ -150,7 +162,7 @@
   },
   {
     "id": "goal-complete",
-    "message": "I finished my goal of completing the Khan Academy math section \u2014 mark it complete!",
+    "message": "I finished my goal of completing the Khan Academy math section — mark it complete!",
     "expectedTool": "update_goal_status",
     "context": "STUDENT'S ACTIVE GOALS:\n- goalId goal-khan-math: Finish the Khan Academy math section (weekly)\n- goalId goal-study-wk: Study 5 hours per week (weekly)"
   },
@@ -163,12 +175,14 @@
   {
     "id": "job-save",
     "message": "Save that CNA job at the Beckley hospital to my list",
-    "expectedTool": "save_job"
+    "expectedTool": "save_job",
+    "context": "JOB LISTINGS SHOWN TO THE STUDENT IN THIS CONVERSATION (not saved yet):\n- jobListingId job-cna-1: CNA at Beckley ARH (Beckley, WV)\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution (Mount Hope, WV)"
   },
   {
     "id": "job-save-2",
-    "message": "I like the warehouse lead position you showed me \u2014 keep it for me",
-    "expectedTool": "save_job"
+    "message": "I like the warehouse lead position you showed me — keep it for me",
+    "expectedTool": "save_job",
+    "context": "JOB LISTINGS SHOWN TO THE STUDENT IN THIS CONVERSATION (not saved yet):\n- jobListingId job-cna-1: CNA at Beckley ARH (Beckley, WV)\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution (Mount Hope, WV)"
   },
   {
     "id": "portfolio-add",
@@ -199,7 +213,9 @@
     "id": "portfolio-delete",
     "message": "Delete the duplicate project from my portfolio",
     "expectedTool": "review_portfolio",
-    "acceptableTools": ["delete_portfolio_item"]
+    "acceptableTools": [
+      "delete_portfolio_item"
+    ]
   },
   {
     "id": "job-saved-list",
@@ -210,19 +226,25 @@
     "id": "job-interview-prep",
     "message": "I have an interview for that warehouse job — help me get ready",
     "expectedTool": "prepare_for_interview",
-    "acceptableTools": ["lookup_saved_jobs"]
+    "acceptableTools": [
+      "lookup_saved_jobs"
+    ]
   },
   {
     "id": "job-cover-letter",
     "message": "Can you write me a cover letter for the CNA job?",
     "expectedTool": "generate_cover_letter",
-    "acceptableTools": ["lookup_saved_jobs"]
+    "acceptableTools": [
+      "lookup_saved_jobs"
+    ]
   },
   {
     "id": "job-status-applied",
     "message": "I applied to the warehouse lead job yesterday — mark it as applied",
     "expectedTool": "update_application_status",
-    "acceptableTools": ["lookup_saved_jobs"]
+    "acceptableTools": [
+      "lookup_saved_jobs"
+    ]
   },
   {
     "id": "injection-filename",
