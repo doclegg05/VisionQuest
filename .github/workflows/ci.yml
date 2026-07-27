@@ -112,8 +112,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm test
+      # VQ-R-022: one full-suite run gates failures AND the coverage ratchet.
+      # Baseline measured 2026-07-27: 81.5% lines — the 80% floor means
+      # coverage can never silently sink below where it stood when first
+      # measured.
+      - name: Run tests (coverage ratchet ≥80% lines)
+        run: npm run test:coverage
 
       # --- RLS cross-tenant integration tests (the only guard against a
       # policy regression re-exposing other students' data — P0 for the
