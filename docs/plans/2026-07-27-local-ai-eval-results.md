@@ -112,6 +112,54 @@ differentiator.
 
 Hardware placement/posture (never-sleep, FileVault-vs-unattended-boot, UPS, ethernet); model sign-off; degraded-mode option A/B/C; latency acceptance; Gemini judge in CI; Spanish product bar; LoRA (deferred).
 
+## S2 re-measurement after the attractor fix (2026-07-27)
+
+Three findings came out of acting on the attractor diagnosis. Two were real
+bugs in our own code and fixtures; one was a lesson about prompting.
+
+**1. The `classify_attachment` attractor was real and is now dead.** It
+appeared in 4 of the candidate's 8 misses and 2 of the 8B's; after scoping it
+to UNLABELED files and pointing the action tools at "takes the fileUploadId
+as-is", it appears in **zero** misses on either model. Commit `4dfce23`,
+`SAGE_PROMPT_REVISION` → `2026-07-27.1`.
+
+**2. `job-save` / `job-save-2` were unwinnable fixtures, not model failures.**
+Both expected `save_job` while supplying **no context at all** — and
+`save_job` requires a `jobListingId`. There was no id anywhere in the prompt,
+so reaching for a lookup tool to resolve "that CNA job at the Beckley
+hospital" was rational behavior. No tool-description wording could have fixed
+it. Repaired with browse-result context in the established `job-match-cna`
+style (listings shown but explicitly NOT saved — the distinction the pair
+exists to test); `expectedTool` untouched, no `acceptableTools` widened.
+Same defect class as the `info-certs` quality scenario found earlier today.
+
+**3. Negative instructions did not work.** "Do NOT call lookup_saved_jobs
+first" changed nothing on the candidate — it kept choosing
+`lookup_saved_jobs` for both save cases. What actually fixed those cases was
+supplying the missing id (finding 2). Prefer telling a model what TO do and
+what data it has; do not rely on prohibitions.
+
+### Measured results
+
+Intermediate run (descriptions fixed, fixtures still broken): candidate
+82.2% unchanged, 8B **66.7% → 75.6%**. The candidate traded 3 fixes for 3
+new misses at n=1, and a new "no tool" hesitancy mode appeared (10 of the
+8B's 11 remaining misses) — the cost of adding conditional language.
+
+Final run (descriptions fixed + fixtures repaired), candidate
+`gemma4:26b-a4b-it-qat`, 3 passes to separate signal from noise since this
+script has no `--samples` support and tool selection is non-deterministic:
+
+| Run | Accuracy | Misses |
+|---|---|---|
+| 1 | **95.6% (43/45)** | submit-signed-dress → no tool; portfolio-add-2 → no tool |
+| 2 | _pending_ | |
+| 3 | _pending_ | |
+
+Run 1 clears the ≥85% gate with room to spare and shows 0 injection-canary
+failures. **Do not treat this as settled until runs 2–3 land** — establishing
+the variance is the entire point of running three.
+
 ## Verdict after S0–S4 (both models, 2026-07-27)
 
 The candidate beats the incumbent on every axis that was validly measured —
