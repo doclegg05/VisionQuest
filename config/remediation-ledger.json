@@ -370,8 +370,25 @@
         "src/app/api/teacher/students/[id]/memories/route.ts"
       ],
       "fix": "Fold recordStudentView into the shared assertStaffCanManageStudent path so read-auditing is automatic for every student-data GET; wire the missing surfaces; delete unused StudentViewSurface values.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/classroom-read-audit.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/classroom.ts",
+          "mustContain": "recordStudentView"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/audit.ts",
+          "mustContain": "student_data"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "recordStudentView now fires inside assertStaffCanManageStudent itself — the gate all ~46 teacher-facing call sites already pass — with default surface \"student_data\", caller override (student-detail route passes \"student_detail\" and dropped its now-duplicate direct call), and an explicit null opt-out for flows audited more precisely elsewhere. Denied access never audits; auditing is fire-and-forget and can never block access. Mutations passing the gate also log a sampled view — accepted noise, bounded by the existing 1/(actor,student,surface)/day sampling. Unused surface values \"conversations\"/\"export\" deleted; \"student_data\" added."
     },
     {
       "id": "VQ-R-014",

@@ -95,12 +95,12 @@ describe("recordStudentView", () => {
 
   it("writes again for a different surface on the same day", async () => {
     await audit.recordStudentView(baseInput);
-    await audit.recordStudentView({ ...baseInput, surface: "conversations" });
+    await audit.recordStudentView({ ...baseInput, surface: "student_data" });
 
     assert.equal(mockCreate.mock.callCount(), 2);
     assert.equal(
       mockCreate.mock.calls[1].arguments[0].data.action,
-      "teacher.student.view.conversations",
+      "teacher.student.view.student_data",
     );
   });
 
