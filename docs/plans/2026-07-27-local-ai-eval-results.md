@@ -51,13 +51,36 @@ No `--judge` locally (no GEMINI_API_KEY on this machine); Gemini-judged S7 runs 
 
 ## Results
 
+### Integration finding (S0, 2026-07-27) — thinking mode, provider fixed
+
+`gemma4:26b-a4b` is a **thinking model**: without `think: false` it spends its
+entire `num_predict` budget on a hidden reasoning channel — plain chat
+returned EMPTY content (finish_reason=length) while tool-calling worked. The
+`/v1` OpenAI-compat layer **ignores** the think flag, and the provider's old
+negotiation settled on exactly that path. Fixed on this branch
+(`fix(local-ai): disable thinking on native Ollama calls; prefer native
+mode`): native bodies carry `think: false` (verified harmless on the
+non-thinking 8B) and unknown-mode negotiation is native-first with 404/405
+compat fallback. Full suite 2,132/2,132 after the provider-test rewrite.
+
+### Candidate 1 — `gemma4:26b-a4b-it-qat` (15GB resident, 100% GPU)
+
+| Stage | Result | Gate |
+|---|---|---|
+| S0 chat | PASS (with think:false) | ✓ |
+| S0 tools | PASS — clean call, correct args | ✓ |
+| S0 JSON | PASS (with think:false) | ✓ |
+| S0 embeddings | 768 dims (nomic-embed-text) | ✓ |
+| Cold load | **11.2s** | ✓ (≤60s) |
+| Decode | **34.5 tok/s** | ✓ (≥12–15) |
+| S1 quality screen | running | — |
+
 ### Baseline — `gemma4:latest` (8B incumbent control)
 
-_(pending pull)_
-
-### Candidate 1 — `gemma4:26b-a4b-it-qat`
-
-_(pending pull)_
+| Stage | Result |
+|---|---|
+| think:false tolerance | PASS (non-thinking model, flag harmless) |
+| S1 quality screen | running |
 
 ## Owner decisions pending (from the plan)
 
