@@ -7,6 +7,30 @@ on:
     branches: [main]
 
 jobs:
+  # VQ-R-021: security scanning for a FERPA-sensitive app — dependency audit
+  # at high severity and full-history secret scanning, parallel to verify so
+  # the main job's wall-clock is unchanged.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks scans commit history, not just the checkout.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Dependency audit (high severity and above fails)
+        run: npm audit --audit-level=high
+
+      - name: Secret scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   verify:
     runs-on: ubuntu-latest
     services:

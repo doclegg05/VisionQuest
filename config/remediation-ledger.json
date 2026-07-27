@@ -562,8 +562,26 @@
         ".github/workflows/ci.yml"
       ],
       "fix": "Add a dependency audit at high severity, a secret-scanning step, and a dependency-update config for the npm and github-actions ecosystems.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "ci",
+          "file": ".github/workflows/ci.yml",
+          "mustContain": "npm audit --audit-level=high"
+        },
+        {
+          "kind": "ci",
+          "file": ".github/workflows/ci.yml",
+          "mustContain": "gitleaks/gitleaks-action@v2"
+        },
+        {
+          "kind": "config",
+          "file": ".github/dependabot.yml",
+          "mustContain": "package-ecosystem: npm"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "New parallel `security` CI job (verify's wall-clock unchanged): npm audit gating at high+ (verified clean today, so the gate lands green) and gitleaks full-history secret scanning (fetch-depth 0). Dependabot covers npm and github-actions weekly with grouped minor/patch to keep PR volume proportionate for a solo maintainer; security advisories bypass the schedule."
     },
     {
       "id": "VQ-R-022",
