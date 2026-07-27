@@ -241,8 +241,30 @@
         "src/app/api/goals/route.ts"
       ],
       "fix": "Extract a pure buildGoalTree module with unit tests and make the renderer total (every active goal renders exactly once); enforce the level lattice at write time.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/goal-tree.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/goal-tree.ts",
+          "mustContain": "buildGoalsPageModel"
+        },
+        {
+          "kind": "config",
+          "file": "src/components/goals/GoalsPageClient.tsx",
+          "mustContain": "buildGoalsPageModel"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/goals/route.ts",
+          "mustContain": "isValidGoalParentLevel"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "New pure src/lib/goal-tree.ts (buildGoalTree forest + buildGoalsPageModel + flattenGoalRows + isValidGoalParentLevel). Ownership cuts at monthly/bhag boundaries; missing parents and cycles degrade to visible orphan rows. Totality pinned by hand-built pathologies (depth-4 task, direct monthly task, weekly-under-bhag, dangling parent, 2-cycle) AND a 40-iteration seeded hostile random-forest sweep asserting every goal renders exactly once. Renderer swaps its seven filter passes for the model: monthly cards render+count identical row sets (the always-empty mDirectTasks bug and depth-3 drops are gone), weekly sub-rows include all depths, and the orphan card renders every orphan with indentation instead of filtering to weekly-or-parentless. POST /api/goals now rejects mis-leveled nesting (lattice: bhag→monthly→weekly→daily→task, tasks/dailies also directly under monthly); PATCH does not accept parentId/level changes so no guard was needed there."
     },
     {
       "id": "VQ-R-009",

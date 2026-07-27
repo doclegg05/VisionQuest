@@ -5,6 +5,9 @@ import { useProgression } from "@/components/progression/ProgressionProvider";
 import {
   GOAL_LEVEL_META,
   isAwaitingInstructorConfirmation,
+} from "@/lib/goals";
+import { buildGoalsPageModel } from "@/lib/goal-tree";
+import {
   type GoalLevel,
   type GoalStatus,
 } from "@/lib/goals";
@@ -485,48 +488,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     }
   }
 
-  // 1. Filter active goals
+  // VQ-R-008: the page model comes from one pure, totality-tested builder —
+  // every active goal renders exactly once (bhag cards, monthly cards, or the
+  // orphan checklist), replacing the seven ad-hoc filter passes whose gaps
+  // dropped deep-nested and orphaned goals while progress still counted them.
   const activeGoals = goals.filter((g) => g.status !== "abandoned");
-
-  // 2. BHAG goals
-  const bhags = activeGoals.filter((g) => g.level === "bhag");
-
-  // 3. Build child mapping
-  const childMap = new Map<string, GoalRecord[]>();
-  for (const g of activeGoals) {
-    if (g.parentId) {
-      if (!childMap.has(g.parentId)) {
-        childMap.set(g.parentId, []);
-      }
-      childMap.get(g.parentId)!.push(g);
-    }
-  }
-
-  // 4. Monthly Goals
-  const monthlyGoals = activeGoals.filter((g) => g.level === "monthly");
-
-  // 5. Weekly Goals
-  const weeklyGoals = activeGoals.filter((g) => g.level === "weekly");
-
-  // 6. Daily Goals and Tasks
-  const dailyGoals = activeGoals.filter((g) => g.level === "daily");
-  const tasks = activeGoals.filter((g) => g.level === "task");
-
-  // Helper to determine if a goal has a monthly goal ancestor
-  const hasMonthlyAncestor = (g: GoalRecord): boolean => {
-    let current: GoalRecord | undefined = g;
-    while (current && current.parentId) {
-      const parent: GoalRecord | undefined = activeGoals.find((p) => p.id === current!.parentId);
-      if (parent && parent.level === "monthly") return true;
-      current = parent;
-    }
-    return false;
-  };
-
-  // 7. Orphan/unsorted weekly/daily/tasks (not tied to any Monthly Goal)
-  const orphanGoals = activeGoals.filter(
-    (g) => g.level !== "bhag" && g.level !== "monthly" && !hasMonthlyAncestor(g)
-  );
+  const goalModel = buildGoalsPageModel(activeGoals);
+  const bhags = goalModel.bhags;
+  const monthlyGoals = goalModel.monthlyRoots.map((node) => node.goal);
+  const orphanRows = goalModel.orphanRows;
 
   return (
     <div className="space-y-6">
@@ -676,8 +646,31 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         {monthlyGoals.map((monthly) => {
           const isMEditing = editingGoalId === monthly.id;
           const isMProposed = monthly.status === "proposed";
-          const mWeekly = weeklyGoals.filter((w) => w.parentId === monthly.id);
-          const mDirectTasks = orphanGoals.filter((o) => o.parentId === monthly.id);
+          // Partition this monthly's card rows: weeklies own the sub-rows that
+          // follow them (any depth); everything else — direct tasks/dailies
+          // AND their nested children — renders in the direct checklist, so
+          // no row of the card can vanish (VQ-R-008).
+          const cardRows = goalModel.cardRowsByMonthlyId.get(monthly.id) ?? [];
+          const mWeekly: GoalRecord[] = [];
+          const weeklySubRows = new Map<string, GoalRecord[]>();
+          const mDirectTasks: GoalRecord[] = [];
+          let currentWeeklyId: string | null = null;
+          for (const row of cardRows) {
+            if (row.depth === 0) {
+              if (row.goal.level === "weekly") {
+                currentWeeklyId = row.goal.id;
+                mWeekly.push(row.goal);
+                weeklySubRows.set(row.goal.id, []);
+              } else {
+                currentWeeklyId = null;
+                mDirectTasks.push(row.goal);
+              }
+            } else if (currentWeeklyId) {
+              weeklySubRows.get(currentWeeklyId)!.push(row.goal);
+            } else {
+              mDirectTasks.push(row.goal);
+            }
+          }
 
           const goalPlan = goalPlans.find((p) => p.goalId === monthly.id) ?? {
             goalId: monthly.id,
@@ -686,16 +679,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             links: [],
           };
 
-          // Find descendants (weekly goals and nested tasks)
-          const descendants = activeGoals.filter((g) => {
-            if (g.parentId === monthly.id && g.level === "weekly") return true;
-            if (g.level === "task" || g.level === "daily") {
-              const parent = activeGoals.find((p) => p.id === g.parentId);
-              if (parent && parent.parentId === monthly.id) return true;
-            }
-            if (g.parentId === monthly.id && (g.level === "task" || g.level === "daily")) return true;
-            return false;
-          });
+          // Progress counts EXACTLY the rows this card renders (VQ-R-008).
+          const descendants = cardRows.map((row) => row.goal);
 
           const totalDescendants = descendants.length;
           const completedDescendants = descendants.filter((g) => g.status === "completed").length;
@@ -843,7 +828,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {/* Render Weekly Goals inside Monthly Card */}
                 {mWeekly.map((weekly) => {
                   const isWEditing = editingGoalId === weekly.id;
-                  const wTasks = dailyGoals.concat(tasks).filter((t) => t.parentId === weekly.id);
+                  const wTasks = weeklySubRows.get(weekly.id) ?? [];
 
                   return (
                     <div key={weekly.id} className="pl-1">
@@ -1235,8 +1220,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           );
         })}
 
-        {/* Orphan Goals Card — for tasks/weekly goals without a monthly parent */}
-        {orphanGoals.length > 0 && (
+        {/* Orphan Goals Card — every goal outside a monthly plan (VQ-R-008: nothing is dropped) */}
+        {orphanRows.length > 0 && (
           <article className="organic-paper-card w-full shadow-md relative overflow-hidden transition-transform duration-300 hover:shadow-lg">
             <div className="tape-effect bg-purple-400/30 border-purple-400/10" />
 
@@ -1254,10 +1239,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             </div>
 
             <div className="space-y-3">
-              {orphanGoals.filter((g) => g.level === "weekly" || g.parentId === null).map((weeklyOrOrphan) => {
+              {orphanRows.map(({ goal: weeklyOrOrphan, depth }) => {
                 const isItemEditing = editingGoalId === weeklyOrOrphan.id;
                 return (
-                  <div key={weeklyOrOrphan.id} className="pl-1 py-1 flex items-start gap-2.5 group">
+                  <div
+                    key={weeklyOrOrphan.id}
+                    className="pl-1 py-1 flex items-start gap-2.5 group"
+                    style={depth > 0 ? { paddingLeft: `${depth * 1.25}rem` } : undefined}
+                  >
                     <button
                       type="button"
                       onClick={() => handleToggleGoalStatus(weeklyOrOrphan.id, weeklyOrOrphan.status)}
