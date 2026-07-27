@@ -368,7 +368,7 @@ const findCertification: AgentTool = {
 const lookupCertProgress: AgentTool = {
   name: "lookup_cert_progress",
   description:
-    "Show the student's Ready-to-Work certification checklist — which requirements are done, which are left, and which need a file or instructor verification. Call this whenever anyone asks about certification progress — a student checking their own, or a teacher asking about a student's — or when marking something complete; the returned requirementId is what mark_certification_complete needs.",
+    "Show THIS student's Ready-to-Work certification checklist — which requirements are done, which are left, and which need a file or instructor verification. Call this whenever anyone asks how a student is doing on their certification — a student checking their own, or a teacher asking about a student's — or when marking something complete; the returned requirementId is what mark_certification_complete needs. For what the program requires in general, rather than one student's status, use lookup_program_info instead.",
   parameters: { type: "object", properties: {} },
   slashCommand: {
     command: "/certprogress",
@@ -793,7 +793,7 @@ const lookupProgramInfo: AgentTool = {
 const classifyAttachment: AgentTool = {
   name: "classify_attachment",
   description:
-    "Inspect a file the user uploaded in chat (image or PDF) and identify what it is — certificate, form, resume, receipt, etc. — plus extracted fields like the credential/form title, issuer, date, and whether it looks completed. Use the fileUploadId from the attached-files context.",
+    "Identify an UNLABELED file the user uploaded in chat (image or PDF) — what kind of document it is, plus extracted fields like the credential/form title, issuer, date, and whether it looks completed. Use the fileUploadId from the attached-files context. Call this only when the user has NOT said what the file is or what they want done with it. When they name the document and ask for an action — file it, submit it, add it to my portfolio — call that action tool directly with the fileUploadId; none of them need this first.",
   parameters: {
     type: "object",
     properties: {

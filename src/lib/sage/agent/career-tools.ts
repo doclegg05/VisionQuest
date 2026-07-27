@@ -301,7 +301,7 @@ const analyzeJobMatch: AgentTool = {
 const lookupSavedJobs: AgentTool = {
   name: "lookup_saved_jobs",
   description:
-    "List the jobs the student has saved and their pipeline status. Call this to find the jobListingId for analyze_job_match, prepare_for_interview, generate_cover_letter, or update_application_status, or when the student asks about jobs they're tracking.",
+    "List the jobs the student has ALREADY saved and their pipeline status. Call this when the student asks about jobs they are tracking, or to find the jobListingId for analyze_job_match, prepare_for_interview, generate_cover_letter, or update_application_status. It only returns saved jobs — to save a NEW listing the student is looking at, call save_job with that listing's id instead.",
   parameters: { type: "object", properties: {} },
   slashCommand: {
     command: "/myjobs",

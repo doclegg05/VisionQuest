@@ -136,7 +136,7 @@ const submitForm: AgentTool = {
     // tool's reply, and enumerating them here bled "instructor/verify"
     // vocabulary into unrelated staff tool choices (caught by the CI chat
     // harness on 2026-07-21).
-    "File a signed form the student uploaded in chat against one of their orientation checklist items and record its completion state. Requires user confirmation.",
+    "File a signed form the student uploaded in chat against one of their orientation checklist items and record its completion state. Call this directly when the student hands in a signed form — takes the fileUploadId as-is, no classification step first. Requires user confirmation.",
   parameters: {
     type: "object",
     properties: {
@@ -214,7 +214,7 @@ const FILE_CATEGORIES = ["general", "resume", "portfolio", "cert_evidence", "ori
 const fileDocument: AgentTool = {
   name: "file_document",
   description:
-    "File an uploaded chat document into the right place: a document category, or as evidence for a certification requirement. Requires user confirmation.",
+    "File an uploaded chat document into the right place: a document category, or as evidence for a certification requirement. Call this directly when the student says where a file should go (with my documents, with my certification records) — takes the fileUploadId as-is, no classification step first. Requires user confirmation.",
   parameters: {
     type: "object",
     properties: {
@@ -339,7 +339,8 @@ const updateGoalStatus: AgentTool = {
 
 const saveJob: AgentTool = {
   name: "save_job",
-  description: "Save a job listing to the student's saved jobs list.",
+  description:
+    "Save a job listing to the student's saved jobs list — call this whenever the student asks to save, keep, or add a job they are looking at. Use the jobListingId of that listing from this conversation (search, browse, or recommendation results). Do NOT call lookup_saved_jobs first: it lists jobs already saved and cannot supply the id of a new one.",
   parameters: {
     type: "object",
     properties: {
@@ -388,7 +389,7 @@ const saveJob: AgentTool = {
 const addPortfolioItem: AgentTool = {
   name: "add_portfolio_item",
   description:
-    "Add an item to the student's portfolio. Set type to categorize it (project, achievement, certification, skill, resume, other). Optionally attach a file they uploaded in chat OR link an external url (e.g. a GitHub repo or live site).",
+    "Add an item to the student's portfolio. Call this directly whenever the student asks to put something in their portfolio — including an uploaded certificate or credential; pass the fileUploadId as-is, no classification step first. Set type to categorize it (project, achievement, certification, skill, resume, other). Optionally attach a file they uploaded in chat OR link an external url (e.g. a GitHub repo or live site).",
   parameters: {
     type: "object",
     properties: {
