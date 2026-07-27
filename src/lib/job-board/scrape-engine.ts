@@ -9,6 +9,58 @@ import { normalizeJobWorkMode } from "./work-mode";
 import { inferEmploymentType } from "./employment-type";
 import type { JobScrapeTrigger, NormalizedJob } from "./types";
 
+/**
+ * Upsert one scraped job under its class's namespace. The unique key is
+ * (classConfigId, sourceId) — never sourceId alone — so the same upstream
+ * posting scraped for two classes is two independent rows and one class's
+ * refresh can never capture or overwrite another's (VQ-R-018).
+ */
+export async function upsertScrapedJob(params: {
+  job: NormalizedJob;
+  clusters: string[];
+  configId: string;
+  batchId: string;
+}): Promise<void> {
+  const { job, clusters, configId, batchId } = params;
+  await prisma.jobListing.upsert({
+    where: {
+      classConfigId_sourceId: { classConfigId: configId, sourceId: job.sourceId },
+    },
+    create: {
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      workMode: job.workMode,
+      salary: job.salary,
+      salaryMin: job.salaryMin,
+      employmentType: job.employmentType,
+      description: job.description,
+      url: job.url,
+      source: job.source,
+      sourceType: job.sourceType,
+      sourceId: job.sourceId,
+      clusters,
+      status: "active",
+      scrapeBatchId: batchId,
+      classConfigId: configId,
+    },
+    update: {
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      workMode: job.workMode,
+      salary: job.salary,
+      salaryMin: job.salaryMin,
+      employmentType: job.employmentType,
+      description: job.description,
+      clusters,
+      status: "active",
+      scrapeBatchId: batchId,
+      updatedAt: new Date(),
+    },
+  });
+}
+
 interface RunScrapeOptions {
   scrapeRunId?: string;
   trigger?: JobScrapeTrigger;
@@ -266,42 +318,7 @@ export async function runScrapeForConfig(
     // Upsert each job
     for (const job of acceptedJobs) {
       const clusters = matchJobToClusters(job);
-
-      await prisma.jobListing.upsert({
-        where: { sourceId: job.sourceId },
-        create: {
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          workMode: job.workMode,
-          salary: job.salary,
-          salaryMin: job.salaryMin,
-          employmentType: job.employmentType,
-          description: job.description,
-          url: job.url,
-          source: job.source,
-          sourceType: job.sourceType,
-          sourceId: job.sourceId,
-          clusters,
-          status: "active",
-          scrapeBatchId: batchId,
-          classConfigId: configId,
-        },
-        update: {
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          workMode: job.workMode,
-          salary: job.salary,
-          salaryMin: job.salaryMin,
-          employmentType: job.employmentType,
-          description: job.description,
-          clusters,
-          status: "active",
-          scrapeBatchId: batchId,
-          updatedAt: new Date(),
-        },
-      });
+      await upsertScrapedJob({ job, clusters, configId, batchId });
       totalUpserted++;
       upsertedBySource.set(job.source, (upsertedBySource.get(job.source) ?? 0) + 1);
     }

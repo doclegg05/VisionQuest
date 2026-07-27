@@ -439,8 +439,25 @@
         "src/lib/job-board/scrape-engine.ts"
       ],
       "fix": "Make the unique key compound on (classConfigId, sourceId) and key the upsert on it; add a two-configuration overlap test (scrape-engine has no test file today).",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/job-board/scrape-engine.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "prisma/schema.prisma",
+          "mustContain": "@@unique([classConfigId, sourceId])"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/scrape-engine.ts",
+          "mustContain": "classConfigId_sourceId"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Migration 20260727120000_job_listing_source_id_per_class drops the global JobListing_sourceId_key and creates the compound unique — strictly weaker, so existing rows all satisfy it (no data change, safe deploy). Upsert extracted into exported upsertScrapedJob keyed on classConfigId_sourceId; scrape-engine gains its first test file, pinning that two classes scraping the same sourceId address distinct rows and that the update payload can never rewrite an existing row's owning class."
     },
     {
       "id": "VQ-R-019",
