@@ -633,8 +633,21 @@
         "src/app/api/internal/jobs/browse-refresh/route.ts"
       ],
       "fix": "Schedule a browse-refresh pg_cron job mirroring the daily-coaching pattern, or descope the browse pool explicitly and delete the endpoint plus script. Either way the false comment goes.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "config",
+          "file": "prisma/migrations/20260727121000_add_browse_refresh_cron/migration.sql",
+          "mustContain": "job-browse-refresh"
+        },
+        {
+          "kind": "config",
+          "file": "scripts/run-browse-refresh.mjs",
+          "mustContain": "job-browse-refresh"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Scheduled (not descoped — the browse pool UI is live). Migration clones the guarded pg_cron+pg_net pattern from add_sage_briefing_cron: cron.schedule upsert by jobname, vault CRON_SECRET, graceful degradation without extensions or privileges. Slot 09:30 UTC (5:30 AM ET), offset from the 06:xx sage jobs, 11:00 briefing, and 13:00 daily-coaching. Script header rewritten to reference the real job. OWNER ACTION at deploy: confirm prod Supabase has app.base_url set and vault CRON_SECRET, and that 09:30 UTC suits the program day."
     },
     {
       "id": "VQ-R-026",
