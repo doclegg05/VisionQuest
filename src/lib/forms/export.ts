@@ -1,3 +1,4 @@
+import { csvCell } from "@/lib/csv";
 import type { FieldDef, FormTemplateSchema } from "@/lib/forms/schema";
 
 export interface ExportableResponse {
@@ -36,18 +37,14 @@ const METADATA_COLUMNS = [
  * RFC 4180 CSV escaping: wrap in double quotes if the field contains comma,
  * quote, CR, or LF; escape embedded quotes by doubling them.
  */
-export function csvEscape(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  const str = typeof value === "string" ? value : Array.isArray(value) ? value.join("; ") : String(value);
-  if (/[",\n\r]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
+// VQ-R-014: the previous local csvEscape quoted commas/quotes but never
+// neutralized =+-@ formula prefixes, leaving form-response and coordinator
+// exports open to CSV formula injection. All cells now route through the
+// formula-safe shared escaper.
 
 export function buildHeaderRow(schema: FormTemplateSchema): string {
   const fieldKeys = schema.map((field) => field.key);
-  return [...METADATA_COLUMNS, ...fieldKeys].map(csvEscape).join(",");
+  return [...METADATA_COLUMNS, ...fieldKeys].map(csvCell).join(",");
 }
 
 export function buildResponseRow(
@@ -67,8 +64,8 @@ export function buildResponseRow(
     createdAt: response.createdAt.toISOString(),
     updatedAt: response.updatedAt.toISOString(),
   };
-  const meta = METADATA_COLUMNS.map((key) => csvEscape(metadata[key]));
-  const values = schema.map((field) => csvEscape(formatAnswer(field, answers[field.key])));
+  const meta = METADATA_COLUMNS.map((key) => csvCell(metadata[key]));
+  const values = schema.map((field) => csvCell(formatAnswer(field, answers[field.key])));
   return [...meta, ...values].join(",");
 }
 

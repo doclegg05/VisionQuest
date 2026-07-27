@@ -384,8 +384,25 @@
         "src/app/api/teacher/forms/[templateId]/export/route.ts"
       ],
       "fix": "Delete csvEscape and route the forms-response and coordinator monthly exports through escapeCsvValue; add a fixture proving = + - @ prefixes are neutralized.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/forms/export.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/forms/export.ts",
+          "mustContain": "csvCell"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/coordinator/reports/monthly/[regionId]/route.ts",
+          "mustContain": "csvCell"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "csvEscape deleted from forms/export.ts; new csvCell wrapper in src/lib/csv.ts coerces unknown cells (null → empty, arrays → semicolon-joined) then applies the formula-safe escapeCsvValue, so all four export paths share one escaper. Forms export rows and the coordinator monthly report both route through it. Fixture pins = + - @ neutralization including a formula hidden behind quote-triggering characters."
     },
     {
       "id": "VQ-R-015",
