@@ -40,6 +40,19 @@ const MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i took all my pills", "took all my pills"],
   ["i took a bunch of pills", "bunch of pills"],
 
+  // Future-intent overdose by pills. The original VQ-R-004 entries covered the
+  // PAST act ("took all my pills") and intent only toward the bare verb
+  // ("gonna od"), so a stated plan naming the method fell through the gap —
+  // found while closing the Spanish parity gaps, where "esta noche me tomo
+  // todas las pastillas" already alerts. Stated plan > ideation, so an English
+  // student must not be detected later than a Spanish one.
+  ["i wanna take all my pills", "wanna take all my pills"],
+  ["im gonna take all my pills tonight", "gonna take all my pills"],
+  ["i'm going to take all my pills tonight", "going to take, apostrophe form"],
+  ["i want to take a bunch of pills", "want to take a bunch of pills"],
+  ["i tried to take too many pills last night", "tried to take too many pills"],
+  ["i wanna take all my meds", "meds noun variant"],
+
   // "ending things" — the existing pattern only covered "my life" / "it all".
   ["thinking about ending things", "ending things"],
   ["i want to end things", "end things"],
@@ -63,6 +76,13 @@ const MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i took my medication this morning", "took medication, no quantity"],
   ["i want to take all my certifications", "take all my …, not pills"],
   ["the pills the doctor gave me help", "pills mentioned benignly"],
+  // Adherence talk. These carry the quantity word AND the medication noun, so
+  // the ONLY thing keeping them quiet is that the intent verb must come from
+  // the crisis register — a bare present tense or an obligation modal must not
+  // alert, or every student managing a prescription trips the safety net daily.
+  ["i take all my pills every morning with breakfast", "adherence, no intent verb"],
+  ["i need to take all my meds before bed", "need to — obligation, not intent"],
+  ["i have to take all my medication with food", "have to — obligation, not intent"],
   ["i wanna work in healthcare", "wanna + career"],
   ["that overdose documentary was sad", "overdose in third person"],
 ];
