@@ -8,7 +8,8 @@ The primary agent MUST read this CLAUDE.md first, then follow the Documentation 
 Agents should read docs based on what they are doing. Do not read everything — follow the routing below.
 
 ### Level 0: Always Read First
-- **This file (CLAUDE.md)** — project overview, architecture, operating rules, key decisions
+- **This file (CLAUDE.md)** — project overview, operating rules, production environment, design context
+- **[.claude/MEMORY.md](./.claude/MEMORY.md)** — project state and handoff: current status, last session, open items, engineering decisions log, architecture notes, known issues (imported below, so it loads with this file)
 
 ### Level 1: Product-Shaping Work
 Read before any change that affects what users see or how workflows behave.
@@ -34,6 +35,11 @@ Read when deciding what to build, cut, simplify, or automate.
 ### Archived (do not read unless explicitly asked)
 - `docs/archive/GAMIFICATION_BACKLOG.md` — frozen planning artifact
 - `docs/archive/SETUP_WIZARD_PLAN.md` — frozen planning artifact
+
+## Project Memory (state, handoff, engineering decisions)
+The live handoff — current status, last session, open items, engineering decisions log, architecture notes, and known issues — is maintained in `.claude/MEMORY.md` and imported here so it loads with this file. Update it at the end of every session.
+
+@.claude/MEMORY.md
 
 ## Project Overview
 - **Name**: VisionQuest
