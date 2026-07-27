@@ -44,7 +44,7 @@ function fakeProvider(toolCallNames: string[], finalText = "briefing text"): AIP
       for (const name of toolCallNames) {
         callId++;
         yield { kind: "tool_call", callId: String(callId), name, args: {} };
-        const result = await onToolCall({ name, args: {} });
+        const result = await onToolCall({ callId: String(callId), name, args: {} });
         yield {
           kind: "tool_result",
           callId: String(callId),

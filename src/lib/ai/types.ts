@@ -115,6 +115,8 @@ export interface ToolStreamOptions {
  * structured result that gets fed back to the model.
  */
 export type ToolCallHandler = (call: {
+  /** Provider-minted id matching the tool_call / tool_result stream events. */
+  callId: string;
   name: string;
   args: Record<string, unknown>;
 }) => Promise<{ response: unknown; summary: string; status: "success" | "error" }>;

@@ -268,8 +268,20 @@
         "src/lib/ai/gemini-provider.ts"
       ],
       "fix": "Key transcript records by callId and look up the matching record per tool_result event; add a two-parallel-call attribution test.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/sage/agent/loop.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/agent/loop.ts",
+          "mustContain": "r.callId === event.callId"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "ToolCallHandler now carries the provider-minted callId; both providers (gemini-provider.ts, ollama-provider.ts) pass it, the loop threads it into executeAgentTool (which already accepted options.callId), and the tool_result branch looks up transcript.find by event.callId instead of taking the last record. Attribution test forces reversed completion order (second call resolves first) so the old last-record lookup demonstrably cross-wires; also asserts the executor received the provider callIds. headless.ts and llm-usage.ts forward the handler verbatim and needed no change."
     },
     {
       "id": "VQ-R-011",

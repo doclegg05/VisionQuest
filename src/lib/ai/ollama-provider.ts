@@ -976,7 +976,7 @@ export class OllamaProvider implements AIProvider {
       // Run all handlers in parallel. Single-call hops are unchanged;
       // multi-call hops collapse from sum(durations) to max(durations).
       const handlerResults = await Promise.all(
-        calls.map((c) => onToolCall({ name: c.name, args: c.args })),
+        calls.map((c) => onToolCall({ callId: c.id, name: c.name, args: c.args })),
       );
 
       for (let i = 0; i < calls.length; i++) {
