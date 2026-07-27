@@ -73,14 +73,21 @@ compat fallback. Full suite 2,132/2,132 after the provider-test rewrite.
 | S0 embeddings | 768 dims (nomic-embed-text) | ✓ |
 | Cold load | **11.2s** | ✓ (≤60s) |
 | Decode | **34.5 tok/s** | ✓ (≥12–15) |
-| S1 quality screen | running | — |
+| S1 quality screen | **7/8 replies, FK avg 4.7, 0 over grade-8** — noticeably richer than the 8B (picks up scenario details like the transportation barrier), still comfortably plain-language | ✓ |
+| S2 agent / S3 harness / S4 redteam | running | — |
 
 ### Baseline — `gemma4:latest` (8B incumbent control)
 
 | Stage | Result |
 |---|---|
 | think:false tolerance | PASS (non-thinking model, flag harmless) |
-| S1 quality screen | running |
+| S1 quality screen | 7/8 replies, FK avg 3.2, 0 over grade-8 — serviceable but flatter, misses scenario specifics |
+| S2 / S3 / S4 | running |
+
+Shared S1 note: `info-certs` returns empty on BOTH models — a harness-context
+artifact (program-facts question with no tools/RAG supplied; the prompt
+correctly forbids invention). Filed as its own task; not a model
+differentiator.
 
 ## Owner decisions pending (from the plan)
 
