@@ -22,6 +22,7 @@
     "users:promote-teacher": "node scripts/promote-teacher.mjs",
     "users:promote-admin": "node scripts/promote-admin.mjs",
     "db:seed": "tsx scripts/seed-data.mjs",
+    "db:seed:progression": "tsx scripts/seed-progression-edges.mjs",
     "db:seed-documents": "node scripts/seed-documents.mjs",
     "seed:sage-context": "node scripts/seed-sage-context.mjs",
     "sage:rag:audit": "node scripts/sage-rag-audit.mjs",
