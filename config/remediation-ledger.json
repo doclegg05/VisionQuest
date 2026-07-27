@@ -255,8 +255,25 @@
         "src/lib/sage/agent/headless.ts"
       ],
       "fix": "Split the ensure-or-create path out so the lookup returns not-started; put creation behind an explicit start action. Add a test asserting no read-tier tool writes.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/sage/cert-actions.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/cert-actions.ts",
+          "mustContain": "getStudentCertProgress"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/agent/tools.ts",
+          "mustContain": "getStudentCertProgress"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "lookup_cert_progress now calls new read-only getStudentCertProgress: no create, no cert_started XP, no status recompute — this also stops the nightly headless briefing (which allowlists the tool) from silently starting certifications across students. Never-started students get a not_started view keyed by TEMPLATE ids; markRequirementComplete (the explicit start action, consequential tier, confirmation-carded) accepts a template id, runs ensureStudentCertification, and resolves the freshly created requirement — so the model's lookup-then-mark flow is unchanged and no tool schema changed. Tripwire tests assert the read performs zero writes; bridge tests cover start-on-mark and nonsense-id rejection."
     },
     {
       "id": "VQ-R-010",
