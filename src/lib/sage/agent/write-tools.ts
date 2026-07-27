@@ -214,7 +214,7 @@ const FILE_CATEGORIES = ["general", "resume", "portfolio", "cert_evidence", "ori
 const fileDocument: AgentTool = {
   name: "file_document",
   description:
-    "File an uploaded chat document into the right place: a document category, or as evidence for a certification requirement. Call this directly when the student says where a file should go (with my documents, with my certification records) — takes the fileUploadId as-is, no classification step first. Requires user confirmation.",
+    "Store an uploaded chat document where the student says it belongs — with their documents, or as evidence for a certification requirement (a certificate or credential they just uploaded belongs here). This is the tool that PUTS a document somewhere; takes the fileUploadId as-is, no classification step first. Requires user confirmation.",
   parameters: {
     type: "object",
     properties: {

@@ -368,7 +368,7 @@ const findCertification: AgentTool = {
 const lookupCertProgress: AgentTool = {
   name: "lookup_cert_progress",
   description:
-    "Show THIS student's Ready-to-Work certification checklist — which requirements are done, which are left, and which need a file or instructor verification. Call this whenever anyone asks how a student is doing on their certification — a student checking their own, or a teacher asking about a student's — or when marking something complete; the returned requirementId is what mark_certification_complete needs. For what the program requires in general, rather than one student's status, use lookup_program_info instead.",
+    "Show THIS student's Ready-to-Work certification checklist — which requirements are done, which are left, and which still need evidence or instructor sign-off. Call this whenever anyone asks how a student is doing on their certification — a student checking their own, or a teacher asking about a student's — or when marking something complete; the returned requirementId is what mark_certification_complete needs. Read-only: to store a document the student uploaded, use file_document. For what the program requires in general, rather than one student's status, use lookup_program_info instead.",
   parameters: { type: "object", properties: {} },
   slashCommand: {
     command: "/certprogress",
