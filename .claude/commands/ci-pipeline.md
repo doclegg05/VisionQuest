@@ -127,9 +127,16 @@ gate-editing while in this role.
      weakened/skipped/deleted tests?
    - Remaining SUGGESTION-level review findings from Stage 4.
    - `Closes #<n>` when the ticket came from an issue.
-2. The PR stays a **draft**; this pipeline **never merges**. Marking the PR ready and
+2. **Update the handoff.** Edit `.claude/MEMORY.md` — the project memory CLAUDE.md
+   imports — so the next session starts current: rewrite **Current Status** and
+   **Last Session** (today's date, what the ticket changed, where the PR stands),
+   tick or add **Open Items** this run closed or uncovered, and append a **Key
+   Decisions Log** row for anything the plan gate settled. Commit it on the branch as
+   a `docs:` commit so it lands in the same draft PR. An unattended run must never
+   finish with a fresh PR and a stale handoff.
+3. The PR stays a **draft**; this pipeline **never merges**. Marking the PR ready and
    merging is the owner's Ship action — Render auto-deploys `main` after merge.
-3. Once the owner has marked the PR ready, arming `gh pr merge <n> --auto --squash`
+4. Once the owner has marked the PR ready, arming `gh pr merge <n> --auto --squash`
    is the sanctioned way to complete Ship without babysitting: repo auto-merge is
    enabled and `main` requires the `verify` check, so GitHub merges server-side only
    when CI is green. GitHub never auto-merges a draft, so the ready-mark remains the

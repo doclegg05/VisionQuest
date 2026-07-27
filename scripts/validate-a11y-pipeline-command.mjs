@@ -111,6 +111,13 @@ const contentChecks = [
         ".claude/agents/gate-runner.md",
       ].every((path) => t.includes(path)),
   ],
+  [
+    "handoff: Ship updates .claude/MEMORY.md (Current Status + Last Session)",
+    (t) =>
+      t.includes(".claude/MEMORY.md") &&
+      /current status/i.test(t) &&
+      /last session/i.test(t),
+  ],
 ];
 
 const results = [
