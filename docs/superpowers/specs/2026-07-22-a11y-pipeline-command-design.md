@@ -69,3 +69,7 @@ per the 2026-07-22 hardening).
 9. Never merges; `Closes #<n>` linkage when issue-sourced.
 10. Named agents referenced by their `.claude/agents/` paths (scout, builder,
     gate-runner).
+11. Ship stage instructs a `.claude/MEMORY.md` handoff update naming at least
+    `Current Status` and `Last Session`, committed on the branch — inherited
+    from `/ci-pipeline` (its criterion 8, added 2026-07-27) and enforced
+    separately here, since each sibling has its own frozen validator.
