@@ -1,0 +1,1416 @@
+{
+  "routes": [
+    {
+      "path": "/api/admin/ai-config",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/ai-config/test",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/ai-provider",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/ai-provider/test",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/ai-safety-report",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/regions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/regions/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/regions/[id]/coordinators",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/regions/[id]/coordinators/[coordinatorId]",
+      "methods": [
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/registry",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/students/[id]/offboard",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/admin/webhooks",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/applications",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/appointments/availability",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/appointments/book",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/forgot-password",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/google",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/google/callback",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/login",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/mfa/backup-codes",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/mfa/challenge",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/mfa/disable",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/mfa/setup",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/mfa/status",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/mfa/verify",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/register-teacher",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/reset-password",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/reset-password/questions",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/auth/session",
+      "methods": [
+        "GET",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/certifications",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/chat/conversations",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": [
+        "sage.conversations"
+      ]
+    },
+    {
+      "path": "/api/chat/conversations/[id]",
+      "methods": [
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/chat/history",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": [
+        "sage.history"
+      ]
+    },
+    {
+      "path": "/api/chat/send",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": [
+        "sage.chat"
+      ]
+    },
+    {
+      "path": "/api/chat/slash-commands",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/chat/tool-confirm",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/chat/upload",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/chat/warmup",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": [
+        "sage.warmup"
+      ]
+    },
+    {
+      "path": "/api/class/progress",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/class/requirements",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/coordinator/grant-goals",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/coordinator/grant-goals/[id]",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/coordinator/regions",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/coordinator/reports/monthly/[regionId]",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/coordinator/rollup/[regionId]",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/credentials/share",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/credly/badges",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/cron/evidence-gap-detection",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/cron/goal-stale-detection",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/csp-report",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/documents",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/documents/download",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/events",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/events/[id]/register",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/files",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/files/download",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/forms/download",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/forms/orientation-packet",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/forms/sign",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/forms/status",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/forms/upload",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/goal-resource-links",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/goal-resource-links/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/goals",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": [
+        "goals.create",
+        "goals.list"
+      ]
+    },
+    {
+      "path": "/api/goals/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": [
+        "goals.update"
+      ]
+    },
+    {
+      "path": "/api/goals/[id]/resources",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/alerts/sync",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/appointments/reminders",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/coaching/daily",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/cron-health",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/jobs/browse-refresh",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/jobs/process",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/jobs/scrape",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/memory/consolidate",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/rag/backfill",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/reports",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/sage/briefing",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/internal/wagers/resolve",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/jobs",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/jobs/save",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/lms",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/lms/platforms",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/lms/platforms/visit",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/mood",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": [
+        "learning.mood",
+        "learning.mood"
+      ]
+    },
+    {
+      "path": "/api/notifications",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": [
+        "notifications.list",
+        "notifications.mark_read"
+      ]
+    },
+    {
+      "path": "/api/notifications/preferences",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/notifications/stream",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/opportunities",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/orientation",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/orientation/complete",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/portfolio",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/progression",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/progression/activity",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/resume",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/resume/application-file",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/resume/assist",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/resume/upload",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/sage/insights",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": [
+        "sage.record_insight"
+      ]
+    },
+    {
+      "path": "/api/sage/insights/[id]",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/sage/panel/dismiss",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/sage/panel/refresh",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/sage/scaffold",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/sage/tools/propose-goal",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": [
+        "sage.propose_goal"
+      ]
+    },
+    {
+      "path": "/api/settings/api-key",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/settings/consent",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/settings/credly",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/settings/profile",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/settings/security-questions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/student/forms",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/student/forms/[templateId]",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/student/forms/[templateId]/submit",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/tasks/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/alerts/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/appointments/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/appointments/reminders",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/audit",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/availability",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/availability/[id]",
+      "methods": [
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/certifications",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/classes",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": [
+        "classes.create",
+        "classes.list"
+      ]
+    },
+    {
+      "path": "/api/teacher/classes/[id]",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/classes/[id]/enrollments/[enrollmentId]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/classes/[id]/readiness-check",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/classes/[id]/requirements",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/classes/[id]/students",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/classes/[id]/unmatched-goals",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": [
+        "classes.dashboard"
+      ]
+    },
+    {
+      "path": "/api/teacher/documents/sage-context",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/documents/sage-context/sync",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/events",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/export",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/failed-extractions",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/failed-extractions/[id]",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/[templateId]/export",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/assignments/[id]",
+      "methods": [
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/responses",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/responses/[id]",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/templates",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/templates/[id]",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/forms/templates/[id]/assign",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/intervention-queue",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/jobs/config",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/jobs/refresh",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/jobs/results",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/jobs/status",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/lms",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/opportunities",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/orientation",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/outcomes/verify",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/pathways",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/pathways/[id]",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/academic-kpi",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/gamification-pilot",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/grant-kpi",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/grant-kpi/history",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/grant-kpi/students",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/outcomes",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/readiness-monthly",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/reports/spokes",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/sage-snippets",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/spokes/config",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/spokes/referrals",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": [
+        "admin.student_detail"
+      ]
+    },
+    {
+      "path": "/api/teacher/students/[id]/appointments",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/archive",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/discovery",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/forms",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/goals/[goalId]",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/goals/[goalId]/pathway-suggestions",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/memories",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/mood",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/notes",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/reassign-class",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/reset-password",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/spokes",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/spokes/checklist",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/spokes/follow-up",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/spokes/modules",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/status",
+      "methods": [
+        "PATCH"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/structured-forms",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/tasks",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/students/[id]/usage",
+      "methods": [
+        "GET"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/teacher/welcome-letter",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "registryIds": []
+    },
+    {
+      "path": "/api/vision-board",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "registryIds": []
+    }
+  ]
+}

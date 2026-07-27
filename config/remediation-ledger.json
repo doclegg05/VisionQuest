@@ -690,8 +690,24 @@
       ],
       "fix": "Apply the locked registry decision: generate the registry from the src/app/api route tree with a CI parity check that fails on drift. Delete the never-read rateLimit/tokenBudget fields and dead helpers.",
       "decision": "registry",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/registry/inventory-parity.test.ts"
+        },
+        {
+          "kind": "script",
+          "name": "registry:generate"
+        },
+        {
+          "kind": "config",
+          "file": "config/endpoint-inventory.generated.json",
+          "mustContain": "registryIds"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Implementation nuance within the locked decision: descriptions/roles/audit levels can't be derived statically, so the GENERATED artifact is the route inventory (config/endpoint-inventory.generated.json — 185 routes, 13 wired, shared walker in scripts/lib/endpoint-inventory.mjs, deterministic output) and the parity test enforces correspondence three ways: committed inventory === live tree (drift fails CI with the regenerate command), every wired withRegistry id exists in the registry, and every enabled registry endpoint points at a real route+method. That last check caught and fixed 45 stale Express-style ':id' paths on first run — after normalization all 189 hand-authored entries correspond to real routes. Never-read rateLimit/tokenBudget fields deleted from types + all entries; dead getAiTools helper deleted. The test runs inside npm test, so it gates CI with no new workflow step."
     },
     {
       "id": "VQ-R-027",
