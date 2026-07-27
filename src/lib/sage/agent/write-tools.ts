@@ -389,7 +389,7 @@ const saveJob: AgentTool = {
 const addPortfolioItem: AgentTool = {
   name: "add_portfolio_item",
   description:
-    "Add an item to the student's portfolio. Call this directly whenever the student asks to put something in their portfolio — including an uploaded certificate or credential; pass the fileUploadId as-is, no classification step first. Set type to categorize it (project, achievement, certification, skill, resume, other). Optionally attach a file they uploaded in chat OR link an external url (e.g. a GitHub repo or live site).",
+    "Add an item to the student's portfolio. Call this whenever the student asks to put something in their portfolio. A title is the ONLY thing required — the student naming the item (a credential, card, certificate, project) is enough; never wait for a file. Set type to categorize it (project, achievement, certification, skill, resume, other). If they did upload a file in chat, pass its fileUploadId as-is; an external url (GitHub repo, live site) also works. Both are optional.",
   parameters: {
     type: "object",
     properties: {
