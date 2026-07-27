@@ -93,6 +93,8 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 - Evals are hard gates — run all three before merging Sage-affecting changes
 
 ## Known Issues
+- **MemPalace and CodeGraph are documented as available but are not wired** (verified 2026-07-27). `docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md:105` asserts MemPalace as one of two existing agent memory systems, and `docs/plans/self-improving-loop-architecture.md` names `codegraph init` a P-1 prerequisite. Neither is connected: no `mempalace` MCP entry or diary hook in `~/.claude/`, no `.codegraph` directory, no references in `src/`/`scripts/`/`package.json`. Don't assume semantic recall or code-graph lookup works — verify first. Harness auto-memory holds the detail (`mempalace-codegraph-not-wired`).
+- **Harness auto-memory is not backed up and does not sync between machines** — `~/.claude/projects/` is gitignored in the claude-config repo, so anything that must survive a machine reset or be visible on both machines belongs here in `.claude/MEMORY.md`, not only in auto-memory. Auto-memory holds the detail (`auto-memory-has-no-backup`).
 - block-no-verify commit hook false-positives when a `git commit` command shares a Bash line with any `-n` flag (grep -n, sed -n) — split commands
 - Port 3000 often occupied by an unrelated local app — e2e: use BASE_URL/PORT overrides
 - `gh pr checks --watch` races fresh pushes: exits "no checks reported" if launched before GitHub registers the new check run (retry after ~10s), and a trailing `echo` on the same Bash line masks the non-zero exit

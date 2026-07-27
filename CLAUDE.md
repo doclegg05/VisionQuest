@@ -31,6 +31,24 @@ Read when deciding what to build, cut, simplify, or automate.
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
 | SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| Recursive self-improving loop (Ouroboros) — **DRAFT** | [docs/plans/self-improving-loop-architecture.md](./docs/plans/self-improving-loop-architecture.md) |
+| Org-knowledge catalog (OKF) + the two agent memory systems | [docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md](./docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md) |
+| `<gate>-pipeline` command contracts (CI-enforced) | [docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md](./docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md) |
+
+### Level 4: The dated plan/spec corpus — search it, don't enumerate it
+`docs/plans/` and `docs/superpowers/{plans,specs}/` hold ~80 dated working documents. They are
+deliberately NOT listed here — listing them would bloat every session — but they are load-bearing,
+and an agent that doesn't know they exist will draw confident, incomplete conclusions.
+
+- **Naming**: `YYYY-MM-DD-<slug>.md`. A `plans/` file and its `specs/` counterpart usually pair up.
+- **Status**: point-in-time records, not current state. On any conflict, `.claude/MEMORY.md` and
+  `docs/PRODUCT_DECISIONS.md` win. A doc may describe something planned, deferred, or since undone —
+  verify against the code before treating it as fact.
+- **Before architecture, memory, or AI-infrastructure work, grep the corpus first**:
+  `grep -ril "<subject>" docs/plans docs/superpowers`
+  Do not declare a survey of any such subject complete without running it. This rule exists because a
+  2026-07-27 review of the memory system mapped six layers and called the map complete, having missed
+  two more that were described only here (MemPalace, CodeGraph).
 
 ### Archived (do not read unless explicitly asked)
 - `docs/archive/GAMIFICATION_BACKLOG.md` — frozen planning artifact
