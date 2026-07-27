@@ -603,8 +603,25 @@
         "src/instrumentation.ts"
       ],
       "fix": "Create src/instrumentation-client.ts with the current client init plus onRouterTransitionStart, export onRequestError from instrumentation.ts, and confirm a browser error actually arrives.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/instrumentation-client.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/instrumentation-client.ts",
+          "mustContain": "onRouterTransitionStart"
+        },
+        {
+          "kind": "config",
+          "file": "src/instrumentation.ts",
+          "mustContain": "onRequestError"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Client init moved verbatim (same DSN gate, sample rates, scrubPii) from the never-bundled root sentry.client.config.ts into src/instrumentation-client.ts — the only location Turbopack builds load — plus the onRouterTransitionStart export; instrumentation.ts exports onRequestError = Sentry.captureRequestError for RSC request errors; the dead root file is deleted and a static test pins all three so a rename can't silently kill client tracking again. OWNER ACTION post-deploy: trigger one browser error and confirm it arrives in Sentry (recorded here, not a deferral)."
     },
     {
       "id": "VQ-R-025",
