@@ -7,7 +7,11 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum
 const mockResumeFindUnique = mock.fn() as any;
 const mockResumeUpsert = mock.fn(async () => ({})) as any;
 const mockJobFindFirst = mock.fn() as any;
-const mockSavedJobFindMany = mock.fn(async () => []) as any;
+const mockJobFindMany = mock.fn(async () => []) as any;
+// VQ-R-017: the pipeline read is Application (+ Opportunity); the db mock
+// exposes NO studentSavedJob delegate, so any tool still touching the retired
+// tracker throws.
+const mockApplicationFindMany = mock.fn(async () => []) as any;
 const mockEnrollmentFindFirst = mock.fn(async () => ({ classId: "class-1" })) as any;
 const mockCertFindMany = mock.fn(async () => []) as any;
 const mockDiscoveryFindUnique = mock.fn(async () => null) as any;
@@ -28,10 +32,13 @@ mock.module("@/lib/db", {
         get findFirst() {
           return mockJobFindFirst;
         },
-      },
-      studentSavedJob: {
         get findMany() {
-          return mockSavedJobFindMany;
+          return mockJobFindMany;
+        },
+      },
+      application: {
+        get findMany() {
+          return mockApplicationFindMany;
         },
       },
       studentClassEnrollment: {
@@ -151,20 +158,32 @@ describe("propose_resume_edit", () => {
   });
 });
 
-describe("lookup_saved_jobs", () => {
+// VQ-R-017: lookup_saved_jobs reads the unified Application pipeline (joined
+// to Opportunity) and attaches class-board jobListingIds by url match, so it
+// only ever advertises ids the other career tools will accept.
+describe("lookup_saved_jobs (VQ-R-017)", () => {
   beforeEach(() => {
-    mockSavedJobFindMany.mock.resetCalls();
+    mockApplicationFindMany.mock.resetCalls();
+    mockJobFindMany.mock.resetCalls();
     mockEnrollmentFindFirst.mock.resetCalls();
     mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
-    mockSavedJobFindMany.mock.mockImplementation(async () => [
+    mockApplicationFindMany.mock.mockImplementation(async () => [
       {
         status: "applied",
-        jobListing: { id: "job-1", title: "CNA", company: "Beckley ARH", location: "Beckley, WV" },
+        opportunity: {
+          title: "CNA",
+          company: "Beckley ARH",
+          location: "Beckley, WV",
+          url: "https://example.com/jobs/cna",
+        },
       },
+    ]);
+    mockJobFindMany.mock.mockImplementation(async () => [
+      { id: "job-1", url: "https://example.com/jobs/cna" },
     ]);
   });
 
-  it("lists the student's saved jobs with their pipeline status", async () => {
+  it("lists the student's applications with their pipeline status", async () => {
     const record = await executeAgentTool({
       session,
       conversationId: "conv-1",
@@ -175,9 +194,11 @@ describe("lookup_saved_jobs", () => {
     assert.equal(record.result.status, "success");
     assert.match(record.result.summary, /tracking 1 job/i);
     assert.match(record.result.modelHint ?? "", /jobListingId=job-1/);
+    const where = mockApplicationFindMany.mock.calls[0].arguments[0].where;
+    assert.equal(where.studentId, "stu-1");
   });
 
-  it("only lists jobs on the student's own class board", async () => {
+  it("only attaches ids from the student's own class board", async () => {
     await executeAgentTool({
       session,
       conversationId: "conv-1",
@@ -185,15 +206,31 @@ describe("lookup_saved_jobs", () => {
       args: {},
     });
 
-    // Must filter through the jobListing relation, not just by studentId —
-    // otherwise it advertises ids the other career tools will refuse.
-    const where = mockSavedJobFindMany.mock.calls[0].arguments[0].where;
-    assert.equal(where.studentId, "stu-1");
-    assert.deepEqual(where.jobListing, { classConfig: { classId: "class-1" } });
+    // The id lookup must be scoped through the class config — otherwise the
+    // tool advertises ids the other career tools will refuse.
+    const where = mockJobFindMany.mock.calls[0].arguments[0].where;
+    assert.deepEqual(where.classConfig, { classId: "class-1" });
+    assert.equal(where.status, "active");
   });
 
-  it("reports an accurate empty state when nothing is saved on the current board", async () => {
-    mockSavedJobFindMany.mock.mockImplementation(async () => []);
+  it("lists a browse save without an id instead of inventing one", async () => {
+    mockJobFindMany.mock.mockImplementation(async () => []);
+
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "lookup_saved_jobs",
+      args: {},
+    });
+
+    assert.equal(record.result.status, "success");
+    const jobs = (record.result.data as { jobs: Array<{ jobListingId: string | null }> }).jobs;
+    assert.equal(jobs[0].jobListingId, null);
+    assert.doesNotMatch(record.result.modelHint ?? "", /jobListingId=/);
+  });
+
+  it("reports an accurate empty state when nothing is tracked", async () => {
+    mockApplicationFindMany.mock.mockImplementation(async () => []);
 
     const record = await executeAgentTool({
       session,
@@ -204,13 +241,10 @@ describe("lookup_saved_jobs", () => {
 
     assert.equal(record.result.status, "success");
     assert.deepEqual(record.result.data, { jobs: [] });
-    // Must not claim they've never saved a job — they may have saves on a board
-    // they're no longer enrolled in.
-    assert.doesNotMatch(record.result.summary, /haven't saved any jobs yet/i);
-    assert.match(record.result.summary, /job board/i);
+    assert.match(record.result.summary, /don't have any saved jobs/i);
   });
 
-  it("refuses when the student has no active enrollment", async () => {
+  it("still lists applications for a student with no active enrollment (browse saves)", async () => {
     mockEnrollmentFindFirst.mock.mockImplementation(async () => null);
 
     const record = await executeAgentTool({
@@ -220,8 +254,12 @@ describe("lookup_saved_jobs", () => {
       args: {},
     });
 
-    assert.equal(record.result.status, "error");
-    assert.equal(mockSavedJobFindMany.mock.callCount(), 0);
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /tracking 1 job/i);
+    // No class board to match against — no id lookup, no invented ids.
+    assert.equal(mockJobFindMany.mock.callCount(), 0);
+    const jobs = (record.result.data as { jobs: Array<{ jobListingId: string | null }> }).jobs;
+    assert.equal(jobs[0].jobListingId, null);
   });
 });
 

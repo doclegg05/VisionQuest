@@ -5,26 +5,36 @@ import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { MAX_LENGTHS } from "@/lib/validation";
 import { parseBody } from "@/lib/schemas";
+import { trackJobInterest, type JobInterestSource } from "@/lib/job-applications";
 
 const VALID_STATUSES = ["saved", "applied", "interviewing", "offered", "withdrawn"] as const;
-const APPLIED_STATUSES = new Set(["applied", "interviewing", "offered"]);
 
-const saveJobSchema = z.object({
-  jobListingId: z.string().cuid("Invalid job listing ID."),
-  status: z.enum(VALID_STATUSES).optional(),
-  notes: z.string().trim().max(MAX_LENGTHS.notes, "Job notes must be 10000 characters or fewer.").optional(),
-});
+const saveJobSchema = z
+  .object({
+    jobListingId: z.string().cuid("Invalid job listing ID.").optional(),
+    browseListingId: z.string().cuid("Invalid browse listing ID.").optional(),
+    status: z.enum(VALID_STATUSES).optional(),
+    notes: z.string().trim().max(MAX_LENGTHS.notes, "Job notes must be 10000 characters or fewer.").optional(),
+  })
+  .refine(
+    (body) => (body.jobListingId ? 1 : 0) + (body.browseListingId ? 1 : 0) === 1,
+    { message: "Provide exactly one of jobListingId or browseListingId." },
+  );
 
 /**
  * POST /api/jobs/save
  *
- * Save or update a student's interaction with a job listing.
- * Body: { jobListingId: string, status?: string, notes?: string }
+ * Track a student's interest in a job through the unified Application
+ * pipeline (VQ-R-017): the listing resolves to a url-deduped Opportunity and
+ * the student's Application row is upserted against it. Accepts either a
+ * class-board listing (jobListingId, class-scope checked) or a program-wide
+ * browse listing (browseListingId).
+ *
+ * Body: { jobListingId?: string, browseListingId?: string, status?: string, notes?: string }
  */
 export const POST = withAuth(async (session: Session, req: Request) => {
-  const { jobListingId, status, notes } = await parseBody(req, saveJobSchema);
+  const { jobListingId, browseListingId, status, notes } = await parseBody(req, saveJobSchema);
   const saveStatus = status ?? "saved";
-  const cleanNotes = notes;
 
   const enrollment = await prisma.studentClassEnrollment.findFirst({
     where: { studentId: session.id, status: "active" },
@@ -34,58 +44,44 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     throw badRequest("No active class enrollment found");
   }
 
-  // Verify the job belongs to the student's active class before tracking it.
-  const job = await prisma.jobListing.findFirst({
-    where: {
-      id: jobListingId,
-      classConfig: { classId: enrollment.classId },
-    },
-    select: { id: true, title: true },
-  });
-  if (!job) {
-    throw badRequest("Job listing not found");
+  let source: JobInterestSource;
+  if (jobListingId) {
+    // Verify the class listing belongs to the student's active class before
+    // tracking it — a student must not track another cohort's board rows.
+    const job = await prisma.jobListing.findFirst({
+      where: {
+        id: jobListingId,
+        classConfig: { classId: enrollment.classId },
+      },
+      select: { id: true },
+    });
+    if (!job) {
+      throw badRequest("Job listing not found");
+    }
+    source = { kind: "listing", jobListingId };
+  } else {
+    // browseListingId is guaranteed by the schema refine; existence is
+    // verified by trackJobInterest when it resolves the row.
+    source = { kind: "browse", browseListingId: browseListingId! };
   }
 
-  const existingSavedJob = await prisma.studentSavedJob.findUnique({
-    where: {
-      studentId_jobListingId: {
-        studentId: session.id,
-        jobListingId,
-      },
-    },
-    select: { appliedAt: true },
+  const result = await trackJobInterest({
+    studentId: session.id,
+    source,
+    status: saveStatus,
+    notes,
   });
-  const shouldSetAppliedAt = APPLIED_STATUSES.has(saveStatus) && !existingSavedJob?.appliedAt;
-  const appliedAt = shouldSetAppliedAt ? new Date() : undefined;
-
-  const savedJob = await prisma.studentSavedJob.upsert({
-    where: {
-      studentId_jobListingId: {
-        studentId: session.id,
-        jobListingId,
-      },
-    },
-    create: {
-      studentId: session.id,
-      jobListingId,
-      status: saveStatus,
-      notes: cleanNotes || null,
-      appliedAt: APPLIED_STATUSES.has(saveStatus) ? (appliedAt ?? new Date()) : null,
-    },
-    update: {
-      status: saveStatus,
-      notes: notes !== undefined ? cleanNotes || null : undefined,
-      appliedAt,
-    },
-  });
+  if (!result.ok) {
+    throw badRequest("Job listing not found");
+  }
 
   await logAuditEvent({
     action: "job.save",
     actorId: session.id,
-    targetType: "JobListing",
-    targetId: jobListingId,
-    summary: `${session.displayName} ${saveStatus} job "${job.title}"`,
+    targetType: jobListingId ? "JobListing" : "JobBrowseListing",
+    targetId: jobListingId ?? browseListingId ?? null,
+    summary: `${session.displayName} ${saveStatus} job "${result.opportunity.title}"`,
   });
 
-  return NextResponse.json({ savedJob });
+  return NextResponse.json({ application: result.application });
 });

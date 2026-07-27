@@ -11,7 +11,9 @@ const session = mockStudentSession();
 const mockEnrollmentFindFirst = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockConfigFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockJobListingFindMany = mock.fn<(args: unknown) => Promise<unknown>>();
-const mockSavedJobFindMany = mock.fn<(args: unknown) => Promise<unknown>>();
+// VQ-R-017: saved-state markers come from Application rows matched by
+// opportunity url — studentSavedJob is retired and absent from the db mock.
+const mockApplicationFindMany = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockDiscoveryFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockResumeFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockLoadBrowseJobs = mock.fn<(args: unknown) => Promise<unknown[]>>();
@@ -33,7 +35,7 @@ mock.module("@/lib/db", {
       studentClassEnrollment: { findFirst: mockEnrollmentFindFirst },
       jobClassConfig: { findUnique: mockConfigFindUnique },
       jobListing: { findMany: mockJobListingFindMany },
-      studentSavedJob: { findMany: mockSavedJobFindMany },
+      application: { findMany: mockApplicationFindMany },
       careerDiscovery: { findUnique: mockDiscoveryFindUnique },
       resumeData: { findUnique: mockResumeFindUnique },
     },
@@ -126,6 +128,7 @@ const RESPONSE_KEYS = [
 ];
 
 const JOB_META_KEYS = [
+  "listingKind",
   "savedStatus",
   "savedNotes",
   "savedAppliedAt",
@@ -146,7 +149,7 @@ describe("GET /api/jobs band annotation", () => {
     mockEnrollmentFindFirst.mock.resetCalls();
     mockConfigFindUnique.mock.resetCalls();
     mockJobListingFindMany.mock.resetCalls();
-    mockSavedJobFindMany.mock.resetCalls();
+    mockApplicationFindMany.mock.resetCalls();
     mockDiscoveryFindUnique.mock.resetCalls();
     mockResumeFindUnique.mock.resetCalls();
     mockLoadBrowseJobs.mock.resetCalls();
@@ -159,7 +162,7 @@ describe("GET /api/jobs band annotation", () => {
       localJobPriority: "prefer_local",
     }));
     mockJobListingFindMany.mock.mockImplementation(async () => [classJobA, classJobB]);
-    mockSavedJobFindMany.mock.mockImplementation(async () => []);
+    mockApplicationFindMany.mock.mockImplementation(async () => []);
     mockDiscoveryFindUnique.mock.mockImplementation(async () => discoveryRow);
     mockResumeFindUnique.mock.mockImplementation(async () => null);
     mockLoadBrowseJobs.mock.mockImplementation(async () => [browseRow]);
@@ -228,5 +231,46 @@ describe("GET /api/jobs band annotation", () => {
     for (const job of body.jobs) {
       assert.equal(job.band, null);
     }
+  });
+
+  it("marks saved state from Applications matched by opportunity url (VQ-R-017)", async () => {
+    mockApplicationFindMany.mock.mockImplementation(async () => [
+      {
+        // Application-model vocabulary maps back to the job-board vocabulary.
+        status: "offer",
+        notes: "Second interview done",
+        appliedAt: new Date("2026-07-05T00:00:00Z"),
+        opportunity: { url: classJobA.url },
+      },
+      {
+        status: "saved",
+        notes: null,
+        appliedAt: null,
+        opportunity: { url: browseRow.url },
+      },
+    ]);
+
+    const res = await route.GET(jobsRequest());
+    const body = await res.json();
+
+    const byId = new Map<string, Record<string, unknown>>(
+      body.jobs.map((job: { id: string }) => [job.id, job]),
+    );
+    const classJob = byId.get("job-a")!;
+    assert.equal(classJob.listingKind, "class");
+    assert.equal(classJob.savedStatus, "offered");
+    assert.equal(classJob.savedNotes, "Second interview done");
+    assert.equal(classJob.savedAppliedAt, "2026-07-05T00:00:00.000Z");
+
+    // Browse rows carry saved state too — the pipeline is url-deduped, not
+    // class-scoped.
+    const browseJob = byId.get("browse-1")!;
+    assert.equal(browseJob.listingKind, "browse");
+    assert.equal(browseJob.savedStatus, "saved");
+
+    const untouched = byId.get("job-b")!;
+    assert.equal(untouched.savedStatus, null);
+
+    assert.equal(body.totalSaved, 2);
   });
 });

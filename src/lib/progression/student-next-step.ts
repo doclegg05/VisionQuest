@@ -302,8 +302,10 @@ export async function getStudentNextStep(studentId: string): Promise<StudentNext
     prisma.goal.count({
       where: { studentId, level: { in: ["weekly", "task", "daily"] }, status: "completed" },
     }),
-    prisma.studentSavedJob.count({
-      where: { studentId },
+    // VQ-R-017: tracking is unified on Application — "saved jobs" are the
+    // student's saved-status Applications (StudentSavedJob is retired).
+    prisma.application.count({
+      where: { studentId, status: "saved" },
     }),
     prisma.application.count({
       where: { studentId },

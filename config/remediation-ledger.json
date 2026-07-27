@@ -503,8 +503,43 @@
       ],
       "fix": "Apply the locked tracker decision: unify on Application, migrate StudentSavedJob, and bridge applied/interviewing/offer to a teacher signal that records the SPOKES employment outcome.",
       "decision": "trackers",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/job-applications.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/app/api/jobs/save/route.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/lib/sage/agent/write-tools.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-applications.ts",
+          "mustContain": "trackJobInterest"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/sage/agent/write-tools.ts",
+          "mustContain": "trackJobInterest"
+        },
+        {
+          "kind": "config",
+          "file": "src/app/api/jobs/route.ts",
+          "mustContain": "applicationStatusForJobBoard"
+        },
+        {
+          "kind": "config",
+          "file": "scripts/migrate-saved-jobs-to-applications.mjs",
+          "mustContain": "--apply"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "Unified per the locked tracker decision. New src/lib/job-applications.ts trackJobInterest is the single student write path: resolves the source (class JobListing or browse JobBrowseListing), find-or-creates an Opportunity deduped by url (oldest wins; no unique on url so a concurrency duplicate is inert), upserts the Application on (studentId, opportunityId), stamps appliedAt once on first applied-family status, and records student-driven changes self_reported with instructor sign-off cleared (P1-4); a bare re-save with neither status nor notes is a no-op touch that preserves verification. Writers swapped: POST /api/jobs/save (also gains browseListingId, exactly-one-of schema) and the save_job / update_application_status agent tools; save_job passes no status so re-saving an applied job cannot downgrade it. Readers swapped: GET /api/jobs marks saved state on class AND browse rows by opportunity-url match (rows also gain listingKind for the client), interaction-profile signals now come from url-matched Applications, totalSaved counts Applications; student-next-step counts saved-status Applications for savedJobCount (applicationCount already counted all); lookup_saved_jobs lists Applications+Opportunity and attaches class-board jobListingIds by url (browse saves listed without ids, unenrolled students no longer refused). Vocabulary decision: Application rows store the Application-model vocabulary — job-board 'offered' is normalized to 'offer' on write and mapped back on read (applicationStatusForJobBoard) — so reporting.ts (in: applied/interviewing/offer), teacher export, students/[id], and outcomes-verify consume unified rows natively with NO reader changes; verified outcomes-verify reads Application by id with no status filter. Migration scripts/migrate-saved-jobs-to-applications.mjs: dry-run by default, --apply to write; richest status wins (existing Application beats saved-job on ties), oldest appliedAt kept, existing notes preferred, StudentSavedJob rows never deleted, idempotent; must be run once at deploy before students with legacy-only saves see their apply-step progress. Superseded test: jobs-save.test.ts pinned the retired StudentSavedJob route internals and was replaced by strictly broader coverage (save/route.test.ts 7 cases + job-applications.test.ts 11 cases — appliedAt-once and class-scope pins carried over). Residual legacy reads left deliberately (non-pipeline, outside plan scope): JobListing._count.savedByStudents dedupe tie-break in scrape-engine and the teacher jobs-results savedCount analytics still count legacy StudentSavedJob rows; campaign-orchestrator's SavedJobPipelineEntry is an un-wired pure-input type with no callers."
     },
     {
       "id": "VQ-R-018",
