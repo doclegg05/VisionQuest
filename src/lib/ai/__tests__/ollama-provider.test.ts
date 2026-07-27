@@ -20,7 +20,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
     it("sends correct request and returns response text", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
         Response.json({
-          message: { content: "Hello there!" },
+          choices: [{ message: { content: "Hello there!" } }],
         }),
       );
 
@@ -31,17 +31,16 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.equal(result, "Hello there!");
 
       const call = mockFetch.mock.calls[0];
-      assert.equal(call.arguments[0], "http://localhost:11434/api/chat");
+      assert.equal(call.arguments[0], "http://localhost:11434/v1/chat/completions");
       const body = JSON.parse((call.arguments[1] as RequestInit).body as string);
       assert.equal(body.model, "gemma4:26b");
       assert.equal(body.stream, false);
-      assert.equal(body.options.num_ctx, 8192);
-      assert.equal(body.think, false);
+      assert.equal(body.num_ctx, 8192);
       assert.deepEqual(body.messages[0], { role: "system", content: "Be helpful." });
       assert.deepEqual(body.messages[1], { role: "user", content: "Hi" });
     });
 
-    it("throws on non-ok response without trying the compat path", async () => {
+    it("throws on non-ok response", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
         new Response("Internal Server Error", { status: 500 }),
       );
@@ -50,13 +49,9 @@ describe("OllamaProvider", { concurrency: false }, () => {
         provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
         /Local AI request failed \(500\)/,
       );
-
-      // Native 5xx is a native-mode failure — no /v1 fallback attempt.
-      assert.equal(mockFetch.mock.callCount(), 1);
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
     });
 
-    it("falls back to the OpenAI-compat path when the native route returns 404", async () => {
+    it("falls back to native Ollama chat when the OpenAI path returns 404", async () => {
       let fetchCount = 0;
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
@@ -64,7 +59,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
           return new Response("Not Found", { status: 404 });
         }
         return Response.json({
-          choices: [{ message: { content: "Hello from the compat path!" } }],
+          message: { content: "Hello from native Ollama!" },
         });
       });
 
@@ -72,17 +67,17 @@ describe("OllamaProvider", { concurrency: false }, () => {
         { role: "user", content: "Hi" },
       ]);
 
-      assert.equal(result, "Hello from the compat path!");
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(result, "Hello from native Ollama!");
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
     });
   });
 
   describe("generateStructuredResponse", () => {
-    it("requests native JSON format output", async () => {
+    it("sets response_format for JSON output", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
         Response.json({
-          message: { content: '{"goals_found":[]}' },
+          choices: [{ message: { content: '{"goals_found":[]}' } }],
         }),
       );
 
@@ -91,16 +86,13 @@ describe("OllamaProvider", { concurrency: false }, () => {
       ]);
 
       assert.equal(result, '{"goals_found":[]}');
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
-      assert.equal(body.format, "json");
-      assert.equal(body.think, false);
-      assert.equal(body.options.num_predict, 512);
+      assert.deepEqual(body.response_format, { type: "json_object" });
     });
 
-    it("falls back to OpenAI-compat JSON mode when the native route returns 404", async () => {
+    it("falls back to native JSON mode when the OpenAI path returns 404", async () => {
       let fetchCount = 0;
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
@@ -108,7 +100,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
           return new Response("Not Found", { status: 404 });
         }
         return Response.json({
-          choices: [{ message: { content: '{"goals_found":[]}' } }],
+          message: { content: '{"goals_found":[]}' },
         });
       });
 
@@ -117,23 +109,20 @@ describe("OllamaProvider", { concurrency: false }, () => {
       ]);
 
       assert.equal(result, '{"goals_found":[]}');
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
-      const compatBody = JSON.parse(
+      const nativeBody = JSON.parse(
         (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
-      assert.deepEqual(compatBody.response_format, { type: "json_object" });
+      assert.equal(nativeBody.format, "json");
+      assert.deepEqual(nativeBody.options, { num_ctx: 8192, num_predict: 512 });
     });
   });
 
   describe("num_ctx override", () => {
     it("uses an explicit numCtx in OpenAI-mode requests when provided", async () => {
-      // OpenAI-only construction pins the compat body — the default provider
-      // negotiates native-first and would never send this top-level field.
       const customProvider = new OllamaProvider(
         "http://localhost:11434",
         "gemma4:26b",
-        { authMode: "none", apiStyle: "openai", numCtx: 32768 },
+        { authMode: "none", numCtx: 32768 },
       );
 
       mockFetch.mock.mockImplementationOnce(async () =>
@@ -144,37 +133,10 @@ describe("OllamaProvider", { concurrency: false }, () => {
         { role: "user", content: "Hi" },
       ]);
 
-      assert.equal(
-        mockFetch.mock.calls[0].arguments[0],
-        "http://localhost:11434/v1/chat/completions",
-      );
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.equal(body.num_ctx, 32768);
-    });
-
-    it("carries an explicit numCtx in native-mode options on the default provider", async () => {
-      const customProvider = new OllamaProvider(
-        "http://localhost:11434",
-        "gemma4:26b",
-        { authMode: "none", numCtx: 32768 },
-      );
-
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ message: { content: "ok" } }),
-      );
-
-      await customProvider.generateResponse("sys", [
-        { role: "user", content: "Hi" },
-      ]);
-
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      const body = JSON.parse(
-        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
-      );
-      assert.equal(body.options.num_ctx, 32768);
-      assert.equal(body.think, false);
     });
 
     it("falls back to the default 8192 when no override is provided", () => {
@@ -190,12 +152,12 @@ describe("OllamaProvider", { concurrency: false }, () => {
   });
 
   describe("streamResponse", () => {
-    it("yields chunks from the native NDJSON stream", async () => {
+    it("yields chunks from SSE stream", async () => {
       const encoder = new TextEncoder();
       const chunks = [
-        JSON.stringify({ message: { content: "Hello" }, done: false }) + "\n",
-        JSON.stringify({ message: { content: " world" }, done: false }) + "\n",
-        JSON.stringify({ message: { content: "" }, done: true }) + "\n",
+        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hello" } }] }) + "\n\n",
+        "data: " + JSON.stringify({ choices: [{ delta: { content: " world" } }] }) + "\n\n",
+        "data: [DONE]\n\n",
       ];
 
       const stream = new ReadableStream({
@@ -219,26 +181,33 @@ describe("OllamaProvider", { concurrency: false }, () => {
       }
 
       assert.deepEqual(result, ["Hello", " world"]);
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.equal(body.stream, true);
-      assert.equal(body.options.num_ctx, 8192);
-      assert.equal(body.think, false);
+      assert.equal(body.num_ctx, 8192);
     });
 
-    it("falls back to the OpenAI-compat SSE stream when the native route returns 404", async () => {
+    it("falls back to native streamed chat when the OpenAI path returns 404", async () => {
       const encoder = new TextEncoder();
-      const sseChunks = [
-        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hello" } }] }) + "\n\n",
-        "data: " + JSON.stringify({ choices: [{ delta: { content: " world" } }] }) + "\n\n",
-        "data: [DONE]\n\n",
+      const nativeChunks = [
+        JSON.stringify({
+          message: { content: "Hello" },
+          done: false,
+        }) + "\n",
+        JSON.stringify({
+          message: { content: " world" },
+          done: false,
+        }) + "\n",
+        JSON.stringify({
+          message: { content: "" },
+          done: true,
+        }) + "\n",
       ];
 
-      const sseStream = new ReadableStream({
+      const nativeStream = new ReadableStream({
         start(controller) {
-          for (const chunk of sseChunks) {
+          for (const chunk of nativeChunks) {
             controller.enqueue(encoder.encode(chunk));
           }
           controller.close();
@@ -251,7 +220,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
         if (fetchCount === 1) {
           return new Response("Not Found", { status: 404 });
         }
-        return new Response(sseStream, { status: 200 });
+        return new Response(nativeStream, { status: 200 });
       });
 
       const result: string[] = [];
@@ -262,15 +231,13 @@ describe("OllamaProvider", { concurrency: false }, () => {
       }
 
       assert.deepEqual(result, ["Hello", " world"]);
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
     });
 
     it("retries a relay startup error before any tokens are yielded", async () => {
       const encoder = new TextEncoder();
       let fetchCount = 0;
 
-      // Both attempts are native — relay startup errors never divert to /v1.
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
         if (fetchCount === 1) {
@@ -280,7 +247,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
                 controller.enqueue(encoder.encode(": heartbeat\n\n"));
                 controller.enqueue(
                   encoder.encode(
-                    '{"error":"Relay: connect ECONNREFUSED 127.0.0.1:11434"}\n',
+                    'data: {"error":"Relay: connect ECONNREFUSED 127.0.0.1:11434"}\n\n',
                   ),
                 );
                 controller.close();
@@ -295,13 +262,12 @@ describe("OllamaProvider", { concurrency: false }, () => {
             start(controller) {
               controller.enqueue(
                 encoder.encode(
-                  JSON.stringify({ message: { content: "Recovered" }, done: false }) +
-                    "\n",
+                  "data: " +
+                    JSON.stringify({ choices: [{ delta: { content: "Recovered" } }] }) +
+                    "\n\n",
                 ),
               );
-              controller.enqueue(
-                encoder.encode(JSON.stringify({ message: { content: "" }, done: true }) + "\n"),
-              );
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
             },
           }),
@@ -318,17 +284,12 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
       assert.deepEqual(result, ["Recovered"]);
       assert.equal(fetchCount, 2);
-      for (const call of mockFetch.mock.calls) {
-        assert.equal(call.arguments[0], "http://localhost:11434/api/chat");
-      }
     });
 
     it("retries Cloudflare 530 startup errors before any tokens are yielded", async () => {
       const encoder = new TextEncoder();
       let fetchCount = 0;
 
-      // Both attempts are native — a 530 startup error re-posts to /api/chat,
-      // never falls back to the compat path.
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
         if (fetchCount === 1) {
@@ -336,7 +297,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
             new ReadableStream({
               start(controller) {
                 controller.enqueue(encoder.encode(": heartbeat\n\n"));
-                controller.enqueue(encoder.encode('{"error":"Ollama returned 530"}\n'));
+                controller.enqueue(encoder.encode('data: {"error":"Ollama returned 530"}\n\n'));
                 controller.close();
               },
             }),
@@ -372,23 +333,15 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
       assert.deepEqual(result, ["Recovered"]);
       assert.equal(fetchCount, 2);
-      for (const call of mockFetch.mock.calls) {
-        assert.equal(call.arguments[0], "http://localhost:11434/api/chat");
-      }
     });
 
-    it("switches back to native streaming when the relay hides an OpenAI-path 404 inside the stream", async () => {
+    it("switches to native streaming when the relay hides an OpenAI-path 404 inside the stream", async () => {
       const encoder = new TextEncoder();
       let fetchCount = 0;
 
-      // Native route 404s → compat path's stream hides an Ollama 404 → the
-      // provider switches to native mode and retries /api/chat.
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
         if (fetchCount === 1) {
-          return new Response("Not Found", { status: 404 });
-        }
-        if (fetchCount === 2) {
           return new Response(
             new ReadableStream({
               start(controller) {
@@ -430,24 +383,17 @@ describe("OllamaProvider", { concurrency: false }, () => {
       }
 
       assert.deepEqual(result, ["Native"]);
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
-      assert.equal(mockFetch.mock.calls[2].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(fetchCount, 3);
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+      assert.equal(fetchCount, 2);
     });
 
-    it("switches back to native streaming when the OpenAI-compatible stream ends without text", async () => {
+    it("switches to native streaming when the OpenAI-compatible stream ends without text", async () => {
       const encoder = new TextEncoder();
       let fetchCount = 0;
 
-      // Native route 404s → compat stream produces no content → the provider
-      // switches to native mode and retries /api/chat.
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
         if (fetchCount === 1) {
-          return new Response("Not Found", { status: 404 });
-        }
-        if (fetchCount === 2) {
           return new Response(
             new ReadableStream({
               start(controller) {
@@ -486,24 +432,16 @@ describe("OllamaProvider", { concurrency: false }, () => {
       }
 
       assert.deepEqual(result, ["Native fallback"]);
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
-      assert.equal(mockFetch.mock.calls[2].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(fetchCount, 3);
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+      assert.equal(fetchCount, 2);
     });
 
     it("accepts native-shaped chunks returned from the OpenAI-compatible stream path", async () => {
       const encoder = new TextEncoder();
 
-      // Native route 404s → the compat path streams native-shaped NDJSON
-      // (relay proxying), which the OpenAI-mode parser must accept.
-      let fetchCount = 0;
-      mockFetch.mock.mockImplementation(async () => {
-        fetchCount += 1;
-        if (fetchCount === 1) {
-          return new Response("Not Found", { status: 404 });
-        }
-        return new Response(
+      mockFetch.mock.mockImplementationOnce(async () =>
+        new Response(
           new ReadableStream({
             start(controller) {
               controller.enqueue(
@@ -519,8 +457,8 @@ describe("OllamaProvider", { concurrency: false }, () => {
             },
           }),
           { status: 200 },
-        );
-      });
+        ),
+      );
 
       const result: string[] = [];
       for await (const chunk of provider.streamResponse("sys", [
@@ -530,24 +468,19 @@ describe("OllamaProvider", { concurrency: false }, () => {
       }
 
       assert.deepEqual(result, ["Relay native"]);
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
-      assert.equal(mockFetch.mock.callCount(), 2);
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
+      assert.equal(mockFetch.mock.callCount(), 1);
     });
   });
 
   describe("onUsage", () => {
     it("generateResponse reports real usage from OpenAI-compat 'usage' field", async () => {
-      // Compat mode is only reached after the native route 404s.
-      let fetchCount = 0;
-      mockFetch.mock.mockImplementation(async () => {
-        fetchCount += 1;
-        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
-        return Response.json({
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
           choices: [{ message: { content: "Hello there!" } }],
           usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
-        });
-      });
+        }),
+      );
 
       const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
       await provider.generateResponse("Be helpful.", [
@@ -563,9 +496,9 @@ describe("OllamaProvider", { concurrency: false }, () => {
       });
     });
 
-    it("generateResponse falls back to the estimator when usage counts are absent (older Ollama)", async () => {
+    it("generateResponse falls back to the estimator when 'usage' is absent (older Ollama)", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ message: { content: "Hi" } }),
+        Response.json({ choices: [{ message: { content: "Hi" } }] }),
       );
 
       const usages: Array<{ source: string }> = [];
@@ -578,20 +511,22 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
 
     it("generateResponse parses prompt_eval_count/eval_count on the native /api/chat path", async () => {
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
+        return Response.json({
           message: { content: "Hello from native Ollama!" },
           prompt_eval_count: 20,
           eval_count: 6,
-        }),
-      );
+        });
+      });
 
       const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
       await provider.generateResponse("Be helpful.", [
         { role: "user", content: "Hi" },
       ], (usage) => usages.push(usage));
 
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
       assert.equal(usages.length, 1);
       assert.deepEqual(usages[0], {
         inputTokens: 20,
@@ -602,7 +537,6 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
 
     it("streamResponse reports real usage from the final SSE usage chunk", async () => {
-      // Compat SSE mode is only reached after the native route 404s.
       const encoder = new TextEncoder();
       const chunks = [
         "data: " + JSON.stringify({ choices: [{ delta: { content: "Hello" } }] }) + "\n\n",
@@ -621,12 +555,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
           controller.close();
         },
       });
-      let fetchCount = 0;
-      mockFetch.mock.mockImplementation(async () => {
-        fetchCount += 1;
-        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
-        return new Response(stream, { status: 200 });
-      });
+      mockFetch.mock.mockImplementationOnce(async () => new Response(stream, { status: 200 }));
 
       const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
       const result: string[] = [];
@@ -645,19 +574,18 @@ describe("OllamaProvider", { concurrency: false }, () => {
         source: "provider",
       });
 
-      // stream_options.include_usage was requested on the compat call.
-      assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/v1/chat/completions");
+      // stream_options.include_usage was requested.
       const body = JSON.parse(
-        (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
+        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.deepEqual(body.stream_options, { include_usage: true });
     });
 
-    it("streamResponse falls back to the estimator when no usage counts arrive", async () => {
+    it("streamResponse falls back to the estimator when no usage chunk arrives", async () => {
       const encoder = new TextEncoder();
       const chunks = [
-        JSON.stringify({ message: { content: "Hello" }, done: false }) + "\n",
-        JSON.stringify({ message: { content: "" }, done: true }) + "\n",
+        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hello" } }] }) + "\n\n",
+        "data: [DONE]\n\n",
       ];
       const stream = new ReadableStream({
         start(controller) {
@@ -680,7 +608,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
     it("does not require onUsage (non-breaking for existing callers)", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ message: { content: "ok" } }),
+        Response.json({ choices: [{ message: { content: "ok" } }] }),
       );
 
       const result = await provider.generateResponse("sys", [
@@ -694,7 +622,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
   describe("temperature", () => {
     it("omits temperature from generateResponse requests when not provided (no behavior change)", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ message: { content: "ok" } }),
+        Response.json({ choices: [{ message: { content: "ok" } }] }),
       );
 
       await provider.generateResponse("sys", [{ role: "user", content: "Hi" }]);
@@ -703,31 +631,20 @@ describe("OllamaProvider", { concurrency: false }, () => {
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
       assert.equal("temperature" in body, false);
-      assert.equal("temperature" in body.options, false);
     });
 
     it("sends temperature in generateResponse OpenAI-mode body when provided", async () => {
-      const openAiOnlyProvider = new OllamaProvider(
-        "http://localhost:11434",
-        "gemma4:26b",
-        { authMode: "none", apiStyle: "openai" },
-      );
-
       mockFetch.mock.mockImplementationOnce(async () =>
         Response.json({ choices: [{ message: { content: "ok" } }] }),
       );
 
-      await openAiOnlyProvider.generateResponse(
+      await provider.generateResponse(
         "sys",
         [{ role: "user", content: "Hi" }],
         undefined,
         { temperature: 0 },
       );
 
-      assert.equal(
-        mockFetch.mock.calls[0].arguments[0],
-        "http://localhost:11434/v1/chat/completions",
-      );
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
@@ -735,9 +652,12 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
 
     it("sends temperature in generateResponse native-mode body when provided", async () => {
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ message: { content: "ok" } }),
-      );
+      let fetchCount = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
+        return Response.json({ message: { content: "ok" } });
+      });
 
       await provider.generateResponse(
         "sys",
@@ -747,15 +667,14 @@ describe("OllamaProvider", { concurrency: false }, () => {
       );
 
       const nativeBody = JSON.parse(
-        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+        (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
       assert.equal(nativeBody.options.temperature, 0.2);
-      assert.equal(nativeBody.think, false);
     });
 
     it("sends temperature in generateStructuredResponse when provided", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ message: { content: '{"a":1}' } }),
+        Response.json({ choices: [{ message: { content: '{"a":1}' } }] }),
       );
 
       await provider.generateStructuredResponse(
@@ -768,13 +687,13 @@ describe("OllamaProvider", { concurrency: false }, () => {
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
-      assert.equal(body.options.temperature, 0);
+      assert.equal(body.temperature, 0);
     });
 
     it("sends temperature in streamResponse when provided", async () => {
       const chunks = [
-        JSON.stringify({ message: { content: "Hi" }, done: false }) + "\n",
-        JSON.stringify({ message: { content: "" }, done: true }) + "\n",
+        "data: " + JSON.stringify({ choices: [{ delta: { content: "Hi" } }] }) + "\n\n",
+        "data: [DONE]\n\n",
       ];
       const stream = new ReadableStream({
         start(controller) {
@@ -799,7 +718,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
-      assert.equal(body.options.temperature, 0);
+      assert.equal(body.temperature, 0);
     });
 
     it("sends temperature in streamWithTools requests when provided", async () => {
@@ -815,7 +734,8 @@ describe("OllamaProvider", { concurrency: false }, () => {
         },
       ];
       const chunks = [
-        JSON.stringify({ message: { content: "Hi" }, done: true }) + "\n",
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "Hi" } }] })}\n`,
+        `data: [DONE]\n`,
       ];
       const stream = new ReadableStream({
         start(controller) {
@@ -846,16 +766,15 @@ describe("OllamaProvider", { concurrency: false }, () => {
       const body = JSON.parse(
         (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
       );
-      assert.equal(body.options.temperature, 0);
-      assert.equal(body.think, false);
+      assert.equal(body.temperature, 0);
     });
   });
 
   describe("message role mapping", () => {
-    it("maps 'model' role to 'assistant' in the request body", async () => {
+    it("maps 'model' role to 'assistant' for OpenAI format", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
         Response.json({
-          message: { content: "ok" },
+          choices: [{ message: { content: "ok" } }],
         }),
       );
 
@@ -970,9 +889,9 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
     it("streams text only when the model emits no tool calls", async () => {
       const chunks = [
-        JSON.stringify({ message: { content: "Hi" }, done: false }) + "\n",
-        JSON.stringify({ message: { content: " there" }, done: false }) + "\n",
-        JSON.stringify({ message: { content: "" }, done: true }) + "\n",
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "Hi" } }] })}\n`,
+        `data: ${JSON.stringify({ choices: [{ delta: { content: " there" } }] })}\n`,
+        `data: [DONE]\n`,
       ];
       mockFetch.mock.mockImplementationOnce(
         async () => new Response(streamFromChunks(chunks), { status: 200 }),
@@ -1003,22 +922,13 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.equal((events.at(-1) as { kind: string; reason: string }).kind, "done");
       assert.equal((events.at(-1) as { reason: string }).reason, "complete");
 
-      // Tools were forwarded in the native request body.
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
+      // Tools were forwarded in the request body.
       const body = JSON.parse((mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string);
       assert.equal(body.tools[0].function.name, "lookup_thing");
       assert.equal(body.stream, true);
-      assert.equal(body.think, false);
     });
 
     it("invokes onToolCall with parsed args and feeds responses back into the next hop", async () => {
-      // OpenAI-only construction: tool-call DELTA accumulation is
-      // compat-streaming machinery, so pin the /v1 path directly.
-      const openAiOnlyProvider = new OllamaProvider(
-        "http://localhost:11434",
-        "gemma4:26b",
-        { authMode: "none", apiStyle: "openai" },
-      );
       // Hop 1: model emits a tool call.
       const hop1Chunks = [
         `data: ${JSON.stringify({
@@ -1076,7 +986,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
       }));
 
       const events: Array<{ kind: string; [k: string]: unknown }> = [];
-      for await (const event of openAiOnlyProvider.streamWithTools(
+      for await (const event of provider.streamWithTools(
         "sys",
         [{ role: "user", content: "Find abc." }],
         tools,
@@ -1115,13 +1025,6 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
 
     it("accumulates real usage across hops into one final onUsage call", async () => {
-      // OpenAI-only construction: per-chunk `usage` on SSE frames is
-      // compat-streaming machinery, so pin the /v1 path directly.
-      const openAiOnlyProvider = new OllamaProvider(
-        "http://localhost:11434",
-        "gemma4:26b",
-        { authMode: "none", apiStyle: "openai" },
-      );
       // Hop 1: tool call + usage on the final chunk.
       const hop1Chunks = [
         `data: ${JSON.stringify({
@@ -1160,7 +1063,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
       const usages: Array<{ inputTokens: number; outputTokens: number; totalTokens: number; source: string }> = [];
       const events: Array<{ kind: string }> = [];
-      for await (const event of openAiOnlyProvider.streamWithTools(
+      for await (const event of provider.streamWithTools(
         "sys",
         [{ role: "user", content: "Find abc." }],
         tools,
@@ -1187,15 +1090,18 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
     it("stops at maxHops when the model loops on tool calls", async () => {
       const loopChunks = [
-        JSON.stringify({
-          message: {
-            content: "",
-            tool_calls: [
-              { function: { name: "lookup_thing", arguments: { id: "x" } } },
-            ],
-          },
-          done: true,
-        }) + "\n",
+        `data: ${JSON.stringify({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, id: "stuck", function: { name: "lookup_thing", arguments: '{"id":"x"}' } },
+                ],
+              },
+            },
+          ],
+        })}\n`,
+        `data: [DONE]\n`,
       ];
       mockFetch.mock.mockImplementation(
         async () => new Response(streamFromChunks(loopChunks), { status: 200 }),
@@ -1225,7 +1131,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
       assert.equal(last?.reason, "max_hops");
     });
 
-    it("handles native /api/chat tool calls across hops", async () => {
+    it("handles native /api/chat tool calls when the OpenAI path returns 404", async () => {
       // Hop 1 (native): text + tool_calls in one final chunk.
       const nativeHop1Chunks = [
         JSON.stringify({
@@ -1255,8 +1161,12 @@ describe("OllamaProvider", { concurrency: false }, () => {
       let fetchCount = 0;
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
-        // Every hop hits native /api/chat first — no compat detour.
-        const stream = fetchCount === 1 ? nativeHop1Chunks : nativeHop2Chunks;
+        // First call: OpenAI path 404 → forces native-mode fallback.
+        if (fetchCount === 1) {
+          return new Response("Not Found", { status: 404 });
+        }
+        // Subsequent calls: native /api/chat with our streamed chunks.
+        const stream = fetchCount === 2 ? nativeHop1Chunks : nativeHop2Chunks;
         return new Response(streamFromChunks(stream), { status: 200 });
       });
 
@@ -1276,8 +1186,8 @@ describe("OllamaProvider", { concurrency: false }, () => {
         events.push(event as { kind: string });
       }
 
-      // Both hops hit native /api/chat.
-      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/api/chat");
+      // First call hit OpenAI path; second hit native /api/chat.
+      assert.equal(mockFetch.mock.calls[0].arguments[0], "http://localhost:11434/v1/chat/completions");
       assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
 
       // Tool was invoked exactly once with parsed args.
@@ -1289,11 +1199,10 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
       // Native mode forwards tools in the request body alongside other options.
       const nativeBody = JSON.parse(
-        (mockFetch.mock.calls[0].arguments[1] as RequestInit).body as string,
+        (mockFetch.mock.calls[1].arguments[1] as RequestInit).body as string,
       );
       assert.equal(nativeBody.tools[0].function.name, "lookup_thing");
       assert.equal(nativeBody.options.num_ctx, 8192);
-      assert.equal(nativeBody.think, false);
 
       // Combined text across both hops should land in the user-visible stream.
       const finalText = events
@@ -1365,7 +1274,8 @@ describe("OllamaProvider", { concurrency: false }, () => {
       let fetchCount = 0;
       mockFetch.mock.mockImplementation(async () => {
         fetchCount += 1;
-        const stream = fetchCount === 1 ? stringArgsChunks : finalReplyChunks;
+        if (fetchCount === 1) return new Response("Not Found", { status: 404 });
+        const stream = fetchCount === 2 ? stringArgsChunks : finalReplyChunks;
         return new Response(streamFromChunks(stream), { status: 200 });
       });
 
