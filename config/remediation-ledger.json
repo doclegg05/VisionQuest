@@ -453,8 +453,29 @@
         "src/lib/job-board/adapters/ats.ts"
       ],
       "fix": "Remove the hardcoded elite-tech boards from BROWSE_SOURCES (keep opt-in per class if wanted) and add a seniority heuristic on title tokens to job-quality or scoring.",
-      "status": "open",
-      "verification": []
+      "status": "fixed",
+      "verification": [
+        {
+          "kind": "test",
+          "file": "src/lib/job-board/adapters/ats.test.ts"
+        },
+        {
+          "kind": "test",
+          "file": "src/lib/job-board/job-quality.test.ts"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/adapters/ats.ts",
+          "mustContain": "GREENHOUSE_BOARDS"
+        },
+        {
+          "kind": "config",
+          "file": "src/lib/job-board/job-quality.ts",
+          "mustContain": "senior-level title"
+        }
+      ],
+      "fixedAt": "2026-07-27",
+      "notes": "The hardcoded elite-tech board lists (DEFAULT_GREENHOUSE/DEFAULT_LEVER/DEFAULT_ASHBY: airbnb, anthropic, stripe, openai, ...) are gone. Boards are opt-in via comma-separated GREENHOUSE_BOARDS / LEVER_BOARDS / ASHBY_BOARDS env vars (documented in .env.example), read at call time; with none set the adapters report isConfigured()=false, which removes them from the default browse pool and from class scrapes through the existing isConfigured() plumbing — BROWSE_SOURCES still names the sources so an explicit opt-in flows with zero further changes. Seniority heuristic added to job-quality's rejectionReason (reason: 'senior-level title'): word-boundary, case-insensitive tokens senior/staff/principal/lead/director/vp/head of/architect, so it guards every source (class scrapes and browse refresh both run filterQualityJobs). Interpretation calls: (1) 'lead' matches 'Team Lead' but never 'Leader'/'Leadership' (word boundary); (2) elder-care titles ('Senior Care Assistant', 'Senior Living Caregiver') are carved out by neutralizing only the 'senior <care-context>' phrase — 'Senior Living Community Director' still rejects; (3) 'staff' follows the prescribed token list even though it also catches 'Staff Accountant'-style titles — acceptable for this audience; (4) DEFAULT_SMARTRECRUITERS (Visa/Bosch/McDonalds/LVMH) left as-is: mass employers, not the elite-tech finding, and the new seniority filter now screens their senior roles too."
     },
     {
       "id": "VQ-R-016",

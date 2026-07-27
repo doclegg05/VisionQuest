@@ -78,3 +78,70 @@ test("filterQualityJobs combines duplicate postings from different sources", () 
   assert.equal(result.rejected.length, 1);
   assert.equal(result.rejected[0].reason, "duplicate job posting");
 });
+
+// =============================================================================
+// VQ-R-015 — the browse pool served senior big-tech roles to TANF/SNAP
+// students. job-quality now rejects senior/leadership titles (word-boundary
+// token match) so no source can put "Staff Engineer" in front of the default
+// student audience, while "Team Leader" / "Senior Care Assistant" style
+// entry-level titles stay.
+// =============================================================================
+
+function seniorityCase(title: string): NormalizedJob {
+  return job({
+    title,
+    sourceId: `test:${title}`,
+    url: `https://example.com/jobs/${encodeURIComponent(title)}`,
+  });
+}
+
+function rejectionFor(title: string): string | null {
+  const result = filterQualityJobs([seniorityCase(title)]);
+  return result.rejected[0]?.reason ?? null;
+}
+
+test("seniority heuristic rejects senior/leadership titles (VQ-R-015)", () => {
+  const seniorTitles = [
+    "Senior Software Engineer",
+    "Staff Engineer",
+    "Principal Product Manager",
+    "Team Lead",
+    "Lead Barista",
+    "Director of Engineering",
+    "VP of Sales",
+    "Head of People",
+    "Solutions Architect",
+    "SENIOR ACCOUNTANT", // case-insensitive
+  ];
+  for (const title of seniorTitles) {
+    assert.equal(rejectionFor(title), "senior-level title", `expected "${title}" rejected`);
+  }
+});
+
+test("seniority heuristic keeps entry-level titles (VQ-R-015)", () => {
+  const entryTitles = [
+    // "lead" must not match "leader"/"leadership" — word boundary only.
+    "Team Leader",
+    "Leadership Development Program Associate",
+    // Elder-care roles are jobs FOR seniors' care, not senior-level roles.
+    "Senior Care Assistant",
+    "Senior Living Caregiver",
+    // "vp" inside another word never matches.
+    "MVP Program Coordinator",
+    "Retail Associate",
+    "Customer Service Representative",
+  ];
+  for (const title of entryTitles) {
+    const result = filterQualityJobs([seniorityCase(title)]);
+    assert.equal(
+      result.rejected.length,
+      0,
+      `"${title}" rejected as: ${result.rejected[0]?.reason}`,
+    );
+    assert.equal(result.jobs.length, 1);
+  }
+});
+
+test("care-context carve-out only neutralizes 'senior', not the rest of the title (VQ-R-015)", () => {
+  assert.equal(rejectionFor("Senior Living Community Director"), "senior-level title");
+});
