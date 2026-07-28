@@ -31,11 +31,18 @@ import {
  */
 
 export type CrisisCategory = "self_harm" | "harm_others" | "abuse";
+export type CrisisLang = "en" | "es";
 export type WellbeingReason = "message_signal" | "low_mood";
 
 interface CrisisPattern {
   category: CrisisCategory;
   pattern: RegExp;
+  /**
+   * Language of the phrase family. Used ONLY to localize the student-facing
+   * 988 resource block (src/lib/chat/crisis-safety-net.ts) — staff alerting
+   * and routing are language-independent. Omitted = English.
+   */
+  lang?: CrisisLang;
 }
 
 // Phrase-level, word-boundary matched, case-insensitive. Phrases (not bare
@@ -92,50 +99,64 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // toward alerting: idioms like "quiero morir de risa" match, exactly as
   // "want to die" matches "I want to die laughing".
   // self_harm (es)
-  { category: "self_harm", pattern: /\b(me\s+quiero\s+morir|(quiero|quisiera)\s+morir(me)?)\b/i },
-  { category: "self_harm", pattern: /\b(matarme|me\s+quiero\s+matar)\b/i },
-  { category: "self_harm", pattern: /\bquitarme\s+la\s+vida\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(me\s+quiero\s+morir|(quiero|quisiera)\s+morir(me)?)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(matarme|me\s+quiero\s+matar)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\bquitarme\s+la\s+vida\b/i },
   // Stem match — suicidio, suicida(s), suicidarme, suicidarse, suicidé, ...
-  { category: "self_harm", pattern: /\bsuicid/i },
-  { category: "self_harm", pattern: /\b(acabar|terminar)\s+con\s+mi\s+vida\b/i },
-  { category: "self_harm", pattern: /\bno\s+quiero\s+(vivir|seguir\s+viviendo)\b/i },
-  { category: "self_harm", pattern: /\b(no\s+vale\s+la\s+pena\s+vivir|la\s+vida\s+no\s+vale\s+la\s+pena)\b/i },
-  { category: "self_harm", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer)\s+da(ñ|n)o|lastimarme|cortarme\s+las\s+venas)\b/i },
-  { category: "self_harm", pattern: /\b(mejor\s+muert[oa]|quisiera\s+estar\s+muert[oa])\b/i },
+  { category: "self_harm", lang: "es", pattern: /\bsuicid/i },
+  { category: "self_harm", lang: "es", pattern: /\b(acabar|terminar)\s+con\s+mi\s+vida\b/i },
+  { category: "self_harm", lang: "es", pattern: /\bno\s+quiero\s+(vivir|seguir\s+viviendo)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(no\s+vale\s+la\s+pena\s+vivir|la\s+vida\s+no\s+vale\s+la\s+pena)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer)\s+da(ñ|n)o|lastimarme|cortarme\s+las\s+venas)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(mejor\s+muert[oa]|quisiera\s+estar\s+muert[oa])\b/i },
   // Ambiguous like the English "can't go on" — included per err-toward-alerting.
-  { category: "self_harm", pattern: /\b(ya\s+)?no\s+puedo\s+m(á|a)s\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(ya\s+)?no\s+puedo\s+m(á|a)s\b/i },
+  // Method-adjacent disclosure (es) — mirrors the English VQ-R-004 entries
+  // above: a stated plan or a past act outranks ideation. Bounded the same
+  // way: a quantity word ("todas las", "demasiadas", "un montón de") is
+  // required so ordinary adherence ("me tomé la pastilla de la presión",
+  // "ya me tomé mis pastillas") stays silent, and "sobredosis" requires a
+  // first-person frame so third-person mentions ("mi primo murió de una
+  // sobredosis") stay silent — the same bounds that keep "took my medication"
+  // and "that overdose documentary" quiet in English.
+  { category: "self_harm", lang: "es", pattern: /\b(me\s+voy\s+a\s+tomar|voy\s+a\s+tomarme|tomarme|me\s+tom(o|e|é|ar(e|é))|tom(e|é|ar(e|é)))\s+(tod[ao]s\s+(l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(as|os)\s+|un\s+(mont(o|ó)n|pu(ñ|n)ado)\s+de\s+)(pastillas|p(í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(darme|tomarme|meterme|me\s+(di|doy|dar(e|é)|tom(o|e|é)|voy\s+a\s+(dar|tomar|meter))|(pienso|pens(e|é|ado|ando))\s+en)\s+una\s+sobredosis\b/i },
   // harm_others (es) — a person object (attached clitic or personal "a") is
   // required, mirroring the English object list; that keeps "matar el tiempo"
   // ("kill time") from false-positive while catching "quiero matar a mi jefe".
-  { category: "harm_others", pattern: /\bhacerles?\s+da(ñ|n)o\s+a\b/i },
-  { category: "harm_others", pattern: /\b((quiero|quisiera|voy\s+a)\s+matar(l[oa]s?|te|les?|\s+a)|(l[oa]s?|te|les?)\s+(quiero|voy\s+a)\s+matar)\b/i },
-  { category: "harm_others", pattern: /\b((quiero|voy\s+a)\s+lastimar(l[oa]s?|te|les?)?|lastimar\s+a\s+alguien)\b/i },
+  { category: "harm_others", lang: "es", pattern: /\bhacerles?\s+da(ñ|n)o\s+a\b/i },
+  { category: "harm_others", lang: "es", pattern: /\b((quiero|quisiera|voy\s+a)\s+matar(l[oa]s?|te|les?|\s+a)|(l[oa]s?|te|les?)\s+(quiero|voy\s+a)\s+matar)\b/i },
+  { category: "harm_others", lang: "es", pattern: /\b((quiero|voy\s+a)\s+lastimar(l[oa]s?|te|les?)?|lastimar\s+a\s+alguien)\b/i },
   // abuse (es) — Spanish is pro-drop ("me pega" = "[he] hits me"), so unlike
   // the English "he/she hits me" no subject pronoun is required: the
   // subjectless form IS the natural disclosure and requiring one would miss
   // real cases. "tengo miedo de mi ..." is bounded to partner nouns to keep
   // precision ("tengo miedo de mi examen" must not alert).
-  { category: "abuse", pattern: /\bme\s+(peg|golpe|maltrat|amenaz)(a|an|aba|aban|aron|ó|o)(?![\wáéíóúüñ])/i },
-  { category: "abuse", pattern: /\bme\s+est(á|a)n?\s+(pegando|golpeando|maltratando|amenazando|abusando)\b/i },
-  { category: "abuse", pattern: /\babus(a|an|ó|o|aba|aban|aron|ando)\s+de\s+m[ií](?![\wáéíóúüñ])/i },
-  { category: "abuse", pattern: /\b(tengo\s+miedo\s+de|le\s+tengo\s+miedo\s+a)\s+mi\s+(pareja|esposo|esposa|marido|mujer|novio|novia)\b/i },
+  { category: "abuse", lang: "es", pattern: /\bme\s+(peg|golpe|maltrat|amenaz)(a|an|aba|aban|aron|ó|o)(?![\wáéíóúüñ])/i },
+  { category: "abuse", lang: "es", pattern: /\bme\s+est(á|a)n?\s+(pegando|golpeando|maltratando|amenazando|abusando)\b/i },
+  { category: "abuse", lang: "es", pattern: /\babus(a|an|ó|o|aba|aban|aron|ando)\s+de\s+m[ií](?![\wáéíóúüñ])/i },
+  { category: "abuse", lang: "es", pattern: /\b(tengo\s+miedo\s+de|le\s+tengo\s+miedo\s+a)\s+mi\s+(pareja|esposo|esposa|marido|mujer|novio|novia)\b/i },
 ];
 
 export interface CrisisDetection {
   matched: boolean;
   category: CrisisCategory | null;
+  /** Language of the matched pattern family; null when nothing matched. */
+  lang: CrisisLang | null;
 }
 
 /**
  * Deterministic scan of a single message for self-harm, harm-to-others, or
  * abuse signals. Pure + synchronous + no AI — safe to call on every turn.
+ * The first matching pattern wins; English families are scanned first, so a
+ * mixed-language message that trips an English phrase reports lang "en".
  */
 export function detectCrisisSignal(text: string): CrisisDetection {
-  if (!text || typeof text !== "string") return { matched: false, category: null };
-  for (const { category, pattern } of CRISIS_PATTERNS) {
-    if (pattern.test(text)) return { matched: true, category };
+  if (!text || typeof text !== "string") return { matched: false, category: null, lang: null };
+  for (const { category, pattern, lang } of CRISIS_PATTERNS) {
+    if (pattern.test(text)) return { matched: true, category, lang: lang ?? "en" };
   }
-  return { matched: false, category: null };
+  return { matched: false, category: null, lang: null };
 }
 
 const ALERT_TYPE = WELLBEING_ALERT_TYPE;
