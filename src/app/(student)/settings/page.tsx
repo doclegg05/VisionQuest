@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PageIntro from "@/components/ui/PageIntro";
 import StaffMfaPanel from "@/components/auth/StaffMfaPanel";
+import PasskeyPanel from "@/components/auth/PasskeyPanel";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 import { ConsentSection } from "@/components/settings/ConsentSection";
@@ -238,6 +239,8 @@ export default function SettingsPage() {
           <StaffMfaPanel />
         </div>
       )}
+
+      {sessionRole && <PasskeyPanel />}
 
       {sessionRole !== "teacher" && sessionRole !== "admin" && (
         <div className="surface-section mb-6 p-6">

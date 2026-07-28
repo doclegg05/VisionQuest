@@ -34,13 +34,30 @@ test("signToken and verifyToken round-trip claims with a configured secret", () 
   process.env.JWT_SECRET = "0123456789abcdef0123456789abcdef";
 
   try {
-    const token = signToken("student-1", "teacher", 3);
+    const token = signToken("student-1", "teacher", 3, true);
     const claims = verifyToken(token);
 
     assert.ok(claims);
     assert.equal(claims.sub, "student-1");
     assert.equal(claims.role, "teacher");
     assert.equal(claims.sv, 3);
+    assert.equal(claims.mfa, true);
+  } finally {
+    if (original === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = original;
+    }
+  }
+});
+
+test("signToken marks ordinary legacy sessions as not MFA-verified", () => {
+  const original = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = "0123456789abcdef0123456789abcdef";
+
+  try {
+    const token = signToken("student-1", "student", 3);
+    assert.equal(verifyToken(token)?.mfa, false);
   } finally {
     if (original === undefined) {
       delete process.env.JWT_SECRET;

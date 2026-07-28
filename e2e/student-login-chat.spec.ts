@@ -43,7 +43,7 @@ test.describe("Student login flow", () => {
 
     await page.getByLabel(/username or email/i).fill("nonexistent-user");
     await page.getByLabel(/password/i).fill("wrongpassword");
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
     await expect(
       page.getByText(/invalid|incorrect|not found|too many/i),

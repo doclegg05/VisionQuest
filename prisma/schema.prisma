@@ -15,6 +15,8 @@ model Student {
   displayName          String
   passwordHash         String?
   email                String?   @unique
+  emailVerified        Boolean   @default(false)
+  profileImage         String?
   authProvider         String?
   geminiApiKey         String?
   credlyUsername       String?
@@ -91,6 +93,11 @@ model Student {
   wagers                  Wager[]
   careerCampaigns         CareerCampaign[]
   failedExtractions       FailedExtraction[]
+  authAccounts            AuthAccount[]
+  authSessions            AuthSession[]
+  authPasskeys            AuthPasskey[]
+  invitationsCreated      ClassroomInvitation[]    @relation("InvitationCreator")
+  invitationsRedeemed     ClassroomInvitation[]    @relation("InvitationRedeemer")
 
   @@schema("visionquest")
 }
@@ -463,12 +470,12 @@ model SpokesEmploymentFollowUp {
 }
 
 model Certification {
-  id          String    @id @default(cuid())
-  studentId   String
-  certType    String    @default("ready-to-work")
-  status      String    @default("in_progress")
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
+  id                 String    @id @default(cuid())
+  studentId          String
+  certType           String    @default("ready-to-work")
+  status             String    @default("in_progress")
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
   // P1-4 outcome verification: null = legacy row (pre-feature, provenance
   // unknown); "self_reported" = progress recorded from a student claim;
   // "verified" = an instructor confirmed the certification outcome.
@@ -632,10 +639,109 @@ model SpokesClass {
   enrollments  StudentClassEnrollment[]
   jobConfig    JobClassConfig?
   requirements ClassRequirement[]
+  invitations  ClassroomInvitation[]
 
   @@index([status, name])
   @@index([programType])
   @@index([regionId, status])
+  @@schema("visionquest")
+}
+
+// Better Auth storage is additive to the legacy JWT/password flow. The
+// existing Student row remains the canonical user and preserves every
+// internal ID and relationship.
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user Student @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@schema("visionquest")
+}
+
+model AuthSession {
+  id             String   @id
+  expiresAt      DateTime
+  token          String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  sessionVersion Int
+  mfaVerified    Boolean  @default(false)
+
+  user Student @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, sessionVersion])
+  @@schema("visionquest")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@schema("visionquest")
+}
+
+model AuthPasskey {
+  id           String   @id
+  name         String?
+  publicKey    String   @db.Text
+  userId       String
+  credentialID String   @unique
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime @default(now())
+  aaguid       String?
+
+  user Student @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("visionquest")
+}
+
+model ClassroomInvitation {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  email        String
+  classId      String
+  role         String    @default("student")
+  expiresAt    DateTime
+  redeemedAt   DateTime?
+  revokedAt    DateTime?
+  createdById  String
+  redeemedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  class      SpokesClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdBy  Student     @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  redeemedBy Student?    @relation("InvitationRedeemer", fields: [redeemedById], references: [id], onDelete: SetNull)
+
+  @@index([classId, email])
+  @@index([email, expiresAt])
   @@schema("visionquest")
 }
 
@@ -810,15 +916,15 @@ model Opportunity {
 }
 
 model Application {
-  id            String    @id @default(cuid())
-  studentId     String
-  opportunityId String
-  status        String    @default("saved")
-  notes         String?   @db.Text
-  resumeFileId  String?
-  appliedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  studentId          String
+  opportunityId      String
+  status             String    @default("saved")
+  notes              String?   @db.Text
+  resumeFileId       String?
+  appliedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
   // P1-4 outcome verification: null = legacy row (pre-feature, provenance
   // unknown); "self_reported" = student-claimed status change; "verified" =
   // an instructor confirmed the application outcome. Carried for grant
@@ -1708,21 +1814,21 @@ model StudentSavedJob {
 // =============================================================================
 
 model LlmCallLog {
-  id           String   @id @default(cuid())
+  id             String   @id @default(cuid())
   // Nullable since Phase 1 semantic RAG: system calls (embedding ingest /
   // backfill scripts) have no student. NULL rows are admin-visible only under
   // the existing llm_call_log_access RLS policy and never count toward quotas.
-  studentId    String?
-  callSite     String
-  model        String
-  inputTokens  Int      @default(0)
-  outputTokens Int      @default(0)
-  totalTokens  Int      @default(0)
-  durationMs   Int?
+  studentId      String?
+  callSite       String
+  model          String
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  totalTokens    Int      @default(0)
+  durationMs     Int?
   // Sage prompt-revision attribution tag (SAGE_PROMPT_REVISION at call time).
   // Nullable: rows written before QW-7 have no revision.
   promptRevision String?
-  createdAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -1747,9 +1853,9 @@ model Pathway {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  goals   Goal[]
+  goals                Goal[]
   careerEducationPlans CareerEducationPlan[]
-  creator Student? @relation("PathwayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  creator              Student?              @relation("PathwayCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([active])
   @@index([createdBy])

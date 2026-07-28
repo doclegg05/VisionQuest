@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prismaAdmin as prisma } from "@/lib/db";
-import { setSessionCookie, normalizeEmail } from "@/lib/auth";
+import {
+  setSessionCookie,
+  normalizeEmail,
+  signMfaSessionToken,
+  setMfaSessionCookie,
+} from "@/lib/auth";
 import crypto from "crypto";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { verifiedGoogleIdentity } from "@/lib/google-identity";
+import { federatedLoginMfaDisposition } from "@/lib/auth-migration-policy";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -28,6 +35,7 @@ interface GoogleTokenResponse {
 interface GoogleUserInfo {
   sub: string;
   email: string;
+  email_verified: boolean;
   name: string;
   picture?: string;
 }
@@ -111,54 +119,170 @@ export async function GET(req: NextRequest) {
       userInfo = {
         sub: payload.sub,
         email: payload.email,
+        email_verified: payload.email_verified === true,
         name: payload.name || "",
         picture: payload.picture,
       };
     } catch {
       return NextResponse.redirect(new URL("/?error=oauth_token_invalid", req.url));
     }
-    const normalizedEmail = normalizeEmail(userInfo.email);
-
-    // Find or create user
-    let student = await prisma.student.findFirst({
-      where: { email: normalizedEmail },
+    const googleIdentity = verifiedGoogleIdentity({
+      sub: userInfo.sub,
+      email: userInfo.email,
+      email_verified: userInfo.email_verified,
     });
+    if (!googleIdentity) {
+      return NextResponse.redirect(
+        new URL("/?error=oauth_email_unverified", req.url),
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(googleIdentity.email);
+    const providerId = googleIdentity.providerId;
+    const providerSubject = googleIdentity.providerSubject;
+
+    // Provider subject is the durable identity key. Email is used only for
+    // the one-time migration/link step when no Google account binding exists.
+    const existingBinding = await prisma.authAccount.findUnique({
+      where: {
+        providerId_accountId: {
+          providerId,
+          accountId: providerSubject,
+        },
+      },
+      include: { user: true },
+    });
+    let student = existingBinding?.user ?? null;
 
     if (!student) {
-      // Create new student from Google info
-      // Use email prefix as studentId, ensure unique
-      const baseId = userInfo.email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
+      student = await prisma.student.findUnique({
+        where: { email: normalizedEmail },
+      });
 
-      // Retry with random suffix to avoid TOCTOU race on studentId uniqueness
-      let studentId = baseId;
-      const maxAttempts = 5;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        try {
-          student = await prisma.student.create({
-            data: {
-              studentId,
-              displayName: userInfo.name || userInfo.email.split("@")[0],
-              email: normalizedEmail,
-              passwordHash: null,
-              authProvider: "google",
-              role: "student",
-            },
-          });
-          break;
-        } catch (err: unknown) {
-          const isPrismaUniqueViolation =
-            err && typeof err === "object" && "code" in err && err.code === "P2002";
-          if (!isPrismaUniqueViolation || attempt === maxAttempts - 1) throw err;
-          studentId = `${baseId}${crypto.randomInt(1000, 9999)}`;
+      if (!student) {
+        const baseId =
+          userInfo.email
+            .split("@")[0]
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]/g, "") || "student";
+
+        let studentId = baseId;
+        const maxAttempts = 5;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            student = await prisma.student.create({
+              data: {
+                studentId,
+                displayName: userInfo.name || userInfo.email.split("@")[0],
+                email: normalizedEmail,
+                emailVerified: true,
+                profileImage: userInfo.picture,
+                passwordHash: null,
+                authProvider: "google",
+                role: "student",
+              },
+            });
+            break;
+          } catch (err: unknown) {
+            const isPrismaUniqueViolation =
+              err &&
+              typeof err === "object" &&
+              "code" in err &&
+              err.code === "P2002";
+            if (!isPrismaUniqueViolation || attempt === maxAttempts - 1) {
+              throw err;
+            }
+
+            // A concurrent callback may have created the email identity.
+            const byEmail = await prisma.student.findUnique({
+              where: { email: normalizedEmail },
+            });
+            if (byEmail) {
+              student = byEmail;
+              break;
+            }
+            studentId = `${baseId}${crypto.randomInt(1000, 9999)}`;
+          }
         }
       }
       if (!student) {
         return NextResponse.redirect(new URL("/?error=oauth_failed", req.url));
       }
+
+      if (!student.emailVerified) {
+        student = await prisma.student.update({
+          where: { id: student.id },
+          data: {
+            emailVerified: true,
+            authProvider: student.authProvider ?? "google",
+          },
+        });
+      }
+
+      // Better Auth and the legacy callback share this account table. Its
+      // accountId is Google's stable OIDC `sub`, never an email address.
+      const binding = await prisma.authAccount.upsert({
+        where: {
+          providerId_accountId: {
+            providerId,
+            accountId: providerSubject,
+          },
+        },
+        update: {},
+        create: {
+          id: crypto.randomUUID(),
+          providerId,
+          accountId: providerSubject,
+          userId: student.id,
+        },
+        include: { user: true },
+      });
+      student = binding.user;
     }
 
     if (!student.isActive) {
       return NextResponse.redirect(new URL("/?error=account_deactivated", req.url));
+    }
+
+    const mfaDisposition = federatedLoginMfaDisposition(
+      student.role,
+      student.mfaEnabled,
+    );
+    if (mfaDisposition === "enrollment_required") {
+      await logAuditEvent({
+        actorId: student.id,
+        actorRole: student.role,
+        action: "auth.google_mfa_enrollment_required",
+        targetType: "student",
+        targetId: student.id,
+        summary: `Google verified for ${student.studentId}, but staff MFA enrollment is required.`,
+      });
+      return NextResponse.redirect(
+        new URL("/?error=mfa_enrollment_required", req.url),
+      );
+    }
+
+    if (mfaDisposition === "challenge_required") {
+      const mfaSessionToken = signMfaSessionToken(
+        student.id,
+        student.role,
+        student.sessionVersion,
+      );
+      await setMfaSessionCookie(mfaSessionToken);
+
+      await logAuditEvent({
+        actorId: student.id,
+        actorRole: student.role,
+        action: "auth.google_mfa_required",
+        targetType: "student",
+        targetId: student.id,
+        summary: `Google verified for ${student.studentId} — MFA challenge required.`,
+      });
+
+      const challengeUrl = new URL("/", req.url);
+      challengeUrl.searchParams.set("mfa", "required");
+      challengeUrl.searchParams.set("login", student.studentId);
+      return NextResponse.redirect(challengeUrl);
     }
 
     // Set session cookie

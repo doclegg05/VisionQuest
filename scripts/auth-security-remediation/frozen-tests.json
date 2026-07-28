@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "frozenAfterFailingBaseline": "2026-07-28",
+  "revisionReason": "Type-only fixture signature correction after Next.js required NODE_ENV on NodeJS.ProcessEnv; assertions and runtime cases unchanged.",
+  "algorithm": "sha256",
+  "files": {
+    "src/app/api/auth/invitations/redeem/security.test.ts": "0ff8f9d908864b532cbe2bcd4fc9f101f608b3df1f0222751695ad2bc000a0c5",
+    "src/app/api/auth/better-auth/security-policy.test.ts": "b5c800ec2c95fd9bb26fd93a76951d951a13e71d27a09e73eb3ca4994006dee4",
+    "src/app/api/auth/better-auth/handoff/security.test.ts": "30c8b27affef571a794aac60947c3653d2b5c524e940d4e55b1b48a4b2f1612c",
+    "src/app/api/auth/session/security.test.ts": "0fdd30db46fc833bc68b1d54c57210d405e5ecd28dc8e02446db7e1ec1e64e4a",
+    "src/app/api/auth/better-auth/e2e-database-safety.test.ts": "72de8eb3ab5c469c88ee348151b4bc1cccd74b84f7bd274a150bd74f17258968"
+  }
+}

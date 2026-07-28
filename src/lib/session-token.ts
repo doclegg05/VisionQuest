@@ -7,6 +7,7 @@ export interface SessionClaims {
   sub: string;
   role: string;
   sv: number;
+  mfa?: boolean;
 }
 
 export interface MfaSessionClaims {
@@ -27,11 +28,20 @@ export function getJwtSecret(): string {
   return secret;
 }
 
-export function signToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), {
-    expiresIn: TOKEN_TTL,
-    algorithm: "HS256",
-  });
+export function signToken(
+  studentId: string,
+  role: string,
+  sessionVersion: number,
+  mfaVerified = false,
+): string {
+  return jwt.sign(
+    { sub: studentId, role, sv: sessionVersion, mfa: mfaVerified },
+    getJwtSecret(),
+    {
+      expiresIn: TOKEN_TTL,
+      algorithm: "HS256",
+    },
+  );
 }
 
 export function verifyToken(token: string): SessionClaims | null {

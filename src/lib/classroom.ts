@@ -12,14 +12,13 @@ export const MAX_ACTIVE_CLASSES_PER_TEACHER = 2;
 
 /**
  * Roles allowed to view/manage students and classes regardless of direct
- * instructor assignment. VisionQuest is a single SPOKES staff workspace:
- * instructors/admins need the same operational access to student profiles,
- * classes, and intervention surfaces.
+ * instructor assignment. Only developer-admin accounts have global scope.
+ * Instructors are constrained to SpokesClassInstructor assignments.
  *
  * CDC is intentionally NOT included: their read-across-region scope is
  * narrower and ships with their dashboard in a later phase.
  */
-export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin", "teacher", "coordinator"];
+export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin"];
 
 export function canManageAnyClass(role: string): boolean {
   return STAFF_CAN_MANAGE_ANY.includes(role);
@@ -55,11 +54,9 @@ export function normalizeInstructorIds(instructorIds: string[]): string[] {
  * scoping and update the tripwire tests in classroom.test.ts,
  * api-error.test.ts, and rls-headers.test.ts (they fail to flag this).
  *
- * Admin and teacher semantics are unchanged: with no classId they get the
- * UNSCOPED student where-clause by design (single SPOKES staff workspace —
- * the teacher dashboard, exports, and reports list across classes), and
- * non-staff roles are narrowed to classes where they are an assigned
- * instructor.
+ * Admins receive the unscoped clause. Teachers and other non-global roles
+ * are always narrowed to classes where they are an assigned instructor,
+ * including when no explicit class filter is provided.
  */
 export function buildManagedStudentWhere(
   session: Session,

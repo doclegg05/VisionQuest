@@ -33,7 +33,7 @@ test("buildManagedStudentWhere returns unrestricted admin access when no class i
   });
 });
 
-test("buildManagedStudentWhere lets teachers filter by class without assignment narrowing", () => {
+test("buildManagedStudentWhere requires teacher assignment for a selected class", () => {
   const where = buildManagedStudentWhere(
     {
       id: "teacher-1",
@@ -50,6 +50,11 @@ test("buildManagedStudentWhere lets teachers filter by class without assignment 
       some: {
         status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
         classId: "class-1",
+        class: {
+          instructors: {
+            some: { instructorId: "teacher-1" },
+          },
+        },
       },
     },
   });
@@ -138,10 +143,7 @@ test("TRIPWIRE (Slice D): coordinator never receives an unscoped or reachable wh
   }
 });
 
-test("buildManagedStudentWhere keeps the unscoped clause for teachers with no class filter", () => {
-  // Load-bearing semantics: the teacher dashboard, forms responses, export,
-  // and grant/KPI reports all list across classes with no classId (single
-  // SPOKES staff workspace). Do not narrow this without auditing those flows.
+test("buildManagedStudentWhere scopes teachers to assigned classes without a class filter", () => {
   const where = buildManagedStudentWhere({
     id: "teacher-1",
     studentId: "teacher-1",
@@ -149,7 +151,19 @@ test("buildManagedStudentWhere keeps the unscoped clause for teachers with no cl
     role: "teacher",
   });
 
-  assert.deepEqual(where, { role: "student" });
+  assert.deepEqual(where, {
+    role: "student",
+    classEnrollments: {
+      some: {
+        status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
+        class: {
+          instructors: {
+            some: { instructorId: "teacher-1" },
+          },
+        },
+      },
+    },
+  });
 });
 
 test("buildManagedStudentWhere does NOT grant CDC unrestricted access", () => {
@@ -215,14 +229,14 @@ test("TRIPWIRE (Slice D): coordinator sessions fail closed at BOTH the app layer
   );
 });
 
-test("STAFF_CAN_MANAGE_ANY contains staff roles with cross-class access", () => {
-  assert.deepEqual([...STAFF_CAN_MANAGE_ANY], ["admin", "teacher", "coordinator"]);
+test("STAFF_CAN_MANAGE_ANY contains only the global developer-admin role", () => {
+  assert.deepEqual([...STAFF_CAN_MANAGE_ANY], ["admin"]);
 });
 
-test("canManageAnyClass returns true for instructor/admin staff roles", () => {
+test("canManageAnyClass denies cross-class access to instructors", () => {
   assert.equal(canManageAnyClass("admin"), true);
-  assert.equal(canManageAnyClass("teacher"), true);
-  assert.equal(canManageAnyClass("coordinator"), true);
+  assert.equal(canManageAnyClass("teacher"), false);
+  assert.equal(canManageAnyClass("coordinator"), false);
   assert.equal(canManageAnyClass("cdc"), false);
   assert.equal(canManageAnyClass("student"), false);
   assert.equal(canManageAnyClass(""), false);

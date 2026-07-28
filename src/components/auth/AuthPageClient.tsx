@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { authClient } from "@/lib/better-auth-client";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to sign in.",
@@ -12,9 +13,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   oauth_invalid: "Google sign-in returned an invalid response. Please try again or use the form below.",
   oauth_state_mismatch: "Google sign-in session expired. Please try again or use the form below.",
   oauth_token_failed: "Google sign-in failed to authenticate. Please try again or use the form below.",
+  oauth_email_unverified: "Google has not verified that email address. Verify it with Google, then try again.",
   oauth_userinfo_failed: "Could not retrieve your Google account info. Please try again or use the form below.",
   oauth_failed: "Google sign-in failed. Please try again or use the form below.",
   auth_failed: "Google sign-in failed. Please try again or use the form below.",
+  mfa_enrollment_required:
+    "Staff accounts must set up multi-factor authentication before using passkey or Google sign-in. Sign in with your password, then open Settings.",
 };
 
 const HIGHLIGHTS = [
@@ -48,6 +52,16 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const oauthError = searchParams.get("error");
   const oauthErrorMessage = oauthError ? (ERROR_MESSAGES[oauthError] || "An error occurred. Please try again.") : null;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mfa") !== "required") return;
+    setMfaRequired(true);
+    setStudentId(params.get("login") ?? "");
+    setMfaMessage(
+      "Your identity is verified. Enter your authenticator code or a saved backup code to finish signing in.",
+    );
+  }, []);
 
   const finishLogin = (role: string) => {
     const nextPath =
@@ -130,6 +144,45 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
       finishLogin(data?.student?.role);
     } catch {
       setError("Could not connect to server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasskeySignIn = async () => {
+    setError("");
+    setMfaMessage("");
+    setLoading(true);
+    try {
+      const result = await authClient.signIn.passkey();
+      if (result.error) {
+        setError(
+          result.error.message ||
+            "The passkey could not be verified. Try another sign-in method.",
+        );
+        return;
+      }
+
+      const response = await fetch("/api/auth/better-auth/handoff", {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Could not finish passkey sign-in.");
+        return;
+      }
+      if (data.requiresMfa) {
+        setMfaRequired(true);
+        setStudentId(data.student?.studentId ?? "");
+        setMfaToken("");
+        setMfaMessage(
+          "Passkey accepted. Enter your authenticator code or a saved backup code to finish signing in.",
+        );
+        return;
+      }
+      finishLogin(data.student?.role);
+    } catch {
+      setError("This browser or device could not complete passkey sign-in.");
     } finally {
       setLoading(false);
     }
@@ -361,6 +414,17 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 Google sign-in is not enabled in this environment. Use the sign-in form above.
               </div>
             ) : null}
+
+            {!mfaRequired && (
+              <button
+                type="button"
+                onClick={() => void handlePasskeySignIn()}
+                disabled={loading}
+                className="mt-3 w-full rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Sign in with a passkey
+              </button>
+            )}
 
             <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
               Your instructor will provide your username and password.

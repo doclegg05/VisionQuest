@@ -12,6 +12,8 @@ import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { consumeBackupCode, verifyTotp } from "@/lib/mfa";
+import { auth } from "@/lib/better-auth";
+import { logger } from "@/lib/logger";
 
 const mfaChallengeSchema = z.object({
   token: z.string().min(6, "MFA code is required.").max(32, "MFA code is too long."),
@@ -126,7 +128,43 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
-  await setSessionCookie(student.id, student.role, student.sessionVersion);
+  // A passkey or Better Auth OAuth sign-in may have created a Prisma-backed
+  // session before handing off to the existing TOTP challenge. Mark only the
+  // current, version-matched session as MFA-complete. Legacy password and
+  // Google sessions simply have no Better Auth cookie, so this is a no-op.
+  try {
+    const betterSession = await auth.api.getSession({ headers: req.headers });
+    if (betterSession) {
+      const session = betterSession.session as typeof betterSession.session & {
+        sessionVersion?: number;
+      };
+      if (
+        betterSession.user.id === student.id &&
+        session.sessionVersion === student.sessionVersion
+      ) {
+        await prisma.authSession.updateMany({
+          where: {
+            token: session.token,
+            userId: student.id,
+            sessionVersion: student.sessionVersion,
+          },
+          data: { mfaVerified: true },
+        });
+      }
+    }
+  } catch (error) {
+    logger.warn("Could not mark Better Auth MFA handoff complete", {
+      studentId: student.id,
+      error: String(error),
+    });
+  }
+
+  await setSessionCookie(
+    student.id,
+    student.role,
+    student.sessionVersion,
+    true,
+  );
   // Single-use cookie — clear once the real session is issued.
   await clearMfaSessionCookie();
 

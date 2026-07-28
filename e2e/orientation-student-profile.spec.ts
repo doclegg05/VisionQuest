@@ -1,8 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { assertDisposableE2eDatabaseUrl } from "../src/lib/e2e-database-safety";
 
 /**
  * E2E: a logged-in student completes the "Complete SPOKES Student Profile"
@@ -11,11 +10,11 @@ import path from "node:path";
  * matching OrientationItem complete.
  *
  * Self-sufficient: seeds its own demo student (never a real record) against
- * the DATABASE_URL in .env.local and cleans up after itself. Requires the
- * orientation items to be seeded first (`npm run db:seed`).
+ * the explicitly injected E2E DATABASE_URL and cleans up after itself.
+ * Requires the orientation items to be seeded first (`npm run db:seed`).
  */
 
-const STUDENT_LOGIN = "e2e-orientation-profile";
+const STUDENT_LOGIN = `e2e-orientation-profile-${randomBytes(8).toString("hex")}`;
 const STUDENT_PASSWORD = "E2e-orientation-pass-1";
 const PROFILE_ITEM_LABEL = "Complete SPOKES Student Profile";
 
@@ -34,16 +33,14 @@ function hashPassword(password: string): string {
   return `scrypt$${salt}$${derived}`;
 }
 
-function databaseUrlFromEnvLocal(): string {
-  const envPath = path.join(__dirname, "..", ".env.local");
-  const line = readFileSync(envPath, "utf8")
-    .split(/\r?\n/)
-    .find((candidate) => candidate.startsWith("DATABASE_URL="));
-  if (!line) throw new Error("DATABASE_URL not found in .env.local");
-  return line.slice("DATABASE_URL=".length);
+function databaseUrlForE2e(): string {
+  return assertDisposableE2eDatabaseUrl(
+    process.env.DATABASE_URL,
+    process.env.E2E_DATABASE_CONFIRMED_DISPOSABLE,
+  );
 }
 
-const prisma = new PrismaClient({ datasourceUrl: databaseUrlFromEnvLocal() });
+const prisma = new PrismaClient({ datasourceUrl: databaseUrlForE2e() });
 
 let studentId: string;
 let profileItemId: string;
@@ -61,13 +58,12 @@ test.beforeAll(async () => {
   }
   profileItemId = profileItem.id;
 
-  const student = await prisma.student.upsert({
-    where: { studentId: STUDENT_LOGIN },
-    update: { passwordHash: hashPassword(STUDENT_PASSWORD), isActive: true },
-    create: {
+  const student = await prisma.student.create({
+    data: {
       studentId: STUDENT_LOGIN,
       displayName: "E2E Orientation Student",
       passwordHash: hashPassword(STUDENT_PASSWORD),
+      isActive: true,
     },
   });
   studentId = student.id;
@@ -104,7 +100,9 @@ test.afterAll(async () => {
     await prisma.orientationProgress.deleteMany({ where: { studentId } }).catch(() => {});
     await prisma.spokesRecord.deleteMany({ where: { studentId } }).catch(() => {});
   }
-  await prisma.student.deleteMany({ where: { studentId: STUDENT_LOGIN } }).catch(() => {});
+  if (studentId) {
+    await prisma.student.delete({ where: { id: studentId } }).catch(() => {});
+  }
   await prisma.$disconnect();
 });
 
@@ -113,7 +111,7 @@ test("student completes the Student Profile orientation step in the browser", as
   await page.goto("/");
   await page.getByLabel(/username or email/i).fill(STUDENT_LOGIN);
   await page.getByLabel(/password/i).fill(STUDENT_PASSWORD);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
   await page.waitForURL(/dashboard|welcome/, { timeout: 20_000 });
 
   // The orientation wizard opens on the Student Profile step as an HTML form.

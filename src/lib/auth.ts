@@ -148,8 +148,13 @@ export const verifyToken = verifySessionToken;
 
 // --- Session helpers ---
 
-export async function setSessionCookie(studentId: string, role: string, sessionVersion: number) {
-  const token = signToken(studentId, role, sessionVersion);
+export async function setSessionCookie(
+  studentId: string,
+  role: string,
+  sessionVersion: number,
+  mfaVerified = false,
+) {
+  const token = signToken(studentId, role, sessionVersion, mfaVerified);
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,

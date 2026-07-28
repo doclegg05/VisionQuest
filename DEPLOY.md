@@ -63,6 +63,7 @@ Run locally:
 
 ```bash
 openssl rand -hex 32
+openssl rand -hex 32
 openssl rand -base64 32 | tr -d '\n'
 openssl rand -base64 32 | tr -d '\n'
 ```
@@ -70,6 +71,7 @@ openssl rand -base64 32 | tr -d '\n'
 Use the outputs for:
 
 - `JWT_SECRET`
+- `BETTER_AUTH_SECRET`
 - `TEACHER_KEY`
 - `API_KEY_ENCRYPTION_KEY`
 
@@ -90,6 +92,13 @@ If you want Google sign-in:
 
 ```text
 https://your-app.onrender.com/api/auth/google/callback
+```
+
+Keep that legacy callback during the staged migration. Before enabling the
+Better Auth Google entry point, also add:
+
+```text
+https://your-app.onrender.com/api/better-auth/callback/google
 ```
 
 3. Save:
@@ -159,6 +168,8 @@ If you do not use the blueprint:
 | `DATABASE_URL` | Supabase Session pooler string |
 | `DIRECT_URL` | Session pooler on Render unless direct host is reachable |
 | `JWT_SECRET` | Hex secret |
+| `BETTER_AUTH_SECRET` | Independent random secret, at least 32 characters |
+| `BETTER_AUTH_URL` | Canonical public HTTPS origin |
 | `TEACHER_KEY` | Gate for `/teacher-register` |
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |
@@ -177,6 +188,7 @@ If you do not use the blueprint:
 | `GOOGLE_CLIENT_ID` | Google OAuth |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `GOOGLE_REDIRECT_URI` | Google OAuth callback URL |
+| `BETTER_AUTH_GOOGLE_ENABLED` | Exact `true` enables the separately staged Better Auth Google callback; omitted/false leaves it off |
 | `GEMINI_MODEL` | Override default Gemini model |
 | `SAGE_AGENT_ENABLED` | Enable Sage tool calls and server-driven slash commands |
 | `CF_ACCESS_CLIENT_ID` | Cloudflare Access service-token client id for the local Sage AI endpoint |

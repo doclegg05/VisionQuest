@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "algorithm": "sha256",
+  "frozenAfterBaselineCapture": "2026-07-28",
+  "revisionReason": "Type-only disposition union annotation required by the TypeScript gate; scenario semantics are unchanged.",
+  "paths": {
+    "scripts/auth-migration-baseline/fixtures.json": "be082bba14d4e5493890fe54ff7efd008c002ae7da814271ae2b35636f455afd",
+    "scripts/auth-migration-baseline/baseline.ts": "bcb48380909a9919ca85db914ff59d9d4f00f1dd005153ac20a29122bf34be16",
+    "scripts/auth-migration-baseline/baseline.test.ts": "b6e8e2940cf80f50a5bff4292aa9e2f5e47c89f756f466c1b7abc7abdcee448c",
+    "scripts/auth-migration-baseline/report.ts": "e1574d475be83abb77c576b7c677ed89465d59663fb8e3e6b2c981ac04da0e33"
+  }
+}

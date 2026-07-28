@@ -1,0 +1,108 @@
+{
+  "baselineVersion": 2,
+  "description": "Synthetic, PII-free characterization fixtures for the pre-migration VisionQuest authentication contract.",
+  "syntheticJwtSecret": "baseline-only-not-a-secret-32-chars-minimum",
+  "scenarios": [
+    {
+      "id": "AUTH-LEGACY-001",
+      "requirement": "legacy-user migration",
+      "label": "Legacy PBKDF2 user is accepted and marked for scrypt rehash",
+      "fixture": {
+        "password": "Legacy!Passphrase-2026",
+        "storedHash": "00112233445566778899aabbccddeeff:f5f3a39faa0de5b82e5826608d6243ab4f0248565a792e45b2e2f86ee6e6940599d079949d5afecefcc95f267d4770752b793030435106d76347b9bdc888767f"
+      },
+      "expectedCurrent": "PASSWORD_ACCEPTED_REHASH_REQUIRED",
+      "requiredMigration": "PASSWORD_ACCEPTED_REHASH_REQUIRED"
+    },
+    {
+      "id": "AUTH-GOOGLE-001",
+      "requirement": "Google identity binding by provider subject",
+      "label": "Stable Google subject binds after the provider email changes",
+      "fixture": {
+        "issuer": "https://accounts.google.com",
+        "providerSubject": "synthetic-google-subject-001",
+        "boundEmail": "former-address@example.test",
+        "tokenEmail": "new-address@example.test",
+        "emailVerified": true
+      },
+      "expectedCurrent": "CREATE_NEW_ACCOUNT_BY_EMAIL",
+      "requiredMigration": "BIND_EXISTING_ACCOUNT_BY_SUBJECT"
+    },
+    {
+      "id": "AUTH-GOOGLE-002",
+      "requirement": "verified-email enforcement",
+      "label": "Google token with an unverified email is denied",
+      "fixture": {
+        "issuer": "https://accounts.google.com",
+        "providerSubject": "synthetic-google-subject-002",
+        "tokenEmail": "unverified@example.test",
+        "emailVerified": false
+      },
+      "expectedCurrent": "SESSION_ISSUED",
+      "requiredMigration": "DENY_UNVERIFIED_EMAIL"
+    },
+    {
+      "id": "AUTH-MFA-001",
+      "requirement": "MFA handoff for instructor",
+      "label": "Google-authenticated instructor with MFA enabled receives a challenge",
+      "fixture": {
+        "role": "teacher",
+        "roleLabel": "instructor",
+        "mfaEnabled": true
+      },
+      "expectedCurrent": "SESSION_ISSUED",
+      "requiredMigration": "MFA_REQUIRED"
+    },
+    {
+      "id": "AUTH-MFA-002",
+      "requirement": "MFA handoff for developer-admin",
+      "label": "Google-authenticated developer-admin with MFA enabled receives a challenge",
+      "fixture": {
+        "role": "admin",
+        "roleLabel": "developer-admin",
+        "mfaEnabled": true
+      },
+      "expectedCurrent": "SESSION_ISSUED",
+      "requiredMigration": "MFA_REQUIRED"
+    },
+    {
+      "id": "AUTH-INVITE-001",
+      "requirement": "invitation redemption",
+      "label": "Unused classroom invitation is redeemed exactly once",
+      "fixture": {
+        "invitationId": "invite-synthetic-001",
+        "classId": "class-synthetic-a",
+        "email": "invited-student@example.test",
+        "status": "pending"
+      },
+      "expectedCurrent": "UNSUPPORTED",
+      "requiredMigration": "REDEEM_AND_ENROLL"
+    },
+    {
+      "id": "AUTH-SCOPE-001",
+      "requirement": "cross-classroom denial",
+      "label": "Instructor assigned to classroom A cannot manage a classroom B student",
+      "fixture": {
+        "role": "teacher",
+        "instructorId": "teacher-synthetic-001",
+        "assignedClassId": "class-synthetic-a",
+        "studentClassId": "class-synthetic-b"
+      },
+      "expectedCurrent": "ALLOW_CROSS_CLASSROOM",
+      "requiredMigration": "DENY_CROSS_CLASSROOM"
+    },
+    {
+      "id": "AUTH-SESSION-001",
+      "requirement": "session revocation",
+      "label": "Session token is rejected after sessionVersion increments",
+      "fixture": {
+        "userId": "student-synthetic-001",
+        "role": "student",
+        "tokenSessionVersion": 3,
+        "accountSessionVersion": 4
+      },
+      "expectedCurrent": "SESSION_REVOKED",
+      "requiredMigration": "SESSION_REVOKED"
+    }
+  ]
+}
