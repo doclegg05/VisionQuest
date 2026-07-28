@@ -1,8 +1,37 @@
 # Local-AI Model Evaluation — iMac M4 32GB (Workstream B)
 
-Status: in progress — started 2026-07-27
+Status: **S0–S4 COMPLETE — evaluation paused for owner decisions.** 2026-07-27
 Branch: `local-ai/32gb-eval` (off `remediation/critical-high` so evals run against the fail-closed provider code that ships with PR #136)
 Plan: the approved two-workstream plan of 2026-07-27 (B1–B4). Single resident model, no two-tier local.
+
+---
+
+## Bottom line
+
+**`gemma4:26b-a4b-it-qat` is the recommended local model.** It clears every
+gate that was validly measurable on this machine and beats the 8B incumbent
+on every axis.
+
+| Stage | Verdict | Evidence |
+|---|---|---|
+| S0 capability | ✅ PASS | chat, tools, JSON, 768-dim embeddings |
+| S1 speed + quality | ✅ PASS | 11.2s cold load, 34.5 tok/s decode, FK 4.7 |
+| **S2 agent** | ✅ **PASS** | 90.4–91.1% mean vs an 85% gate; **93.3%** under CI-style majority voting; 0 injection failures |
+| S3 harness | ⚠️ PARTIAL | tool 4/4 + guardrail 7/7; grounding blocked on a missing local Postgres |
+| S4 redteam | ✅ PASS | 0 hard violations, crisis 7/7, 4 soft warnings (8B had 8) |
+| S5 memory · S6 documents · S7 judged | ⛔ NOT RUN | S5 needs a DB; S6/S7 never attempted |
+| Latency | ❓ UNRESOLVED | raw decode is fine; no honest warm FIRST-TOKEN number yet |
+
+**vs. the 8B incumbent** — the incumbent empirically fails the agent lane:
+66.7% → 75.6% tool selection (below the gate either way) at p50 16.9s, which
+is the owner's "too weak / too slow" complaint reproduced as measurements.
+
+**Two blockers before a sign-off, neither a model problem:** an honest
+first-token latency measurement (must run with the GPU otherwise idle), and a
+local Postgres for the grounding + memory stages.
+
+**Do not resume by tuning tool descriptions.** That work is finished and its
+returns are exhausted — see "where tuning stops paying" below.
 
 ## Host
 
@@ -15,11 +44,11 @@ Plan: the approved two-workstream plan of 2026-07-27 (B1–B4). Single resident 
 
 | # | Tag | Class | Status |
 |---|---|---|---|
-| 1 | `gemma4:26b-a4b-it-qat` | 26.1B sparse-MoE, ~4B active — **repo's own default family, MoE claim VERIFIED** (ollama.com/library/gemma4) | pulling |
-| 2 | `qwen3:30b-a3b` (instruct) | standby fallback | not pulled |
-| 3 | `gpt-oss:20b` | standby fallback | not pulled |
-| — | `gemma4:latest` (8B) | incumbent control floor | pulling |
-| — | `nomic-embed-text` | embeddings lane (unchanged) | pulling |
+| 1 | `gemma4:26b-a4b-it-qat` | 26.1B sparse-MoE, ~4B active — MoE claim VERIFIED | ✅ **SELECTED** — 15GB resident, 100% GPU |
+| 2 | `qwen3:30b-a3b` (instruct) | standby fallback | not needed — candidate passed |
+| 3 | `gpt-oss:20b` | standby fallback | not needed — candidate passed |
+| — | `gemma4:latest` (8B) | incumbent control floor | measured; **fails the agent gate** |
+| — | `nomic-embed-text` | embeddings lane (unchanged) | pulled, 768 dims verified |
 
 ## How to run (exact commands)
 
@@ -57,13 +86,24 @@ No `--judge` locally (no GEMINI_API_KEY on this machine); Gemini-judged S7 runs 
 entire `num_predict` budget on a hidden reasoning channel — plain chat
 returned EMPTY content (finish_reason=length) while tool-calling worked. The
 `/v1` OpenAI-compat layer **ignores** the think flag, and the provider's old
-negotiation settled on exactly that path. Fixed on this branch
-(`fix(local-ai): disable thinking on native Ollama calls; prefer native
-mode`): native bodies carry `think: false` (verified harmless on the
-non-thinking 8B) and unknown-mode negotiation is native-first with 404/405
-compat fallback. Full suite 2,132/2,132 after the provider-test rewrite.
+negotiation settled on exactly that path.
+
+**Resolution — NOT the fix originally written here.** A sibling session hit
+the same bug the same day and shipped a better fix as **PR #147**: it handles
+BOTH surfaces (`reasoning_effort:"none"` on `/v1`, `think:false` on native —
+each silently ignores the other's knob), makes it configurable
+(`ai_provider_reasoning`, `ai_provider_max_output_tokens`), and throws on a
+truncated no-content turn instead of returning `""` — which is precisely why
+this shipped unnoticed. This branch's duplicate was **reverted** and #147's
+branch merged in. A native-only fix (the original here) would have looked
+correct and changed nothing on the live `/v1` path.
 
 ### Candidate 1 — `gemma4:26b-a4b-it-qat` (15GB resident, 100% GPU)
+
+> **Chronological record of the FIRST pass.** The S2 row below (82.2%,
+> failing) was measured against broken fixtures and pre-fix tool
+> descriptions. It was superseded — see "S2 re-measurement" for the result
+> of record (90.4–91.1%, PASS).
 
 | Stage | Result | Gate |
 |---|---|---|
@@ -295,13 +335,23 @@ Prereqs: `ollama serve` running (models already pulled: `gemma4:26b-a4b-it-qat`,
 `gemma4:latest`, `nomic-embed-text`); a local Postgres with `DATABASE_URL` set
 for grounding/memory stages.
 
+**Only ONE model fits in 32GB** (8B 9.7GB + 26B 15GB exceeds the ~21-24GB
+Metal budget), so Ollama evicts and reloads on every switch — about 70s, and
+it will silently make an eval look like a timeout. Warm the target first and
+confirm with `ollama ps`:
+
+```bash
+curl -s http://localhost:11434/api/chat -d '{"model":"gemma4:26b-a4b-it-qat","messages":[{"role":"user","content":"hi"}],"stream":false,"think":false,"keep_alive":"60m","options":{"num_predict":5}}' > /dev/null
+ollama ps
+```
+
 ```bash
 export OLLAMA_URL=http://localhost:11434
 export OLLAMA_MODEL=gemma4:26b-a4b-it-qat
 
-# 1. AFTER disambiguating the classify_attachment / lookup_saved_jobs tool
-#    descriptions (see Verdict above), re-run the gate that failed:
-npm run sage:agent:eval   -- --provider=ollama                                    # S2 — gate ≥85%
+# 1. DONE — S2 passes (90.4-91.1%). Re-run only to confirm after a prompt or
+#    tool change; do NOT resume by tuning tool descriptions.
+npm run sage:agent:eval   -- --provider=ollama                                    # S2 — gate >=85%
 
 # 2. Stages that never ran or were environment-invalid (need a local Postgres):
 npm run sage:chat:harness -- --provider=ollama --families=grounding --strict --temperature=0   # S3 grounding only
@@ -322,3 +372,58 @@ the model recommendation is settled and work moves to migration (M0–M5:
 launchd daemons, tunnel, Render env, cutover). If it does not, pull the
 fallback ladder — `qwen3:30b-a3b`, then `gpt-oss:20b` — and run the same
 battery.
+
+---
+
+## Workstream B wrap-up (2026-07-27)
+
+**Delivered.** A local model recommendation backed by measurement rather than
+vibes: `gemma4:26b-a4b-it-qat` on this iMac M4/32GB, passing S0, S1, S2 and
+S4, and beating the 8B incumbent on every axis measured. The incumbent's
+failure is now a number (66.7-75.6% tool selection against an 85% gate,
+p50 16.9s), not an impression.
+
+**Fixed along the way** — all of it product code or test infrastructure that
+was broken independent of which model ships:
+
+1. Thinking-model support in the local provider (landed via PR #147 after a
+   duplicate here was reverted).
+2. Two tool-description attractors — `classify_attachment` swallowing
+   `submit_form`/`add_portfolio_item`/`file_document`, and
+   `lookup_saved_jobs` swallowing `save_job`.
+3. A third attractor in `lookup_cert_progress` (the "file" token beside
+   "certification").
+4. Five uncallable eval fixtures across two suites (`job-save`,
+   `job-save-2`, `submit-signed-dress`, `submit-signed-rights`, and
+   `info-certs` via a sibling session's PR #143).
+5. `eval-fixture-integrity.test.ts`, which makes defect class 4
+   unreintroducible.
+6. First Spanish guardrail coverage in the chat harness.
+
+**Durable lessons recorded** (these outlive the model choice):
+
+- Removing an attractor token beats adding a prohibition. Negative
+  instructions ("do NOT call X first") achieved nothing, twice.
+- The agent eval needs `--samples=3` majority voting: the measured spread is
+  4.4 points, and single-run comparisons misled two sessions.
+- Never edit fixtures mid-measurement — one 3-run set had to be discarded.
+- Only one model fits in 32GB; switching costs a ~70s evict+reload and
+  disguises itself as a timeout.
+- The "no tool" hesitancy mode is this model's floor, not a wording problem.
+
+**Explicitly NOT done, and why:**
+
+| Item | Why |
+|---|---|
+| S5 memory, S3 grounding | Need a local Postgres — never started here |
+| S6 document UAT, S7 judged delta | Never attempted; S7 belongs in CI |
+| Honest first-token latency | Needs an idle GPU; every number on record is whole-response with tool loops |
+| Migration M0–M5 (launchd, tunnel, Render env, cutover) | Gated on the owner's model sign-off and hardware-posture decisions |
+| Further tool-description tuning | Returns exhausted — six runs, three revisions, no movement |
+
+**Owner decisions this is now waiting on:** model sign-off (accepting ~15GB
+resident on a shared desktop); hardware posture (never-sleep, unattended
+boot vs FileVault, UPS, wired ethernet); the degraded-mode policy A/B/C from
+the plan; latency acceptance once measured honestly; whether the Gemini judge
+runs in CI; and the Spanish product bar — including the still-open gap that
+`CRISIS_APPEND` is English-only while detection is bilingual.
