@@ -23,19 +23,21 @@ interface AgentTurnOptions {
   /** Override the role-based default tool subset (e.g., constrain to a single tool). */
   toolNames?: string[];
   maxHops?: number;
+  /** Cancels provider streaming when the originating request disconnects. */
+  signal?: AbortSignal;
 }
 
 export async function* runAgentTurn(
   options: AgentTurnOptions,
 ): AsyncGenerator<AgentEvent> {
-  const { provider, systemPrompt, messages, session, conversationId, targetStudentId, toolNames, maxHops } = options;
+  const { provider, systemPrompt, messages, session, conversationId, targetStudentId, toolNames, maxHops, signal } = options;
 
   const role = session.role || "student";
   const enabledTools = filterTools(getEnabledTools(role), toolNames);
 
   // No tools available or provider can't function-call → fall back to plain stream.
   if (enabledTools.length === 0 || !provider.streamWithTools) {
-    yield* runFallbackStream(provider, systemPrompt, messages);
+    yield* runFallbackStream(provider, systemPrompt, messages, signal);
     return;
   }
 
@@ -70,7 +72,7 @@ export async function* runAgentTurn(
           status: record.result.status,
         };
       },
-      { maxHops: maxHops ?? 8 },
+      { maxHops: maxHops ?? 8, signal },
     );
 
     for await (const event of stream) {
@@ -117,12 +119,7 @@ export async function* runAgentTurn(
     logger.error("agent.loop: provider stream failed", {
       err: err instanceof Error ? err.message : String(err),
     });
-    yield {
-      type: "agent_stop",
-      reason: "error",
-      transcript,
-      finalText: finalChunks.join(""),
-    };
+    throw err;
   }
 }
 
@@ -130,9 +127,15 @@ async function* runFallbackStream(
   provider: AIProvider,
   systemPrompt: string,
   messages: ChatMessage[],
+  signal?: AbortSignal,
 ): AsyncGenerator<AgentEvent> {
   const finalChunks: string[] = [];
-  for await (const chunk of provider.streamResponse(systemPrompt, messages)) {
+  for await (const chunk of provider.streamResponse(
+    systemPrompt,
+    messages,
+    undefined,
+    { signal },
+  )) {
     finalChunks.push(chunk);
     yield { type: "text", text: chunk };
   }

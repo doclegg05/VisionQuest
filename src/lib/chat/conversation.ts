@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { resolveAiProvider } from "@/lib/ai";
+import { withUsageLogging } from "@/lib/llm-usage";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { notFound } from "@/lib/api-error";
@@ -360,7 +361,12 @@ export async function maybeUpdateSummary(
         ? "Conversation summaries use student conversation content and are local-only by policy."
         : "Operator configured cloud AI; conversation summary routed to the configured provider.",
   });
-  const updatedSummary = await provider.generateResponse(
+  const summaryProvider = withUsageLogging(provider, {
+    studentId,
+    callSite: "sage_conversation_summary",
+    priority: "background",
+  });
+  const updatedSummary = await summaryProvider.generateResponse(
     COMPACTION_SYSTEM_PROMPT,
     [{ role: "user", content: summaryPrompt }],
   );

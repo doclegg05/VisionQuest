@@ -39,6 +39,7 @@ import { prisma } from "@/lib/db";
 import { resolveAiProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { withUsageLogging } from "@/lib/llm-usage";
+import { withAiHarness } from "@/lib/ai/harness";
 import { GOAL_PLANNING_STATUSES, isGoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
 import { proposeGoal } from "@/lib/sage/propose-goal";
@@ -331,12 +332,32 @@ async function runPostResponse(
   // scripts/sage-usage-summary.mjs can break down post-response cost by
   // extractor. extractAndStoreMemories (src/lib/sage/memory/extract.ts) is
   // deliberately excluded — it already logs its own LlmCallLog row under
-  // callSite "sage_memory_extract" and is out of scope for this change, so
-  // it keeps using the unwrapped `provider` below to avoid double-logging.
-  const goalsProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.goals" });
-  const discoveryProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.discovery" });
-  const moodProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.mood" });
-  const classroomProvider = withUsageLogging(provider, { studentId, callSite: "sage_post.classroom" });
+  // callSite "sage_memory_extract", so it uses the admission-only harness
+  // below rather than withUsageLogging to avoid double-logging.
+  const goalsProvider = withUsageLogging(provider, {
+    studentId,
+    callSite: "sage_post.goals",
+    priority: "background",
+  });
+  const discoveryProvider = withUsageLogging(provider, {
+    studentId,
+    callSite: "sage_post.discovery",
+    priority: "background",
+  });
+  const moodProvider = withUsageLogging(provider, {
+    studentId,
+    callSite: "sage_post.mood",
+    priority: "background",
+  });
+  const classroomProvider = withUsageLogging(provider, {
+    studentId,
+    callSite: "sage_post.classroom",
+    priority: "background",
+  });
+  const memoryProvider = withAiHarness(provider, {
+    callSite: "sage_memory_extract",
+    priority: "background",
+  });
 
   const providerClass = getProviderClass(provider.name);
   const postResponsePolicyDecision = policyDecisionForProvider(provider.name);
@@ -430,7 +451,7 @@ async function runPostResponse(
     } else {
       plan.markRan("memory");
       void extractAndStoreMemories({
-        provider,
+        provider: memoryProvider,
         studentId,
         conversationId,
         messages: [

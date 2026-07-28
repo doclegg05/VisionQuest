@@ -33,7 +33,18 @@ export type OnUsage = (usage: TokenUsage) => void;
  */
 export interface GenerationOptions {
   temperature?: number;
+  /** Cancels queue admission and the in-flight provider request. */
+  signal?: AbortSignal;
+  /** Provider-neutral lifecycle events consumed by the shared harness. */
+  onEvent?: (event: ProviderCallEvent) => void;
 }
+
+export type ProviderCallEvent = {
+  type: "retry";
+  attempt: number;
+  delayMs: number;
+  reason: string;
+};
 
 export interface AIProvider {
   readonly name: string;
@@ -108,6 +119,10 @@ export interface ToolStreamOptions {
   onUsage?: OnUsage;
   /** Optional sampling temperature override — see GenerationOptions. */
   temperature?: number;
+  /** Cancels queue admission and the in-flight provider/tool-loop request. */
+  signal?: AbortSignal;
+  /** Provider-neutral lifecycle events consumed by the shared harness. */
+  onEvent?: (event: ProviderCallEvent) => void;
 }
 
 /**

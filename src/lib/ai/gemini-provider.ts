@@ -8,6 +8,7 @@ import type {
   ChatMessage,
   GenerationOptions,
   OnUsage,
+  ProviderCallEvent,
   TokenUsage,
   ToolCallHandler,
   ToolDeclaration,
@@ -60,8 +61,42 @@ const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const NETWORK_ERROR_RE =
   /Error fetching from|Error reading from the stream|fetch failed|network error|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated/i;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface RetryOptions {
+  signal?: AbortSignal;
+  onEvent?: (event: ProviderCallEvent) => void;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw new DOMException(
+    typeof signal.reason === "string"
+      ? signal.reason
+      : "Gemini request was cancelled.",
+    "AbortError",
+  );
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(
+        new DOMException(
+          typeof signal.reason === "string"
+            ? signal.reason
+            : "Gemini request was cancelled.",
+          "AbortError",
+        ),
+      );
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 /**
@@ -81,9 +116,14 @@ function isRetryableError(error: unknown): boolean {
 }
 
 /** Runs `fn`, retrying transient failures with 500ms/1500ms backoff (3 attempts total). */
-async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+async function withTransientRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  options?: RetryOptions,
+): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    throwIfAborted(options?.signal);
     try {
       return await fn();
     } catch (error) {
@@ -96,7 +136,13 @@ async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promi
         maxAttempts: RETRY_DELAYS_MS.length + 1,
         error: String(error),
       });
-      await sleep(RETRY_DELAYS_MS[attempt]);
+      options?.onEvent?.({
+        type: "retry",
+        attempt: attempt + 1,
+        delayMs: RETRY_DELAYS_MS[attempt],
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      await sleep(RETRY_DELAYS_MS[attempt], options?.signal);
     }
   }
   // Unreachable — the final failed attempt throws inside the catch above.
@@ -113,6 +159,7 @@ async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promi
 async function establishStream(
   send: () => Promise<GenerateContentStreamResult>,
   label: string,
+  options?: RetryOptions,
 ): Promise<{
   result: GenerateContentStreamResult;
   iterator: AsyncIterator<EnhancedGenerateContentResponse>;
@@ -123,7 +170,7 @@ async function establishStream(
     const iterator = result.stream[Symbol.asyncIterator]();
     const first = await iterator.next();
     return { result, iterator, first };
-  }, label);
+  }, label, options);
 }
 
 export class GeminiProvider implements AIProvider {
@@ -170,11 +217,14 @@ export class GeminiProvider implements AIProvider {
         })),
       });
 
-      const result = await chat.sendMessage(lastMessage.content);
+      const result = await chat.sendMessage(
+        lastMessage.content,
+        options?.signal ? { signal: options.signal } : undefined,
+      );
       const text = result.response.text();
       reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
       return text;
-    }, "generateResponse");
+    }, "generateResponse", options);
   }
 
   async *streamResponse(
@@ -198,8 +248,11 @@ export class GeminiProvider implements AIProvider {
           parts: [{ text: m.content }],
         })),
       });
-      return chat.sendMessageStream(lastMessage.content);
-    }, "streamResponse");
+      return chat.sendMessageStream(
+        lastMessage.content,
+        options?.signal ? { signal: options.signal } : undefined,
+      );
+    }, "streamResponse", options);
 
     let outputChars = 0;
     let next = first;
@@ -245,11 +298,14 @@ export class GeminiProvider implements AIProvider {
         })),
       });
 
-      const result = await chat.sendMessage(lastMessage.content);
+      const result = await chat.sendMessage(
+        lastMessage.content,
+        options?.signal ? { signal: options.signal } : undefined,
+      );
       const text = result.response.text();
       reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
       return text;
-    }, "generateStructuredResponse");
+    }, "generateStructuredResponse", options);
   }
 
   async *streamWithTools(
@@ -302,8 +358,13 @@ export class GeminiProvider implements AIProvider {
       // as safe as on hop 1 — tool handlers are NOT re-run, only the model
       // request. Once a chunk has arrived, errors propagate untouched.
       const { result, iterator, first } = await establishStream(
-        () => model.generateContentStream({ contents }),
+        () =>
+          model.generateContentStream(
+            { contents },
+            options?.signal ? { signal: options.signal } : undefined,
+          ),
         "streamWithTools",
+        options,
       );
 
       // Stream text as it arrives, keeping every raw part verbatim: the SDK's
@@ -351,7 +412,10 @@ export class GeminiProvider implements AIProvider {
       // "show me my goals AND my appointments") the wall-clock cost
       // collapses from sum(durations) to max(durations).
       const handlerResults = await Promise.all(
-        enriched.map((c) => onToolCall({ name: c.name, args: c.args })),
+        enriched.map((c) => {
+          throwIfAborted(options?.signal);
+          return onToolCall({ name: c.name, args: c.args });
+        }),
       );
 
       const responseParts: Part[] = [];

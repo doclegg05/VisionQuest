@@ -5,6 +5,7 @@ import { SAGE_PROMPT_REVISION } from "./sage/prompt-revision";
 import type {
   AIProvider,
   ChatMessage,
+  GenerationOptions,
   OnUsage,
   ToolCallHandler,
   ToolDeclaration,
@@ -12,6 +13,11 @@ import type {
   ToolStreamOptions,
   TokenUsage,
 } from "./ai/types";
+import {
+  withAiHarness,
+  type AiCallPriority,
+  type PromptBudgetTelemetry,
+} from "./ai/harness";
 
 // ─── Token Logging ──────────────────────────────────────────────────────────
 
@@ -125,6 +131,10 @@ export interface WithUsageLoggingContext {
   model?: string;
   /** Overrides the default SAGE_PROMPT_REVISION stamp in the logged row when set. */
   promptRevision?: string;
+  /** Foreground chat reserves admission capacity ahead of background AI work. */
+  priority?: AiCallPriority;
+  /** Full-prompt measurement prepared by the chat route. */
+  promptBudget?: PromptBudgetTelemetry;
 }
 
 function fallbackUsage(inputChars: number, outputChars: number): TokenUsage {
@@ -159,6 +169,11 @@ export function withUsageLogging(
   ctx: WithUsageLoggingContext,
 ): AIProvider {
   const model = ctx.model ?? provider.name;
+  const harnessedProvider = withAiHarness(provider, {
+    callSite: ctx.callSite,
+    priority: ctx.priority ?? (ctx.callSite === "sage_chat" ? "foreground" : "background"),
+    promptBudget: ctx.promptBudget,
+  });
 
   const record = (usage: TokenUsage, durationMs: number): void => {
     void logLlmCall({
@@ -180,13 +195,19 @@ export function withUsageLogging(
       systemPrompt: string,
       messages: ChatMessage[],
       onUsage?: OnUsage,
+      options?: GenerationOptions,
     ): Promise<string> {
       const startedAt = Date.now();
       let captured: TokenUsage | null = null;
-      const result = await provider.generateResponse(systemPrompt, messages, (usage) => {
-        captured = usage;
-        onUsage?.(usage);
-      });
+      const result = await harnessedProvider.generateResponse(
+        systemPrompt,
+        messages,
+        (usage) => {
+          captured = usage;
+          onUsage?.(usage);
+        },
+        options,
+      );
       const usage =
         captured ?? fallbackUsage(systemPrompt.length + totalMessageChars(messages), result.length);
       record(usage, Date.now() - startedAt);
@@ -197,14 +218,20 @@ export function withUsageLogging(
       systemPrompt: string,
       messages: ChatMessage[],
       onUsage?: OnUsage,
+      options?: GenerationOptions,
     ): AsyncGenerator<string> {
       const startedAt = Date.now();
       let captured: TokenUsage | null = null;
       let outputChars = 0;
-      for await (const chunk of provider.streamResponse(systemPrompt, messages, (usage) => {
-        captured = usage;
-        onUsage?.(usage);
-      })) {
+      for await (const chunk of harnessedProvider.streamResponse(
+        systemPrompt,
+        messages,
+        (usage) => {
+          captured = usage;
+          onUsage?.(usage);
+        },
+        options,
+      )) {
         outputChars += chunk.length;
         yield chunk;
       }
@@ -217,13 +244,19 @@ export function withUsageLogging(
       systemPrompt: string,
       messages: ChatMessage[],
       onUsage?: OnUsage,
+      options?: GenerationOptions,
     ): Promise<string> {
       const startedAt = Date.now();
       let captured: TokenUsage | null = null;
-      const result = await provider.generateStructuredResponse(systemPrompt, messages, (usage) => {
-        captured = usage;
-        onUsage?.(usage);
-      });
+      const result = await harnessedProvider.generateStructuredResponse(
+        systemPrompt,
+        messages,
+        (usage) => {
+          captured = usage;
+          onUsage?.(usage);
+        },
+        options,
+      );
       const usage =
         captured ?? fallbackUsage(systemPrompt.length + totalMessageChars(messages), result.length);
       record(usage, Date.now() - startedAt);
@@ -231,8 +264,8 @@ export function withUsageLogging(
     },
   };
 
-  if (provider.streamWithTools) {
-    const innerStreamWithTools = provider.streamWithTools.bind(provider);
+  if (harnessedProvider.streamWithTools) {
+    const innerStreamWithTools = harnessedProvider.streamWithTools.bind(harnessedProvider);
     wrapped.streamWithTools = async function* (
       systemPrompt: string,
       messages: ChatMessage[],

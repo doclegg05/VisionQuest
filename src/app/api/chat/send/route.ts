@@ -41,6 +41,11 @@ import {
 import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota, withUsageLogging } from "@/lib/llm-usage";
 import { estimateTokens } from "@/lib/llm-usage-estimate";
+import {
+  COMPACT_PROMPT_INPUT_TOKEN_BUDGET,
+  FULL_PROMPT_INPUT_TOKEN_BUDGET,
+  preparePrompt,
+} from "@/lib/ai/harness";
 import { prisma } from "@/lib/db";
 import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
@@ -648,7 +653,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     documentContextChars,
     formContextChars,
     sections: sectionSizes,
-    estInputTokens: estimateTokens(systemPrompt.length),
+    estSystemTokens: estimateTokens(systemPrompt.length),
   });
 
   // Format message history for Gemini, using compacted context when available
@@ -666,10 +671,23 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       ? COMPACT_HISTORY_TOKEN_BUDGET
       : FULL_HISTORY_TOKEN_BUDGET,
   );
-  const allMessages = [
-    ...conversationContext.messages,
-    { role: "user" as const, content: userMessage },
-  ];
+  const preparedPrompt = preparePrompt({
+    systemPrompt,
+    history: conversationContext.messages,
+    currentUserMessage: userMessage,
+    maxInputTokens:
+      promptTier === "compact"
+        ? COMPACT_PROMPT_INPUT_TOKEN_BUDGET
+        : FULL_PROMPT_INPUT_TOKEN_BUDGET,
+  });
+  const allMessages = preparedPrompt.messages;
+  logger.info("sage.prompt.budget", {
+    provider: provider.name,
+    promptTier,
+    stage: conversationStage,
+    role: session.role,
+    ...preparedPrompt.telemetry,
+  });
 
   // Stream response via SSE
   // Local (Ollama) providers MUST use streaming: Cloudflare Tunnel returns 524
@@ -680,6 +698,14 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const useNonStreaming = false;
   const encoder = new TextEncoder();
   let fullResponse = "";
+  const generationAbortController = new AbortController();
+  const abortGeneration = () => {
+    if (!generationAbortController.signal.aborted) {
+      generationAbortController.abort(req.signal.reason);
+    }
+  };
+  if (req.signal.aborted) abortGeneration();
+  else req.signal.addEventListener("abort", abortGeneration, { once: true });
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -717,6 +743,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
       const closeStream = () => {
         stopHeartbeat();
+        req.signal.removeEventListener("abort", abortGeneration);
         if (streamClosed) return;
         try {
           controller.close();
@@ -751,6 +778,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         const loggedProvider = withUsageLogging(provider, {
           studentId: session.id,
           callSite: "sage_chat",
+          priority: "foreground",
+          promptBudget: preparedPrompt.telemetry,
         });
 
         const agentLoopEnabled = agentLoopEnabledEarly;
@@ -895,6 +924,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             session,
             conversationId: conversation.id,
             targetStudentId: staffStudentTargetId ?? undefined,
+            signal: generationAbortController.signal,
           });
           for await (const event of agentEvents) {
             if (event.type === "text") {
@@ -938,13 +968,27 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             // via the surrounding try/catch + sendEvent({ done: true }) below.
           }
         } else if (useNonStreaming) {
-          fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages);
+          fullResponse = await loggedProvider.generateResponse(
+            systemPrompt,
+            allMessages,
+            undefined,
+            { signal: generationAbortController.signal },
+          );
           sendEvent({ text: fullResponse }, "text");
         } else {
-          for await (const chunk of loggedProvider.streamResponse(systemPrompt, allMessages)) {
+          for await (const chunk of loggedProvider.streamResponse(
+            systemPrompt,
+            allMessages,
+            undefined,
+            { signal: generationAbortController.signal },
+          )) {
             fullResponse += chunk;
             sendEvent({ text: chunk }, "text");
           }
+        }
+
+        if (fullResponse.trim().length === 0) {
+          throw new Error(`${provider.name} completed without an assistant reply.`);
         }
 
         // Deterministic crisis-resource safety net (student chat only). The
@@ -1036,7 +1080,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         const cause = error instanceof Error && error.cause ? String(error.cause) : undefined;
-        const clientClosed = error instanceof ChatSseClientClosedError || streamClosed;
+        const clientClosed =
+          error instanceof ChatSseClientClosedError ||
+          streamClosed ||
+          generationAbortController.signal.aborted;
         const errorCode = clientClosed ? "CLIENT_STREAM_CLOSED" : "AI_STREAM_FAILED";
         const logPayload = { error: msg, cause, provider: provider.name };
         if (clientClosed) {
@@ -1076,6 +1123,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         }
         closeStream();
       }
+    },
+    cancel(reason) {
+      if (!generationAbortController.signal.aborted) {
+        generationAbortController.abort(reason);
+      }
+      req.signal.removeEventListener("abort", abortGeneration);
     },
   });
 

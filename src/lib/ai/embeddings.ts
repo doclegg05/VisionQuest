@@ -12,6 +12,9 @@
 
 import { resolveEmbeddingProvider } from "./embedding-provider";
 import { EMBEDDING_DIMENSIONS, type EmbeddingTaskType } from "./embedding-types";
+import { aiAdmissionController, type AiCallPriority } from "./harness";
+import { estimateTokens } from "@/lib/llm-usage-estimate";
+import { logger } from "@/lib/logger";
 
 export { EMBEDDING_DIMENSIONS };
 
@@ -20,6 +23,8 @@ export interface EmbeddingUsageContext {
   studentId?: string | null;
   /** e.g. "sage_embedding_query", "sage_embedding_backfill". */
   callSite: string;
+  /** Retrieval queries are interactive; indexing/extraction is background. */
+  priority?: AiCallPriority;
 }
 
 interface EmbedTextsOptions {
@@ -50,11 +55,70 @@ export async function embedTexts(
     studentId: usage?.studentId ?? null,
     callSite: usage?.callSite,
   });
-  return provider.embed(texts, {
-    taskType,
-    callSite: usage?.callSite,
-    studentId: usage?.studentId ?? null,
-  });
+  const priority =
+    usage?.priority ??
+    (taskType === "RETRIEVAL_QUERY" ? "foreground" : "background");
+  const startedAt = Date.now();
+  const lease = await aiAdmissionController.acquire(priority);
+  const estimatedInputTokens = texts.reduce(
+    (total, text) => total + estimateTokens(text.length),
+    0,
+  );
+  try {
+    const vectors = await provider.embed(texts, {
+      taskType,
+      callSite: usage?.callSite,
+      studentId: usage?.studentId ?? null,
+    });
+    const durationMs = Date.now() - startedAt;
+    logger.info("ai.harness.telemetry", {
+      provider: provider.name,
+      callSite: usage?.callSite ?? "sage_embedding",
+      operation: "embedding",
+      priority,
+      status: "completed",
+      durationMs,
+      queueWaitMs: lease.queueWaitMs,
+      ttftMs: durationMs,
+      retryCount: 0,
+      promptBudget: {
+        maxInputTokens: 0,
+        estimatedInputTokens,
+        systemTokens: 0,
+        messageTokens: estimatedInputTokens,
+        currentMessageTokens: 0,
+        droppedMessages: 0,
+        duplicateCurrentMessagesRemoved: 0,
+        overBudget: false,
+      },
+    });
+    return vectors;
+  } catch (error) {
+    logger.warn("ai.harness.telemetry", {
+      provider: provider.name,
+      callSite: usage?.callSite ?? "sage_embedding",
+      operation: "embedding",
+      priority,
+      status: "failed",
+      durationMs: Date.now() - startedAt,
+      queueWaitMs: lease.queueWaitMs,
+      ttftMs: null,
+      retryCount: 0,
+      promptBudget: {
+        maxInputTokens: 0,
+        estimatedInputTokens,
+        systemTokens: 0,
+        messageTokens: estimatedInputTokens,
+        currentMessageTokens: 0,
+        droppedMessages: 0,
+        duplicateCurrentMessagesRemoved: 0,
+        overBudget: false,
+      },
+    });
+    throw error;
+  } finally {
+    lease.release();
+  }
 }
 
 /** Embed a single retrieval query. */

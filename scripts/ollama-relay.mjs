@@ -42,6 +42,7 @@ function forwardHeaders(clientReq) {
 }
 
 function handleNonStreaming(clientReq, clientRes, requestBody) {
+  let finished = false;
   const upstreamReq = http.request(
     {
       hostname: ollamaUrl.hostname,
@@ -52,9 +53,20 @@ function handleNonStreaming(clientReq, clientRes, requestBody) {
     },
     (upstreamRes) => {
       clientRes.writeHead(upstreamRes.statusCode, upstreamRes.headers);
+      upstreamRes.on("end", () => {
+        finished = true;
+      });
       upstreamRes.pipe(clientRes);
     },
   );
+
+  const abortUpstream = () => {
+    if (finished) return;
+    finished = true;
+    upstreamReq.destroy();
+  };
+  clientReq.on("aborted", abortUpstream);
+  clientRes.on("close", abortUpstream);
 
   upstreamReq.setTimeout(300_000, () => {
     console.error("[relay] non-streaming upstream timeout");
@@ -62,6 +74,7 @@ function handleNonStreaming(clientReq, clientRes, requestBody) {
   });
 
   upstreamReq.on("error", (err) => {
+    if (clientRes.destroyed) return;
     console.error("[relay] non-streaming error:", err.message);
     if (!clientRes.headersSent) {
       clientRes.writeHead(502, { "Content-Type": "application/json" });
@@ -106,6 +119,7 @@ function handleStreaming(clientReq, clientRes, requestBody) {
     clearInterval(heartbeat);
   };
   const abortUpstream = (reason) => {
+    if (finished) return;
     cleanup();
     if (reason) {
       console.error(`[relay] streaming closed: ${reason}`);
@@ -113,6 +127,7 @@ function handleStreaming(clientReq, clientRes, requestBody) {
     upstreamReq?.destroy();
   };
 
+  clientReq.on("aborted", () => abortUpstream("client request aborted"));
   clientRes.on("close", () => abortUpstream("client response closed"));
 
   upstreamReq = http.request(
