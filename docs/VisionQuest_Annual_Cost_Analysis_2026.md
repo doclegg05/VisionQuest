@@ -37,7 +37,14 @@ The 128GB unified memory runs 70B parameter AI models locally, keeping all stude
 
 ## Cloud AI Cost Comparison (Reference Only)
 
-Using Google Gemini API instead of local AI would cost approximately **$50–$275/year** for 200 students. However, cloud AI is not an option — student conversations contain FERPA-protected educational records, and no cloud AI provider currently offers compliant terms for this data.
+The April 2026 estimate for Google Gemini API was approximately **$50–$275/year**
+for 200 students. Treat that figure as historical: models and list prices change.
+Cloud AI is not currently approved for live VisionQuest education-record data, but
+the former claim that no provider offers potentially usable terms was too absolute.
+Paid enterprise services can provide contractual and technical controls that support
+FERPA readiness; they do not make a model automatically compliant. See the current
+[AI Data Handling and Cloud-Provider Terms](./AI_DATA_HANDLING_AND_CLOUD_PROVIDER_TERMS.md)
+reference for the approval conditions, provider comparison, and dated pricing snapshot.
 
 ---
 

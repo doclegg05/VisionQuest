@@ -32,6 +32,8 @@ VisionQuest is an AI-coach-driven portal for the SPOKES workforce development pr
 - CSP and request hardening are enforced in [`src/proxy.ts`](/Users/brittlegg/visionquest/src/proxy.ts)
 
 For a fuller repo walkthrough, see [`docs/DEVELOPER_GUIDE.md`](/Users/brittlegg/visionquest/docs/DEVELOPER_GUIDE.md).
+Before changing any AI provider or allowing cloud processing, read
+[`docs/AI_DATA_HANDLING_AND_CLOUD_PROVIDER_TERMS.md`](docs/AI_DATA_HANDLING_AND_CLOUD_PROVIDER_TERMS.md).
 
 ## Repository Map
 
