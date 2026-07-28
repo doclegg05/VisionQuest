@@ -83,6 +83,8 @@ interface OpenAIChatResponse {
       content?: string;
       /** Reasoning channel on thinking models. Never shown to students. */
       reasoning?: string;
+      /** Present when the turn ended by asking to call one or more tools. */
+      tool_calls?: OpenAIToolCallMessage[];
     };
     /** "length" when the model hit the output-token cap mid-generation. */
     finish_reason?: string | null;
@@ -280,6 +282,70 @@ function noVisibleContentError(
     `Local AI model "${model}" hit its ${maxOutputTokens}-token output budget without emitting any visible content.${spentOnReasoning}` +
       ` Disable reasoning for this model (the default) or raise its output budget via ai_provider_max_output_tokens.`,
   );
+}
+
+/**
+ * Builds the error thrown when a turn ends by asking to call a tool the
+ * caller never offered, producing no visible content.
+ *
+ * `generateResponse` and `generateStructuredResponse` send no `tools` array,
+ * so an agent-mode prompt that tells the model to "call lookup_program_info
+ * first" leaves Ollama's parser with a tool call it has nowhere to put: it
+ * strips the call syntax out of `content` and the caller is handed "".
+ * Measured against Ollama 0.32.4 / gemma4:latest with the real ~20k-char Sage
+ * agent-mode prompt — declaring the same tool name makes the identical output
+ * parse into a well-formed `tool_calls` entry, so this is an undeclared-tool
+ * drop, not a broken parser.
+ */
+function undeclaredToolCallError(model: string, toolNames: string[]): Error {
+  const named =
+    toolNames.length > 0
+      ? ` It asked to call ${toolNames.map((name) => `"${name}"`).join(", ")}.`
+      : "";
+  return new Error(
+    `Local AI model "${model}" ended its turn with a tool call instead of any visible content.${named}` +
+      ` This call asked for text and declared no tools, so the model asked to call a tool it was never offered` +
+      ` and the reply came back empty. Supply the facts in the prompt, or route this call through a tool-enabled path.`,
+  );
+}
+
+/**
+ * Tool-call names on an OpenAI-compat turn, or null when the turn did not end
+ * in a tool call.
+ *
+ * Either signal counts. With no `tools` on the request, Ollama 0.32.4 reports
+ * `finish_reason: "tool_calls"` and an empty/absent `tool_calls` array — so
+ * the finish reason alone must be enough, and the names are best-effort.
+ */
+function openAiToolCallNames(data: OpenAIChatResponse): string[] | null {
+  const choice = data.choices?.[0];
+  const calls = choice?.message?.tool_calls ?? [];
+  if (choice?.finish_reason !== "tool_calls" && calls.length === 0) return null;
+  return calls
+    .map((call) => call.function?.name)
+    .filter((name): name is string => Boolean(name));
+}
+
+/**
+ * Tool-call names on a native /api/chat turn, or null when there is no signal.
+ *
+ * LIMITATION — kept honest deliberately: the native surface gives NO signal at
+ * all when the caller declared no tools. Measured against Ollama 0.32.4 /
+ * gemma4:latest, a turn whose only emitted tokens were
+ * `call:find_certification(query="...")` came back as a bare
+ * `{"role":"assistant","content":""}` with `done_reason: "stop"` and no
+ * `tool_calls` field — indistinguishable from a model that said nothing. Only
+ * the case where Ollama does report the call is detectable here; there is no
+ * way to promise more without inventing a signal that does not exist. The live
+ * path is `/v1` (postChat tries it first and real Ollama answers it), where
+ * detection does work.
+ */
+function nativeToolCallNames(data: NativeChatResponse): string[] | null {
+  const calls = data.message?.tool_calls ?? [];
+  if (calls.length === 0) return null;
+  return calls
+    .map((call) => call.function?.name)
+    .filter((name): name is string => Boolean(name));
 }
 
 function toOpenAIMessages(
@@ -597,9 +663,10 @@ export class OllamaProvider implements AIProvider {
   }
 
   /**
-   * Fail loudly when a turn was cut off by the output cap without producing
-   * any visible text. Truncated-but-present content is still usable and
-   * passes through; only the all-or-nothing case throws.
+   * Fail loudly when a turn produced no visible text — either because the
+   * output cap cut it off, or because it ended in a tool call this caller
+   * never offered. Truncated-but-present content is still usable and passes
+   * through; only the all-or-nothing cases throw.
    */
   private assertVisibleContent(
     mode: Exclude<OllamaApiMode, "unknown">,
@@ -609,18 +676,28 @@ export class OllamaProvider implements AIProvider {
   ): void {
     if (text) return;
 
+    // Budget exhaustion is checked first: when both signals are present it is
+    // the more actionable diagnosis, and it keeps the shipped behavior intact.
     const truncated =
       mode === "openai"
         ? isTruncated((data as OpenAIChatResponse).choices?.[0]?.finish_reason)
         : isTruncated((data as NativeChatResponse).done_reason);
-    if (!truncated) return;
+    if (truncated) {
+      const reasoningChars =
+        mode === "openai"
+          ? ((data as OpenAIChatResponse).choices?.[0]?.message?.reasoning ?? "").length
+          : ((data as NativeChatResponse).message?.thinking ?? "").length;
 
-    const reasoningChars =
+      throw noVisibleContentError(this.model, budget, reasoningChars);
+    }
+
+    const toolCallNames =
       mode === "openai"
-        ? ((data as OpenAIChatResponse).choices?.[0]?.message?.reasoning ?? "").length
-        : ((data as NativeChatResponse).message?.thinking ?? "").length;
-
-    throw noVisibleContentError(this.model, budget, reasoningChars);
+        ? openAiToolCallNames(data as OpenAIChatResponse)
+        : nativeToolCallNames(data as NativeChatResponse);
+    if (toolCallNames) {
+      throw undeclaredToolCallError(this.model, toolCallNames);
+    }
   }
 
   /**
