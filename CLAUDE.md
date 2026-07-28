@@ -24,7 +24,9 @@ Read when deciding what to build, cut, simplify, or automate.
 | Goal/learning/evidence architecture | [docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md](./docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md) |
 | Infrastructure & Supabase optimization | [docs/plans/supabase-optimization.md](./docs/plans/supabase-optimization.md) |
 | Funding & vendor billing structure | [docs/plans/funding-options-monthly-subscriptions.md](./docs/plans/funding-options-monthly-subscriptions.md) |
-| Local AI hosting & tunnel recommendation | [docs/plans/2026-04-15-local-ai-tunnel-recommendation.md](./docs/plans/2026-04-15-local-ai-tunnel-recommendation.md) |
+| Local AI hosting, Windows services, tunnel & routing policy | [docs/runbooks/local-ai-windows-cloudflare.md](./docs/runbooks/local-ai-windows-cloudflare.md) |
+| Local AI cross-platform implementation handoff | [docs/handoffs/2026-07-28-local-ai-implementation-packet.md](./docs/handoffs/2026-07-28-local-ai-implementation-packet.md) |
+| Secret handling & scanning | [docs/runbooks/secret-handling.md](./docs/runbooks/secret-handling.md) |
 | Frontend redesign implementation | [docs/superpowers/plans/2026-03-30-frontend-redesign.md](./docs/superpowers/plans/2026-03-30-frontend-redesign.md) |
 | Job board implementation | [docs/superpowers/plans/2026-03-31-job-board.md](./docs/superpowers/plans/2026-03-31-job-board.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
@@ -45,7 +47,7 @@ Read when deciding what to build, cut, simplify, or automate.
 
 ## Architecture Notes
 - Auth: JWT in httpOnly cookies (SameSite=strict), scrypt password hashing (legacy PBKDF2 rehashed on login), TOTP MFA, `sessionVersion` invalidation
-- AI providers: `src/lib/ai/` abstraction — Gemini (cloud) + Ollama (local), routed by data sensitivity (`resolveAiProvider`; student_record/staff_entered are local-only per FERPA policy); explicit safetySettings; transient-failure retry pre-first-token; prompt revisions stamped via `SAGE_PROMPT_REVISION`
+- AI providers: `src/lib/ai/` abstraction — local Gemma 4 through Windows Ollama for FERPA-sensitive `student_record` / `staff_entered` prompts; Gemini may handle non-FERPA prompts. Production must remain set to Local AI Server and fail closed during local outages. The current resolver still honors an operator-selected cloud setting during alpha, so a hard code lock remains follow-up work. See the local-AI runbook.
 - Chat: SSE streaming from `/api/chat/send` (heartbeats, disconnect handling), two-call pattern (conversation + prioritized async extraction in `src/lib/chat/post-response.ts`); token-budget-aware history trimming
 - RAG: live hybrid pgvector + FTS retrieval with RRF (`src/lib/sage/hybrid-retrieval.ts`), `ProgramDocument` corpus + `catalog/` OKF layer, gating red-team/guardrail evals in CI (`.github/workflows/sage-evals.yml`)
 - Safety: deterministic crisis detection (English + Spanish) with 988 safety net, structured crisis context cards to assigned instructors, failed extractions dead-lettered for teacher review
@@ -85,6 +87,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | 2026-06-10 | Chat-first student home (Phase 4) | Sage conversation is the home surface; ambient rail carries vitals; classic dashboard kept at /dashboard/classic as a one-release parity fallback, retired 2026-07-20 — the route now redirects to /dashboard (issue #76 closed as satisfied by the redirect per PRODUCT_DECISIONS.md) |
 | 2026-05-07 | Project Autopilot installed locally | Read-only Claude Code orchestrator at `project-autopilot/` (gitignored) generates morning digests, weekly reviews, and triage sweeps over the GitHub repo. Deny list blocks all `gh` writes; agents propose, humans apply |
 | 2026-07-20 | Maturity repair session (see docs/MATURITY_REVIEW.md) | Verification layer added across orientation/goals/certs; crisis alerts get context cards (no transcript access — owner decision); classic dashboard deleted; crisis routing scoped to assigned instructors; data lifecycle v1; extraction dead-letter; Spanish crisis patterns |
+| 2026-07-28 | FERPA chat routing policy | Student-record and staff-entered chats use only pinned local Gemma 4 through Windows Ollama; no Gemini fallback. Non-FERPA prompts may use Gemini. Operations are documented in the Windows Ollama + Cloudflare runbook; hard code enforcement remains follow-up work. |
 
 ## Known Issues
 - ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (no sleep). Verified 2026-04-29 in `render.yaml` (`plan: starter`).

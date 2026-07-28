@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Production VisionQuest on Render reaches the local Ollama via
-  Cloudflare Tunnel: Render -> Cloudflare DNS (llm.leggaiops.com) ->
+  Cloudflare Tunnel: Render -> Cloudflare DNS (llm.example.org) ->
   cloudflared (this machine) -> ollama-relay :11435 -> Ollama :11434.
 
   The relay (scripts/ollama-relay.mjs) sits between cloudflared and
@@ -34,9 +34,10 @@ param(
   [string] $OllamaExe = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
   [string] $OllamaModels = "$env:USERPROFILE\.ollama\models",
   [string] $OllamaServiceName = "VisionQuest-Ollama",
-  [string] $RelayScript = "C:\Users\Instructor\Dev\VisionQuest\scripts\ollama-relay.mjs",
+  [string] $RelayScript = (Join-Path $PSScriptRoot "ollama-relay.mjs"),
   [string] $RelayServiceName = "VisionQuest-OllamaRelay",
-  [string] $CloudflaredExe = "C:\Program Files (x86)\cloudflared\cloudflared.exe",
+  [string] $CloudflaredExe = "C:\Cloudflared\bin\cloudflared.exe",
+  [string] $CloudflaredConfig = "C:\Windows\System32\config\systemprofile\.cloudflared\config.yml",
   [switch] $StopExistingProcesses
 )
 
@@ -254,7 +255,10 @@ Assert-Elevated
 Step 1 "Verify prerequisites"
 
 if (-not (Test-Path $CloudflaredExe)) {
-  throw "cloudflared not found at $CloudflaredExe. Install it from https://github.com/cloudflare/cloudflared/releases first."
+  throw "cloudflared not found at $CloudflaredExe. Install it from https://github.com/cloudflare/cloudflared/releases first, or pass -CloudflaredExe."
+}
+if (-not (Test-Path $CloudflaredConfig)) {
+  throw "cloudflared config not found at $CloudflaredConfig. Copy config/cloudflared/config.example.yml there, replace placeholders, and keep the credential JSON outside the repository."
 }
 if (-not (Test-Path $OllamaExe)) {
   throw "Ollama not found at $OllamaExe. Install Ollama first, then re-run this script."
@@ -270,6 +274,7 @@ if (-not $node) {
   throw "Node.js not found on PATH."
 }
 Write-Host "  cloudflared : $CloudflaredExe"
+Write-Host "  cf config   : $CloudflaredConfig"
 Write-Host "  ollama      : $OllamaExe"
 Write-Host "  models      : $OllamaModels"
 Write-Host "  relay       : $RelayScript"

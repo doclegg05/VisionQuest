@@ -1,5 +1,11 @@
 # Local AI Operator Runbook
 
+> **Canonical setup moved:** For the supported Windows Ollama + relay +
+> Cloudflare service/tunnel path and the FERPA/Gemini routing policy, use
+> [Windows Ollama + Cloudflare Runbook](../runbooks/local-ai-windows-cloudflare.md).
+> This older document remains useful for capability reports, embedding
+> cutover, model swaps, and troubleshooting.
+
 **Created:** 2026-07-02
 **Audience:** the operator running the always-on local AI host (technical,
 but not necessarily a developer). Covers install → tunnel → admin config →

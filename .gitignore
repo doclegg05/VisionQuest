@@ -30,12 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env
-.env.local
-.env.*.local
-.env.development
-.env.production
+# Environment files are always local. Never add a new .env variant to Git.
+.env*
 
 # vercel
 .vercel
@@ -78,6 +74,14 @@ CLAUDE.local.md
 
 # Root-level credential screenshots (never commit)
 /*.png
+
+# Local AI tunnel credentials and private keys
+/.cloudflared/
+/config/cloudflared/config.yml
+/config/cloudflared/*.json
+*.key
+*.p12
+*.pfx
 
 # Generated artifacts (screenshots, audit reports)
 /artifacts/

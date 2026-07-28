@@ -91,3 +91,7 @@ Permanent fix checklist:
 2. Store Cloudflare Access service-token credentials in Render environment variables.
 3. In production, run `Program Setup -> AI Provider -> Test Connection` after any tunnel, credential, model, or encryption-key change.
 4. Treat any future `Local AI stream failed (502/530)` as a tunnel/edge/credential incident first, not as a chat UI bug.
+
+For current end-to-end Windows installation, service configuration,
+Cloudflare Access, and provider-routing policy, follow
+[Windows Ollama + Cloudflare Runbook](../runbooks/local-ai-windows-cloudflare.md).

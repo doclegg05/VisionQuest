@@ -7,7 +7,8 @@ VisionQuest is an AI-coach-driven portal for the SPOKES workforce development pr
 - Student experience centered around Sage, goals, orientation, certifications, portfolio, files, resources, and job exploration
 - Teacher operations for rosters, student detail, interventions, advising, forms, reports, and content management
 - Background workflows for appointment reminders, job processing, and daily coaching prompts
-- AI-assisted coaching and extraction flows powered by Google Gemini
+- AI-assisted coaching and extraction flows with FERPA-sensitive chat routed
+  to local Gemma 4 through Ollama; non-FERPA prompts may use Gemini
 
 ## Stack
 
@@ -16,7 +17,8 @@ VisionQuest is an AI-coach-driven portal for the SPOKES workforce development pr
 - TypeScript 5
 - Prisma 6 with PostgreSQL
 - Supabase PostgreSQL and Supabase Storage (S3-compatible)
-- Google Gemini 3.1 Flash Lite by default (cloud), with an optional local Ollama provider routed by data sensitivity
+- Local Gemma 4 through Windows Ollama for FERPA-protected chat, with Gemini
+  available only for prompts classified as non-FERPA
 - Tailwind CSS 4
 - Sentry for optional error tracking
 
@@ -28,6 +30,8 @@ VisionQuest is an AI-coach-driven portal for the SPOKES workforce development pr
 - Teacher routes live under [`src/app/(teacher)`](/Users/brittlegg/visionquest/src/app/(teacher))
 - API routes live under [`src/app/api`](/Users/brittlegg/visionquest/src/app/api)
 - Sage chat streams responses from `/api/chat/send` and runs a follow-up extraction pass asynchronously
+- `student_record` and `staff_entered` prompts must use the local provider and
+  fail closed; never switch production to Gemini during a local-AI outage
 - Files write to local `./uploads/` in development and to Supabase Storage in production
 - CSP and request hardening are enforced in [`src/proxy.ts`](/Users/brittlegg/visionquest/src/proxy.ts)
 
@@ -182,9 +186,21 @@ VisionQuest is configured for Render plus Supabase. The blueprint file in [`rend
 
 Use [`DEPLOY.md`](/Users/brittlegg/visionquest/DEPLOY.md) for the full deployment runbook.
 
+For the protected Sage path, follow
+[`docs/runbooks/local-ai-windows-cloudflare.md`](/Users/brittlegg/visionquest/docs/runbooks/local-ai-windows-cloudflare.md).
+It covers Windows Ollama, the relay service, Cloudflare Tunnel/Access, Render
+configuration, and the FERPA/Gemini routing boundary. Before staging
+configuration work, follow
+[`docs/runbooks/secret-handling.md`](/Users/brittlegg/visionquest/docs/runbooks/secret-handling.md).
+The repository-grounded handoff packet for a separate implementation agent is
+[`docs/handoffs/2026-07-28-local-ai-implementation-packet.md`](/Users/brittlegg/visionquest/docs/handoffs/2026-07-28-local-ai-implementation-packet.md).
+
 ## Product And Planning Docs
 
 - [`docs/PRODUCT_GUIDE.md`](/Users/brittlegg/visionquest/docs/PRODUCT_GUIDE.md) product intent, user model, and current gaps
 - [`docs/PRODUCT_DECISIONS.md`](/Users/brittlegg/visionquest/docs/PRODUCT_DECISIONS.md) scope authority and current decisions
 - [`docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md`](/Users/brittlegg/visionquest/docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md) learning and evidence strategy
+- [`docs/runbooks/local-ai-windows-cloudflare.md`](/Users/brittlegg/visionquest/docs/runbooks/local-ai-windows-cloudflare.md) protected local-AI operations
+- [`docs/runbooks/secret-handling.md`](/Users/brittlegg/visionquest/docs/runbooks/secret-handling.md) credential handling and scanning
+- [`docs/handoffs/2026-07-28-local-ai-implementation-packet.md`](/Users/brittlegg/visionquest/docs/handoffs/2026-07-28-local-ai-implementation-packet.md) cross-platform local-AI implementation handoff
 - [`CLAUDE.md`](/Users/brittlegg/visionquest/CLAUDE.md) project operating rules and doc-routing instructions for agents

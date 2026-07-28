@@ -119,6 +119,8 @@ Start with:
 - [`DEPLOY.md`](/Users/brittlegg/visionquest/DEPLOY.md)
 - [`render.yaml`](/Users/brittlegg/visionquest/render.yaml)
 - [`/.env.example`](/Users/brittlegg/visionquest/.env.example)
+- [`docs/runbooks/local-ai-windows-cloudflare.md`](/Users/brittlegg/visionquest/docs/runbooks/local-ai-windows-cloudflare.md)
+- [`docs/runbooks/secret-handling.md`](/Users/brittlegg/visionquest/docs/runbooks/secret-handling.md)
 
 ## Local Development Checklist
 
@@ -152,4 +154,6 @@ npm run test:e2e
 - [`DEPLOY.md`](/Users/brittlegg/visionquest/DEPLOY.md) deployment runbook
 - [`docs/PRODUCT_GUIDE.md`](/Users/brittlegg/visionquest/docs/PRODUCT_GUIDE.md) product framing
 - [`docs/PRODUCT_DECISIONS.md`](/Users/brittlegg/visionquest/docs/PRODUCT_DECISIONS.md) scope authority
+- [`docs/runbooks/local-ai-windows-cloudflare.md`](/Users/brittlegg/visionquest/docs/runbooks/local-ai-windows-cloudflare.md) Windows local-AI and Cloudflare operations
+- [`docs/runbooks/secret-handling.md`](/Users/brittlegg/visionquest/docs/runbooks/secret-handling.md) secret storage and scanning
 - [`CLAUDE.md`](/Users/brittlegg/visionquest/CLAUDE.md) project operating instructions for agents

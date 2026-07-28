@@ -202,9 +202,23 @@ Render dashboard note:
 
 Local AI note:
 
-- Student and staff Sage chat can be forced to the local Ollama provider for protected data.
+- FERPA-protected `student_record` and `staff_entered` chat must use a pinned
+  local Gemma 4 model through Ollama. It must fail closed; do not switch
+  production to Gemini when the local path is unavailable.
+- Non-FERPA prompts may use `GEMINI_API_KEY` only when they contain no student
+  record or staff-entered content.
 - If the local endpoint is protected by Cloudflare Access, set the service-token values in Render env vars or in Program Setup. Env vars are preferred for production because they survive database secret-encryption-key drift.
 - The local host must run Ollama, `scripts/ollama-relay.mjs`, and `cloudflared` as auto-starting services. Use `scripts/install-local-ai-services.ps1` from an elevated PowerShell on the local AI host.
+- Keep **Program Setup -> AI Provider** set to **Local AI Server** in
+  production. The current resolver still permits an operator-selected cloud
+  provider during alpha testing, so this selection is part of the compliance
+  boundary until a hard code lock is added.
+- Follow
+  [`docs/runbooks/local-ai-windows-cloudflare.md`](./docs/runbooks/local-ai-windows-cloudflare.md)
+  for the complete host, relay, tunnel, Access, and acceptance procedure.
+- Follow
+  [`docs/runbooks/secret-handling.md`](./docs/runbooks/secret-handling.md)
+  before staging or publishing any configuration change.
 
 ## 6. First-Run Data Setup
 
@@ -242,6 +256,8 @@ DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 - Student can register and sign in
 - Student can open Sage and receive a streamed response
 - Admin `Program Setup -> AI Provider -> Test Connection` succeeds if Sage is using local AI
+- A protected synthetic chat fails closed when the local tunnel is stopped;
+  it must not return a Gemini response
 - Goal extraction runs after chat
 - Orientation loads
 - File upload succeeds

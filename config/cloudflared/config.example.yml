@@ -1,0 +1,11 @@
+# Safe example only. Copy this file OUTSIDE the repository to:
+# C:\Windows\System32\config\systemprofile\.cloudflared\config.yml
+#
+# Never commit the tunnel credential JSON referenced below.
+tunnel: <TUNNEL-UUID>
+credentials-file: C:\Windows\System32\config\systemprofile\.cloudflared\<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: llm.example.org
+    service: http://127.0.0.1:11435
+  - service: http_status:404
