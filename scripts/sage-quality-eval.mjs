@@ -28,6 +28,7 @@
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
 import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { buildQualityEvalPrompt } from "./lib/sage-quality-eval-prompt.mjs";
 
 loadEnvFile();
 
@@ -105,7 +106,16 @@ async function main() {
   for (const scenario of SCENARIOS) {
     let reply = "";
     try {
-      const systemPrompt = buildSystemPrompt(scenario.stage, { studentName: "Sam", programType: "spokes" }, "full");
+      // The real prompt, plus the two things this tool-less harness must say
+      // for a tool-mapped question to come back as scoreable text: that no
+      // tools are connected, and (when the scenario supplies `context`) the
+      // facts a retrieval hit would have provided in production. Assembly
+      // lives in sage-quality-eval-prompt.mjs so the contract tests check the
+      // same code path the harness runs.
+      const systemPrompt = buildQualityEvalPrompt(
+        buildSystemPrompt(scenario.stage, { studentName: "Sam", programType: "spokes" }, "full"),
+        scenario.context,
+      );
       reply = await provider.generateResponse(systemPrompt, [{ role: "user", content: scenario.message }]);
     } catch (err) {
       console.log(`  ?? ${scenario.id}: Sage call failed — ${err.message}`);
@@ -136,6 +146,10 @@ async function main() {
     try {
       const judgePrompt =
         `SCENARIO — student said: "${scenario.message}"\n\n` +
+        (scenario.context
+          ? `FACTS SAGE WAS GIVEN (she was expected to answer from these, not from memory — ` +
+            `judge accuracy against them):\n"""${scenario.context}"""\n\n`
+          : "") +
         `WHAT A GREAT REPLY DOES HERE: ${scenario.focus}\n\n` +
         `RUBRIC (score each 1-5):\n${rubricText}\n\n` +
         `SAGE'S REPLY:\n"""${reply}"""\n\n` +

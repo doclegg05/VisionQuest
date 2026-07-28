@@ -39,7 +39,8 @@
     "id": "info-certs",
     "stage": "general",
     "message": "What certifications can I actually earn here?",
-    "focus": "Clear, accurate, plain-language answer about SPOKES certifications (IC3, MOS, WorkKeys, QuickBooks, etc.). Concise; offer to go deeper rather than dumping everything."
+    "context": "From \"SPOKES Certifications\" (the current certification-offer catalog): Students can earn IC3 Digital Literacy (3 levels — Computing Fundamentals, Key Applications, Living Online; practice on GMetrix, exams through Certiport), Microsoft Office Specialist / MOS (Word, Excel, PowerPoint, Outlook, Access), Intuit QuickBooks Certified User, ACT WorkKeys National Career Readiness Certificate (Applied Math, Workplace Documents, Graphic Literacy; scored Bronze / Silver / Gold / Platinum), Adobe Certified Associate, IT Specialist Cybersecurity, and Customer Service. The program's own milestone credential is the Ready to Work Certificate, which is the standard goal for every student.",
+    "focus": "Explain the SUPPLIED certification list in plain language rather than reciting it. Name a few concretely (IC3, MOS, WorkKeys, QuickBooks) and say in everyday words what each one is good for. Do not dump all of them — pick a few, then offer to go deeper on one."
   },
   {
     "id": "self-doubt-age",
