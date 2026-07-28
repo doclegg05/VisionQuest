@@ -24,7 +24,7 @@ vq_status: approved
 When a student is doing structured career exploration on CFWV.com and needs a place to record their Interest Profiler, Work Values Sorter, and Basic Skills results, then compare three matching careers (education required, outlook, and fit).
 
 ## When NOT to use
-- NOT the Education and Career Plan (ECP) — the official ECP form is the corpus document titled "ECP AE and SPOKES" (currently filed teacher-side); this worksheet is an exploration exercise, not the plan of record.
+- NOT the Education and Career Plan (ECP) — the official ECP form is [ECP AE and SPOKES Fillable FY25](./ecp-ae-and-spokes-fillable-fy25.md) (student copy) or the orientation twin; this worksheet is an exploration exercise, not the plan of record.
 - NOT the FY27 ECP workflow — FY27 guidance points ECP completion at CareerOneStop, not CFWV (see the FY27 updates transcript).
 
 ## Related

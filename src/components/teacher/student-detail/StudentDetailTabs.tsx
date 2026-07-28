@@ -38,6 +38,7 @@ const ANCHOR_TO_TAB: Record<string, StudentDetailTabKey> = {
   "appointments": "coach",
   "alerts": "coach",
   "goals-plan": "coach",
+  "career-education-plan": "coach",
   // Progress tab anchors
   "orientation": "progress",
   "certification-review": "progress",

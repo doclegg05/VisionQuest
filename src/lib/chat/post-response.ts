@@ -12,6 +12,8 @@
  *   2. goals           — goal extraction → proposals (core product loop).
  *   3. discovery       — discovery-stage replacement for goal extraction
  *                        (stage-exclusive with goals; keeps its early return).
+ *   3b. career_plan    — career_planning-stage plan extraction (exclusive
+ *                        with goals while that stage is active).
  *   4. classroom_confirmation — onboarding-only detector, stops once the
  *                        student has confirmed their classroom.
  *   5. memory          — durable-fact extraction (has its own daily
@@ -45,6 +47,9 @@ import { proposeGoal } from "@/lib/sage/propose-goal";
 import { maybeCreateGoalProposalWager } from "@/lib/sage/propose-goal-wager";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
 import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
+import { extractCareerPlanSignals } from "@/lib/sage/plan-extractor";
+import { proposeCareerPlan } from "@/lib/sage/propose-career-plan";
+import { recordMilestoneMemory } from "@/lib/sage/milestone-memory";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
@@ -89,6 +94,7 @@ const MODEL_STEP_PRIORITY = [
   "mood",
   "goals",
   "discovery",
+  "career_plan",
   "classroom_confirmation",
   "memory",
 ] as const;
@@ -148,10 +154,12 @@ function planPostResponseModelSteps(input: {
 }): PostResponsePlan {
   const cap = getPostResponseMaxCalls();
   const isDiscoveryStage = input.conversationStage === "discovery";
+  const isCareerPlanningStage = input.conversationStage === "career_planning";
   const eligibility: Record<PostResponseModelStep, boolean> = {
     mood: input.conversationStage === "checkin" || input.conversationStage === "review",
-    goals: !isDiscoveryStage,
+    goals: !isDiscoveryStage && !isCareerPlanningStage,
     discovery: isDiscoveryStage,
+    career_plan: isCareerPlanningStage,
     classroom_confirmation: input.classroomConfirmedAt === null,
     memory: process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false",
   };
@@ -508,10 +516,10 @@ async function runPostResponse(
             },
           });
 
-          // Update conversation stage to onboarding
+          // Update conversation stage to career_planning (plan before BHAG)
           await prisma.conversation.update({
             where: { id: conversationId },
-            data: { stage: "onboarding" },
+            data: { stage: "career_planning" },
           });
 
           // Award discovery XP
@@ -543,6 +551,114 @@ async function runPostResponse(
     }
 
     // Rolling summary compaction is now handled by maybeUpdateSummary in the route
+    await logAiAuditEvent({
+      actorId: studentId,
+      actorRole: "student",
+      route: "background:chat/post-response",
+      task: "sage_post_response",
+      sensitivity: "student_record",
+      policyDecision: postResponsePolicyDecision,
+      status: "completed",
+      targetId: conversationId,
+      providerName: provider.name,
+      providerClass,
+      allowCloud: postResponseAllowCloud,
+      inputChars: userMessage.length + fullResponse.length,
+    });
+    return;
+  }
+
+  // Career & Education Plan extraction (priority career_plan; exclusive with goals)
+  if (conversationStage === "career_planning") {
+    if (plan.allows("career_plan")) {
+      plan.markRan("career_plan");
+      const planProvider = withUsageLogging(provider, {
+        studentId,
+        callSite: "sage_post.career_plan",
+      });
+      try {
+        const planWindow = [
+          ...allMessages,
+          { role: "model" as const, content: fullResponse },
+        ];
+        const conversationText = planWindow
+          .map((m) => `${m.role === "user" ? "Student" : "Sage"}: ${m.content}`)
+          .join("\n");
+        const extraction = await retryWithBackoff(
+          () => extractCareerPlanSignals(planProvider, conversationText),
+          {
+            label: "Career plan extraction",
+            alertKey: "career_plan_extraction_exhausted",
+            context: { conversationId, studentId },
+            studentId,
+            conversationId,
+            failurePayload: () => conversationText.slice(0, 4000),
+          },
+        );
+
+        const proposed = await proposeCareerPlan({
+          studentId,
+          extraction,
+          sourceMessageId: proposalSourceMessageId,
+          conversationId,
+          invokedBy: studentId,
+        });
+
+        if (extraction.stage_complete && proposed.status !== "rejected") {
+          await prisma.conversation.update({
+            where: { id: conversationId },
+            data: { stage: "onboarding" },
+          });
+          await recordMilestoneMemory({
+            studentId,
+            kind: "curriculum_proposed",
+            title: "Career & Education Plan drafted for instructor review",
+            detail: extraction.summary || undefined,
+            sourceId: "planId" in proposed ? proposed.planId : conversationId,
+          });
+        }
+
+        if (extraction.needs_wioa_referral) {
+          const alertKey = `wioa-referral:${studentId}:${conversationId}`;
+          await prisma.studentAlert
+            .upsert({
+              where: { alertKey },
+              create: {
+                studentId,
+                alertKey,
+                type: "wioa_referral_needed",
+                severity: "medium",
+                title: "WIOA referral may be needed",
+                summary:
+                  extraction.wioa_reason ||
+                  "Student plan may need a WIOA referral beyond SPOKES LMS/cert resources.",
+                sourceType: "sage_career_plan",
+                sourceId: conversationId,
+              },
+              update: {
+                status: "open",
+                summary:
+                  extraction.wioa_reason ||
+                  "Student plan may need a WIOA referral beyond SPOKES LMS/cert resources.",
+                resolvedAt: null,
+                dismissedAt: null,
+              },
+            })
+            .catch((err) =>
+              logger.warn("Failed to create WIOA referral alert", { error: String(err) }),
+            );
+        }
+      } catch (err) {
+        logger.error("Career plan extraction failed", { error: String(err) });
+      }
+    }
+
+    try {
+      await generateConversationTitle(conversationId, fullResponse, conversationTitle);
+    } catch (err) {
+      logger.error("Failed to generate conversation title", { error: String(err) });
+    }
+
     await logAiAuditEvent({
       actorId: studentId,
       actorRole: "student",
@@ -629,7 +745,7 @@ async function runPostResponse(
     // 4. Update conversation stage if needed
     if (extracted.stage_complete) {
       try {
-        const [updatedGoals, discovery] = await Promise.all([
+        const [updatedGoals, discovery, careerPlan] = await Promise.all([
           prisma.goal.findMany({
             where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
             select: { level: true },
@@ -638,8 +754,16 @@ async function runPostResponse(
             where: { studentId },
             select: { status: true },
           }),
+          prisma.careerEducationPlan.findUnique({
+            where: { studentId },
+            select: { status: true },
+          }),
         ]);
-        const newStage = determineStage(updatedGoals, discovery?.status === "complete");
+        const newStage = determineStage(
+          updatedGoals,
+          discovery?.status === "complete",
+          careerPlan?.status === "confirmed",
+        );
         await prisma.conversation.update({
           where: { id: conversationId },
           data: { stage: newStage },

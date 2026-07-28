@@ -19,6 +19,10 @@ export const STAGE_OPENERS: Record<ConversationStage, string> = {
   discovery:
     "Hey! I'm Sage, your personal guide here at VisionQuest. What should I call you?",
 
+  /** Career & Education Plan scaffold after discovery */
+  career_planning:
+    "Great work figuring out what fits you. Let's turn that into a plan — job or more school first — and the certifications that get you there.",
+
   /** Exact opening from the onboarding stage prompt */
   onboarding:
     "Hey! I'm Sage, your personal guide here at VisionQuest. I'm here to help you build a plan. What should I call you?",
@@ -57,6 +61,10 @@ export const STAGE_OPENERS: Record<ConversationStage, string> = {
   /** General Q&A stage */
   general:
     "Hey! What can I help you with today?",
+
+  /** Job-search / interview endgame */
+  job_campaign:
+    "You're ready for the job-search stretch. Want to prep a resume piece, pick a job to apply for, or practice a STAR interview question?",
 
   /** Teacher/instructor assistant */
   teacher_assistant:

@@ -1,5 +1,6 @@
 export type ConversationStage =
   | "discovery"
+  | "career_planning"
   | "onboarding"
   | "bhag"
   | "monthly"
@@ -13,16 +14,27 @@ export type ConversationStage =
   | "teacher_assistant"
   | "admin_assistant"
   | "coordinator_assistant"
-  | "career_profile_review";
+  | "career_profile_review"
+  | "job_campaign";
 
 export function determineStage(
   goals: { level: string }[],
   hasCompletedDiscovery?: boolean,
+  hasConfirmedCareerPlan?: boolean,
 ): ConversationStage {
   const levels = new Set(goals.map((g) => g.level));
   // Discovery comes first — any student without a completed discovery
   // and without a BHAG enters discovery mode
   if (hasCompletedDiscovery !== true && !levels.has("bhag")) return "discovery";
+  // After discovery, build a Career & Education Plan before the BHAG ladder
+  // unless a BHAG already exists (legacy / instructor-seeded path).
+  if (
+    hasCompletedDiscovery === true &&
+    hasConfirmedCareerPlan !== true &&
+    !levels.has("bhag")
+  ) {
+    return "career_planning";
+  }
   if (!levels.has("bhag")) return "onboarding";
   if (!levels.has("monthly")) return "monthly";
   if (!levels.has("weekly")) return "weekly";
@@ -37,12 +49,14 @@ export function determineStage(
  */
 const LOGISTICS_OVERRIDE_STAGES = new Set<ConversationStage>([
   "discovery",
+  "career_planning",
   "onboarding",
   "bhag",
   "monthly",
   "weekly",
   "daily",
   "tasks",
+  "job_campaign",
 ]);
 
 /** Tool-mapped platform logistics (forms, certs, appointments, portfolio, jobs). */

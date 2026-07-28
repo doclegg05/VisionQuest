@@ -35,7 +35,7 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
   // Derive the student's current conversation stage from their active goals.
   // We use a lightweight goals query rather than loading the full conversation,
   // since the warmup only needs to prime the base-context cache key.
-  const [goals, careerDiscovery] = await Promise.all([
+  const [goals, careerDiscovery, careerPlan] = await Promise.all([
     prisma.goal.findMany({
       where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
       select: { level: true },
@@ -44,9 +44,17 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
       where: { studentId: session.id },
       select: { status: true },
     }),
+    prisma.careerEducationPlan.findUnique({
+      where: { studentId: session.id },
+      select: { status: true },
+    }),
   ]);
 
-  const stage = determineStage(goals, careerDiscovery?.status === "complete");
+  const stage = determineStage(
+    goals,
+    careerDiscovery?.status === "complete",
+    careerPlan?.status === "confirmed",
+  );
 
   // Prime the cache — result is intentionally discarded.
   // conversationId "none" matches the key used in send/route.ts for new conversations.

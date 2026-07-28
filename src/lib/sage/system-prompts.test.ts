@@ -17,8 +17,13 @@ describe("determineStage", () => {
     assert.equal(determineStage([]), "discovery");
   });
 
-  it("returns onboarding when discovery is complete but no BHAG", () => {
-    assert.equal(determineStage([], true), "onboarding");
+  it("returns career_planning when discovery is complete but no confirmed plan or BHAG", () => {
+    assert.equal(determineStage([], true), "career_planning");
+    assert.equal(determineStage([], true, false), "career_planning");
+  });
+
+  it("returns onboarding when discovery and plan are complete but no BHAG", () => {
+    assert.equal(determineStage([], true, true), "onboarding");
   });
 
   it("skips discovery when BHAG exists even without completed discovery", () => {

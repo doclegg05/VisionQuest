@@ -58,8 +58,10 @@ mock.module("@/lib/db", {
     prisma: {
       goal: { findMany: mockGoalFindMany },
       careerDiscovery: { upsert: mockCareerDiscoveryUpsert, findUnique: mockCareerDiscoveryFindUnique },
+      careerEducationPlan: { findUnique: async () => null },
       conversation: { update: mockConversationUpdate },
       message: { count: mockMessageCount },
+      studentAlert: { upsert: async () => ({}) },
     },
   },
 });
@@ -112,6 +114,31 @@ mock.module("@/lib/sage/discovery-extractor", {
     extractDiscoverySignals: mockExtractDiscoverySignals,
     topClusterIds: () => [],
   },
+});
+
+mock.module("@/lib/sage/plan-extractor", {
+  namedExports: {
+    extractCareerPlanSignals: async () => ({
+      terminal_outcome: null,
+      target_clusters: [],
+      target_industries: [],
+      onet_codes: [],
+      assessment_results: { tabe: null, cfwv: null, onet_or_cos: null, other: null },
+      ecp_status: "not_started",
+      summary: "",
+      needs_wioa_referral: false,
+      wioa_reason: "",
+      stage_complete: false,
+    }),
+  },
+});
+
+mock.module("@/lib/sage/propose-career-plan", {
+  namedExports: { proposeCareerPlan: async () => ({ status: "created", planId: "plan-1" }) },
+});
+
+mock.module("@/lib/sage/milestone-memory", {
+  namedExports: { recordMilestoneMemory: async () => undefined },
 });
 
 mock.module("@/lib/sage/system-prompts", {
@@ -267,6 +294,7 @@ describe("handlePostResponse priority order and per-turn cap", () => {
       "mood:ran",
       "goals:ran",
       "discovery:not_eligible",
+      "career_plan:not_eligible",
       "classroom_confirmation:ran",
       "memory:ran",
     ]);
@@ -304,6 +332,7 @@ describe("handlePostResponse priority order and per-turn cap", () => {
       "mood:ran",
       "goals:ran",
       "discovery:not_eligible",
+      "career_plan:not_eligible",
       "classroom_confirmation:ran",
       "memory:skipped_cap",
     ]);
@@ -368,6 +397,7 @@ describe("handlePostResponse priority order and per-turn cap", () => {
       "mood:not_eligible",
       "goals:not_eligible",
       "discovery:ran",
+      "career_plan:not_eligible",
       "classroom_confirmation:ran",
       "memory:ran",
     ]);
@@ -410,6 +440,7 @@ describe("handlePostResponse priority order and per-turn cap", () => {
       "mood:ran",
       "goals:ran",
       "discovery:not_eligible",
+      "career_plan:not_eligible",
       "classroom_confirmation:not_eligible",
       "memory:not_eligible",
     ]);

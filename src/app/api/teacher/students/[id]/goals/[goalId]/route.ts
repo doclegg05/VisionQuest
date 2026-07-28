@@ -5,6 +5,7 @@ import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
 import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
+import { recordMilestoneMemory } from "@/lib/sage/milestone-memory";
 
 export const PATCH = withTeacherAuth(async (
   session,
@@ -92,6 +93,16 @@ export const PATCH = withTeacherAuth(async (
 
   if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
     await ensureGoalLevelProgression(studentId, [updatedGoal.level]);
+  }
+
+  if (updates.status === "confirmed") {
+    await recordMilestoneMemory({
+      studentId,
+      kind: "goal_confirmed",
+      title: `Goal confirmed (${updatedGoal.level})`,
+      detail: updatedGoal.content,
+      sourceId: updatedGoal.id,
+    });
   }
 
   return NextResponse.json({ goal: updatedGoal });

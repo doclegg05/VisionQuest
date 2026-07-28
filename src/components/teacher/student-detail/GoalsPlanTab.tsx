@@ -4,11 +4,13 @@ import GoalPathwayAssigner from "../GoalPathwayAssigner";
 import {
   GOAL_RESOURCE_TYPE_LABELS,
 } from "@/lib/goal-resource-links";
+import { apiFetch } from "@/lib/api";
 import type {
   GoalEvidenceData,
   ReviewQueueItemData,
   StudentData,
 } from "./types";
+import { useState } from "react";
 
 const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
   not_started: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
@@ -45,10 +47,41 @@ export default function GoalsPlanTab({
     goalEvidence,
     reviewQueue,
     careerDiscovery,
+    careerEducationPlan,
+    student,
   } = data;
+
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planMessage, setPlanMessage] = useState<string | null>(null);
 
   const evidenceByLinkId = new Map(goalEvidence.map((entry) => [entry.linkId, entry]));
   const goalById = new Map(goals.map((goal) => [goal.id, goal]));
+
+  async function confirmCareerPlan() {
+    if (!careerEducationPlan) return;
+    setPlanBusy(true);
+    setPlanMessage(null);
+    try {
+      const res = await apiFetch(`/api/teacher/students/${student.id}/career-plan`, {
+        method: "PATCH",
+        body: JSON.stringify({ confirm: true, reviewed: true }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(
+          payload && typeof payload === "object" && "error" in payload
+            ? String(payload.error)
+            : "Could not confirm the plan.",
+        );
+      }
+      await onChanged();
+      setPlanMessage("Career & Education Plan confirmed.");
+    } catch (err) {
+      setPlanMessage(err instanceof Error ? err.message : "Could not confirm the plan.");
+    } finally {
+      setPlanBusy(false);
+    }
+  }
 
   const reviewActionForItem = (item: ReviewQueueItemData) => {
     const evidence = item.linkId ? evidenceByLinkId.get(item.linkId) : null;
@@ -69,6 +102,107 @@ export default function GoalsPlanTab({
 
   return (
     <div className="space-y-6">
+      {/* Career & Education Plan */}
+      <div id="career-education-plan" className="theme-card rounded-xl p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+              Career &amp; Education Plan
+            </h3>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
+              Mission-aligned plan toward a job or post-secondary transfer. Sage proposes; you confirm.
+            </p>
+          </div>
+          {careerEducationPlan && (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                careerEducationPlan.status === "confirmed"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : careerEducationPlan.status === "proposed"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-[var(--surface-interactive)] text-[var(--ink-muted)]"
+              }`}
+            >
+              {careerEducationPlan.status}
+            </span>
+          )}
+        </div>
+
+        {!careerEducationPlan ? (
+          <p className="mt-4 text-sm text-[var(--ink-muted)]">
+            No Career &amp; Education Plan yet. Sage drafts one during the career planning stage after discovery.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <dl className="grid gap-3 sm:grid-cols-2 text-sm">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
+                  Terminal outcome
+                </dt>
+                <dd className="mt-1 text-[var(--ink-strong)]">
+                  {careerEducationPlan.terminalOutcome?.replace(/_/g, " ") ?? "Not set"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
+                  ECP status
+                </dt>
+                <dd className="mt-1 text-[var(--ink-strong)]">
+                  {careerEducationPlan.ecpStatus.replace(/_/g, " ")}
+                </dd>
+              </div>
+            </dl>
+            {careerEducationPlan.summary && (
+              <p className="text-sm text-[var(--ink-strong)]">{careerEducationPlan.summary}</p>
+            )}
+            {careerEducationPlan.targetClusters.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Clusters</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {careerEducationPlan.targetClusters.map((cluster) => (
+                    <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
+                      {cluster}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {careerEducationPlan.targetIndustries.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Industries</span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {careerEducationPlan.targetIndustries.map((industry) => (
+                    <span key={industry} className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-2 py-1 rounded-md">
+                      {industry}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(careerEducationPlan.status === "proposed" || careerEducationPlan.status === "draft") && (
+              <button
+                type="button"
+                disabled={planBusy}
+                onClick={() => void confirmCareerPlan()}
+                className="rounded-lg bg-[var(--accent-secondary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {planBusy ? "Confirming…" : "Confirm plan"}
+              </button>
+            )}
+            {planMessage && (
+              <p className="text-sm text-[var(--ink-muted)]" role="status">
+                {planMessage}
+              </p>
+            )}
+            {careerEducationPlan.confirmedAt && (
+              <p className="text-xs text-[var(--ink-muted)]">
+                Confirmed {dateFormatter.format(new Date(careerEducationPlan.confirmedAt))}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Goal Evidence & Review */}
       <div id="goal-evidence" className="theme-card rounded-xl p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
