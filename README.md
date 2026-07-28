@@ -138,9 +138,18 @@ See [`/.env.example`](/Users/brittlegg/visionquest/.env.example) for the authori
 
 - `npm run test`
 - `npm run test:api`
+- `npm run test:ai:benchmark`
 - `npm run test:smoke`
 - `npm run test:smoke:api`
 - `npm run test:e2e`
+
+### AI provider benchmark
+
+- `npm run ai:benchmark -- --dry-run` validates the bundled public/synthetic fixtures without API keys.
+- `npm run ai:benchmark` runs the isolated Gemini Flash-Lite vs GPT-5 mini evaluation.
+- `npm run ai:benchmark:score -- --run artifacts/ai-benchmark/<run-id>` scores a completed blind-review worksheet.
+
+See [`docs/benchmarks/AI_PROVIDER_BENCHMARK.md`](./docs/benchmarks/AI_PROVIDER_BENCHMARK.md). The harness is evaluation-only and does not change Sage's production provider routing or defaults.
 
 ### Database and user operations
 
