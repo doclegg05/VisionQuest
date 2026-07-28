@@ -8,12 +8,20 @@ import {
 } from "./local-config";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
+import { LocalQualityFallbackProvider } from "./local-quality-fallback-provider";
+import {
+  isLocalTaskRoutingEnabled,
+  isProtectedSensitivity,
+  readLocalTaskRoutingConfig,
+  selectLocalModel,
+  type LocalTaskRoutingConfig,
+} from "./task-router";
 import type {
   AIProvider,
   AIProviderRequest,
   AIProviderType,
-  DataSensitivity,
   PromptTier,
+  LocalRoutingMetadata,
 } from "./types";
 
 async function getConfiguredProviderType(): Promise<AIProviderType> {
@@ -40,7 +48,7 @@ function parseNumCtxOverride(raw: string | null): number | undefined {
   return parsed;
 }
 
-async function getLocalProvider(): Promise<AIProvider> {
+async function getLocalProvider(modelOverride?: string): Promise<AIProvider> {
   const config = await readLocalAiProviderConfig();
   if (!config.url) {
     throw new Error(
@@ -54,15 +62,50 @@ async function getLocalProvider(): Promise<AIProvider> {
   }
   return new OllamaProvider(
     config.url,
-    config.model || DEFAULT_OLLAMA_MODEL,
+    modelOverride || config.model || DEFAULT_OLLAMA_MODEL,
     toLocalAiAuthConfig(config, {
       numCtx: parseNumCtxOverride(config.numCtxRaw),
     }),
   );
 }
 
-function isLocalOnlySensitivity(sensitivity: DataSensitivity): boolean {
-  return sensitivity === "student_record" || sensitivity === "staff_entered";
+async function getTaskRoutedLocalProvider(
+  request: AIProviderRequest,
+  config: LocalTaskRoutingConfig,
+): Promise<AIProvider> {
+  const decision = selectLocalModel(request, config);
+  const metadata: LocalRoutingMetadata = {
+    taskClass: decision.taskClass,
+    requestedTier: decision.requestedTier,
+    selectedTier: decision.selectedTier,
+    model: decision.model,
+    fallbackModel:
+      decision.selectedTier === "quality" ? config.defaultModel : null,
+    buffersBeforeOutput: decision.selectedTier === "quality",
+  };
+
+  if (decision.selectedTier === "quality") {
+    const [qualityProvider, defaultProvider] = await Promise.all([
+      getLocalProvider(decision.model),
+      getLocalProvider(config.defaultModel),
+    ]);
+    return new LocalQualityFallbackProvider(
+      qualityProvider,
+      defaultProvider,
+      decision.model,
+      config.defaultModel,
+      decision.taskClass,
+    );
+  }
+
+  const provider = await getLocalProvider(decision.model);
+  Object.defineProperty(provider, "localRouting", {
+    value: metadata,
+    enumerable: true,
+    configurable: false,
+    writable: false,
+  });
+  return provider;
 }
 
 /**
@@ -92,19 +135,45 @@ export async function getProvider(studentId: string): Promise<AIProvider> {
 export async function resolveAiProvider(
   request: AIProviderRequest,
 ): Promise<AIProvider> {
-  if (isLocalOnlySensitivity(request.sensitivity)) {
-    const providerType = await getConfiguredProviderType();
-    if (providerType === "local") {
-      return getLocalProvider();
+  const taskRoutingEnabled = await isLocalTaskRoutingEnabled();
+
+  // Exact legacy behavior unless an operator explicitly enables the staged
+  // task router. This preserves current production routing and defaults.
+  if (!taskRoutingEnabled) {
+    if (isProtectedSensitivity(request.sensitivity)) {
+      const providerType = await getConfiguredProviderType();
+      if (providerType === "local") {
+        return getLocalProvider();
+      }
+      return getCloudProvider(request.studentId);
     }
-    return getCloudProvider(request.studentId);
+
+    if (request.preferCloud && request.sensitivity === "public_program") {
+      return getCloudProvider(request.studentId);
+    }
+
+    return getProvider(request.studentId);
   }
 
+  const routingConfig = await readLocalTaskRoutingConfig();
+
+  // With rollout enabled, protected records are local-only regardless of the
+  // legacy provider switch. Missing/unsafe local config or unavailable Gemma
+  // throws before any cloud key is resolved.
+  if (isProtectedSensitivity(request.sensitivity)) {
+    return getTaskRoutedLocalProvider(request, routingConfig);
+  }
+
+  // Public/de-identified/system work retains the existing cloud/local policy.
   if (request.preferCloud && request.sensitivity === "public_program") {
     return getCloudProvider(request.studentId);
   }
 
-  return getProvider(request.studentId);
+  const providerType = await getConfiguredProviderType();
+  if (providerType === "local") {
+    return getTaskRoutedLocalProvider(request, routingConfig);
+  }
+  return getCloudProvider(request.studentId);
 }
 
 export function getPromptTier(provider: AIProvider): PromptTier {

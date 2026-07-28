@@ -60,6 +60,13 @@ const mockReadLocalAiProviderConfig = mock.fn<
     cloudflareAccessClientSecretSource: "config" | "env" | null;
   }>
 >();
+const mockActivateLocalTaskRouting = mock.fn<
+  (input: unknown) => Promise<{
+    enabled: boolean;
+    models: { default: string; speed: string; quality: string };
+    inventory: string[];
+  }>
+>();
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -139,6 +146,12 @@ mock.module("@/lib/ai", {
   },
 });
 
+mock.module("@/lib/ai/local-routing-rollout", {
+  namedExports: {
+    activateLocalTaskRouting: mockActivateLocalTaskRouting,
+  },
+});
+
 let configRoute: Awaited<typeof import("./route")>;
 let testRoute: Awaited<typeof import("./test/route")>;
 
@@ -158,6 +171,7 @@ describe("admin AI provider routes", () => {
     mockCheckOllamaHealth.mock.resetCalls();
     mockDetectModelCapabilities.mock.resetCalls();
     mockReadLocalAiProviderConfig.mock.resetCalls();
+    mockActivateLocalTaskRouting.mock.resetCalls();
 
     mockSetPlainConfigValue.mock.mockImplementation(async () => undefined);
     mockSetConfigValue.mock.mockImplementation(async () => undefined);
@@ -213,6 +227,26 @@ describe("admin AI provider routes", () => {
         cloudflareAccessClientIdSource: cloudflareId ? "config" : null,
         cloudflareAccessClientSecret: cloudflareSecret,
         cloudflareAccessClientSecretSource: cloudflareSecret ? "config" : null,
+      };
+    });
+    mockActivateLocalTaskRouting.mock.mockImplementation(async (input) => {
+      const values = input as {
+        defaultModel: string;
+        speedModel: string;
+        qualityModel: string;
+      };
+      return {
+        enabled: true,
+        models: {
+          default: values.defaultModel,
+          speed: values.speedModel,
+          quality: values.qualityModel,
+        },
+        inventory: [
+          values.defaultModel,
+          values.speedModel,
+          values.qualityModel,
+        ],
       };
     });
   });
@@ -508,5 +542,68 @@ describe("admin AI provider routes", () => {
         cloudflareAccessClientSecret: null,
       },
     });
+  });
+
+  it("refuses routing activation when local model inventory validation fails", async () => {
+    mockActivateLocalTaskRouting.mock.mockImplementation(async () => {
+      throw makeHttpError(
+        400,
+        "Local model inventory is missing required model gemma4:26b.",
+      );
+    });
+    const routingRoute = await import("./routing/route");
+    const req = mockRequest("/api/admin/ai-provider/routing", {
+      method: "PUT",
+      body: {
+        defaultModel: "gemma4:12b",
+        speedModel: "qwen3.5:9b",
+        qualityModel: "gemma4:26b",
+        enabled: true,
+      },
+    });
+
+    const res = await routingRoute.PUT(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 400);
+    assert.match(String(body.error), /inventory.*gemma4:26b/i);
+    assert.equal(mockActivateLocalTaskRouting.mock.callCount(), 1);
+  });
+
+  it("uses one audited activation operation after inventory validation", async () => {
+    const routingRoute = await import("./routing/route");
+    const req = mockRequest("/api/admin/ai-provider/routing", {
+      method: "PUT",
+      body: {
+        defaultModel: "gemma4:12b",
+        speedModel: "qwen3.5:9b",
+        qualityModel: "gemma4:26b",
+        enabled: true,
+      },
+    });
+
+    const res = await routingRoute.PUT(req as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.enabled, true);
+    assert.equal(mockActivateLocalTaskRouting.mock.callCount(), 1);
+    assert.deepEqual(mockActivateLocalTaskRouting.mock.calls[0].arguments[0], {
+      actorId: session.id,
+      defaultModel: "gemma4:12b",
+      speedModel: "qwen3.5:9b",
+      qualityModel: "gemma4:26b",
+      enabled: true,
+    });
+    assert.equal(
+      mockSetPlainConfigValue.mock.callCount(),
+      0,
+      "the route must not perform partial per-key configuration writes",
+    );
+    assert.equal(
+      mockLogAuditEvent.mock.callCount(),
+      0,
+      "the activation helper owns the audit record in the same transaction",
+    );
   });
 });

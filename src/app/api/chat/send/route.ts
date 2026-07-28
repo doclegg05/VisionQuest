@@ -47,6 +47,7 @@ import { getStudentProgramType } from "@/lib/program-type-server";
 import { runAgentTurn } from "@/lib/sage/agent/loop";
 import { executeAgentTool, executeSlashCommand } from "@/lib/sage/agent/executor";
 import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
+import { classifyStudentChatTask } from "@/lib/ai/task-router";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -178,6 +179,37 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const isStaffChat = isTeacher || session.role === "coordinator";
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
+  const skipGroundingForMessage = isTrivialMessage(userMessage);
+  const localTaskClass = isStaffChat
+    ? undefined
+    : classifyStudentChatTask({
+        message: userMessage,
+        hasAttachments: Boolean(body.attachmentIds?.length),
+        groundingSkipped: skipGroundingForMessage,
+      });
+  const hasAttachments = Boolean(body.attachmentIds?.length);
+  const newConversation = conversationId === null;
+  const localRoutingContext = {
+    newConversation,
+    hasHistory: !newConversation,
+    hasRag: !skipGroundingForMessage,
+    hasAttachments,
+    hasCrisisState: localTaskClass === "crisis_safety",
+    hasStaffContext: isStaffChat,
+    classificationCertain: localTaskClass !== "uncertain",
+    minimalContext: false,
+  };
+  const minimalCasualCandidate =
+    !isStaffChat &&
+    localTaskClass === "casual_chat" &&
+    newConversation &&
+    !hasAttachments &&
+    !localRoutingContext.hasRag &&
+    !localRoutingContext.hasCrisisState &&
+    localRoutingContext.classificationCertain;
+  if (minimalCasualCandidate) {
+    localRoutingContext.minimalContext = true;
+  }
   // Deterministic form lookup — bypasses discovery/goal stage prompts so a
   // student who asks for a form gets it even mid-onboarding.
   const agentLoopEnabledEarly = isAgentLoopEnabled();
@@ -300,6 +332,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       studentId: session.id,
       task: chatTask,
       sensitivity: chatSensitivity,
+      localTaskClass,
+      localPayloadSensitivity: minimalCasualCandidate
+        ? "deidentified"
+        : chatSensitivity,
+      localRoutingContext,
     });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
@@ -333,6 +370,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     );
   }
   const promptTier = getPromptTier(provider);
+  const useMinimalChatContext = minimalCasualCandidate;
   const providerClass = getProviderClass(provider.name);
   const chatPolicyDecision = policyDecisionForProvider(provider.name);
   const allowCloud = providerClass === "cloud";
@@ -349,11 +387,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     providerClass,
     promptTier,
     allowCloud,
-    inputChars: userMessage.length,
-    reason:
+      inputChars: userMessage.length,
+      reason:
       chatPolicyDecision === "local_only"
         ? "Student-record and staff-entered Sage chat are local-only by policy."
         : "Operator configured cloud AI; chat routed to the configured provider.",
+      metadata: {
+        localModel: provider.localRouting?.model ?? null,
+        localModelTier: provider.localRouting?.selectedTier ?? null,
+        minimalContext: useMinimalChatContext,
+      },
   });
 
   // Cost/token quota and the per-role daily cap only apply to cloud providers
@@ -474,7 +517,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // prompt and the post-response handler.
   let studentProgramType: ProgramType | null = null;
   let studentClassroomConfirmedAt: Date | null = null;
-  if (!isStaffChat) {
+  if (!isStaffChat && !useMinimalChatContext) {
     const [programType, studentRecord] = await Promise.all([
       getStudentProgramType(session.id),
       prisma.student.findUnique({
@@ -489,7 +532,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Build system prompt — staff (teacher/admin/coordinator) get a streamlined path
   let systemPrompt: string;
 
-  if (isStaffChat) {
+  if (useMinimalChatContext) {
+    systemPrompt =
+      "You are Sage, a warm and concise workforce-program coach. " +
+      "This is a new, casual conversation with no student record, prior history, " +
+      "retrieved documents, attachments, or staff context. Respond only to the " +
+      "single casual message. Do not infer personal facts, offer account-specific " +
+      "advice, or claim to remember the user. If the request becomes substantive, " +
+      "invite the user to ask a specific question so it can be handled by the " +
+      "appropriate coaching path.";
+  } else if (isStaffChat) {
     const staffStage = isAdmin
       ? "admin_assistant"
       : session.role === "coordinator"
@@ -565,10 +617,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Skip RAG for trivial messages — short pleasantries don't benefit from
   // ~6,000 chars of program docs and the round-trip just delays first token.
   // In agent mode, Sage can call `lookup_program_info` if she needs specifics.
-  const trivialMessage = isTrivialMessage(userMessage);
+  const trivialMessage = skipGroundingForMessage;
   let documentContextChars = 0;
   let formContextChars = 0;
-  if (!trivialMessage) {
+  if (!trivialMessage && !useMinimalChatContext) {
     const documentContext = await getDocumentContext(
       userMessage,
       isStaffChat ? "staff" : "student",
@@ -609,7 +661,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Attached files (Phase 3): gists loaded server-side, ownership-scoped.
   // The gist content is student-document derived — wrap it like other
   // untrusted reference data so it cannot smuggle instructions.
-  if (body.attachmentIds && body.attachmentIds.length > 0) {
+  if (
+    !useMinimalChatContext &&
+    body.attachmentIds &&
+    body.attachmentIds.length > 0
+  ) {
     const attachments = await prisma.fileUpload.findMany({
       where: { id: { in: body.attachmentIds }, studentId: session.id },
       select: { id: true, filename: true, gist: true },
@@ -626,7 +682,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   }
 
   // 80% daily warning — inject into system prompt so Sage mentions it naturally
-  if (dailyRemaining !== null) {
+  if (dailyRemaining !== null && !useMinimalChatContext) {
     const dailyLimit = isStaffChat ? 400 : 200;
     const usagePercent = 1 - (dailyRemaining / dailyLimit);
     if (usagePercent >= 0.8) {
@@ -659,13 +715,15 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         ? 12
         : 6
       : 20;
-  const conversationContext = await getConversationContext(
-    conversation.id,
-    maxRecentMessages,
-    promptTier === "compact"
-      ? COMPACT_HISTORY_TOKEN_BUDGET
-      : FULL_HISTORY_TOKEN_BUDGET,
-  );
+  const conversationContext = useMinimalChatContext
+    ? { messages: [] }
+    : await getConversationContext(
+        conversation.id,
+        maxRecentMessages,
+        promptTier === "compact"
+          ? COMPACT_HISTORY_TOKEN_BUDGET
+          : FULL_HISTORY_TOKEN_BUDGET,
+      );
   const allMessages = [
     ...conversationContext.messages,
     { role: "user" as const, content: userMessage },
@@ -753,7 +811,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           callSite: "sage_chat",
         });
 
-        const agentLoopEnabled = agentLoopEnabledEarly;
+        const agentLoopEnabled =
+          agentLoopEnabledEarly && !useMinimalChatContext;
 
         // Deterministic form-commitment path: student said yes/sure/etc. after
         // Sage offered a form — present_form immediately (action card), no
@@ -994,13 +1053,18 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             conversationStage,
             staffStudentContextResolution,
             staffStudentTargetId,
+            localModel: provider.localRouting?.model ?? null,
+            localModelTier: provider.localRouting?.selectedTier ?? null,
+            minimalContext: useMinimalChatContext,
           },
         });
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
-        void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
-          logger.error("Summary compaction failed", { conversationId: conversation.id, error: String(err) }),
-        );
+        if (!useMinimalChatContext) {
+          void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
+            logger.error("Summary compaction failed", { conversationId: conversation.id, error: String(err) }),
+          );
+        }
 
         // Student-only post-processing: XP, goal extraction, stage updates
         if (!isStaffChat) {
@@ -1017,18 +1081,20 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             logger.error("Failed to award chat XP", { error: String(err) });
           }
 
-          handlePostResponse({
-            conversationId: conversation.id,
-            conversationTitle: conversation.title,
-            conversationStage: conversation.stage,
-            fullResponse,
-            sourceMessageId: assistantMessage.id,
-            studentId: session.id,
-            allMessages,
-            userMessage,
-            programType: studentProgramType,
-            classroomConfirmedAt: studentClassroomConfirmedAt,
-          }).catch((err) => logger.error("Post-response error", { error: String(err) }));
+          if (!useMinimalChatContext) {
+            handlePostResponse({
+              conversationId: conversation.id,
+              conversationTitle: conversation.title,
+              conversationStage: conversation.stage,
+              fullResponse,
+              sourceMessageId: assistantMessage.id,
+              studentId: session.id,
+              allMessages,
+              userMessage,
+              programType: studentProgramType,
+              classroomConfirmedAt: studentClassroomConfirmedAt,
+            }).catch((err) => logger.error("Post-response error", { error: String(err) }));
+          }
         }
 
         sendEvent({ done: true, conversationId: conversation.id }, "done");

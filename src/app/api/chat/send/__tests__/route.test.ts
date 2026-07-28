@@ -2,6 +2,10 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
 import { mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import {
+  selectLocalModel,
+  type LocalTaskRoutingConfig,
+} from "@/lib/ai/task-router";
 
 // ---------------------------------------------------------------------------
 // Request-level tests for POST /api/chat/send.
@@ -847,5 +851,110 @@ describe("POST /api/chat/send — form commitment → present_form", () => {
     assert.equal(mockGetDirectFormAnswer.mock.callCount(), 0);
     assert.equal(mockRunAgentTurn.mock.callCount(), 0);
     assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+  });
+});
+
+describe("POST /api/chat/send — frozen local-routing security contract", () => {
+  const allModelsAvailable: LocalTaskRoutingConfig = {
+    enabled: true,
+    defaultModel: "gemma4:12b",
+    defaultAvailable: true,
+    speedModel: "qwen3.5:9b",
+    speedAvailable: true,
+    qualityModel: "gemma4:26b",
+    qualityAvailable: true,
+  };
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("never selects Qwen when a casual message continues an existing conversation", async () => {
+    const conversationId = "cm1234567890abcdefghijklm";
+    mockGetOrCreateConversation.mock.mockImplementation(async () => ({
+      id: conversationId,
+      title: "sensitive history",
+      stage: "general",
+      messages: [
+        {
+          role: "user",
+          content: "My caseworker changed my benefits and housing plan.",
+        },
+      ],
+    }));
+    mockGetConversationContext.mock.mockImplementation(async () => ({
+      messages: [
+        {
+          role: "user",
+          content: "My caseworker changed my benefits and housing plan.",
+        },
+      ],
+    }));
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Let's just chat.", conversationId },
+    });
+
+    const res = await route.POST(req as never, {
+      params: Promise.resolve({}),
+    } as never);
+    await readSseBody(res);
+
+    assert.equal(mockResolveAiProvider.mock.callCount(), 1);
+    const providerRequest = mockResolveAiProvider.mock.calls[0].arguments[0];
+    assert.equal(providerRequest.localRoutingContext?.newConversation, false);
+    assert.equal(providerRequest.localRoutingContext?.hasHistory, true);
+    assert.notEqual(
+      selectLocalModel(providerRequest, allModelsAvailable).selectedTier,
+      "speed",
+      "an existing conversation may contain protected history and must not select Qwen",
+    );
+  });
+
+  it("allows Qwen only for a new casual request whose model payload omits protected context", async () => {
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Let's just chat." },
+    });
+
+    const res = await route.POST(req as never, {
+      params: Promise.resolve({}),
+    } as never);
+    await readSseBody(res);
+
+    assert.equal(mockResolveAiProvider.mock.callCount(), 1);
+    const providerRequest = mockResolveAiProvider.mock.calls[0].arguments[0];
+    assert.equal(providerRequest.sensitivity, "student_record");
+    assert.equal(providerRequest.localPayloadSensitivity, "deidentified");
+    assert.deepEqual(providerRequest.localRoutingContext, {
+      newConversation: true,
+      hasHistory: false,
+      hasRag: false,
+      hasAttachments: false,
+      hasCrisisState: false,
+      hasStaffContext: false,
+      classificationCertain: true,
+      minimalContext: true,
+    });
+    assert.equal(
+      selectLocalModel(providerRequest, allModelsAvailable).selectedTier,
+      "speed",
+    );
+    assert.equal(
+      mockAssembleStudentContextBundle.mock.callCount(),
+      0,
+      "the Qwen path must not assemble student records into its prompt",
+    );
+    assert.equal(
+      mockGetConversationContext.mock.callCount(),
+      0,
+      "the Qwen path must not load conversation history",
+    );
+    assert.equal(
+      mockGetDocumentContext.mock.callCount(),
+      0,
+      "the Qwen path must not perform RAG",
+    );
   });
 });

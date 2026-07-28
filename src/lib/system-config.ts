@@ -18,6 +18,15 @@ export const SYSTEM_CONFIG_KEYS = [
   // Optional integer override for Ollama's num_ctx (KV-cache window size).
   // Unset → provider default (8192). Bounds enforced at read time.
   "ai_provider_num_ctx",
+  // Staged, opt-in task router. Disabled unless the enabled key is exactly
+  // "true"; model availability must also be explicitly confirmed.
+  "ai_local_task_routing_enabled",
+  "ai_local_model_default",
+  "ai_local_model_default_available",
+  "ai_local_model_speed",
+  "ai_local_model_speed_available",
+  "ai_local_model_quality",
+  "ai_local_model_quality_available",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

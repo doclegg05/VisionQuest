@@ -37,6 +37,12 @@ export interface GenerationOptions {
 
 export interface AIProvider {
   readonly name: string;
+  /**
+   * Present only when the opt-in local task router selected a concrete model.
+   * Callers use this metadata to enforce payload minimization; provider
+   * selection remains authoritative in the router.
+   */
+  readonly localRouting?: LocalRoutingMetadata;
 
   /** Non-streaming completion. Returns the full response text. */
   generateResponse(
@@ -167,13 +173,70 @@ export type DataSensitivity =
   | "configured"
   | "student_record"
   | "staff_entered"
+  | "deidentified"
   | "public_program"
   | "system";
+
+export type LocalTaskClass =
+  | "casual_chat"
+  | "student_coaching"
+  | "crisis_safety"
+  | "structured_extraction"
+  | "rag_grounded_answer"
+  | "sensitive_coaching"
+  | "staff_workflow"
+  | "complex_structured"
+  | "uncertain";
+
+export interface LocalRoutingContext {
+  /** True only when this request did not name or continue a conversation. */
+  newConversation: boolean;
+  /** Conservative signal: an existing conversation may contain protected history. */
+  hasHistory: boolean;
+  /** True when retrieved/program grounding will be included in the model payload. */
+  hasRag: boolean;
+  /** True when a user-uploaded file or derived gist will be included. */
+  hasAttachments: boolean;
+  /** True for crisis/safety signals, even if the user text also looks casual. */
+  hasCrisisState: boolean;
+  /** True for teacher/admin/coordinator or staff-derived student context. */
+  hasStaffContext: boolean;
+  /** False for ambiguous, prompt-injection-like, or otherwise uncertain input. */
+  classificationCertain: boolean;
+  /** True only when the caller guarantees a generic prompt plus this one turn. */
+  minimalContext: boolean;
+}
+
+export interface LocalRoutingMetadata {
+  taskClass: LocalTaskClass;
+  requestedTier: "speed" | "default" | "quality";
+  selectedTier: "speed" | "default" | "quality";
+  model: string;
+  fallbackModel: string | null;
+  /** Quality responses are fully buffered before any caller-visible output. */
+  buffersBeforeOutput: boolean;
+}
 
 export interface AIProviderRequest {
   studentId: string;
   task: AiTask;
   sensitivity: DataSensitivity;
+  /**
+   * Optional deterministic classification supplied by a trusted caller.
+   * The router independently enforces task/sensitivity eligibility, so this
+   * cannot opt staff, public, or non-chat work into the Qwen speed path.
+   */
+  localTaskClass?: LocalTaskClass;
+  /**
+   * Sensitivity of the exact payload sent to a locally selected model. This
+   * never changes the request's authoritative sensitivity or cloud policy.
+   */
+  localPayloadSensitivity?: DataSensitivity;
+  /**
+   * Trusted, conservative context signals. Missing fields fail closed to a
+   * Gemma tier; they can never broaden cloud eligibility.
+   */
+  localRoutingContext?: LocalRoutingContext;
   /**
    * Public, non-student tasks may prefer the cloud provider for latency.
    * Sensitive tasks ignore this and remain local-only.

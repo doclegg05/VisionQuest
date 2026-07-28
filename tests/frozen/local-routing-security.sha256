@@ -1,0 +1,3 @@
+5c806436b300e91370d12b532e4575d0b2fdf3a795ce42b684b49840207bd812  src/app/api/chat/send/__tests__/route.test.ts
+a31cec938b6a20d52315f67258a10a3011569e2c91749e6d63802f2ca5bdcf18  src/app/api/admin/ai-provider/route.test.ts
+480d6d2bd4e3eb1d13dd8167fd51fb7d5b9e8d7f7b7d6c26ead84881d1951f12  src/lib/ai/__tests__/local-routing-security.test.ts

@@ -218,6 +218,157 @@ describe("getProvider", () => {
     assert.ok(provider instanceof GeminiProvider);
   });
 
+  it("preserves legacy cloud routing until task routing is explicitly enabled", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "cloud";
+      if (key === "ai_local_model_default_available") return "true";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+    mockResolveKey.mock.mockImplementationOnce(async () => "test-gemini-key");
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "sage_student_chat",
+      sensitivity: "student_record",
+    });
+
+    assert.ok(provider instanceof GeminiProvider);
+  });
+
+  it("fails protected data closed to local Gemma when task routing is enabled", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "cloud";
+      if (key === "ai_provider_url") return "https://llm.example.com";
+      if (key === "ai_local_task_routing_enabled") return "true";
+      if (key === "ai_local_model_default_available") return "true";
+      if (key === "ai_local_model_default") return "gemma4:12b";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "sage_student_chat",
+      sensitivity: "student_record",
+    });
+
+    assert.ok(provider instanceof OllamaProvider);
+    assert.equal(
+      (provider as unknown as { model: string }).model,
+      "gemma4:12b",
+    );
+    assert.equal(mockResolveKey.mock.callCount(), 0);
+  });
+
+  it("uses Qwen only for explicitly classified safe casual student chat", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider_url") return "https://llm.example.com";
+      if (key === "ai_local_task_routing_enabled") return "true";
+      if (key === "ai_local_model_default_available") return "true";
+      if (key === "ai_local_model_speed_available") return "true";
+      if (key === "ai_local_model_speed") return "qwen3.5:9b";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "sage_student_chat",
+      sensitivity: "student_record",
+      localTaskClass: "casual_chat",
+      localPayloadSensitivity: "deidentified",
+      localRoutingContext: {
+        newConversation: true,
+        hasHistory: false,
+        hasRag: false,
+        hasAttachments: false,
+        hasCrisisState: false,
+        hasStaffContext: false,
+        classificationCertain: true,
+        minimalContext: true,
+      },
+    });
+
+    assert.ok(provider instanceof OllamaProvider);
+    assert.equal(
+      (provider as unknown as { model: string }).model,
+      "qwen3.5:9b",
+    );
+  });
+
+  it("uses quality Gemma for staff work and falls back only to default Gemma", async () => {
+    const values = new Map<string, string>([
+      ["ai_provider_url", "https://llm.example.com"],
+      ["ai_local_task_routing_enabled", "true"],
+      ["ai_local_model_default_available", "true"],
+      ["ai_local_model_default", "gemma4:12b"],
+      ["ai_local_model_quality_available", "true"],
+      ["ai_local_model_quality", "gemma4:26b"],
+    ]);
+    mockGetPlain.mock.mockImplementation(async (key: string) => values.get(key) ?? null);
+    mockGetConfig.mock.mockImplementation(async () => null);
+
+    const qualityProvider = await resolveAiProvider({
+      studentId: "staff-123",
+      task: "sage_staff_chat",
+      sensitivity: "staff_entered",
+      localTaskClass: "casual_chat",
+    });
+    assert.equal(qualityProvider.localRouting?.model, "gemma4:26b");
+    assert.equal(qualityProvider.localRouting?.fallbackModel, "gemma4:12b");
+    assert.equal(qualityProvider.localRouting?.buffersBeforeOutput, true);
+
+    values.set("ai_local_model_quality_available", "false");
+    const fallbackProvider = await resolveAiProvider({
+      studentId: "staff-123",
+      task: "sage_staff_chat",
+      sensitivity: "staff_entered",
+    });
+    assert.equal(
+      (fallbackProvider as unknown as { model: string }).model,
+      "gemma4:12b",
+    );
+  });
+
+  it("does not resolve cloud credentials when required local routing is unavailable", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "cloud";
+      if (key === "ai_local_task_routing_enabled") return "true";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+
+    await assert.rejects(
+      resolveAiProvider({
+        studentId: "student-123",
+        task: "sage_student_chat",
+        sensitivity: "student_record",
+      }),
+      /default Gemma model is not marked available/i,
+    );
+    assert.equal(mockResolveKey.mock.callCount(), 0);
+  });
+
+  it("keeps public prefer-cloud routing separate after local task rollout", async () => {
+    mockGetPlain.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider") return "local";
+      if (key === "ai_local_task_routing_enabled") return "true";
+      return null;
+    });
+    mockGetConfig.mock.mockImplementation(async () => null);
+    mockResolveKey.mock.mockImplementationOnce(async () => "test-gemini-key");
+
+    const provider = await resolveAiProvider({
+      studentId: "student-123",
+      task: "public_program_help",
+      sensitivity: "public_program",
+      preferCloud: true,
+    });
+
+    assert.ok(provider instanceof GeminiProvider);
+  });
+
   it("maps providers to prompt tiers", async () => {
     assert.equal(
       getPromptTier(new OllamaProvider("http://localhost:11434", "gemma4:26b")),

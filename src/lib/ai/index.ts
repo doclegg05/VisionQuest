@@ -1,4 +1,21 @@
 export { getProvider, getPromptTier, resolveAiProvider } from "./provider";
+export { LocalQualityFallbackProvider } from "./local-quality-fallback-provider";
+export {
+  classifyStudentChatTask,
+  defaultTaskClass,
+  isLocalTaskRoutingEnabled,
+  isProtectedSensitivity,
+  readLocalTaskRoutingConfig,
+  selectLocalModel,
+  DEFAULT_LOCAL_COACHING_MODEL,
+  DEFAULT_LOCAL_SPEED_MODEL,
+  DEFAULT_LOCAL_QUALITY_MODEL,
+} from "./task-router";
+export type {
+  LocalModelDecision,
+  LocalModelTier,
+  LocalTaskRoutingConfig,
+} from "./task-router";
 export { checkOllamaHealth } from "./health";
 export { detectModelCapabilities } from "./capabilities";
 export type { ModelCapabilities, DetectCapabilitiesConfig } from "./capabilities";
@@ -24,6 +41,9 @@ export type {
   LocalAIAuthMode,
   LocalAIAuthConfig,
   LocalAiApiStyle,
+  LocalRoutingContext,
+  LocalRoutingMetadata,
+  LocalTaskClass,
   PromptTier,
 } from "./types";
 export type { EmbeddingProvider, EmbeddingTaskType } from "./embedding-types";
