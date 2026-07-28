@@ -1408,7 +1408,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     description: "Submit Mini-IP answers or manually imported RIASEC scores",
     endpoint: { method: "POST", path: "/api/career/interest-profiler" },
     requiredRoles: ["student"],
-    auditLevel: "detailed",
+    auditLevel: "full",
     enabled: true,
     tags: ["career", "assessment"],
   },
