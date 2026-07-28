@@ -28,7 +28,7 @@
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
 import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
-import { withScenarioContext } from "./lib/sage-quality-eval-prompt.mjs";
+import { buildQualityEvalPrompt } from "./lib/sage-quality-eval-prompt.mjs";
 
 loadEnvFile();
 
@@ -106,11 +106,13 @@ async function main() {
   for (const scenario of SCENARIOS) {
     let reply = "";
     try {
-      // A scenario may supply `context` — the facts a retrieval hit would have
-      // provided in production. Without it, a program-facts question is
-      // unanswerable here: agent mode puts that knowledge behind
-      // lookup_program_info, and this harness generates with no tools.
-      const systemPrompt = withScenarioContext(
+      // The real prompt, plus the two things this tool-less harness must say
+      // for a tool-mapped question to come back as scoreable text: that no
+      // tools are connected, and (when the scenario supplies `context`) the
+      // facts a retrieval hit would have provided in production. Assembly
+      // lives in sage-quality-eval-prompt.mjs so the contract tests check the
+      // same code path the harness runs.
+      const systemPrompt = buildQualityEvalPrompt(
         buildSystemPrompt(scenario.stage, { studentName: "Sam", programType: "spokes" }, "full"),
         scenario.context,
       );
