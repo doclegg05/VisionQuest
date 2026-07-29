@@ -1,3 +1,7 @@
+---
+name: student-data-privacy
+description: FERPA-sensitive handling of TANF/SNAP student PII in VisionQuest — RLS scoping, staff-read auditing, no PII in logs, local-only AI routing for student_record data. Use when touching student data, logging, or AI provider routing.
+---
 # Student Data Privacy Skill
 
 Automatically invoked when handling PII, student records, or data export/sharing features.

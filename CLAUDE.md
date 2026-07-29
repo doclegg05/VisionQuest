@@ -59,31 +59,13 @@ The live handoff — current status, last session, open items, engineering decis
 
 @.claude/MEMORY.md
 
-## Project Overview
-- **Name**: VisionQuest
-- **Description**: AI-coach-driven program portal for SPOKES workforce development (adults on TANF/SNAP). AI coach named "Sage" guides students through goal-setting, orientation, certification tracking, portfolio building, and employability skills.
-- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 3.1 Flash Lite, Tailwind CSS 4, Sentry
-- **Hosting**: Render.com (free tier)
-- **Repo**: https://github.com/doclegg05/VisionQuest.git
-- **Live URL**: https://visionquest.onrender.com
-
-## Architecture Notes
-Maintained in [.claude/MEMORY.md](./.claude/MEMORY.md) (imported above) — the single home for architecture notes.
-
 ## Production Environment
-- **Render Start Command**: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
-- **Render Build Command**: `npm ci && npx prisma generate && npm run build`
+- Render build/start commands live in `render.yaml` — read it rather than trusting a copy here.
 - **TEACHER_KEY**: Stored in Render env vars and `.env.local` only (not tracked in git)
 
 ## Product Scope Authority
 - **Authoritative doc**: `docs/PRODUCT_DECISIONS.md` — governs all product scope decisions (5-step framework: Question → Delete → Simplify → Accelerate → Automate)
 - **Key decision (April 1, 2026, superseded June 10, 2026)**: Vision Board, Files, and Resources features are retained; the chat-first redesign (user-approved 2026-06-09) moved Resources into Learning and renamed Files to "Documents" in nav. See the 2026-06-10 entry in PRODUCT_DECISIONS.md.
-
-## Key Decisions Log
-Maintained in [.claude/MEMORY.md](./.claude/MEMORY.md) (imported above) — the single home for engineering decisions. Product **scope** decisions stay in `docs/PRODUCT_DECISIONS.md` per the Product Scope Authority section above.
-
-## Known Issues
-Maintained in [.claude/MEMORY.md](./.claude/MEMORY.md) (imported above) — the single home for known issues.
 
 ## Design Context
 - **Full design context**: See [.impeccable.md](./.impeccable.md) for complete design principles, color system, typography, and accessibility requirements

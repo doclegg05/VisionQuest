@@ -1,3 +1,7 @@
+---
+name: sage-prompt-engineering
+description: Editing Sage's system prompt and personality — bump SAGE_PROMPT_REVISION, keep eval leak canaries fresh, and keep the gating red-team/chat evals green. Use before changing anything under src/lib/sage/ that affects prompt text.
+---
 # Sage Prompt Engineering Skill
 
 Automatically invoked when modifying Sage AI behavior, system prompts, or chat logic.

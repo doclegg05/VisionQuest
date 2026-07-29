@@ -1,3 +1,12 @@
+---
+paths:
+  - "src/lib/sage/**"
+  - "src/lib/ai/**"
+  - "src/lib/chat/**"
+  - "src/app/api/chat/**"
+  - "config/sage-*.json"
+  - "scripts/sage-*"
+---
 # Sage AI Coach Rules
 
 ## Identity

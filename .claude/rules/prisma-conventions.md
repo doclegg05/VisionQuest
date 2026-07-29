@@ -1,3 +1,9 @@
+---
+paths:
+  - "prisma/**"
+  - "src/lib/**"
+  - "scripts/seed-*"
+---
 # Prisma Conventions
 
 ## Schema

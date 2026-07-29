@@ -1,3 +1,6 @@
+---
+description: Full TypeScript type-checking pass across the codebase, with errors grouped by file.
+---
 # /project:typecheck
 
 Full type-checking pass across the codebase.
