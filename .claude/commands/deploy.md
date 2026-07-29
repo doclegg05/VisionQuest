@@ -1,3 +1,6 @@
+---
+description: Pre-deployment checklist for Render — clean tree, prisma validate, typecheck, build, then post-deploy verification.
+---
 # /project:deploy
 
 Pre-deployment checklist for Render.

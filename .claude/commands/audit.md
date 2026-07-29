@@ -1,3 +1,6 @@
+---
+description: Security and quality audit of the current branch's changed files — CSRF, JWT auth, Prisma error leakage, secrets.
+---
 # /project:audit
 
 Security and quality audit of recent changes.

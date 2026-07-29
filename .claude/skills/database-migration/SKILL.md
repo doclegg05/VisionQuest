@@ -1,3 +1,7 @@
+---
+name: database-migration
+description: Prisma schema changes and migrations for VisionQuest — validate, name descriptively, review generated SQL for unintended DROPs, and deploy via prisma:migrate:deploy. Use when editing prisma/schema.prisma or adding a migration.
+---
 # Database Migration Skill
 
 Automatically invoked when modifying `prisma/schema.prisma` or creating migrations.
