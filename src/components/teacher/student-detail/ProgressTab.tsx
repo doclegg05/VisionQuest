@@ -241,8 +241,8 @@ export default function ProgressTab({
                           {application.opportunity.company} {"\u2022"} {application.opportunity.type}
                         </p>
                       </div>
-                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">
-                        {application.status}
+                      <span className="rounded-full border border-sky-300 bg-sky-100 px-2.5 py-1 text-sm font-semibold text-sky-800">
+                        Status: {application.status}
                       </span>
                     </div>
                     <p className="mt-2 text-xs text-[var(--ink-faint)]">
@@ -269,8 +269,8 @@ export default function ProgressTab({
                           {dateFormatter.format(new Date(registration.event.startsAt))}
                         </p>
                       </div>
-                      <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
-                        {registration.status}
+                      <span className="rounded-full border border-teal-300 bg-teal-100 px-2.5 py-1 text-sm font-semibold text-teal-800">
+                        Status: {registration.status}
                       </span>
                     </div>
                     {registration.event.location ? (

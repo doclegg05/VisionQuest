@@ -9,6 +9,7 @@ import type {
   ReviewQueueItemData,
   StudentData,
 } from "./types";
+import { goalLevelLabel, goalStatusLabel } from "@/lib/goals";
 
 const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
   not_started: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
@@ -133,7 +134,7 @@ export default function GoalsPlanTab({
                     ) : null}
                     <a
                       href={reviewActionForItem(item).href}
-                      className="mt-3 inline-flex text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                      className="mt-3 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
                     >
                       {reviewActionForItem(item).label} {"\u2192"}
                     </a>
@@ -200,7 +201,7 @@ export default function GoalsPlanTab({
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${EVIDENCE_STATUS_STYLES[evidence?.evidenceStatus || "not_started"]}`}>
-                                      {evidence?.evidenceLabel || "Waiting for activity"}
+                                      Status: {evidence?.evidenceLabel || "Waiting for activity"}
                                     </span>
                                     {evidence?.reviewNeeded ? (
                                       <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
@@ -242,18 +243,20 @@ export default function GoalsPlanTab({
                   <li key={goal.id} className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <p className="text-sm font-medium">{goal.content}</p>
-                      <p className="text-xs text-[var(--ink-muted)]">{goal.level} &middot; {goal.status}</p>
+                      <p className="text-sm text-[var(--ink-muted)]">
+                        {goalLevelLabel(goal.level)} &middot; Status: {goalStatusLabel(goal.status)}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => void onGoalAction(goal.id, { confirm: true })}
-                        className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+                        className="min-h-11 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-200"
                       >
                         Confirm
                       </button>
                       <button
                         onClick={() => void onGoalAction(goal.id, { reviewed: true })}
-                        className="rounded-lg bg-[var(--surface-interactive)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-strong)]"
+                        className="min-h-11 rounded-lg bg-[var(--surface-interactive)] px-3 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-strong)]"
                       >
                         Mark Reviewed
                       </button>
@@ -274,15 +277,21 @@ export default function GoalsPlanTab({
 
       {/* Career Discovery */}
       <div id="career-discovery" className="theme-card rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
-          Career Discovery
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+            Career Discovery
+          </h3>
           {careerDiscovery?.status === "complete" && (
-            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Complete</span>
+            <span className="rounded-full border border-green-300 bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+              Status: Complete
+            </span>
           )}
           {careerDiscovery?.status === "in_progress" && (
-            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">In Progress</span>
+            <span className="rounded-full border border-yellow-300 bg-yellow-100 px-3 py-1 text-sm font-semibold text-yellow-900">
+              Status: In progress
+            </span>
           )}
-        </h3>
+        </div>
         {!careerDiscovery ? (
           <p className="text-sm text-[var(--ink-muted)]">Student has not started career discovery yet.</p>
         ) : (

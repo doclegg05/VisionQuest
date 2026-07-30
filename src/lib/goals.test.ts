@@ -4,6 +4,7 @@ import {
   GOAL_PLANNING_STATUSES,
   GOAL_STATUSES,
   goalCountsTowardPlan,
+  goalLevelLabel,
   goalStatusLabel,
   isGoalLevel,
   isGoalStatus,
@@ -35,6 +36,11 @@ describe("goal helpers", () => {
     assert.equal(goalStatusLabel("proposed"), "Proposed");
     assert.equal(goalStatusLabel("in_progress"), "In Progress");
     assert.equal(goalStatusLabel("blocked"), "Blocked");
+  });
+
+  it("uses plain language for the long-term Big Vision level", () => {
+    assert.equal(goalLevelLabel("bhag"), "Big Vision");
+    assert.equal(goalLevelLabel("long_term"), "long term");
   });
 
   it("falls back to the raw value for unknown statuses", () => {

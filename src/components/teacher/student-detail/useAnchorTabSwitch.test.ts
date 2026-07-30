@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveTabForAnchor } from "./useAnchorTabSwitch";
+import {
+  resolveTabForAnchor,
+  STUDENT_DETAIL_ANCHOR_TO_TAB,
+} from "./useAnchorTabSwitch";
 
 describe("resolveTabForAnchor", () => {
   const map = {
@@ -26,5 +29,21 @@ describe("resolveTabForAnchor", () => {
 
   it("returns null for an empty anchor", () => {
     assert.equal(resolveTabForAnchor("", map), null);
+  });
+});
+
+describe("student detail career anchor ownership", () => {
+  it("opens career discovery on Coach, where the section renders", () => {
+    assert.equal(
+      resolveTabForAnchor("#career-discovery", STUDENT_DETAIL_ANCHOR_TO_TAB),
+      "coach",
+    );
+  });
+
+  it("opens career progress on Progress, where the section renders", () => {
+    assert.equal(
+      resolveTabForAnchor("#career-progress", STUDENT_DETAIL_ANCHOR_TO_TAB),
+      "progress",
+    );
   });
 });

@@ -2,6 +2,29 @@
 
 import { useEffect } from "react";
 
+export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
+  // Coach tab anchors
+  "goal-evidence": "coach",
+  "review-queue": "coach",
+  "case-notes": "coach",
+  "follow-up-tasks": "coach",
+  "appointments": "coach",
+  "alerts": "coach",
+  "goals-plan": "coach",
+  "career-discovery": "coach",
+  // Progress tab anchors
+  "orientation": "progress",
+  "orientation-review": "progress",
+  "certification-review": "progress",
+  "career-progress": "progress",
+  "portfolio": "progress",
+  "files": "progress",
+  "conversations": "progress",
+  // Admin tab anchors
+  "submitted-forms": "admin",
+  "account-actions": "admin",
+} as const;
+
 /**
  * Watches the URL hash and switches the active StudentDetail tab when the
  * hash targets a section that lives on a different tab. Then scrolls the

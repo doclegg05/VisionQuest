@@ -517,23 +517,26 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         </div>
       ) : null}
 
-      {/* BHAG Section — Gold-themed notepad card at top */}
+      {/* Long-term Big Vision goal */}
       <div className="surface-section p-6 bg-gradient-to-br from-amber-50/80 to-orange-50/50 border-amber-200/80 dark:from-[#1b1c20] dark:to-[#171412] dark:border-amber-950/60 relative overflow-hidden rounded-2xl">
         <div className="tape-effect bg-amber-400/40 border-amber-400/20" />
         <div className="flex items-center gap-2 mb-3">
           <Sparkle className="text-amber-500 animate-pulse" size={24} weight="fill" />
-          <h2 className="font-display text-2xl text-[var(--ink-strong)]">My Big Vision (BHAG)</h2>
+          <h2 className="font-display text-2xl text-[var(--ink-strong)]">My Big Vision</h2>
         </div>
         <p className="text-sm text-[var(--ink-muted)] mb-4 leading-relaxed">
-          Your Big Hairy Audacious Goal — the long-term career destination you are working toward.
+          Your long-term career goal: the work and future you are building toward.
         </p>
 
         {bhags.length > 0 ? (
           bhags.map((bhag) => (
             <div key={bhag.id} className="bg-white/80 dark:bg-black/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm">
               {bhag.status === "proposed" && (
-                <span className="inline-block mb-2 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
-                  Awaiting instructor confirmation
+                <span
+                  role="status"
+                  className="mb-2 inline-flex min-h-8 items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  Status: Waiting for instructor confirmation
                 </span>
               )}
               {editingGoalId === bhag.id ? (
@@ -548,11 +551,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                     type="text"
                     value={editingGoalContent}
                     onChange={(e) => setEditingGoalContent(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="min-h-11 flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
                     autoFocus
                   />
-                  <button type="submit" className="primary-button px-4 py-2 text-xs">Save</button>
-                  <button type="button" onClick={() => setEditingGoalId(null)} className="rounded-full border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)]">Cancel</button>
+                  <button type="submit" className="primary-button min-h-11 px-4 py-2 text-sm">Save</button>
+                  <button type="button" onClick={() => setEditingGoalId(null)} className="min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)]">Cancel</button>
                 </form>
               ) : (
                 <div className="flex items-start justify-between gap-3 group">
@@ -562,27 +565,27 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => handleReadAloud(bhag.id, `My Big Vision: ${bhag.content}`)}
-                      className={`p-1.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/60 text-[var(--ink-muted)] hover:text-amber-700 transition-colors ${speakingId === bhag.id ? "text-amber-600 animate-pulse bg-amber-50 dark:bg-amber-950/20" : ""}`}
-                      aria-label="Read BHAG aloud"
-                      title="Read BHAG aloud"
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-amber-100 dark:hover:bg-amber-950/60 text-[var(--ink-muted)] hover:text-amber-700 transition-colors ${speakingId === bhag.id ? "text-amber-600 animate-pulse bg-amber-50 dark:bg-amber-950/20" : ""}`}
+                      aria-label="Read Big Vision aloud"
+                      title="Read Big Vision aloud"
                     >
                       <SpeakerHigh size={16} weight={speakingId === bhag.id ? "fill" : "regular"} />
                     </button>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <div className="flex gap-1">
                       <button
                         onClick={() => {
                           setEditingGoalId(bhag.id);
                           setEditingGoalContent(bhag.content);
                         }}
-                        className="p-1.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/60 text-[var(--ink-muted)] hover:text-amber-700"
-                        aria-label="Edit BHAG"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-amber-100 dark:hover:bg-amber-950/60 text-[var(--ink-muted)] hover:text-amber-700"
+                        aria-label="Edit Big Vision"
                       >
                         <PencilSimple size={16} />
                       </button>
                       <button
                         onClick={() => handleDismissGoal(bhag.id)}
-                        className="p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-950/40 text-[var(--ink-muted)] hover:text-red-500"
-                        aria-label="Dismiss BHAG"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-red-50 dark:hover:bg-red-950/40 text-[var(--ink-muted)] hover:text-red-500"
+                        aria-label="Dismiss Big Vision"
                       >
                         <X size={16} />
                       </button>
@@ -609,16 +612,16 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   placeholder="What is your ultimate dream career? (e.g. Become a certified welder)"
                   value={addingBhagContent}
                   onChange={(e) => setAddingBhagContent(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="min-h-11 flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
                   autoFocus
                 />
-                <button type="submit" className="primary-button px-4 py-2 text-xs" disabled={!addingBhagContent.trim()}>Add</button>
-                <button type="button" onClick={() => setAddingBhag(false)} className="rounded-full border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)]">Cancel</button>
+                <button type="submit" className="primary-button min-h-11 px-4 py-2 text-sm" disabled={!addingBhagContent.trim()}>Add</button>
+                <button type="button" onClick={() => setAddingBhag(false)} className="min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)]">Cancel</button>
               </form>
             ) : (
               <button
                 onClick={() => setAddingBhag(true)}
-                className="text-amber-700 dark:text-amber-500 text-sm font-semibold hover:underline flex items-center gap-1.5 mx-auto"
+                className="mx-auto flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-amber-700 hover:underline dark:text-amber-500"
               >
                 <Plus size={16} weight="bold" /> Define your Big Vision
               </button>
