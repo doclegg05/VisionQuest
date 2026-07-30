@@ -1,3 +1,8 @@
+---
+paths:
+  - "src/components/**"
+  - "src/app/**"
+---
 # UI Patterns
 
 ## Framework

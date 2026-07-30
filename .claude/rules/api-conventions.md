@@ -1,3 +1,7 @@
+---
+paths:
+  - "src/app/api/**"
+---
 # API Conventions
 
 - All API routes live under `src/app/api/`

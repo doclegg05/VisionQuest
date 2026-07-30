@@ -1,3 +1,6 @@
+---
+description: Seed the database with orientation items, cert templates, SPOKES checklists, and program documents.
+---
 # /project:seed
 
 Seed the database with orientation items, cert templates, SPOKES checklists, and program documents.

@@ -1,3 +1,7 @@
+---
+name: vq-security-review
+description: VisionQuest-specific security review — auth, RLS, CSRF, Zod validation at boundaries, secret handling, and student-PII exposure. Use before merging changes to auth, API routes, or anything reading student data.
+---
 # Security Review Skill
 
 Automatically invoked when reviewing auth, API, or data-handling changes.
