@@ -142,7 +142,7 @@ describe("computeAcademicKpis", () => {
     assert.equal(result.goalAdoption.goalsWithResourcesPct, 50);
   });
 
-  it("computes resource-to-evidence pipeline", () => {
+  it("counts only started or completed links as resource activity", () => {
     const students = [
       makeStudent({
         id: "s1",
@@ -165,6 +165,7 @@ describe("computeAcademicKpis", () => {
             resourceLinks: [
               makeLink({ id: "l4", status: "assigned" }),
               makeLink({ id: "l5", status: "blocked" }),
+              makeLink({ id: "l6", status: "dismissed" }),
             ],
           }),
         ],
@@ -172,10 +173,10 @@ describe("computeAcademicKpis", () => {
     ];
 
     const result = computeAcademicKpis(students, NOW);
-    assert.equal(result.resourcePipeline.totalAssignedLinks, 5);
-    assert.equal(result.resourcePipeline.linksWithEvidence, 3); // in_progress, completed, blocked
+    assert.equal(result.resourcePipeline.totalAssignedLinks, 6);
+    assert.equal(result.resourcePipeline.linksWithActivity, 2);
     assert.equal(result.resourcePipeline.linksCompleted, 1);
-    assert.equal(result.resourcePipeline.studentsWithAnyEvidence, 2);
+    assert.equal(result.resourcePipeline.studentsWithAnyActivity, 1);
   });
 
   it("computes median and average days to first goal", () => {
@@ -197,7 +198,7 @@ describe("computeAcademicKpis", () => {
     assert.equal(result.timeToMilestone.avgDaysToFirstGoal, 15);
   });
 
-  it("computes time from goal to resource and resource to evidence", () => {
+  it("computes time from goal to resource and resource to first activity", () => {
     const students = [
       makeStudent({
         id: "s1",
@@ -218,7 +219,30 @@ describe("computeAcademicKpis", () => {
 
     const result = computeAcademicKpis(students, NOW);
     assert.equal(result.timeToMilestone.medianDaysGoalToResource, 5);
-    assert.equal(result.timeToMilestone.medianDaysResourceToEvidence, 5);
+    assert.equal(result.timeToMilestone.medianDaysResourceToActivity, 5);
+  });
+
+  it("uses verified orientation progress in readiness scores", () => {
+    const students = [
+      makeStudent({
+        id: "partial",
+        orientationProgress: [
+          { completed: true, completedAt: new Date("2026-01-05") },
+          { completed: false, completedAt: null },
+        ],
+      }),
+      makeStudent({
+        id: "complete",
+        orientationProgress: [
+          { completed: true, completedAt: new Date("2026-01-05") },
+          { completed: true, completedAt: new Date("2026-01-06") },
+        ],
+      }),
+    ];
+
+    const result = computeAcademicKpis(students, NOW, 2);
+    assert.equal(result.readinessDistribution.avgScore, 7.5);
+    assert.equal(result.readinessDistribution.medianScore, 7.5);
   });
 
   it("bins readiness scores into correct buckets", () => {
@@ -291,7 +315,7 @@ describe("computeAcademicKpis", () => {
     assert.equal(result.academicFunnel[3].value, 1);
     assert.equal(result.academicFunnel[4].label, "Assigned resource");
     assert.equal(result.academicFunnel[4].value, 1);
-    assert.equal(result.academicFunnel[5].label, "Evidence submitted");
+    assert.equal(result.academicFunnel[5].label, "Resource activity");
     assert.equal(result.academicFunnel[5].value, 1);
     assert.equal(result.academicFunnel[6].label, "Certification progress");
     assert.equal(result.academicFunnel[6].value, 1);

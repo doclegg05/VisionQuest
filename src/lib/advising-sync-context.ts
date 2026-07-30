@@ -156,8 +156,8 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
           orderBy: { updatedAt: "desc" },
         },
         certifications: {
-          where: { certType: "ready-to-work" },
           select: {
+            certType: true,
             status: true,
             startedAt: true,
             completedAt: true,
@@ -178,7 +178,6 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
               },
             },
           },
-          take: 1,
         },
         _count: {
           select: {

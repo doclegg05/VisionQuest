@@ -123,6 +123,70 @@ test("buildGoalEvidenceEntries recognizes completed portfolio tasks from system 
   assert.equal(evidence.reviewNeeded, false);
 });
 
+test("buildGoalEvidenceEntries matches each certification link to its own tracked certification", () => {
+  const evidence = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        id: "cert-link-1",
+        resourceType: "certification",
+        resourceId: "ic3",
+        title: "IC3 Digital Literacy",
+      }),
+      makeLink({
+        id: "cert-link-2",
+        resourceType: "certification",
+        resourceId: "mos-word",
+        title: "Microsoft Office Specialist - Word",
+      }),
+    ],
+    progressionState: createInitialState(),
+    certifications: [
+      {
+        certType: "ic3",
+        status: "completed",
+        startedAt: "2026-03-01T12:00:00.000Z",
+        completedAt: "2026-03-05T12:00:00.000Z",
+        requirements: [],
+      },
+      {
+        certType: "mos-word",
+        status: "in_progress",
+        startedAt: "2026-03-08T12:00:00.000Z",
+        completedAt: null,
+        requirements: [],
+      },
+    ],
+  });
+
+  assert.equal(evidence[0]?.evidenceStatus, "approved");
+  assert.equal(evidence[0]?.summary, "IC3 Digital Literacy is complete.");
+  assert.equal(evidence[1]?.evidenceStatus, "in_progress");
+});
+
+test("buildGoalEvidenceEntries does not borrow evidence from another certification", () => {
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "certification",
+        resourceId: "workkeys-ncrc",
+        title: "ACT WorkKeys NCRC",
+      }),
+    ],
+    progressionState: createInitialState(),
+    certifications: [{
+      certType: "ic3",
+      status: "completed",
+      startedAt: "2026-03-01T12:00:00.000Z",
+      completedAt: "2026-03-05T12:00:00.000Z",
+      requirements: [],
+    }],
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "not_started");
+  assert.equal(evidence.evidenceSource, "none");
+});
+
 test("buildGoalEvidenceEntries recognizes application and event career steps from tracked outcomes", () => {
   const evidence = buildGoalEvidenceEntries({
     links: [

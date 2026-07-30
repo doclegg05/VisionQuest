@@ -17,52 +17,59 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     return NextResponse.json(computeAcademicKpis([]));
   }
 
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds } },
-    select: {
-      id: true,
-      createdAt: true,
-      conversations: {
-        select: { createdAt: true },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-      goals: {
-        select: {
-          id: true,
-          level: true,
-          status: true,
-          createdAt: true,
-          resourceLinks: {
-            select: {
-              id: true,
-              linkType: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
+  const [students, orientationTotal] = await Promise.all([
+    prisma.student.findMany({
+      where: { id: { in: studentIds } },
+      select: {
+        id: true,
+        createdAt: true,
+        conversations: {
+          select: { createdAt: true },
+          orderBy: { createdAt: "asc" },
+          take: 1,
+        },
+        goals: {
+          select: {
+            id: true,
+            level: true,
+            status: true,
+            createdAt: true,
+            resourceLinks: {
+              select: {
+                id: true,
+                linkType: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+              },
             },
           },
         },
+        progression: {
+          select: { state: true },
+        },
+        certifications: {
+          select: { status: true, startedAt: true, completedAt: true },
+        },
+        portfolioItems: { select: { id: true } },
+        resumeData: { select: { id: true } },
+        publicCredentialPage: { select: { isPublic: true } },
+        orientationProgress: {
+          where: {
+            completed: true,
+            item: { required: true },
+          },
+          select: { completed: true, completedAt: true },
+        },
       },
-      progression: {
-        select: { state: true },
-      },
-      certifications: {
-        select: { status: true, startedAt: true, completedAt: true },
-      },
-      portfolioItems: { select: { id: true } },
-      resumeData: { select: { id: true } },
-      publicCredentialPage: { select: { isPublic: true } },
-      orientationProgress: {
-        select: { completed: true, completedAt: true },
-      },
-    },
-  });
+    }),
+    prisma.orientationItem.count({ where: { required: true } }),
+  ]);
 
   const rows = students.map((s) => ({
     ...s,
     progressionState: s.progression?.state ?? null,
   }));
 
-  return NextResponse.json(computeAcademicKpis(rows));
+  return NextResponse.json(computeAcademicKpis(rows, new Date(), orientationTotal));
 });

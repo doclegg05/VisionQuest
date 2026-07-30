@@ -65,6 +65,7 @@ export interface GoalEvidenceCertificationRequirement {
 }
 
 export interface GoalEvidenceCertification {
+  certType: string;
   status: string | null;
   startedAt: Date | string | null;
   completedAt: Date | string | null;
@@ -380,7 +381,7 @@ function evidenceFromCertification(
       evidenceSource: "teacher_review" as const,
       reviewNeeded: false,
       evidenceLabel: "Certification complete",
-      summary: "Ready to Work certification is complete.",
+      summary: `${link.title} is complete.`,
       lastObservedAt: certification.completedAt,
     };
   }
@@ -502,7 +503,7 @@ export function buildGoalEvidenceEntries({
   progressionState,
   formSubmissions = [],
   orientationProgress = [],
-  certification = null,
+  certifications = [],
   portfolioItems = [],
   resumeData = null,
   publicCredentialPage = null,
@@ -513,7 +514,7 @@ export function buildGoalEvidenceEntries({
   progressionState: ProgressionState | null;
   formSubmissions?: GoalEvidenceFormSubmission[];
   orientationProgress?: GoalEvidenceOrientationProgress[];
-  certification?: GoalEvidenceCertification | null;
+  certifications?: GoalEvidenceCertification[];
   portfolioItems?: GoalEvidencePortfolioItem[];
   resumeData?: GoalEvidenceResumeData | null;
   publicCredentialPage?: GoalEvidencePublicCredentialPage | null;
@@ -522,6 +523,9 @@ export function buildGoalEvidenceEntries({
 }): GoalEvidenceEntry[] {
   const submissionsByFormId = new Map(formSubmissions.map((submission) => [submission.formId, submission]));
   const progressByItemId = new Map(orientationProgress.map((item) => [item.itemId, item]));
+  const certificationsByType = new Map(
+    certifications.map((certification) => [certification.certType, certification]),
+  );
 
   return links.map((link) => {
     const observed = (() => {
@@ -535,7 +539,7 @@ export function buildGoalEvidenceEntries({
         case "portfolio_task":
           return evidenceFromPortfolioTask(link, portfolioItems, resumeData, publicCredentialPage);
         case "certification":
-          return evidenceFromCertification(link, certification);
+          return evidenceFromCertification(link, certificationsByType.get(link.resourceId) ?? null);
         case "career_step":
           return evidenceFromCareerStep(link, applications, eventRegistrations);
         case "document":
