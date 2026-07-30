@@ -5,6 +5,7 @@ import { prisma } from "./db";
 import { buildGoalEvidenceEntries, buildGoalReviewQueue } from "./goal-evidence";
 import { parseState } from "./progression/engine";
 import { toGoalResourceLinkView } from "./goal-resource-links";
+import { buildPlacementAlertDescriptors } from "./placement-bridge";
 import { buildStudentStatusSignals } from "./student-status";
 import type { loadStudentAlertSyncContext } from "./advising-sync-context";
 
@@ -34,6 +35,7 @@ export function buildStudentAlertSyncPlan({
     orientationItems,
     recentMoodEntries,
     compliance,
+    placementBridgeScope,
   } = context;
 
   const certification = studentSignals?.certifications.find(
@@ -209,6 +211,19 @@ export function buildStudentAlertSyncPlan({
     return null;
   })();
 
+  // Phase 0A placement bridge: verified accepted applications raise a
+  // "Record employment outcome" queue item until employment is recorded.
+  const placementAlerts = studentSignals
+    ? buildPlacementAlertDescriptors({
+        scope: placementBridgeScope,
+        activeClassIds: studentSignals.classEnrollments.map(
+          (enrollment) => enrollment.classId
+        ),
+        applications: studentSignals.applications,
+        spokesRecord: studentSignals.spokesRecord,
+      })
+    : [];
+
   return {
     studentSignals,
     goalEvidenceEntries,
@@ -217,6 +232,7 @@ export function buildStudentAlertSyncPlan({
       ...baselineAlerts,
       ...goalAlerts,
       ...(motivationAlert ? [motivationAlert] : []),
+      ...placementAlerts,
     ],
   };
 }
