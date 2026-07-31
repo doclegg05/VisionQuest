@@ -38,7 +38,7 @@ describe("goal helpers", () => {
     assert.equal(goalStatusLabel("blocked"), "Blocked");
   });
 
-  it("uses plain language for the long-term Big Vision level", () => {
+  it("falls back to de-underscored text for unknown goal levels", () => {
     assert.equal(goalLevelLabel("bhag"), "Big Vision");
     assert.equal(goalLevelLabel("long_term"), "long term");
   });

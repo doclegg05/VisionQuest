@@ -3,6 +3,10 @@ import type {
   PublicCredentialPageData,
 } from "./types";
 import { MemoryInspectorPanel } from "./MemoryInspectorPanel";
+import {
+  applicationStatusLabel,
+  eventRegistrationStatusLabel,
+} from "@/lib/status-labels";
 
 interface ProgressTabProps {
   data: StudentData;
@@ -242,7 +246,7 @@ export default function ProgressTab({
                         </p>
                       </div>
                       <span className="rounded-full border border-sky-300 bg-sky-100 px-2.5 py-1 text-sm font-semibold text-sky-800">
-                        Status: {application.status}
+                        Status: {applicationStatusLabel(application.status)}
                       </span>
                     </div>
                     <p className="mt-2 text-xs text-[var(--ink-faint)]">
@@ -270,7 +274,7 @@ export default function ProgressTab({
                         </p>
                       </div>
                       <span className="rounded-full border border-teal-300 bg-teal-100 px-2.5 py-1 text-sm font-semibold text-teal-800">
-                        Status: {registration.status}
+                        Status: {eventRegistrationStatusLabel(registration.status)}
                       </span>
                     </div>
                     {registration.event.location ? (

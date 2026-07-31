@@ -532,10 +532,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           bhags.map((bhag) => (
             <div key={bhag.id} className="bg-white/80 dark:bg-black/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm">
               {bhag.status === "proposed" && (
-                <span
-                  role="status"
-                  className="mb-2 inline-flex min-h-8 items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                >
+                <span className="mb-2 inline-flex min-h-8 items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                   Status: Waiting for instructor confirmation
                 </span>
               )}
