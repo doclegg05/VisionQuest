@@ -678,6 +678,13 @@
       "registryIds": []
     },
     {
+      "path": "/api/orientation/welcome-video",
+      "methods": [
+        "POST"
+      ],
+      "registryIds": []
+    },
+    {
       "path": "/api/portfolio",
       "methods": [
         "GET",
