@@ -59,30 +59,22 @@ describe("GET /api/teacher/reports/academic-kpi", () => {
       portfolioItems: [],
       resumeData: null,
       publicCredentialPage: null,
-      orientationProgress: [{
-        completed: true,
-        completedAt: new Date("2026-01-02T12:00:00.000Z"),
-      }],
+      orientationProgress: [{ itemId: "item-1" }],
     }]);
   });
 
-  it("uses only required verified orientation work and returns the activity field contract", async () => {
+  it("counts all orientation items in the readiness denominator and returns the activity field contract", async () => {
     const req = mockRequest("/api/teacher/reports/academic-kpi", { method: "GET" });
 
     const res = await route.GET(req as never);
     const body = await res.json();
 
     assert.equal(res.status, 200);
-    assert.deepEqual(
-      mockOrientationItemCount.mock.calls[0]?.arguments[0],
-      { where: { required: true } },
-    );
+    // Denominator convention: ALL orientation items — no required-only filter.
+    assert.equal(mockOrientationItemCount.mock.calls[0]?.arguments.length, 0);
     assert.deepEqual(
       mockStudentFindMany.mock.calls[0]?.arguments[0].select.orientationProgress.where,
-      {
-        completed: true,
-        item: { required: true },
-      },
+      { completed: true },
     );
     assert.equal(body.readinessDistribution.avgScore, 5);
     assert.ok("linksWithActivity" in body.resourcePipeline);
