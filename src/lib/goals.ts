@@ -2,7 +2,7 @@ export const GOAL_LEVELS = ["bhag", "monthly", "weekly", "daily", "task"] as con
 export type GoalLevel = (typeof GOAL_LEVELS)[number];
 
 export const GOAL_LEVEL_META: Record<GoalLevel, { label: string; icon: string }> = {
-  bhag: { label: "Big Hairy Audacious Goal", icon: "⭐" },
+  bhag: { label: "Big Vision", icon: "⭐" },
   monthly: { label: "Monthly Goal", icon: "📅" },
   weekly: { label: "Weekly Goal", icon: "📆" },
   daily: { label: "Daily Goal", icon: "☀️" },
@@ -48,6 +48,10 @@ export function isGoalStatus(value: string): value is GoalStatus {
 
 export function goalCountsTowardPlan(status: string): status is (typeof GOAL_PLANNING_STATUSES)[number] {
   return GOAL_PLANNING_STATUSES.includes(status as (typeof GOAL_PLANNING_STATUSES)[number]);
+}
+
+export function goalLevelLabel(level: string): string {
+  return isGoalLevel(level) ? GOAL_LEVEL_META[level].label : level.replace(/_/g, " ");
 }
 
 export function goalStatusLabel(status: string): string {

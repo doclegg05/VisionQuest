@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+// Type-only import: erased at compile time, so the module's "server-only"
+// guard never executes in this client component.
+import type { PlacementSuggestion } from "@/lib/placement-bridge";
 
 interface StudentSummary {
   id: string;
@@ -105,6 +108,7 @@ interface SpokesRecord {
   unsubsidizedEmploymentAt: string | null;
   employerName: string | null;
   hourlyWage: number | null;
+  placementApplicationId: string | null;
   nonCompleterAt: string | null;
   nonCompleterReason: string | null;
   notes: string | null;
@@ -153,6 +157,7 @@ interface WorkspacePayload {
   checklistTemplates: ChecklistTemplate[];
   moduleTemplates: ModuleTemplate[];
   summary: SummaryPayload;
+  placementSuggestion?: PlacementSuggestion | null;
 }
 
 function getErrorMessage(payload: unknown, fallback: string) {
@@ -188,6 +193,9 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   const [savingChecklistId, setSavingChecklistId] = useState<string | null>(null);
   const [savingModuleId, setSavingModuleId] = useState<string | null>(null);
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+  // Phase 0A placement bridge: set when staff choose "Use this job" on the
+  // verified-application suggestion; sent with the next profile save.
+  const [placementLink, setPlacementLink] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [profileForm, setProfileForm] = useState({
     firstName: "",
@@ -280,6 +288,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           })
         )
       );
+      setPlacementLink(null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the SPOKES record.");
@@ -304,6 +313,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           ...profileForm,
           barriersOnEntry: profileForm.barriersOnEntry.split("\n").map(s => s.trim()).filter(Boolean),
           barriersRemaining: profileForm.barriersRemaining.split("\n").map(s => s.trim()).filter(Boolean),
+          ...(placementLink ? { placementApplicationId: placementLink } : {}),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -694,7 +704,48 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             <input type="date" value={profileForm.familySurveyOfferedAt} onChange={(event) => setProfileForm((current) => ({ ...current, familySurveyOfferedAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input type="date" value={profileForm.postSecondaryEnteredAt} onChange={(event) => setProfileForm((current) => ({ ...current, postSecondaryEnteredAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.postSecondaryProgram} onChange={(event) => setProfileForm((current) => ({ ...current, postSecondaryProgram: event.target.value }))} placeholder="Post-secondary school or training" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.unsubsidizedEmploymentAt} onChange={(event) => setProfileForm((current) => ({ ...current, unsubsidizedEmploymentAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            {data?.placementSuggestion && !data.record.placementApplicationId ? (
+              <div
+                role="region"
+                aria-label="Verified job outcome ready to record"
+                className="rounded-xl border-2 border-[var(--accent-strong)] bg-[var(--surface-raised)] p-3"
+              >
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">
+                  Verified job outcome ready to record
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+                  This student&apos;s application
+                  {data.placementSuggestion.title ? ` for "${data.placementSuggestion.title}"` : ""}
+                  {data.placementSuggestion.company ? ` at ${data.placementSuggestion.company}` : ""} was
+                  accepted and an instructor verified it. &ldquo;Use this job&rdquo; fills in the
+                  employer below and links the placement to the application when you save. Enter the
+                  student&apos;s actual first day of work in the employment start date field — it is
+                  not filled in for you, because the verification date is not the start date.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const suggestion = data.placementSuggestion;
+                    if (!suggestion) return;
+                    setPlacementLink(suggestion.applicationId);
+                    setProfileForm((current) => ({
+                      ...current,
+                      employerName: current.employerName || suggestion.company || "",
+                    }));
+                  }}
+                  className="mt-2 min-h-11 rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                >
+                  {placementLink ? "Employer filled in — add the start date, then save" : "Use this job"}
+                </button>
+              </div>
+            ) : null}
+            {data?.record.placementApplicationId ? (
+              <p className="text-sm text-[var(--ink-muted)]">
+                <span aria-hidden="true">&#10003;</span> This employment entry is linked to a verified
+                accepted application.
+              </p>
+            ) : null}
+            <input type="date" aria-label="Employment start date" value={profileForm.unsubsidizedEmploymentAt} onChange={(event) => setProfileForm((current) => ({ ...current, unsubsidizedEmploymentAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.employerName} onChange={(event) => setProfileForm((current) => ({ ...current, employerName: event.target.value }))} placeholder="Employer name" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input value={profileForm.hourlyWage} onChange={(event) => setProfileForm((current) => ({ ...current, hourlyWage: event.target.value }))} placeholder="Hourly wage" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
             <input type="date" value={profileForm.nonCompleterAt} onChange={(event) => setProfileForm((current) => ({ ...current, nonCompleterAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />

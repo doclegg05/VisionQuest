@@ -26,6 +26,11 @@ export const SYSTEM_CONFIG_KEYS = [
   // (num_predict / max_tokens). Unset → provider default (768).
   // Raise this when enabling reasoning. Bounds enforced at read time.
   "ai_provider_max_output_tokens",
+  // Phase 0A placement bridge pilot flag (plain value, not encrypted).
+  // Unset/empty → bridge OFF. "all" → every class. Otherwise a
+  // comma-separated list of SpokesClass IDs whose actively enrolled
+  // students get the "Record employment outcome" queue item.
+  "placement_bridge_classes",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

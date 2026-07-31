@@ -357,13 +357,18 @@ model SpokesRecord {
   unsubsidizedEmploymentAt        DateTime? @db.Date
   employerName                    String?
   hourlyWage                      Float?
+  // Phase 0A placement bridge: which verified accepted Application produced
+  // this employment entry. Null = staff recorded employment manually.
+  // Unique so one application can never back two placement records.
+  placementApplicationId          String?   @unique
   nonCompleterAt                  DateTime? @db.Date
   nonCompleterReason              String?   @db.Text
   notes                           String?   @db.Text
   createdAt                       DateTime  @default(now())
   updatedAt                       DateTime  @updatedAt
 
-  student             Student?                   @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  student              Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  placementApplication Application? @relation("PlacementProvenance", fields: [placementApplicationId], references: [id], onDelete: SetNull)
   checklistProgress   SpokesChecklistProgress[]
   moduleProgress      SpokesModuleProgress[]
   employmentFollowUps SpokesEmploymentFollowUp[]
@@ -825,8 +830,9 @@ model Application {
   verifiedBy         String?
   verifiedAt         DateTime?
 
-  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  spokesPlacement SpokesRecord? @relation("PlacementProvenance")
 
   @@unique([studentId, opportunityId])
   @@index([studentId, status])

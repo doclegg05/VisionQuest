@@ -3,6 +3,26 @@
 import { useEffect } from "react";
 
 /**
+ * Anchor→tab map for the StudentDetail tabs. Every key MUST match a rendered
+ * DOM `id="…"` in the student-detail component tree — the map-integrity test
+ * in useAnchorTabSwitch.test.ts enforces this against the sources on disk.
+ */
+export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
+  // Coach tab anchors
+  "goal-evidence": "coach",
+  "goal-plans": "coach",
+  "career-discovery": "coach",
+  // Progress tab anchors
+  "orientation-review": "progress",
+  "certification-review": "progress",
+  "career-progress": "progress",
+  // Admin tab anchors
+  "submitted-forms": "admin",
+  "account-actions": "admin",
+  "follow-up-tasks": "admin",
+} as const;
+
+/**
  * Watches the URL hash and switches the active StudentDetail tab when the
  * hash targets a section that lives on a different tab. Then scrolls the
  * target into view. Handles both the first-load case (hash already in URL)

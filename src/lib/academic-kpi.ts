@@ -28,7 +28,8 @@ export interface KpiStudentRow {
   portfolioItems: { id: string }[];
   resumeData: { id: string } | null;
   publicCredentialPage: { isPublic: boolean } | null;
-  orientationProgress: { completed: boolean; completedAt: Date | null }[];
+  /** Completed orientation rows only — the query filters on `completed: true`. */
+  orientationProgress: { itemId: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -50,12 +51,12 @@ export interface GoalAdoptionKpis {
 
 export interface ResourcePipelineKpis {
   totalAssignedLinks: number;
-  linksWithEvidence: number;
-  linksWithEvidencePct: number;
+  linksWithActivity: number;
+  linksWithActivityPct: number;
   linksCompleted: number;
   linksCompletedPct: number;
-  studentsWithAnyEvidence: number;
-  studentsWithAnyEvidencePct: number;
+  studentsWithAnyActivity: number;
+  studentsWithAnyActivityPct: number;
 }
 
 export interface TimeToMilestoneKpis {
@@ -63,8 +64,8 @@ export interface TimeToMilestoneKpis {
   avgDaysToFirstGoal: number | null;
   medianDaysGoalToResource: number | null;
   avgDaysGoalToResource: number | null;
-  medianDaysResourceToEvidence: number | null;
-  avgDaysResourceToEvidence: number | null;
+  medianDaysResourceToActivity: number | null;
+  avgDaysResourceToActivity: number | null;
 }
 
 export interface ReadinessDistributionKpis {
@@ -124,7 +125,7 @@ function round1(value: number | null): number | null {
   return Math.round(value * 10) / 10;
 }
 
-const LINK_NO_EVIDENCE_STATUSES = new Set(["assigned", "suggested"]);
+const LINK_ACTIVITY_STATUSES = new Set(["in_progress", "completed"]);
 
 // ---------------------------------------------------------------------------
 // Main computation
@@ -132,7 +133,10 @@ const LINK_NO_EVIDENCE_STATUSES = new Set(["assigned", "suggested"]);
 
 export function computeAcademicKpis(
   students: KpiStudentRow[],
-  now: Date = new Date(),
+  now: Date,
+  // Count of ALL orientation items (the repo-wide readiness denominator).
+  // Required on purpose: a defaulted 0 silently zeroes orientation scores.
+  orientationTotal: number,
 ): AcademicKpiPayload {
   const total = students.length;
 
@@ -145,14 +149,14 @@ export function computeAcademicKpis(
 
   // --- Resource pipeline accumulators ---
   let totalAssignedLinks = 0;
-  let linksWithEvidence = 0;
+  let linksWithActivity = 0;
   let linksCompleted = 0;
-  let studentsWithAnyEvidence = 0;
+  let studentsWithAnyActivity = 0;
 
   // --- Time-to-milestone arrays ---
   const daysToFirstGoal: number[] = [];
   const daysGoalToResource: number[] = [];
-  const daysResourceToEvidence: number[] = [];
+  const daysResourceToActivity: number[] = [];
 
   // --- Readiness scores ---
   const readinessScores: number[] = [];
@@ -162,7 +166,7 @@ export function computeAcademicKpis(
   let funnelBhag = 0;
   let funnelMonthly = 0;
   let funnelAssignedResource = 0;
-  let funnelEvidenceSubmitted = 0;
+  let funnelResourceActivity = 0;
   let funnelCertProgress = 0;
   let funnelReadiness50 = 0;
 
@@ -179,7 +183,7 @@ export function computeAcademicKpis(
     totalActiveGoals += activeGoals.length;
 
     // Per-goal: linked resources + time-to-milestone
-    let studentHasEvidence = false;
+    let studentHasActivity = false;
     let studentHasAssignedLink = false;
 
     // Time to first goal
@@ -202,14 +206,15 @@ export function computeAcademicKpis(
         totalAssignedLinks++;
         studentHasAssignedLink = true;
 
-        const hasEv = !LINK_NO_EVIDENCE_STATUSES.has(link.status);
-        if (hasEv) {
-          linksWithEvidence++;
-          studentHasEvidence = true;
+        const hasActivity = LINK_ACTIVITY_STATUSES.has(link.status);
+        if (hasActivity) {
+          linksWithActivity++;
+          studentHasActivity = true;
 
-          // Time from resource assignment to evidence
-          const evidenceDelta = daysBetween(link.createdAt, link.updatedAt);
-          if (evidenceDelta >= 0) daysResourceToEvidence.push(evidenceDelta);
+          // Time from resource assignment to the most recent link update —
+          // a proxy for activity recency, not the first recorded activity.
+          const activityDelta = daysBetween(link.createdAt, link.updatedAt);
+          if (activityDelta >= 0) daysResourceToActivity.push(activityDelta);
         }
         if (link.status === "completed") {
           linksCompleted++;
@@ -221,12 +226,20 @@ export function computeAcademicKpis(
       }
     }
 
-    if (studentHasEvidence) studentsWithAnyEvidence++;
+    if (studentHasActivity) studentsWithAnyActivity++;
 
     // Readiness score
     const progState = parseState(student.progressionState);
     const studentBhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-    const readiness = computeReadinessScore({ ...progState, bhagCompleted: studentBhagCompleted, orientationProgress: { completed: 0, total: 0 } });
+    const completedOrientationItems = student.orientationProgress.length;
+    const readiness = computeReadinessScore({
+      ...progState,
+      bhagCompleted: studentBhagCompleted,
+      orientationProgress: {
+        completed: completedOrientationItems,
+        total: orientationTotal,
+      },
+    });
     readinessScores.push(readiness.score);
 
     // Funnel
@@ -234,7 +247,7 @@ export function computeAcademicKpis(
     if (hasBhag) funnelBhag++;
     if (hasMonthly) funnelMonthly++;
     if (studentHasAssignedLink) funnelAssignedResource++;
-    if (studentHasEvidence) funnelEvidenceSubmitted++;
+    if (studentHasActivity) funnelResourceActivity++;
     if (
       student.certifications.some(
         (c) => c.status === "in_progress" || c.status === "completed",
@@ -280,20 +293,20 @@ export function computeAcademicKpis(
     },
     resourcePipeline: {
       totalAssignedLinks,
-      linksWithEvidence,
-      linksWithEvidencePct: pct(linksWithEvidence, totalAssignedLinks),
+      linksWithActivity,
+      linksWithActivityPct: pct(linksWithActivity, totalAssignedLinks),
       linksCompleted,
       linksCompletedPct: pct(linksCompleted, totalAssignedLinks),
-      studentsWithAnyEvidence,
-      studentsWithAnyEvidencePct: pct(studentsWithAnyEvidence, total),
+      studentsWithAnyActivity,
+      studentsWithAnyActivityPct: pct(studentsWithAnyActivity, total),
     },
     timeToMilestone: {
       medianDaysToFirstGoal: round1(median(daysToFirstGoal)),
       avgDaysToFirstGoal: round1(average(daysToFirstGoal)),
       medianDaysGoalToResource: round1(median(daysGoalToResource)),
       avgDaysGoalToResource: round1(average(daysGoalToResource)),
-      medianDaysResourceToEvidence: round1(median(daysResourceToEvidence)),
-      avgDaysResourceToEvidence: round1(average(daysResourceToEvidence)),
+      medianDaysResourceToActivity: round1(median(daysResourceToActivity)),
+      avgDaysResourceToActivity: round1(average(daysResourceToActivity)),
     },
     readinessDistribution: {
       distribution: buckets,
@@ -310,7 +323,7 @@ export function computeAcademicKpis(
       { label: "Confirmed BHAG", value: funnelBhag, pct: pct(funnelBhag, total) },
       { label: "Active monthly plan", value: funnelMonthly, pct: pct(funnelMonthly, total) },
       { label: "Assigned resource", value: funnelAssignedResource, pct: pct(funnelAssignedResource, total) },
-      { label: "Evidence submitted", value: funnelEvidenceSubmitted, pct: pct(funnelEvidenceSubmitted, total) },
+      { label: "Resource activity", value: funnelResourceActivity, pct: pct(funnelResourceActivity, total) },
       { label: "Certification progress", value: funnelCertProgress, pct: pct(funnelCertProgress, total) },
       { label: "Readiness \u2265 50", value: funnelReadiness50, pct: pct(funnelReadiness50, total) },
     ],

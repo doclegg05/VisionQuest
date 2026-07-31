@@ -1,10 +1,40 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { syncStudentAlerts } from "@/lib/advising";
 import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import {
+  buildPlacementSuggestion,
+  evaluatePlacementProvenance,
+  getPlacementBridgeScope,
+} from "@/lib/placement-bridge";
 import { buildSpokesSummary, ensureSpokesRecordForStudent } from "@/lib/spokes";
 
+// Phase 0A placement bridge: the only NEW input this route accepts. The rest
+// of the PUT body keeps its legacy hand-rolled parsing deliberately — a
+// wholesale Zod conversion of this staff surface is out of scope for the
+// bridge slice (api-conventions.md's opportunistic-conversion rule noted).
+const placementProvenanceSchema = z.object({
+  // undefined → leave unchanged; null → clear the link; cuid → set it.
+  placementApplicationId: z.string().cuid("Invalid application ID.").nullish(),
+});
+
+const placementApplicationSelect = {
+  id: true,
+  studentId: true,
+  status: true,
+  verificationStatus: true,
+  verifiedAt: true,
+  opportunity: { select: { title: true, company: true } },
+} as const;
+
+// CONTRACT: date fields do NOT carry forward — an absent/blank date in the
+// body clears the stored value, so clients must submit the full form. (String
+// fields differ: they carry forward when omitted.) Combined with the
+// resulting-state check below, a partial PUT against a placement-linked
+// record fails 400 rather than silently blanking the employment date.
 function parseOptionalDate(value: unknown) {
   if (!value || typeof value !== "string") return null;
 
@@ -92,12 +122,33 @@ export const GET = withTeacherAuth(async (
     employmentFollowUps: hydratedRecord.employmentFollowUps,
   });
 
+  // Phase 0A placement bridge: prefill suggestion from the most recently
+  // verified accepted application (flag-gated; null when off or recorded).
+  const [placementScope, placementApplications, activeEnrollments] = await Promise.all([
+    getPlacementBridgeScope(),
+    prisma.application.findMany({
+      where: { studentId: id },
+      select: placementApplicationSelect,
+    }),
+    prisma.studentClassEnrollment.findMany({
+      where: { studentId: id, status: "active" },
+      select: { classId: true },
+    }),
+  ]);
+  const placementSuggestion = buildPlacementSuggestion({
+    scope: placementScope,
+    activeClassIds: activeEnrollments.map((enrollment) => enrollment.classId),
+    applications: placementApplications,
+    spokesRecord: hydratedRecord,
+  });
+
   return NextResponse.json({
     student,
     record: hydratedRecord,
     checklistTemplates,
     moduleTemplates,
     summary,
+    placementSuggestion,
   });
 });
 
@@ -110,6 +161,16 @@ export const PUT = withTeacherAuth(async (
   await assertStaffCanManageStudent(session, id);
   const existingRecord = await ensureSpokesRecordForStudent(id);
   const body = await req.json();
+
+  const provenanceParse = placementProvenanceSchema.safeParse(body);
+  if (!provenanceParse.success) {
+    return NextResponse.json(
+      { error: provenanceParse.error.issues[0]?.message ?? "Invalid application ID." },
+      { status: 400 }
+    );
+  }
+  const requestedPlacementApplicationId = provenanceParse.data.placementApplicationId;
+
   const data = {
     firstName: typeof body.firstName === "string" && body.firstName.trim() ? body.firstName.trim() : existingRecord.firstName,
     lastName: typeof body.lastName === "string" && body.lastName.trim() ? body.lastName.trim() : existingRecord.lastName,
@@ -206,10 +267,77 @@ export const PUT = withTeacherAuth(async (
           : existingRecord.notes,
   };
 
-  const record = await prisma.spokesRecord.update({
-    where: { id: existingRecord.id },
-    data,
-  });
+  // Phase 0A placement bridge: link the employment entry to the verified
+  // accepted application that produced it. undefined → leave the existing
+  // link unchanged; null → clear it; cuid → validate then set.
+  let placementApplicationId = existingRecord.placementApplicationId;
+  if (requestedPlacementApplicationId === null) {
+    placementApplicationId = null;
+  } else if (requestedPlacementApplicationId !== undefined) {
+    // Scoped to the student on purpose: an application that exists but
+    // belongs to someone else must be indistinguishable from one that does
+    // not exist, so this route never acts as an existence oracle on global
+    // Application ids.
+    const application = await prisma.application.findFirst({
+      where: { id: requestedPlacementApplicationId, studentId: id },
+      select: placementApplicationSelect,
+    });
+    const check = evaluatePlacementProvenance({
+      application,
+      employmentDate: data.unsubsidizedEmploymentAt,
+    });
+    if (!check.ok) {
+      return NextResponse.json({ error: check.message }, { status: check.status });
+    }
+    placementApplicationId = requestedPlacementApplicationId;
+  }
+
+  // The link/date invariant must hold on the RESULTING record, not only when
+  // the link arrives in this request body: a later save that carries the
+  // existing link forward while blanking unsubsidizedEmploymentAt would
+  // otherwise strand a linked record with no start date.
+  if (placementApplicationId && !data.unsubsidizedEmploymentAt) {
+    return NextResponse.json(
+      {
+        error:
+          "This record is linked to a placement application, so it needs an employment start date. Add the start date, or clear the application link first.",
+      },
+      { status: 400 }
+    );
+  }
+
+  let record;
+  try {
+    record = await prisma.spokesRecord.update({
+      where: { id: existingRecord.id },
+      data: { ...data, placementApplicationId },
+    });
+  } catch (error: unknown) {
+    // Unique constraint on placementApplicationId: another SPOKES record
+    // already claims this application as its placement source. SpokesRecord
+    // has other unique columns (studentId), so inspect meta.target and only
+    // translate the placement collision — anything else is a real 500.
+    if (
+      error !== null &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      const target = (error as { meta?: { target?: unknown } }).meta?.target;
+      const targetFields = Array.isArray(target)
+        ? target.map(String)
+        : typeof target === "string"
+          ? [target]
+          : [];
+      if (targetFields.some((field) => field.includes("placementApplicationId"))) {
+        return NextResponse.json(
+          { error: "That application is already linked to another placement record." },
+          { status: 409 }
+        );
+      }
+    }
+    throw error;
+  }
 
   await logAuditEvent({
     actorId: session.id,
@@ -221,8 +349,16 @@ export const PUT = withTeacherAuth(async (
     metadata: {
       studentId: id,
       status: record.status,
+      ...(record.placementApplicationId
+        ? { placementApplicationId: record.placementApplicationId }
+        : {}),
     },
   });
+
+  // Recording employment (or clearing it) changes the desired state of the
+  // "Record employment outcome" queue item — re-sync so it resolves/reopens
+  // without waiting for the next background sweep.
+  await syncStudentAlerts(id);
 
   return NextResponse.json({ record });
 });

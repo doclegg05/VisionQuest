@@ -21,12 +21,12 @@ interface GoalAdoptionKpis {
 
 interface ResourcePipelineKpis {
   totalAssignedLinks: number;
-  linksWithEvidence: number;
-  linksWithEvidencePct: number;
+  linksWithActivity: number;
+  linksWithActivityPct: number;
   linksCompleted: number;
   linksCompletedPct: number;
-  studentsWithAnyEvidence: number;
-  studentsWithAnyEvidencePct: number;
+  studentsWithAnyActivity: number;
+  studentsWithAnyActivityPct: number;
 }
 
 interface TimeToMilestoneKpis {
@@ -34,8 +34,8 @@ interface TimeToMilestoneKpis {
   avgDaysToFirstGoal: number | null;
   medianDaysGoalToResource: number | null;
   avgDaysGoalToResource: number | null;
-  medianDaysResourceToEvidence: number | null;
-  avgDaysResourceToEvidence: number | null;
+  medianDaysResourceToActivity: number | null;
+  avgDaysResourceToActivity: number | null;
 }
 
 interface ReadinessDistributionKpis {
@@ -119,9 +119,9 @@ function ResourcePipelineSection({ data, totalStudents }: { data: ResourcePipeli
           <p className="mt-1 text-xs text-[var(--ink-muted)]">resource links across all students</p>
         </div>
         <div className="theme-card rounded-xl p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Has evidence</p>
-          <p className="mt-2 text-3xl font-bold text-sky-700">{data.linksWithEvidence}</p>
-          <p className="mt-1 text-xs text-[var(--ink-muted)]">{data.linksWithEvidencePct}% of assigned links</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Has activity</p>
+          <p className="mt-2 text-3xl font-bold text-sky-700">{data.linksWithActivity}</p>
+          <p className="mt-1 text-xs text-[var(--ink-muted)]">{data.linksWithActivityPct}% of assigned links</p>
         </div>
         <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Completed</p>
@@ -132,10 +132,10 @@ function ResourcePipelineSection({ data, totalStudents }: { data: ResourcePipeli
 
       <div className="mt-3 rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-medium-bg)] p-4">
         <p className="text-sm font-semibold text-[var(--urgency-medium-text)]">
-          {data.studentsWithAnyEvidence} of {totalStudents} students
+          {data.studentsWithAnyActivity} of {totalStudents} students
         </p>
         <p className="mt-1 text-xs text-[var(--urgency-medium-text)]">
-          have submitted evidence on at least one assigned resource ({data.studentsWithAnyEvidencePct}%)
+          have started or completed at least one assigned resource ({data.studentsWithAnyActivityPct}%)
         </p>
       </div>
     </div>
@@ -148,7 +148,7 @@ function TimeToMilestoneSection({ data }: { data: TimeToMilestoneKpis }) {
   const rows: { label: string; median: number | null; avg: number | null }[] = [
     { label: "Enrollment to first goal", median: data.medianDaysToFirstGoal, avg: data.avgDaysToFirstGoal },
     { label: "Goal to first assigned resource", median: data.medianDaysGoalToResource, avg: data.avgDaysGoalToResource },
-    { label: "Resource to evidence", median: data.medianDaysResourceToEvidence, avg: data.avgDaysResourceToEvidence },
+    { label: "Resource to first activity", median: data.medianDaysResourceToActivity, avg: data.avgDaysResourceToActivity },
   ];
 
   return (
