@@ -116,6 +116,7 @@ const CONSOLIDATION_GROUPS: Record<string, { label: string; groupCategory: strin
   missed_appointment:              { label: "missed appointments",               groupCategory: "Advising" },
   certification_stalled:           { label: "certifications stalled",            groupCategory: "Certifications" },
   profile_birthdate_missing:       { label: "birthdates missing",                groupCategory: "Profile" },
+  placement_outcome_pending:       { label: "employment outcomes to record",     groupCategory: "Placement" },
 };
 
 interface ConsolidatedItem {

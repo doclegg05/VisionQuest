@@ -21,7 +21,14 @@
 // UI, and a mid-flight flag flip must never fail a staff save.
 //
 // Deliberately AI-free. Never auto-creates a SpokesRecord.
+//
+// FOLLOW-UP (known limitation): alert suppression is per-student — any
+// recorded `unsubsidizedEmploymentAt` on the SpokesRecord suppresses ALL
+// future placement alerts for that student, so a second placement (or a
+// retention change after job loss) never raises a new queue item.
 // ---------------------------------------------------------------------------
+
+import "server-only";
 
 import type { AlertDescriptor } from "./advising-alerts";
 import { OUTCOME_VERIFICATION } from "./outcome-verification";
@@ -175,26 +182,20 @@ export type PlacementProvenanceCheck =
 
 /**
  * Validates a provenance link before the SPOKES PUT writes it. Pure: the
- * route fetches the application row and passes it in.
+ * route fetches the application row — scoped to the student — and passes it
+ * in. A miss is always a plain 404: "no such application" and "belongs to a
+ * different student" are deliberately indistinguishable so the route cannot
+ * be used as an existence oracle on global Application ids.
  */
 export function evaluatePlacementProvenance({
   application,
-  studentId,
   employmentDate,
 }: {
-  application: (PlacementApplicationSignal & { studentId: string }) | null;
-  studentId: string;
+  application: PlacementApplicationSignal | null;
   employmentDate: Date | null;
 }): PlacementProvenanceCheck {
   if (!application) {
     return { ok: false, status: 404, message: "Application not found." };
-  }
-  if (application.studentId !== studentId) {
-    return {
-      ok: false,
-      status: 400,
-      message: "That application belongs to a different student.",
-    };
   }
   if (!qualifiesForPlacement(application)) {
     return {

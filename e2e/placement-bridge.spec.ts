@@ -45,7 +45,11 @@ function databaseUrlFromEnvLocal(): string {
     .split(/\r?\n/)
     .find((candidate) => candidate.startsWith("DATABASE_URL="));
   if (!line) throw new Error("DATABASE_URL not found in .env.local");
-  return line.slice("DATABASE_URL=".length);
+  // dotenv-style values may be quoted ("..." or '...'); the quotes are not
+  // part of the URL.
+  const raw = line.slice("DATABASE_URL=".length).trim();
+  const quoted = raw.match(/^(["'])(.*)\1$/);
+  return quoted ? quoted[2] : raw;
 }
 
 const prisma = new PrismaClient({ datasourceUrl: databaseUrlFromEnvLocal() });
@@ -54,8 +58,7 @@ let teacherId: string;
 let studentId: string;
 let opportunityId: string;
 let applicationId: string;
-let previousFlagValue: string | null = null;
-let flagExisted = false;
+let previousFlag: { value: string; updatedBy: string | null } | null = null;
 
 test.beforeAll(async () => {
   const teacher = await prisma.student.upsert({
@@ -112,11 +115,13 @@ test.beforeAll(async () => {
   });
   await prisma.spokesRecord.deleteMany({ where: { studentId } });
 
-  // Pilot flag ON for the run (plain, unencrypted value) — remember what was
-  // there so afterAll can restore it.
+  // Pilot flag ON for the run (plain, unencrypted value) — remember the full
+  // previous row (value AND updatedBy, since the e2e teacher is deleted in
+  // afterAll) so cleanup can restore it exactly.
   const existingFlag = await prisma.systemConfig.findUnique({ where: { key: FLAG_KEY } });
-  flagExisted = Boolean(existingFlag);
-  previousFlagValue = existingFlag?.value ?? null;
+  previousFlag = existingFlag
+    ? { value: existingFlag.value, updatedBy: existingFlag.updatedBy }
+    : null;
   await prisma.systemConfig.upsert({
     where: { key: FLAG_KEY },
     update: { value: "all", updatedBy: teacherId },
@@ -125,9 +130,14 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  if (flagExisted && previousFlagValue !== null) {
+  // Restore the flag row exactly as it was before the run (or remove it if
+  // it did not exist) so the pilot scope never stays "all" after the suite.
+  if (previousFlag) {
     await prisma.systemConfig
-      .update({ where: { key: FLAG_KEY }, data: { value: previousFlagValue } })
+      .update({
+        where: { key: FLAG_KEY },
+        data: { value: previousFlag.value, updatedBy: previousFlag.updatedBy },
+      })
       .catch(() => {});
   } else {
     await prisma.systemConfig.deleteMany({ where: { key: FLAG_KEY } }).catch(() => {});

@@ -1,15 +1,31 @@
 import assert from "node:assert/strict";
-import test from "node:test";
-import {
-  buildPlacementAlertDescriptors,
-  buildPlacementSuggestion,
-  evaluatePlacementProvenance,
-  isPlacementBridgeEnabledForStudent,
-  parsePlacementBridgeScope,
-  placementAlertKey,
-  PLACEMENT_ALERT_TYPE,
-  type PlacementApplicationSignal,
-} from "./placement-bridge";
+import test, { before, mock } from "node:test";
+
+// "server-only" throws at import time outside a Next.js server build.
+// Everything exercised here is pure, so we stub the module before the
+// dynamic import below resolves placement-bridge.ts.
+mock.module("server-only", { namedExports: {} });
+
+type PlacementApplicationSignal = import("./placement-bridge").PlacementApplicationSignal;
+
+let buildPlacementAlertDescriptors: typeof import("./placement-bridge").buildPlacementAlertDescriptors;
+let buildPlacementSuggestion: typeof import("./placement-bridge").buildPlacementSuggestion;
+let evaluatePlacementProvenance: typeof import("./placement-bridge").evaluatePlacementProvenance;
+let isPlacementBridgeEnabledForStudent: typeof import("./placement-bridge").isPlacementBridgeEnabledForStudent;
+let parsePlacementBridgeScope: typeof import("./placement-bridge").parsePlacementBridgeScope;
+let placementAlertKey: typeof import("./placement-bridge").placementAlertKey;
+let PLACEMENT_ALERT_TYPE: typeof import("./placement-bridge").PLACEMENT_ALERT_TYPE;
+
+before(async () => {
+  const mod = await import("./placement-bridge");
+  buildPlacementAlertDescriptors = mod.buildPlacementAlertDescriptors;
+  buildPlacementSuggestion = mod.buildPlacementSuggestion;
+  evaluatePlacementProvenance = mod.evaluatePlacementProvenance;
+  isPlacementBridgeEnabledForStudent = mod.isPlacementBridgeEnabledForStudent;
+  parsePlacementBridgeScope = mod.parsePlacementBridgeScope;
+  placementAlertKey = mod.placementAlertKey;
+  PLACEMENT_ALERT_TYPE = mod.PLACEMENT_ALERT_TYPE;
+});
 
 function application(
   overrides: Partial<PlacementApplicationSignal> = {}
@@ -188,34 +204,27 @@ test("suggestion is null when off, none qualify, or employment is recorded", () 
 
 const employmentDate = new Date("2026-07-30");
 
-test("provenance accepts a verified accepted application of the same student", () => {
+test("provenance accepts a verified accepted application", () => {
   assert.deepEqual(
     evaluatePlacementProvenance({
-      application: { ...application(), studentId: "student-1" },
-      studentId: "student-1",
+      application: application(),
       employmentDate,
     }),
     { ok: true }
   );
 });
 
-test("provenance rejects a missing application with 404", () => {
+// The route queries applications scoped to the student, so "does not exist"
+// and "belongs to a different student" both arrive here as null — and both
+// must come back as the same plain 404 (no existence oracle on global ids).
+test("provenance rejects a missing or foreign application with one plain 404", () => {
   const check = evaluatePlacementProvenance({
     application: null,
-    studentId: "student-1",
     employmentDate,
   });
   assert.equal(check.ok, false);
   assert.equal(!check.ok && check.status, 404);
-});
-
-test("provenance rejects another student's application with 400", () => {
-  const check = evaluatePlacementProvenance({
-    application: { ...application(), studentId: "student-2" },
-    studentId: "student-1",
-    employmentDate,
-  });
-  assert.equal(!check.ok && check.status, 400);
+  assert.equal(!check.ok && check.message, "Application not found.");
 });
 
 test("provenance rejects unverified or non-accepted applications with 409", () => {
@@ -225,8 +234,7 @@ test("provenance rejects unverified or non-accepted applications with 409", () =
     application({ status: "interviewing" }),
   ]) {
     const check = evaluatePlacementProvenance({
-      application: { ...app, studentId: "student-1" },
-      studentId: "student-1",
+      application: app,
       employmentDate,
     });
     assert.equal(!check.ok && check.status, 409);
@@ -235,8 +243,7 @@ test("provenance rejects unverified or non-accepted applications with 409", () =
 
 test("provenance requires an employment start date", () => {
   const check = evaluatePlacementProvenance({
-    application: { ...application(), studentId: "student-1" },
-    studentId: "student-1",
+    application: application(),
     employmentDate: null,
   });
   assert.equal(!check.ok && check.status, 400);

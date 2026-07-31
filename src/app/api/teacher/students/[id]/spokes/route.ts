@@ -269,19 +269,36 @@ export const PUT = withTeacherAuth(async (
   if (requestedPlacementApplicationId === null) {
     placementApplicationId = null;
   } else if (requestedPlacementApplicationId !== undefined) {
-    const application = await prisma.application.findUnique({
-      where: { id: requestedPlacementApplicationId },
+    // Scoped to the student on purpose: an application that exists but
+    // belongs to someone else must be indistinguishable from one that does
+    // not exist, so this route never acts as an existence oracle on global
+    // Application ids.
+    const application = await prisma.application.findFirst({
+      where: { id: requestedPlacementApplicationId, studentId: id },
       select: placementApplicationSelect,
     });
     const check = evaluatePlacementProvenance({
       application,
-      studentId: id,
       employmentDate: data.unsubsidizedEmploymentAt,
     });
     if (!check.ok) {
       return NextResponse.json({ error: check.message }, { status: check.status });
     }
     placementApplicationId = requestedPlacementApplicationId;
+  }
+
+  // The link/date invariant must hold on the RESULTING record, not only when
+  // the link arrives in this request body: a later save that carries the
+  // existing link forward while blanking unsubsidizedEmploymentAt would
+  // otherwise strand a linked record with no start date.
+  if (placementApplicationId && !data.unsubsidizedEmploymentAt) {
+    return NextResponse.json(
+      {
+        error:
+          "This record is linked to a placement application, so it needs an employment start date. Add the start date, or clear the application link first.",
+      },
+      { status: 400 }
+    );
   }
 
   let record;
@@ -292,17 +309,27 @@ export const PUT = withTeacherAuth(async (
     });
   } catch (error: unknown) {
     // Unique constraint on placementApplicationId: another SPOKES record
-    // already claims this application as its placement source.
+    // already claims this application as its placement source. SpokesRecord
+    // has other unique columns (studentId), so inspect meta.target and only
+    // translate the placement collision — anything else is a real 500.
     if (
       error !== null &&
       typeof error === "object" &&
       "code" in error &&
       (error as { code?: string }).code === "P2002"
     ) {
-      return NextResponse.json(
-        { error: "That application is already linked to another placement record." },
-        { status: 409 }
-      );
+      const target = (error as { meta?: { target?: unknown } }).meta?.target;
+      const targetFields = Array.isArray(target)
+        ? target.map(String)
+        : typeof target === "string"
+          ? [target]
+          : [];
+      if (targetFields.some((field) => field.includes("placementApplicationId"))) {
+        return NextResponse.json(
+          { error: "That application is already linked to another placement record." },
+          { status: 409 }
+        );
+      }
     }
     throw error;
   }
