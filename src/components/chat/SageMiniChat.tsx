@@ -6,7 +6,6 @@ import ChatInput from "./ChatInput";
 import { ActionCard } from "./ActionCard";
 import { ConfirmToolCard } from "./ConfirmToolCard";
 import MessageBubble from "./MessageBubble";
-import SageMark from "./SageMark";
 import TypingIndicator from "./TypingIndicator";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
@@ -299,7 +298,9 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--chat-panel-border)] bg-[var(--chat-header-bg)] px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <SageMark className="h-7 w-7" />
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--chat-sage-mark-bg)] text-xs font-bold text-[var(--chat-sage-mark)]">
+            S
+          </span>
           <span className="text-sm font-semibold text-[var(--ink-strong)]">Sage</span>
         </div>
         <div className="flex items-center gap-2">

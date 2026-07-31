@@ -176,11 +176,11 @@ export default function DashboardClient({
             <div className="mt-4">
               <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
                 <Image
-                  src="/images/sage-compass-chat-symbol.png"
+                  src="/images/sage-new-chat-symbol.png"
                   alt=""
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 object-contain"
+                  width={16}
+                  height={25}
+                  className="h-6 w-auto"
                 />
                 Open Sage
               </Link>

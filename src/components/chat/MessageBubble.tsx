@@ -1,7 +1,6 @@
 "use client";
 
 import { useReducedMotion } from "framer-motion";
-import SageMark from "./SageMark";
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
@@ -19,16 +18,17 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
       role="group"
       aria-label={`${isUser ? "Your" : "Sage's"} message`}
     >
-      {isUser ? (
-        <div
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--chat-bubble-user-avatar)] text-xs font-bold text-white"
-          aria-hidden="true"
-        >
-          Y
-        </div>
-      ) : (
-        <SageMark />
-      )}
+      <div
+        className={[
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold",
+          isUser
+            ? "bg-[var(--chat-bubble-user-avatar)] text-white"
+            : "bg-[var(--chat-sage-mark-bg)] text-[var(--chat-sage-mark)]",
+        ].join(" ")}
+        aria-hidden="true"
+      >
+        {isUser ? "Y" : "S"}
+      </div>
 
       <div
         className={[
