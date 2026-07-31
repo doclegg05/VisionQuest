@@ -47,6 +47,7 @@
     "sage:usage:summary": "node scripts/sage-usage-summary.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs",
+    "audit:deps": "tsx scripts/audit-dependencies.ts",
     "remediation:gate": "node scripts/validate-remediation.mjs",
     "ci-pipeline:validate": "node scripts/validate-ci-pipeline-command.mjs",
     "a11y-pipeline:validate": "node scripts/validate-a11y-pipeline-command.mjs",

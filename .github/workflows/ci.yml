@@ -28,8 +28,19 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Dependency audit (high severity and above fails)
-        run: npm audit --audit-level=high
+      # tsx is needed to run the gate; --ignore-scripts skips `prisma generate`,
+      # which the audit does not need.
+      - name: Install (audit gate only)
+        run: npm ci --ignore-scripts
+
+      # Same strictness as `npm audit --audit-level=high`, plus a DATED
+      # allowlist: a specific advisory can be waived with a written reason and an
+      # expiry, so one unfixable finding cannot force the whole gate down to
+      # --audit-level=critical. An expired waiver fails the build on purpose.
+      # Waivers live in config/audit-allowlist.json; logic in
+      # src/lib/audit-allowlist.ts (unit-tested).
+      - name: Dependency audit (high+ fails unless waived and unexpired)
+        run: npm run audit:deps
 
       - name: Secret scanning (gitleaks)
         uses: gitleaks/gitleaks-action@v2
