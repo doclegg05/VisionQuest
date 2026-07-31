@@ -10,6 +10,7 @@ import { ActionCard } from "./ActionCard";
 import { ConfirmToolCard } from "./ConfirmToolCard";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
+import SageMark from "./SageMark";
 import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
@@ -648,12 +649,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           >
             <List aria-hidden="true" size={20} weight="bold" />
           </button>
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--chat-sage-mark-bg)] text-xs font-bold text-[var(--chat-sage-mark)]"
-            aria-hidden="true"
-          >
-            S
-          </div>
+          <SageMark className="h-7 w-7" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Sage</p>
             <p className="text-xs text-[var(--ink-muted)]">Your SPOKES coach</p>
