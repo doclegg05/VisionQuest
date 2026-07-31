@@ -2,24 +2,20 @@
 
 import { useEffect } from "react";
 
+/**
+ * Anchor→tab map for the StudentDetail tabs. Every key MUST match a rendered
+ * DOM `id="…"` in the student-detail component tree — the map-integrity test
+ * in useAnchorTabSwitch.test.ts enforces this against the sources on disk.
+ */
 export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
   // Coach tab anchors
   "goal-evidence": "coach",
-  "review-queue": "coach",
-  "case-notes": "coach",
-  "follow-up-tasks": "coach",
-  "appointments": "coach",
-  "alerts": "coach",
-  "goals-plan": "coach",
+  "goal-plans": "coach",
   "career-discovery": "coach",
   // Progress tab anchors
-  "orientation": "progress",
   "orientation-review": "progress",
   "certification-review": "progress",
   "career-progress": "progress",
-  "portfolio": "progress",
-  "files": "progress",
-  "conversations": "progress",
   // Admin tab anchors
   "submitted-forms": "admin",
   "account-actions": "admin",
