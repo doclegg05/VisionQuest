@@ -58,6 +58,7 @@ const ORIENTATION_ITEMS = [
 
   // Section 9: Get Started with VisionQuest
   { label: "Set up your Sage profile", description: "Introduce yourself to Sage, your AI career coach, and set your initial goals.", section: "Get Started with VisionQuest", sortOrder: 23, required: true },
+  { label: "Watch the VisionQuest welcome video", description: "Watch Sage's welcome to VisionQuest, then earn a one-time XP reward for completing the introduction.", section: "Get Started with VisionQuest", sortOrder: 24, required: true },
 ];
 
 // ---------- Ready-to-Work Certification Templates ----------

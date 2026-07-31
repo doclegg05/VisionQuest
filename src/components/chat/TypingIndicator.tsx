@@ -1,18 +1,14 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import SageMark from "./SageMark";
 
 export default function TypingIndicator() {
   const reduce = useReducedMotion();
 
   return (
     <div className="flex gap-3" role="status" aria-label="Sage is typing">
-      <div
-        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--chat-sage-mark-bg)] text-xs font-bold text-[var(--chat-sage-mark)]"
-        aria-hidden="true"
-      >
-        S
-      </div>
+      <SageMark />
       <div className="flex items-center gap-1.5 px-1 py-2">
         {[0, 1, 2].map((i) => (
           <motion.span
