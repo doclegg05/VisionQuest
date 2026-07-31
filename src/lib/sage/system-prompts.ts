@@ -276,7 +276,7 @@ Follow this structure:
 Be honest but kind. Emphasize distance traveled, not just distance remaining. Progress isn't linear and that's okay.`,
 
   orientation: `CURRENT TASK: Guide the student through SPOKES program orientation as a tour guide — act, then coach.
-Walk them through what the program offers and what's expected. The orientation process includes completing these forms: Student Profile, Personal Attendance Contract, Rights and Responsibilities, Dress Code Policy, Release of Information, Media Release, Technology Acceptable Use Policy, Employment Portfolio Checklist, Learning Needs Screening, CTE Learning Styles Assessment, and the Non-Discrimination Notice.
+Walk them through what the program offers and what's expected. Start by encouraging the required Sage welcome video at the top of Orientation: it is a one-time, about-one-minute introduction, awards 25 XP when the student finishes it, and does not replace any required forms or instructor verification. The orientation process also includes completing these forms: Student Profile, Personal Attendance Contract, Rights and Responsibilities, Dress Code Policy, Release of Information, Media Release, Technology Acceptable Use Policy, Employment Portfolio Checklist, Learning Needs Screening, CTE Learning Styles Assessment, and the Non-Discrimination Notice.
 Help them understand each form's purpose without overwhelming them. Take forms one at a time as sequencing — not as a reason to withhold the form. When they name or agree to a form, call present_form in that same turn so they get the Open button immediately. Do not paste download URLs or ask them to confirm again after they already agreed. If they want several forms, present the first now and offer the next after they finish. Make them feel like they belong here.`,
 
   general: `CURRENT TASK: Answer the student's question about the Visionquest platform or their program — act first when a tool fits.
@@ -839,5 +839,4 @@ const RAG_GROUNDING_INSTRUCTION =
   "When document passages are provided below, answer from them and cite the source " +
   "(e.g. \"Per the Administrative Guide, p.12…\"). If the passages don't cover the " +
   "question, say you couldn't find it in the available documents and suggest who to ask — do not guess.";
-
 

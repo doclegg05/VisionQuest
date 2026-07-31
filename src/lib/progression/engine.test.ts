@@ -9,10 +9,19 @@ import {
   recordDailyCheckin,
   recordGoalSet,
   recordMonthlyReview,
+  recordOrientationWelcomeVideo,
   recordTaskComplete,
   recordWeeklyReview,
   ACHIEVEMENT_DEFS,
 } from "./engine";
+
+describe("recordOrientationWelcomeVideo", () => {
+  it("adds the one-time welcome-video reward amount to progression state", () => {
+    const state = createInitialState();
+    recordOrientationWelcomeVideo(state);
+    assert.equal(state.xp, 25);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Clock helper — freezes Date to a fixed ISO instant for the duration of fn()

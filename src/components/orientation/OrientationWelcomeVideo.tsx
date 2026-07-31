@@ -1,4 +1,57 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useProgression } from "@/components/progression/ProgressionProvider";
+import {
+  WELCOME_VIDEO_ORIENTATION_ITEM_ID,
+  WELCOME_VIDEO_XP,
+} from "@/lib/orientation-welcome-video";
+
 export default function OrientationWelcomeVideo() {
+  const { checkProgression } = useProgression();
+  const [completed, setCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [awarded, setAwarded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/orientation")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const item = data?.items?.find((candidate: { id: string }) => candidate.id === WELCOME_VIDEO_ORIENTATION_ITEM_ID);
+        setCompleted(Boolean(item?.completed));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function markVideoComplete() {
+    if (completed || saving) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/orientation/welcome-video", { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "We couldn't record your video completion. Please try again.");
+        return;
+      }
+      setCompleted(true);
+      setAwarded(Boolean(data.awarded));
+      await fetch("/api/orientation/complete", { method: "POST" }).catch(() => {});
+      await checkProgression();
+    } catch {
+      setError("We couldn't record your video completion. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section
       aria-labelledby="orientation-welcome-title"
@@ -12,7 +65,7 @@ export default function OrientationWelcomeVideo() {
           Welcome to VisionQuest
         </h2>
         <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-          Watch this one-minute introduction whenever you like. It is here to help you get oriented and does not replace any required orientation steps.
+          Watch this one-minute introduction to complete the Sage welcome step in Orientation and earn a one-time {WELCOME_VIDEO_XP} XP reward.
         </p>
       </div>
 
@@ -21,6 +74,7 @@ export default function OrientationWelcomeVideo() {
         controls
         playsInline
         preload="metadata"
+        onEnded={markVideoComplete}
       >
         <source src="/media/sage-welcome-orientation.mp4" type="video/mp4" />
         <track
@@ -32,6 +86,17 @@ export default function OrientationWelcomeVideo() {
         />
         Your browser does not support the welcome video. You can download it below.
       </video>
+
+      <div className="mt-3" aria-live="polite">
+        {completed ? (
+          <p className="text-sm font-semibold text-emerald-700">
+            {awarded ? `Welcome video complete — ${WELCOME_VIDEO_XP} XP added.` : "Welcome video complete."}
+          </p>
+        ) : (
+          <p className="text-sm text-[var(--ink-muted)]">Finish the video to complete this Orientation step and earn {WELCOME_VIDEO_XP} XP.</p>
+        )}
+        {error && <p role="alert" className="mt-1 text-sm text-red-600">{error}</p>}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <a

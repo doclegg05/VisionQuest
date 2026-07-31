@@ -417,6 +417,12 @@ export function recordOrientationComplete(state: ProgressionState): void {
   }
 }
 
+/** One-time XP for completing the Sage welcome video during orientation. */
+export function recordOrientationWelcomeVideo(state: ProgressionState): void {
+  state.xp += 25;
+  checkTierUnlocks(state);
+}
+
 export function recordPortfolioItem(state: ProgressionState, type: "item" | "resume" | "shared"): void {
   if (type === "item") {
     state.portfolioItemCount++;

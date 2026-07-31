@@ -126,10 +126,10 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     roles: ["student"],
     route: "/orientation",
     summary:
-      "New-student onboarding: required forms and a walkthrough of what the SPOKES program offers and expects.",
-    compact: "orientation (onboarding forms + program intro)",
+      "New-student onboarding: Sage's one-minute welcome video, required forms, and a walkthrough of what the SPOKES program offers and expects.",
+    compact: "orientation (Sage welcome video + onboarding forms + program intro)",
     mechanics:
-      "Covers Student Profile, Personal Attendance Contract, Rights and Responsibilities, Dress Code Policy, Release of Information, Media Release, Technology Acceptable Use Policy, Employment Portfolio Checklist, Learning Needs Screening, CTE Learning Styles Assessment, and the Non-Discrimination Notice.",
+      "The Sage welcome video at the top is a required one-time 25 XP step; it does not replace any form, signature, or instructor verification. Orientation also covers Student Profile, Personal Attendance Contract, Rights and Responsibilities, Dress Code Policy, Release of Information, Media Release, Technology Acceptable Use Policy, Employment Portfolio Checklist, Learning Needs Screening, CTE Learning Styles Assessment, and the Non-Discrimination Notice.",
     seeAlso: ["forms"],
   },
   {
