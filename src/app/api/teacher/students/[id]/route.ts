@@ -96,6 +96,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       certifications: {
         select: {
           id: true,
+          certType: true,
           status: true,
           startedAt: true,
           completedAt: true,
@@ -404,20 +405,19 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     progressionState: parsedProgression,
     formSubmissions: student.formSubmissions,
     orientationProgress: student.orientationProgress,
-    certification: student.certifications[0]
-      ? {
-          status: student.certifications[0].status,
-          startedAt: student.certifications[0].startedAt,
-          completedAt: student.certifications[0].completedAt,
-          requirements: student.certifications[0].requirements.map((requirement) => ({
-            templateId: requirement.templateId,
-            completed: requirement.completed,
-            completedAt: requirement.completedAt,
-            verifiedBy: requirement.verifiedBy,
-            verifiedAt: requirement.verifiedAt,
-          })),
-        }
-      : null,
+    certifications: student.certifications.map((certification) => ({
+      certType: certification.certType,
+      status: certification.status,
+      startedAt: certification.startedAt,
+      completedAt: certification.completedAt,
+      requirements: certification.requirements.map((requirement) => ({
+        templateId: requirement.templateId,
+        completed: requirement.completed,
+        completedAt: requirement.completedAt,
+        verifiedBy: requirement.verifiedBy,
+        verifiedAt: requirement.verifiedAt,
+      })),
+    })),
     portfolioItems: student.portfolioItems,
     resumeData: student.resumeData,
     publicCredentialPage: student.publicCredentialPage,

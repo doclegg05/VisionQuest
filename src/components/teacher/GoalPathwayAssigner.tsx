@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { GoalData } from "./student-detail/types";
+import { goalLevelLabel, goalStatusLabel } from "@/lib/goals";
 
 interface PathwaySuggestion {
   pathwayId: string;
@@ -125,13 +126,14 @@ export default function GoalPathwayAssigner({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[var(--ink-strong)]">{goal.content}</p>
-                <p className="text-xs text-[var(--ink-muted)] mt-0.5">
-                  {goal.level} &middot; {goal.status} &middot; No pathway assigned
+                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                  {goalLevelLabel(goal.level)} &middot; Status: {goalStatusLabel(goal.status)}
+                  {" \u2022 "}No pathway assigned
                 </p>
               </div>
               <button
                 onClick={() => setExpandedGoalId(expandedGoalId === goal.id ? null : goal.id)}
-                className="text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 shrink-0"
+                className="min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-900"
               >
                 {expandedGoalId === goal.id ? "Close" : "Assign"}
               </button>
@@ -157,18 +159,18 @@ export default function GoalPathwayAssigner({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[var(--ink-strong)]">{goal.content}</p>
-                <p className="text-xs text-[var(--ink-muted)] mt-0.5">
-                  {goal.level} &middot; {goal.status}
+                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                  {goalLevelLabel(goal.level)} &middot; Status: {goalStatusLabel(goal.status)}
                   {goal.pathway && (
-                    <span className="ml-1.5 inline-flex items-center rounded-full bg-green-50 text-green-700 px-2 py-0.5 text-xs">
-                      {goal.pathway.label}
+                    <span className="ml-1.5 inline-flex items-center rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-sm text-green-800">
+                      Pathway: {goal.pathway.label}
                     </span>
                   )}
                 </p>
               </div>
               <button
                 onClick={() => setExpandedGoalId(expandedGoalId === goal.id ? null : goal.id)}
-                className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] px-2 py-1 shrink-0"
+                className="min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
               >
                 {expandedGoalId === goal.id ? "Close" : "Change"}
               </button>
@@ -209,11 +211,11 @@ function PathwaySuggestionPanel({
   const [showAll, setShowAll] = useState(false);
 
   if (loading) {
-    return <p className="mt-3 text-xs text-[var(--ink-faint)]">Loading suggestions...</p>;
+    return <p className="mt-3 text-sm text-[var(--ink-muted)]">Loading pathway suggestions...</p>;
   }
 
   if (!suggestions) {
-    return <p className="mt-3 text-xs text-[var(--ink-faint)]">Could not load pathway suggestions.</p>;
+    return <p className="mt-3 text-sm font-medium text-[var(--urgency-critical-text)]">Could not load pathway suggestions.</p>;
   }
 
   return (
@@ -234,7 +236,7 @@ function PathwaySuggestionPanel({
                 <button
                   onClick={() => onAssign(s.pathwayId)}
                   disabled={assigning || s.pathwayId === currentPathwayId}
-                  className="text-xs font-medium text-green-700 hover:text-green-900 px-2 py-1 disabled:opacity-40"
+                  className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50 hover:text-green-900 disabled:opacity-40"
                 >
                   {s.pathwayId === currentPathwayId ? "Current" : "Assign"}
                 </button>
@@ -247,7 +249,7 @@ function PathwaySuggestionPanel({
       {!showAll && suggestions.allPathways.length > suggestions.suggestions.length && (
         <button
           onClick={() => setShowAll(true)}
-          className="text-xs text-blue-600 hover:text-blue-800"
+          className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-900"
         >
           Show all {suggestions.allPathways.length} pathways
         </button>
@@ -268,7 +270,7 @@ function PathwaySuggestionPanel({
                   <button
                     onClick={() => onAssign(p.id)}
                     disabled={assigning || p.id === currentPathwayId}
-                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 disabled:opacity-40"
+                    className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-900 disabled:opacity-40"
                   >
                     {p.id === currentPathwayId ? "Current" : "Assign"}
                   </button>
@@ -282,14 +284,14 @@ function PathwaySuggestionPanel({
         <button
           onClick={onClear}
           disabled={assigning}
-          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+          className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-800 disabled:opacity-40"
         >
           Remove pathway assignment
         </button>
       )}
 
       {suggestions.suggestions.length === 0 && suggestions.allPathways.length === 0 && (
-        <p className="text-xs text-[var(--ink-faint)]">
+        <p className="text-sm text-[var(--ink-muted)]">
           No pathways exist yet. Create pathways in Program Setup &gt; Learning &gt; Pathways.
         </p>
       )}

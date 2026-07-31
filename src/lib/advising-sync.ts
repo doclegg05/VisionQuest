@@ -5,6 +5,7 @@ import { prisma } from "./db";
 import { buildGoalEvidenceEntries, buildGoalReviewQueue } from "./goal-evidence";
 import { parseState } from "./progression/engine";
 import { toGoalResourceLinkView } from "./goal-resource-links";
+import { buildPlacementAlertDescriptors } from "./placement-bridge";
 import { buildStudentStatusSignals } from "./student-status";
 import type { loadStudentAlertSyncContext } from "./advising-sync-context";
 
@@ -34,9 +35,12 @@ export function buildStudentAlertSyncPlan({
     orientationItems,
     recentMoodEntries,
     compliance,
+    placementBridgeScope,
   } = context;
 
-  const certification = studentSignals?.certifications[0];
+  const certification = studentSignals?.certifications.find(
+    (candidate) => candidate.certType === "ready-to-work",
+  );
   const requiredCertificationRequirements = certification?.requirements.filter(
     (requirement) => requirement.template.required
   ) || [];
@@ -67,20 +71,19 @@ export function buildStudentAlertSyncPlan({
         progressionState,
         formSubmissions: studentSignals.formSubmissions,
         orientationProgress: studentSignals.orientationProgress,
-        certification: certification
-          ? {
-              status: certification.status,
-              startedAt: certification.startedAt,
-              completedAt: certification.completedAt,
-              requirements: certification.requirements.map((requirement) => ({
-                templateId: requirement.templateId,
-                completed: requirement.completed,
-                completedAt: requirement.completedAt,
-                verifiedBy: requirement.verifiedBy,
-                verifiedAt: requirement.verifiedAt,
-              })),
-            }
-          : null,
+        certifications: studentSignals.certifications.map((candidate) => ({
+          certType: candidate.certType,
+          status: candidate.status,
+          startedAt: candidate.startedAt,
+          completedAt: candidate.completedAt,
+          requirements: candidate.requirements.map((requirement) => ({
+            templateId: requirement.templateId,
+            completed: requirement.completed,
+            completedAt: requirement.completedAt,
+            verifiedBy: requirement.verifiedBy,
+            verifiedAt: requirement.verifiedAt,
+          })),
+        })),
         portfolioItems: studentSignals.portfolioItems,
         resumeData: studentSignals.resumeData,
         publicCredentialPage: studentSignals.publicCredentialPage,
@@ -208,6 +211,19 @@ export function buildStudentAlertSyncPlan({
     return null;
   })();
 
+  // Phase 0A placement bridge: verified accepted applications raise a
+  // "Record employment outcome" queue item until employment is recorded.
+  const placementAlerts = studentSignals
+    ? buildPlacementAlertDescriptors({
+        scope: placementBridgeScope,
+        activeClassIds: studentSignals.classEnrollments.map(
+          (enrollment) => enrollment.classId
+        ),
+        applications: studentSignals.applications,
+        spokesRecord: studentSignals.spokesRecord,
+      })
+    : [];
+
   return {
     studentSignals,
     goalEvidenceEntries,
@@ -216,6 +232,7 @@ export function buildStudentAlertSyncPlan({
       ...baselineAlerts,
       ...goalAlerts,
       ...(motivationAlert ? [motivationAlert] : []),
+      ...placementAlerts,
     ],
   };
 }

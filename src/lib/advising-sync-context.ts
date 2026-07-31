@@ -3,6 +3,7 @@ import "server-only";
 import { checkStudentCompliance } from "./class-requirement-compliance";
 import { prisma } from "./db";
 import { ALL_INACTIVITY_ALERT_TYPES } from "./inactivity";
+import { getPlacementBridgeScope, PLACEMENT_ALERT_TYPE } from "./placement-bridge";
 
 export async function loadStudentAlertSyncContext(studentId: string, now: Date) {
   const [tasks, appointments, studentSignals, orientationItems, existing, recentMoodEntries] = await prisma.$transaction([
@@ -118,7 +119,17 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
           },
         },
         spokesRecord: {
-          select: { birthDate: true },
+          select: {
+            birthDate: true,
+            // Phase 0A placement bridge: recorded employment (any provenance)
+            // retires the placement queue item.
+            placementApplicationId: true,
+            unsubsidizedEmploymentAt: true,
+          },
+        },
+        classEnrollments: {
+          where: { status: "active" },
+          select: { classId: true },
         },
         files: {
           select: { uploadedAt: true },
@@ -152,12 +163,19 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             status: true,
             updatedAt: true,
             appliedAt: true,
+            // Phase 0A placement bridge: verified accepted applications raise
+            // the "Record employment outcome" queue item.
+            verificationStatus: true,
+            verifiedAt: true,
+            opportunity: {
+              select: { title: true, company: true },
+            },
           },
           orderBy: { updatedAt: "desc" },
         },
         certifications: {
-          where: { certType: "ready-to-work" },
           select: {
+            certType: true,
             status: true,
             startedAt: true,
             completedAt: true,
@@ -178,7 +196,6 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
               },
             },
           },
-          take: 1,
         },
         _count: {
           select: {
@@ -225,6 +242,7 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
             "motivation_declining",
             "profile_birthdate_missing",
             "requirement_noncompliant",
+            PLACEMENT_ALERT_TYPE,
             ...ALL_INACTIVITY_ALERT_TYPES,
           ],
         },
@@ -242,6 +260,9 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
   // Check class requirement compliance (outside the transaction since it's read-only)
   const compliance = await checkStudentCompliance(studentId);
 
+  // Phase 0A placement bridge pilot scope (SystemConfig, cached 60s).
+  const placementBridgeScope = await getPlacementBridgeScope();
+
   return {
     tasks,
     appointments,
@@ -250,5 +271,6 @@ export async function loadStudentAlertSyncContext(studentId: string, now: Date) 
     existing,
     recentMoodEntries,
     compliance,
+    placementBridgeScope,
   };
 }

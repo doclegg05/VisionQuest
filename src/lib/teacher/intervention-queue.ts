@@ -165,7 +165,7 @@ function fallbackAction(studentId: string, signals: StudentSignals) {
     return {
       kind: "create_task" as const,
       label: "Add task",
-      href: `/teacher/students/${studentId}#tasks`,
+      href: `/teacher/students/${studentId}#follow-up-tasks`,
     };
   }
 
