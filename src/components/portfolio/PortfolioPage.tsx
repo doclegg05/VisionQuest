@@ -46,7 +46,7 @@ export default function PortfolioPage() {
             id={`portfolio-tab-${item.key}`}
             role="tab"
             aria-selected={tab === item.key}
-            aria-controls={`portfolio-tabpanel-${item.key}`}
+            aria-controls="portfolio-tabpanel"
             tabIndex={tab === item.key ? 0 : -1}
             onClick={() => setTab(item.key)}
             onKeyDown={(event) => selectAdjacentTab(event, item.key)}
@@ -63,10 +63,9 @@ export default function PortfolioPage() {
       </div>
 
       <div
-        id={`portfolio-tabpanel-${tab}`}
+        id="portfolio-tabpanel"
         role="tabpanel"
         aria-labelledby={`portfolio-tab-${tab}`}
-        tabIndex={0}
       >
         {tab === "portfolio"
           ? <PortfolioGrid />
