@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   Fire,
@@ -174,7 +175,13 @@ export default function DashboardClient({
             </h1>
             <div className="mt-4">
               <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
-                <ChatCircle size={18} weight="fill" />
+                <Image
+                  src="/images/sage-compass-chat-symbol.png"
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 object-contain"
+                />
                 Open Sage
               </Link>
             </div>
