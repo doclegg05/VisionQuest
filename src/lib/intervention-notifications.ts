@@ -357,16 +357,19 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         href: `/teacher/students/${studentRecordId}#orientation-review`,
         label: "Open orientation",
       };
+    // Birthdate and employment outcomes are edited in SpokesStudentWorkspace,
+    // which renders only on the /spokes route — the student-detail page has no
+    // SPOKES section, so a #anchor on the base route would silently no-op.
     case "profile_birthdate_missing":
       return {
-        href: `/teacher/students/${studentRecordId}#spokes-profile`,
+        href: `/teacher/students/${studentRecordId}/spokes`,
         label: "Add birthdate",
       };
     // Phase 0A placement bridge: a verified accepted application is waiting
     // for staff to record the employment outcome on the SPOKES record.
     case "placement_outcome_pending":
       return {
-        href: `/teacher/students/${studentRecordId}#spokes-profile`,
+        href: `/teacher/students/${studentRecordId}/spokes`,
         label: "Record employment",
       };
     default:

@@ -1,4 +1,5 @@
 import { type FormEvent } from "react";
+import { humanizeStatusValue } from "@/lib/status-labels";
 import StructuredFormsSection from "./StructuredFormsSection";
 import type {
   StudentData,
@@ -159,7 +160,7 @@ export default function OperationsTab({
                             ? "bg-rose-100 text-rose-800"
                             : "bg-amber-100 text-amber-800"
                       }`}>
-                        {submission.status}
+                        {humanizeStatusValue(submission.status)}
                       </span>
                     </div>
                     {submission.description ? (
@@ -344,7 +345,7 @@ export default function OperationsTab({
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadge(appointment.status)}`}>
-                          {appointment.status}
+                          {humanizeStatusValue(appointment.status)}
                         </span>
                         {appointment.followUpRequired && (
                           <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
@@ -421,7 +422,7 @@ export default function OperationsTab({
         </div>
 
         {/* Tasks */}
-        <div className="theme-card rounded-xl p-5">
+        <div id="follow-up-tasks" className="theme-card rounded-xl p-5">
           <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Follow-Up Tasks</h3>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">
             Assign next steps that the student can track and complete.

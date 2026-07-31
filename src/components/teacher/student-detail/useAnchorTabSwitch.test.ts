@@ -77,4 +77,36 @@ describe("STUDENT_DETAIL_ANCHOR_TO_TAB integrity", () => {
       );
     }
   });
+
+  it("covers every student-detail deep link emitted anywhere in src", () => {
+    // The reverse direction: a link built as /teacher/students/${…}#anchor
+    // that is NOT in the map silently no-ops (tab never switches). This is
+    // the direction the actual bugs traveled (#spokes-profile, #tasks).
+    const testDir = dirname(fileURLToPath(import.meta.url));
+    const srcRoot = join(testDir, "..", "..", "..");
+    const sourceFiles = readdirSync(srcRoot, { recursive: true })
+      .map(String)
+      .filter(
+        (relPath) =>
+          (relPath.endsWith(".ts") || relPath.endsWith(".tsx")) &&
+          !relPath.endsWith(".test.ts") &&
+          !relPath.endsWith(".test.tsx"),
+      );
+
+    const mappedAnchors = new Set(Object.keys(STUDENT_DETAIL_ANCHOR_TO_TAB));
+    // Literal anchors on the student-detail base route only — links to
+    // sub-routes like /teacher/students/${id}/spokes carry no anchor and
+    // dynamic anchors (#${…}) do not match the literal character class.
+    const deepLinkPattern = /\/teacher\/students\/\$\{[^}]+\}#([a-z0-9-]+)/g;
+
+    for (const relPath of sourceFiles) {
+      const source = readFileSync(join(srcRoot, relPath), "utf8");
+      for (const match of source.matchAll(deepLinkPattern)) {
+        assert.ok(
+          mappedAnchors.has(match[1]),
+          `${relPath} deep-links to unmapped anchor "#${match[1]}" — add it to STUDENT_DETAIL_ANCHOR_TO_TAB (with a rendered id) or fix the link`,
+        );
+      }
+    }
+  });
 });

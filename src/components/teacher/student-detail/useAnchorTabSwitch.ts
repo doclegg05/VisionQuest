@@ -19,6 +19,7 @@ export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
   // Admin tab anchors
   "submitted-forms": "admin",
   "account-actions": "admin",
+  "follow-up-tasks": "admin",
 } as const;
 
 /**

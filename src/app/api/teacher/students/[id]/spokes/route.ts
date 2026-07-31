@@ -30,6 +30,11 @@ const placementApplicationSelect = {
   opportunity: { select: { title: true, company: true } },
 } as const;
 
+// CONTRACT: date fields do NOT carry forward — an absent/blank date in the
+// body clears the stored value, so clients must submit the full form. (String
+// fields differ: they carry forward when omitted.) Combined with the
+// resulting-state check below, a partial PUT against a placement-linked
+// record fails 400 rather than silently blanking the employment date.
 function parseOptionalDate(value: unknown) {
   if (!value || typeof value !== "string") return null;
 
