@@ -1,5 +1,7 @@
 # VisionQuest Local AI Tunnel Recommendation
 
+Status: current operational reference — standing tunnel guidance plus the 2026-05-13 follow-up and permanent-fix checklist.
+
 **Created:** 2026-04-15  
 **Context:** Internal planning note for future agents
 

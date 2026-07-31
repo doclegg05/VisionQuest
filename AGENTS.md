@@ -29,7 +29,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | Job board implementation | [docs/superpowers/plans/2026-03-31-job-board.md](./docs/superpowers/plans/2026-03-31-job-board.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
-| SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| SPOKES program knowledge (Sage grounding) | [catalog/index.md](./catalog/index.md) — git-tracked OKF layer; staff record logic in `src/lib/spokes.ts` |
 
 ### Archived (do not read unless explicitly asked)
 - `docs/archive/GAMIFICATION_BACKLOG.md` — frozen planning artifact
@@ -45,7 +45,7 @@ Read when deciding what to build, cut, simplify, or automate.
 
 ## Architecture Notes
 - Auth: JWT in httpOnly cookies (SameSite=strict), scrypt password hashing (legacy PBKDF2 rehashed on login), TOTP MFA, `sessionVersion` invalidation
-- AI providers: `src/lib/ai/` abstraction — Gemini cloud + Ollama local, routed by data sensitivity (FERPA-sensitive classes are local-only by policy); systemInstruction set at `getGenerativeModel()` level (`DEFAULT_GEMINI_MODEL` in `src/lib/gemini.ts`)
+- AI providers: `src/lib/ai/` abstraction — Gemini cloud + Ollama local, routed by `resolveAiProvider` in two tiers (owner decision 2026-07-24): document-PII tasks (`DOCUMENT_LOCAL_ONLY_TASKS`: resume extract/assist, tailor_application, chat_file_gist) hard-gate to local and fail closed with a 503 when it is unavailable; everything else, including student_record chat, uses the configured provider with consent + AI audit logging so a local outage cannot take chat down. See CLAUDE.md and `.claude/rules/sage-ai.md` for the full rule. systemInstruction set at `getGenerativeModel()` level (`DEFAULT_GEMINI_MODEL` in `src/lib/gemini.ts`)
 - Chat: SSE streaming from `/api/chat/send`, two-call pattern (conversation + prioritized async extraction); deterministic crisis safety net (988, English + Spanish patterns)
 - RAG: live hybrid pgvector + full-text retrieval (`src/lib/sage/hybrid-retrieval.ts`) over `ProgramDocument` rows + the `catalog/` OKF layer; gating red-team evals in CI
 - File storage: local `./uploads/` in dev, Supabase Storage (S3-compatible) in prod

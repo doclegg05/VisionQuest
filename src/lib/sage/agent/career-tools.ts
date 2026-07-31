@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { applicationStatusForJobBoard } from "@/lib/job-applications";
 import {
   parseStoredResumeData,
   resumeContentSchema,
@@ -313,33 +314,22 @@ const lookupSavedJobs: AgentTool = {
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.session.id;
 
-    // Scope to the student's current class board, matching gatherJobAndProfile()
-    // and update_application_status. Without this the list can advertise a
-    // jobListingId (e.g. saved under a previous enrollment) that every other
-    // career tool then refuses as "not found" — so the pipeline only ever lists
-    // jobs the student can actually act on.
-    const enrollment = await prisma.studentClassEnrollment.findFirst({
-      where: { studentId, status: "active" },
-      select: { classId: true },
-    });
-    if (!enrollment) return { status: "error", summary: "I couldn't find your active class enrollment." };
-
-    const saved = await prisma.studentSavedJob.findMany({
-      where: { studentId, jobListing: { classConfig: { classId: enrollment.classId } } },
-      orderBy: { savedAt: "desc" },
+    // VQ-R-017: the pipeline is the unified Application model (joined to its
+    // url-deduped Opportunity). StudentSavedJob is retired.
+    const applications = await prisma.application.findMany({
+      where: { studentId },
+      orderBy: { updatedAt: "desc" },
       take: 25,
       select: {
         status: true,
-        jobListing: { select: { id: true, title: true, company: true, location: true } },
+        opportunity: { select: { title: true, company: true, location: true, url: true } },
       },
     });
 
-    if (saved.length === 0) {
+    if (applications.length === 0) {
       return {
         status: "success",
-        // Accurate whether they've saved nothing at all or only jobs that are no
-        // longer on their board — without revealing another board's contents.
-        summary: "You don't have any saved jobs on your job board yet.",
+        summary: "You don't have any saved jobs yet.",
         data: { jobs: [] },
         action: { action: "navigate", target: "/career", label: "Browse jobs" },
         modelHint:
@@ -347,12 +337,37 @@ const lookupSavedJobs: AgentTool = {
       };
     }
 
-    const jobs = saved.map((s) => ({
-      jobListingId: s.jobListing.id,
-      title: s.jobListing.title,
-      company: s.jobListing.company,
-      location: s.jobListing.location,
-      status: s.status,
+    // Attach the class-board jobListingId (matched by opportunity url) where
+    // one exists, because analyze_job_match / prepare_for_interview /
+    // generate_cover_letter / update_application_status act on class listings.
+    // Browse saves list without an id — still real pipeline entries.
+    const enrollment = await prisma.studentClassEnrollment.findFirst({
+      where: { studentId, status: "active" },
+      select: { classId: true },
+    });
+    const urls = applications
+      .map((application) => application.opportunity.url)
+      .filter((value): value is string => Boolean(value));
+    const boardListings = enrollment
+      ? await prisma.jobListing.findMany({
+          where: {
+            classConfig: { classId: enrollment.classId },
+            status: "active",
+            url: { in: urls },
+          },
+          select: { id: true, url: true },
+        })
+      : [];
+    const listingIdByUrl = new Map(boardListings.map((listing) => [listing.url, listing.id]));
+
+    const jobs = applications.map((application) => ({
+      jobListingId: application.opportunity.url
+        ? listingIdByUrl.get(application.opportunity.url) ?? null
+        : null,
+      title: application.opportunity.title,
+      company: application.opportunity.company,
+      location: application.opportunity.location ?? "",
+      status: applicationStatusForJobBoard(application.status),
     }));
 
     return {
@@ -361,9 +376,14 @@ const lookupSavedJobs: AgentTool = {
       data: { jobs },
       modelHint:
         `Saved jobs: ${jobs
-          .map((j) => `"${j.title}" at ${j.company} — ${j.status} [jobListingId=${j.jobListingId}]`)
+          .map(
+            (j) =>
+              `"${j.title}" at ${j.company} — ${j.status}` +
+              (j.jobListingId ? ` [jobListingId=${j.jobListingId}]` : " [not on your class board]"),
+          )
           .join("; ")}. ` +
-        "Use these jobListingIds for analyze_job_match, prepare_for_interview, generate_cover_letter, or update_application_status.",
+        "Use the jobListingIds for analyze_job_match, prepare_for_interview, generate_cover_letter, or update_application_status. " +
+        "Jobs without an id can't be used with those tools — they were saved from the browse pool.",
     };
   },
 };

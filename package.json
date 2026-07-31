@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --experimental-test-module-mocks \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+    "test:coverage": "tsx --test --experimental-test-module-mocks --experimental-test-coverage --test-coverage-lines=80 \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
     "test:rls": "tsx --test src/lib/rls.test.ts",
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:forms:delivery": "tsx --test --experimental-test-module-mocks src/lib/spokes/forms-delivery.test.ts src/lib/spokes/forms-delivery.s3fallback.test.ts src/lib/spokes/forms-delivery.route.test.ts",
@@ -46,9 +47,12 @@
     "sage:usage:summary": "node scripts/sage-usage-summary.mjs",
     "postinstall": "prisma generate",
     "audit:api-auth": "node scripts/audit-api-auth.mjs",
+    "audit:deps": "tsx scripts/audit-dependencies.ts",
+    "remediation:gate": "node scripts/validate-remediation.mjs",
     "ci-pipeline:validate": "node scripts/validate-ci-pipeline-command.mjs",
     "a11y-pipeline:validate": "node scripts/validate-a11y-pipeline-command.mjs",
-    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate"
+    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate",
+    "registry:generate": "node scripts/generate-endpoint-inventory.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1042.0",

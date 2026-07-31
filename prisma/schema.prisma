@@ -1618,7 +1618,7 @@ model JobListing {
   url            String
   source         String
   sourceType     String
-  sourceId       String    @unique
+  sourceId       String
   clusters       String[]  @default([])
   status         String    @default("active")
   expiresAt      DateTime?
@@ -1632,6 +1632,10 @@ model JobListing {
   resumeVersions  ResumeVersion[]
   coverLetters    CoverLetter[]
 
+  // VQ-R-018: sourceId is unique PER CLASS, not globally — the same upstream
+  // posting scraped for two classes is two rows, so one class's refresh can
+  // never overwrite another's.
+  @@unique([classConfigId, sourceId])
   @@index([classConfigId, status])
   @@index([classConfigId, status, workMode])
   @@index([status, createdAt])

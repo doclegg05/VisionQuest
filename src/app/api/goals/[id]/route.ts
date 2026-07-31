@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { badRequest, forbidden, notFound } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
-import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
-import { ensureGoalLevelProgression } from "@/lib/goal-progression";
-import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
-import { recordBhagCompleted } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { applyGoalStatusEffects } from "@/lib/goal-status";
+import { isAwaitingInstructorConfirmation, isGoalStatus } from "@/lib/goals";
 
 async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {
@@ -32,6 +29,8 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
       status: true,
       parentId: true,
       sourceMessageId: true,
+      // Needed by the unconfirmed-Sage-proposal guard below (VQ-R-005).
+      confirmedAt: true,
       createdAt: true,
     },
   });
@@ -71,6 +70,28 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
     }
   }
 
+  // VQ-R-005: a Sage-proposed goal is not the student's to advance until an
+  // instructor confirms it. Blocking only "confirmed" left every other
+  // transition open — including "completed" — so a student could drive an
+  // AI-generated goal to done with no human in the loop, which is the exact
+  // loop the verification layer exists to close. Dismissal stays available so a
+  // student is never stuck with a suggestion they did not want. Content edits
+  // are unaffected: refining the wording of a suggestion before an instructor
+  // reviews it is the intended flow.
+  const isUnconfirmedSageProposal = isAwaitingInstructorConfirmation(goal);
+  // "confirmed" is deliberately excluded here so the dedicated confirmation
+  // guard below owns that case and keeps its more specific message.
+  if (
+    isUnconfirmedSageProposal &&
+    updates.status &&
+    updates.status !== "abandoned" &&
+    updates.status !== "confirmed"
+  ) {
+    throw forbidden(
+      "Sage suggested this goal — ask your instructor to confirm it before updating its progress.",
+    );
+  }
+
   // Handle confirmation: proposed Sage goals and student-entered active goals
   // both become confirmed only after a human explicitly accepts them.
   if (updates.status === "confirmed" || ("confirm" in body && body.confirm === true)) {
@@ -107,16 +128,9 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
     data: updates,
   });
 
-  invalidatePrefix(`goals:${session.id}`);
-
-  if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
-    await ensureGoalLevelProgression(session.id, [updatedGoal.level]);
-  }
-
-  // When a BHAG is marked completed, award XP and check tier unlocks
-  if (updatedGoal.level === "bhag" && updatedGoal.status === "completed") {
-    await updateProgression(session.id, recordBhagCompleted);
-  }
+  // Shared with Sage's update_goal_status tool so status side effects
+  // (cache, level progression, BHAG XP) can never drift (VQ-R-011).
+  await applyGoalStatusEffects(session.id, updatedGoal);
 
   return NextResponse.json({ goal: updatedGoal });
 });

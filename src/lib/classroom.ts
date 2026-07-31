@@ -1,4 +1,5 @@
 import { badRequest, forbidden, type Session } from "@/lib/api-error";
+import { recordStudentView, type StudentViewSurface } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
 export const NON_ARCHIVED_ENROLLMENT_STATUSES = [
@@ -199,7 +200,11 @@ export async function assertTeacherAssignmentLimit(
   }
 }
 
-export async function assertStaffCanManageStudent(session: Session, studentIdentifier: string) {
+export async function assertStaffCanManageStudent(
+  session: Session,
+  studentIdentifier: string,
+  options: { auditSurface?: StudentViewSurface | null } = {},
+) {
   const managedStudent = await prisma.student.findFirst({
     where: {
       AND: [
@@ -218,6 +223,22 @@ export async function assertStaffCanManageStudent(session: Session, studentIdent
 
   if (!managedStudent) {
     throw forbidden("You do not have access to this student.");
+  }
+
+  // VQ-R-013: staff access to a student's data is read-audited HERE — the one
+  // gate every teacher-facing student route already passes through — so new
+  // routes are audited by default instead of by remembering recordStudentView.
+  // Sampled to 1/(actor, student, surface)/day inside audit.ts; mutations that
+  // pass this gate also log a sampled view, which is acceptable noise. Pass
+  // auditSurface: null ONLY when the caller audits the same read more
+  // precisely itself. Fire-and-forget: auditing never blocks or fails access.
+  if (options.auditSurface !== null) {
+    void recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: managedStudent.id,
+      surface: options.auditSurface ?? "student_data",
+    });
   }
 
   return managedStudent;

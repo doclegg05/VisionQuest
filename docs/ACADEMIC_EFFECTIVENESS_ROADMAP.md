@@ -1,5 +1,7 @@
 # Academic Effectiveness Roadmap
 
+Status: archived reference — March 2026 planning artifact; where it conflicts with [PRODUCT_DECISIONS.md](./PRODUCT_DECISIONS.md) or [PRODUCT_GUIDE.md](./PRODUCT_GUIDE.md), those win.
+
 ## Strategic Question
 
 Will VisionQuest help students:

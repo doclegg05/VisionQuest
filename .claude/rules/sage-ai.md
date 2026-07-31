@@ -16,7 +16,11 @@ paths:
 
 ## Technical Implementation
 - Model: Google Gemini 3.1 Flash Lite (`DEFAULT_GEMINI_MODEL` in `src/lib/gemini.ts`, `GEMINI_MODEL` env override)
-- Provider abstraction in `src/lib/ai/`: `GeminiProvider` (cloud) + `OllamaProvider` (local). `resolveAiProvider` routes by data sensitivity — `student_record`/`staff_entered` are local-only by policy (FERPA); `getPromptTier` selects the compact prompt for local models
+- Provider abstraction in `src/lib/ai/`: `GeminiProvider` (cloud) + `OllamaProvider` (local). `resolveAiProvider` routes in two tiers (owner decision 2026-07-24):
+  - **Hard-gated to local, fails closed.** Tasks in `DOCUMENT_LOCAL_ONLY_TASKS` — `resume_extract`, `resume_assist`, `tailor_application`, `chat_file_gist` — submit whole documents of student PII (resume text, uploaded file contents). If no local server is configured, `resolveAiProvider` **throws**; the resume routes turn that into a 503 ("offline until the local AI server is available"). There is no cloud fallback and no silent downgrade. Adding a task to that set is a deliberate act — do not widen it casually, and never add a chat task to it.
+  - **Configured provider, cloud permitted.** Everything else — chat, post-response extraction, briefings, summaries — follows the `ai_provider` config row. `student_record` chat may run on cloud so a local outage never takes the product down; the AI data-consent form is the basis and every request lands in the AI audit log.
+  - The gate keys off **task, not sensitivity**, on purpose: `sage_staff_chat` carries `staff_entered`, so a sensitivity-based gate would take staff chat offline whenever the local server was down. See `src/lib/ai/__tests__/document-local-only.test.ts` (VQ-R-002).
+- `getPromptTier` selects the compact prompt for local models
 - `systemInstruction` set at `getGenerativeModel()` level in `src/lib/ai/gemini-provider.ts` — NOT at chat level (breaks streaming). Explicit `safetySettings` (BLOCK_ONLY_HIGH) so default filters can't block crisis-coaching replies
 - Cloud chat turns retry transient failures (429/5xx/network) before the first streamed token only
 - Chat streaming via SSE at `/api/chat/send` (heartbeats, disconnect handling)

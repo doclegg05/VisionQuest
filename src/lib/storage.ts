@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import { Readable } from "stream";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { logger } from "@/lib/logger";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 // turbopackIgnore comments below tell Turbopack not to trace these paths
@@ -160,6 +161,34 @@ export function bundledCandidatePaths(storageKey: string): string[] {
   return candidates;
 }
 
+/**
+ * VQ-R-020: any file served from a fallback tier is a degraded delivery —
+ * primary storage missed and the student may be getting a stale or wrong
+ * document. Every fallback serve is warn-logged with its tier and leaves a
+ * Sentry breadcrumb so the next captured error carries the trail. Sentry is
+ * imported lazily so the standalone asset-staging script (which imports this
+ * module at build time) never pulls it in.
+ */
+function warnDegradedDelivery(storageKey: string, tier: string, matched?: string): void {
+  logger.warn("storage: fallback tier served a file — primary storage missed", {
+    storageKey,
+    tier,
+    ...(matched ? { matched } : {}),
+  });
+  void import("@sentry/nextjs")
+    .then((Sentry) => {
+      Sentry.addBreadcrumb({
+        category: "storage",
+        level: "warning",
+        message: `fallback ${tier} served ${storageKey}`,
+        data: { storageKey, tier, ...(matched ? { matched } : {}) },
+      });
+    })
+    .catch(() => {
+      // Breadcrumbs are best-effort; delivery must not depend on Sentry.
+    });
+}
+
 export async function downloadBundledFile(
   storageKey: string,
 ): Promise<{ buffer: Buffer; mimeType: string } | null> {
@@ -167,6 +196,7 @@ export async function downloadBundledFile(
     try {
       const resolved = resolveStoragePath(BUNDLED_UPLOAD_DIR, candidate);
       const buffer = await fs.readFile(resolved);
+      warnDegradedDelivery(storageKey, "bundled", candidate);
       return {
         buffer,
         mimeType: inferMimeType(storageKey),
@@ -188,9 +218,14 @@ function normalizeForMatch(filename: string): string {
   return base.toLowerCase().replace(/[^a-z0-9]/g, "") + ext;
 }
 
-async function findInContentDir(
+export async function findInContentDir(
   storageKey: string,
+  options: { baseDir?: string; allowFuzzy?: boolean } = {},
 ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const baseDir = options.baseDir ?? CONTENT_DIR;
+  // VQ-R-020: the fuzzy pass can serve the WRONG document when filenames
+  // merely overlap — a dev convenience, never acceptable in production.
+  const allowFuzzy = options.allowFuzzy ?? IS_DEV;
   const targetName = path.basename(storageKey);
   if (!targetName || targetName.includes("..")) return null;
 
@@ -219,17 +254,20 @@ async function findInContentDir(
   }
 
   // Pass 1: exact match
-  const exactMatch = await search(CONTENT_DIR);
+  const exactMatch = await search(baseDir);
   if (exactMatch) {
     try {
       const buffer = await fs.readFile(exactMatch);
+      warnDegradedDelivery(storageKey, "content-dir", exactMatch);
       return { buffer, mimeType: inferMimeType(exactMatch) };
     } catch {
       return null;
     }
   }
 
-  // Pass 2: normalized fuzzy match
+  // Pass 2: normalized fuzzy match — dev builds only (VQ-R-020).
+  if (!allowFuzzy) return null;
+
   const normalizedTarget = normalizeForMatch(targetName);
   for (const filePath of allFiles) {
     const normalizedCandidate = normalizeForMatch(path.basename(filePath));
@@ -240,6 +278,7 @@ async function findInContentDir(
     ) {
       try {
         const buffer = await fs.readFile(filePath);
+        warnDegradedDelivery(storageKey, "content-dir-fuzzy", filePath);
         return { buffer, mimeType: inferMimeType(filePath) };
       } catch {
         continue;

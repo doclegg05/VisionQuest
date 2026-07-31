@@ -1,6 +1,6 @@
 import { forbidden, notFound } from "@/lib/api-error";
 import { withCoordinatorAuth } from "@/lib/coordinator-auth";
-import { csvEscape } from "@/lib/forms/export";
+import { csvCell } from "@/lib/csv";
 import {
   currentMonthBounds,
   getRegionRollup,
@@ -57,7 +57,7 @@ export const GET = withCoordinatorAuth(
       lines.push(
         [
           "Instructor",
-          csvEscape(row.instructor.displayName),
+          csvCell(row.instructor.displayName),
           row.activeStudents,
           row.classCount,
           formatRate(row.certPassRate),
@@ -84,11 +84,11 @@ export const GET = withCoordinatorAuth(
 function grantGoalRow(goal: GrantGoalRow): string {
   return [
     "Grant",
-    csvEscape(goal.metric),
-    csvEscape(goal.programType),
+    csvCell(goal.metric),
+    csvCell(goal.programType),
     goal.targetValue,
     goal.actualValue,
-    csvEscape(goal.status),
+    csvCell(goal.status),
   ].join(",");
 }
 

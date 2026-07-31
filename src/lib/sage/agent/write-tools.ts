@@ -15,6 +15,8 @@
  */
 
 import { prisma } from "@/lib/db";
+import { trackJobInterest } from "@/lib/job-applications";
+import { transitionGoalStatus } from "@/lib/goal-status";
 import { logger } from "@/lib/logger";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
 import { formatCohortDateTime } from "@/lib/timezone";
@@ -325,7 +327,9 @@ const updateGoalStatus: AgentTool = {
     if (gate) return gate;
 
     return executeAndLedger("update_goal_status", { goalId, status }, ctx, async () => {
-      await prisma.goal.update({ where: { id: goalId }, data: { status } });
+      // Same transition path as PATCH /api/goals/[id] — cache invalidation,
+      // level progression, and BHAG-completion XP included (VQ-R-011).
+      await transitionGoalStatus({ studentId: ctx.session.id, goalId, status });
       return { summary: `Goal updated to ${status}.`, data: { goalId, status } };
     });
   },
@@ -366,11 +370,14 @@ const saveJob: AgentTool = {
     if (!listing) return { status: "error", summary: "That job listing was not found." };
 
     return executeAndLedger("save_job", { jobListingId }, ctx, async () => {
-      await prisma.studentSavedJob.upsert({
-        where: { studentId_jobListingId: { studentId, jobListingId } },
-        create: { studentId, jobListingId },
-        update: {},
+      // VQ-R-017: tracking is unified on Application. No status passed —
+      // a re-save of an already-applied job stays a no-op touch instead of
+      // downgrading the pipeline status back to "saved".
+      const result = await trackJobInterest({
+        studentId,
+        source: { kind: "listing", jobListingId },
       });
+      if (!result.ok) throw new Error("That job listing was not found.");
       return { summary: `Saved "${listing.title}" at ${listing.company} to your jobs list.` };
     });
   },
@@ -717,7 +724,6 @@ const markCertificationComplete: AgentTool = {
 // ─── update_application_status — track a saved job through the pipeline ─────
 
 const APPLICATION_STATUSES = ["saved", "applied", "interviewing", "offered", "withdrawn"] as const;
-const APPLIED_STATUSES = new Set<string>(["applied", "interviewing", "offered"]);
 
 const updateApplicationStatus: AgentTool = {
   name: "update_application_status",
@@ -759,32 +765,18 @@ const updateApplicationStatus: AgentTool = {
     if (!job) return { status: "error", summary: "That job listing wasn't found on your job board." };
 
     return executeAndLedger("update_application_status", { jobListingId, status, notes }, ctx, async () => {
-      const existing = await prisma.studentSavedJob.findUnique({
-        where: { studentId_jobListingId: { studentId, jobListingId } },
-        select: { appliedAt: true },
+      // VQ-R-017 (locked tracker decision): the pipeline row is the unified
+      // Application. trackJobInterest resolves the listing to its url-deduped
+      // Opportunity, upserts the Application, stamps appliedAt once, and
+      // records the change self-reported with any instructor sign-off cleared
+      // — that verification trail is what grant reporting reads.
+      const result = await trackJobInterest({
+        studentId,
+        source: { kind: "listing", jobListingId },
+        status: status as (typeof APPLICATION_STATUSES)[number],
+        notes,
       });
-      const setAppliedAt = APPLIED_STATUSES.has(status) && !existing?.appliedAt ? new Date() : undefined;
-
-      await prisma.studentSavedJob.upsert({
-        where: { studentId_jobListingId: { studentId, jobListingId } },
-        create: {
-          studentId,
-          jobListingId,
-          status,
-          notes: notes || null,
-          appliedAt: APPLIED_STATUSES.has(status) ? new Date() : null,
-        },
-        update: {
-          status,
-          ...(notes !== undefined ? { notes: notes || null } : {}),
-          appliedAt: setAppliedAt,
-        },
-      });
-      // P1-4 honesty note: pipeline status is the student's own report. The
-      // job-board row (StudentSavedJob) carries no verification column — the
-      // grant-reporting verification trail lives on the Application model —
-      // so the reply names the claim as self-reported instead of implying a
-      // confirmed outcome.
+      if (!result.ok) throw new Error("That job listing wasn't found on your job board.");
       return {
         summary: `Marked "${job.title}" at ${job.company} as ${status} — logged as self-reported; your instructor can confirm the outcome.`,
         data: { jobListingId, status },

@@ -1,7 +1,7 @@
 "use client";
 
 import { JobList, type ListJob } from "./JobList";
-import type { JobTrackingUpdate } from "./JobCard";
+import type { JobSaveHandler } from "./JobCard";
 import { groupJobsByBand } from "@/lib/job-board/job-band-groups";
 import type { JobBand } from "@/lib/job-board/job-bands-response";
 
@@ -9,7 +9,7 @@ export type BandedJob = ListJob & { band?: JobBand | null };
 
 interface BandedJobListProps {
   jobs: BandedJob[];
-  onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  onSave: JobSaveHandler;
 }
 
 /**

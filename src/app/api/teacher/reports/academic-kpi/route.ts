@@ -33,6 +33,9 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
           level: true,
           status: true,
           createdAt: true,
+          confirmedAt: true,
+          lastReviewedAt: true,
+          pathwayId: true,
           resourceLinks: {
             select: {
               id: true,

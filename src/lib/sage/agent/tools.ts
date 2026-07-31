@@ -26,7 +26,7 @@ import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
 import { listBookableAdvisors } from "@/lib/advising";
 import { formatCohortDateTime } from "@/lib/timezone";
-import { ensureStudentCertification } from "@/lib/sage/cert-actions";
+import { getStudentCertProgress } from "@/lib/sage/cert-actions";
 import type { AgentTool, AgentToolResult } from "./types";
 
 const PROGRAM_INFO_TOPICS = Object.keys(TOPIC_CONTENT) as ReadonlyArray<string>;
@@ -380,7 +380,10 @@ const lookupCertProgress: AgentTool = {
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.targetStudentId ?? ctx.session.id;
-    const progress = await ensureStudentCertification(studentId);
+    // Read-only by contract (VQ-R-009): a read-tier tool must not create the
+    // certification, award XP, or recompute status. Never-started students get
+    // a not_started view; marking an item performs the explicit start.
+    const progress = await getStudentCertProgress(studentId);
     if (!progress) {
       return {
         status: "error",
@@ -393,7 +396,10 @@ const lookupCertProgress: AgentTool = {
 
     return {
       status: "success",
-      summary: `Ready-to-Work: ${progress.done}/${progress.total} required items done.`,
+      summary:
+        progress.status === "not_started"
+          ? `Ready-to-Work: not started yet (${progress.total} required items).`
+          : `Ready-to-Work: ${progress.done}/${progress.total} required items done.`,
       data: {
         certificationId: progress.certificationId,
         status: progress.status,

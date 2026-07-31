@@ -26,10 +26,6 @@ export function getToolsByNamespace(
   return TOOLS.filter((t) => t.namespace === namespace);
 }
 
-/** Get all AI-powered tools (have tokenBudget) */
-export function getAiTools(): ToolDefinition[] {
-  return TOOLS.filter((t) => t.tokenBudget !== undefined);
-}
 
 /** Get all tools that require full audit logging */
 export function getFullAuditTools(): ToolDefinition[] {

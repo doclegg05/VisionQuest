@@ -1,0 +1,23 @@
+# VQ-R-021: automated dependency updates for both ecosystems this repo ships.
+# Weekly cadence, grouped minor/patch to keep PR noise proportionate to a
+# solo-maintained project; security updates arrive regardless of schedule.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

@@ -13,6 +13,7 @@ const auditActions: string[] = [];
 
 mock.module("./rate-limit", {
   namedExports: {
+    peekToolRateLimit: async () => ({ allowed: true, remaining: 99, resetTime: 1_000, limit: 100, window: "day" }),
     checkToolRateLimit: async (studentId: string, toolName: string, tier: string) => {
       rateCalls.push({ studentId, toolName, tier });
       return { allowed: allow, remaining: allow ? 1 : 0, resetTime: 1_000, limit: 5, window: "day" };

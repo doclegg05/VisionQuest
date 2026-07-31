@@ -1,5 +1,7 @@
 # VisionQuest Funding Options for Monthly-Only Vendor Costs
 
+Status: current reference — funding/vendor structure options for owner decisions.
+
 **Created:** 2026-04-01  
 **Context:** Internal planning note for future agents
 

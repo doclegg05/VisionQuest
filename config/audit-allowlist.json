@@ -1,0 +1,18 @@
+{
+  "$comment": [
+    "Dated waivers for `npm run audit:deps`. Every entry needs a reason and an expiry.",
+    "On or after `expires` the waiver STOPS WORKING and CI fails — that is deliberate.",
+    "When one expires, re-decide it: try the fix again, or accept the risk again with a",
+    "new date and a note saying what changed. Do not simply push the date out.",
+    "Critical advisories are never waivable, regardless of what is listed here.",
+    "Remove entries once the advisory is fixed; `audit:deps` reports stale ones."
+  ],
+  "allow": [
+    {
+      "id": "GHSA-mh99-v99m-4gvg",
+      "reason": "brace-expansion unbounded-expansion DoS. Unfixable here without breaking eslint: the tree holds minimatch@3 (needs brace-expansion 1.x, used by @eslint/eslintrc) alongside minimatch@10 (already ships 5.x), and npm overrides apply to every consumer at once — forcing 5.0.8 throws 'expand is not a function'. A scoped override keyed on minimatch@>=10 does not match in npm. `npm audit fix --force` resolves it only by installing eslint 10, a breaking major. Accepted because the reachable surface is build-time glob expansion (npm scripts and eslint globbing patterns we author ourselves) — it is on no request path a student or instructor can reach, and no untrusted input flows into it.",
+      "expires": "2026-10-31",
+      "ref": "VQ-R-021; PR #151; https://github.com/advisories/GHSA-mh99-v99m-4gvg"
+    }
+  ]
+}

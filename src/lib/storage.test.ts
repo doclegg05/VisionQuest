@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import {
   downloadBundledFile,
+  findInContentDir,
   getPresignedDownloadUrl,
   isObjectStorageConfigured,
   mapLocalPathToStorageKey,
@@ -113,5 +116,62 @@ describe("getPresignedDownloadUrl feature-flag gating", () => {
       if (prev !== undefined) process.env.USE_PRESIGNED_URLS = prev;
       else delete process.env.USE_PRESIGNED_URLS;
     }
+  });
+});
+
+// =============================================================================
+// VQ-R-020 — forms delivery must not degrade invisibly or serve the wrong doc.
+//
+// findInContentDir's pass-2 fuzzy substring match can serve a DIFFERENT
+// document whose normalized name merely overlaps the requested one. That pass
+// is now dev-only (allowFuzzy defaults to IS_DEV), and every fallback serve
+// warn-logs its tier so production degradation is observable.
+// =============================================================================
+describe("findInContentDir fuzzy gating (VQ-R-020)", () => {
+  async function makeContentDir(): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "vq-content-"));
+    await fs.writeFile(path.join(dir, "Student-Handbook-2026.pdf"), "handbook");
+    return dir;
+  }
+
+  it("serves an exact filename match regardless of fuzzy gating", async () => {
+    const dir = await makeContentDir();
+    const hit = await findInContentDir("forms/Student-Handbook-2026.pdf", {
+      baseDir: dir,
+      allowFuzzy: false,
+    });
+    assert.ok(hit);
+    assert.equal(hit.buffer.toString(), "handbook");
+  });
+
+  it("refuses a normalized fuzzy match when fuzzy is disallowed (production)", async () => {
+    const dir = await makeContentDir();
+    // "Student Handbook 2026.pdf" (spaces) normalizes identically to the
+    // stored "Student-Handbook-2026.pdf" — pass 1 misses on the exact name,
+    // and pass 2 would serve it: the wrong-document hazard the review flagged.
+    const hit = await findInContentDir("forms/Student Handbook 2026.pdf", {
+      baseDir: dir,
+      allowFuzzy: false,
+    });
+    assert.equal(hit, null);
+  });
+
+  it("still allows the fuzzy convenience when explicitly enabled (dev)", async () => {
+    const dir = await makeContentDir();
+    const hit = await findInContentDir("forms/Student Handbook 2026.pdf", {
+      baseDir: dir,
+      allowFuzzy: true,
+    });
+    assert.ok(hit);
+    assert.equal(hit.buffer.toString(), "handbook");
+  });
+
+  it("returns null for a missing file without touching the fuzzy pass", async () => {
+    const dir = await makeContentDir();
+    const hit = await findInContentDir("forms/Completely-Unrelated.pdf", {
+      baseDir: dir,
+      allowFuzzy: false,
+    });
+    assert.equal(hit, null);
   });
 });

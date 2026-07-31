@@ -1,6 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
+import { fetchJson } from "./shared";
 import { logger } from "@/lib/logger";
 
 /**
@@ -19,6 +20,10 @@ interface AdzunaResult {
   salary_max: number | null;
   description: string;
   redirect_url: string;
+}
+
+interface AdzunaResponse {
+  results?: AdzunaResult[];
 }
 
 export const adzunaAdapter: JobSourceAdapter = {
@@ -44,14 +49,11 @@ export const adzunaAdapter: JobSourceAdapter = {
         content_type: "application/json",
       });
 
-      const res = await fetch(`${ADZUNA_BASE}?${params}`);
+      // shared fetchJson carries the 30s AbortSignal timeout and failure
+      // logging — a raw fetch here can hang a scrape run forever (VQ-R-019).
+      const json = await fetchJson<AdzunaResponse>(`${ADZUNA_BASE}?${params}`);
+      if (!json) return [];
 
-      if (!res.ok) {
-        logger.error("Adzuna API error", { status: res.status });
-        return [];
-      }
-
-      const json = await res.json();
       const results: AdzunaResult[] = json.results ?? [];
 
       return results.map((r) => {

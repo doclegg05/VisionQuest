@@ -140,10 +140,13 @@ describe("getProvider", () => {
   });
 
   it("routes student-record tasks to the configured cloud provider when ai_provider is 'cloud'", async () => {
-    // Alpha/pre-hardware operating mode: when the operator has explicitly
-    // set ai_provider='cloud', honor that even for FERPA-sensitive prompts.
+    // Alpha/pre-hardware operating mode: when the operator has explicitly set
+    // ai_provider='cloud', honor that for CHAT even though it is
+    // student_record. Chat stays available on cloud with consent + audit.
+    // Document-PII tasks are the exception and hard-gate to local — see
+    // DOCUMENT_LOCAL_ONLY_TASKS and document-local-only.test.ts (VQ-R-002).
     // Once local hardware is provisioned, flipping ai_provider='local'
-    // re-enforces FERPA-local routing.
+    // routes chat locally too.
     mockGetPlain.mock.mockImplementation(async (key: string) => {
       if (key === "ai_provider") return "cloud";
       return null;

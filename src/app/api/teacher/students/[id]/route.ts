@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { withRegistry } from "@/lib/registry/middleware";
-import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
@@ -19,18 +18,12 @@ import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 // GET — individual student detail for teacher view
 export const GET = withRegistry("admin.student_detail", async (session, _req, ctx, _tool) => {
   const { id } = await ctx.params;
-  const managedStudent = await assertStaffCanManageStudent(session, id);
-  const studentId = managedStudent.id;
-
-  // Read-access audit (sampled to 1/day per surface inside recordStudentView).
-  // This surface includes conversation summaries, so it covers those reads too.
-  // recordStudentView never throws; awaiting costs one indexed query at most.
-  await recordStudentView({
-    actorId: session.id,
-    actorRole: session.role,
-    targetStudentId: studentId,
-    surface: "student_detail",
+  // Read-access audit happens inside the gate (VQ-R-013); this surface
+  // includes conversation summaries, so it covers those reads too.
+  const managedStudent = await assertStaffCanManageStudent(session, id, {
+    auditSurface: "student_detail",
   });
+  const studentId = managedStudent.id;
 
   const student = await prisma.student.findUnique({
     where: { id: studentId },

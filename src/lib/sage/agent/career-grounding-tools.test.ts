@@ -14,6 +14,7 @@ mock.module("@/lib/db", {
 // RateLimitEntry store (DB). Covered by rate-limit.test.ts.
 mock.module("./rate-limit", {
   namedExports: {
+    peekToolRateLimit: async () => ({ allowed: true, remaining: 99, resetTime: 1_000, limit: 100, window: "day" }),
     checkToolRateLimit: async () => ({
       allowed: true,
       remaining: 99,

@@ -11,7 +11,7 @@ import { logAuditEvent } from "@/lib/audit";
 import type { Session } from "@/lib/api-error";
 import { getToolByName, findToolBySlashCommand } from "./tools";
 import { validateToolArgs } from "./validation";
-import { checkToolRateLimit, rateLimitMessage } from "./rate-limit";
+import { checkToolRateLimit, peekToolRateLimit, rateLimitMessage } from "./rate-limit";
 import { agentMode, isTierAllowedInMode } from "./flags";
 import type { AgentTool, AgentToolCallRecord, AgentToolResult } from "./types";
 
@@ -89,8 +89,22 @@ export async function executeAgentTool(
   // loop can't hammer a tool. Composes with (does not replace) the token/cost
   // quota checked upstream in the chat route. Blocked → friendly, audited
   // error record, same as other pre-execution rejections.
-  const rateDecision = await checkToolRateLimit(session.id, toolName, tool.riskTier);
-  if (!rateDecision.allowed) {
+  //
+  // Consequential tools run through the executor twice per action (proposal
+  // leg → HMAC confirmation card → confirmed leg). Consuming a unit on both
+  // legs double-counted every action and could land the block AFTER the
+  // student clicked confirm (VQ-R-012). The proposal leg now peeks (check
+  // without consuming) and may block; the confirmed leg never blocks on quota
+  // — an approved card always runs — and exactly one unit is consumed after
+  // the confirmed action executes.
+  const isConfirmedConsequential =
+    tool.riskTier === "mutate_consequential" && Boolean(confirmedToken);
+  const rateDecision = isConfirmedConsequential
+    ? null
+    : tool.riskTier === "mutate_consequential"
+      ? await peekToolRateLimit(session.id, toolName, tool.riskTier)
+      : await checkToolRateLimit(session.id, toolName, tool.riskTier);
+  if (rateDecision && !rateDecision.allowed) {
     void logAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -133,6 +147,15 @@ export async function executeAgentTool(
     });
 
     const finishedAt = new Date().toISOString();
+
+    // VQ-R-012: the confirmed leg consumes the action's single unit only
+    // after it actually executed. Best-effort — a store failure must not
+    // fail an action that already ran.
+    if (isConfirmedConsequential && result.status !== "error") {
+      void checkToolRateLimit(session.id, toolName, tool.riskTier).catch((err) => {
+        logger.warn("agent.executor: rate-limit consume failed", { err: String(err), toolName });
+      });
+    }
 
     // Best-effort audit. Failures here must not break the agent loop.
     void logAuditEvent({

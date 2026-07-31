@@ -48,13 +48,14 @@ export async function* runAgentTurn(
       systemPrompt,
       messages,
       declarations,
-      async ({ name, args }) => {
+      async ({ callId, name, args }) => {
         const record = await executeAgentTool({
           session,
           conversationId,
           toolName: name,
           args,
           targetStudentId,
+          callId,
         });
         transcript.push(record);
         const responsePayload = record.result.modelHint
@@ -83,8 +84,9 @@ export async function* runAgentTurn(
           yield { type: "tool_call", callId: event.callId, tool: event.name, args: event.args };
           break;
         case "tool_result": {
-          // Find the matching transcript record (added by the onToolCall handler above).
-          const record = transcript[transcript.length - 1];
+          // Parallel hops resolve handlers in completion order, not call
+          // order — match by callId, never by transcript position (VQ-R-010).
+          const record = transcript.find((r) => r.callId === event.callId);
           yield {
             type: "tool_result",
             callId: event.callId,

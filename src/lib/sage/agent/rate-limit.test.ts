@@ -17,6 +17,7 @@ interface WindowCall {
 }
 const dailyCalls: DailyCall[] = [];
 const windowCalls: WindowCall[] = [];
+const peekCalls: DailyCall[] = [];
 let nextSuccess = true;
 
 mock.module("@/lib/rate-limit", {
@@ -29,18 +30,24 @@ mock.module("@/lib/rate-limit", {
       windowCalls.push({ key, limit, windowMs });
       return { success: nextSuccess, remaining: nextSuccess ? limit - 1 : 0, resetTime: 2_000 };
     },
+    peekRateLimit: async (key: string, limit: number) => {
+      peekCalls.push({ key, limit });
+      return { success: nextSuccess, remaining: nextSuccess ? limit : 0, resetTime: 3_000 };
+    },
   },
 });
 
 let checkToolRateLimit: typeof import("./rate-limit").checkToolRateLimit;
+let peekToolRateLimit: typeof import("./rate-limit").peekToolRateLimit;
 
 before(async () => {
-  ({ checkToolRateLimit } = await import("./rate-limit"));
+  ({ checkToolRateLimit, peekToolRateLimit } = await import("./rate-limit"));
 });
 
 beforeEach(() => {
   dailyCalls.length = 0;
   windowCalls.length = 0;
+  peekCalls.length = 0;
   nextSuccess = true;
   delete process.env.SAGE_TOOL_RATE_CONSEQUENTIAL;
   delete process.env.SAGE_TOOL_RATE_REVERSIBLE;
@@ -81,6 +88,28 @@ describe("checkToolRateLimit — window + default limits per tier", () => {
     const d = await checkToolRateLimit("stu-1", "book_appointment", "mutate_consequential");
     assert.equal(d.allowed, false);
     assert.equal(d.remaining, 0);
+  });
+});
+
+describe("peekToolRateLimit — read-only check (VQ-R-012)", () => {
+  it("uses the same key and limit as the consuming variant, via the peek store call", async () => {
+    const d = await peekToolRateLimit("stu-1", "book_appointment", "mutate_consequential");
+    assert.equal(peekCalls.length, 1);
+    assert.equal(peekCalls[0].key, "sage-tool:day:stu-1:book_appointment");
+    assert.equal(peekCalls[0].limit, 5);
+    // Never touches the consuming helpers.
+    assert.equal(dailyCalls.length, 0);
+    assert.equal(windowCalls.length, 0);
+    assert.equal(d.allowed, true);
+    assert.equal(d.window, "day");
+  });
+
+  it("reports blocked without consuming when the store says the budget is spent", async () => {
+    nextSuccess = false;
+    const d = await peekToolRateLimit("stu-1", "book_appointment", "mutate_consequential");
+    assert.equal(d.allowed, false);
+    assert.equal(d.remaining, 0);
+    assert.equal(dailyCalls.length, 0);
   });
 });
 

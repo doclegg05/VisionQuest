@@ -26,7 +26,10 @@ export async function logAuditEvent(input: AuditEventInput) {
 }
 
 /** Where in the app the staff member viewed the student's data. */
-export type StudentViewSurface = "student_detail" | "conversations" | "export";
+// "student_data" is the default surface stamped by assertStaffCanManageStudent
+// (VQ-R-013); "student_detail" marks the full student-detail page. The unused
+// "conversations"/"export" values were removed — no route ever passed them.
+export type StudentViewSurface = "student_detail" | "student_data";
 
 interface StudentViewInput {
   actorId: string;

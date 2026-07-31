@@ -4,6 +4,7 @@ import { withRegistry } from "@/lib/registry/middleware";
 import { cached, invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
+import { isValidGoalParentLevel } from "@/lib/goal-tree";
 import { goalCountsTowardPlan, isGoalLevel, isGoalStatus, type GoalStatus } from "@/lib/goals";
 
 function parseGoalStatusFilters(url: URL): GoalStatus[] | null {
@@ -79,10 +80,18 @@ export const POST = withRegistry("goals.create", async (session, req, _ctx, _too
   if (parentId) {
     const parentGoal = await prisma.goal.findFirst({
       where: { id: parentId, studentId: session.id },
-      select: { id: true },
+      select: { id: true, level: true },
     });
     if (!parentGoal) {
       throw badRequest("Parent goal not found.");
+    }
+    // VQ-R-008: enforce the level lattice at write time (bhag→monthly→
+    // weekly→daily→task, with tasks/dailies also allowed directly under a
+    // monthly) so mis-nested goals can't be created in the first place.
+    if (!isValidGoalParentLevel(parentGoal.level, rawLevel)) {
+      throw badRequest(
+        `A ${rawLevel} goal cannot be nested under a ${parentGoal.level} goal.`,
+      );
     }
   }
 

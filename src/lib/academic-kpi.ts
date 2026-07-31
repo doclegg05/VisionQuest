@@ -15,6 +15,9 @@ export interface KpiStudentRow {
     level: string;
     status: string;
     createdAt: Date;
+    confirmedAt: Date | null;
+    lastReviewedAt: Date | null;
+    pathwayId: string | null;
     resourceLinks: {
       id: string;
       linkType: string;
@@ -90,6 +93,13 @@ export interface AcademicKpiPayload {
   timeToMilestone: TimeToMilestoneKpis;
   readinessDistribution: ReadinessDistributionKpis;
   academicFunnel: AcademicFunnelStep[];
+  /** VQ-R-029 goal-integrity aggregates (locked KPI decision). */
+  goalIntegrity: {
+    confirmedBhagReviewed14d: number;
+    confirmedBhagReviewed14dPct: number;
+    pathwayLinkedToConfirmedGoal: number;
+    pathwayLinkedToConfirmedGoalPct: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +176,15 @@ export function computeAcademicKpis(
   let funnelCertProgress = 0;
   let funnelReadiness50 = 0;
 
+  // VQ-R-029 (locked KPI decision): the funnel's BHAG step reports EXISTENCE
+  // (relabeled "Active BHAG"); actual confirmation health lives in the two
+  // aggregates below — confirmed BHAG reviewed within 14 days, and a pathway
+  // linked to a confirmed goal.
+  const REVIEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+  const reviewCutoff = now.getTime() - REVIEW_WINDOW_MS;
+  let withConfirmedBhagReviewed14d = 0;
+  let withPathwayOnConfirmedGoal = 0;
+
   for (const student of students) {
     const activeGoals = student.goals.filter((g) => goalCountsTowardPlan(g.status));
 
@@ -177,6 +196,20 @@ export function computeAcademicKpis(
     if (hasMonthly) withMonthly++;
     if (hasWeekly) withWeekly++;
     totalActiveGoals += activeGoals.length;
+
+    // Goal integrity (VQ-R-029)
+    const hasConfirmedReviewedBhag = activeGoals.some(
+      (g) =>
+        g.level === "bhag" &&
+        g.confirmedAt !== null &&
+        g.lastReviewedAt !== null &&
+        g.lastReviewedAt.getTime() >= reviewCutoff,
+    );
+    if (hasConfirmedReviewedBhag) withConfirmedBhagReviewed14d++;
+    const hasPathwayOnConfirmed = activeGoals.some(
+      (g) => g.confirmedAt !== null && g.pathwayId !== null,
+    );
+    if (hasPathwayOnConfirmed) withPathwayOnConfirmedGoal++;
 
     // Per-goal: linked resources + time-to-milestone
     let studentHasEvidence = false;
@@ -307,12 +340,18 @@ export function computeAcademicKpis(
     academicFunnel: [
       { label: "Enrolled", value: total, pct: 100 },
       { label: "First Sage conversation", value: funnelConversation, pct: pct(funnelConversation, total) },
-      { label: "Confirmed BHAG", value: funnelBhag, pct: pct(funnelBhag, total) },
+      { label: "Active BHAG", value: funnelBhag, pct: pct(funnelBhag, total) },
       { label: "Active monthly plan", value: funnelMonthly, pct: pct(funnelMonthly, total) },
       { label: "Assigned resource", value: funnelAssignedResource, pct: pct(funnelAssignedResource, total) },
       { label: "Evidence submitted", value: funnelEvidenceSubmitted, pct: pct(funnelEvidenceSubmitted, total) },
       { label: "Certification progress", value: funnelCertProgress, pct: pct(funnelCertProgress, total) },
       { label: "Readiness \u2265 50", value: funnelReadiness50, pct: pct(funnelReadiness50, total) },
     ],
+    goalIntegrity: {
+      confirmedBhagReviewed14d: withConfirmedBhagReviewed14d,
+      confirmedBhagReviewed14dPct: pct(withConfirmedBhagReviewed14d, total),
+      pathwayLinkedToConfirmedGoal: withPathwayOnConfirmedGoal,
+      pathwayLinkedToConfirmedGoalPct: pct(withPathwayOnConfirmedGoal, total),
+    },
   };
 }

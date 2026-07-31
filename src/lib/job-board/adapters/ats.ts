@@ -3,38 +3,27 @@ import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { inferJobWorkMode } from "../work-mode";
 import { fetchJson, stripHtml, textMatchesQuery, truncateDescription } from "./shared";
 
-const DEFAULT_GREENHOUSE = [
-  "airbnb",
-  "anthropic",
-  "coinbase",
-  "datadog",
-  "discord",
-  "dropbox",
-  "duolingo",
-  "figma",
-  "gitlab",
-  "mongodb",
-  "reddit",
-  "stripe",
-  "cloudflare",
-  "elastic",
-  "okta",
-  "twilio",
-] as const;
+/**
+ * VQ-R-015: these adapters used to hardcode elite-tech boards (airbnb,
+ * anthropic, stripe, openai, ...) whose openings are overwhelmingly senior
+ * software roles — the wrong default pool for SPOKES students. Boards are now
+ * opt-in only: comma-separated slugs in the GREENHOUSE_BOARDS / LEVER_BOARDS /
+ * ASHBY_BOARDS env vars. With none configured the adapter reports
+ * isConfigured() = false, which drops it from the browse pool and from class
+ * scrapes through the existing plumbing (browseAdapters() and the scrape
+ * engine both filter on isConfigured() before consulting per-class sources).
+ * Read at call time so a deployment change needs no rebuild.
+ */
+function boardsFromEnv(envKey: string): string[] {
+  return (process.env[envKey] ?? "")
+    .split(",")
+    .map((slug) => slug.trim())
+    .filter(Boolean);
+}
 
-const DEFAULT_LEVER = ["wealthfront"] as const;
-
-const DEFAULT_ASHBY = [
-  "browserbase",
-  "clerk",
-  "linear",
-  "modal",
-  "openai",
-  "posthog",
-  "ramp",
-  "supabase",
-  "writer",
-] as const;
+const GREENHOUSE_BOARDS_ENV = "GREENHOUSE_BOARDS";
+const LEVER_BOARDS_ENV = "LEVER_BOARDS";
+const ASHBY_BOARDS_ENV = "ASHBY_BOARDS";
 
 function isRemote(location: string): boolean {
   return location.toLowerCase().includes("remote");
@@ -63,13 +52,13 @@ export const greenhouseAdapter: JobSourceAdapter = {
   sourceType: "api",
 
   isConfigured(): boolean {
-    return true;
+    return boardsFromEnv(GREENHOUSE_BOARDS_ENV).length > 0;
   },
 
   async fetchJobs(region: string): Promise<NormalizedJob[]> {
     const out: NormalizedJob[] = [];
 
-    for (const board of DEFAULT_GREENHOUSE) {
+    for (const board of boardsFromEnv(GREENHOUSE_BOARDS_ENV)) {
       const data = await fetchJson<GreenhouseResponse>(
         `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`,
       );
@@ -125,13 +114,13 @@ export const leverAdapter: JobSourceAdapter = {
   sourceType: "api",
 
   isConfigured(): boolean {
-    return true;
+    return boardsFromEnv(LEVER_BOARDS_ENV).length > 0;
   },
 
   async fetchJobs(region: string): Promise<NormalizedJob[]> {
     const out: NormalizedJob[] = [];
 
-    for (const board of DEFAULT_LEVER) {
+    for (const board of boardsFromEnv(LEVER_BOARDS_ENV)) {
       const data = await fetchJson<LeverJob[]>(`https://api.lever.co/v0/postings/${board}?mode=json`);
       for (const job of Array.isArray(data) ? data : []) {
         const location = job.categories?.location || "";
@@ -192,13 +181,13 @@ export const ashbyAdapter: JobSourceAdapter = {
   sourceType: "api",
 
   isConfigured(): boolean {
-    return true;
+    return boardsFromEnv(ASHBY_BOARDS_ENV).length > 0;
   },
 
   async fetchJobs(region: string): Promise<NormalizedJob[]> {
     const out: NormalizedJob[] = [];
 
-    for (const board of DEFAULT_ASHBY) {
+    for (const board of boardsFromEnv(ASHBY_BOARDS_ENV)) {
       const data = await fetchJson<AshbyResponse>(
         `https://api.ashbyhq.com/posting-api/job-board/${board}?includeCompensation=true`,
       );

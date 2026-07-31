@@ -22,6 +22,28 @@ function hasValidUrl(value: string): boolean {
   }
 }
 
+/**
+ * VQ-R-015: senior/leadership title tokens, word-boundary matched so "lead"
+ * never fires on "Leader"/"Leadership" and "vp" never fires inside "MVP".
+ * The default audience is SPOKES students entering the workforce — a
+ * "Staff Engineer" or "Director" posting is noise for them no matter which
+ * source produced it, so the quality filter rejects it centrally.
+ */
+const SENIORITY_TITLE_PATTERN = /\b(?:senior|staff|principal|lead|director|vp|head of|architect)\b/i;
+
+/**
+ * Elder-care titles ("Senior Care Assistant", "Senior Living Caregiver") are
+ * entry-level jobs FOR seniors' care, not senior-level roles. Neutralize only
+ * the "senior <care-context>" phrase before testing, so a remaining
+ * leadership token ("Senior Living Community Director") still rejects.
+ */
+const SENIOR_CARE_CONTEXT_PATTERN = /\bsenior\s+(?:care\b|caregiver|caregiving|living|center|centre|companion)/gi;
+
+export function isSeniorLevelTitle(title: string): boolean {
+  const scrubbed = title.replace(SENIOR_CARE_CONTEXT_PATTERN, " ");
+  return SENIORITY_TITLE_PATTERN.test(scrubbed);
+}
+
 function rejectionReason(job: NormalizedJob): string | null {
   if (!job.sourceId.trim()) return "missing source id";
   if (!job.title.trim()) return "missing title";
@@ -29,6 +51,7 @@ function rejectionReason(job: NormalizedJob): string | null {
   if (!job.location.trim()) return "missing location";
   if (!hasValidUrl(job.url)) return "invalid url";
   if (job.description.trim().length < MIN_DESCRIPTION_LENGTH) return "description too short";
+  if (isSeniorLevelTitle(job.title)) return "senior-level title";
   return null;
 }
 

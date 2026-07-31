@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// DEPRECATED as of Phase 1 (pg_cron migration). The scheduled run is handled
-// by the `browse-refresh` job in Supabase pg_cron. This script is kept as a
-// manual trigger for debugging and as a rollback fallback.
+// Manual trigger / rollback fallback for the scheduled browse refresh.
+// The scheduled run is the `job-browse-refresh` pg_cron job created by
+// prisma/migrations/20260727121000_add_browse_refresh_cron (VQ-R-025 — before
+// that migration this header claimed a cron job that never existed).
 // See docs/plans/pg-cron-setup-runbook.md.
 
 function required(name) {

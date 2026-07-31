@@ -34,16 +34,21 @@ function hashPassword(password: string): string {
   return `scrypt$${salt}$${derived}`;
 }
 
-function databaseUrlFromEnvLocal(): string {
+function resolveDatabaseUrl(): string {
+  // VQ-R-023: CI provides DATABASE_URL directly (hermetic Postgres service);
+  // reading .env.local is the LOCAL fallback, not the only path — the old
+  // version threw in any environment without that file, which is why this
+  // spec could never run in CI.
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
   const envPath = path.join(__dirname, "..", ".env.local");
   const line = readFileSync(envPath, "utf8")
     .split(/\r?\n/)
     .find((candidate) => candidate.startsWith("DATABASE_URL="));
-  if (!line) throw new Error("DATABASE_URL not found in .env.local");
+  if (!line) throw new Error("DATABASE_URL not found in env or .env.local");
   return line.slice("DATABASE_URL=".length);
 }
 
-const prisma = new PrismaClient({ datasourceUrl: databaseUrlFromEnvLocal() });
+const prisma = new PrismaClient({ datasourceUrl: resolveDatabaseUrl() });
 
 let studentId: string;
 let profileItemId: string;

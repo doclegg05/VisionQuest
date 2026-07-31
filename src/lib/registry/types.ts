@@ -45,17 +45,8 @@ export interface ToolDefinition {
   /** Optional feature flag — if set and disabled, capability is unavailable */
   featureFlag?: string;
 
-  /** Max tokens per invocation (for AI-powered capabilities) */
-  tokenBudget?: number;
-
   /** Compliance logging tier */
   auditLevel: AuditLevel;
-
-  /** Per-user rate limit */
-  rateLimit?: {
-    maxPerHour?: number;
-    maxPerDay?: number;
-  };
 
   /** Whether this capability is currently enabled */
   enabled: boolean;

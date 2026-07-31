@@ -131,6 +131,8 @@ const sageProposedGoal = {
   status: "proposed",
   parentId: null,
   sourceMessageId: "msg-123",
+  // Mirrors the real select: the VQ-R-005 guard reads confirmedAt.
+  confirmedAt: null,
   createdAt: new Date("2026-07-01T00:00:00Z"),
 };
 
@@ -230,6 +232,52 @@ describe("PATCH /api/goals/[id] — Sage-proposed confirmation guard", () => {
     assert.equal(updateData.content, "Earn the OSHA-10 card by August");
     assert.equal(updateData.status, undefined, "no status change");
     assert.equal(updateData.confirmedBy, undefined, "no confirmation recorded");
+  });
+
+  // VQ-R-005: confirmation was blocked but every OTHER status transition was
+  // accepted on a Sage-proposed goal — including "completed". The UI made that
+  // the default path (proposed weekly/task rows rendered live checkboxes with
+  // no proposal badge), so one tap drove an AI-generated goal to completed with
+  // no instructor ever involved. That is the exact loop the verification layer
+  // exists to close, so confirmation-only was the wrong scope for the guard.
+  for (const status of ["completed", "in_progress", "active", "blocked"]) {
+    it(`rejects a student setting a Sage-proposed goal to '${status}'`, async () => {
+      mockGoalFindFirst.mock.mockImplementation(async () => sageProposedGoal);
+
+      const res = await studentRoute.PATCH(
+        patchRequest(sageProposedGoal, { status }),
+        studentCtx(sageProposedGoal.id),
+      );
+
+      assert.equal(res.status, 403);
+      const body = await res.json();
+      assert.match(body.error, /instructor/i, "the message must point at the instructor");
+      assert.equal(mockGoalUpdate.mock.callCount(), 0, "goal must not be updated");
+    });
+  }
+
+  it("allows progress once an instructor has confirmed the Sage-proposed goal", async () => {
+    // The gate is "until confirmed", not "forever": after staff confirmation the
+    // student owns the goal and must be able to work it to completion.
+    const confirmedSageGoal = {
+      ...sageProposedGoal,
+      status: "confirmed",
+      confirmedAt: new Date("2026-07-01"),
+      confirmedBy: "teacher-1",
+    };
+    mockGoalFindFirst.mock.mockImplementation(async () => confirmedSageGoal);
+    mockGoalUpdate.mock.mockImplementation(async ({ data }) => ({
+      ...confirmedSageGoal,
+      ...data,
+    }));
+
+    const res = await studentRoute.PATCH(
+      patchRequest(confirmedSageGoal, { status: "completed" }),
+      studentCtx(confirmedSageGoal.id),
+    );
+
+    assert.equal(res.status, 200);
+    assert.equal(mockGoalUpdate.mock.calls[0].arguments[0].data.status, "completed");
   });
 
   it("still allows a student to dismiss (abandon) a Sage-proposed goal", async () => {

@@ -53,3 +53,22 @@ export function goalCountsTowardPlan(status: string): status is (typeof GOAL_PLA
 export function goalStatusLabel(status: string): string {
   return isGoalStatus(status) ? GOAL_STATUS_LABELS[status] : status;
 }
+
+/**
+ * True when a goal came from Sage and no instructor has confirmed it yet.
+ *
+ * VQ-R-005: the single definition of "not the student's to advance". Shared by
+ * the PATCH /api/goals/[id] guard (server authority) and the goals UI (badge +
+ * disabled checkbox) so the interface can never offer an action the API will
+ * reject. Dismissal is still allowed on these; only progress transitions are
+ * withheld until a human confirms.
+ */
+export function isAwaitingInstructorConfirmation(goal: {
+  sourceMessageId?: string | null;
+  status: string;
+  confirmedAt?: Date | string | null;
+}): boolean {
+  if (!goal.sourceMessageId) return false;
+  if (goal.status === "confirmed") return false;
+  return !goal.confirmedAt;
+}

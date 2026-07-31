@@ -9,7 +9,14 @@ const mockItemFindUnique = mock.fn() as any;
 const mockGoalFindFirst = mock.fn() as any;
 const mockGoalUpdate = mock.fn(async () => ({})) as any;
 const mockTransaction = mock.fn(async () => []) as any;
-const mockSavedJobUpsert = mock.fn(async () => ({})) as any;
+// VQ-R-017: save_job / update_application_status route through the unified
+// tracking lib; the db mock exposes NO studentSavedJob delegate, so any tool
+// still writing the retired tracker throws.
+const mockTrackJobInterest = mock.fn(async () => ({
+  ok: true,
+  application: { id: "app-1", status: "saved" },
+  opportunity: { id: "opp-1", title: "CNA", company: "Beckley ARH" },
+})) as any;
 const mockListingFindFirst = mock.fn() as any;
 const mockSaveJobEnrollmentFindFirst = mock.fn(async () => ({ classId: "class-1" })) as any;
 const mockRecordOperation = mock.fn(async () => undefined) as any;
@@ -62,17 +69,18 @@ mock.module("@/lib/db", {
           return mockSaveJobEnrollmentFindFirst;
         },
       },
-      studentSavedJob: {
-        get upsert() {
-          return mockSavedJobUpsert;
-        },
-      },
       certification: { findFirst: mock.fn(async () => null) },
       certRequirement: { updateMany: mock.fn(async () => ({ count: 0 })) },
       get $transaction() {
         return mockTransaction;
       },
     },
+  },
+});
+
+mock.module("@/lib/job-applications", {
+  namedExports: {
+    trackJobInterest: mockTrackJobInterest,
   },
 });
 
@@ -89,6 +97,7 @@ mock.module("../operations", {
 // rate-limit.test.ts and executor-rate-limit.test.ts.
 mock.module("./rate-limit", {
   namedExports: {
+    peekToolRateLimit: async () => ({ allowed: true, remaining: 99, resetTime: 1_000, limit: 100, window: "day" }),
     checkToolRateLimit: async () => ({
       allowed: true,
       remaining: 99,
@@ -357,7 +366,7 @@ describe("save_job — class scoping", () => {
   beforeEach(() => {
     mockListingFindFirst.mock.resetCalls();
     mockSaveJobEnrollmentFindFirst.mock.resetCalls();
-    mockSavedJobUpsert.mock.resetCalls();
+    mockTrackJobInterest.mock.resetCalls();
     mockSaveJobEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
     mockListingFindFirst.mock.mockImplementation(async () => ({
       id: "job-1",
@@ -379,6 +388,23 @@ describe("save_job — class scoping", () => {
     assert.deepEqual(where.classConfig, { classId: "class-1" });
   });
 
+  it("routes the save through the unified tracker without a status (VQ-R-017)", async () => {
+    const record = await executeAgentTool({
+      session: { id: "stu-1", role: "student" } as any,
+      conversationId: "conv-1",
+      toolName: "save_job",
+      args: { jobListingId: "job-1" },
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockTrackJobInterest.mock.callCount(), 1);
+    const input = mockTrackJobInterest.mock.calls[0].arguments[0];
+    assert.equal(input.studentId, "stu-1");
+    assert.deepEqual(input.source, { kind: "listing", jobListingId: "job-1" });
+    // No status: re-saving an already-applied job must not downgrade it.
+    assert.equal(input.status, undefined);
+  });
+
   it("refuses to save another cohort's job listing", async () => {
     // The id is real, but it lives on a different class's board.
     mockListingFindFirst.mock.mockImplementation(async () => null);
@@ -392,7 +418,7 @@ describe("save_job — class scoping", () => {
 
     assert.equal(record.result.status, "error");
     assert.match(record.result.summary, /not found/i);
-    assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
+    assert.equal(mockTrackJobInterest.mock.callCount(), 0);
   });
 
   it("refuses when the student has no active enrollment", async () => {
@@ -407,7 +433,52 @@ describe("save_job — class scoping", () => {
 
     assert.equal(record.result.status, "error");
     assert.equal(mockListingFindFirst.mock.callCount(), 0);
-    assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
+    assert.equal(mockTrackJobInterest.mock.callCount(), 0);
+  });
+});
+
+describe("update_application_status — unified tracker routing (VQ-R-017)", () => {
+  beforeEach(() => {
+    mockListingFindFirst.mock.resetCalls();
+    mockSaveJobEnrollmentFindFirst.mock.resetCalls();
+    mockTrackJobInterest.mock.resetCalls();
+    mockSaveJobEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+    mockListingFindFirst.mock.mockImplementation(async () => ({
+      id: "job-1",
+      title: "CNA",
+      company: "Beckley ARH",
+    }));
+  });
+
+  it("routes the status change through trackJobInterest with status and notes", async () => {
+    const record = await executeAgentTool({
+      session: { id: "stu-1", role: "student" } as any,
+      conversationId: "conv-1",
+      toolName: "update_application_status",
+      args: { jobListingId: "job-1", status: "interviewing", notes: "Tuesday 2pm" },
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.match(record.result.summary, /self-reported/i);
+    assert.equal(mockTrackJobInterest.mock.callCount(), 1);
+    const input = mockTrackJobInterest.mock.calls[0].arguments[0];
+    assert.deepEqual(input.source, { kind: "listing", jobListingId: "job-1" });
+    assert.equal(input.status, "interviewing");
+    assert.equal(input.notes, "Tuesday 2pm");
+  });
+
+  it("keeps the class-scope check before any write", async () => {
+    mockListingFindFirst.mock.mockImplementation(async () => null);
+
+    const record = await executeAgentTool({
+      session: { id: "stu-1", role: "student" } as any,
+      conversationId: "conv-1",
+      toolName: "update_application_status",
+      args: { jobListingId: "other-class-job", status: "applied" },
+    });
+
+    assert.equal(record.result.status, "error");
+    assert.equal(mockTrackJobInterest.mock.callCount(), 0);
   });
 });
 
@@ -421,7 +492,7 @@ describe("write tools — role gating at the executor", () => {
     });
     assert.equal(record.result.status, "error");
     assert.match(record.result.summary, /permission/i);
-    assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
+    assert.equal(mockTrackJobInterest.mock.callCount(), 0);
   });
 
   it("rejects unknown tools outright", async () => {

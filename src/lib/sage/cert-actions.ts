@@ -39,10 +39,87 @@ export interface CertProgress {
   total: number;
 }
 
+interface TemplateRow {
+  id: string;
+  label: string;
+  required: boolean;
+  needsFile: boolean;
+  needsVerify: boolean;
+}
+
+interface RequirementRow {
+  id: string;
+  templateId: string;
+  completed: boolean;
+  fileId: string | null;
+  verifiedBy: string | null;
+}
+
+function buildRequirementViews(
+  templates: TemplateRow[],
+  requirementRows: RequirementRow[],
+): CertRequirementView[] {
+  return templates.map((t) => {
+    const req = requirementRows.find((r) => r.templateId === t.id);
+    const completed = req?.completed ?? false;
+    return {
+      requirementId: req?.id ?? "",
+      label: t.label,
+      required: t.required,
+      needsFile: t.needsFile,
+      needsVerify: t.needsVerify,
+      completed,
+      hasFile: Boolean(req?.fileId),
+      awaitingVerification: completed && t.needsVerify && !req?.verifiedBy,
+    };
+  });
+}
+
+function countProgress(requirements: CertRequirementView[]): { done: number; total: number } {
+  return {
+    total: requirements.filter((r) => r.required).length,
+    done: requirements.filter((r) => r.required && r.completed).length,
+  };
+}
+
+/**
+ * Read-only certification progress for `lookup_cert_progress` (VQ-R-009).
+ *
+ * Never creates rows, never awards XP, never recomputes status — a read-tier
+ * tool must not write, and this is also what the nightly headless briefing
+ * calls per student. A student who never started gets a `not_started` view
+ * whose requirementIds are TEMPLATE ids; markRequirementComplete accepts
+ * those and performs the explicit start itself.
+ */
+export async function getStudentCertProgress(studentId: string): Promise<CertProgress | null> {
+  const templates = await prisma.certTemplate.findMany({
+    where: { certType: CERT_TYPE },
+    orderBy: { sortOrder: "asc" },
+  });
+  if (templates.length === 0) return null;
+
+  const cert = await prisma.certification.findUnique({
+    where: { studentId_certType: { studentId, certType: CERT_TYPE } },
+    include: { requirements: true },
+  });
+
+  if (!cert) {
+    const requirements = buildRequirementViews(templates, []).map((view, i) => ({
+      ...view,
+      requirementId: templates[i].id,
+    }));
+    return { certificationId: "", status: "not_started", requirements, ...countProgress(requirements) };
+  }
+
+  const requirements = buildRequirementViews(templates, cert.requirements);
+  return { certificationId: cert.id, status: cert.status, requirements, ...countProgress(requirements) };
+}
+
 /**
  * Ensure the student has a Ready-to-Work certification (auto-creating it from
  * templates the first time, exactly like the GET route) and return its
- * requirements with the ids needed to mark them complete.
+ * requirements with the ids needed to mark them complete. Write path only —
+ * called from mark actions, never from lookups (VQ-R-009).
  */
 export async function ensureStudentCertification(studentId: string): Promise<CertProgress | null> {
   const templates = await prisma.certTemplate.findMany({
@@ -81,25 +158,8 @@ export async function ensureStudentCertification(studentId: string): Promise<Cer
 
   cert = await recomputeCertificationStatus(cert.id, cert.certType);
 
-  const requirements: CertRequirementView[] = templates.map((t) => {
-    const req = cert!.requirements.find((r) => r.templateId === t.id);
-    const completed = req?.completed ?? false;
-    return {
-      requirementId: req?.id ?? "",
-      label: t.label,
-      required: t.required,
-      needsFile: t.needsFile,
-      needsVerify: t.needsVerify,
-      completed,
-      hasFile: Boolean(req?.fileId),
-      awaitingVerification: completed && t.needsVerify && !req?.verifiedBy,
-    };
-  });
-
-  const total = requirements.filter((r) => r.required).length;
-  const done = requirements.filter((r) => r.required && r.completed).length;
-
-  return { certificationId: cert.id, status: cert.status, requirements, done, total };
+  const requirements = buildRequirementViews(templates, cert.requirements);
+  return { certificationId: cert.id, status: cert.status, requirements, ...countProgress(requirements) };
 }
 
 export type MarkRequirementResult =
@@ -118,15 +178,36 @@ export async function markRequirementComplete(params: {
 }): Promise<MarkRequirementResult> {
   const { studentId, requirementId } = params;
 
-  const requirement = await prisma.certRequirement.findFirst({
-    where: { id: requirementId },
-    include: {
-      certification: { select: { studentId: true } },
-      template: {
-        select: { id: true, certType: true, required: true, needsFile: true, needsVerify: true, label: true },
-      },
+  const requirementInclude = {
+    certification: { select: { studentId: true } },
+    template: {
+      select: { id: true, certType: true, required: true, needsFile: true, needsVerify: true, label: true },
     },
+  } as const;
+
+  let requirement = await prisma.certRequirement.findFirst({
+    where: { id: requirementId },
+    include: requirementInclude,
   });
+
+  // VQ-R-009 bridge: for a student who never started, lookup_cert_progress
+  // returns TEMPLATE ids. Marking is the explicit start action — ensure the
+  // certification now (create + cert_started award) and resolve the
+  // requirement that was just created from that template.
+  if (!requirement) {
+    const template = await prisma.certTemplate.findFirst({
+      where: { id: requirementId, certType: CERT_TYPE },
+      select: { id: true },
+    });
+    if (template) {
+      await ensureStudentCertification(studentId);
+      requirement = await prisma.certRequirement.findFirst({
+        where: { templateId: requirementId, certification: { studentId, certType: CERT_TYPE } },
+        include: requirementInclude,
+      });
+    }
+  }
+
   if (!requirement || requirement.certification.studentId !== studentId) {
     return { ok: false, reason: "That certification item wasn't found on your account." };
   }

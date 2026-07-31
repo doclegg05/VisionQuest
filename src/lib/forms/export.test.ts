@@ -4,35 +4,50 @@ import assert from "node:assert/strict";
 import {
   buildHeaderRow,
   buildResponseRow,
-  csvEscape,
   type ExportableResponse,
 } from "./export";
+import { csvCell } from "@/lib/csv";
 import { type FormTemplateSchema } from "./schema";
 
-describe("csvEscape", () => {
+// VQ-R-014: form exports previously used a local csvEscape that quoted
+// commas/quotes but never neutralized formula prefixes — a spreadsheet
+// opening the export would execute =/+/-/@ payloads typed into form answers.
+// Every cell now routes through the shared formula-safe escaper.
+describe("csvCell (VQ-R-014 formula-safe cells)", () => {
   it("returns the raw value when no special characters", () => {
-    assert.equal(csvEscape("plain"), "plain");
+    assert.equal(csvCell("plain"), "plain");
+  });
+
+  it("neutralizes formula prefixes = + - @", () => {
+    assert.equal(csvCell("=2+2"), "'=2+2");
+    assert.equal(csvCell("+SUM(A1:A2)"), "'+SUM(A1:A2)");
+    assert.equal(csvCell("-1234"), "'-1234");
+    assert.equal(csvCell("@cmd"), "'@cmd");
+  });
+
+  it("neutralizes a formula hidden behind quoting characters", () => {
+    assert.equal(csvCell('=HYPERLINK("http://evil","x"), extra'), '"\'=HYPERLINK(""http://evil"",""x""), extra"');
   });
 
   it("wraps and doubles embedded quotes", () => {
-    assert.equal(csvEscape('she said "hi"'), '"she said ""hi"""');
+    assert.equal(csvCell('she said "hi"'), '"she said ""hi"""');
   });
 
   it("wraps values containing commas", () => {
-    assert.equal(csvEscape("one,two"), '"one,two"');
+    assert.equal(csvCell("one,two"), '"one,two"');
   });
 
   it("wraps values containing newlines", () => {
-    assert.equal(csvEscape("line1\nline2"), '"line1\nline2"');
+    assert.equal(csvCell("line1\nline2"), '"line1\nline2"');
   });
 
   it("joins arrays with semicolons", () => {
-    assert.equal(csvEscape(["a", "b", "c"]), "a; b; c");
+    assert.equal(csvCell(["a", "b", "c"]), "a; b; c");
   });
 
   it("renders null/undefined as empty string", () => {
-    assert.equal(csvEscape(null), "");
-    assert.equal(csvEscape(undefined), "");
+    assert.equal(csvCell(null), "");
+    assert.equal(csvCell(undefined), "");
   });
 });
 

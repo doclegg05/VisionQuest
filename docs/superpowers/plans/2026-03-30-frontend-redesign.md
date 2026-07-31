@@ -1,5 +1,7 @@
 # Frontend Redesign Implementation Plan
 
+Status: historical — implementation plan, shipped (chat-first home landed 2026-06); retained for reference.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Redesign VisionQuest's frontend with dark-mode-first theming, Phosphor icons, cinematic animations, Journey Flow dashboard, and a mobile bottom tab bar.

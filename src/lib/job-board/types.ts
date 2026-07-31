@@ -30,8 +30,15 @@ export interface JobSourceAdapter {
   fetchJobs(region: string, radiusMiles: number): Promise<NormalizedJob[]>;
 }
 
-/** Status values for StudentSavedJob */
+/** Job-board pipeline status vocabulary (stored on Application as "offer" for "offered" — see src/lib/job-applications.ts). */
 export type SavedJobStatus = "saved" | "applied" | "interviewing" | "offered" | "withdrawn";
+
+/**
+ * Which pool a board row came from: a class-scoped JobListing or the
+ * program-wide JobBrowseListing browse pool. Emitted by GET /api/jobs so the
+ * save path can send the matching id field (VQ-R-016/VQ-R-017).
+ */
+export type JobListingKind = "class" | "browse";
 
 /** Work mode values for JobListing */
 export type JobWorkMode = "onsite" | "remote" | "hybrid";
