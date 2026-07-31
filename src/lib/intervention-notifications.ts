@@ -362,6 +362,13 @@ export function teacherDashboardAlertAction(alertType: string, studentRecordId: 
         href: `/teacher/students/${studentRecordId}#spokes-profile`,
         label: "Add birthdate",
       };
+    // Phase 0A placement bridge: a verified accepted application is waiting
+    // for staff to record the employment outcome on the SPOKES record.
+    case "placement_outcome_pending":
+      return {
+        href: `/teacher/students/${studentRecordId}#spokes-profile`,
+        label: "Record employment",
+      };
     default:
       return {
         href: `/teacher/students/${studentRecordId}`,
@@ -410,6 +417,13 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
       return {
         kind: "create_task",
         label: "Add goal review task",
+      };
+    // Phase 0A placement bridge: pairs with teacherDashboardAlertAction's
+    // deep link so the queue row renders an action button.
+    case "placement_outcome_pending":
+      return {
+        kind: "create_task",
+        label: "Add task",
       };
     default:
       return null;

@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+// Type-only import: erased at compile time, so the module's "server-only"
+// guard never executes in this client component.
+import type { PlacementSuggestion } from "@/lib/placement-bridge";
 
 interface StudentSummary {
   id: string;
@@ -146,13 +149,6 @@ interface SummaryPayload {
     completed: boolean;
     followUp: EmploymentFollowUp | null;
   }>;
-}
-
-interface PlacementSuggestion {
-  applicationId: string;
-  title: string | null;
-  company: string | null;
-  verifiedAt: string | null;
 }
 
 interface WorkspacePayload {
