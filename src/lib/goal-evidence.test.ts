@@ -187,6 +187,112 @@ test("buildGoalEvidenceEntries does not borrow evidence from another certificati
   assert.equal(evidence.evidenceSource, "none");
 });
 
+test("buildGoalEvidenceEntries matches a certification link by exact certType", () => {
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "certification",
+        resourceId: "ic3",
+        title: "IC3 Digital Literacy",
+      }),
+    ],
+    progressionState: createInitialState(),
+    certifications: [{
+      certType: "ic3",
+      status: "completed",
+      startedAt: "2026-03-01T12:00:00.000Z",
+      completedAt: "2026-03-05T12:00:00.000Z",
+      requirements: [],
+    }],
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "approved");
+  assert.equal(evidence.summary, "IC3 Digital Literacy is complete.");
+});
+
+test("buildGoalEvidenceEntries falls back to the ready-to-work certification for family links", () => {
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "certification",
+        resourceId: "workkeys-ncrc",
+        title: "ACT WorkKeys NCRC",
+      }),
+    ],
+    progressionState: createInitialState(),
+    // No cert row carries the catalog id — only the hardcoded certType that
+    // src/app/api/certifications/route.ts creates.
+    certifications: [{
+      certType: "ready-to-work",
+      status: "completed",
+      startedAt: "2026-03-01T12:00:00.000Z",
+      completedAt: "2026-03-05T12:00:00.000Z",
+      requirements: [],
+    }],
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "approved");
+  assert.equal(evidence.summary, "ACT WorkKeys NCRC is complete.");
+});
+
+test("buildGoalEvidenceEntries prefers an exact certType match over the ready-to-work fallback", () => {
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "certification",
+        resourceId: "workkeys-ncrc",
+        title: "ACT WorkKeys NCRC",
+      }),
+    ],
+    progressionState: createInitialState(),
+    certifications: [
+      {
+        certType: "ready-to-work",
+        status: "completed",
+        startedAt: "2026-03-01T12:00:00.000Z",
+        completedAt: "2026-03-05T12:00:00.000Z",
+        requirements: [],
+      },
+      {
+        certType: "workkeys-ncrc",
+        status: "in_progress",
+        startedAt: "2026-03-08T12:00:00.000Z",
+        completedAt: null,
+        requirements: [],
+      },
+    ],
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "in_progress");
+});
+
+test("buildGoalEvidenceEntries leaves non-family links on manual evidence when no cert matches", () => {
+  const [evidence] = buildGoalEvidenceEntries({
+    links: [
+      makeLink({
+        resourceType: "certification",
+        resourceId: "mos-word",
+        title: "Microsoft Office Specialist - Word",
+      }),
+    ],
+    progressionState: createInitialState(),
+    certifications: [{
+      certType: "ready-to-work",
+      status: "completed",
+      startedAt: "2026-03-01T12:00:00.000Z",
+      completedAt: "2026-03-05T12:00:00.000Z",
+      requirements: [],
+    }],
+  });
+
+  assert.ok(evidence);
+  assert.equal(evidence.evidenceStatus, "not_started");
+  assert.equal(evidence.evidenceSource, "none");
+});
+
 test("buildGoalEvidenceEntries recognizes application and event career steps from tracked outcomes", () => {
   const evidence = buildGoalEvidenceEntries({
     links: [

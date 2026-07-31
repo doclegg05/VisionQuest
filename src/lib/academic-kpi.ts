@@ -28,7 +28,8 @@ export interface KpiStudentRow {
   portfolioItems: { id: string }[];
   resumeData: { id: string } | null;
   publicCredentialPage: { isPublic: boolean } | null;
-  orientationProgress: { completed: boolean; completedAt: Date | null }[];
+  /** Completed orientation rows only — the query filters on `completed: true`. */
+  orientationProgress: { itemId: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -132,8 +133,10 @@ const LINK_ACTIVITY_STATUSES = new Set(["in_progress", "completed"]);
 
 export function computeAcademicKpis(
   students: KpiStudentRow[],
-  now: Date = new Date(),
-  orientationTotal = 0,
+  now: Date,
+  // Count of ALL orientation items (the repo-wide readiness denominator).
+  // Required on purpose: a defaulted 0 silently zeroes orientation scores.
+  orientationTotal: number,
 ): AcademicKpiPayload {
   const total = students.length;
 
@@ -208,7 +211,8 @@ export function computeAcademicKpis(
           linksWithActivity++;
           studentHasActivity = true;
 
-          // Time from resource assignment to the first recorded activity.
+          // Time from resource assignment to the most recent link update —
+          // a proxy for activity recency, not the first recorded activity.
           const activityDelta = daysBetween(link.createdAt, link.updatedAt);
           if (activityDelta >= 0) daysResourceToActivity.push(activityDelta);
         }
@@ -227,9 +231,7 @@ export function computeAcademicKpis(
     // Readiness score
     const progState = parseState(student.progressionState);
     const studentBhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-    const completedOrientationItems = student.orientationProgress.filter(
-      (progress) => progress.completed,
-    ).length;
+    const completedOrientationItems = student.orientationProgress.length;
     const readiness = computeReadinessScore({
       ...progState,
       bhagCompleted: studentBhagCompleted,

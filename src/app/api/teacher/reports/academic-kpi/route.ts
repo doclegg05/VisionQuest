@@ -14,7 +14,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   });
 
   if (studentIds.length === 0) {
-    return NextResponse.json(computeAcademicKpis([]));
+    return NextResponse.json(computeAcademicKpis([], new Date(), 0));
   }
 
   const [students, orientationTotal] = await Promise.all([
@@ -54,16 +54,16 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         portfolioItems: { select: { id: true } },
         resumeData: { select: { id: true } },
         publicCredentialPage: { select: { isPublic: true } },
+        // Readiness denominator convention: ALL orientation items count, not
+        // just required ones — matches fetch-readiness-data, class-progress,
+        // teacher/dashboard, reporting, export, and coaching-arcs.
         orientationProgress: {
-          where: {
-            completed: true,
-            item: { required: true },
-          },
-          select: { completed: true, completedAt: true },
+          where: { completed: true },
+          select: { itemId: true },
         },
       },
     }),
-    prisma.orientationItem.count({ where: { required: true } }),
+    prisma.orientationItem.count(),
   ]);
 
   const rows = students.map((s) => ({
