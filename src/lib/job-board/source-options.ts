@@ -6,6 +6,10 @@ export const DEFAULT_JOB_SOURCES = [
 
 export const JOB_SOURCE_OPTIONS = [
   { value: "careeronestop", label: "WV Local Jobs — state job bank", sourceMode: "local" },
+  // Opt-in rather than a default: it bills against APIFY_TOKEN, and the Indeed
+  // terms question is an owner decision. See
+  // docs/superpowers/plans/2026-07-24-apify-job-sources.md.
+  { value: "apify-indeed", label: "Indeed — local jobs (via Apify)", sourceMode: "local" },
   { value: "remotive", label: "Remotive (remote, no key)", sourceMode: "remote" },
   { value: "remoteok", label: "Remote OK (remote, no key)", sourceMode: "remote" },
   { value: "weworkremotely", label: "We Work Remotely (remote, no key)", sourceMode: "remote" },

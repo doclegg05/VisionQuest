@@ -59,4 +59,73 @@ describe("parseSalaryToHourly", () => {
     const result = parseSalaryToHourly("$120,000/year");
     assert.equal(result, 57.69); // 120000 / 2080 = 57.692... rounded
   });
+
+  // Non-annual pay periods. Before these were handled, "$400 - $800 a week"
+  // parsed as $400/hour and "$4,000/month" as $1.92/hour (via the >1000
+  // yearly heuristic). jsearch emits "/week" and "/month" directly from
+  // JSearch's job_salary_period, so this was reachable in production.
+  describe("pay periods other than yearly", () => {
+    it("converts weekly pay", () => {
+      assert.equal(parseSalaryToHourly("$400 - $800 a week"), 10);
+      assert.equal(parseSalaryToHourly("$1,500 - $1,800 a week"), 37.5);
+      assert.equal(parseSalaryToHourly("$600/week"), 15);
+      assert.equal(parseSalaryToHourly("$600 per wk"), 15);
+    });
+
+    it("converts daily pay", () => {
+      assert.equal(parseSalaryToHourly("From $215 a day"), 26.88);
+      assert.equal(parseSalaryToHourly("$160/day"), 20);
+    });
+
+    it("converts monthly pay", () => {
+      assert.equal(parseSalaryToHourly("$2,450 a month"), 14.13);
+      assert.equal(parseSalaryToHourly("$4,000/month"), 23.08);
+      assert.equal(parseSalaryToHourly("$3,000 per mo"), 17.31);
+    });
+
+    it("converts biweekly pay without reading it as weekly", () => {
+      assert.equal(parseSalaryToHourly("$2,000 biweekly"), 25);
+      assert.equal(parseSalaryToHourly("$2,000 bi-weekly"), 25);
+    });
+
+    it("recognizes spelled-out hourly forms", () => {
+      assert.equal(parseSalaryToHourly("$16.50 - $18.00 an hour"), 16.5);
+      assert.equal(parseSalaryToHourly("From $20 an hour"), 20);
+      assert.equal(parseSalaryToHourly("$22 per hour"), 22);
+      assert.equal(parseSalaryToHourly("$19 hourly"), 19);
+    });
+
+    it("recognizes spelled-out yearly forms", () => {
+      assert.equal(parseSalaryToHourly("$85,000 a year"), 40.87);
+      assert.equal(parseSalaryToHourly("$62,400 annually"), 30);
+    });
+  });
+
+  describe("guards against nonsense values", () => {
+    // Indeed tags BAYADA's per-visit pay as "hourly"; other sources invent
+    // their own units. An unrecognized unit is an unknown, not an hourly rate.
+    it("returns null for an unrecognized explicit unit", () => {
+      assert.equal(parseSalaryToHourly("$23 - $27 per point"), null);
+      assert.equal(parseSalaryToHourly("$50/visit"), null);
+    });
+
+    it("returns null when the converted rate is implausible", () => {
+      assert.equal(parseSalaryToHourly("$0.50/hr"), null);
+      assert.equal(parseSalaryToHourly("$5,000/hour"), null);
+    });
+
+    it("still infers yearly for bare large amounts (remotive/ats free text)", () => {
+      assert.equal(parseSalaryToHourly("$50000"), 24.04);
+      assert.equal(parseSalaryToHourly("$45000-$55000"), 21.63);
+    });
+
+    it("still treats bare small amounts as hourly", () => {
+      assert.equal(parseSalaryToHourly("$18-$22"), 18);
+    });
+
+    it("returns null for text with no usable amount", () => {
+      assert.equal(parseSalaryToHourly("Competitive salary"), null);
+      assert.equal(parseSalaryToHourly("DOE"), null);
+    });
+  });
 });

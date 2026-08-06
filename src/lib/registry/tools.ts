@@ -1390,6 +1390,28 @@ export const TOOLS: readonly ToolDefinition[] = [
     enabled: true,
     tags: ["learning", "wellness"],
   },
+  {
+    id: "career.interest_profiler.questions",
+    namespace: "career",
+    name: "Interest Profiler Questions",
+    description: "Fetch O*NET Mini Interest Profiler questions for the in-app assessment",
+    endpoint: { method: "GET", path: "/api/career/interest-profiler/questions" },
+    requiredRoles: ["student"],
+    auditLevel: "none",
+    enabled: true,
+    tags: ["career", "assessment"],
+  },
+  {
+    id: "career.interest_profiler.submit",
+    namespace: "career",
+    name: "Submit Interest Profiler",
+    description: "Submit Mini-IP answers or manually imported RIASEC scores",
+    endpoint: { method: "POST", path: "/api/career/interest-profiler" },
+    requiredRoles: ["student"],
+    auditLevel: "full",
+    enabled: true,
+    tags: ["career", "assessment"],
+  },
 
   // ─── Notifications Namespace ─────────────────────────────────────────────────
 

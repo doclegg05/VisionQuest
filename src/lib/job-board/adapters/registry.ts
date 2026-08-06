@@ -1,4 +1,5 @@
 import type { JobSourceAdapter } from "../types";
+import { apifyIndeedAdapter } from "./apify-indeed";
 import { careerOneStopAdapter } from "./careeronestop";
 import { jsearchAdapter } from "./jsearch";
 import { usajobsAdapter } from "./usajobs";
@@ -12,6 +13,7 @@ import { smartRecruitersAdapter } from "./smartrecruiters";
 
 export const ALL_JOB_SOURCE_ADAPTERS: JobSourceAdapter[] = [
   careerOneStopAdapter,
+  apifyIndeedAdapter,
   remotiveAdapter,
   remoteOkAdapter,
   weWorkRemotelyAdapter,

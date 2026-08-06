@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { OnetWebServicesAttribution } from "@/components/career/OnetAttribution";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to sign in.",
@@ -373,6 +374,12 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               >
                 Staff? Register here
               </a>
+              <a
+                href="/onet-interest-areas"
+                className="text-xs font-medium text-[var(--ink-muted)] underline transition-colors hover:text-[var(--ink-strong)]"
+              >
+                O*NET Interest Profiler interest areas (public, no login)
+              </a>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
                 <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
@@ -380,6 +387,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               <p className="text-xs uppercase font-semibold tracking-widest text-[var(--ink-muted)]">
                 SPOKES Workforce Development Program
               </p>
+              <div className="max-w-sm text-left">
+                <OnetWebServicesAttribution />
+              </div>
             </div>
           </div>
         </section>

@@ -1,10 +1,14 @@
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 
 /**
- * High-demand WV entry-level titles not yet covered by a formal career
- * cluster (there is no healthcare or skilled-trades cluster today). Querying
- * these makes those jobs appear; they match on location + skills even though
- * they earn no cluster-match points until the taxonomy expands.
+ * High-demand WV entry-level titles. As of 2026-07-24 these ARE covered by
+ * formal clusters (`healthcare-support`, `trades-logistics`), so they now earn
+ * cluster-match points rather than relying on location + skills alone.
+ *
+ * The list stays because a cluster contributes only its `sampleJobs[0]` below —
+ * without it, Home Health Aide, Caregiver, Medical Assistant, CDL Driver, and
+ * Maintenance Technician would drop out of the search entirely. Entries that
+ * duplicate a cluster's first sample job are deduped case-insensitively.
  */
 const HEALTHCARE_TRADES_TITLES = [
   "Certified Nursing Assistant",

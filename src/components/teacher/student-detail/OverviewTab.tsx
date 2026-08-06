@@ -361,6 +361,36 @@ export default function OverviewTab({
           {careerDiscovery?.sageSummary && (
             <p className="text-sm text-[var(--ink-strong)]">{careerDiscovery.sageSummary}</p>
           )}
+          {(careerDiscovery?.hollandCode || careerDiscovery?.riasecSource) && (
+            <div className="text-xs text-[var(--ink-muted)] space-y-1">
+              {careerDiscovery.hollandCode && (
+                <p>
+                  <span className="font-medium uppercase tracking-wide">Holland code:</span>{" "}
+                  <span className="text-[var(--ink-strong)]">{careerDiscovery.hollandCode}</span>
+                </p>
+              )}
+              {careerDiscovery.riasecSource && (
+                <p>
+                  <span className="font-medium uppercase tracking-wide">RIASEC source:</span>{" "}
+                  <span className="text-[var(--ink-strong)]">
+                    {careerDiscovery.riasecSource === "onet_mini_ip"
+                      ? "O*NET Mini Interest Profiler"
+                      : careerDiscovery.riasecSource === "manual_entry"
+                        ? "Student import"
+                        : careerDiscovery.riasecSource === "sage_chat"
+                          ? "Sage chat (informal)"
+                          : careerDiscovery.riasecSource}
+                  </span>
+                  {careerDiscovery.riasecAssessedAt && (
+                    <>
+                      {" "}
+                      · {dateFormatter.format(new Date(careerDiscovery.riasecAssessedAt))}
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
           {careerDiscovery && careerDiscovery.topClusters.length > 0 && (
             <div>
               <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
