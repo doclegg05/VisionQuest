@@ -281,6 +281,195 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
     });
   });
 
+  /**
+   * The sibling silent-empty case. `generateResponse` sends no `tools`, but an
+   * agent-mode prompt still tells the model to "call lookup_program_info
+   * first". Measured against Ollama 0.32.4 / gemma4:latest with the real
+   * ~20k-char Sage prompt and NO tools declared: `/v1` answers
+   * `finish_reason: "tool_calls"` with `content: ""`, so the turn is not
+   * truncated and used to fall straight through to `return ""`.
+   */
+  describe("a tool call the caller never offered throws instead of returning ''", () => {
+    it("generateResponse throws on the OpenAI-compat path and names the tool", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [
+            {
+              finish_reason: "tool_calls",
+              message: {
+                content: "",
+                tool_calls: [
+                  {
+                    id: "call_0",
+                    type: "function",
+                    function: {
+                      name: "lookup_program_info",
+                      arguments: '{"topic":"certifications"}',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      );
+
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        (error: Error) => {
+          assert.match(error.message, /tool call/i);
+          assert.match(error.message, /lookup_program_info/);
+          assert.match(error.message, /never offered/i);
+          return true;
+        },
+      );
+    });
+
+    /**
+     * The measured shape with no `tools` on the request: Ollama reports the
+     * finish reason but has nowhere to put the parsed call, so `tool_calls` is
+     * absent. The finish reason alone has to be enough.
+     */
+    it("throws on a tool_calls finish even when no tool_calls array is reported", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [
+            {
+              finish_reason: "tool_calls",
+              message: {
+                content: "",
+                reasoning: 'Plan: 1. Call lookup_program_info("certifications")',
+              },
+            },
+          ],
+        }),
+      );
+
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        /tool call/i,
+      );
+    });
+
+    it("generateResponse throws on the native path when tool_calls are reported", async () => {
+      nativeAfter404(() =>
+        Response.json({
+          message: {
+            content: "",
+            tool_calls: [
+              { function: { name: "find_certification", arguments: { query: "CNA" } } },
+            ],
+          },
+          done: true,
+          done_reason: "stop",
+        }),
+      );
+
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        (error: Error) => {
+          assert.match(error.message, /tool call/i);
+          assert.match(error.message, /find_certification/);
+          return true;
+        },
+      );
+    });
+
+    it("generateStructuredResponse throws rather than returning unparseable ''", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [{ finish_reason: "tool_calls", message: { content: "" } }],
+        }),
+      );
+
+      await assert.rejects(
+        provider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
+        /tool call/i,
+      );
+    });
+
+    /** A tool call alongside real text is a usable reply — must not throw. */
+    it("returns visible content that accompanies a tool-call finish", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [
+            {
+              finish_reason: "tool_calls",
+              message: {
+                content: "Let me pull the cert list.",
+                tool_calls: [
+                  {
+                    id: "call_0",
+                    type: "function",
+                    function: { name: "lookup_program_info", arguments: "{}" },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      );
+
+      const result = await provider.generateResponse("sys", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      assert.equal(result, "Let me pull the cert list.");
+    });
+
+    /**
+     * Honest limitation, locked in so nobody assumes coverage this surface
+     * cannot give: with no tools declared, native /api/chat returns a bare
+     * empty assistant message with `done_reason: "stop"` and no tool_calls —
+     * indistinguishable from a model that simply said nothing. The live path
+     * is /v1, where the case above does throw.
+     */
+    it("cannot detect a dropped tool call on native when Ollama reports no signal", async () => {
+      nativeAfter404(() =>
+        Response.json({
+          message: { role: "assistant", content: "" },
+          done: true,
+          done_reason: "stop",
+        }),
+      );
+
+      const result = await provider.generateResponse("sys", [
+        { role: "user", content: "Hi" },
+      ]);
+
+      assert.equal(result, "");
+    });
+
+    /** Budget exhaustion stays the diagnosis when both signals are present. */
+    it("still reports the output budget when the tool-call turn was also truncated", async () => {
+      mockFetch.mock.mockImplementationOnce(async () =>
+        Response.json({
+          choices: [
+            {
+              finish_reason: "length",
+              message: {
+                content: "",
+                reasoning: "x".repeat(200),
+                tool_calls: [
+                  {
+                    id: "call_0",
+                    type: "function",
+                    function: { name: "lookup_program_info", arguments: "{" },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      );
+
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        /reasoning/i,
+      );
+    });
+  });
+
   describe("streaming a reasoning-only turn", () => {
     it("reports the reasoning budget, not a generic empty stream", async () => {
       nativeAfter404(
