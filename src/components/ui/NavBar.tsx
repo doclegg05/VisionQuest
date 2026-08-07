@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getRoleHomePath } from "@/lib/role-home";
+import { getRoleHomePath, getRoleSettingsPath } from "@/lib/role-home";
 import { type NavPhase, type NavItem } from "@/lib/nav-progression";
 import { getVisibleNavItems, getVisibleSecondaryNavItems } from "@/lib/nav-items";
 import {
@@ -81,6 +81,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const homeHref = getRoleHomePath(role);
+  const settingsHref = getRoleSettingsPath(role);
 
   // Primary nav items for the sidebar
   const primaryItems =
@@ -181,7 +182,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
     new Set<string>([
       ...primaryItems.map((i) => i.href),
       ...secondaryItems.map((i) => i.href),
-      "/settings",
+      ...(settingsHref ? [settingsHref] : []),
       "/chat",
       "/teacher/chat",
       "/admin/chat",
@@ -367,18 +368,18 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   <span className="text-center leading-4">{item.label}</span>
                 </Link>
               ))}
-              {/* Settings in More sheet for students */}
-              {role === "student" && (
+              {/* Settings in More sheet for roles with a settings surface */}
+              {settingsHref && (
                 <Link
-                  href="/settings"
+                  href={settingsHref}
                   prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
-                    isActive("/settings")
+                    isActive(settingsHref)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
                   }`}
-                  aria-current={isActive("/settings") ? "page" : undefined}
+                  aria-current={isActive(settingsHref) ? "page" : undefined}
                 >
                   <Gear size={24} weight="regular" className="mb-1" />
                   <span className="text-center leading-4">Settings</span>
@@ -454,9 +455,9 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
               <p className="mb-2 break-words px-2 text-sm font-semibold text-white">
                 {studentName}
               </p>
-              {role === "student" && (
+              {settingsHref && (
                 <Link
-                  href="/settings"
+                  href={settingsHref}
                   prefetch={false}
                   onClick={() => setProfileOpen(false)}
                   className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
