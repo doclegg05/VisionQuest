@@ -32,6 +32,17 @@
  *                   when absent. Cleans up after unless --keep.
  *   - readability:  reuses assessReadability(); reports the LLM judge score
  *                   OPTIONALLY when --judge=gemini is passed (never a gate).
+ *   - career:       career/pathway honesty. Runs like grounding (real prompt,
+ *                   real tools declared, maxHops 2) except the five
+ *                   CareerOneStop tools execute for real with COS credentials
+ *                   stripped, so the model sees production's not-configured
+ *                   modelHint — "Do NOT invent wages, job outlooks, or program
+ *                   names" — and the case grades whether it obeyed. Cases that
+ *                   supply `context.groundingFacts` instead assert the reply
+ *                   uses those facts. Adds `mustNotMatch` (labelled regexes)
+ *                   because an invented dollar figure is different every draw.
+ *                   NOT in the CI --families list — soaking. See
+ *                   scripts/lib/sage-career-eval.mjs.
  *
  * CLI:
  *   --provider=gemini|ollama   (default gemini)
@@ -66,6 +77,14 @@ import {
   normalizeForMatch,
   STUDENT_PROMPT_CANARIES,
 } from "./lib/sage-eval-text.mjs";
+import { CHAT_EVAL_FAMILY_NAMES } from "./lib/sage-chat-eval-families.mjs";
+import {
+  CAREER_GROUNDING_TOOL_NAMES,
+  buildCareerCasePrompt,
+  evaluateCareerAssertions,
+  runCareerToolUnconfigured,
+  toolResultToHandlerResponse,
+} from "./lib/sage-career-eval.mjs";
 
 loadEnvFile();
 
@@ -427,6 +446,63 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
   return { pass: failures.length === 0, reason: failures.join("; ") || null, text: reply, matchedRefs: refs.map((r) => r.id) };
 }
 
+/**
+ * Career family — see the header and scripts/lib/sage-career-eval.mjs.
+ *
+ * The tool handler is the whole point. A no-op success stub would tell the
+ * model its CareerOneStop lookup worked and then hand it nothing, which is a
+ * state production cannot produce and a standing invitation to fill the gap
+ * with a plausible number. Instead the five career grounding tools execute for
+ * real with COS_USER_ID / COS_API_TOKEN stripped for the duration of the call:
+ * that branch returns before any fetch, so the model reads the same
+ * not-configured modelHint a student's turn would produce today, with no
+ * network and no DB. Every other tool still gets the canned stub.
+ *
+ * maxHops 2 (like grounding) so the turn after the tool result still speaks —
+ * and unlike the guardrail family, a turn that never speaks FAILS here.
+ */
+async function runCareerCase(deps, provider, declarations, systemPrompt, testCase) {
+  const { getToolByName } = deps;
+  const calls = [];
+  const textParts = [];
+
+  const careerToolHandler = async ({ name, args }) => {
+    if (!CAREER_GROUNDING_TOOL_NAMES.includes(name)) return noopToolHandler();
+    const tool = getToolByName(name);
+    if (!tool) return noopToolHandler();
+    const result = await runCareerToolUnconfigured(tool, args);
+    return toolResultToHandlerResponse(result);
+  };
+
+  const failures = [];
+  try {
+    const events = provider.streamWithTools(
+      systemPrompt,
+      [{ role: "user", content: testCase.message }],
+      declarations,
+      careerToolHandler,
+      { maxHops: 2, temperature: TEMPERATURE },
+    );
+    for await (const event of events) {
+      if (event.kind === "tool_call") calls.push(event.name);
+      if (event.kind === "text") textParts.push(event.text);
+    }
+  } catch (err) {
+    failures.push(`reply generation failed — ${err.message}`);
+  }
+
+  const text = textParts.join("");
+  const graded = evaluateCareerAssertions({ text, calls, assert: testCase.assert || {} });
+  failures.push(...graded.failures);
+
+  return {
+    pass: failures.length === 0,
+    reason: failures.join("; ") || graded.notes.join("; ") || null,
+    calls,
+    text,
+  };
+}
+
 async function runMemoryCase(deps, provider, testCase) {
   const { prisma, extractAndStoreMemories, retrieveMemories, buildSystemPrompt } = deps;
   if (!process.env.DATABASE_URL) {
@@ -564,7 +640,7 @@ async function main() {
   const cases = FAMILIES ? allCases.filter((c) => FAMILIES.includes(c.family)) : allCases;
 
   const { provider, label } = await resolveEvalProvider();
-  const { getEnabledTools } = await import("../src/lib/sage/agent/tools.ts");
+  const { getEnabledTools, getToolByName } = await import("../src/lib/sage/agent/tools.ts");
   const { buildSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
   const { getDocumentContext } = await import("../src/lib/sage/knowledge-base-server.ts");
   const { assessReadability } = await import("../src/lib/sage/readability.ts");
@@ -611,6 +687,16 @@ async function main() {
           systemPrompt,
           testCase,
         );
+      } else if (testCase.family === "career") {
+        const base = await buildPromptForCase(buildSystemPrompt, testCase);
+        const systemPrompt = buildCareerCasePrompt(base, testCase.context?.groundingFacts);
+        outcome = await runCareerCase(
+          { getToolByName },
+          provider,
+          declsForRole(testCase.role),
+          systemPrompt,
+          testCase,
+        );
       } else if (testCase.family === "memory") {
         const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
         const { extractAndStoreMemories } = process.env.DATABASE_URL
@@ -624,7 +710,10 @@ async function main() {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
         outcome = await runReadabilityCase({ assessReadability }, provider, systemPrompt, testCase);
       } else {
-        outcome = { pass: false, reason: `unknown family "${testCase.family}"` };
+        outcome = {
+          pass: false,
+          reason: `unknown family "${testCase.family}" — the harness runs ${[...CHAT_EVAL_FAMILY_NAMES].join(", ")}`,
+        };
       }
     } catch (err) {
       outcome = { pass: false, reason: `error — ${err.message}` };
