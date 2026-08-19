@@ -62,6 +62,21 @@ function cosineSimilarity(a, b) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+/**
+ * Pure exit-code decision for the memory eval gates — extracted so it can be
+ * exercised with synthetic inputs (mocked duplicateRate/hitRate) without
+ * running the live extract -> store -> retrieve pipeline.
+ *
+ * Gates:
+ *   - duplicate-fact rate >= 5%  (unchanged — the original gate)
+ *   - retrieval hit rate  < 90%  (new — mirrors the printed PASS bar above)
+ */
+export function computeMemoryEvalExitCode({ duplicateRate, hitRate }) {
+  if (duplicateRate >= 0.05) return 1;
+  if (hitRate < 0.9) return 1;
+  return 0;
+}
+
 async function main() {
   const { prisma } = await import("../src/lib/db.ts");
   const { GeminiProvider } = await import("../src/lib/ai/gemini-provider.ts");
@@ -152,10 +167,17 @@ async function main() {
   }
 
   await prisma.$disconnect();
-  if (duplicateRate >= 0.05) process.exitCode = 1;
+  const exitCode = computeMemoryEvalExitCode({ duplicateRate, hitRate });
+  if (exitCode !== 0) process.exitCode = exitCode;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Only auto-run when executed directly (e.g. `npm run sage:memory:eval`) —
+// importing this module for computeMemoryEvalExitCode (verification, tests)
+// must not trigger the live DB/model pipeline.
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

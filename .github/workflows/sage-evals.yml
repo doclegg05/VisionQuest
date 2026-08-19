@@ -62,14 +62,13 @@ jobs:
           fi
           npm run sage:quality:eval
 
-      - name: Tool-selection eval (informational)
-        continue-on-error: true
+      - name: Tool-selection eval (gating when GEMINI_API_KEY is set — accuracy < 75% fails the run; skips when the secret is unset)
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY not set — skipping tool-selection eval."
             exit 0
           fi
-          npm run sage:agent:eval
+          npm run sage:agent:eval -- --min-accuracy=75
 
       - name: Chat harness — deterministic families (gating — tool + guardrail failures fail the run)
         # --samples=3: Gemini tool selection is not fully deterministic even at
@@ -121,8 +120,7 @@ jobs:
         run: npx prisma generate
       - name: Apply migrations
         run: npx prisma migrate deploy
-      - name: Sage memory eval (informational — non-deterministic, needs live DB + model)
-        continue-on-error: true
+      - name: Sage memory eval (gating when GEMINI_API_KEY is set — retrieval hit rate < 90% or duplicate rate >= 5% fails the run; skips when the secret is unset)
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY not set — skipping sage memory eval."
