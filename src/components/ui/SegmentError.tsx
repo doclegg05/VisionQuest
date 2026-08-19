@@ -52,6 +52,14 @@ export function SegmentError({
           {backLabel}
         </a>
       </div>
+      {/* Shared across every student segment: a page that failed to load is
+          a dead end on its own — give it a way to the Help page too. */}
+      <a
+        href="/help"
+        className="text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
+      >
+        Still stuck? Visit the Help page.
+      </a>
     </div>
   );
 }
