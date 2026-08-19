@@ -13,10 +13,12 @@ export default async function GoalsPage() {
   const session = await getSession();
   if (!session) return null;
 
+  // One readiness fetch, shared with the next-step engine (still parallel).
+  const readinessPromise = fetchStudentReadinessData(session.id);
   const [{ goals: initialGoals, goalPlans: initialGoalPlans }, { state, readiness }, nextStep] = await Promise.all([
     getStudentGoalPlanData(session.id),
-    fetchStudentReadinessData(session.id),
-    getStudentNextStep(session.id),
+    readinessPromise,
+    getStudentNextStep(session.id, readinessPromise),
   ]);
 
   return (

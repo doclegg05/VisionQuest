@@ -37,16 +37,30 @@ describe("detectProactiveSignals", () => {
     assert.ok(!signals.some((s) => s.kind === "appointment_soon"));
   });
 
-  it("flags a missing goal and incomplete orientation in priority order", () => {
+  it("ranks incomplete orientation above a missing goal (journey step 0 first)", () => {
     const signals = detectProactiveSignals({
       ...clean,
       activeGoalCount: 0,
       orientationComplete: false,
       orientationRemaining: 3,
     });
-    assert.equal(signals[0].kind, "no_goals");
-    assert.equal(signals[1].kind, "orientation_incomplete");
-    assert.match(signals[1].nudge, /3 orientation steps/);
+    assert.equal(signals[0].kind, "orientation_incomplete");
+    assert.equal(signals[1].kind, "no_goals");
+    assert.match(signals[0].nudge, /3 orientation steps/);
+  });
+
+  it("keeps imminent appointments and stalled goals above the orientation nudge", () => {
+    const signals = detectProactiveSignals({
+      ...clean,
+      stalledGoalCount: 1,
+      orientationComplete: false,
+      orientationRemaining: 1,
+      nextAppointmentInHours: 12,
+      nextAppointmentLabel: "Advising on Mon 2:30 PM",
+    });
+    assert.equal(signals[0].kind, "appointment_soon");
+    assert.equal(signals[1].kind, "stalled_goal");
+    assert.equal(signals[2].kind, "orientation_incomplete");
   });
 
   it("offers early encouragement only when readiness is low AND goals exist", () => {

@@ -3,12 +3,14 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
-import type { ReadinessBreakdown } from "@/lib/progression/readiness-score";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { AmbientPanels } from "@/components/dashboard/AmbientPanels";
 import { SagePanels } from "@/components/dashboard/sage/SagePanels";
 import { getLatestPanelSpec } from "@/lib/sage/panel-data";
-import { getStudentNextStep } from "@/lib/progression/student-next-step";
+import {
+  getStudentNextStep,
+  nextStepShortLabel,
+} from "@/lib/progression/student-next-step";
 import { PathToEmployment } from "@/components/progression/PathToEmployment";
 
 /**
@@ -17,19 +19,11 @@ import { PathToEmployment } from "@/components/progression/PathToEmployment";
  * The Sage conversation IS the home surface; the ambient rail carries the
  * old dashboard's vital signs and deep-links into full pages. The classic
  * dashboard was retired 2026-07-20; /dashboard/classic now redirects here.
+ *
+ * The "Next up" hint on the readiness card derives from the SAME
+ * StudentNextStepResult as the Current Target strip (nextStepShortLabel) —
+ * the journey has exactly one next-action engine.
  */
-
-/** The lowest-scoring readiness dimension — the student's next gap. */
-function findNextGap(breakdown: ReadinessBreakdown): string | null {
-  let worst: { label: string; ratio: number } | null = null;
-  for (const part of Object.values(breakdown)) {
-    if (part.max === 0) continue;
-    const ratio = part.score / part.max;
-    if (ratio >= 1) continue;
-    if (!worst || ratio < worst.ratio) worst = { label: part.label, ratio };
-  }
-  return worst?.label ?? null;
-}
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -86,7 +80,8 @@ export default async function DashboardPage() {
     }
   }
 
-  const nextStep = await getStudentNextStep(session.id);
+  // Reuse the readiness data fetched above — no duplicate readiness queries.
+  const nextStep = await getStudentNextStep(session.id, readinessData);
 
   return (
     <div className="page-shell page-shell-wide space-y-6">
@@ -104,7 +99,7 @@ export default async function DashboardPage() {
           {sagePanel && <SagePanels panel={sagePanel} showActions />}
           <AmbientPanels
             readinessScore={readiness.score}
-            nextGap={findNextGap(readiness.breakdown)}
+            nextGap={nextStepShortLabel(nextStep)}
             tasks={tasks.map((task) => ({
               ...task,
               dueAt: task.dueAt ? task.dueAt.toISOString() : null,

@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createInitialState } from "./engine";
 import {
   DISCOVERY_STALL_ASSISTANT_TURNS,
+  nextStepShortLabel,
   resolveStudentNextStep,
   type StudentNextStepSignals,
 } from "./student-next-step";
@@ -12,6 +16,7 @@ function makeSignals(
 ): StudentNextStepSignals {
   return {
     state: createInitialState(),
+    orientationComplete: true,
     bhagCompleted: false,
     hasCompletedDiscovery: false,
     goalCount: 0,
@@ -33,6 +38,39 @@ function stepStatus(
 ) {
   return result.steps.find((step) => step.key === key)?.status;
 }
+
+test("incomplete orientation is the current target before anything else", () => {
+  const result = resolveStudentNextStep(makeSignals({ orientationComplete: false }));
+
+  assert.equal(result.currentStepKey, "orientation");
+  assert.equal(stepStatus(result, "orientation"), "active");
+  assert.equal(stepStatus(result, "discover"), "locked");
+  assert.equal(result.actionLink, "/orientation");
+});
+
+test("orientation stays the current target even when later progress exists", () => {
+  const result = resolveStudentNextStep(
+    makeSignals({
+      orientationComplete: false,
+      hasCompletedDiscovery: true,
+      goalCount: 2,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "orientation");
+  // Later steps keep their data-driven statuses, matching how existing
+  // goals already render as complete while discovery is still active.
+  assert.equal(stepStatus(result, "discover"), "complete");
+  assert.equal(stepStatus(result, "goal"), "complete");
+});
+
+test("orientation renders as a completed step 0 in the 8-step strip", () => {
+  const result = resolveStudentNextStep(makeSignals());
+
+  assert.equal(result.steps.length, 8);
+  assert.equal(result.steps[0]?.key, "orientation");
+  assert.equal(result.steps[0]?.status, "complete");
+});
 
 test("new students start with career discovery", () => {
   const result = resolveStudentNextStep(makeSignals());
@@ -162,6 +200,39 @@ test("a short discovery conversation does not show the coach-review nudge", () =
 
   assert.equal(result.currentStepKey, "discover");
   assert.doesNotMatch(result.description, /review your discovery/);
+});
+
+test("nextStepShortLabel names the current step from the same result", () => {
+  const orientation = resolveStudentNextStep(makeSignals({ orientationComplete: false }));
+  assert.equal(nextStepShortLabel(orientation), "Orientation");
+
+  const learn = resolveStudentNextStep(
+    makeSignals({ hasCompletedDiscovery: true, goalCount: 2 }),
+  );
+  assert.equal(learn.currentStepKey, "learn");
+  assert.equal(nextStepShortLabel(learn), "Learn");
+});
+
+// Charter contract: the student journey has exactly ONE next-action engine.
+// The dashboard's "Next up" hint must derive from the same
+// StudentNextStepResult as the Current Target strip — never from an
+// independent heuristic (the old findNextGap picked the lowest readiness
+// dimension and could disagree with the strip).
+test("dashboard derives its next hint from StudentNextStepResult, not a second engine", () => {
+  const testDir = dirname(fileURLToPath(import.meta.url));
+  const dashboardSource = readFileSync(
+    join(testDir, "../../app/(student)/dashboard/page.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    !dashboardSource.includes("findNextGap"),
+    "dashboard must not run an independent next-gap engine (findNextGap)",
+  );
+  assert.ok(
+    dashboardSource.includes("nextGap={nextStepShortLabel(nextStep)}"),
+    "dashboard's nextGap must derive from the StudentNextStepResult via nextStepShortLabel",
+  );
 });
 
 test("open advising work blocks the follow-up step after applications start", () => {

@@ -63,19 +63,22 @@ export function detectProactiveSignals(input: ProactiveSignalInput): ProactiveSi
     });
   }
 
+  // Orientation is the student journey's step 0 (see
+  // src/lib/progression/student-next-step.ts), so its nudge outranks the
+  // missing-goal nudge — Sage's top hint matches the Current Target strip.
+  if (!input.orientationComplete && input.orientationRemaining > 0) {
+    signals.push({
+      kind: "orientation_incomplete",
+      priority: 75,
+      nudge: `They still have ${input.orientationRemaining} orientation step${input.orientationRemaining === 1 ? "" : "s"} left. Offer to help them finish when it's natural.`,
+    });
+  }
+
   if (input.activeGoalCount === 0) {
     signals.push({
       kind: "no_goals",
       priority: 70,
       nudge: "They don't have an active goal yet. When the moment fits, offer to set one small goal together.",
-    });
-  }
-
-  if (!input.orientationComplete && input.orientationRemaining > 0) {
-    signals.push({
-      kind: "orientation_incomplete",
-      priority: 60,
-      nudge: `They still have ${input.orientationRemaining} orientation step${input.orientationRemaining === 1 ? "" : "s"} left. Offer to help them finish when it's natural.`,
     });
   }
 
