@@ -50,5 +50,20 @@ export default async function WelcomePage() {
     .slice(0, 3)
     .map((item) => ({ id: item.id, label: item.label, description: item.description }));
 
-  return <WelcomeFlow studentName={session.displayName} quickWinItems={quickWinItems} />;
+  // Real readiness numbers — the same orientationItems query /api/orientation
+  // uses (total items, and how many this student had already completed
+  // before this flow started). Never a hardcoded denominator.
+  const totalOrientationItems = orientationItems.length;
+  const completedOrientationCount = orientationItems.filter(
+    (item) => item.progress[0]?.completed,
+  ).length;
+
+  return (
+    <WelcomeFlow
+      studentName={session.displayName}
+      quickWinItems={quickWinItems}
+      totalOrientationItems={totalOrientationItems}
+      completedOrientationCount={completedOrientationCount}
+    />
+  );
 }

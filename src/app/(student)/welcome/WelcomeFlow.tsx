@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-interface QuickWinItem {
+interface QuickWinItemData {
   id: string;
   label: string;
   description: string | null;
@@ -11,43 +11,141 @@ interface QuickWinItem {
 
 interface WelcomeFlowProps {
   studentName: string;
-  quickWinItems?: QuickWinItem[];
+  quickWinItems?: QuickWinItemData[];
+  /** Real orientation item count — the same total /api/orientation reports. */
+  totalOrientationItems: number;
+  /** Items already completed before this flow started (default 0 — new
+   *  students reach this screen with a clean slate, but never assume it). */
+  completedOrientationCount?: number;
 }
 
 const TOTAL_STEPS = 4;
 
-export default function WelcomeFlow({ studentName, quickWinItems = [] }: WelcomeFlowProps) {
+/**
+ * Posts a single quick-win orientation item as complete. Returns whether the
+ * save succeeded — never throws — so the caller can show a retry affordance
+ * instead of silently discarding the failure. Exported for tests.
+ */
+export async function postQuickWinCompletion(
+  itemId: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const res = await fetchFn("/api/orientation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId, completed: true }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Readiness percentage for the "your first wins" step, derived from the real
+ * orientation item count — never a hardcoded total. Returns null when the
+ * total is unknown/zero so the caller shows count-free encouragement instead
+ * of a fabricated percentage. Exported for tests.
+ */
+export function computeReadinessPercent(
+  totalOrientationItems: number,
+  completedOrientationCount: number,
+  completedWinsCount: number,
+): number | null {
+  if (totalOrientationItems <= 0) return null;
+  return Math.round(((completedOrientationCount + completedWinsCount) / totalOrientationItems) * 100);
+}
+
+interface QuickWinCardProps {
+  item: QuickWinItemData;
+  done: boolean;
+  saving: boolean;
+  hasError: boolean;
+  onComplete: (itemId: string) => void;
+}
+
+/**
+ * One quick-win row. A failed save must stay visible with a retry — it must
+ * never disappear silently. Exported (named) so the failure-path markup is
+ * directly testable via renderToString without simulating a click/fetch
+ * cycle, mirroring the repo's OrientationWizard test pattern.
+ */
+export function QuickWinCard({ item, done, saving, hasError, onComplete }: QuickWinCardProps) {
+  return (
+    <div
+      className={`rounded-xl border p-4 transition-colors ${
+        done
+          ? "border-green-200 bg-green-50"
+          : hasError
+            ? "border-red-200 bg-red-50"
+            : "border-[var(--border)] bg-[var(--surface-raised)]"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-medium ${done ? "text-green-800" : "text-[var(--ink-strong)]"}`}>
+            {done && <span className="mr-1.5">✓</span>}
+            {item.label}
+          </p>
+          {item.description && (
+            <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{item.description}</p>
+          )}
+        </div>
+        {!done && (
+          <button
+            type="button"
+            onClick={() => onComplete(item.id)}
+            disabled={saving}
+            className="shrink-0 rounded-full bg-[var(--accent-strong)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent)] disabled:opacity-60"
+          >
+            {saving ? "Saving..." : hasError ? "Try again" : "I've read this"}
+          </button>
+        )}
+      </div>
+      {!done && hasError && (
+        <p role="alert" className="mt-2 text-xs font-medium text-red-700">
+          That didn&apos;t save. Tap to try again.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function WelcomeFlow({
+  studentName,
+  quickWinItems = [],
+  totalOrientationItems,
+  completedOrientationCount = 0,
+}: WelcomeFlowProps) {
   const [step, setStep] = useState(0);
   const [completedWins, setCompletedWins] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<string | null>(null);
+  const [errorItemId, setErrorItemId] = useState<string | null>(null);
   const [showScore, setShowScore] = useState(false);
 
   const hasQuickWins = quickWinItems.length > 0;
   const allWinsDone = hasQuickWins && completedWins.size >= quickWinItems.length;
-  const scorePct = hasQuickWins
-    ? Math.round((completedWins.size / 24) * 100) // ~24 total orientation items
-    : 0;
+  const scorePct = computeReadinessPercent(
+    totalOrientationItems,
+    completedOrientationCount,
+    completedWins.size,
+  );
 
   async function completeQuickWin(itemId: string) {
     setSaving(itemId);
-    try {
-      const res = await fetch("/api/orientation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, completed: true }),
-      });
-      if (res.ok) {
-        setCompletedWins((prev) => new Set(prev).add(itemId));
-        // If all done, show score animation briefly
-        if (completedWins.size + 1 >= quickWinItems.length) {
-          setShowScore(true);
-          setTimeout(() => setStep(3), 2000);
-        }
-      }
-    } catch {
-      // Silent fail — they can retry
-    } finally {
-      setSaving(null);
+    setErrorItemId((prev) => (prev === itemId ? null : prev));
+    const saved = await postQuickWinCompletion(itemId);
+    setSaving(null);
+    if (!saved) {
+      setErrorItemId(itemId);
+      return;
+    }
+    setCompletedWins((prev) => new Set(prev).add(itemId));
+    // If all done, show score animation briefly
+    if (completedWins.size + 1 >= quickWinItems.length) {
+      setShowScore(true);
+      setTimeout(() => setStep(3), 2000);
     }
   }
 
@@ -131,53 +229,39 @@ export default function WelcomeFlow({ studentName, quickWinItems = [] }: Welcome
 
             {hasQuickWins && (
               <div className="mt-8 space-y-3 text-left">
-                {quickWinItems.map((item) => {
-                  const done = completedWins.has(item.id);
-                  return (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
-                        done
-                          ? "border-green-200 bg-green-50"
-                          : "border-[var(--border)] bg-[var(--surface-raised)]"
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium ${done ? "text-green-800" : "text-[var(--ink-strong)]"}`}>
-                          {done && <span className="mr-1.5">✓</span>}
-                          {item.label}
-                        </p>
-                        {item.description && (
-                          <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{item.description}</p>
-                        )}
-                      </div>
-                      {!done && (
-                        <button
-                          onClick={() => completeQuickWin(item.id)}
-                          disabled={saving === item.id}
-                          className="shrink-0 rounded-full bg-[var(--accent-strong)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent)] disabled:opacity-60"
-                        >
-                          {saving === item.id ? "Saving..." : "I've read this"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+                {quickWinItems.map((item) => (
+                  <QuickWinCard
+                    key={item.id}
+                    item={item}
+                    done={completedWins.has(item.id)}
+                    saving={saving === item.id}
+                    hasError={errorItemId === item.id}
+                    onComplete={completeQuickWin}
+                  />
+                ))}
               </div>
             )}
 
             {/* Score animation after all wins */}
             {showScore && (
               <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
-                <p className="text-sm font-medium text-green-800">
-                  🎉 Nice! Your readiness score is already at {scorePct}%
-                </p>
-                <div className="mt-2 h-2 rounded-full bg-green-200 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-green-500 transition-all duration-1000"
-                    style={{ width: `${scorePct}%` }}
-                  />
-                </div>
+                {scorePct !== null ? (
+                  <>
+                    <p className="text-sm font-medium text-green-800">
+                      🎉 Nice! Your readiness score is already at {scorePct}%
+                    </p>
+                    <div className="mt-2 h-2 rounded-full bg-green-200 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-green-500 transition-all duration-1000"
+                        style={{ width: `${scorePct}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm font-medium text-green-800">
+                    🎉 Nice! You&apos;re off to a great start.
+                  </p>
+                )}
               </div>
             )}
 
