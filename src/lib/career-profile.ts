@@ -17,6 +17,7 @@ import type {
   WorkValue,
 } from "@/lib/sage/discovery-extractor";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
+import { normalizeNationalClusterScores } from "@/lib/spokes/national-clusters";
 
 const careerProfileSelect = {
   id: true,
@@ -168,7 +169,14 @@ function sanitizeClusters(parsed: unknown): NationalClusterScore[] | null {
         : [],
     });
   }
-  return clusters.length > 0 ? clusters : null;
+  if (clusters.length === 0) return null;
+  // Read-time normalization: rows stored under retired 16-framework names
+  // render as their modernized clusters (duplicates merge by max score).
+  const normalized = normalizeNationalClusterScores(clusters).map((cluster) => ({
+    ...cluster,
+    spokes_mapping: cluster.spokes_mapping ?? [],
+  }));
+  return normalized.length > 0 ? normalized : null;
 }
 
 function sanitizeSkills(parsed: unknown): TransferableSkill[] | null {

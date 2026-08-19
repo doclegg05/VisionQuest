@@ -32,10 +32,12 @@ function buildRow(
       enterprising: 0.7,
       conventional: 0.6,
     }),
+    // Deliberately stored under RETIRED 16-framework names: shaping must
+    // read them through the national-cluster normalizer (2026 modernization).
     nationalClusters: JSON.stringify([
       { cluster_name: "Human Services", score: 0.8, spokes_mapping: ["office-admin"] },
       { cluster_name: "Health Science", score: 0.9, spokes_mapping: ["no-such-cluster"] },
-      { cluster_name: "Business Management & Administration", score: 0.5, spokes_mapping: [] },
+      { cluster_name: "Business Management & Administration", score: 0.5, spokes_mapping: ["no-such-cluster"] },
       { cluster_name: "Education & Training", score: 0.4, spokes_mapping: [] },
     ]),
     transferableSkills: JSON.stringify([
@@ -72,26 +74,31 @@ describe("shapeCareerProfile", () => {
     }
   });
 
-  it("ranks suggested clusters by score and enriches SPOKES-mapped ones with sample jobs", () => {
+  it("normalizes legacy names, merges duplicates by max score, and ranks the result", () => {
     const view = careerProfile.shapeCareerProfile(buildRow());
 
+    // Human Services (0.8) + Health Science (0.9) both land on
+    // Healthcare & Human Services: one entry at the MAX score.
     assert.deepEqual(
       view.suggestedClusters.map((c) => [c.name, c.matchPercent]),
       [
-        ["Health Science", 90],
-        ["Human Services", 80],
-        ["Business Management & Administration", 50],
+        ["Healthcare & Human Services", 90],
+        ["Management & Entrepreneurship", 50],
+        ["Education", 40],
       ],
     );
 
-    const humanServices = view.suggestedClusters[1];
-    assert.equal(humanServices.spokesLabel, "Office & Administrative Support");
-    assert.equal(humanServices.sampleJobs.length, 4);
+    // The merged entry unions both stored SPOKES mappings and enriches from
+    // the first one that resolves.
+    const healthcare = view.suggestedClusters[0];
+    assert.deepEqual(healthcare.spokesClusterIds, ["office-admin", "no-such-cluster"]);
+    assert.equal(healthcare.spokesLabel, "Office & Administrative Support");
+    assert.equal(healthcare.sampleJobs.length, 4);
 
     // Unknown SPOKES mapping degrades to no sample jobs, not a crash.
-    const healthScience = view.suggestedClusters[0];
-    assert.equal(healthScience.spokesLabel, null);
-    assert.deepEqual(healthScience.sampleJobs, []);
+    const management = view.suggestedClusters[1];
+    assert.equal(management.spokesLabel, null);
+    assert.deepEqual(management.sampleJobs, []);
   });
 
   it("reports full completeness when all four sections have signal", () => {
@@ -156,6 +163,8 @@ describe("shapeCareerProfile", () => {
     assert.equal(byKey.get("social")?.percent, 0);
     assert.equal(byKey.get("enterprising")?.percent, 50);
     assert.equal(view.suggestedClusters[0].matchPercent, 100);
+    // Retired "Manufacturing" renders under its modernized name.
+    assert.equal(view.suggestedClusters[0].name, "Advanced Manufacturing");
   });
 
   it("coerces unknown work-value importance to medium instead of dropping the value", () => {

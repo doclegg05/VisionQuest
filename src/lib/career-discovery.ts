@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { RiasecScores, NationalClusterScore, TransferableSkill, WorkValue } from "@/lib/sage/discovery-extractor";
+import { parseAndNormalizeStoredNationalClusters } from "@/lib/spokes/national-clusters";
 
 export interface CareerDiscoveryData {
   id: string;
@@ -42,12 +43,18 @@ export async function getCareerDiscovery(
 
   if (!record) return null;
 
+  // Read-time normalization: legacy 16-framework rows render as their
+  // modernized clusters everywhere this data is displayed.
+  const normalizedClusters = parseAndNormalizeStoredNationalClusters(
+    record.nationalClusters,
+  ).map((cluster) => ({ ...cluster, spokes_mapping: cluster.spokes_mapping ?? [] }));
+
   return {
     id: record.id,
     status: record.status,
     hollandCode: record.hollandCode,
     riasecScores: parseJsonField<RiasecScores>(record.riasecScores),
-    nationalClusters: parseJsonField<NationalClusterScore[]>(record.nationalClusters),
+    nationalClusters: normalizedClusters.length > 0 ? normalizedClusters : null,
     transferableSkills: parseJsonField<TransferableSkill[]>(record.transferableSkills),
     workValues: parseJsonField<WorkValue[]>(record.workValues),
     sageSummary: record.sageSummary,
