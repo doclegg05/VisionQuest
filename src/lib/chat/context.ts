@@ -362,8 +362,10 @@ export async function getStudentPromptContext(
             `chat:pathway:${studentId}`,
             SUPPLEMENTAL_CONTEXT_TTL_SECONDS,
             async () => {
-              const pathway = await getLearningPathway(studentId);
-              return pathway ? buildPathwayContextString(pathway) : undefined;
+              const result = await getLearningPathway(studentId);
+              return result.status === "ready"
+                ? buildPathwayContextString(result.pathway)
+                : undefined;
             },
           )
         : Promise.resolve(undefined),

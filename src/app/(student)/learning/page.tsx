@@ -3,7 +3,11 @@ import CredlyBadges from "@/components/certifications/CredlyBadges";
 import CredlyConnect from "@/components/certifications/CredlyConnect";
 import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
 import StudentPathwayPlan from "@/components/goals/StudentPathwayPlan";
-import { LearningPathway, LearningPathwayEmpty } from "@/components/career/LearningPathway";
+import {
+  LearningPathway,
+  LearningPathwayAwaitingCluster,
+  LearningPathwayEmpty,
+} from "@/components/career/LearningPathway";
 import CoursesHub from "@/components/lms/CoursesHub";
 import AskSageLink from "@/components/sage/AskSageLink";
 import PageIntro from "@/components/ui/PageIntro";
@@ -17,7 +21,7 @@ export default async function LearningPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [[{ goals, goalPlans }, pathway], nextStep] = await Promise.all([
+  const [[{ goals, goalPlans }, pathwayResult], nextStep] = await Promise.all([
     Promise.all([
       getStudentGoalPlanData(session.id),
       getLearningPathway(session.id),
@@ -57,8 +61,10 @@ export default async function LearningPage() {
 
       <section id="roadmap" className="mt-6">
         <h2 className="sr-only">Your Learning Roadmap</h2>
-        {pathway ? (
-          <LearningPathway pathway={pathway} />
+        {pathwayResult.status === "ready" ? (
+          <LearningPathway pathway={pathwayResult.pathway} />
+        ) : pathwayResult.status === "awaiting_cluster" ? (
+          <LearningPathwayAwaitingCluster />
         ) : (
           <LearningPathwayEmpty />
         )}
