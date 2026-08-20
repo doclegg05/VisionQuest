@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { invalidateAllChatContext } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 
 function isAuthorized(req: Request) {
@@ -51,6 +52,14 @@ export async function POST(req: Request) {
       WHERE "validTo" IS NULL
         AND confidence < ${ARCHIVE_BELOW_CONFIDENCE}
     `;
+
+    // Raw SQL through prismaAdmin bypasses the chat-context write-through
+    // extension (src/lib/db.ts). Archival changes which memories
+    // chat:profile shows, and this is a global weekly batch, so drop every
+    // student's cached chat context when anything actually changed.
+    if (decayed > 0 || archived > 0) {
+      invalidateAllChatContext();
+    }
 
     const durationMs = Date.now() - start;
     logger.info("Memory consolidation complete", { decayed, archived, durationMs });

@@ -194,4 +194,4 @@ jobs:
       - name: Apply migrations
         run: npx prisma migrate deploy
       - name: Sage freshness eval (Group A gates the read plane; Group B reports staleness)
-        run: npm run sage:freshness:eval
+        run: npm run sage:freshness:eval -- --strict

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cached, invalidate, invalidatePrefix } from "./cache";
+import {
+  cached,
+  invalidate,
+  invalidateAllChatContext,
+  invalidateChatContext,
+  invalidatePrefix,
+} from "./cache";
 
 // Each test uses a unique key prefix to avoid cross-test cache pollution
 // since the module holds a singleton NodeCache instance.
@@ -146,4 +152,85 @@ test("cached() propagates fetcher errors without caching anything", async () => 
   await assert.rejects(() => cached(key, 60, throwingFetcher), /fetch failed/);
 
   assert.equal(callCount, 2);
+});
+
+// ---------------------------------------------------------------------------
+// invalidateChatContext / invalidateAllChatContext — write-through
+// invalidation of every per-student chat context layer.
+// ---------------------------------------------------------------------------
+
+test("invalidateChatContext clears every chat layer for the student and nothing else", async () => {
+  const sid = "cache-test-sid-a";
+  const otherSid = "cache-test-sid-b";
+  const studentKeys = [
+    `chat:base-context:${sid}:conv-1:discovery:3`,
+    `chat:base-context:${sid}:conv-2:daily:3`,
+    `chat:snapshot:${sid}`,
+    `chat:skill-gap:${sid}`,
+    `chat:pathway:${sid}`,
+    `chat:career-thread:${sid}`,
+    `chat:profile:${sid}`,
+  ];
+  const survivorKeys = [
+    `chat:base-context:${otherSid}:conv-9:discovery:3`,
+    `chat:snapshot:${otherSid}`,
+    // Rate-limit-shaped key (src/app/api/chat/send/route.ts) — no layer, must survive.
+    `chat:${sid}`,
+    `unrelated:${sid}`,
+  ];
+  for (const key of [...studentKeys, ...survivorKeys]) {
+    await cached(key, 60, async () => "warm");
+  }
+
+  invalidateChatContext(sid);
+
+  for (const key of studentKeys) {
+    let recomputed = false;
+    await cached(key, 60, async () => {
+      recomputed = true;
+      return "fresh";
+    });
+    assert.equal(recomputed, true, `expected ${key} to be invalidated`);
+  }
+  for (const key of survivorKeys) {
+    let recomputed = false;
+    await cached(key, 60, async () => {
+      recomputed = true;
+      return "?";
+    });
+    assert.equal(recomputed, false, `expected ${key} to survive`);
+    invalidate(key);
+  }
+  for (const key of studentKeys) invalidate(key);
+});
+
+test("invalidateAllChatContext clears chat layers for every student but not layerless chat keys", async () => {
+  const keys = [
+    "chat:base-context:sid-x:conv:discovery:3",
+    "chat:snapshot:sid-y",
+    "chat:profile:sid-z",
+  ];
+  const rateLimitKey = "chat:sid-x";
+  for (const key of [...keys, rateLimitKey]) {
+    await cached(key, 60, async () => "warm");
+  }
+
+  invalidateAllChatContext();
+
+  for (const key of keys) {
+    let recomputed = false;
+    await cached(key, 60, async () => {
+      recomputed = true;
+      return "fresh";
+    });
+    assert.equal(recomputed, true, `expected ${key} to be invalidated`);
+    invalidate(key);
+  }
+  let rateLimitRecomputed = false;
+  await cached(rateLimitKey, 60, async () => {
+    rateLimitRecomputed = true;
+    return "?";
+  });
+  assert.equal(rateLimitRecomputed, false, "layerless chat:<id> key must survive");
+  invalidate(rateLimitKey);
 });

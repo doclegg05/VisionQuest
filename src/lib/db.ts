@@ -1,6 +1,10 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { getRlsContext, type RlsContext } from "./rls-context";
 import { rlsContextFromHeaders } from "./rls-headers";
+import {
+  applyChatContextWriteThrough,
+  isChatContextWrite,
+} from "./chat-context-write-through";
 import { logger } from "./logger";
 
 /**
@@ -192,6 +196,35 @@ const rlsExtension = Prisma.defineExtension((client) =>
   }),
 );
 
+/**
+ * Prisma extension: chat-context write-through invalidation.
+ *
+ * The shared app client is the one boundary EVERY write path crosses — route
+ * handlers writing Prisma directly, lib helpers, agent write tools, and
+ * background extraction alike — so this is where a write to state Sage's chat
+ * context reads drops the student's `chat:*` cache layers (write-through; the
+ * TTLs become a backstop instead of the freshness window). Logic lives in
+ * src/lib/chat-context-write-through.ts (pure, unit-tested); this hook only
+ * awaits the write and applies the resolved invalidation, which is fire-safe
+ * by contract — a cache failure never fails the write. Proven end to end by
+ * scripts/sage-freshness-eval.mjs (Group B must be FRESH).
+ */
+const chatContextWriteThroughExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: "chat-context-write-through",
+    query: {
+      $allOperations({ args, query, operation, model }) {
+        if (!isChatContextWrite(model, operation)) return query(args);
+        return (async () => {
+          const result = await query(args);
+          applyChatContextWriteThrough(model, operation, args, result);
+          return result;
+        })();
+      },
+    },
+  }),
+);
+
 const globalForPrisma = globalThis as unknown as {
   prismaApp?: PrismaClient;
   prismaAdmin?: PrismaClient;
@@ -232,7 +265,9 @@ if (process.env.NODE_ENV !== "production") {
  * After Slice C, DATABASE_URL points at the `vq_app` role (no RLS
  * bypass); un-contextualized queries fail-closed.
  */
-export const prisma = appClient.$extends(rlsExtension);
+export const prisma = appClient
+  .$extends(rlsExtension)
+  .$extends(chatContextWriteThroughExtension);
 
 /**
  * Admin Prisma client — uses ADMIN_DATABASE_URL (postgres credentials)
