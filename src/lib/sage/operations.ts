@@ -29,6 +29,12 @@ export interface RecordOperationParams {
   actorType: OperationActorType;
   actorId: string;
   actorRole: string;
+  /**
+   * The student the operation acted ON. Equals actorId for student
+   * self-service writes; the target student for staff on-behalf-of writes.
+   * Null when the operation has no student target.
+   */
+  targetStudentId?: string | null;
   toolName: string;
   status: OperationStatus;
   payload: Prisma.InputJsonValue;
@@ -42,6 +48,7 @@ export async function recordOperation(params: RecordOperationParams): Promise<vo
       id: params.id,
       actorType: params.actorType,
       actorId: params.actorId,
+      targetStudentId: params.targetStudentId ?? null,
       toolName: params.toolName,
       status: params.status,
       payload: params.payload,

@@ -35,6 +35,16 @@ function actorTypeFor(role: string): OperationActorType {
 }
 
 /**
+ * The student a tool invocation acts ON, for ledger attribution: staff pass
+ * an explicit target; students act on themselves. Null for a staff call
+ * with no target (ownership checks then find nothing to act on anyway).
+ */
+function actedOnStudentId(ctx: AgentToolContext): string | null {
+  if (ctx.targetStudentId) return ctx.targetStudentId;
+  return actorTypeFor(ctx.session.role) === "student" ? ctx.session.id : null;
+}
+
+/**
  * Confirmation gate shared by consequential tools. Returns null when the
  * call is confirmed (proceed); otherwise returns the proposal result.
  */
@@ -65,6 +75,7 @@ export async function confirmationGate(
     actorType: actorTypeFor(ctx.session.role),
     actorId: ctx.session.id,
     actorRole: ctx.session.role,
+    targetStudentId: actedOnStudentId(ctx),
     toolName,
     status: "proposed",
     payload: args as never,
@@ -101,6 +112,7 @@ export async function executeAndLedger(
       actorType: actorTypeFor(ctx.session.role),
       actorId: ctx.session.id,
       actorRole: ctx.session.role,
+      targetStudentId: actedOnStudentId(ctx),
       toolName,
       status: "executed",
       payload: args as never,
@@ -115,6 +127,7 @@ export async function executeAndLedger(
       actorType: actorTypeFor(ctx.session.role),
       actorId: ctx.session.id,
       actorRole: ctx.session.role,
+      targetStudentId: actedOnStudentId(ctx),
       toolName,
       status: "failed",
       payload: args as never,
