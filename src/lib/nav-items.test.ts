@@ -21,9 +21,11 @@ describe("STUDENT_NAV_ITEMS", () => {
 
   it("exposes consolidated secondary nav items (Phase 4 chat-first redesign)", () => {
     const hrefs = STUDENT_SECONDARY_NAV.map((item) => item.href);
-    // Resources merged into Learning; Files presented as "Documents"; Help
-    // added so a dead end always has a human exit even when Sage is down.
-    assert.deepEqual(hrefs, ["/vision-board", "/files", "/help"]);
+    // Resources merged into Learning; Files presented as "Documents"; Sage
+    // Memory added as the student's window into what Sage remembers about
+    // them; Help added so a dead end always has a human exit even when
+    // Sage is down.
+    assert.deepEqual(hrefs, ["/vision-board", "/files", "/memory", "/help"]);
   });
 
   it("always offers a Help entry with an icon, even before orientation completes", () => {

@@ -9,6 +9,7 @@ import {
   FolderOpen,
   ClipboardText,
   Lifebuoy,
+  Brain,
 } from "@phosphor-icons/react";
 import type { NavItem, NavPhase } from "./nav-progression";
 
@@ -28,6 +29,9 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
 export const STUDENT_SECONDARY_NAV: NavItem[] = [
   { href: "/vision-board", label: "Vision Board", icon: ImageSquare, phase: 1 },
   { href: "/files", label: "Documents", icon: FolderOpen, phase: 1 },
+  // The data subject's window into Sage's memory of them — mirrors the
+  // staff governance surface (MemoryInspectorPanel on Student Detail).
+  { href: "/memory", label: "Sage Memory", icon: Brain, phase: 1 },
   // Give every dead end a human exit: Help is always reachable, even when
   // Sage (the designed help channel) is the thing that's down.
   { href: "/help", label: "Help", icon: Lifebuoy, phase: 1 },

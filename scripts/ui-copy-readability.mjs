@@ -67,6 +67,14 @@ const TOP_WORST_COUNT = 15;
 // alone would find zero literal strings for that surface, so the one lib
 // file that owns the copy is included explicitly. This is a single-file
 // carve-out, not a general sweep of src/lib.
+//
+// components/student was added 2026-08-20 alongside the "What Sage
+// Remembers About You" memory-inspector page (src/app/(student)/memory) —
+// its copy lives partly in src/components/student/SageMemoryList.tsx and
+// SageMemoryPanel.tsx, which sat outside every existing root and so were
+// silently unscanned. AssignedFormsCard.tsx already lived in this directory
+// with only short (<12-word, non-scorable) strings, so adding the root
+// does not newly fail anything that already passed.
 // ---------------------------------------------------------------------------
 const SCAN_ROOTS = [
   { label: "student app routes", relPath: "src/app/(student)" },
@@ -82,6 +90,7 @@ const SCAN_ROOTS = [
   { label: "components/career", relPath: "src/components/career" },
   { label: "components/onboarding", relPath: "src/components/onboarding" },
   { label: "components/chat", relPath: "src/components/chat" },
+  { label: "components/student", relPath: "src/components/student" },
   { label: "next-step copy data (src/lib carve-out)", relPath: "src/lib/progression/student-next-step.ts" },
 ];
 
