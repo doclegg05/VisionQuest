@@ -172,13 +172,12 @@ const MAX_OPERATION_PAGE_LIMIT = 100;
 /**
  * Sage write-operation ledger for one student, newest first.
  *
- * Scoped to `actorType: "student", actorId: studentId` — the only reliable
- * student linkage SageOperation supports today (there is no
- * `targetStudentId` column on the model). Three tools (submit_form,
- * file_document, update_goal_status) allow a teacher to invoke them "as"
- * a student via chat's targetStudentId; those rows persist with the
- * teacher as actor, so they are NOT attributed to the student here. See
- * the Known Issues / Open Items note this ships with for the follow-up.
+ * Two linkages, both queried: `actorType: "student", actorId` covers
+ * self-service writes and every legacy row (targetStudentId is NULL before
+ * the 20260820120000 migration), and `targetStudentId` covers staff
+ * on-behalf-of writes (submit_form, file_document, update_goal_status
+ * invoked "as" a student from staff chat). Legacy staff-actor rows carry no
+ * recoverable student link and remain outside any student's ledger.
  */
 export async function fetchOperationsForStudent(
   studentId: string,
