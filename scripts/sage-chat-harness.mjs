@@ -43,6 +43,14 @@
  *                   because an invented dollar figure is different every draw.
  *                   NOT in the CI --families list — soaking. See
  *                   scripts/lib/sage-career-eval.mjs.
+ *   - activity:     recent-activity grounding. The case's context.recentEvents
+ *                   are rendered through the REAL production builder
+ *                   (renderRecentActivity) and appended to the real prompt in
+ *                   the route's position; the reply must reference the listed
+ *                   events (mustContainAny/All) and must never claim activity
+ *                   the block does not show (mustNotMatch). Same grader as
+ *                   career; an empty reply fails. NOT in the CI --families
+ *                   list — soaking. See scripts/lib/sage-activity-eval.mjs.
  *
  * CLI:
  *   --provider=gemini|ollama   (default gemini)
@@ -85,6 +93,11 @@ import {
   runCareerToolUnconfigured,
   toolResultToHandlerResponse,
 } from "./lib/sage-career-eval.mjs";
+import {
+  activityEventsFromCase,
+  buildActivityCasePrompt,
+  evaluateActivityAssertions,
+} from "./lib/sage-activity-eval.mjs";
 
 loadEnvFile();
 
@@ -503,6 +516,47 @@ async function runCareerCase(deps, provider, declarations, systemPrompt, testCas
   };
 }
 
+/**
+ * Activity family — see the header and scripts/lib/sage-activity-eval.mjs.
+ * The prompt arrives with the case's RECENT ACTIVITY block already appended
+ * (real renderRecentActivity output, route position). Tools are declared with
+ * the canned no-op stub — nothing here needs a real tool result — and
+ * maxHops 2 so a tool-first turn still speaks. Grading is the shared pure
+ * grader: reference the listed events, invent nothing, and an empty reply
+ * fails (the #147/#149 empty-reply shape must never read as a pass).
+ */
+async function runActivityCase(provider, declarations, systemPrompt, testCase) {
+  const calls = [];
+  const textParts = [];
+  const failures = [];
+  try {
+    const events = provider.streamWithTools(
+      systemPrompt,
+      [{ role: "user", content: testCase.message }],
+      declarations,
+      noopToolHandler,
+      { maxHops: 2, temperature: TEMPERATURE },
+    );
+    for await (const event of events) {
+      if (event.kind === "tool_call") calls.push(event.name);
+      if (event.kind === "text") textParts.push(event.text);
+    }
+  } catch (err) {
+    failures.push(`reply generation failed — ${err.message}`);
+  }
+
+  const text = textParts.join("");
+  const graded = evaluateActivityAssertions({ text, calls, assert: testCase.assert || {} });
+  failures.push(...graded.failures);
+
+  return {
+    pass: failures.length === 0,
+    reason: failures.join("; ") || graded.notes.join("; ") || null,
+    calls,
+    text,
+  };
+}
+
 async function runMemoryCase(deps, provider, testCase) {
   const { prisma, extractAndStoreMemories, retrieveMemories, buildSystemPrompt } = deps;
   if (!process.env.DATABASE_URL) {
@@ -697,6 +751,20 @@ async function main() {
           systemPrompt,
           testCase,
         );
+      } else if (testCase.family === "activity") {
+        const base = await buildPromptForCase(buildSystemPrompt, testCase);
+        // The REAL production builder renders the case's events, and the block
+        // lands where the send route puts it — the harness fixes itself, never
+        // the section.
+        const { renderRecentActivity } = await import("../src/lib/sage/recent-activity.ts");
+        const now = new Date();
+        const activityBlock = renderRecentActivity({
+          events: activityEventsFromCase(testCase.context?.recentEvents, now),
+          alerts: [],
+          now,
+        });
+        const systemPrompt = buildActivityCasePrompt(base, activityBlock);
+        outcome = await runActivityCase(provider, declsForRole(testCase.role), systemPrompt, testCase);
       } else if (testCase.family === "memory") {
         const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
         const { extractAndStoreMemories } = process.env.DATABASE_URL

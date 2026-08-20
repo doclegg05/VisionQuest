@@ -28,6 +28,13 @@ export const CHAT_EVAL_FAMILIES = Object.freeze([
       "career/pathway honesty: with CareerOneStop unconfigured Sage must not invent wages, outlooks, " +
       "or program names, and with facts supplied she must answer from them",
   },
+  {
+    name: "activity",
+    purpose:
+      "recent-activity grounding: with a RECENT ACTIVITY block supplied (the real renderRecentActivity " +
+      "builder) the reply must reference the listed events, and it must never claim activity the block " +
+      "does not show",
+  },
 ]);
 
 /** @type {ReadonlySet<string>} */

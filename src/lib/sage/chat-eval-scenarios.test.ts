@@ -17,6 +17,12 @@ import {
   runCareerToolUnconfigured,
   toolResultToHandlerResponse,
 } from "../../../scripts/lib/sage-career-eval.mjs";
+import {
+  activityEventsFromCase,
+  buildActivityCasePrompt,
+  evaluateActivityAssertions,
+} from "../../../scripts/lib/sage-activity-eval.mjs";
+import { renderRecentActivity } from "./recent-activity";
 
 /**
  * Contract tests for config/sage-chat-eval.json, driven by
@@ -58,6 +64,7 @@ interface ChatEvalCase {
     seedConversation?: string;
     seedProbe?: string;
     groundingFacts?: string;
+    recentEvents?: { eventType: string; daysAgo?: number; xp?: number }[];
   };
   assert?: {
     expectedTool?: string;
@@ -86,6 +93,7 @@ const WORKFLOW_PATH = ".github/workflows/sage-evals.yml";
 const CASES: ChatEvalCase[] = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
 const HARNESS_SOURCE = readFileSync(HARNESS_PATH, "utf8");
 const CAREER_CASES = CASES.filter((testCase) => testCase.family === "career");
+const ACTIVITY_CASES = CASES.filter((testCase) => testCase.family === "activity");
 
 /** Same mapping the harness uses: student unless the case says teacher/admin. */
 const registryRoleFor = (role?: string): string =>
@@ -454,5 +462,206 @@ describe("sage chat eval — the mechanism the career family grades", () => {
     });
     assert.equal(failures.length, 1);
     assert.match(failures[0], /empty reply after calling career_wages/);
+  });
+});
+
+describe("sage chat eval — activity family fixtures", () => {
+  // Deterministic render for grading fixture structure: daysAgo offsets are
+  // relative, so any fixed instant works.
+  const RENDER_NOW = new Date("2026-08-20T12:00:00");
+
+  /** The exact block the harness hands the model for a case. */
+  const renderedBlockFor = (testCase: ChatEvalCase): string =>
+    renderRecentActivity({
+      events: activityEventsFromCase(testCase.context?.recentEvents, RENDER_NOW),
+      alerts: [],
+      now: RENDER_NOW,
+    });
+
+  /** Markers that make "I don't see that yet" an acceptable graded answer. */
+  const HONESTY_TERMS = [
+    "don't see",
+    "doesn't show",
+    "not showing",
+    "not approved",
+    "no approval",
+    "can't see",
+    "instructor",
+  ];
+
+  it("the family has cases and is soaking or gated — never silently unwired", () => {
+    assert.ok(
+      ACTIVITY_CASES.length > 0,
+      "the activity family has no cases — the fixtures were removed but the family wiring stayed",
+    );
+    const workflow = readFileSync(WORKFLOW_PATH, "utf8");
+    const invocation = workflow
+      .split("\n")
+      .find((line) => line.includes("sage-chat-harness.mjs") && line.includes("--families="));
+    assert.ok(invocation, `${WORKFLOW_PATH} no longer invokes the chat harness with --families`);
+    const gated = /--families=([a-z_,]+)/.exec(invocation!)![1].split(",");
+    const soaking = [...CHAT_EVAL_FAMILY_NAMES].filter((family) => !gated.includes(family));
+    assert.ok(
+      soaking.includes("activity") || gated.includes("activity"),
+      "family 'activity' is neither gated nor soaking, which is not a state that exists",
+    );
+  });
+
+  it("the harness renders each case's events through the REAL production builder", () => {
+    // The family is worthless if the harness hand-rolls its own block — a
+    // wording drift in renderRecentActivity would go ungraded.
+    assert.ok(
+      HARNESS_SOURCE.includes("renderRecentActivity({"),
+      `${HARNESS_PATH} no longer renders activity cases through renderRecentActivity`,
+    );
+    assert.ok(
+      HARNESS_SOURCE.includes("activityEventsFromCase(testCase.context?.recentEvents"),
+      `${HARNESS_PATH} no longer maps context.recentEvents through activityEventsFromCase`,
+    );
+    assert.ok(
+      HARNESS_SOURCE.includes("buildActivityCasePrompt(base, activityBlock)"),
+      `${HARNESS_PATH} no longer appends the block in the route's position via buildActivityCasePrompt`,
+    );
+  });
+
+  it("every activity case carries assertions that can fail, plus a red baseline", () => {
+    for (const testCase of ACTIVITY_CASES) {
+      const a = testCase.assert ?? {};
+      const graded =
+        (a.mustNotMatch?.length ?? 0) +
+        (a.mustContainAll?.length ?? 0) +
+        (a.mustContainAny?.length ?? 0) +
+        (a.mustNotContain?.length ?? 0);
+      assert.ok(
+        graded > 0,
+        `activity case "${testCase.id}" asserts nothing about the reply — it would pass on any text`,
+      );
+      assert.ok(
+        testCase.redBaseline?.badReply?.trim() && testCase.redBaseline?.goodReply?.trim(),
+        `activity case "${testCase.id}" has no redBaseline pair, so nobody can tell whether its ` +
+          `checks would catch the fabrication they target`,
+      );
+    }
+  });
+
+  it("every case renders a non-empty block and only grades events it supplied", () => {
+    // The #143 rule, adapted: a term the reply MUST contain either appears in
+    // the rendered block (the reply references a real listed event) or the
+    // case is a negative one asserting honesty — in which case it needs
+    // honesty markers AND a mustNotMatch guard for the fabrication.
+    assert.ok(ACTIVITY_CASES.length > 0, "no activity cases to check");
+    for (const testCase of ACTIVITY_CASES) {
+      const block = renderedBlockFor(testCase);
+      assert.ok(
+        block.length > 0,
+        `activity case "${testCase.id}" renders an EMPTY block (all events filtered as ambient ` +
+          `noise?) — the model would be graded on context it never received`,
+      );
+      const blockLower = block.toLowerCase();
+      for (const term of testCase.assert?.mustContainAll ?? []) {
+        assert.ok(
+          blockLower.includes(term.toLowerCase()),
+          `activity case "${testCase.id}" requires "${term}" but its rendered block never says it — ` +
+            `Sage would have to invent it, the behavior this family exists to forbid`,
+        );
+      }
+      const any = testCase.assert?.mustContainAny ?? [];
+      const referencesBlock = any.some((term) => blockLower.includes(term.toLowerCase()));
+      if (!referencesBlock) {
+        assert.ok(
+          any.some((term) =>
+            HONESTY_TERMS.some((honest) => term.toLowerCase().includes(honest)),
+          ),
+          `activity case "${testCase.id}"'s mustContainAny neither references the supplied block ` +
+            `nor accepts an honest "I don't see it" — every acceptable answer is one Sage made up`,
+        );
+        assert.ok(
+          (testCase.assert?.mustNotMatch?.length ?? 0) > 0,
+          `activity case "${testCase.id}" is a negative case but has no mustNotMatch guard, so an ` +
+            `invented event would score as a pass`,
+        );
+      }
+    }
+  });
+
+  it("the block lands appended after the real prompt, the position production uses", () => {
+    for (const testCase of ACTIVITY_CASES) {
+      const base = buildSystemPrompt(
+        (testCase.stage ?? "general") as Parameters<typeof buildSystemPrompt>[0],
+        { studentName: "Sam", programType: "spokes" },
+        "full",
+      );
+      const block = renderedBlockFor(testCase);
+      const assembled: string = buildActivityCasePrompt(base, block);
+      assert.ok(
+        assembled.startsWith(base),
+        `activity case "${testCase.id}" splices into the production prompt instead of appending — ` +
+          `the harness fixes itself, never the section`,
+      );
+      assert.ok(
+        assembled.trimEnd().endsWith(block.trim()),
+        `activity case "${testCase.id}" no longer ends with its RECENT ACTIVITY block`,
+      );
+    }
+  });
+
+  it("each activity case's checks reject its red-baseline fabrication", () => {
+    for (const testCase of ACTIVITY_CASES) {
+      const { failures } = evaluateActivityAssertions({
+        text: testCase.redBaseline!.badReply,
+        calls: [],
+        assert: testCase.assert ?? {},
+      });
+      assert.ok(
+        failures.length > 0,
+        `activity case "${testCase.id}" PASSES its own badReply:\n  "${testCase.redBaseline!.badReply}"\n` +
+          `The checks cannot catch the failure they were written for.`,
+      );
+    }
+  });
+
+  it("every single mustNotMatch entry fires on its case's fabrication", () => {
+    // Same per-entry rule as the career family: the aggregate test passes as
+    // long as ONE check fires, which hides a dead regex.
+    for (const testCase of ACTIVITY_CASES) {
+      for (const entry of testCase.assert?.mustNotMatch ?? []) {
+        const { failures } = evaluateActivityAssertions({
+          text: testCase.redBaseline!.badReply,
+          calls: [],
+          assert: { mustNotMatch: [entry] },
+        });
+        assert.ok(
+          failures.length > 0,
+          `activity case "${testCase.id}": mustNotMatch "${entry.label}" (/${entry.pattern}/) does ` +
+            `not match its own badReply — the check has never been observed failing.`,
+        );
+      }
+    }
+  });
+
+  it("each activity case's checks accept its red-baseline honest reply", () => {
+    for (const testCase of ACTIVITY_CASES) {
+      const { failures } = evaluateActivityAssertions({
+        text: testCase.redBaseline!.goodReply,
+        calls: [],
+        assert: testCase.assert ?? {},
+      });
+      assert.deepEqual(
+        failures,
+        [],
+        `activity case "${testCase.id}" FAILS its own goodReply — the checks fire on the reply we ` +
+          `want, which is how a family becomes noise nobody promotes`,
+      );
+    }
+  });
+
+  it("an empty reply fails instead of passing quietly", () => {
+    const { failures } = evaluateActivityAssertions({
+      text: "",
+      calls: [],
+      assert: { mustContainAny: ["certification"] },
+    });
+    assert.equal(failures.length, 1);
+    assert.match(failures[0], /empty reply/);
   });
 });
