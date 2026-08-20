@@ -69,3 +69,162 @@ export async function recordOperation(params: RecordOperationParams): Promise<vo
     summary: params.resultSummary ?? `${params.toolName} ${params.status}`,
   });
 }
+
+// =============================================================================
+// Teacher-facing ledger viewer (read side).
+//
+// SCOPE GUARD: `SageOperation.payload` and `.resultSummary` are raw tool
+// arguments / generated summaries. Several write tools embed quoted
+// user-authored free text in them — e.g. update_goal_status's confirm
+// summary includes `goal.content.slice(0, 80)`, and propose_resume_edit's
+// includes a preview of the student's actual resume section text. The
+// crisis-era "no transcript access" decision (MEMORY.md 2026-07-20) means a
+// teacher-facing ledger view must never surface conversation-adjacent free
+// text, so the functions below are built ONLY from `toolName`, `status`,
+// and `actorType` — payload and resultSummary are never selected out of the
+// database for this surface, let alone rendered.
+// =============================================================================
+
+/**
+ * Plain-language description of what a write tool changed, keyed by the
+ * exact tool names in src/lib/sage/agent/write-tools.ts and
+ * src/lib/sage/agent/career-tools.ts (the only two modules that call
+ * recordOperation). An unrecognized tool name (a future tool this map
+ * hasn't been updated for) falls back to a humanized version of the raw
+ * name rather than failing closed.
+ */
+const OPERATION_TARGET_LABELS: Record<string, string> = {
+  submit_form: "Filed a signed orientation form",
+  file_document: "Filed an uploaded document",
+  update_goal_status: "Updated a goal's status",
+  save_job: "Saved a job listing",
+  add_portfolio_item: "Added a portfolio item",
+  edit_portfolio_item: "Edited a portfolio item",
+  delete_portfolio_item: "Removed a portfolio item",
+  book_appointment: "Booked an appointment",
+  mark_certification_complete: "Marked a certification requirement complete",
+  update_application_status: "Updated a job application's status",
+  propose_resume_edit: "Edited a resume section",
+  tailor_application: "Created a tailored resume and cover letter",
+};
+
+const OPERATION_STATUS_LABELS: Record<OperationStatus, string> = {
+  proposed: "Proposed — awaiting confirmation",
+  confirmed: "Confirmed",
+  executed: "Completed",
+  failed: "Failed",
+  rejected: "Rejected",
+};
+
+const OPERATION_ACTOR_LABELS: Record<OperationActorType, string> = {
+  student: "Student",
+  teacher: "Teacher",
+  admin: "Admin",
+  system: "System",
+};
+
+function humanizeIdentifier(raw: string): string {
+  const spaced = raw.replace(/_/g, " ").trim();
+  if (!spaced) return raw;
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export function describeOperationTarget(toolName: string): string {
+  return OPERATION_TARGET_LABELS[toolName] ?? humanizeIdentifier(toolName);
+}
+
+export function describeOperationStatus(status: string): string {
+  return OPERATION_STATUS_LABELS[status as OperationStatus] ?? humanizeIdentifier(status);
+}
+
+export function describeOperationActor(actorType: string): string {
+  return OPERATION_ACTOR_LABELS[actorType as OperationActorType] ?? humanizeIdentifier(actorType);
+}
+
+/** Safe, allowlisted shape of a ledger row for the teacher-facing viewer. */
+export interface SageOperationLedgerRow {
+  id: string;
+  toolName: string;
+  targetSummary: string;
+  status: string;
+  statusLabel: string;
+  actorRole: string;
+  actorRoleLabel: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FetchOperationsForStudentOptions {
+  /** 1-indexed page number. Defaults to 1. */
+  page?: number;
+  /** Rows per page, clamped to [1, 100]. Defaults to 20. */
+  limit?: number;
+}
+
+export interface FetchOperationsForStudentResult {
+  operations: SageOperationLedgerRow[];
+  hasMore: boolean;
+}
+
+const DEFAULT_OPERATION_PAGE_LIMIT = 20;
+const MAX_OPERATION_PAGE_LIMIT = 100;
+
+/**
+ * Sage write-operation ledger for one student, newest first.
+ *
+ * Two linkages, both queried: `actorType: "student", actorId` covers
+ * self-service writes and every legacy row (targetStudentId is NULL before
+ * the 20260820120000 migration), and `targetStudentId` covers staff
+ * on-behalf-of writes (submit_form, file_document, update_goal_status
+ * invoked "as" a student from staff chat). Legacy staff-actor rows carry no
+ * recoverable student link and remain outside any student's ledger.
+ */
+export async function fetchOperationsForStudent(
+  studentId: string,
+  options: FetchOperationsForStudentOptions,
+): Promise<FetchOperationsForStudentResult> {
+  const limit = Math.min(Math.max(options.limit ?? DEFAULT_OPERATION_PAGE_LIMIT, 1), MAX_OPERATION_PAGE_LIMIT);
+  const page = Math.max(options.page ?? 1, 1);
+
+  // Two clauses, both required: actor-based matches legacy rows (targetStudentId
+  // NULL predates the 20260820120000 migration) and student self-service writes;
+  // targetStudentId picks up staff on-behalf-of writes (submit_form,
+  // file_document, update_goal_status invoked "as" a student from staff chat).
+  const rows = await prisma.sageOperation.findMany({
+    where: {
+      OR: [
+        { actorType: "student", actorId: studentId },
+        { targetStudentId: studentId },
+      ],
+    },
+    select: {
+      id: true,
+      toolName: true,
+      status: true,
+      actorType: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * limit,
+    take: limit + 1,
+  });
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+  return {
+    operations: pageRows.map((row) => ({
+      id: row.id,
+      toolName: row.toolName,
+      targetSummary: describeOperationTarget(row.toolName),
+      status: row.status,
+      statusLabel: describeOperationStatus(row.status),
+      actorRole: row.actorType,
+      actorRoleLabel: describeOperationActor(row.actorType),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    hasMore,
+  };
+}

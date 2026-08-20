@@ -1,3 +1,9 @@
+// Pathway-to-placement attribution ("did the pathway we suggested lead to a
+// job?") lives in the sibling module src/lib/pathway-outcomes.ts, not here:
+// it joins SpokesRecord to Application rather than walking the per-student
+// rows this module takes, and its consumer is a report script, not the class
+// KPI page.
+
 import { goalCountsTowardPlan } from "./goals";
 import { parseState } from "./progression/engine";
 import { computeReadinessScore } from "./progression/readiness-score";

@@ -9,6 +9,8 @@ import { isValidUrl, MAX_LENGTHS } from "@/lib/validation";
 import { getCertificationProgress } from "@/lib/certifications";
 import { logAuditEvent } from "@/lib/audit";
 import { recomputeCertificationStatus, recomputeCertificationStatusesForType } from "@/lib/certification-service";
+import { CERTIFICATIONS } from "@/lib/spokes/certifications";
+import { recordCertVerificationMemory } from "@/lib/sage/memory/operation-memory";
 import { parseBody } from "@/lib/schemas";
 
 // URL field accepts empty string / null / undefined for "clear" semantics; isValidUrl()
@@ -213,6 +215,23 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
       },
     });
     await recomputeCertificationStatus(requirement.certificationId, requirement.certification.certType);
+
+    // Operation-sourced memory: verification is the step that makes a
+    // student's cert progress real, and Sage could not see it. Only the
+    // positive direction is recorded — an unverify is a correction, and the
+    // memory layer is ADD-only. Fire-and-forget: never fail the teacher's
+    // action on a memory write.
+    if (verified) {
+      const catalogCert = CERTIFICATIONS.find(
+        (cert) => cert.id === requirement.certification.certType,
+      );
+      void recordCertVerificationMemory({
+        studentId: requirement.certification.studentId,
+        requirementId,
+        requirementLabel: requirement.template.label,
+        certLabel: catalogCert?.name ?? requirement.certification.certType,
+      });
+    }
 
     await logAuditEvent({
       actorId: session.id,

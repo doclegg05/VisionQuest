@@ -1,6 +1,10 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { getRlsContext, type RlsContext } from "./rls-context";
 import { rlsContextFromHeaders } from "./rls-headers";
+import {
+  applyChatContextWriteThrough,
+  isChatContextWrite,
+} from "./chat-context-write-through";
 import { logger } from "./logger";
 
 /**
@@ -192,6 +196,35 @@ const rlsExtension = Prisma.defineExtension((client) =>
   }),
 );
 
+/**
+ * Prisma extension: chat-context write-through invalidation.
+ *
+ * The shared app client is the one boundary EVERY write path crosses — route
+ * handlers writing Prisma directly, lib helpers, agent write tools, and
+ * background extraction alike — so this is where a write to state Sage's chat
+ * context reads drops the student's `chat:*` cache layers (write-through; the
+ * TTLs become a backstop instead of the freshness window). Logic lives in
+ * src/lib/chat-context-write-through.ts (pure, unit-tested); this hook only
+ * awaits the write and applies the resolved invalidation, which is fire-safe
+ * by contract — a cache failure never fails the write. Proven end to end by
+ * scripts/sage-freshness-eval.mjs (Group B must be FRESH).
+ */
+const chatContextWriteThroughExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: "chat-context-write-through",
+    query: {
+      $allOperations({ args, query, operation, model }) {
+        if (!isChatContextWrite(model, operation)) return query(args);
+        return (async () => {
+          const result = await query(args);
+          applyChatContextWriteThrough(model, operation, args, result);
+          return result;
+        })();
+      },
+    },
+  }),
+);
+
 const globalForPrisma = globalThis as unknown as {
   prismaApp?: PrismaClient;
   prismaAdmin?: PrismaClient;
@@ -232,7 +265,9 @@ if (process.env.NODE_ENV !== "production") {
  * After Slice C, DATABASE_URL points at the `vq_app` role (no RLS
  * bypass); un-contextualized queries fail-closed.
  */
-export const prisma = appClient.$extends(rlsExtension);
+export const prisma = appClient
+  .$extends(rlsExtension)
+  .$extends(chatContextWriteThroughExtension);
 
 /**
  * Admin Prisma client — uses ADMIN_DATABASE_URL (postgres credentials)
@@ -243,5 +278,22 @@ export const prisma = appClient.$extends(rlsExtension);
  * Before Slice C (ADMIN_DATABASE_URL unset), this falls back to the
  * same DATABASE_URL as `prisma`, so callers get identical behavior
  * today and the eventual swap is a pure env-var change.
+ *
+ * *** WRITES THROUGH THIS CLIENT BYPASS THE CHAT-CONTEXT WRITE-THROUGH
+ * EXTENSION. *** `prismaAdmin` is `adminClient` directly — it is never
+ * `.$extends(chatContextWriteThroughExtension)` like `prisma` above is. A
+ * write to any model in STUDENT_SCOPED_MODEL_LIST / GLOBAL_MODEL_LIST /
+ * Conversation (see src/lib/chat-context-write-through.ts) made through
+ * `prismaAdmin` will NOT invalidate the student's cached `chat:*` context —
+ * Sage keeps serving stale data for up to the cache's TTL (180-600s).
+ * If you add or modify a `prismaAdmin` write that touches a watched model,
+ * you must hand-invalidate by calling `invalidateChatContext(studentId)` (or
+ * `invalidateAllChatContext()` for a batch/global write) yourself, right
+ * after the write resolves. Precedent: POST /api/internal/memory/consolidate
+ * (src/app/api/internal/memory/consolidate/route.ts) does exactly this for
+ * its `prismaAdmin.$executeRaw` SageMemory updates.
+ * (A lint rule to catch an unguarded watched-model write through
+ * `prismaAdmin` is a tracked follow-up, not yet implemented — this comment
+ * is the only enforcement today.)
  */
 export const prismaAdmin: PrismaClient = adminClient;

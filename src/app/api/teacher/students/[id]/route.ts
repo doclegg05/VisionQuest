@@ -13,6 +13,7 @@ import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
 import { parseState } from "@/lib/progression/engine";
 import { FORMS } from "@/lib/spokes/forms";
+import { parseAndNormalizeStoredNationalClusters } from "@/lib/spokes/national-clusters";
 import { normalizeProgramType } from "@/lib/program-type";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 
@@ -520,7 +521,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           circumstances: safeJsonParse(student.careerDiscovery.circumstances),
           riasecScores: safeJsonParse(student.careerDiscovery.riasecScores),
           hollandCode: student.careerDiscovery.hollandCode,
-          nationalClusters: safeJsonParse(student.careerDiscovery.nationalClusters),
+          // Read through the taxonomy normalizer so legacy 16-framework rows
+          // reach the teacher UI under their modernized cluster names.
+          nationalClusters: parseAndNormalizeStoredNationalClusters(
+            student.careerDiscovery.nationalClusters,
+          ),
           transferableSkills: safeJsonParse(student.careerDiscovery.transferableSkills),
           workValues: safeJsonParse(student.careerDiscovery.workValues),
           assessmentSummary: student.careerDiscovery.assessmentSummary,

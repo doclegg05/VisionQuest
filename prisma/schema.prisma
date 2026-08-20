@@ -829,6 +829,17 @@ model Application {
   verificationStatus String?
   verifiedBy         String?
   verifiedAt         DateTime?
+  // Pathway provenance — what the student's suggested SPOKES career pathway
+  // WAS at the moment this application row was created, copied from
+  // CareerDiscovery.topClusters[0]. Null = no cluster existed then, or a
+  // legacy row created before this field. WRITE-ONCE by design: never
+  // updated when discovery changes later. The whole point is to ask "did the
+  // pathway we suggested at the time lead to a placement" (via
+  // SpokesRecord.placementApplicationId), and a retroactive rewrite would
+  // destroy the only evidence that question has. See src/lib/pathway-
+  // provenance.ts (capture) and src/lib/pathway-outcomes.ts (report).
+  pathwayClusterId   String?
+  pathwaySnapshotAt  DateTime?
 
   student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
@@ -1466,6 +1477,13 @@ model CareerDiscovery {
   transferableSkills String?   @db.Text // JSON: [{skill, category, evidence}]
   workValues         String?   @db.Text // JSON: [{value, importance}]
   assessmentSummary  String?   @db.Text // 3-5 sentence instructor-facing summary
+  // Provenance of the RIASEC profile (string union by convention):
+  // sage_inferred | student_reported_cos | cos_api. Assessed sources
+  // (student_reported_cos, cos_api) must never be silently stomped back to
+  // inference by the discovery extractor — see src/lib/career-discovery.ts.
+  profileSource      String    @default("sage_inferred")
+  assessedAt         DateTime?
+  assessmentPayload  Json? // raw student-reported (or API) assessment results
   conversationId     String?
   completedAt        DateTime?
   createdAt          DateTime  @default(now())

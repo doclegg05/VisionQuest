@@ -159,7 +159,7 @@ export default function CareerHub({
         <div className="mb-4">
           <h2 className="font-display text-2xl text-[var(--ink-strong)]">Jobs</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Explore matched roles, save the ones that fit, and keep your active search in the same workflow as events and applications.
+            Explore matched roles and save the ones that fit. Track your search, events, and applications in one place.
           </p>
         </div>
 
@@ -201,11 +201,11 @@ export default function CareerHub({
                       Add career discovery or resume skills to unlock personalized job matches.
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                      Sage can use your interests, strengths, saved skills, and resume details to improve recommendations.
+                      Sage can use your interests, strengths, skills, and resume to give better matches.
                     </p>
                   </div>
                   <AskSageLink
-                    prompt="Help me complete career discovery. Ask about my interests, strengths, work values, schedule needs, and job preferences."
+                    prompt="Help me complete career discovery. Ask about my interests, strengths, and schedule. Also ask what job I want."
                     label="Start with Sage"
                     variant="button"
                     className="shrink-0"
@@ -265,7 +265,7 @@ export default function CareerHub({
         <div className="mb-4">
           <h2 className="font-display text-2xl text-[var(--ink-strong)]">Opportunities</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Save roles, attach your current resume, and keep your application pipeline current.
+            Save roles, attach your resume, and keep your applications up to date.
           </p>
         </div>
         <OpportunitiesHub opportunities={opportunities} />
@@ -275,7 +275,7 @@ export default function CareerHub({
         <div className="mb-4">
           <h2 className="font-display text-2xl text-[var(--ink-strong)]">Events</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Register for workshops, fairs, and hiring events without leaving your career workflow.
+            Register for workshops, fairs, and hiring events right from this page.
           </p>
         </div>
         <EventsHub events={events} />

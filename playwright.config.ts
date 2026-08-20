@@ -32,7 +32,10 @@ export default defineConfig({
   webServer: {
     // PORT is inherited by `next dev`, so BASE_URL + PORT together relocate
     // the whole suite when port 3000 is occupied by something else.
-    command: "npm run dev",
+    // CI overrides the command with PLAYWRIGHT_WEB_SERVER="npm run start" to
+    // exercise the built standalone server (same boot path as the smoke
+    // tests) instead of a dev server.
+    command: process.env.PLAYWRIGHT_WEB_SERVER ?? "npm run dev",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

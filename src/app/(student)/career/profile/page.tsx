@@ -27,13 +27,21 @@ export default async function CareerProfilePage() {
 
       {profile?.isComplete ? (
         <>
-          <CareerDnaHighlights topInterests={profile.topInterests} />
+          <CareerDnaHighlights
+            topInterests={profile.topInterests}
+            profileSource={profile.discovery.profileSource}
+          />
           <CareerProfile discovery={profile.discovery} />
         </>
       ) : (
         <>
           <CareerDnaEmptyState completeness={profile?.completeness ?? null} />
-          {profile && <CareerDnaHighlights topInterests={profile.topInterests} />}
+          {profile && (
+            <CareerDnaHighlights
+              topInterests={profile.topInterests}
+              profileSource={profile.discovery.profileSource}
+            />
+          )}
         </>
       )}
     </div>

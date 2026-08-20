@@ -1,0 +1,10 @@
+{
+  "description": "Exemptions for scripts/ui-copy-readability.mjs. Every entry MUST carry a non-empty \"reason\". Seed this ONLY with genuinely unavoidable copy — legal/regulatory names, proper nouns, certification titles that cannot be reworded without changing what they refer to. Do NOT use this file to silence today's rewrite backlog; that work belongs on the Phase-2 worklist the script prints (its \"top worst strings\" section), not in this allowlist.",
+  "exemptions": [
+    {
+      "type": "exact",
+      "value": "Ready to Work",
+      "reason": "Official SPOKES certification/program name — a proper noun, not rewritable prose."
+    }
+  ]
+}

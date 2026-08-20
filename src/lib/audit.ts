@@ -26,7 +26,7 @@ export async function logAuditEvent(input: AuditEventInput) {
 }
 
 /** Where in the app the staff member viewed the student's data. */
-export type StudentViewSurface = "student_detail" | "conversations" | "export";
+export type StudentViewSurface = "student_detail" | "conversations" | "export" | "sage_operations";
 
 interface StudentViewInput {
   actorId: string;

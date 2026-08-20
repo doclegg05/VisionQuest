@@ -208,6 +208,11 @@ export interface LocalAIAuthConfig {
    * Defaults to the provider's built-in fallback. Bounded by the caller.
    */
   maxOutputTokens?: number;
+  /**
+   * Override how long a live stream may go without a model delta before the
+   * provider cancels it. Defaults to the provider's built-in fallback.
+   */
+  streamStallTimeoutMs?: number;
 }
 
 export interface AIProviderConfig {

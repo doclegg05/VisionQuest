@@ -181,6 +181,68 @@ describe("awardEvent idempotency", () => {
     assert.equal(mockUpdateProgression.mock.callCount(), 0, "no state mutation on error");
   });
 
+  it("rethrowOnFailure rethrows a non-P2002 create failure instead of swallowing it (W2)", async () => {
+    // Without this option, awardEvent returns false on ANY create failure —
+    // indistinguishable from the idempotent "already recorded" false. A
+    // caller that needs to tell the two apart (e.g. a route that must 500 on
+    // a real write failure rather than 200) opts in per-call.
+    mockCreate.mock.mockImplementation(async () => {
+      const err = Object.assign(new Error("connection reset"), { code: "P9999" });
+      throw err;
+    });
+    const mutate = mock.fn();
+
+    await assert.rejects(
+      () =>
+        events.awardEvent({
+          studentId: "stu-1",
+          eventType: "welcome_complete",
+          sourceType: "welcome",
+          sourceId: "welcome-flow",
+          xp: 0,
+          mutate,
+          rethrowOnFailure: true,
+        }),
+      /connection reset/,
+    );
+    assert.equal(mockUpdateProgression.mock.callCount(), 0, "no state mutation on error");
+  });
+
+  it("rethrowOnFailure still returns false (no throw) on P2002 — idempotency is preserved (W2)", async () => {
+    mockCreate.mock.mockImplementation(async () => {
+      const err = Object.assign(new Error("Unique constraint violation"), { code: "P2002" });
+      throw err;
+    });
+
+    const result = await events.awardEvent({
+      studentId: "stu-1",
+      eventType: "welcome_complete",
+      sourceType: "welcome",
+      sourceId: "welcome-flow",
+      xp: 0,
+      rethrowOnFailure: true,
+    });
+
+    assert.equal(result, false, "idempotent repeat must not throw even with rethrowOnFailure");
+  });
+
+  it("omitting rethrowOnFailure keeps the original swallow-and-return-false contract (W2 regression guard)", async () => {
+    mockCreate.mock.mockImplementation(async () => {
+      const err = Object.assign(new Error("connection reset"), { code: "P9999" });
+      throw err;
+    });
+
+    const result = await events.awardEvent({
+      studentId: "stu-1",
+      eventType: "chat_session",
+      sourceType: "conversation",
+      sourceId: "conv-Y",
+      xp: 10,
+    });
+
+    assert.equal(result, false, "existing callers must see no behavior change");
+  });
+
   it("rolls back the event row when updateProgression fails, so a retry re-applies", async () => {
     mockCreate.mock.mockImplementation(async () => ({ id: "evt-rollback" }));
     mockUpdateProgression.mock.mockImplementation(async () => {

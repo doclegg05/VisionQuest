@@ -27,6 +27,12 @@ export default function StudentError({
           Go to Dashboard
         </a>
       </div>
+      <a
+        href="/help"
+        className="mt-4 text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
+      >
+        Still stuck? Visit the Help page.
+      </a>
     </div>
   );
 }

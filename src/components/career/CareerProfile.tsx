@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CareerDiscoveryData } from "@/lib/career-discovery";
+import { careerProvenanceLabel } from "@/lib/career-provenance";
 import type { RiasecScores, NationalClusterScore, TransferableSkill, WorkValue } from "@/lib/sage/discovery-extractor";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 
@@ -134,18 +135,24 @@ function RadarChart({ scores }: { scores: RiasecScores }) {
 function RiasecSection({
   scores,
   hollandCode,
+  provenanceLabel,
 }: {
   scores: RiasecScores;
   hollandCode: string | null;
+  provenanceLabel: string;
 }) {
   return (
     <div className="surface-section p-5">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
         Career interest profile
       </p>
+      {/* Honest provenance: assessed results vs Sage's inference. */}
+      <p className="mt-2 inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1 text-xs font-medium text-[var(--ink-muted)]">
+        {provenanceLabel}
+      </p>
       <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-        This is sometimes called a Holland or RIASEC profile. It compares six kinds of work:
-        hands-on, problem-solving, creative, helping people, leading, and organizing.
+        This is sometimes called a Holland or RIASEC profile. It compares six kinds of work.
+        These are hands-on, problem-solving, creative, helping people, leading, and organizing.
       </p>
       {hollandCode && (
         <div className="mt-3 flex flex-wrap items-baseline gap-3">
@@ -361,7 +368,11 @@ export function CareerProfile({ discovery }: CareerProfileProps) {
     <div className="space-y-4">
       {/* Section A: Career interests */}
       {riasecScores && (
-        <RiasecSection scores={riasecScores} hollandCode={hollandCode} />
+        <RiasecSection
+          scores={riasecScores}
+          hollandCode={hollandCode}
+          provenanceLabel={careerProvenanceLabel(discovery.profileSource, discovery.assessedAt)}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

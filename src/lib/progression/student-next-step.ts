@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import type { ProgressionState } from "./engine";
-import { fetchStudentReadinessData } from "./fetch-readiness-data";
+import {
+  fetchStudentReadinessData,
+  type StudentReadinessData,
+} from "./fetch-readiness-data";
 
 export type PathStepKey =
+  | "orientation"
   | "discover"
   | "goal"
   | "learn"
@@ -36,6 +40,14 @@ export interface StudentNextStepSignals {
     ProgressionState,
     "certificationsEarned" | "portfolioItemCount" | "resumeCreated" | "platformsVisited"
   >;
+  /**
+   * Orientation is journey step 0. Complete follows the readiness engine's
+   * all-items convention (2026-07-31 decision): the persisted progression
+   * flag, or every orientation item done — not required-only. Callers also
+   * treat an unseeded checklist (zero items) as complete so an empty table
+   * never blocks the journey.
+   */
+  orientationComplete: boolean;
   bhagCompleted: boolean;
   hasCompletedDiscovery: boolean;
   goalCount: number;
@@ -107,7 +119,12 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   const interceptForGoalConfirmation =
     signals.hasCompletedDiscovery && hasGoals && goalsAwaitConfirmationOnly && !hasLearningProgress;
 
-  const discoverStatus: PathStepStatus = signals.hasCompletedDiscovery ? "complete" : "active";
+  const orientationStatus: PathStepStatus = signals.orientationComplete ? "complete" : "active";
+  const discoverStatus: PathStepStatus = signals.hasCompletedDiscovery
+    ? "complete"
+    : signals.orientationComplete
+      ? "active"
+      : "locked";
   const goalStatus: PathStepStatus = hasGoals
     ? interceptForGoalConfirmation
       ? "active"
@@ -147,11 +164,19 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   let title = "Talk to Sage about your career interests";
   let description = "Chat with Sage to explore your strengths, interests, and matching career paths.";
   let whyItMatters =
-    "Identifying your target career field helps focus your study and preparation on positions that fit you.";
+    "Knowing your target career field helps you focus your study on jobs that fit you.";
   let actionLabel = "Chat with Sage";
   let actionLink = "/chat";
 
-  if (!signals.hasCompletedDiscovery) {
+  if (!signals.orientationComplete) {
+    currentStepKey = "orientation";
+    title = "Finish your orientation checklist";
+    description = "Complete each item on your orientation checklist. It gets you set up for the program.";
+    whyItMatters =
+      "Orientation covers the basics you need before career work starts. Finish it to open the rest of your path.";
+    actionLabel = "Go to Orientation";
+    actionLink = "/orientation";
+  } else if (!signals.hasCompletedDiscovery) {
     currentStepKey = "discover";
     if (signals.discoveryAssistantTurnCount >= DISCOVERY_STALL_ASSISTANT_TURNS) {
       // The discovery conversation has run long without completing —
@@ -187,7 +212,7 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   } else if (!hasPortfolioItems) {
     currentStepKey = "prove";
     title = "Add proof of what you can do";
-    description = "Add a certificate, project, work sample, or training milestone to your portfolio.";
+    description = "Add a certificate, project, work sample, or training milestone. It goes in your portfolio.";
     whyItMatters =
       "Employers value concrete proof of skills. Your portfolio turns progress into evidence.";
     actionLabel = "Add Proof";
@@ -205,7 +230,7 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
     title = "Save your first job opportunity";
     description = "Browse jobs, matches, and hiring events in the Career Hub.";
     whyItMatters =
-      "Saving target jobs helps you tailor your resume, cover letter, and interview practice.";
+      "Saving target jobs helps you plan ahead. You can tailor your resume, cover letter, and interview prep.";
     actionLabel = "Explore Career Hub";
     actionLink = "/career";
   } else {
@@ -228,6 +253,7 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   }
 
   const steps: PathStep[] = [
+    buildStep("orientation", "Orientation", orientationStatus, "Finish program basics"),
     buildStep("discover", "Discover", discoverStatus, "Explore career paths"),
     buildStep("goal", "Goal", goalStatus, "Set career focus"),
     buildStep("learn", "Learn", learnStatus, "Build skills"),
@@ -248,9 +274,33 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   };
 }
 
-export async function getStudentNextStep(studentId: string): Promise<StudentNextStepResult> {
-  const readinessData = await fetchStudentReadinessData(studentId);
+/**
+ * The short "next up" label for the current step. Derived from the same
+ * StudentNextStepResult the Current Target card renders, so a surface that
+ * shows a next hint (the dashboard readiness card) can never disagree with
+ * the journey strip. This is the ONE next-action engine — do not add a
+ * second heuristic (e.g. lowest readiness dimension) beside it.
+ */
+export function nextStepShortLabel(result: StudentNextStepResult): string | null {
+  return result.steps.find((step) => step.key === result.currentStepKey)?.label ?? null;
+}
+
+export async function getStudentNextStep(
+  studentId: string,
+  /**
+   * Readiness data the caller already fetched (or is fetching) for its own
+   * render — passing it avoids a duplicate 8-query readiness fetch.
+   */
+  preloadedReadinessData?: StudentReadinessData | Promise<StudentReadinessData>,
+): Promise<StudentNextStepResult> {
+  const readinessData = await (preloadedReadinessData ?? fetchStudentReadinessData(studentId));
   const { state, bhagCompleted } = readinessData;
+
+  // Journey step 0. buildReadinessSnapshot already resolved the all-items
+  // convention into state.orientationComplete (persisted flag OR every
+  // orientation item complete); an unseeded checklist never blocks.
+  const orientationComplete =
+    state.orientationComplete || readinessData.orientationProgress.total === 0;
 
   // Planning statuses that can still be awaiting instructor confirmation —
   // "confirmed" and "completed" goals are settled by definition.
@@ -318,6 +368,7 @@ export async function getStudentNextStep(studentId: string): Promise<StudentNext
 
   return resolveStudentNextStep({
     state,
+    orientationComplete,
     bhagCompleted,
     hasCompletedDiscovery: careerDiscovery?.status === "complete",
     goalCount,

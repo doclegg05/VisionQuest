@@ -19,6 +19,7 @@ import {
   resumeContentSchema,
   type ResumeContent,
 } from "@/lib/resume";
+import { normalizeStoredNationalClustersJson } from "@/lib/spokes/national-clusters";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
 import {
@@ -246,6 +247,11 @@ export async function gatherJobAndProfile(
   if (!job) return null;
 
   const resume = parseStoredResumeData(stored?.data);
+  // Legacy 16-framework cluster names normalize to the modernized taxonomy
+  // before reaching the model's grounding text.
+  const nationalClusters = normalizeStoredNationalClustersJson(
+    discovery?.nationalClusters ?? null,
+  );
   const grounding = [
     `JOB POSTING (real text — use ONLY this):`,
     `Title: ${job.title} at ${job.company} (${job.location})${job.salary ? ` — ${job.salary}` : ""}`,
@@ -257,7 +263,7 @@ export async function gatherJobAndProfile(
     `Resume skills: ${resume.skills.join(", ") || "(none listed yet)"}`,
     `Experience: ${resume.experience.map((e) => `${e.title} at ${e.company}`).join("; ") || "(none listed)"}`,
     `Completed certifications: ${certs.map((cert) => cert.certType).join(", ") || "(none yet)"}`,
-    `Career clusters: ${discovery?.nationalClusters ?? "(no discovery data)"}`,
+    `Career clusters: ${nationalClusters ?? "(no discovery data)"}`,
     `Transferable skills: ${discovery?.transferableSkills ?? "(none recorded)"}`,
   ].join("\n");
 
@@ -266,7 +272,7 @@ export async function gatherJobAndProfile(
     profile: {
       resume,
       completedCertifications: certs.map((cert) => cert.certType),
-      nationalClusters: discovery?.nationalClusters ?? null,
+      nationalClusters,
       transferableSkills: discovery?.transferableSkills ?? null,
     },
     grounding,

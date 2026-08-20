@@ -41,7 +41,10 @@ function notConfiguredResult(): AgentToolResult {
     modelHint:
       "The CareerOneStop connection isn't configured on this server, so you cannot pull live " +
       "career data (wages, occupations, training programs). Tell the user plainly that live " +
-      "career numbers aren't available right now and suggest they ask their instructor. " +
+      "career numbers aren't available right now. They still have a real path: they can take " +
+      "the free Skills Matcher themselves at " +
+      "careeronestop.org/toolkit/skills/skills-matcher.aspx, then tell you their results so " +
+      "you can save them with record_assessment_results. They can also ask their instructor. " +
       "Do NOT invent wages, job outlooks, or program names.",
   };
 }

@@ -1,20 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
 import { ActionCard } from "./ActionCard";
+import { ChatErrorBanner } from "./ChatErrorBanner";
 import { ConfirmToolCard } from "./ConfirmToolCard";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
+import { RetryResponseButton } from "./RetryResponseButton";
 import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
+import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
@@ -409,6 +411,12 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         })
         .catch(() => 0);
 
+      // Hoisted above the try block (not `let` inside it) so the catch
+      // block below can see how much text, if any, streamed in before the
+      // failure — that's what decides whether a retry control is offered
+      // on a zero-content error (see resolveSendError in send-outcome.ts).
+      let fullContent = "";
+
       try {
         const stageParam = searchParams.get("stage") ?? defaultStage;
         const res = await apiFetch("/api/chat/send", {
@@ -429,7 +437,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
-        let fullContent = "";
         let streamCompleted = false;
         let refreshedConversationList = false;
         let sseBuffer = "";
@@ -524,16 +531,15 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         }
 
         const msgId = `msg-${Date.now()}`;
+        const streamOutcome = resolveStreamOutcome(streamCompleted, fullContent);
         const assistantMsg: Message = {
           id: msgId,
           role: "assistant",
-          content: !streamCompleted && fullContent
-            ? `${fullContent} (Response may be incomplete)`
-            : fullContent || "I didn't receive a complete response. Please try again.",
+          content: streamOutcome.content,
           events: agentEvents.length > 0 ? [...agentEvents] : undefined,
         };
 
-        if (!streamCompleted && fullContent) {
+        if (streamOutcome.offerRetry) {
           setIncompleteMessageId(msgId);
         }
 
@@ -546,18 +552,22 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setTimeout(() => checkProgression(), 2000);
       } catch (err) {
         console.error("Send error:", err instanceof Error ? err.message : "Unknown error");
-        const message = err instanceof Error ? err.message : "Sorry, I had trouble responding. Please try again.";
-        setChatError(message);
+        const errorOutcome = resolveSendError(err, fullContent);
+        setChatError(errorOutcome.bannerMessage);
+        const errMsgId = `err-${Date.now()}`;
         setMessages((prev) => [
           ...prev,
           {
-            id: `err-${Date.now()}`,
+            id: errMsgId,
             role: "assistant",
-            content: message.includes("API key") || message.includes("Sage is not configured")
-              ? "Sage needs a Gemini API key before it can respond. Open Settings to add a personal key, or ask staff to configure the shared one."
-              : message,
+            content: errorOutcome.displayContent,
           },
         ]);
+        // A send error with no prior content is the same dead end as a
+        // zero-content stream completion — offer the same retry control.
+        if (errorOutcome.offerRetry) {
+          setIncompleteMessageId(errMsgId);
+        }
       } finally {
         greetingGenerationRef.current++;
         setIsLoading(false);
@@ -687,8 +697,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                 <MessageBubble role={msg.role} content={msg.content} />
                 {msg.events?.length ? <AgentEventList events={msg.events} /> : null}
                 {msg.id === incompleteMessageId && (
-                  <button
-                    onClick={() => {
+                  <RetryResponseButton
+                    onRetry={() => {
                       const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
                       if (lastUserMsg) {
                         setMessages((prev) => prev.filter((m) => m.id !== incompleteMessageId));
@@ -696,11 +706,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                         void handleSend(lastUserMsg.content);
                       }
                     }}
-                    type="button"
-                    className="ml-11 mt-2 text-xs font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
-                  >
-                    Retry response
-                  </button>
+                  />
                 )}
               </div>
             ))}
@@ -739,16 +745,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           </div>
         )}
 
-        {chatError && (
-          <div role="alert" className="mx-4 mb-2 rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-4 py-3 text-sm text-[var(--chat-error-text)]">
-            <p>{chatError}</p>
-            {(chatError.includes("API key") || chatError.includes("Sage is not configured")) && (
-              <Link href="/settings" prefetch={false} className="mt-2 inline-block font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]">
-                Open Settings →
-              </Link>
-            )}
-          </div>
-        )}
+        {chatError && <ChatErrorBanner message={chatError} />}
 
         <ChatInput onSend={handleSend} disabled={isLoading} role={role} />
       </div>

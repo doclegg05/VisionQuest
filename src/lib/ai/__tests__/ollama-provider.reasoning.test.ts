@@ -267,17 +267,27 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
       assert.equal(result, "Here's what I'd sugg");
     });
 
-    /** An empty reply that stopped normally is a different failure — don't mislabel it. */
+    /**
+     * An empty reply that stopped normally is a different failure — it must
+     * still fail, and must not be mislabeled as the reasoning-budget one.
+     *
+     * This case used to assert `result === ""`, which pinned the silence: a
+     * normally-stopped empty turn is also how an undeclared tool call comes
+     * back on the native surface, and passing it through is what hid that bug
+     * for two sessions. See ollama-provider.tool-call-silence.test.ts.
+     */
     it("does not blame reasoning when the turn stopped normally", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>
         Response.json({ choices: [{ finish_reason: "stop", message: { content: "" } }] }),
       );
 
-      const result = await provider.generateResponse("sys", [
-        { role: "user", content: "Hi" },
-      ]);
-
-      assert.equal(result, "");
+      await assert.rejects(
+        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        (error: Error) => {
+          assert.doesNotMatch(error.message, /reasoning/i);
+          return true;
+        },
+      );
     });
   });
 

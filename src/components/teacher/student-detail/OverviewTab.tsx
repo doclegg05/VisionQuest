@@ -7,6 +7,11 @@ import ReadinessScore from "@/components/ui/ReadinessScore";
 import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
 import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
+import {
+  DiscoveryClusterPicker,
+  needsPathwayCluster,
+  submitPathwayCluster,
+} from "./DiscoveryClusterPicker";
 import type {
   StudentData,
   MoodEntryData,
@@ -89,6 +94,31 @@ export default function OverviewTab({
   const discoveryStatus = discoveryOverridden
     ? "complete"
     : careerDiscovery?.status ?? "not_started";
+
+  // Pathway picker — the exit from the awaiting_cluster state (discovery
+  // complete, no cluster recorded). It also appears the moment the override
+  // above succeeds, since that flips status to "complete" with no cluster.
+  const [clusterChoice, setClusterChoice] = useState("");
+  const [savingCluster, setSavingCluster] = useState(false);
+  const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
+  const [clusterError, setClusterError] = useState<string | null>(null);
+
+  const awaitingCluster = needsPathwayCluster({
+    status: discoveryStatus,
+    topClusters: careerDiscovery?.topClusters ?? [],
+  });
+
+  async function handleSavePathwayCluster() {
+    setSavingCluster(true);
+    setClusterError(null);
+    const result = await submitPathwayCluster(student.id, clusterChoice);
+    if (result.ok) {
+      setSavedClusterId(clusterChoice);
+    } else {
+      setClusterError(result.error);
+    }
+    setSavingCluster(false);
+  }
 
   async function handleDiscoveryOverride() {
     setOverridingDiscovery(true);
@@ -375,6 +405,16 @@ export default function OverviewTab({
           )}
           {discoveryOverridden && (
             <p className="text-xs text-green-700">Discovery marked complete by staff.</p>
+          )}
+          {(awaitingCluster || savedClusterId) && (
+            <DiscoveryClusterPicker
+              value={clusterChoice}
+              onChange={setClusterChoice}
+              onConfirm={handleSavePathwayCluster}
+              saving={savingCluster}
+              error={clusterError}
+              savedClusterId={savedClusterId}
+            />
           )}
           {discoveryStatus !== "complete" && (
             <div className="pt-1">
