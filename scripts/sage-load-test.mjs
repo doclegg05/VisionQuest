@@ -125,6 +125,7 @@
  */
 
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
+import { percentile } from "./lib/percentile.mjs";
 import { writeFileSync } from "node:fs";
 
 loadEnvFile();
@@ -369,12 +370,6 @@ async function runClient({ args, clientIndex, now }) {
 // ---------------------------------------------------------------------------
 // Stats + report
 // ---------------------------------------------------------------------------
-
-function percentile(sortedValues, p) {
-  if (sortedValues.length === 0) return null;
-  const idx = Math.min(sortedValues.length - 1, Math.ceil((p / 100) * sortedValues.length) - 1);
-  return sortedValues[Math.max(0, idx)];
-}
 
 function fmtMs(ms) {
   if (ms === null || ms === undefined) return "n/a";

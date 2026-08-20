@@ -59,7 +59,7 @@ const mockLoggerWarn = mock.fn<(msg: string, meta?: Record<string, unknown>) => 
 const mockLoggerError = mock.fn<(msg: string, meta?: Record<string, unknown>) => void>();
 
 mock.module("@/lib/db", {
-  namedExports: {
+  exports: {
     prisma: {
       goal: { findMany: mockGoalFindMany },
       careerDiscovery: { upsert: mockCareerDiscoveryUpsert, findUnique: mockCareerDiscoveryFindUnique },
@@ -70,13 +70,13 @@ mock.module("@/lib/db", {
 });
 
 mock.module("@/lib/ai", {
-  namedExports: {
+  exports: {
     resolveAiProvider: async () => ({ name: "ollama" }),
   },
 });
 
 mock.module("@/lib/ai/audit", {
-  namedExports: {
+  exports: {
     getProviderClass: () => "local",
     logAiAuditEvent: mockLogAiAuditEvent,
     policyDecisionForProvider: () => "local_only",
@@ -84,94 +84,94 @@ mock.module("@/lib/ai/audit", {
 });
 
 mock.module("@/lib/llm-usage", {
-  namedExports: {
+  exports: {
     withUsageLogging: (provider: unknown) => provider,
   },
 });
 
 mock.module("@/lib/goals", {
-  namedExports: {
+  exports: {
     GOAL_PLANNING_STATUSES: ["confirmed", "active"],
     isGoalLevel: () => true,
   },
 });
 
 mock.module("@/lib/sage/goal-extractor", {
-  namedExports: { extractGoals: mockExtractGoals },
+  exports: { extractGoals: mockExtractGoals },
 });
 
 mock.module("@/lib/sage/propose-goal", {
-  namedExports: { proposeGoal: async () => ({ status: "created" }) },
+  exports: { proposeGoal: async () => ({ status: "created" }) },
 });
 
 mock.module("@/lib/sage/record-insight", {
-  namedExports: { recordInsight: mockRecordInsight },
+  exports: { recordInsight: mockRecordInsight },
 });
 
 mock.module("@/lib/sage/propose-goal-wager", {
-  namedExports: { maybeCreateGoalProposalWager: async () => undefined },
+  exports: { maybeCreateGoalProposalWager: async () => undefined },
 });
 
 mock.module("@/lib/sage/mood-extractor", {
-  namedExports: { extractMoodFromConversation: mockExtractMood },
+  exports: { extractMoodFromConversation: mockExtractMood },
 });
 
 mock.module("@/lib/sage/discovery-extractor", {
-  namedExports: {
+  exports: {
     extractDiscoverySignals: mockExtractDiscoverySignals,
     topClusterIds: () => [],
   },
 });
 
 mock.module("@/lib/sage/system-prompts", {
-  namedExports: { determineStage: () => "planning" },
+  exports: { determineStage: () => "planning" },
 });
 
 mock.module("@/lib/sage/classroom-confirmation", {
-  namedExports: { detectAndRecordClassroomConfirmation: mockClassroomConfirmation },
+  exports: { detectAndRecordClassroomConfirmation: mockClassroomConfirmation },
 });
 
 mock.module("@/lib/sage/memory/extract", {
-  namedExports: { extractAndStoreMemories: mockExtractMemories },
+  exports: { extractAndStoreMemories: mockExtractMemories },
 });
 
 mock.module("@/lib/rate-limit", {
-  namedExports: { rateLimitDaily: mockRateLimitDaily },
+  exports: { rateLimitDaily: mockRateLimitDaily },
 });
 
 mock.module("@/lib/sage/crisis-detection", {
-  namedExports: {
+  exports: {
     detectCrisisSignal: mockDetectCrisisSignal,
     recordWellbeingConcern: mockRecordWellbeingConcern,
   },
 });
 
 mock.module("@/lib/sage/readability", {
-  namedExports: {
+  exports: {
     assessReadability: () => ({ scorable: false, withinTarget: true, grade: 0, ease: 0, words: 0 }),
     PLAIN_LANGUAGE_MAX_GRADE: 8,
   },
 });
 
 mock.module("@/lib/sage/retry", {
-  namedExports: {
+  exports: {
     retryWithBackoff: async (fn: () => Promise<unknown>) => fn(),
   },
 });
 
 mock.module("@/lib/progression/engine", {
-  namedExports: {
+  exports: {
     recordWeeklyReview: () => undefined,
     recordMonthlyReview: () => undefined,
   },
 });
 
 mock.module("@/lib/progression/events", {
-  namedExports: { awardEvent: mockAwardEvent },
+  exports: { awardEvent: mockAwardEvent },
 });
 
 mock.module("@/lib/logger", {
-  namedExports: {
+  exports: {
     logger: {
       info: mockLoggerInfo,
       warn: mockLoggerWarn,
@@ -182,7 +182,7 @@ mock.module("@/lib/logger", {
 });
 
 mock.module("./conversation", {
-  namedExports: { generateConversationTitle: mockGenerateTitle },
+  exports: { generateConversationTitle: mockGenerateTitle },
 });
 
 let postResponseModule: typeof import("./post-response");

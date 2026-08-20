@@ -22,6 +22,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { ensureParentDir, loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
+import { percentile } from "./lib/percentile.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -81,24 +82,14 @@ function pct(part, total) {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
-/** Nearest-rank percentile over a pre-sorted ascending numeric array. */
-function percentile(sortedValues, p) {
-  if (sortedValues.length === 0) return 0;
-  const index = Math.min(
-    sortedValues.length - 1,
-    Math.ceil((p / 100) * sortedValues.length) - 1,
-  );
-  return sortedValues[Math.max(0, index)];
-}
-
 function summarizeTokens(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const sum = sorted.reduce((acc, v) => acc + v, 0);
   return {
     sum,
     mean: sorted.length ? sum / sorted.length : 0,
-    p50: percentile(sorted, 50),
-    p95: percentile(sorted, 95),
+    p50: percentile(sorted, 50) ?? 0,
+    p95: percentile(sorted, 95) ?? 0,
   };
 }
 
@@ -114,8 +105,8 @@ function summarizeDuration(values) {
   return {
     count: sorted.length,
     mean: sorted.length ? sum / sorted.length : 0,
-    p50: percentile(sorted, 50),
-    p95: percentile(sorted, 95),
+    p50: percentile(sorted, 50) ?? 0,
+    p95: percentile(sorted, 95) ?? 0,
     max: sorted.length ? sorted[sorted.length - 1] : 0,
   };
 }

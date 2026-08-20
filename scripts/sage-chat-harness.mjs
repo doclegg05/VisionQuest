@@ -86,6 +86,7 @@ import {
   STUDENT_PROMPT_CANARIES,
 } from "./lib/sage-eval-text.mjs";
 import { CHAT_EVAL_FAMILY_NAMES } from "./lib/sage-chat-eval-families.mjs";
+import { percentile } from "./lib/percentile.mjs";
 import {
   CAREER_GROUNDING_TOOL_NAMES,
   buildCareerCasePrompt,
@@ -684,11 +685,6 @@ async function runJudge(reply, testCase) {
   }
 }
 
-function percentile(sorted, p) {
-  if (sorted.length === 0) return 0;
-  return sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)];
-}
-
 async function main() {
   const allCases = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
   const cases = FAMILIES ? allCases.filter((c) => FAMILIES.includes(c.family)) : allCases;
@@ -832,8 +828,8 @@ async function main() {
 
   const latencies = evaluated.map((r) => r.latencyMs).sort((a, b) => a - b);
   const latency = {
-    p50Ms: percentile(latencies, 0.5),
-    p95Ms: percentile(latencies, 0.95),
+    p50Ms: percentile(latencies, 50) ?? 0,
+    p95Ms: percentile(latencies, 95) ?? 0,
     maxMs: latencies[latencies.length - 1] ?? 0,
   };
 
