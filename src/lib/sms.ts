@@ -3,6 +3,7 @@
  * Twilio credentials are optional — if not configured, SMS silently degrades to no-op.
  */
 import { logger } from "./logger";
+import { redactContactInfo } from "./log-redaction";
 
 interface TwilioConfig {
   accountSid: string;
@@ -57,20 +58,24 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
       body: params.toString(),
     });
 
+    // The recipient number never reaches the logs, and Twilio quotes it inside
+    // its own error bodies, so provider text is redacted before it is logged
+    // (.claude/rules/security.md, Data Privacy).
     if (!response.ok) {
       const errorText = await response.text();
       logger.error("Twilio SMS delivery failed", {
         status: response.status,
-        to,
-        error: errorText,
+        error: redactContactInfo(errorText),
       });
       return false;
     }
 
-    logger.info("SMS sent successfully", { to });
+    logger.info("SMS sent successfully");
     return true;
   } catch (err) {
-    logger.error("Twilio SMS delivery threw an error", { to, error: String(err) });
+    logger.error("Twilio SMS delivery threw an error", {
+      error: redactContactInfo(String(err)),
+    });
     return false;
   }
 }
