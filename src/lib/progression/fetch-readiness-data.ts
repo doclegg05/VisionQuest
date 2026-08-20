@@ -8,8 +8,15 @@ export interface StudentReadinessData {
   readiness: ReadinessResult;
   orientationProgress: { completed: number; total: number };
   bhagCompleted: boolean;
-  hasProgressionRecord: boolean;
 }
+
+/**
+ * No `hasProgressionRecord` here on purpose. The Progression row is created as
+ * a side effect of the daily check-in that GET /api/progression awards on every
+ * student page mount, so its existence describes the app's own behaviour, not
+ * the student's. Routing that once read it now reads a recorded fact instead —
+ * see src/lib/progression/welcome-routing.ts.
+ */
 
 export async function fetchStudentReadinessData(studentId: string): Promise<StudentReadinessData> {
   const [
@@ -55,6 +62,5 @@ export async function fetchStudentReadinessData(studentId: string): Promise<Stud
     readiness: snapshot.readiness,
     orientationProgress: snapshot.orientationProgress,
     bhagCompleted,
-    hasProgressionRecord: progression !== null,
   };
 }

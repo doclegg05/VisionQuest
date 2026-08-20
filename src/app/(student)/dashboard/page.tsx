@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { getWelcomeCompletedAt } from "@/lib/progression/welcome-completion";
+import { shouldEnterWelcome } from "@/lib/progression/welcome-routing";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { AmbientPanels } from "@/components/dashboard/AmbientPanels";
 import { SagePanels } from "@/components/dashboard/sage/SagePanels";
@@ -70,12 +72,25 @@ export default async function DashboardPage() {
       getLatestPanelSpec(session.id),
     ]);
 
-  const { state, readiness, hasProgressionRecord } = readinessData;
+  const { state, readiness, orientationProgress } = readinessData;
 
-  // Brand-new students still start at the welcome flow.
-  if (goalCount === 0 && !hasProgressionRecord) {
-    const convCount = await prisma.conversation.count({ where: { studentId: session.id } });
-    if (convCount === 0) {
+  // Brand-new students still start at the welcome flow. "Brand new" is a
+  // recorded fact (shouldEnterWelcome), never an inference from a row the app
+  // creates on its own: this check used to read "no Progression row", which
+  // the layout's ProgressionProvider falsifies on the student's very first
+  // page mount. The cheap signals already in hand gate the extra reads.
+  if (goalCount === 0 && orientationProgress.completed === 0) {
+    const [conversationCount, welcomeCompletedAt] = await Promise.all([
+      prisma.conversation.count({ where: { studentId: session.id } }),
+      getWelcomeCompletedAt(session.id),
+    ]);
+    const shouldStartAtWelcome = shouldEnterWelcome({
+      welcomeCompletedAt,
+      goalCount,
+      conversationCount,
+      orientationCompletedCount: orientationProgress.completed,
+    });
+    if (shouldStartAtWelcome) {
       redirect("/welcome");
     }
   }

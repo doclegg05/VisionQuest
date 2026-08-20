@@ -5,21 +5,19 @@ import {
   isSignatureRequiredItem,
   isVerificationRequiredItem,
 } from "@/lib/orientation-step-resources";
+import { fetchWelcomeRoutingFacts } from "@/lib/progression/welcome-completion";
+import { shouldLeaveWelcome } from "@/lib/progression/welcome-routing";
 import WelcomeFlow from "./WelcomeFlow";
 
 export default async function WelcomePage() {
   const session = await getSession();
   if (!session) redirect("/");
 
-  // Check if student has any activity
-  const [goalCount, conversationCount, progression] = await Promise.all([
-    prisma.goal.count({ where: { studentId: session.id } }),
-    prisma.conversation.count({ where: { studentId: session.id } }),
-    prisma.progression.findUnique({ where: { studentId: session.id } }),
-  ]);
-
-  // If they have activity, they're not new — send to dashboard
-  if (goalCount > 0 || conversationCount > 0 || progression) {
+  // Has this student outgrown the intro? Only facts the welcome flow cannot
+  // itself produce may answer yes — see shouldLeaveWelcome. This page used to
+  // treat "a Progression row exists" as activity, which the layout's own
+  // ProgressionProvider creates on mount, so the flow evicted its own student.
+  if (shouldLeaveWelcome(await fetchWelcomeRoutingFacts(session.id))) {
     redirect("/dashboard");
   }
 

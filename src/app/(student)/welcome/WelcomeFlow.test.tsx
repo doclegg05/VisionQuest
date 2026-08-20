@@ -1,15 +1,47 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { renderToString } from "react-dom/server";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
   isSignatureRequiredItem,
   isVerificationRequiredItem,
 } from "@/lib/orientation-step-resources";
+import { WELCOME_PATHS } from "@/lib/progression/welcome-routing";
 import WelcomeFlow, {
+  PathChoiceCard,
   QuickWinCard,
+  WELCOME_PATH_CHOICES,
   computeReadinessPercent,
   postQuickWinCompletion,
+  postWelcomeCompletion,
 } from "./WelcomeFlow";
+
+/**
+ * WelcomeFlow calls useRouter() to leave the flow once the completion fact is
+ * saved, and next/navigation's hook throws outside an app-router context.
+ * Wrapping the render supplies one — the calls are recorded so a test can
+ * assert where a path choice sent the student.
+ */
+function withAppRouter(node: React.ReactNode) {
+  const calls: { method: string; arg?: string }[] = [];
+  const router = {
+    push: (href: string) => calls.push({ method: "push", arg: href }),
+    replace: (href: string) => calls.push({ method: "replace", arg: href }),
+    refresh: () => calls.push({ method: "refresh" }),
+    back: () => {},
+    forward: () => {},
+    prefetch: () => {},
+  };
+  return {
+    calls,
+    element: (
+      <AppRouterContext.Provider value={router as unknown as AppRouterInstance}>
+        {node}
+      </AppRouterContext.Provider>
+    ),
+  };
+}
 
 function fetchStub(
   impl: () => Promise<Response> | never,
@@ -150,17 +182,19 @@ describe("quick-win eligibility — verifying the review's 'always empty' claim"
 
   it("when that item survives the filter, WelcomeFlow renders it with real content instead of an empty step", () => {
     const html = renderToString(
-      <WelcomeFlow
-        studentName="Jordan"
-        quickWinItems={[
-          {
-            id: "seed-orient-22",
-            label: REAL_SURVIVOR_LABEL,
-            description: "Attendance verification form for Ready to Work certification",
-          },
-        ]}
-        totalOrientationItems={24}
-      />,
+      withAppRouter(
+        <WelcomeFlow
+          studentName="Jordan"
+          quickWinItems={[
+            {
+              id: "seed-orient-22",
+              label: REAL_SURVIVOR_LABEL,
+              description: "Attendance verification form for Ready to Work certification",
+            },
+          ]}
+          totalOrientationItems={24}
+        />,
+      ).element,
     );
 
     // Step 0 (Welcome) is the initial render; the quick-win list itself only
@@ -183,5 +217,94 @@ describe("quick-win eligibility — verifying the review's 'always empty' claim"
     );
     assert.ok(cardHtml.includes(REAL_SURVIVOR_LABEL));
     assert.ok(cardHtml.includes("Attendance verification form for Ready to Work certification"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Path choice: leaving the flow is recorded, so no door loops back
+// ---------------------------------------------------------------------------
+
+describe("WELCOME_PATH_CHOICES", () => {
+  it("offers exactly the path vocabulary the API accepts — no unrecordable door", () => {
+    assert.deepEqual(
+      WELCOME_PATH_CHOICES.map((choice) => choice.path),
+      [...WELCOME_PATHS],
+    );
+  });
+
+  it("keeps the dashboard door, the one that loops without a recorded completion", () => {
+    const dashboard = WELCOME_PATH_CHOICES.find((choice) => choice.path === "dashboard");
+    assert.ok(dashboard, "path choice 3 must exist");
+    assert.equal(dashboard.href, "/dashboard");
+  });
+
+  it("gives every door a distinct destination", () => {
+    const hrefs = WELCOME_PATH_CHOICES.map((choice) => choice.href);
+    assert.equal(new Set(hrefs).size, hrefs.length);
+    for (const href of hrefs) assert.match(href, /^\/[a-z-]+$/);
+  });
+});
+
+describe("postWelcomeCompletion", () => {
+  it("posts the chosen path to /api/welcome/complete and returns true on a 2xx response", async () => {
+    const fetchFn = fetchStub(() =>
+      Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 })),
+    );
+
+    const saved = await postWelcomeCompletion("orientation", fetchFn);
+
+    assert.equal(saved, true);
+    assert.equal(fetchFn.calls.length, 1);
+    assert.equal(fetchFn.calls[0].input, "/api/welcome/complete");
+    assert.equal(fetchFn.calls[0].init?.method, "POST");
+    assert.deepEqual(JSON.parse(String(fetchFn.calls[0].init?.body)), { path: "orientation" });
+  });
+
+  it("returns false (never throws) on a non-2xx response", async () => {
+    const fetchFn = fetchStub(() =>
+      Promise.resolve(new Response(JSON.stringify({ error: "nope" }), { status: 500 })),
+    );
+
+    assert.equal(await postWelcomeCompletion("dashboard", fetchFn), false);
+  });
+
+  it("returns false (never throws) when fetch rejects outright", async () => {
+    const fetchFn = fetchStub(() => Promise.reject(new Error("network down")));
+
+    assert.equal(await postWelcomeCompletion("chat", fetchFn), false);
+  });
+});
+
+describe("PathChoiceCard", () => {
+  const choice = WELCOME_PATH_CHOICES[2]; // the dashboard door
+
+  it("renders a real link, so the destination stays visible and middle-clickable", () => {
+    const html = renderToString(
+      <PathChoiceCard choice={choice} saving={false} hasError={false} onChoose={() => {}} />,
+    );
+
+    assert.match(html, /href="\/dashboard"/);
+    assert.ok(html.includes(choice.title));
+    assert.ok(!/role="alert"/.test(html));
+  });
+
+  it("shows a plain-language retry notice when the completion failed to save", () => {
+    const html = renderToString(
+      <PathChoiceCard choice={choice} saving={false} hasError onChoose={() => {}} />,
+    );
+
+    assert.match(html, /role="alert"/);
+    assert.ok(
+      /didn.{0,6}t save/i.test(html) && /try again/i.test(html),
+      `expected a plain-language retry notice, got: ${html}`,
+    );
+  });
+
+  it("marks an in-flight choice busy instead of looking inert", () => {
+    const html = renderToString(
+      <PathChoiceCard choice={choice} saving hasError={false} onChoose={() => {}} />,
+    );
+
+    assert.match(html, /aria-busy="true"/);
   });
 });

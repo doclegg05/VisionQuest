@@ -16,25 +16,20 @@ import { createPrisma, resetStudentToDayOne } from "./helpers/db";
  * path choice; the established student (seeded confirmed goal) sees the
  * dashboard as home with exactly one "Current Target" and an actionable CTA.
  *
- * KNOWN GAPS this spec works around rather than hides (findings for a later
- * phase, verified against the running app 2026-08-19):
+ * Two gaps this spec used to work around are now product behaviour it
+ * asserts (fixed 2026-08-20, see src/lib/progression/welcome-routing.ts):
  *
- *  1. The welcome flow self-destructs on first load: the (student) layout's
- *     ProgressionProvider calls GET /api/progression on mount, which awards
- *     daily-checkin XP and CREATES the Progression row — and any server
- *     re-render of /welcome after that (the post-login router.refresh(), a
- *     reload) redirects the student to /dashboard because "they have
- *     activity". In practice a brand-new student can be bounced out of the
- *     welcome flow before reading step 0. This test therefore resets the
- *     journey student to day-1 state AFTER the login landing settles, then
- *     enters /welcome via the /dashboard redirect deterministically.
+ *  1. The flow no longer self-destructs. The (student) layout's
+ *     ProgressionProvider still calls GET /api/progression on mount, and that
+ *     call still creates the Progression row — but neither redirect reads
+ *     that row any more, so the walkthrough survives the provider, a reload,
+ *     and the quick-win writes it makes itself. This spec runs with nothing
+ *     stubbed or aborted; if the self-destruct returns, it fails at step 0.
  *
- *  2. Welcome path choice 3 ("View My Employment Journey Map" → /dashboard)
- *     is a loop for a genuinely day-1 student — /dashboard redirects
- *     zero-activity students straight back to /welcome, and completing
- *     quick-win orientation items does not change that (orientation
- *     completion writes no Progression row). It only "works" today because
- *     of gap 1. This test exercises path choice 1, which works by design.
+ *  2. No path choice loops. Leaving the flow records an explicit completion
+ *     fact, so a student who picks any of the three doors — including "View
+ *     My Employment Journey Map", which lands on the very page that used to
+ *     bounce them back — stays where they chose to go.
  */
 
 test.describe("Day-1 student journey", () => {
@@ -49,23 +44,9 @@ test.describe("Day-1 student journey", () => {
   });
 
   test("new student signs in, lands on the welcome flow, and a path choice works", async ({ page }) => {
-    // Real sign-in form — the actual day-1 entry path.
-    await page.goto("/");
-    await page.getByLabel(/username or email/i).fill(E2E_JOURNEY_STUDENT.login);
-    await page.getByLabel(/password/i).fill(E2E_JOURNEY_STUDENT.password);
-    await page.getByRole("button", { name: /sign in/i }).click();
-
-    // Login routes day-1 students toward /welcome, but the refresh-vs-
-    // progression race (gap 1 above) means the first landing can be either
-    // surface. Reaching an authenticated route at all proves the sign-in
-    // (both routes bounce anonymous visitors back to "/").
-    await page.waitForURL(/\/(welcome|dashboard)/, { timeout: 20_000 });
-
-    // Park on a blank page so no mounted component can fire further
-    // Progression-creating requests, let in-flight writes land, then restore
-    // true day-1 state (same reset the seed applies).
-    await page.goto("about:blank");
-    await page.waitForTimeout(1_500);
+    // Restore true day-1 state BEFORE the browser touches anything, so the
+    // walkthrough that follows is the student's real first session. (Reruns
+    // need this: the previous run left a welcome-completion event behind.)
     const journeyStudent = await prisma.student.findUnique({
       where: { studentId: E2E_JOURNEY_STUDENT.login },
       select: { id: true },
@@ -73,29 +54,38 @@ test.describe("Day-1 student journey", () => {
     expect(journeyStudent, "journey student must be seeded").toBeTruthy();
     await resetStudentToDayOne(prisma, journeyStudent!.id);
 
-    // Isolate the walkthrough from gap 1: GET /api/progression (fired by the
-    // layout's ProgressionProvider on every page mount) is what creates the
-    // Progression row that makes any /welcome re-render bounce to /dashboard
-    // — under the dev server a hot-reload re-request mid-flow reproducibly
-    // kills the flow. Abort just that call (the provider swallows the error)
-    // so the welcome flow stays alive for the walkthrough; everything else,
-    // including the quick-win POST /api/orientation, runs for real. Remove
-    // this block once the self-destruct gap is fixed product-side.
-    await page.route(
-      (url) => url.pathname.endsWith("/api/progression"),
-      (route) => route.abort(),
-    );
+    // Real sign-in form — the actual day-1 entry path.
+    await page.goto("/");
+    await page.getByLabel(/username or email/i).fill(E2E_JOURNEY_STUDENT.login);
+    await page.getByLabel(/password/i).fill(E2E_JOURNEY_STUDENT.password);
+    await page.getByRole("button", { name: /sign in/i }).click();
 
-    // Day-1 routing: /dashboard sends zero-activity students to /welcome.
-    await page.goto("/dashboard");
+    // Login lands every student on /dashboard, which sends a day-1 student to
+    // the welcome flow. Nothing is stubbed here: the ProgressionProvider that
+    // used to end this walkthrough is mounted and firing.
     await page.waitForURL(/\/welcome/, { timeout: 20_000 });
 
     // Step 0 — personalized welcome.
-    await expect(
-      page.getByRole("heading", {
-        name: new RegExp(`welcome, ${E2E_JOURNEY_STUDENT.displayName}`, "i"),
-      }),
-    ).toBeVisible();
+    const step0Heading = page.getByRole("heading", {
+      name: new RegExp(`welcome, ${E2E_JOURNEY_STUDENT.displayName}`, "i"),
+    });
+    await expect(step0Heading).toBeVisible();
+
+    // The self-destruct, reproduced on purpose: by now the mounted
+    // ProgressionProvider has called GET /api/progression at least once, so
+    // the student HAS a Progression row. A reload used to hand them to
+    // /dashboard here. It must not.
+    await expect
+      .poll(
+        async () =>
+          prisma.progression.count({ where: { studentId: journeyStudent!.id } }),
+        { message: "the provider should have created the Progression row", timeout: 15_000 },
+      )
+      .toBeGreaterThan(0);
+    await page.reload();
+    await expect(page).toHaveURL(/\/welcome/);
+    await expect(step0Heading).toBeVisible();
+
     await page.getByRole("button", { name: /let's get started/i }).click();
 
     // Step 1 — Meet Sage.
@@ -113,20 +103,52 @@ test.describe("Day-1 student journey", () => {
 
     // Two legitimate continuations, depending on how many quick wins the
     // database offers: completing the ONLY one plays the readiness-score
-    // animation and auto-advances; with more remaining, "Skip for now"
-    // advances manually.
+    // animation and auto-advances after a timer; with more remaining, "Skip
+    // for now" advances manually. Poll rather than branch once — deciding
+    // from a single snapshot races the auto-advance, which detaches the Skip
+    // button out from under the click.
     const pathHeading = page.getByRole("heading", { name: /your path to employment/i });
     const skipButton = page.getByRole("button", { name: /skip for now/i });
-    await expect(pathHeading.or(skipButton)).toBeVisible({ timeout: 10_000 });
-    if (!(await pathHeading.isVisible())) {
-      await skipButton.click();
-    }
-    await expect(pathHeading).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(
+        async () => {
+          if (await pathHeading.isVisible()) return true;
+          if (await skipButton.isVisible()) {
+            await skipButton.click({ timeout: 2_000 }).catch(() => {});
+          }
+          return pathHeading.isVisible();
+        },
+        { message: "the path chooser should be reachable", timeout: 20_000 },
+      )
+      .toBe(true);
+
+    // All three doors are offered, including the one that used to loop.
+    await expect(page.getByRole("link", { name: /view my employment journey map/i })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
 
     // Step 3 — the recommended path choice routes to the Sage conversation.
     await page.getByRole("link", { name: /discover my career path/i }).click();
     await expect(page).toHaveURL(/\/chat/, { timeout: 20_000 });
     await expect(page.getByLabel("Message to Sage")).toBeVisible({ timeout: 20_000 });
+
+    // Choosing a path recorded that this student finished the intro, and that
+    // fact is what closes the loop: the dashboard keeps them (it would have
+    // bounced a student with no goals and no conversation straight back)...
+    // Wait for real dashboard content before judging the URL: this page group
+    // streams, so a redirect arrives AFTER the shell — a URL checked too early
+    // would read /dashboard even on a bounce. (The journey strip renders the
+    // CTA twice, one variant per breakpoint; exactly one is ever visible.)
+    await page.goto("/dashboard");
+    await expect(
+      page.getByTestId("current-target-cta").filter({ visible: true }),
+    ).toHaveCount(1, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/dashboard/);
+
+    // ...and the intro is not replayed at them.
+    await page.goto("/welcome");
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
   });
 
   test("student with an active plan sees exactly one Current Target with an actionable CTA", async ({ browser }) => {

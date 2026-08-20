@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type WelcomePath } from "@/lib/progression/welcome-routing";
 
 interface QuickWinItemData {
   id: string;
@@ -55,6 +57,127 @@ export function computeReadinessPercent(
 ): number | null {
   if (totalOrientationItems <= 0) return null;
   return Math.round(((completedOrientationCount + completedWinsCount) / totalOrientationItems) * 100);
+}
+
+export interface WelcomePathChoice {
+  path: WelcomePath;
+  href: string;
+  title: string;
+  description: string;
+  icon: string;
+  /** The one card the flow steers toward. */
+  recommended?: boolean;
+}
+
+/**
+ * The last step's three doors. Each carries the `path` value recorded with the
+ * completion fact, so the thing the student clicked and the thing the ledger
+ * remembers can never drift apart. Exported for tests.
+ */
+export const WELCOME_PATH_CHOICES: readonly WelcomePathChoice[] = [
+  {
+    path: "chat",
+    href: "/chat",
+    icon: "💬",
+    title: "1. Discover My Career Path (Recommended)",
+    description:
+      "Start a discovery conversation with Sage to explore your strengths, skills, and match with a career goal.",
+    recommended: true,
+  },
+  {
+    path: "orientation",
+    href: "/orientation",
+    icon: "📋",
+    title: "2. Complete Onboarding Paperwork",
+    description:
+      "Review and complete required SPOKES program forms and onboarding checklist items.",
+  },
+  {
+    path: "dashboard",
+    href: "/dashboard",
+    icon: "📊",
+    title: "3. View My Employment Journey Map",
+    description:
+      "Go directly to your dashboard to see your 7-stage path to employment.",
+  },
+];
+
+/**
+ * Records that the student finished the welcome flow, and which door they took.
+ *
+ * This is what stops the next page from sending them straight back here: with
+ * no goals, no conversation and (if they skipped the quick wins) no orientation
+ * progress, the recorded fact is the ONLY thing that distinguishes "chose a
+ * path" from "never arrived". Returns whether the save succeeded — never
+ * throws — so the caller can keep the student here with a retry rather than
+ * walk them into a redirect loop. Exported for tests.
+ */
+export async function postWelcomeCompletion(
+  path: WelcomePath,
+  fetchFn: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const res = await fetchFn("/api/welcome/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+interface PathChoiceCardProps {
+  choice: WelcomePathChoice;
+  saving: boolean;
+  hasError: boolean;
+  onChoose: (choice: WelcomePathChoice) => void;
+}
+
+/**
+ * One path card. It stays a real link — the href is what makes it
+ * middle-clickable and readable to assistive tech — but the click is
+ * intercepted so the completion fact lands before the navigation. A failed
+ * save keeps the student here with a retry instead of dropping them into the
+ * /dashboard ⇄ /welcome loop. Exported (named) so the failure markup is
+ * directly testable via renderToString, mirroring QuickWinCard.
+ */
+export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoiceCardProps) {
+  return (
+    <div>
+      <Link
+        href={choice.href}
+        aria-busy={saving || undefined}
+        onClick={(event) => {
+          event.preventDefault();
+          onChoose(choice);
+        }}
+        className={`group flex items-start gap-4 rounded-[1.5rem] border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+          hasError
+            ? "border-red-300"
+            : choice.recommended
+              ? "border-2 border-[var(--accent-strong)]"
+              : "border-[var(--border)]"
+        } ${saving ? "opacity-70" : ""}`}
+      >
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
+          {choice.icon}
+        </span>
+        <div>
+          <p className="font-display text-lg font-semibold text-[var(--ink-strong)]">
+            {choice.title}
+          </p>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">{choice.description}</p>
+        </div>
+      </Link>
+      {hasError && (
+        <p role="alert" className="mt-2 text-left text-xs font-medium text-red-700">
+          That didn&apos;t save. Tap to try again.
+        </p>
+      )}
+    </div>
+  );
 }
 
 interface QuickWinCardProps {
@@ -118,11 +241,14 @@ export default function WelcomeFlow({
   totalOrientationItems,
   completedOrientationCount = 0,
 }: WelcomeFlowProps) {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [completedWins, setCompletedWins] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<string | null>(null);
   const [errorItemId, setErrorItemId] = useState<string | null>(null);
   const [showScore, setShowScore] = useState(false);
+  const [savingPath, setSavingPath] = useState<WelcomePath | null>(null);
+  const [errorPath, setErrorPath] = useState<WelcomePath | null>(null);
 
   const hasQuickWins = quickWinItems.length > 0;
   const allWinsDone = hasQuickWins && completedWins.size >= quickWinItems.length;
@@ -147,6 +273,25 @@ export default function WelcomeFlow({
       setShowScore(true);
       setTimeout(() => setStep(3), 2000);
     }
+  }
+
+  async function choosePath(choice: WelcomePathChoice) {
+    setSavingPath(choice.path);
+    setErrorPath((prev) => (prev === choice.path ? null : prev));
+    const saved = await postWelcomeCompletion(choice.path);
+    setSavingPath(null);
+    if (!saved) {
+      // Navigating anyway would drop the student into the loop this fact
+      // exists to prevent, so the failure stays on screen with a retry.
+      setErrorPath(choice.path);
+      return;
+    }
+    // refresh() before push(): the destination may already sit in the client
+    // router cache from a prefetch taken BEFORE the completion fact existed —
+    // and back then /dashboard answered with a redirect to /welcome. Serving
+    // that cached answer would rebuild the loop out of stale bytes.
+    router.refresh();
+    router.push(choice.href);
   }
 
   return (
@@ -299,48 +444,15 @@ export default function WelcomeFlow({
               VisionQuest is structured around one clear path to help you secure a job. Choose where you would like to start:
             </p>
             <div className="mt-8 space-y-3">
-              <Link
-                href="/chat"
-                className="group flex items-start gap-4 rounded-[1.5rem] border-2 border-[var(--accent-strong)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
-                  💬
-                </span>
-                <div>
-                  <p className="font-display text-lg text-[var(--ink-strong)] font-semibold">1. Discover My Career Path (Recommended)</p>
-                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    Start a discovery conversation with Sage to explore your strengths, skills, and match with a career goal.
-                  </p>
-                </div>
-              </Link>
-              <Link
-                href="/orientation"
-                className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
-                  📋
-                </span>
-                <div>
-                  <p className="font-display text-lg text-[var(--ink-strong)] font-semibold">2. Complete Onboarding Paperwork</p>
-                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    Review and complete required SPOKES program forms and onboarding checklist items.
-                  </p>
-                </div>
-              </Link>
-              <Link
-                href="/dashboard"
-                className="group flex items-start gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
-                  📊
-                </span>
-                <div>
-                  <p className="font-display text-lg text-[var(--ink-strong)] font-semibold">3. View My Employment Journey Map</p>
-                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    Go directly to your dashboard to see your 7-stage path to employment.
-                  </p>
-                </div>
-              </Link>
+              {WELCOME_PATH_CHOICES.map((choice) => (
+                <PathChoiceCard
+                  key={choice.path}
+                  choice={choice}
+                  saving={savingPath === choice.path}
+                  hasError={errorPath === choice.path}
+                  onChoose={choosePath}
+                />
+              ))}
             </div>
             <button
               onClick={() => setStep(2)}
