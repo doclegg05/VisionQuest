@@ -43,7 +43,7 @@ export default async function LearningPage() {
       <PageIntro
         eyebrow="Learning"
         title="Learning"
-        description="Keep your goal-aligned platforms, certification progress, and required training work in one place."
+        description="See your training platforms and certification progress. All your required work is in one place."
       />
 
       {/* Phase 4 consolidation: the Resource Center moved out of the nav and lives here. */}
@@ -74,14 +74,14 @@ export default async function LearningPage() {
 
       <GoalPlanFocus
         title="Goal-aligned training"
-        description="These are the platforms and certification paths that best support the goals you are actively working."
+        description="These platforms and certifications match the goals you are working on now."
         goals={goals}
         goalPlans={goalPlans}
         resourceTypes={["platform", "certification"]}
         emptyMessage="Confirm a goal first. Then this page will show training platforms and certification paths that match what you are working toward."
         emptyAction={
           <AskSageLink
-            prompt="Help me choose the certification or learning platform I should focus on next based on my confirmed goals."
+            prompt="Help me choose a certification or platform to focus on next. Base it on my confirmed goals."
             label="Ask Sage what to study next"
           />
         }
@@ -101,7 +101,7 @@ export default async function LearningPage() {
         <div className="mb-4">
           <h2 className="font-display text-2xl text-[var(--ink-strong)]">Credentials</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Track badge visibility and required certification steps without switching to a second tab.
+            See your badges and required certification steps here. No need to open a new tab.
           </p>
         </div>
         <CredlyConnect />

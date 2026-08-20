@@ -499,9 +499,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
       <div className="surface-section p-5">
         <p className="text-sm leading-relaxed text-[var(--ink-muted)]">
-          Build goals directly here, then use Sage when you want coaching help refining them into
-          clearer next steps. Status changes stay visible to your instructor and keep your planning
-          data aligned with the dashboard.
+          Build your goals here. Ask Sage for coaching help when you want clearer next steps.
+          Status changes stay visible to your instructor and match your dashboard.
         </p>
       </div>
 

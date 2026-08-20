@@ -151,8 +151,8 @@ function RiasecSection({
         {provenanceLabel}
       </p>
       <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-        This is sometimes called a Holland or RIASEC profile. It compares six kinds of work:
-        hands-on, problem-solving, creative, helping people, leading, and organizing.
+        This is sometimes called a Holland or RIASEC profile. It compares six kinds of work.
+        These are hands-on, problem-solving, creative, helping people, leading, and organizing.
       </p>
       {hollandCode && (
         <div className="mt-3 flex flex-wrap items-baseline gap-3">

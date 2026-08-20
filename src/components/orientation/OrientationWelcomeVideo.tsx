@@ -65,7 +65,7 @@ export default function OrientationWelcomeVideo() {
           Welcome to VisionQuest
         </h2>
         <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-          Watch this one-minute introduction to complete the Sage welcome step in Orientation and earn a one-time {WELCOME_VIDEO_XP} XP reward.
+          Watch this short video to complete the Sage welcome step in Orientation. You&apos;ll earn a one-time {WELCOME_VIDEO_XP} XP reward.
         </p>
       </div>
 
@@ -112,10 +112,12 @@ export default function OrientationWelcomeVideo() {
           </summary>
           <div className="mt-3 max-w-3xl space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6">
             <p>Welcome to VisionQuest — your starting point for building a path toward your goals.</p>
-            <p>Through SPOKES, you&apos;ll have the support, skills, and structure to move forward — whether you&apos;re preparing for work, continuing your education, or building more stability for yourself and your family.</p>
+            <p>Through SPOKES, you&apos;ll have the support, skills, and structure to move forward.</p>
+            <p>This is true if you&apos;re preparing for work. It&apos;s true if you&apos;re continuing your education. And it&apos;s true if you want more stability for your family.</p>
             <p>I&apos;m Sage. I&apos;m here to guide you, answer your questions, and help you stay on track.</p>
             <p>Your Dashboard is your home base. Set goals that matter to you, track your progress, and always see what comes next.</p>
-            <p>Together, we&apos;ll find the courses and opportunities that fit your goals — and keep you moving toward your SPOKES Ready to Work Certification.</p>
+            <p>Together, we&apos;ll find courses and chances that fit your goals.</p>
+            <p>We&apos;ll help you earn your SPOKES Ready to Work Certification.</p>
             <p>And whenever you need me, just tap my symbol to start a chat.</p>
             <p>One clear next step at a time. Every step you take matters — and you don&apos;t have to figure it out alone.</p>
             <p>Welcome to VisionQuest. Let&apos;s begin building your path forward.</p>

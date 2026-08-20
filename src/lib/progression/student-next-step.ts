@@ -164,7 +164,7 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   let title = "Talk to Sage about your career interests";
   let description = "Chat with Sage to explore your strengths, interests, and matching career paths.";
   let whyItMatters =
-    "Identifying your target career field helps focus your study and preparation on positions that fit you.";
+    "Knowing your target career field helps you focus your study on jobs that fit you.";
   let actionLabel = "Chat with Sage";
   let actionLink = "/chat";
 
@@ -212,7 +212,7 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
   } else if (!hasPortfolioItems) {
     currentStepKey = "prove";
     title = "Add proof of what you can do";
-    description = "Add a certificate, project, work sample, or training milestone to your portfolio.";
+    description = "Add a certificate, project, work sample, or training milestone. It goes in your portfolio.";
     whyItMatters =
       "Employers value concrete proof of skills. Your portfolio turns progress into evidence.";
     actionLabel = "Add Proof";
@@ -230,7 +230,7 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
     title = "Save your first job opportunity";
     description = "Browse jobs, matches, and hiring events in the Career Hub.";
     whyItMatters =
-      "Saving target jobs helps you tailor your resume, cover letter, and interview practice.";
+      "Saving target jobs helps you plan ahead. You can tailor your resume, cover letter, and interview prep.";
     actionLabel = "Explore Career Hub";
     actionLink = "/career";
   } else {

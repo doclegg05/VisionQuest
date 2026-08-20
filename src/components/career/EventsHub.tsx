@@ -89,7 +89,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
           </p>
           <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No events scheduled yet</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
-            You can still prepare a short introduction, questions for employers, and a resume checklist.
+            You can still get ready. Prepare a short introduction, employer questions, and a resume checklist.
           </p>
           <div className="mt-4 flex justify-center">
             <AskSageLink

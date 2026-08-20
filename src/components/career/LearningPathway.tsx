@@ -182,10 +182,10 @@ export function LearningPathwayEmpty() {
         Your Learning Roadmap
       </p>
       <p className="mt-3 text-sm text-[var(--ink-muted)]">
-        Complete your career discovery with Sage to see your personalized learning pathway.
+        Complete career discovery with Sage. Then you&apos;ll see your personal learning pathway.
       </p>
       <AskSageLink
-        prompt="Help me complete career discovery so VisionQuest can build a learning pathway that fits my goals."
+        prompt="Help me complete career discovery. Then VisionQuest can build a learning pathway for my goals."
         label="Start with Sage"
         variant="button"
         className="mt-4"

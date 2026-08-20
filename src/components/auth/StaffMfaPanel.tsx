@@ -230,7 +230,7 @@ export default function StaffMfaPanel() {
               Multi-factor authentication
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
-              Staff accounts can require an authenticator app at sign-in. Backup codes are your recovery path if your phone is unavailable, so store them somewhere safe offline.
+              Staff accounts can require an authenticator app at sign-in. If your phone is unavailable, use a backup code instead. Store your codes somewhere safe.
             </p>
           </div>
           <span
@@ -287,7 +287,7 @@ export default function StaffMfaPanel() {
                   {setupSecret}
                 </code>
                 <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">
-                  If your authenticator app supports setup links, you can also open the generated `otpauth://` value below.
+                  If your app supports setup links, you can open the value below instead.
                 </p>
                 <textarea
                   readOnly

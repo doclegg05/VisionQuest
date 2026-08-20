@@ -17,11 +17,11 @@ export default async function ResourcesPage() {
       <PageIntro
         eyebrow="Reference library"
         title="Forms & Documents"
-        description="Program forms, certification guides, and compliance documents. View, download, or print any document."
+        description="Find program forms, certification guides, and compliance documents here. View, download, or print any of them."
       />
       <GoalPlanFocus
         title="Goal-aligned resource plan"
-        description="Use these forms, documents, orientation steps, and portfolio actions to move your current goals forward."
+        description="Use these forms, documents, and steps to move your goals forward."
         goals={goals}
         goalPlans={goalPlans}
         resourceTypes={["form", "document", "orientation", "portfolio_task"]}
@@ -41,7 +41,7 @@ export default async function ResourcesPage() {
             </p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">SPOKES form library</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-              Open the form you need, upload completed versions when required, and keep your paperwork tied to your goals.
+              Open the form you need. Upload it when required. Your paperwork stays linked to your goals.
             </p>
           </div>
         </div>
@@ -55,7 +55,7 @@ export default async function ResourcesPage() {
             </p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Document library</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-              Program guides, certification references, and printable documents stay available here for quick lookup.
+              Find program guides, certification references, and printable documents here anytime.
             </p>
           </div>
         </div>

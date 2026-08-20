@@ -180,7 +180,7 @@ export default function OpportunitiesHub({
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Tracking</p>
           <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Keep your pipeline visible</p>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">
-            Save roles you&apos;re considering, then update them as you apply and interview.
+            Save roles you&apos;re considering. Update them as you apply and interview.
           </p>
         </div>
       </div>
@@ -198,11 +198,11 @@ export default function OpportunitiesHub({
           </p>
           <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No posted opportunities yet</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
-            While you wait, Sage can help you get your resume, portfolio, and interview talking points ready.
+            While you wait, ask Sage to help with your resume, portfolio, and interview talking points.
           </p>
           <div className="mt-4 flex justify-center">
             <AskSageLink
-              prompt="No opportunities are posted yet. Help me prepare for applications by improving my resume, portfolio proof, and interview talking points."
+              prompt="No jobs are posted yet. Help me get ready by improving my resume, portfolio, and interview talking points."
               label="Prepare with Sage"
             />
           </div>
@@ -258,7 +258,7 @@ export default function OpportunitiesHub({
                       <p className="mt-2 text-sm text-[var(--ink-strong)]">
                         {draft.resumeFileId
                           ? "This opportunity has a saved PDF generated from your Portfolio resume."
-                          : "Attach the current saved resume from your Portfolio tab before you apply."}
+                          : "Attach your saved resume from the Portfolio tab before you apply."}
                       </p>
                     </div>
                   <div className="flex flex-wrap gap-2">

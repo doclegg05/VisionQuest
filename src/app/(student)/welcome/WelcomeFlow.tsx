@@ -81,7 +81,7 @@ export const WELCOME_PATH_CHOICES: readonly WelcomePathChoice[] = [
     icon: "💬",
     title: "1. Discover My Career Path (Recommended)",
     description:
-      "Start a discovery conversation with Sage to explore your strengths, skills, and match with a career goal.",
+      "Start a conversation with Sage. Explore your strengths and skills, and find a career goal that fits.",
     recommended: true,
   },
   {
@@ -305,9 +305,8 @@ export default function WelcomeFlow({
               Welcome, {studentName}!
             </h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
-              VisionQuest is your personal guide through the SPOKES program —
-              from setting goals to earning certifications and building your
-              career.
+              VisionQuest guides you through the SPOKES program. Set goals,
+              earn certifications, and build your career.
             </p>
             <div className="mt-8 space-y-3 text-left">
               {[
@@ -333,7 +332,7 @@ export default function WelcomeFlow({
             <p className="mb-6 text-5xl">🧙‍♂️</p>
             <h1 className="font-display text-3xl text-[var(--ink-strong)]">Meet Sage</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
-              Sage is your AI mentor — like a supportive friend who helps you
+              Sage is your AI mentor, like a supportive friend. Sage helps you
               plan, stay motivated, and make progress toward your goals.
             </p>
             <div className="mt-8 space-y-3 text-left">
@@ -368,7 +367,9 @@ export default function WelcomeFlow({
             <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your first wins</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               {hasQuickWins
-                ? "Let's knock out a few quick orientation items right now. These take just a moment."
+                ? quickWinItems.length === 1
+                  ? "Let's knock out this quick orientation item right now. It will take just a moment."
+                  : "Let's knock out these quick orientation items right now. They will take just a moment."
                 : "You're all set! Let's choose where you'd like to start."}
             </p>
 

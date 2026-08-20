@@ -59,6 +59,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: ui-copy readability gate
+        # Flesch-Kincaid gate on student-facing UI copy (scripts/ui-copy-
+        # readability.mjs), sharing PLAIN_LANGUAGE_MAX_GRADE with the Sage
+        # chat-reply gate in src/lib/sage/readability.ts. New gate as of the
+        # 2026-08-20 UI-copy rewrite pass: red baseline was 48 strings over
+        # the grade-8 ceiling before that pass landed — see that commit's
+        # before/after report for the red-baseline proof. DB-free, filesystem
+        # only.
+        run: npx tsx scripts/ui-copy-readability.mjs --gate
+
       - name: Audit API auth wrappers
         # Static scan of every route file; exits 1 on any FOOTGUN finding
         # (withErrorHandler + getSession() + prisma — the 2026-04-24 bug).

@@ -7,7 +7,7 @@ export default function ChatPage() {
       <PageIntro
         eyebrow="Sage coaching"
         title="Talk through the next step"
-        description="Use Sage to clarify goals, troubleshoot blockers, and turn intention into a plan you can act on today."
+        description="Talk with Sage to sort out your goals and get past blockers. Leave with a plan for today."
       />
       <div className="surface-section overflow-hidden p-0">
         <ChatWindow />

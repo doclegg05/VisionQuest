@@ -99,7 +99,7 @@ export default function ForgotPasswordPage() {
           <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
           <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Reset your password</h1>
           <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
-            Use an email link or answer the classroom recovery questions tied to your account.
+            Use an email link, or answer your classroom recovery questions.
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--surface-muted)] p-1.5">
@@ -157,7 +157,7 @@ export default function ForgotPasswordPage() {
                 onChange={setSecurityQuestions}
                 idPrefix="forgot-password-security-question"
                 title="Classroom recovery questions"
-                description="This is a lower-security recovery option intended only for your classroom's internal VisionQuest deployment."
+                description="This is a lower-security option. Use it only for your classroom's VisionQuest account."
               />
 
               <div>
