@@ -11,6 +11,7 @@ const mockFileDeleteMany = mock.fn() as any;
 const mockApplicationFindUnique = mock.fn() as any;
 const mockApplicationCount = mock.fn() as any;
 const mockApplicationUpsert = mock.fn() as any;
+const mockDiscoveryFindUnique = mock.fn() as any;
 const mockSyncStudentAlerts = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
 const mockDeleteFile = mock.fn() as any;
@@ -37,6 +38,9 @@ mock.module("@/lib/db", {
         findUnique: mockApplicationFindUnique,
         count: mockApplicationCount,
         upsert: mockApplicationUpsert,
+      },
+      careerDiscovery: {
+        findUnique: mockDiscoveryFindUnique,
       },
     },
   },
@@ -74,6 +78,7 @@ describe("POST /api/applications", () => {
     mockApplicationFindUnique.mock.resetCalls();
     mockApplicationCount.mock.resetCalls();
     mockApplicationUpsert.mock.resetCalls();
+    mockDiscoveryFindUnique.mock.resetCalls();
     mockSyncStudentAlerts.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
     mockDeleteFile.mock.resetCalls();
@@ -90,6 +95,9 @@ describe("POST /api/applications", () => {
       appliedAt: null,
     }));
     mockApplicationCount.mock.mockImplementation(async () => 0);
+    mockDiscoveryFindUnique.mock.mockImplementation(async () => ({
+      topClusters: ["office-admin", "tech-digital"],
+    }));
     mockApplicationUpsert.mock.mockImplementation(async (args: any) => ({
       id: "application-1",
       studentId: session.id,
@@ -137,5 +145,66 @@ describe("POST /api/applications", () => {
 
     assert.equal(res.status, 200);
     assert.equal(mockApplicationUpsert.mock.calls[0]?.arguments[0].update.appliedAt, undefined);
+  });
+
+  describe("pathway provenance", () => {
+    function newApplicationRequest() {
+      // No existing row -> the upsert takes its create branch.
+      mockApplicationFindUnique.mock.mockImplementationOnce(async () => null);
+      return mockRequest("/api/applications", {
+        method: "POST",
+        body: { opportunityId: "opportunity-1", status: "applied" },
+      });
+    }
+
+    it("stamps the student's current pathway on a brand-new application", async () => {
+      const res = await route.POST(newApplicationRequest() as never);
+
+      assert.equal(res.status, 200);
+      const create = mockApplicationUpsert.mock.calls[0]?.arguments[0].create;
+      assert.equal(create.pathwayClusterId, "office-admin");
+      assert.ok(create.pathwaySnapshotAt instanceof Date);
+      assert.deepEqual(mockDiscoveryFindUnique.mock.calls[0]?.arguments[0].where, {
+        studentId: session.id,
+      });
+    });
+
+    it("records no pathway when the student has not finished discovery", async () => {
+      mockDiscoveryFindUnique.mock.mockImplementationOnce(async () => null);
+
+      const res = await route.POST(newApplicationRequest() as never);
+
+      assert.equal(res.status, 200);
+      const create = mockApplicationUpsert.mock.calls[0]?.arguments[0].create;
+      assert.equal(create.pathwayClusterId, null);
+      assert.equal(create.pathwaySnapshotAt, null);
+    });
+
+    it("never rewrites provenance on a later status change", async () => {
+      // Provenance answers "what pathway were they on when they applied".
+      // A status update must leave the original snapshot alone.
+      const req = mockRequest("/api/applications", {
+        method: "POST",
+        body: { opportunityId: "opportunity-1", status: "offer" },
+      });
+
+      const res = await route.POST(req as never);
+
+      assert.equal(res.status, 200);
+      const update = mockApplicationUpsert.mock.calls[0]?.arguments[0].update;
+      assert.ok(!("pathwayClusterId" in update), "update must not touch pathwayClusterId");
+      assert.ok(!("pathwaySnapshotAt" in update), "update must not touch pathwaySnapshotAt");
+    });
+
+    it("skips the discovery read entirely when the application already exists", async () => {
+      const req = mockRequest("/api/applications", {
+        method: "POST",
+        body: { opportunityId: "opportunity-1", status: "offer" },
+      });
+
+      await route.POST(req as never);
+
+      assert.equal(mockDiscoveryFindUnique.mock.calls.length, 0);
+    });
   });
 });

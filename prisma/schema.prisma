@@ -829,6 +829,17 @@ model Application {
   verificationStatus String?
   verifiedBy         String?
   verifiedAt         DateTime?
+  // Pathway provenance — what the student's suggested SPOKES career pathway
+  // WAS at the moment this application row was created, copied from
+  // CareerDiscovery.topClusters[0]. Null = no cluster existed then, or a
+  // legacy row created before this field. WRITE-ONCE by design: never
+  // updated when discovery changes later. The whole point is to ask "did the
+  // pathway we suggested at the time lead to a placement" (via
+  // SpokesRecord.placementApplicationId), and a retroactive rewrite would
+  // destroy the only evidence that question has. See src/lib/pathway-
+  // provenance.ts (capture) and src/lib/pathway-outcomes.ts (report).
+  pathwayClusterId   String?
+  pathwaySnapshotAt  DateTime?
 
   student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
