@@ -34,6 +34,50 @@ describe("confirmation tokens", () => {
     assert.equal(verifyConfirmationToken(token, reordered, NOW), true);
   });
 
+  it("round-trips for a staff-assisted payload carrying targetStudentId", () => {
+    const staffPayload = { ...payload, targetStudentId: "stu-target-1" };
+    const token = createConfirmationToken(staffPayload, NOW);
+    assert.equal(verifyConfirmationToken(token, staffPayload, NOW), true);
+  });
+
+  it("rejects a payload that re-splits field content across the old |-boundaries", () => {
+    // Both payloads joined to the identical "stu-1|evil|conv-1" segment under
+    // the previous |-delimited signature input — the delimiter inside a field
+    // value made the boundary ambiguous.
+    const shifted = {
+      ...payload,
+      sessionId: "stu-1|evil",
+      conversationId: "conv-1",
+    };
+    const original = { ...payload, sessionId: "stu-1", conversationId: "evil|conv-1" };
+    assert.equal(
+      [original.sessionId, original.conversationId].join("|"),
+      [shifted.sessionId, shifted.conversationId].join("|"),
+    );
+
+    const token = createConfirmationToken(original, NOW);
+    assert.equal(verifyConfirmationToken(token, shifted, NOW), false);
+  });
+
+  it("distinguishes an absent targetStudentId from an empty-string one", () => {
+    const emptyTarget = { ...payload, targetStudentId: "" };
+    assert.notEqual(
+      createConfirmationToken(payload, NOW),
+      createConfirmationToken(emptyTarget, NOW),
+    );
+
+    const token = createConfirmationToken(payload, NOW);
+    assert.equal(verifyConfirmationToken(token, emptyTarget, NOW), false);
+  });
+
+  it("treats an explicitly-undefined targetStudentId as absent", () => {
+    const token = createConfirmationToken(payload, NOW);
+    assert.equal(
+      verifyConfirmationToken(token, { ...payload, targetStudentId: undefined }, NOW),
+      true,
+    );
+  });
+
   it("rejects any tampering with tool, args, session, or conversation", () => {
     const token = createConfirmationToken(payload, NOW);
     assert.equal(
@@ -47,6 +91,10 @@ describe("confirmation tokens", () => {
     assert.equal(verifyConfirmationToken(token, { ...payload, sessionId: "stu-2" }, NOW), false);
     assert.equal(
       verifyConfirmationToken(token, { ...payload, conversationId: "conv-2" }, NOW),
+      false,
+    );
+    assert.equal(
+      verifyConfirmationToken(token, { ...payload, targetStudentId: "stu-other" }, NOW),
       false,
     );
   });
