@@ -41,13 +41,13 @@ export function SegmentError({
       <div className="flex gap-3">
         <button
           onClick={reset}
-          className="rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           Try again
         </button>
         <a
           href={backHref}
-          className="rounded-full border border-[var(--border)] px-5 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
+          className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] px-5 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
         >
           {backLabel}
         </a>

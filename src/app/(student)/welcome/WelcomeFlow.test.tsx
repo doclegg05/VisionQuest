@@ -11,8 +11,9 @@ import { WELCOME_PATHS } from "@/lib/progression/welcome-routing";
 import WelcomeFlow, {
   PathChoiceCard,
   QuickWinCard,
+  ScoreCard,
   WELCOME_PATH_CHOICES,
-  computeReadinessPercent,
+  computeOrientationCompletionPercent,
   postQuickWinCompletion,
   postWelcomeCompletion,
 } from "./WelcomeFlow";
@@ -136,27 +137,40 @@ describe("QuickWinCard failure-path markup", () => {
 
     assert.ok(!/role="alert"/.test(html), "a done item must not show a stale retry notice");
   });
+
+  it("gives the completion button a real 44px touch target — it was ~28px tall before", () => {
+    const html = renderToString(
+      <QuickWinCard item={item} done={false} saving={false} hasError={false} onComplete={() => {}} />,
+    );
+
+    const buttonMatch = html.match(/<button[^>]*>/);
+    assert.ok(buttonMatch, "expected a <button> tag");
+    assert.ok(buttonMatch![0].includes("min-h-11"), buttonMatch![0]);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // 2. Real denominator — no hardcoded "/ 24"
 // ---------------------------------------------------------------------------
 
-describe("computeReadinessPercent", () => {
+describe("computeOrientationCompletionPercent", () => {
   it("computes from the real total passed in, not a hardcoded 24", () => {
     // Same numerator (1 win), two different real totals -> two different
     // percentages. A hardcoded "/24" would return the same number for both.
-    assert.equal(computeReadinessPercent(24, 0, 1), Math.round((1 / 24) * 100));
-    assert.equal(computeReadinessPercent(30, 0, 1), Math.round((1 / 30) * 100));
-    assert.notEqual(computeReadinessPercent(24, 0, 1), computeReadinessPercent(30, 0, 1));
+    assert.equal(computeOrientationCompletionPercent(24, 0, 1), Math.round((1 / 24) * 100));
+    assert.equal(computeOrientationCompletionPercent(30, 0, 1), Math.round((1 / 30) * 100));
+    assert.notEqual(
+      computeOrientationCompletionPercent(24, 0, 1),
+      computeOrientationCompletionPercent(30, 0, 1),
+    );
   });
 
   it("counts orientation items already completed before this flow, plus wins from this flow", () => {
-    assert.equal(computeReadinessPercent(24, 5, 3), Math.round((8 / 24) * 100));
+    assert.equal(computeOrientationCompletionPercent(24, 5, 3), Math.round((8 / 24) * 100));
   });
 
   it("returns null (never a fabricated percentage) when the real total is unavailable", () => {
-    assert.equal(computeReadinessPercent(0, 0, 1), null);
+    assert.equal(computeOrientationCompletionPercent(0, 0, 1), null);
   });
 });
 
@@ -243,6 +257,29 @@ describe("WELCOME_PATH_CHOICES", () => {
     assert.equal(new Set(hrefs).size, hrefs.length);
     for (const href of hrefs) assert.match(href, /^\/[a-z-]+$/);
   });
+
+  it("no title carries a leading ordinal — the heading already asks for ONE choice", () => {
+    for (const choice of WELCOME_PATH_CHOICES) {
+      assert.doesNotMatch(choice.title, /^\d+\./, `"${choice.title}" still has a numbered prefix`);
+    }
+  });
+
+  it("does not bake 'Recommended' into the title text — it renders as a separate chip", () => {
+    for (const choice of WELCOME_PATH_CHOICES) {
+      assert.doesNotMatch(choice.title, /recommended/i, `"${choice.title}" still says Recommended`);
+    }
+  });
+
+  it("names the orientation door 'Finish Orientation', not a third name for the same thing", () => {
+    const orientation = WELCOME_PATH_CHOICES.find((choice) => choice.path === "orientation");
+    assert.equal(orientation?.title, "Finish Orientation");
+  });
+
+  it("describes the dashboard door with the real step count, not the stale 7-stage figure", () => {
+    const dashboard = WELCOME_PATH_CHOICES.find((choice) => choice.path === "dashboard");
+    assert.doesNotMatch(dashboard?.description ?? "", /7-stage/);
+    assert.match(dashboard?.description ?? "", /8-step/);
+  });
 });
 
 describe("postWelcomeCompletion", () => {
@@ -306,5 +343,60 @@ describe("PathChoiceCard", () => {
     );
 
     assert.match(html, /aria-busy="true"/);
+  });
+
+  it("renders a Recommended chip for the recommended door, separate from the title", () => {
+    const recommended = WELCOME_PATH_CHOICES[0]; // the chat door
+    assert.equal(recommended.recommended, true);
+
+    const html = renderToString(
+      <PathChoiceCard choice={recommended} saving={false} hasError={false} onChoose={() => {}} />,
+    );
+
+    assert.ok(html.includes("Recommended"), "expected a visible Recommended chip");
+    assert.ok(!/Discover My Career Path[^<]*Recommended/.test(html), "title text should not include the word");
+  });
+
+  it("renders no Recommended chip for a non-recommended door", () => {
+    const html = renderToString(
+      <PathChoiceCard choice={choice} saving={false} hasError={false} onChoose={() => {}} />,
+    );
+
+    assert.ok(!html.includes("Recommended"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Score card: honest count framing, not a borrowed "readiness" score
+// ---------------------------------------------------------------------------
+
+describe("ScoreCard", () => {
+  it("shows the real completed/total counts, never the word 'readiness'", () => {
+    const html = renderToString(<ScoreCard completedCount={6} totalCount={24} percent={25} />);
+
+    assert.ok(html.includes("6"));
+    assert.ok(html.includes("24"));
+    assert.ok(html.includes("orientation items"));
+    assert.doesNotMatch(html, /readiness/i);
+  });
+
+  it("matches the percent the caller passes for the progress bar width", () => {
+    const html = renderToString(<ScoreCard completedCount={6} totalCount={24} percent={25} />);
+
+    assert.match(html, /width:\s*25%/);
+  });
+
+  it("falls back to count-free praise when the real total is unavailable", () => {
+    const html = renderToString(<ScoreCard completedCount={0} totalCount={0} percent={null} />);
+
+    assert.ok(html.includes("off to a great start"));
+    assert.ok(!html.includes("orientation items"));
+  });
+
+  it("agrees with computeOrientationCompletionPercent's own null case", () => {
+    const percent = computeOrientationCompletionPercent(0, 0, 1);
+    assert.equal(percent, null);
+    const html = renderToString(<ScoreCard completedCount={1} totalCount={0} percent={percent} />);
+    assert.ok(html.includes("off to a great start"));
   });
 });

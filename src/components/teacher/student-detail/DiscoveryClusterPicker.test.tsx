@@ -109,6 +109,16 @@ describe("DiscoveryClusterPicker rendering", () => {
     assert.ok(html.includes('role="alert"'), "expected the error in an alert region");
   });
 
+  it("renders no alert region at all when there is no error — not an empty, contradictory one", () => {
+    const html = renderToString(<DiscoveryClusterPicker {...baseProps} error={null} />);
+
+    assert.ok(
+      !html.includes('role="alert"'),
+      "an unconditional empty alert region announces nothing to fix and confuses screen readers",
+    );
+    assert.ok(!html.includes("aria-live"), "role=\"alert\" alone is already assertive; no separate aria-live needed");
+  });
+
   it("replaces the form with the saved pathway once it lands", () => {
     const html = renderToString(
       <DiscoveryClusterPicker {...baseProps} savedClusterId="office-admin" />,

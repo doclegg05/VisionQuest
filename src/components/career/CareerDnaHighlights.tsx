@@ -1,7 +1,13 @@
 import type { RiasecDimensionView } from "@/lib/career-profile";
+import { isAssessedProfileSource } from "@/lib/career-provenance";
 
 interface CareerDnaHighlightsProps {
   topInterests: RiasecDimensionView[];
+  /** CareerDiscovery.profileSource — decides whether the blurb below credits
+   *  a real assessment or names this as Sage's inference. Optional so
+   *  existing callers that haven't threaded it through yet still render
+   *  (falls back to the honest, conservative "Sage's guess" framing). */
+  profileSource?: string;
 }
 
 /**
@@ -9,8 +15,10 @@ interface CareerDnaHighlightsProps {
  * Rendered above the detailed CareerProfile sections on /career/profile,
  * and on its own while an assessment is still in progress.
  */
-export function CareerDnaHighlights({ topInterests }: CareerDnaHighlightsProps) {
+export function CareerDnaHighlights({ topInterests, profileSource }: CareerDnaHighlightsProps) {
   if (topInterests.length === 0) return null;
+
+  const assessed = profileSource !== undefined && isAssessedProfileSource(profileSource);
 
   return (
     <section aria-labelledby="career-dna-highlights-heading" className="surface-section p-5">
@@ -21,7 +29,9 @@ export function CareerDnaHighlights({ topInterests }: CareerDnaHighlightsProps) 
         Your top interests
       </h2>
       <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
-        These are the kinds of work you told Sage you enjoy most.
+        {assessed
+          ? "These are the kinds of work you enjoy most, from your CareerOneStop results."
+          : "These are the kinds of work Sage thinks you enjoy most, based on your chats."}
       </p>
       <ol className="mt-4 grid list-none gap-3 sm:grid-cols-3">
         {topInterests.map((interest, idx) => (

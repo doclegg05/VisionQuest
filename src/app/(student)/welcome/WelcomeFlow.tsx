@@ -45,12 +45,17 @@ export async function postQuickWinCompletion(
 }
 
 /**
- * Readiness percentage for the "your first wins" step, derived from the real
- * orientation item count — never a hardcoded total. Returns null when the
- * total is unknown/zero so the caller shows count-free encouragement instead
- * of a fabricated percentage. Exported for tests.
+ * Orientation-item completion percentage for the "your first wins" step's
+ * progress bar, derived from the real orientation item count — never a
+ * hardcoded total. Returns null when the total is unknown/zero so the caller
+ * shows count-free encouragement instead of a fabricated percentage.
+ *
+ * Named for what it actually measures — a share of orientation items — not
+ * "readiness": that word is reserved for the dashboard's 100-point composite
+ * score, which this number does not match and was never meant to represent.
+ * Exported for tests.
  */
-export function computeReadinessPercent(
+export function computeOrientationCompletionPercent(
   totalOrientationItems: number,
   completedOrientationCount: number,
   completedWinsCount: number,
@@ -79,7 +84,7 @@ export const WELCOME_PATH_CHOICES: readonly WelcomePathChoice[] = [
     path: "chat",
     href: "/chat",
     icon: "💬",
-    title: "1. Discover My Career Path (Recommended)",
+    title: "Discover My Career Path",
     description:
       "Start a conversation with Sage. Explore your strengths and skills, and find a career goal that fits.",
     recommended: true,
@@ -88,7 +93,7 @@ export const WELCOME_PATH_CHOICES: readonly WelcomePathChoice[] = [
     path: "orientation",
     href: "/orientation",
     icon: "📋",
-    title: "2. Complete Onboarding Paperwork",
+    title: "Finish Orientation",
     description:
       "Review and complete required SPOKES program forms and onboarding checklist items.",
   },
@@ -96,9 +101,9 @@ export const WELCOME_PATH_CHOICES: readonly WelcomePathChoice[] = [
     path: "dashboard",
     href: "/dashboard",
     icon: "📊",
-    title: "3. View My Employment Journey Map",
+    title: "View My Employment Journey Map",
     description:
-      "Go directly to your dashboard to see your 7-stage path to employment.",
+      "Go directly to your dashboard to see your 8-step path to employment.",
   },
 ];
 
@@ -165,9 +170,16 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
           {choice.icon}
         </span>
         <div>
-          <p className="font-display text-lg font-semibold text-[var(--ink-strong)]">
-            {choice.title}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-display text-lg font-semibold text-[var(--ink-strong)]">
+              {choice.title}
+            </p>
+            {choice.recommended && (
+              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
+                Recommended
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">{choice.description}</p>
         </div>
       </Link>
@@ -220,7 +232,7 @@ export function QuickWinCard({ item, done, saving, hasError, onComplete }: Quick
             type="button"
             onClick={() => onComplete(item.id)}
             disabled={saving}
-            className="shrink-0 rounded-full bg-[var(--accent-strong)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent)] disabled:opacity-60"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent)] disabled:opacity-60"
           >
             {saving ? "Saving..." : hasError ? "Try again" : "I've read this"}
           </button>
@@ -229,6 +241,47 @@ export function QuickWinCard({ item, done, saving, hasError, onComplete }: Quick
       {!done && hasError && (
         <p role="alert" className="mt-2 text-xs font-medium text-red-700">
           That didn&apos;t save. Tap to try again.
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface ScoreCardProps {
+  /** Orientation items completed before this flow, plus wins from this flow. */
+  completedCount: number;
+  totalCount: number;
+  /** Same value computeOrientationCompletionPercent returns — null when the
+   *  real total is unavailable, so the caller falls back to count-free praise
+   *  instead of a fabricated percentage. */
+  percent: number | null;
+}
+
+/**
+ * The "nice work" card shown once every quick win is done. Uses the honest
+ * count framing — n of total real orientation items — instead of borrowing
+ * the word "readiness" for a number that will not match the dashboard's
+ * 100-point composite score. Exported (named) so the copy is directly
+ * testable via renderToString, mirroring PathChoiceCard/QuickWinCard.
+ */
+export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProps) {
+  return (
+    <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
+      {percent !== null ? (
+        <>
+          <p className="text-sm font-medium text-green-800">
+            🎉 Nice! You&apos;ve finished {completedCount} of {totalCount} orientation items.
+          </p>
+          <div className="mt-2 h-2 rounded-full bg-green-200 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-green-500 transition-all duration-1000"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </>
+      ) : (
+        <p className="text-sm font-medium text-green-800">
+          🎉 Nice! You&apos;re off to a great start.
         </p>
       )}
     </div>
@@ -252,7 +305,8 @@ export default function WelcomeFlow({
 
   const hasQuickWins = quickWinItems.length > 0;
   const allWinsDone = hasQuickWins && completedWins.size >= quickWinItems.length;
-  const scorePct = computeReadinessPercent(
+  const completedOrientationTotal = completedOrientationCount + completedWins.size;
+  const scorePct = computeOrientationCompletionPercent(
     totalOrientationItems,
     completedOrientationCount,
     completedWins.size,
@@ -353,7 +407,7 @@ export default function WelcomeFlow({
             </button>
             <button
               onClick={() => setStep(0)}
-              className="mx-auto mt-3 block text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+              className="mx-auto mt-3 flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               ← Back
             </button>
@@ -388,27 +442,13 @@ export default function WelcomeFlow({
               </div>
             )}
 
-            {/* Score animation after all wins */}
+            {/* Score card after all wins */}
             {showScore && (
-              <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
-                {scorePct !== null ? (
-                  <>
-                    <p className="text-sm font-medium text-green-800">
-                      🎉 Nice! Your readiness score is already at {scorePct}%
-                    </p>
-                    <div className="mt-2 h-2 rounded-full bg-green-200 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-green-500 transition-all duration-1000"
-                        style={{ width: `${scorePct}%` }}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm font-medium text-green-800">
-                    🎉 Nice! You&apos;re off to a great start.
-                  </p>
-                )}
-              </div>
+              <ScoreCard
+                completedCount={completedOrientationTotal}
+                totalCount={totalOrientationItems}
+                percent={scorePct}
+              />
             )}
 
             {!showScore && (
@@ -416,7 +456,7 @@ export default function WelcomeFlow({
                 {hasQuickWins && !allWinsDone ? (
                   <button
                     onClick={() => setStep(3)}
-                    className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                    className="inline-flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
                   >
                     Skip for now →
                   </button>
@@ -427,7 +467,7 @@ export default function WelcomeFlow({
                 )}
                 <button
                   onClick={() => setStep(1)}
-                  className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                  className="inline-flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
                 >
                   ← Back
                 </button>
@@ -457,7 +497,7 @@ export default function WelcomeFlow({
             </div>
             <button
               onClick={() => setStep(2)}
-              className="mt-4 text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+              className="mt-4 flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               ← Back
             </button>

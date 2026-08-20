@@ -1,3 +1,4 @@
+import Link from "next/link";
 import PageIntro from "@/components/ui/PageIntro";
 import { SageMemoryPanel } from "@/components/student/SageMemoryPanel";
 
@@ -18,9 +19,15 @@ export default function MemoryPage() {
         </p>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
           See something that is wrong below? Tell your teacher. They can fix it or take it out.
-          Teachers can already see and correct these notes, the same way they can for every
-          student.
+          Your teacher can see these notes too. If something is wrong, they can fix it or
+          remove it.
         </p>
+        <Link
+          href="/appointments"
+          className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)]"
+        >
+          Book time with your teacher
+        </Link>
       </div>
 
       <SageMemoryPanel />

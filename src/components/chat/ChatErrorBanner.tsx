@@ -38,7 +38,7 @@ export function ChatErrorBanner({ message }: ChatErrorBannerProps) {
         <Link
           href="/help"
           prefetch={false}
-          className="font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
+          className="inline-flex min-h-11 items-center font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
         >
           Visit the Help page
         </Link>{" "}

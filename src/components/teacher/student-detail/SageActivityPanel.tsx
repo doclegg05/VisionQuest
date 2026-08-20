@@ -145,7 +145,7 @@ export function SageActivityPanel({ studentId }: SageActivityPanelProps) {
         Sage&apos;s activity
       </p>
       <p className="mt-1 text-xs text-[var(--ink-faint)]">
-        What Sage has done for this student — confirmed writes only, never conversation content.
+        Actions Sage has taken or proposed for this student — never conversation content.
       </p>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

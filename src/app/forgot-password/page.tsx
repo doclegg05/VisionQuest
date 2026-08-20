@@ -157,7 +157,7 @@ export default function ForgotPasswordPage() {
                 onChange={setSecurityQuestions}
                 idPrefix="forgot-password-security-question"
                 title="Classroom recovery questions"
-                description="This is a lower-security option. Use it only for your classroom's VisionQuest account."
+                description="Anyone who knows the answers could get into your account this way. Use it only for your classroom's VisionQuest account."
               />
 
               <div>

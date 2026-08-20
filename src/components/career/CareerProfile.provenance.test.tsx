@@ -30,10 +30,13 @@ function buildDiscovery(overrides: Partial<CareerDiscoveryData> = {}): CareerDis
 }
 
 describe("CareerProfile provenance labels", () => {
-  it("labels an inferred profile as Sage's read, not a formal assessment", () => {
+  it("labels an inferred profile as Sage's guess, not a test the student took", () => {
     const html = renderToString(<CareerProfile discovery={buildDiscovery()} />);
-    assert.ok(html.includes("What Sage has learned from your conversations"));
-    assert.ok(html.includes("not a formal assessment"));
+    assert.ok(
+      html.includes("Sage&#x27;s best guess from your chats") ||
+        html.includes("Sage's best guess from your chats"),
+    );
+    assert.ok(html.includes("not a test you took"));
     assert.ok(!html.includes("From your CareerOneStop results"));
   });
 

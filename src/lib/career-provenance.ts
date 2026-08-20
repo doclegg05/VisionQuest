@@ -63,5 +63,5 @@ export function careerProvenanceLabel(
       ? `From your CareerOneStop results, saved ${saved}.`
       : "From your CareerOneStop results.";
   }
-  return "What Sage has learned from your conversations — not a formal assessment.";
+  return "This is Sage's best guess from your chats. It is not a test you took.";
 }

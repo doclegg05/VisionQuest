@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { renderToString } from "react-dom/server";
-import { SageActivityList, loadSageOperations, type SageOperationRow } from "./SageActivityPanel";
+import {
+  SageActivityList,
+  SageActivityPanel,
+  loadSageOperations,
+  type SageOperationRow,
+} from "./SageActivityPanel";
 
 const sampleRow: SageOperationRow = {
   id: "op-1",
@@ -52,6 +57,15 @@ describe("SageActivityList rendering", () => {
 
     assert.ok(html.includes("Updated a goal&#x27;s status"));
     assert.ok(html.includes("Saved a job listing"));
+  });
+});
+
+describe("SageActivityPanel intro copy", () => {
+  it("does not claim 'confirmed writes only' — proposed/rejected/failed rows can render too", () => {
+    const html = renderToString(<SageActivityPanel studentId="stu-1" />);
+    assert.ok(!html.includes("confirmed writes only"));
+    assert.ok(html.includes("Actions Sage has taken or proposed for this student"));
+    assert.ok(html.includes("never conversation content"));
   });
 });
 

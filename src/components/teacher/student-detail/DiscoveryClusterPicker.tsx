@@ -133,9 +133,11 @@ export function DiscoveryClusterPicker({
           {saving ? "Saving..." : "Save pathway"}
         </button>
       </div>
-      <p role="alert" aria-live="polite" className="mt-2 text-xs text-red-600">
-        {error}
-      </p>
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

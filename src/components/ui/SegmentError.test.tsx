@@ -33,6 +33,19 @@ describe("SegmentError", () => {
     assert.ok(html.includes('href="/career"'));
     assert.ok(html.includes("Back to Career"));
   });
+
+  it("gives both the Try again button and the back link a real 44px touch target", () => {
+    const html = renderToString(
+      <SegmentError
+        error={new Error("boom")}
+        reset={() => {}}
+        title="We couldn't load this"
+        message="Try again in a moment."
+      />,
+    );
+    const targets = html.match(/min-h-11/g) ?? [];
+    assert.ok(targets.length >= 2, `expected Try again + back link at min-h-11, found ${targets.length}`);
+  });
 });
 
 function findErrorFiles(dir: string, out: string[] = []): string[] {

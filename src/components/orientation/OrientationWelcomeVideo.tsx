@@ -118,7 +118,6 @@ export default function OrientationWelcomeVideo() {
             <p>Your Dashboard is your home base. Set goals that matter to you, track your progress, and always see what comes next.</p>
             <p>Together, we&apos;ll find courses and chances that fit your goals.</p>
             <p>We&apos;ll help you earn your SPOKES Ready to Work Certification.</p>
-            <p>And whenever you need me, just tap my symbol to start a chat.</p>
             <p>One clear next step at a time. Every step you take matters — and you don&apos;t have to figure it out alone.</p>
             <p>Welcome to VisionQuest. Let&apos;s begin building your path forward.</p>
           </div>

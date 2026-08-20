@@ -37,4 +37,11 @@ describe("ChatErrorBanner", () => {
     const html = renderToString(<ChatErrorBanner message="Failed to send message." />);
     assert.ok(html.includes('role="alert"'));
   });
+
+  it("gives the Help page link a real 44px touch target, not just text-xs text", () => {
+    const html = renderToString(<ChatErrorBanner message="Failed to send message." />);
+    const anchorMatch = html.match(/<a [^>]*href="\/help"[^>]*>/);
+    assert.ok(anchorMatch, 'expected an <a href="/help"> tag');
+    assert.ok(anchorMatch![0].includes("min-h-11"), anchorMatch![0]);
+  });
 });

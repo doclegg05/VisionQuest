@@ -43,15 +43,15 @@ describe("careerProvenanceLabel", () => {
     assert.doesNotMatch(label, /saved\s*[.,]/);
   });
 
-  it("labels an inferred profile honestly — not a formal assessment", () => {
+  it("labels an inferred profile honestly — Sage's guess, not a test the student took", () => {
     const label = careerProvenanceLabel(PROFILE_SOURCE_SAGE_INFERRED, null);
-    assert.match(label, /What Sage has learned from your conversations/);
-    assert.match(label, /not a formal assessment/);
+    assert.match(label, /Sage's best guess from your chats/);
+    assert.match(label, /not a test you took/);
   });
 
   it("falls back to the inferred label for unknown sources", () => {
     const label = careerProvenanceLabel("something-else", new Date());
-    assert.match(label, /not a formal assessment/);
+    assert.match(label, /not a test you took/);
   });
 
   it("accepts an ISO string date (serialized rows)", () => {
