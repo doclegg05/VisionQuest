@@ -201,7 +201,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
         }}
         className={`group flex items-start gap-4 rounded-[1.5rem] border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
           hasError
-            ? "border-red-300"
+            ? "border-[var(--badge-error-text)]"
             : choice.recommended
               ? "border-2 border-[var(--accent-strong)]"
               : "border-[var(--border)]"
@@ -225,7 +225,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
         </div>
       </Link>
       {hasError && (
-        <p role="alert" className="mt-2 text-left text-xs font-medium text-red-700">
+        <p role="alert" className="mt-2 text-left text-xs font-medium text-[var(--badge-error-text)]">
           That didn&apos;t save. Tap to try again.
         </p>
       )}
@@ -248,19 +248,23 @@ interface QuickWinCardProps {
  * cycle, mirroring the repo's OrientationWizard test pattern.
  */
 export function QuickWinCard({ item, done, saving, hasError, onComplete }: QuickWinCardProps) {
+  // Colors come from theme tokens, not hardcoded light values: the app themes
+  // with [data-theme], while Tailwind's dark: variant keys off the OS setting,
+  // so a `bg-green-50` card left white body text on pale green whenever the
+  // two disagreed.
   return (
     <div
       className={`rounded-xl border p-4 transition-colors ${
         done
-          ? "border-green-200 bg-green-50"
+          ? "border-[var(--border)] bg-[var(--badge-success-bg)]"
           : hasError
-            ? "border-red-200 bg-red-50"
+            ? "border-[var(--border)] bg-[var(--badge-error-bg)]"
             : "border-[var(--border)] bg-[var(--surface-raised)]"
       }`}
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-medium ${done ? "text-green-800" : "text-[var(--ink-strong)]"}`}>
+          <p className="text-sm font-medium text-[var(--ink-strong)]">
             {done && <span className="mr-1.5">✓</span>}
             {item.label}
           </p>
@@ -280,7 +284,7 @@ export function QuickWinCard({ item, done, saving, hasError, onComplete }: Quick
         )}
       </div>
       {!done && hasError && (
-        <p role="alert" className="mt-2 text-xs font-medium text-red-700">
+        <p role="alert" className="mt-2 text-xs font-medium text-[var(--badge-error-text)]">
           That didn&apos;t save. Tap to try again.
         </p>
       )}
@@ -304,24 +308,35 @@ interface ScoreCardProps {
  * the word "readiness" for a number that will not match the dashboard's
  * 100-point composite score. Exported (named) so the copy is directly
  * testable via renderToString, mirroring PathChoiceCard/QuickWinCard.
+ *
+ * It waits for an explicit Continue. A 2s auto-advance used to take the
+ * message away mid-sentence for a slower reader — and this card is their only
+ * confirmation that the first win actually saved.
  */
 export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProps) {
   return (
-    <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
+    <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--badge-success-bg)] p-4">
       {percent !== null ? (
         <>
-          <p className="text-sm font-medium text-green-800">
+          <p className="text-sm font-medium text-[var(--ink-strong)]">
             🎉 Nice! You&apos;ve finished {completedCount} of {totalCount} orientation items.
           </p>
-          <div className="mt-2 h-2 rounded-full bg-green-200 overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={completedCount}
+            aria-valuemin={0}
+            aria-valuemax={totalCount}
+            aria-valuetext={`${completedCount} of ${totalCount} orientation items done`}
+            className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+          >
             <div
-              className="h-full rounded-full bg-green-500 transition-all duration-1000"
+              className="h-full rounded-full bg-[var(--accent-green)] transition-all duration-1000"
               style={{ width: `${percent}%` }}
             />
           </div>
         </>
       ) : (
-        <p className="text-sm font-medium text-green-800">
+        <p className="text-sm font-medium text-[var(--ink-strong)]">
           🎉 Nice! You&apos;re off to a great start.
         </p>
       )}
@@ -461,7 +476,6 @@ export default function WelcomeFlow({
       return;
     }
     setCompletedWins((prev) => new Set(prev).add(itemId));
-    // If all done, show score animation briefly
     if (completedWins.size + 1 >= quickWinItems.length) {
       setShowScore(true);
       autoAdvance.current.start(

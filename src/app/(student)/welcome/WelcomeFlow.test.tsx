@@ -405,6 +405,27 @@ describe("ScoreCard", () => {
     const html = renderToString(<ScoreCard completedCount={1} totalCount={0} percent={percent} />);
     assert.ok(html.includes("off to a great start"));
   });
+
+  // The card itself carries no button: QuickWinsNav renders the way forward
+  // unconditionally right below it (see its own suite), so a Continue here
+  // would stack two of them. What this card owes assistive tech is the meaning
+  // of its progress bar, which was a bare styled div.
+  it("exposes the progress bar to assistive tech in real item counts", () => {
+    const html = renderToString(
+      <ScoreCard completedCount={6} totalCount={24} percent={25} />,
+    );
+
+    assert.match(html, /role="progressbar"/);
+    assert.match(html, /aria-valuenow="6"/);
+    assert.match(html, /aria-valuemin="0"/);
+    assert.match(html, /aria-valuemax="24"/);
+  });
+
+  it("announces no progress bar when there is no real total to measure", () => {
+    const html = renderToString(<ScoreCard completedCount={0} totalCount={0} percent={null} />);
+
+    assert.ok(!/role="progressbar"/.test(html), "no bar without a real total");
+  });
 });
 
 // ---------------------------------------------------------------------------
