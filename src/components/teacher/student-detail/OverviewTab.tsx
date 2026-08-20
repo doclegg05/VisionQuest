@@ -7,11 +7,111 @@ import ReadinessScore from "@/components/ui/ReadinessScore";
 import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
 import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
+import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 import type {
   StudentData,
   MoodEntryData,
   AlertData,
 } from "./types";
+
+// ─── Pure helpers (exported for unit testing) ─────────────────────────────────
+
+/** Sentinel select value for "no cluster picked". */
+export const NO_CLUSTER_VALUE = "";
+
+/** Options for the discovery-override cluster picker, straight from the SPOKES catalog. */
+export function discoveryClusterOptions(): { id: string; label: string }[] {
+  return CAREER_CLUSTERS.map((cluster) => ({ id: cluster.id, label: cluster.label }));
+}
+
+/** Build the discovery-override PATCH body; omits clusterId when none is picked. */
+export function buildDiscoveryOverrideBody(
+  clusterId: string,
+): { status: "complete"; clusterId?: string } {
+  return clusterId === NO_CLUSTER_VALUE
+    ? { status: "complete" }
+    : { status: "complete", clusterId };
+}
+
+/**
+ * A complete discovery with no recorded pathway is the stuck state staff must
+ * be able to fix — the completion override no longer renders, so a dedicated
+ * cluster-backfill control has to.
+ */
+export function needsClusterBackfill(
+  status: string,
+  topClusters: readonly string[],
+): boolean {
+  return status === "complete" && topClusters.length === 0;
+}
+
+interface DiscoveryOverridePanelProps {
+  /** true = discovery is already complete and only the cluster is being recorded. */
+  isClusterBackfill: boolean;
+  clusterId: string;
+  onClusterIdChange: (value: string) => void;
+  saving: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/** Confirm panel for the discovery override, exported for render testing. */
+export function DiscoveryOverridePanel({
+  isClusterBackfill,
+  clusterId,
+  onClusterIdChange,
+  saving,
+  onConfirm,
+  onCancel,
+}: DiscoveryOverridePanelProps) {
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+      <p className="text-sm text-emerald-900">
+        {isClusterBackfill
+          ? "Discovery is complete, but no career pathway was recorded. Pick the cluster this student is working toward. The change is recorded in the audit log."
+          : "This unblocks the student's next step when Sage never marked discovery complete automatically. The override is recorded in the audit log."}
+      </p>
+      <div className="mt-2 flex flex-col gap-1">
+        <label
+          htmlFor="discovery-cluster-select"
+          className="text-xs font-medium text-emerald-900"
+        >
+          Career pathway{isClusterBackfill ? "" : " (optional)"}
+        </label>
+        <select
+          id="discovery-cluster-select"
+          value={clusterId}
+          onChange={(event) => onClusterIdChange(event.target.value)}
+          className="theme-input rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value={NO_CLUSTER_VALUE} disabled={isClusterBackfill}>
+            {isClusterBackfill ? "Choose a cluster…" : "No cluster yet"}
+          </option>
+          {discoveryClusterOptions().map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={onConfirm}
+          disabled={saving || (isClusterBackfill && clusterId === NO_CLUSTER_VALUE)}
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Confirm"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="theme-card-subtle rounded-lg px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface OverviewTabProps {
   data: StudentData;
@@ -85,10 +185,27 @@ export default function OverviewTab({
   const [overridingDiscovery, setOverridingDiscovery] = useState(false);
   const [discoveryOverridden, setDiscoveryOverridden] = useState(false);
   const [discoveryOverrideError, setDiscoveryOverrideError] = useState<string | null>(null);
+  const [overrideClusterId, setOverrideClusterId] = useState(NO_CLUSTER_VALUE);
+  const [appliedClusterId, setAppliedClusterId] = useState<string | null>(null);
 
   const discoveryStatus = discoveryOverridden
     ? "complete"
     : careerDiscovery?.status ?? "not_started";
+
+  const storedTopClusters = careerDiscovery?.topClusters ?? [];
+  const topClusters =
+    appliedClusterId && !storedTopClusters.includes(appliedClusterId)
+      ? [appliedClusterId, ...storedTopClusters]
+      : storedTopClusters;
+
+  // When discovery is already complete the control's job shifts from
+  // completing it to backfilling the missing career cluster.
+  const isClusterBackfill = discoveryStatus === "complete";
+  const showDiscoveryControl =
+    discoveryStatus !== "complete" || needsClusterBackfill(discoveryStatus, topClusters);
+  const overrideFailureMessage = isClusterBackfill
+    ? "Could not record the career cluster."
+    : "Could not mark discovery complete.";
 
   async function handleDiscoveryOverride() {
     setOverridingDiscovery(true);
@@ -97,7 +214,7 @@ export default function OverviewTab({
       const res = await fetch(`/api/teacher/students/${student.id}/discovery`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "complete" }),
+        body: JSON.stringify(buildDiscoveryOverrideBody(overrideClusterId)),
       });
       if (!res.ok) {
         const payload: unknown = await res.json().catch(() => null);
@@ -107,14 +224,16 @@ export default function OverviewTab({
           "error" in payload &&
           typeof (payload as { error?: unknown }).error === "string"
             ? (payload as { error: string }).error
-            : "Could not mark discovery complete.";
+            : overrideFailureMessage;
         throw new Error(message);
       }
-      setDiscoveryOverridden(true);
+      if (!isClusterBackfill) setDiscoveryOverridden(true);
+      if (overrideClusterId !== NO_CLUSTER_VALUE) setAppliedClusterId(overrideClusterId);
       setConfirmDiscoveryOverride(false);
+      setOverrideClusterId(NO_CLUSTER_VALUE);
     } catch (error: unknown) {
       setDiscoveryOverrideError(
-        error instanceof Error ? error.message : "Could not mark discovery complete.",
+        error instanceof Error ? error.message : overrideFailureMessage,
       );
     } finally {
       setOverridingDiscovery(false);
@@ -361,11 +480,11 @@ export default function OverviewTab({
           {careerDiscovery?.sageSummary && (
             <p className="text-sm text-[var(--ink-strong)]">{careerDiscovery.sageSummary}</p>
           )}
-          {careerDiscovery && careerDiscovery.topClusters.length > 0 && (
+          {topClusters.length > 0 && (
             <div>
               <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
               <div className="flex flex-wrap gap-1.5 mt-1">
-                {careerDiscovery.topClusters.map((cluster) => (
+                {topClusters.map((cluster) => (
                   <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
                     {cluster.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                   </span>
@@ -376,7 +495,10 @@ export default function OverviewTab({
           {discoveryOverridden && (
             <p className="text-xs text-green-700">Discovery marked complete by staff.</p>
           )}
-          {discoveryStatus !== "complete" && (
+          {!discoveryOverridden && appliedClusterId && (
+            <p className="text-xs text-green-700">Career cluster recorded by staff.</p>
+          )}
+          {showDiscoveryControl && (
             <div className="pt-1">
               {!confirmDiscoveryOverride ? (
                 <button
@@ -386,31 +508,17 @@ export default function OverviewTab({
                   }}
                   className="rounded-lg border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
                 >
-                  Mark discovery complete
+                  {isClusterBackfill ? "Record career cluster" : "Mark discovery complete"}
                 </button>
               ) : (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                  <p className="text-sm text-emerald-900">
-                    This unblocks the student&apos;s next step when Sage never marked
-                    discovery complete automatically. The override is recorded in the
-                    audit log.
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={handleDiscoveryOverride}
-                      disabled={overridingDiscovery}
-                      className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {overridingDiscovery ? "Saving..." : "Confirm"}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDiscoveryOverride(false)}
-                      className="theme-card-subtle rounded-lg px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <DiscoveryOverridePanel
+                  isClusterBackfill={isClusterBackfill}
+                  clusterId={overrideClusterId}
+                  onClusterIdChange={setOverrideClusterId}
+                  saving={overridingDiscovery}
+                  onConfirm={handleDiscoveryOverride}
+                  onCancel={() => setConfirmDiscoveryOverride(false)}
+                />
               )}
               {discoveryOverrideError && (
                 <p className="mt-2 text-xs text-red-500">{discoveryOverrideError}</p>

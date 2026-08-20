@@ -143,9 +143,107 @@ describe("PATCH /api/teacher/students/[id]/discovery", () => {
     mockFindUnique.mock.mockImplementation(async () => ({
       status: "complete",
       completedAt: new Date("2026-06-01T12:00:00.000Z"),
+      topClusters: [],
     }));
 
     const res = await PATCH(makeRequest({ status: "complete" }), { params });
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.alreadyComplete, true);
+
+    assert.equal(mockUpsert.mock.callCount(), 0);
+    assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+  });
+
+  it("rejects a clusterId that is not a SPOKES career cluster", async () => {
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: "underwater-basket-weaving" }),
+      { params },
+    );
+    assert.equal(res.status, 400);
+    assert.equal(mockUpsert.mock.callCount(), 0);
+    assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+  });
+
+  it("records the picked cluster in topClusters when completing discovery", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "in_progress",
+      completedAt: null,
+      topClusters: [],
+    }));
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: "tech-digital" }),
+      { params },
+    );
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.alreadyComplete, false);
+
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.deepEqual(upsertArgs.update.topClusters, ["tech-digital"]);
+    assert.deepEqual(upsertArgs.create.topClusters, ["tech-digital"]);
+
+    const auditArgs = mockLogAuditEvent.mock.calls[0].arguments[0];
+    assert.equal(auditArgs.metadata.clusterId, "tech-digital");
+  });
+
+  it("puts the teacher's pick first without duplicating existing clusters", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "in_progress",
+      completedAt: null,
+      topClusters: ["office-admin"],
+    }));
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: "tech-digital" }),
+      { params },
+    );
+    assert.equal(res.status, 200);
+
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.deepEqual(upsertArgs.update.topClusters, ["tech-digital", "office-admin"]);
+  });
+
+  it("backfills a cluster onto an already-complete discovery", async () => {
+    const completedAt = new Date("2026-06-01T12:00:00.000Z");
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "complete",
+      completedAt,
+      topClusters: [],
+    }));
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: "customer-service" }),
+      { params },
+    );
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.alreadyComplete, true);
+
+    assert.equal(mockUpsert.mock.callCount(), 1);
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.deepEqual(upsertArgs.update.topClusters, ["customer-service"]);
+    // Backfilling a cluster must not move the original completion date.
+    assert.equal(upsertArgs.update.completedAt, completedAt);
+
+    assert.equal(mockLogAuditEvent.mock.callCount(), 1);
+    const auditArgs = mockLogAuditEvent.mock.calls[0].arguments[0];
+    assert.equal(auditArgs.metadata.clusterId, "customer-service");
+    assert.equal(auditArgs.metadata.previousStatus, "complete");
+  });
+
+  it("stays idempotent when the picked cluster is already recorded", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "complete",
+      completedAt: new Date("2026-06-01T12:00:00.000Z"),
+      topClusters: ["tech-digital"],
+    }));
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: "tech-digital" }),
+      { params },
+    );
     assert.equal(res.status, 200);
     const payload = await res.json();
     assert.equal(payload.alreadyComplete, true);
