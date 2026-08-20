@@ -29,13 +29,17 @@ function getSecret(): string {
   return secret;
 }
 
-/** Canonical JSON: sorted keys so semantically-equal args hash identically. */
+/** Canonical JSON: sorted keys so semantically-equal payloads hash identically.
+ *  Undefined-valued entries are omitted (like JSON.stringify), so an absent
+ *  optional field and an explicitly-undefined one sign the same — and neither
+ *  collides with an empty string. */
 function canonicalize(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalize).join(",")}]`;
   }
   if (value !== null && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, entryValue]) => entryValue !== undefined)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, entryValue]) => `${JSON.stringify(key)}:${canonicalize(entryValue)}`);
     return `{${entries.join(",")}}`;
@@ -43,18 +47,12 @@ function canonicalize(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** The signature input is the canonical JSON of the whole payload, never a
+ *  delimiter-joined field list — JSON quoting keeps every field boundary
+ *  unambiguous, and future payload fields are covered automatically. */
 function signatureFor(payload: ConfirmationPayload, expiresAt: number): string {
   return createHmac("sha256", getSecret())
-    .update(
-      [
-        payload.toolName,
-        canonicalize(payload.args),
-        payload.sessionId,
-        payload.conversationId,
-        payload.targetStudentId ?? "",
-        String(expiresAt),
-      ].join("|"),
-    )
+    .update(canonicalize({ ...payload, expiresAt }))
     .digest("hex");
 }
 
