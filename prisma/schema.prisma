@@ -1253,6 +1253,12 @@ model SageOperation {
   id            String   @id
   actorType     String // student | teacher | admin | system
   actorId       String
+  // The student the operation acted ON (actorType/actorId is the invoker).
+  // Equals actorId for student self-service writes; the target student for
+  // staff on-behalf-of writes. Null = legacy row (pre-2026-08) or no student
+  // target. No FK on purpose — like actorId, ledger rows must survive
+  // student offboarding.
+  targetStudentId String?
   toolName      String
   status        String // proposed | confirmed | executed | failed | rejected
   payload       Json
@@ -1261,6 +1267,7 @@ model SageOperation {
   updatedAt     DateTime @updatedAt
 
   @@index([actorType, actorId])
+  @@index([targetStudentId])
   @@index([toolName, status])
   @@schema("visionquest")
 }

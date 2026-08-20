@@ -351,6 +351,127 @@ describe("write tools — staff-assisted target binding", () => {
   // Note: a STUDENT supplying targetStudentId to /api/chat/tool-confirm is
   // rejected with 400 at the route itself (isStaffRole guard in
   // src/app/api/chat/tool-confirm/route.ts) before any verification runs.
+
+  it("teacher on-behalf-of execution ledgers the TARGET student, not just the teacher", async () => {
+    const token = createConfirmationToken(
+      {
+        toolName: "submit_form",
+        args: SUBMIT_ARGS,
+        sessionId: "teach-1",
+        conversationId: "conv-1",
+        targetStudentId: "stu-2",
+      },
+      new Date(),
+    );
+    await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      targetStudentId: "stu-2",
+      confirmedToken: token,
+    });
+
+    const executed = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .find((op: any) => op.status === "executed");
+    assert.ok(executed, "expected an executed ledger entry");
+    assert.equal(executed.actorType, "teacher");
+    assert.equal(executed.actorId, "teach-1");
+    assert.equal(executed.targetStudentId, "stu-2");
+  });
+
+  it("an unconfirmed teacher proposal also carries the target student", async () => {
+    await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      targetStudentId: "stu-2",
+    });
+
+    const proposed = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .find((op: any) => op.status === "proposed");
+    assert.ok(proposed, "expected a proposed ledger entry");
+    assert.equal(proposed.targetStudentId, "stu-2");
+  });
+
+  it("student self-service execution carries their own id as the target", async () => {
+    const token = createConfirmationToken(
+      { toolName: "submit_form", args: SUBMIT_ARGS, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    await executeAgentTool({
+      session: studentSession(),
+      conversationId: "conv-1",
+      toolName: "submit_form",
+      args: SUBMIT_ARGS,
+      confirmedToken: token,
+    });
+
+    const executed = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .find((op: any) => op.status === "executed");
+    assert.ok(executed, "expected an executed ledger entry");
+    assert.equal(executed.targetStudentId, "stu-1");
+  });
+});
+
+describe("ledger attribution — tools that act on no student", () => {
+  const CONFIG_ARGS = { key: "ai_provider", value: "local" };
+
+  beforeEach(() => {
+    mockRecordOperation.mock.resetCalls();
+  });
+
+  it("a staff chat's student target does not smear onto set_system_config's proposal", async () => {
+    // The executor threads one conversation-level target onto every call in
+    // the turn; a system-scope write must not claim that student was acted on.
+    await executeAgentTool({
+      session: { id: "admin-1", role: "admin" } as any,
+      conversationId: "conv-1",
+      toolName: "set_system_config",
+      args: CONFIG_ARGS,
+      targetStudentId: "stu-2",
+    });
+
+    const proposed = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .find((op: any) => op.status === "proposed");
+    assert.ok(proposed, "expected a proposed ledger entry");
+    assert.equal(proposed.targetStudentId, null);
+  });
+
+  it("nor onto its post-confirmation ledger rows", async () => {
+    const token = createConfirmationToken(
+      {
+        toolName: "set_system_config",
+        args: CONFIG_ARGS,
+        sessionId: "admin-1",
+        conversationId: "conv-1",
+        targetStudentId: "stu-2",
+      },
+      new Date(),
+    );
+    await executeAgentTool({
+      session: { id: "admin-1", role: "admin" } as any,
+      conversationId: "conv-1",
+      toolName: "set_system_config",
+      args: CONFIG_ARGS,
+      targetStudentId: "stu-2",
+      confirmedToken: token,
+    });
+
+    // The confirmed call ledgers executed (or failed, if the underlying
+    // config write can't run under these mocks) — either way the attribution
+    // rule is the same: no student target on a system-scope operation.
+    const post = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .filter((op: any) => op.status !== "proposed");
+    assert.ok(post.length >= 1, "expected a post-confirmation ledger entry");
+    for (const op of post) assert.equal(op.targetStudentId, null);
+  });
 });
 
 describe("save_job — class scoping", () => {
@@ -436,6 +557,14 @@ describe("write tools — role gating at the executor", () => {
 });
 
 describe("write tools — injection resistance", () => {
+  beforeEach(() => {
+    // Reset the counters this suite asserts on — earlier suites run
+    // successful executions that would otherwise leak into the counts.
+    mockProgressUpsert.mock.resetCalls();
+    mockGoalUpdate.mock.resetCalls();
+    mockFileFindFirst.mock.resetCalls();
+  });
+
   it("goal status outside the allowed transitions is rejected", async () => {
     const token = createConfirmationToken(
       { toolName: "update_goal_status", args: { goalId: "goal-1", status: "archived" }, sessionId: "stu-1", conversationId: "conv-1" },

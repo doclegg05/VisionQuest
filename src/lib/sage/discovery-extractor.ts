@@ -84,7 +84,7 @@ Common values: stability, creativity, independence, helping-others, income, grow
 Rules:
 - cluster_scores: score each SPOKES pathway 0.0 to 1.0 based on fit
 - Valid SPOKES cluster IDs: ${clusterIds}
-- stage_complete: true ONLY when the student has clearly confirmed or agreed to a career direction
+- stage_complete: true ONLY when the most recent student message explicitly confirms Sage's reflected profile or proposed direction, or explicitly corrects it into an agreed direction. Do NOT mark complete merely because Sage suggested a pathway, the extractor has enough signals, or the student expressed an interest earlier in the conversation.
 - A student immediately saying "I want to work in [specific field]" counts as stage_complete
 - stage_complete is false if the student is still exploring or hasn't confirmed
 - xp_events can include: "discovery_complete" (only when stage_complete is true)

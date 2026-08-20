@@ -69,4 +69,38 @@ describe("recordOperation", () => {
     assert.equal(auditArgs.action, "sage_tool.file_document.executed");
     assert.equal(auditArgs.targetId, "op-1-file-document");
   });
+
+  it("persists the acted-on student when targetStudentId is provided", async () => {
+    await recordOperation({
+      id: "op-2-submit-form",
+      actorType: "teacher",
+      actorId: "teach-1",
+      actorRole: "teacher",
+      toolName: "submit_form",
+      status: "executed",
+      payload: { fileUploadId: "file-1" },
+      resultSummary: "Filed on behalf of the student",
+      targetStudentId: "stu-2",
+    });
+
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.equal(upsertArgs.create.targetStudentId, "stu-2");
+    // Retry idempotency contract unchanged: update stays status/summary-only.
+    assert.deepEqual(Object.keys(upsertArgs.update).sort(), ["resultSummary", "status"]);
+  });
+
+  it("records null targetStudentId when the caller supplies none", async () => {
+    await recordOperation({
+      id: "op-3-save-job",
+      actorType: "student",
+      actorId: "stu-1",
+      actorRole: "student",
+      toolName: "save_job",
+      status: "executed",
+      payload: {},
+    });
+
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.equal(upsertArgs.create.targetStudentId, null);
+  });
 });

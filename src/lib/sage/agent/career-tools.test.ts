@@ -127,6 +127,33 @@ describe("propose_resume_edit", () => {
     assert.deepEqual(saved.skills, ["Customer service", "Forklift", "Excel"]);
   });
 
+  it("ledgers the student as the acted-on target on both proposal and execution", async () => {
+    await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "propose_resume_edit",
+      args: EDIT_ARGS,
+    });
+    const token = createConfirmationToken(
+      { toolName: "propose_resume_edit", args: EDIT_ARGS, sessionId: "stu-1", conversationId: "conv-1" },
+      new Date(),
+    );
+    await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "propose_resume_edit",
+      args: EDIT_ARGS,
+      confirmedToken: token,
+    });
+
+    const ops = mockRecordOperation.mock.calls.map((c: any) => c.arguments[0]);
+    const proposed = ops.find((op: any) => op.status === "proposed");
+    const executed = ops.find((op: any) => op.status === "executed");
+    assert.ok(proposed && executed, "expected proposed and executed ledger entries");
+    assert.equal(proposed.targetStudentId, "stu-1");
+    assert.equal(executed.targetStudentId, "stu-1");
+  });
+
   it("rejects sections outside the editable surface", async () => {
     const record = await executeAgentTool({
       session,
