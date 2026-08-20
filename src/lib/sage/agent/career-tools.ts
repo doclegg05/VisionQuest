@@ -155,6 +155,10 @@ const proposeResumeEdit: AgentTool = {
             args: toolArgs,
             conversationId: ctx.conversationId,
             summary,
+            // Must echo every field the token binds — the confirm route
+            // rebuilds the signed payload from this meta, so a dropped field
+            // fails verification. See confirmationGate for the same shape.
+            targetStudentId: ctx.targetStudentId,
           },
         },
         modelHint:
