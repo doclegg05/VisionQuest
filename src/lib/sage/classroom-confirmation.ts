@@ -2,6 +2,7 @@ import type { AIProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { retryWithBackoff } from "./retry";
+import { studentLogKey } from "@/lib/log-keys";
 
 /**
  * JSON contract the LLM returns when asked to inspect a single student turn
@@ -129,7 +130,7 @@ export async function detectAndRecordClassroomConfirmation(
   } catch (err) {
     // Never bubble — this is a background extractor. Log and move on.
     logger.error("Classroom confirmation detection failed", {
-      studentId,
+      student: studentLogKey(studentId),
       error: String(err),
     });
     return { confirmed: false, mismatch: false, noSignal: true };
@@ -253,7 +254,7 @@ async function raiseAlert(
     });
   } catch (err) {
     logger.error("Failed to raise classroom-confirmation alert", {
-      studentId,
+      student: studentLogKey(studentId),
       type,
       error: String(err),
     });

@@ -19,6 +19,7 @@ import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { topProactiveNudge } from "./proactivity";
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 const SNAPSHOT_TTL_SECONDS = 180;
 const STALLED_DAYS = 21;
@@ -194,7 +195,7 @@ export async function getSituationalSnapshot(studentId: string): Promise<string 
     });
   } catch (err) {
     logger.warn("Situational snapshot failed; continuing without it", {
-      studentId,
+      student: studentLogKey(studentId),
       error: err instanceof Error ? err.message : String(err),
     });
     return null;

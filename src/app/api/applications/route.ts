@@ -7,6 +7,7 @@ import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 import { logger } from "@/lib/logger";
 import { deleteFile } from "@/lib/storage";
 import { parseBody, opportunityApplicationSchema } from "@/lib/schemas";
+import { studentLogKey } from "@/lib/log-keys";
 
 const APPLIED_STATUSES = new Set(["applied", "interviewing", "offer"]);
 
@@ -49,7 +50,7 @@ async function cleanupDetachedGeneratedResumeFile(
     await deleteFile(generatedFile.storageKey);
   } catch (error) {
     logger.warn("Failed to delete detached generated resume from storage", {
-      studentId,
+      student: studentLogKey(studentId),
       fileId: generatedFile.id,
       storageKey: generatedFile.storageKey,
       error: String(error),
