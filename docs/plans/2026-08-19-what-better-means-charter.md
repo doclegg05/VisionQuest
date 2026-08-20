@@ -179,4 +179,17 @@ Three examples in the /goal format (End State, Proof, Constraints, Bound), for t
 
 ---
 
+## Execution status (2026-08-20)
+
+Britt approved all phases on 2026-08-20 with two amendments: no CareerOneStop API credentials yet (replaced by a student-reported results workflow), and the national cluster taxonomy updated 16 → 14. One agent-team run executed Phases 1 through 5 (~30 commits on `claude/visionquest-review-improve-1ac878`). Scorecard movement:
+
+- **Pillar 1**: orientation is journey step 0; one next signal (contract-tested); discovery dead-end closed (was unrepairable, not just mislabeled); welcome flow honest AND no longer self-destructing (root cause: redirects inferred newness from a side-effect row); day-1 journey + teacher-loop e2e specs gate CI.
+- **Pillar 2**: latency reported (p50/p95 per callSite) against a stated SLO; Gemini deadlines + Ollama stall guards; the tool-call silent-empty hole closed (empty is now an error everywhere); provider p95 bars checked on every report run.
+- **Pillar 3/5 (living agent)**: write-through cache invalidation — a native change reaches Sage's next reply; the strict freshness eval (6 FRESH) gates CI; Sage sees recent events and alerts in the prompt; the insight loop writes; memory extends to teacher subjects and operations; the briefing soak is one env var away with report + runbook. Bonus: fixed silent-dead memory extraction on the local FERPA path (json_object vs bare-array).
+- **Pillar 6 (pathways)**: student-reported COS results persist with provenance and replace inferred RIASEC; Career DNA labels its source; applications capture write-once pathway provenance; the pathway-vs-placement report exists; 14-cluster framework live with legacy normalization and an idempotent backfill; career eval coverage (watch tier) + cos-smoke ready for credentials day; corpus triage is a one-sitting workbench (463-row worksheet generated).
+- **Pillar 7**: all 48 over-ceiling strings rewritten (median 5.0, gate live in CI); help route + error fallbacks; authenticated a11y scans run as a soak lane (33-node violation inventory to burn down); e2e in CI for the first time.
+- **Pillar 8**: AI accountability report (FERPA provider-mix flag FIRED on dev: ai_provider=cloud), student memory view, SageOperation viewer, backup/restore runbook (Supabase excludes Storage from backups at every tier), classroom load test (15-student p50 projection 9.0 min — past the 300s timeout).
+
+Still owner-gated: COS credentials, SAGE_AUTOPILOT_ENABLED flip, reading-level ceiling decision (gate holds at 8; median already 5.0), prod provider-mix check, backup plan-tier verification + first restore drill, corpus triage sitting, a11y violation burn-down, OLLAMA_NUM_PARALLEL vs queue-UX decision, consent/retention items.
+
 *Presentation copy of this charter is published as the "What Better Means for VisionQuest" artifact. This file is the canonical draft; edits land here first.*
