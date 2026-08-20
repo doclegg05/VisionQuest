@@ -36,6 +36,7 @@ care as healthcare or financial records.
 - Server logs: no student identifier at any log level. Names and emails are the obvious cases, and `studentId` counts too, because it resolves to exactly one student's record for anyone who can also read the database. Log the staff `actorId`, the surface, and the error message instead
 - The failure path of `recordStudentView` in `src/lib/audit.ts` is the reference shape, and `src/lib/audit.test.ts` shows how to assert a log payload carries no student id
 - If a failure is genuinely undebuggable without a per-student key, log a salted hash of the id, never the raw value
+- Third-party error text quotes contact details (SMTP bounces quote the address, Twilio quotes the number), so wrap provider errors in `redactContactInfo` from `src/lib/log-redaction.ts` before logging them
 - Known gap: many `src/lib` call sites still put `studentId` in log payloads and predate this rule. Do not copy them. The sweep is tracked in `.claude/MEMORY.md` Open Items
 - Chat messages: stored in DB only, never logged to stdout or Sentry
 
