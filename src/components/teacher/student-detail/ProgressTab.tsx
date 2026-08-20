@@ -3,6 +3,7 @@ import type {
   PublicCredentialPageData,
 } from "./types";
 import { MemoryInspectorPanel } from "./MemoryInspectorPanel";
+import { SageActivityPanel } from "./SageActivityPanel";
 import {
   applicationStatusLabel,
   eventRegistrationStatusLabel,
@@ -391,6 +392,7 @@ export default function ProgressTab({
       </div>
 
       <MemoryInspectorPanel studentId={data.student.id} />
+      <SageActivityPanel studentId={data.student.id} />
     </div>
   );
 }
