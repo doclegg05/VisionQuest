@@ -70,6 +70,28 @@ describe("confirmation tokens", () => {
     assert.equal(verifyConfirmationToken(token, emptyTarget, NOW), false);
   });
 
+  it("signs a payload field named expiresAt distinctly from the token expiry", () => {
+    // If ConfirmationPayload ever grows an expiresAt field, it must be bound
+    // into the HMAC — not shadowed by the token-expiry entry.
+    const withField = { ...payload, expiresAt: 1 } as unknown as typeof payload;
+    assert.notEqual(
+      createConfirmationToken(withField, NOW),
+      createConfirmationToken(payload, NOW),
+    );
+  });
+
+  it("signs undefined array elements as null, like JSON.stringify", () => {
+    const withUndefined = { ...payload, args: { list: [undefined] } };
+    assert.notEqual(
+      createConfirmationToken(withUndefined, NOW),
+      createConfirmationToken({ ...payload, args: { list: [] } }, NOW),
+    );
+    assert.equal(
+      createConfirmationToken(withUndefined, NOW),
+      createConfirmationToken({ ...payload, args: { list: [null] } }, NOW),
+    );
+  });
+
   it("treats an explicitly-undefined targetStudentId as absent", () => {
     const token = createConfirmationToken(payload, NOW);
     assert.equal(
