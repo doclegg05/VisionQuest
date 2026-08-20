@@ -1466,6 +1466,13 @@ model CareerDiscovery {
   transferableSkills String?   @db.Text // JSON: [{skill, category, evidence}]
   workValues         String?   @db.Text // JSON: [{value, importance}]
   assessmentSummary  String?   @db.Text // 3-5 sentence instructor-facing summary
+  // Provenance of the RIASEC profile (string union by convention):
+  // sage_inferred | student_reported_cos | cos_api. Assessed sources
+  // (student_reported_cos, cos_api) must never be silently stomped back to
+  // inference by the discovery extractor — see src/lib/career-discovery.ts.
+  profileSource      String    @default("sage_inferred")
+  assessedAt         DateTime?
+  assessmentPayload  Json? // raw student-reported (or API) assessment results
   conversationId     String?
   completedAt        DateTime?
   createdAt          DateTime  @default(now())

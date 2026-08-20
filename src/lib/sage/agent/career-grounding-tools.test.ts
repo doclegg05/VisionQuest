@@ -136,6 +136,27 @@ describe("career grounding tools — execution", () => {
     assert.equal(calls.length, 0);
   });
 
+  it("not-configured hint offers the self-service Skills Matcher path alongside the instructor", async () => {
+    delete process.env.COS_USER_ID;
+    delete process.env.COS_API_TOKEN;
+    scriptFetch([new Error("must not fetch")]);
+
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "career_wages",
+      args: { occupation: "nurse" },
+    });
+    const hint = record.result.modelHint ?? "";
+    // Students without live COS credentials still have a real path: take the
+    // free Skills Matcher themselves and report results back to Sage.
+    assert.match(hint, /careeronestop\.org\/toolkit\/skills\/skills-matcher\.aspx/);
+    assert.match(hint, /record_assessment_results/);
+    assert.match(hint, /instructor/);
+    // Anti-fabrication clause stays word-for-word.
+    assert.match(hint, /Do NOT invent wages, job outlooks, or program names\./);
+  });
+
   it("401 (wrong token) becomes a friendly error that never leaks the credential", async () => {
     scriptFetch([new Response("denied", { status: 401 })]);
     const record = await executeAgentTool({

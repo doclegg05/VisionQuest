@@ -49,6 +49,8 @@ function buildRow(
     ]),
     sageSummary: "Synthetic summary for testing.",
     completedAt: new Date("2026-07-01T00:00:00Z"),
+    profileSource: "sage_inferred",
+    assessedAt: null,
     ...overrides,
   };
 }
@@ -99,6 +101,16 @@ describe("shapeCareerProfile", () => {
     const management = view.suggestedClusters[1];
     assert.equal(management.spokesLabel, null);
     assert.deepEqual(management.sampleJobs, []);
+  });
+
+  it("passes provenance through so the UI can label assessed vs inferred data", () => {
+    const assessedAt = new Date("2026-08-20T10:00:00Z");
+    const view = careerProfile.shapeCareerProfile(
+      buildRow({ profileSource: "student_reported_cos", assessedAt }),
+    );
+
+    assert.equal(view.discovery.profileSource, "student_reported_cos");
+    assert.equal(view.discovery.assessedAt, assessedAt);
   });
 
   it("reports full completeness when all four sections have signal", () => {

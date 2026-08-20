@@ -183,7 +183,8 @@ const RIASEC_KEYS: (keyof RiasecScores)[] = [
   "conventional",
 ];
 
-function computeHollandCode(scores: RiasecScores): string {
+/** Top-3 letter code from RIASEC scores (exported for assessed-profile writes). */
+export function computeHollandCode(scores: RiasecScores): string {
   return RIASEC_KEYS
     .filter((k) => scores[k] > 0)
     .sort((a, b) => scores[b] - scores[a])

@@ -29,6 +29,8 @@ const careerProfileSelect = {
   workValues: true,
   sageSummary: true,
   completedAt: true,
+  profileSource: true,
+  assessedAt: true,
 } satisfies Prisma.CareerDiscoverySelect;
 
 export type CareerDiscoveryRow = Prisma.CareerDiscoveryGetPayload<{
@@ -274,6 +276,8 @@ export function shapeCareerProfile(row: CareerDiscoveryRow): CareerProfileView {
       workValues,
       sageSummary: row.sageSummary,
       completedAt: row.completedAt,
+      profileSource: row.profileSource,
+      assessedAt: row.assessedAt,
     },
     isComplete: row.status === "complete",
     dimensions,
