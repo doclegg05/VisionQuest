@@ -418,6 +418,62 @@ describe("write tools — staff-assisted target binding", () => {
   });
 });
 
+describe("ledger attribution — tools that act on no student", () => {
+  const CONFIG_ARGS = { key: "ai_provider", value: "local" };
+
+  beforeEach(() => {
+    mockRecordOperation.mock.resetCalls();
+  });
+
+  it("a staff chat's student target does not smear onto set_system_config's proposal", async () => {
+    // The executor threads one conversation-level target onto every call in
+    // the turn; a system-scope write must not claim that student was acted on.
+    await executeAgentTool({
+      session: { id: "admin-1", role: "admin" } as any,
+      conversationId: "conv-1",
+      toolName: "set_system_config",
+      args: CONFIG_ARGS,
+      targetStudentId: "stu-2",
+    });
+
+    const proposed = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .find((op: any) => op.status === "proposed");
+    assert.ok(proposed, "expected a proposed ledger entry");
+    assert.equal(proposed.targetStudentId, null);
+  });
+
+  it("nor onto its post-confirmation ledger rows", async () => {
+    const token = createConfirmationToken(
+      {
+        toolName: "set_system_config",
+        args: CONFIG_ARGS,
+        sessionId: "admin-1",
+        conversationId: "conv-1",
+        targetStudentId: "stu-2",
+      },
+      new Date(),
+    );
+    await executeAgentTool({
+      session: { id: "admin-1", role: "admin" } as any,
+      conversationId: "conv-1",
+      toolName: "set_system_config",
+      args: CONFIG_ARGS,
+      targetStudentId: "stu-2",
+      confirmedToken: token,
+    });
+
+    // The confirmed call ledgers executed (or failed, if the underlying
+    // config write can't run under these mocks) — either way the attribution
+    // rule is the same: no student target on a system-scope operation.
+    const post = mockRecordOperation.mock.calls
+      .map((c: any) => c.arguments[0])
+      .filter((op: any) => op.status !== "proposed");
+    assert.ok(post.length >= 1, "expected a post-confirmation ledger entry");
+    for (const op of post) assert.equal(op.targetStudentId, null);
+  });
+});
+
 describe("save_job — class scoping", () => {
   beforeEach(() => {
     mockListingFindFirst.mock.resetCalls();
