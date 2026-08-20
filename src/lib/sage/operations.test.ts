@@ -204,13 +204,21 @@ describe("fetchOperationsForStudent", () => {
     );
   });
 
-  it("scopes to the student's own actor rows only", async () => {
+  it("scopes to the student's own actor rows plus staff on-behalf-of rows targeting them", async () => {
     mockFindMany.mock.mockImplementationOnce(async () => []);
 
     await fetchOperationsForStudent("stu-1", {});
 
     const query = mockFindMany.mock.calls[0].arguments[0];
-    assert.deepEqual(query.where, { actorType: "student", actorId: "stu-1" });
+    // Both clauses are load-bearing: the actor clause keeps legacy rows
+    // (targetStudentId NULL) and self-service writes visible; the target
+    // clause surfaces staff on-behalf-of writes for oversight.
+    assert.deepEqual(query.where, {
+      OR: [
+        { actorType: "student", actorId: "stu-1" },
+        { targetStudentId: "stu-1" },
+      ],
+    });
   });
 
   it("orders newest first", async () => {

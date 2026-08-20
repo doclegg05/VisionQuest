@@ -187,8 +187,17 @@ export async function fetchOperationsForStudent(
   const limit = Math.min(Math.max(options.limit ?? DEFAULT_OPERATION_PAGE_LIMIT, 1), MAX_OPERATION_PAGE_LIMIT);
   const page = Math.max(options.page ?? 1, 1);
 
+  // Two clauses, both required: actor-based matches legacy rows (targetStudentId
+  // NULL predates the 20260820120000 migration) and student self-service writes;
+  // targetStudentId picks up staff on-behalf-of writes (submit_form,
+  // file_document, update_goal_status invoked "as" a student from staff chat).
   const rows = await prisma.sageOperation.findMany({
-    where: { actorType: "student", actorId: studentId },
+    where: {
+      OR: [
+        { actorType: "student", actorId: studentId },
+        { targetStudentId: studentId },
+      ],
+    },
     select: {
       id: true,
       toolName: true,
