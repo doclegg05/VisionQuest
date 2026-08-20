@@ -16,6 +16,7 @@ import WelcomeFlow, {
   QuickWinCard,
   QuickWinsNav,
   ScoreCard,
+  ScoreSlot,
   createAutoAdvance,
   WELCOME_PATH_CHOICES,
   computeOrientationCompletionPercent,
@@ -559,4 +560,37 @@ describe("createAutoAdvance", () => {
     );
     assert.ok(/onClick=\{\(\) => goToStep\(/.test(source), "the flow should still navigate");
   });
+});
+
+describe("ScoreSlot", () => {
+  const card = { completedCount: 4, totalCount: 24, percent: 17 };
+
+  it("holds the card's space before it is revealed, so the navigation below never moves", () => {
+    // The card mounts either way; only its visibility changes. Measured in a
+    // browser at 375px, inserting it on reveal pushed "← Back" down 57px and
+    // put "Continue →" on the pixel Back had just vacated — a student
+    // reaching for Back as the save landed hit the opposite action.
+    const hidden = renderToString(<ScoreSlot shown={false} {...card} />);
+    const shown = renderToString(<ScoreSlot shown {...card} />);
+
+    // `invisible` is visibility:hidden, which reserves the box AND stays out
+    // of the accessibility tree — unlike opacity-0, which would announce the
+    // celebration before it is true.
+    assert.match(hidden, /class="invisible"/, "the unrevealed slot must still occupy its box");
+    assert.ok(!/class="invisible"/.test(shown), "the revealed slot must not stay hidden");
+    assert.ok(
+      hidden.includes("finished") && shown.includes("finished"),
+      "the card itself must be mounted in BOTH states — that is what reserves the height",
+    );
+  });
+
+  it("reserves the same box it will fill, so the reveal is a visibility change only", () => {
+    const hidden = renderToString(<ScoreSlot shown={false} {...card} />);
+    const shown = renderToString(<ScoreSlot shown {...card} />);
+
+    // Identical but for the wrapper's visibility class: same card, same
+    // content, therefore the same rendered height.
+    assert.equal(hidden.replace(' class="invisible"', ""), shown);
+  });
+
 });

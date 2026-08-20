@@ -329,6 +329,31 @@ export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProp
   );
 }
 
+interface ScoreSlotProps extends ScoreCardProps {
+  /** False until every quick win is done — the card is present either way. */
+  shown: boolean;
+}
+
+/**
+ * Holds the score card's space from the moment step 2 renders.
+ *
+ * The card appears ABOVE the navigation the instant the last save resolves.
+ * Inserting it at that moment pushed "← Back" down 57px (measured in a
+ * browser at 375px) and dropped "Continue →" onto the pixel Back had just
+ * vacated — so a student reaching for Back as the save landed hit the
+ * opposite action. Keeping the card mounted all along and only revealing it
+ * holds the row still. `invisible` is visibility:hidden, which also keeps the
+ * unrevealed copy out of the accessibility tree, so nothing is announced
+ * before it is true. Exported for tests.
+ */
+export function ScoreSlot({ shown, ...card }: ScoreSlotProps) {
+  return (
+    <div className={shown ? undefined : "invisible"}>
+      <ScoreCard {...card} />
+    </div>
+  );
+}
+
 interface QuickWinsNavProps {
   hasQuickWins: boolean;
   allWinsDone: boolean;
@@ -562,9 +587,11 @@ export default function WelcomeFlow({
               </div>
             )}
 
-            {/* Score card after all wins */}
-            {showScore && (
-              <ScoreCard
+            {/* Score card after all wins — its space is held from the start
+                so revealing it never moves the navigation below it. */}
+            {hasQuickWins && (
+              <ScoreSlot
+                shown={showScore}
                 completedCount={completedOrientationTotal}
                 totalCount={totalOrientationItems}
                 percent={scorePct}
