@@ -33,6 +33,6 @@
 
 ## Data Privacy
 - Students are TANF/SNAP recipients — PII handling is critical
-- No PII in server logs — Sentry configured to scrub sensitive fields
+- No PII in server logs — Sentry configured to scrub sensitive fields. This includes `studentId`, not just names and emails: it resolves to one student's record for anyone who can also read the database. Log the staff `actorId` and the surface instead (see `.claude/skills/student-data-privacy` for the reference shape)
 - Audit log captures who did what, but not the full data payload
 - File uploads go to Supabase Storage (not local FS) in production
