@@ -12,6 +12,11 @@ export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
   "goal-evidence": "coach",
   "goal-plans": "coach",
   "career-discovery": "coach",
+  // Follow-Up Tasks lives in OperationsTab's scope="coaching" render,
+  // which StudentDetail.tsx only mounts on the Coach tab (Admin mounts
+  // OperationsTab with scope="submittedForms", which does not render this
+  // section). Do not move this back to Admin without also moving the card.
+  "follow-up-tasks": "coach",
   // Progress tab anchors
   "orientation-review": "progress",
   "certification-review": "progress",
@@ -19,7 +24,6 @@ export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
   // Admin tab anchors
   "submitted-forms": "admin",
   "account-actions": "admin",
-  "follow-up-tasks": "admin",
 } as const;
 
 /**
