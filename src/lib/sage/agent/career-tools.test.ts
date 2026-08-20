@@ -77,10 +77,11 @@ mock.module("./rate-limit", {
 
 let executeAgentTool: typeof import("./executor").executeAgentTool;
 let createConfirmationToken: typeof import("./confirmation").createConfirmationToken;
+let verifyConfirmationToken: typeof import("./confirmation").verifyConfirmationToken;
 
 before(async () => {
   ({ executeAgentTool } = await import("./executor"));
-  ({ createConfirmationToken } = await import("./confirmation"));
+  ({ createConfirmationToken, verifyConfirmationToken } = await import("./confirmation"));
 });
 
 const session = { id: "stu-1", role: "student" } as any;
@@ -107,6 +108,39 @@ describe("propose_resume_edit", () => {
     assert.match(record.result.summary, /Customer service/); // shows current state
     assert.match(record.result.summary, /Forklift/); // shows proposal
     assert.equal(mockResumeUpsert.mock.callCount(), 0);
+  });
+
+  it("card meta carries every field its token binds", async () => {
+    // ConfirmToolCard posts back exactly the meta fields below, and
+    // /api/chat/tool-confirm rebuilds the signed payload from them. Anything
+    // the token binds but the card drops makes verification fail on confirm.
+    // ctx.targetStudentId is not reachable here today (the tool is
+    // student-only and only staff sessions get a target threaded), so this
+    // pins the invariant rather than a live flow — it is what breaks first if
+    // the tool ever becomes staff-capable.
+    const record = await executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "propose_resume_edit",
+      args: EDIT_ARGS,
+      targetStudentId: "stu-target-1",
+    });
+
+    const meta = (record.result.action?.meta ?? {}) as Record<string, unknown>;
+    assert.equal(
+      verifyConfirmationToken(
+        String(meta.token),
+        {
+          toolName: String(meta.toolName),
+          args: meta.args as Record<string, unknown>,
+          sessionId: session.id,
+          conversationId: String(meta.conversationId),
+          targetStudentId: meta.targetStudentId as string | undefined,
+        },
+        new Date(),
+      ),
+      true,
+    );
   });
 
   it("confirmed call applies the edit (skills append de-duplicates)", async () => {
