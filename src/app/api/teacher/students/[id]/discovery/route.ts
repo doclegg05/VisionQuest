@@ -5,6 +5,7 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
+import { recordDiscoveryOverrideMemory } from "@/lib/sage/memory/operation-memory";
 
 const CLUSTER_IDS = new Set(CAREER_CLUSTERS.map((cluster) => cluster.id));
 
@@ -88,6 +89,19 @@ export const PATCH = withTeacherAuth(async (
       completedAt: now,
       ...(clusterId ? { topClusters: [clusterId] } : {}),
     },
+  });
+
+  // Operation-sourced memory: this override is how a student stuck at the
+  // Discover step gets unblocked, and the cluster it sets steers every
+  // pathway suggestion afterward — Sage should not have to re-derive it from
+  // conversation. Fire-and-forget; a memory failure must not fail the
+  // override.
+  void recordDiscoveryOverrideMemory({
+    studentId: student.id,
+    clusterLabel: clusterId
+      ? CAREER_CLUSTERS.find((cluster) => cluster.id === clusterId)?.label ?? clusterId
+      : null,
+    at: now,
   });
 
   await logAuditEvent({

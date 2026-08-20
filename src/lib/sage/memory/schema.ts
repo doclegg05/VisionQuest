@@ -178,6 +178,47 @@ export const extractionItemSchema = memoryCandidateSchema
 export type ExtractionItem = z.infer<typeof extractionItemSchema>;
 
 /**
+ * Recover the item list from a model response that wrapped it in an object.
+ *
+ * The local provider requests OpenAI `json_object` mode
+ * (OllamaProvider.generateStructuredResponse), and that mode requires the top
+ * level of the response to be an OBJECT — a bare array is not valid JSON-object
+ * output. So a compliant local model has no way to answer "respond with ONLY a
+ * JSON array" literally, and returns `{"json": [...]}` or `{"memories": [...]}`
+ * instead. Before this unwrapping, every extraction on the local path produced
+ * zero memories AND zero rejections, which reads identically to "the student
+ * said nothing durable" — the failure was completely silent. Local is the
+ * FERPA-mandated path for student_record data, so that was the live behavior
+ * wherever ai_provider = local.
+ *
+ * Two shapes show up in practice, both measured against gemma4 through
+ * OllamaProvider:
+ *   {"json": [ {...}, {...} ]}   — the list, wrapped
+ *   {"kind": ..., "content": ...} — the list collapsed to its first item
+ *
+ * Deliberately conservative in both directions. Unwrap an array only when the
+ * object has exactly one array-valued property: two arrays means the shape is
+ * something this parser does not understand, and guessing which one holds the
+ * memories is how a "discarded" list ends up written to the DB. Treat a bare
+ * object as a single item only when it carries the item's own discriminating
+ * keys, so an arbitrary status object does not become a memory. Everything
+ * that survives here still passes extractionItemSchema afterward.
+ */
+function looksLikeExtractionItem(value: object): boolean {
+  return "content" in value && ("kind" in value || "category" in value);
+}
+
+function unwrapItemList(raw: unknown): unknown[] | null {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== "object" || raw === null) return null;
+
+  const arrays = Object.values(raw as Record<string, unknown>).filter(Array.isArray);
+  if (arrays.length === 1) return arrays[0] as unknown[];
+  if (arrays.length === 0 && looksLikeExtractionItem(raw)) return [raw];
+  return null;
+}
+
+/**
  * Parse a batch of raw model extraction items. Invalid entries are dropped
  * (reported in `rejected`), never thrown — extraction is best-effort.
  */
@@ -185,11 +226,12 @@ export function parseExtractionItems(raw: unknown): {
   accepted: ExtractionItem[];
   rejected: number;
 } {
-  if (!Array.isArray(raw)) return { accepted: [], rejected: 0 };
+  const items = unwrapItemList(raw);
+  if (!items) return { accepted: [], rejected: 0 };
 
   const accepted: ExtractionItem[] = [];
   let rejected = 0;
-  for (const entry of raw) {
+  for (const entry of items) {
     const result = extractionItemSchema.safeParse(entry);
     if (result.success) {
       accepted.push(result.data);

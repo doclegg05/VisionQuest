@@ -41,6 +41,7 @@ import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/
 import { withUsageLogging } from "@/lib/llm-usage";
 import { GOAL_PLANNING_STATUSES, isGoalLevel } from "@/lib/goals";
 import { extractGoals } from "@/lib/sage/goal-extractor";
+import { recordInsight } from "@/lib/sage/record-insight";
 import { proposeGoal } from "@/lib/sage/propose-goal";
 import { maybeCreateGoalProposalWager } from "@/lib/sage/propose-goal-wager";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
@@ -57,6 +58,7 @@ import {
   recordMonthlyReview,
 } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
+import { upsertDiscoveryFromExtraction } from "@/lib/career-discovery";
 import { logger } from "@/lib/logger";
 import { generateConversationTitle } from "./conversation";
 import type { ProgramType } from "@/lib/program-type";
@@ -491,21 +493,9 @@ async function runPostResponse(
 
         if (discoveryResult.stage_complete) {
           const top = topClusterIds(discoveryResult.cluster_scores);
-          await prisma.careerDiscovery.upsert({
-            where: { studentId },
-            create: {
-              studentId,
-              ...upsertData,
-              status: "complete",
-              topClusters: top,
-              completedAt: new Date(),
-            },
-            update: {
-              ...upsertData,
-              status: "complete",
-              topClusters: top,
-              completedAt: new Date(),
-            },
+          await upsertDiscoveryFromExtraction(studentId, upsertData, {
+            topClusters: top,
+            completedAt: new Date(),
           });
 
           // Update conversation stage to onboarding
@@ -524,11 +514,7 @@ async function runPostResponse(
             mutate: () => {},
           }).catch((err) => logger.error("Failed to award discovery XP", { error: String(err) }));
         } else {
-          await prisma.careerDiscovery.upsert({
-            where: { studentId },
-            create: { studentId, ...upsertData },
-            update: upsertData,
-          });
+          await upsertDiscoveryFromExtraction(studentId, upsertData);
         }
       } catch (err) {
         logger.error("Discovery extraction failed", { error: String(err) });
@@ -582,6 +568,40 @@ async function runPostResponse(
       programType,
       { studentId, conversationId, sourceMessageId: proposalSourceMessageId },
     );
+
+    // 1b. Close the insight loop (Tier A of the closed-loop plan): when the
+    // extraction flagged an observation, persist it as a SageInsight via
+    // recordInsight — the writer the SageInsightList UI and GET
+    // /api/sage/insights read from, which previously had NO caller in this
+    // pipeline. At most one per turn by schema (the extractor returns a
+    // single insight or null, validated at >0.7 confidence). Fire-and-forget:
+    // an insight is nice-to-have and must never block or fail the turn.
+    if (extracted.insight) {
+      const { category, content, confidence } = extracted.insight;
+      void recordInsight({
+        studentId,
+        category,
+        content,
+        invokedBy: studentId,
+        conversationId,
+        sourceMessageId: proposalSourceMessageId,
+        confidence,
+      })
+        .then((result) => {
+          if (result.status === "rejected") {
+            logger.warn("Sage insight rejected", {
+              conversationId,
+              reason: result.reason,
+            });
+          }
+        })
+        .catch((err) =>
+          logger.error("Failed to record Sage insight", {
+            conversationId,
+            error: String(err),
+          }),
+        );
+    }
 
     // 2. Create proposed goal records. Sage can suggest, but a human must
     // confirm before a goal joins the student's plan/progression.
