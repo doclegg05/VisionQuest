@@ -9,7 +9,11 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
 const listQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1).optional(),
+  // Same 10,000 upper bound as GET /api/student/memories — an unbounded page
+  // number lets a caller force an enormous OFFSET, which is a cheap way to
+  // put load on the DB for no legitimate reason (nobody pages 10,000 deep
+  // into their own ledger).
+  page: z.coerce.number().int().min(1).max(10_000).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT).optional(),
 });
 

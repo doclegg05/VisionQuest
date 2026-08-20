@@ -190,4 +190,27 @@ describe("GET /api/teacher/students/[id]/sage-operations", () => {
     assert.equal(res.status, 400);
     assert.equal(mockFetchOperationsForStudent.mock.callCount(), 0);
   });
+
+  it("rejects a page above the 10,000 bound with 400 (S2 — matches the memories route's page cap)", async () => {
+    const req = mockRequest("/api/teacher/students/stu-1/sage-operations", {
+      searchParams: { page: "10001" },
+    });
+    const res = await route.GET(req as never, { params } as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockFetchOperationsForStudent.mock.callCount(), 0);
+  });
+
+  it("accepts a page at the 10,000 bound", async () => {
+    const req = mockRequest("/api/teacher/students/stu-1/sage-operations", {
+      searchParams: { page: "10000" },
+    });
+    const res = await route.GET(req as never, { params } as never);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(mockFetchOperationsForStudent.mock.calls[0].arguments, [
+      "stu-1",
+      { page: 10000, limit: 20 },
+    ]);
+  });
 });

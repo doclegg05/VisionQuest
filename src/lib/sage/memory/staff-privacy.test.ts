@@ -52,6 +52,31 @@ describe("looksLikeStudentReference", () => {
     assert.equal(looksLikeStudentReference("Jasmine needs a bus pass this month."), true);
   });
 
+  it("rejects accented capitalized names (Unicode-aware token scan)", () => {
+    // The ASCII-only splitter (/[^A-Za-z'’-]+/) tore these apart at the
+    // accented letter, so neither "Ángel" nor "Émile" ever reached the
+    // capitalized-token check as a single token.
+    assert.equal(
+      looksLikeStudentReference("Ángel needs a bus pass and missed class twice this week."),
+      true,
+    );
+    assert.equal(looksLikeStudentReference("Émile lost his housing voucher."), true);
+  });
+
+  it("rejects a lowercase name followed by a possessive/circumstance marker", () => {
+    // A capital-only scan has nothing to catch here at all — the name was
+    // never capitalized. Covered as a targeted extension, not full lowercase
+    // name detection (see the module's documented residual).
+    assert.equal(
+      looksLikeStudentReference("jasmine needs a bus pass and is behind on her forms."),
+      true,
+    );
+  });
+
+  it("keeps rejecting a possessive circumstance sentence (regression guard)", () => {
+    assert.equal(looksLikeStudentReference("Maria's court date is Tuesday."), true);
+  });
+
   it("rejects a disclosure attributed to a student", () => {
     assert.equal(
       looksLikeStudentReference("A student disclosed a custody hearing on Thursday."),

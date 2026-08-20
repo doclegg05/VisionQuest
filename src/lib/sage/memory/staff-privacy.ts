@@ -18,6 +18,16 @@
  * costs one memory that the next conversation will re-state; keeping one
  * student fact is a privacy incident. When in doubt it rejects.
  *
+ * The proper-noun scan is Unicode-aware: tokens are split on \p{L} (letters
+ * in any script) rather than A-Za-z, and "capitalized" means \p{Lu}, so
+ * accented names (Ángel, Émile) are caught the same way ASCII ones are. A
+ * capital-only scan still misses a name that was never capitalized at all
+ * ("jasmine needs a bus pass…") — a narrow, documented extension flags a
+ * lowercase sentence-initial token paired with a personal pronoun elsewhere
+ * in the sentence, but a lowercase name with no pronoun anywhere still
+ * passes. See looksLikeStudentReference for the residual and why it isn't
+ * widened further.
+ *
  * Layer 1 is the extraction prompt (see staff-extract.ts). This is layer 2,
  * applied at write time. Layer 3 is the same function applied at render time
  * in retrieve.ts, so a row written by some other path — a manual correction, a
@@ -119,6 +129,25 @@ const STUDENT_CIRCUMSTANCE_RE =
   /\b(custody|eviction|evicted|homeless(?:ness)?|shelter|probation|parole|arrest(?:ed)?|incarcerat\w*|court date|hearing|diagnos\w*|medication|pregnan\w*|miscarriage|domestic|abuse|assault|addiction|relapse|sober\w*|overdose|suicid\w*|self-harm|depress\w*|anxiety attack|crisis|restraining order|divorce|foster care|child support|food stamps|benefits check|utility shutoff|back rent)\b/i;
 
 /**
+ * True when `token`, capitalized, is one of the safe sentence-openers.
+ * Distinguishes "usually" (an adverb someone forgot to capitalize) from
+ * "jasmine" (a name that was never capitalized at all) — both are lowercase
+ * at sentence-initial position, but only one is a legitimate opener.
+ */
+function isSafeWhenCapitalized(token: string): boolean {
+  const capitalized = token.charAt(0).toUpperCase() + token.slice(1);
+  return SAFE_CAPITALIZED_TOKENS.has(capitalized);
+}
+
+/**
+ * A personal pronoun anywhere in the sentence — the "possessive/circumstance
+ * marker" half of the lowercase-name heuristic below. None of these are ever
+ * capitalized mid-sentence in ordinary prose, so this does not overlap with
+ * the SAFE_CAPITALIZED_TOKENS check above.
+ */
+const PRONOUN_RE = /\b(his|hers?|theirs?|him|she|he|they)\b/iu;
+
+/**
  * True when `content` must not be stored as (or rendered from) a
  * teacher-subject memory. See the module header for the drop-biased rationale.
  */
@@ -129,12 +158,47 @@ export function looksLikeStudentReference(content: string): boolean {
   if (SUBJECT_DISCLOSURE_RE.test(content)) return true;
   if (STUDENT_CIRCUMSTANCE_RE.test(content)) return true;
 
-  for (const token of content.split(/[^A-Za-z'’-]+/)) {
-    if (!token) continue;
-    if (!/^[A-Z]/.test(token)) continue;
+  // Unicode-aware tokenizer: split on anything that is not a letter (in any
+  // script), apostrophe, or hyphen. The prior ASCII-only class
+  // (/[^A-Za-z'’-]+/) tore an accented capital like "Ángel" or "Émile" apart
+  // at the accent, so the capitalized-token check below never saw it as one
+  // token and let it through.
+  const tokens = content.split(/[^\p{L}'’-]+/u).filter(Boolean);
+
+  for (const token of tokens) {
+    // \p{Lu} is the Unicode "uppercase letter" category — covers accented
+    // capitals (Á, É, …) that /^[A-Z]/ misses entirely.
+    if (!/^\p{Lu}/u.test(token)) continue;
     // Strip a possessive so "Maria's" is judged as "Maria".
-    const bare = token.replace(/['’]s$/i, "");
+    const bare = token.replace(/['’]s$/iu, "");
     if (!SAFE_CAPITALIZED_TOKENS.has(bare)) return true;
+  }
+
+  // Lowercase-name residual: a capital-only scan has nothing to catch when a
+  // name is never capitalized ("jasmine needs a bus pass…"). Every
+  // legitimate staff-preference sentence opens with a capitalized verb or
+  // adverb (see SAFE_CAPITALIZED_TOKENS and the module header) — there is no
+  // documented legitimate shape with a lowercase opener — so a lowercase
+  // first token that is not a known safe word (even capitalized) AND is
+  // paired with a personal pronoun elsewhere in the sentence ("her forms",
+  // "his transportation") reads as an uncapitalized name plus a
+  // circumstance reference. This is deliberately narrow: it fires only on
+  // sentence-initial position, gated by isSafeWhenCapitalized to avoid
+  // flagging a merely-uncapitalized safe opener ("usually checks in with
+  // him…"). It is NOT full lowercase-name detection — a lowercase name with
+  // no pronoun anywhere in the sentence ("jasmine missed orientation
+  // Monday.") still passes. Widening this further (e.g. flagging any
+  // unrecognized lowercase word) risks rejecting ordinary staff prose that
+  // simply forgot to capitalize a non-name word, which is a worse failure
+  // mode for a drop-biased guard than the documented residual miss.
+  const firstToken = tokens[0];
+  if (
+    firstToken !== undefined &&
+    /^\p{Ll}/u.test(firstToken) &&
+    !isSafeWhenCapitalized(firstToken) &&
+    PRONOUN_RE.test(content)
+  ) {
+    return true;
   }
 
   return false;

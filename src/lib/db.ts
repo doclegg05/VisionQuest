@@ -278,5 +278,22 @@ export const prisma = appClient
  * Before Slice C (ADMIN_DATABASE_URL unset), this falls back to the
  * same DATABASE_URL as `prisma`, so callers get identical behavior
  * today and the eventual swap is a pure env-var change.
+ *
+ * *** WRITES THROUGH THIS CLIENT BYPASS THE CHAT-CONTEXT WRITE-THROUGH
+ * EXTENSION. *** `prismaAdmin` is `adminClient` directly — it is never
+ * `.$extends(chatContextWriteThroughExtension)` like `prisma` above is. A
+ * write to any model in STUDENT_SCOPED_MODEL_LIST / GLOBAL_MODEL_LIST /
+ * Conversation (see src/lib/chat-context-write-through.ts) made through
+ * `prismaAdmin` will NOT invalidate the student's cached `chat:*` context —
+ * Sage keeps serving stale data for up to the cache's TTL (180-600s).
+ * If you add or modify a `prismaAdmin` write that touches a watched model,
+ * you must hand-invalidate by calling `invalidateChatContext(studentId)` (or
+ * `invalidateAllChatContext()` for a batch/global write) yourself, right
+ * after the write resolves. Precedent: POST /api/internal/memory/consolidate
+ * (src/app/api/internal/memory/consolidate/route.ts) does exactly this for
+ * its `prismaAdmin.$executeRaw` SageMemory updates.
+ * (A lint rule to catch an unguarded watched-model write through
+ * `prismaAdmin` is a tracked follow-up, not yet implemented — this comment
+ * is the only enforcement today.)
  */
 export const prismaAdmin: PrismaClient = adminClient;

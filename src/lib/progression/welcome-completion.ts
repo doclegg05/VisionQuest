@@ -45,6 +45,12 @@ export async function fetchWelcomeRoutingFacts(
 /**
  * Record that the student finished the welcome flow by choosing a path.
  * Idempotent — returns false when the fact was already on the ledger.
+ *
+ * `rethrowOnFailure: true` (see events.ts) is required here: without it,
+ * `awardEvent` returns false on BOTH an idempotent repeat AND a genuine
+ * write failure, and the route above this call would answer 200 to a
+ * student whose completion was never actually recorded. Rethrowing lets the
+ * route's `withAuth` error handler surface a real 500 instead.
  */
 export async function recordWelcomeCompleted(
   studentId: string,
@@ -54,5 +60,6 @@ export async function recordWelcomeCompleted(
     studentId,
     ...WELCOME_COMPLETE_EVENT,
     metadata: { path },
+    rethrowOnFailure: true,
   });
 }

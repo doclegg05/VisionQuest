@@ -30,6 +30,12 @@
  * Usage:
  *   DATABASE_URL="..." npx tsx scripts/seed-e2e-users.ts
  *   DATABASE_URL="..." npx tsx scripts/seed-e2e-users.ts --clean
+ *   DATABASE_URL="..." npx tsx scripts/seed-e2e-users.ts --allow-remote
+ *
+ * W4: this seed creates accounts with passwords hard-coded in this repo
+ * (e2e/fixtures.ts), so it refuses to run against anything that doesn't
+ * look local or CI-scoped — see src/lib/e2e-seed-guard.ts. Pass
+ * --allow-remote to override (prints a loud warning naming the host).
  */
 
 import { loadEnvConfig } from "@next/env";
@@ -41,6 +47,7 @@ import {
   E2E_TEACHER,
 } from "../e2e/fixtures";
 import { resetStudentToDayOne } from "../e2e/helpers/db";
+import { assertSafeE2eSeedTarget } from "../src/lib/e2e-seed-guard";
 
 // Already-set process env always wins over .env.local — @next/env never
 // overrides existing variables, so CI / inline DATABASE_URL overrides work.
@@ -93,6 +100,11 @@ async function main() {
       "DATABASE_URL is not set — pass it inline or provide .env.local.",
     );
   }
+
+  const allowRemote = process.argv.includes("--allow-remote");
+  // Refuses a non-local, non-CI target BEFORE any connection is opened —
+  // see src/lib/e2e-seed-guard.ts for why (git-committed credentials).
+  assertSafeE2eSeedTarget(databaseUrl, { allowRemote });
 
   // Real auth helpers (scrypt) — imported lazily so env is loaded before
   // src/lib/db.ts (a transitive import of auth.ts) initializes.
