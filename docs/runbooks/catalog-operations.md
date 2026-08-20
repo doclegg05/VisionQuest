@@ -1,10 +1,38 @@
 # Catalog Operations Runbook
 
 Operator process for growing the OKF (org-knowledge) catalog and activating
-orphaned `ProgramDocument` rows for Sage RAG. As of 2026-07-02: 463 of 513
-`ProgramDocument` rows have `usedBySage=false`; the catalog has 22 approved
-nodes (18 forms + 3 documents, 0 certifications). This is the repeatable
-batch loop for closing that gap safely, a few documents at a time.
+orphaned `ProgramDocument` rows for Sage RAG. As of 2026-08-20 (re-measured —
+see Bulk backlog triage below): 463 of 530 `ProgramDocument` rows have
+`usedBySage=false`; the catalog has 22 approved nodes (18 forms + 3
+documents, 0 certifications). This is the repeatable batch loop for closing
+that gap safely, a few documents at a time, producing a fully curated
+catalog node per document.
+
+## Bulk backlog triage (fast path, no catalog node)
+
+The batch-activation loop below is the right process when a document is
+worth a permanent, hand-curated catalog node. Most of the 463-row backlog
+isn't that — it's dead LMS exports, teacher-only admin files, and slide
+decks with no extractable text that just need a disposition (keep it out of
+Sage's knowledge base on purpose, or flip it on) so "463 undecided" stops
+being an open item. For that pass, use the triage workbench:
+
+```
+tsx scripts/sage-rag-triage.mjs worksheet                # emits a TSV, one row per usedBySage:false doc
+tsx scripts/sage-rag-triage.mjs apply --file=<worksheet.tsv>                                    # dry run
+tsx scripts/sage-rag-triage.mjs apply --file=<worksheet.tsv> --commit --confirm=apply-sage-rag-triage
+```
+
+Fill in `disposition` (`activate`/`archive`/`exempt`) and `reason` per row,
+then apply. `activate` flips `usedBySage` the same way `sage:rag:activate`
+does (add `--embed` to also run the real embedding backfill in the same
+pass); `archive`/`exempt` record a short marker + reason in
+`sageContextNote` (there's no dedicated schema field — see the header
+comment in `scripts/sage-rag-triage.mjs` for why that field was chosen and
+how it stays safe from a later default `sage:rag:activate` run). Every
+`apply --commit` writes a rollback manifest, same convention as
+`sage-rag-activate.mjs`/`sage-rag-notes.mjs`. A doc worth real grounding
+prose can still graduate into the batch-activation loop afterward.
 
 ## Prerequisites
 
