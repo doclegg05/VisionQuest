@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "monthlyBudgetUsd": null,
+  "pricePerMtok": {},
+  "notes": {
+    "monthlyBudgetUsd": "No sponsor-approved monthly AI spend ceiling exists yet. docs/plans/funding-options-monthly-subscriptions.md asks a sponsor to pre-fund a year of usage with no monthly cost view to size that ask against — this file (plus scripts/sage-ai-accountability.mjs) is that view. Set this to a number once a budget is approved, or pass --budget=<usd> for a one-off check. Left null on purpose: a guessed ceiling would let a real overrun pass silently as 'under budget'.",
+    "pricePerMtok": "Deliberately empty. Per-model $/Mtok rates are NOT filled in because no verified billing figure for the live model (gemini-3.1-flash-lite, see DEFAULT_GEMINI_MODEL in src/lib/gemini.ts) or the embedding model (gemini-embedding-001) has been checked against Google's actual invoice or pricing page for this account. Shipping a guessed number here would look like verified cost data in a report whose whole purpose is trustworthy accounting. Two ways to fill this in: (1) add entries here once real pricing is confirmed, keyed by the exact `model` string as it appears in LlmCallLog rows (e.g. \"gemini\", \"gemini-embedding-001\", \"ollama\") — value is either a flat number (USD per 1M total tokens) or an {\"input\":X,\"output\":Y} object (USD per 1M input/output tokens separately, when the provider prices them differently); (2) pass --price-per-mtok=<usd> on a single run for a rough flat-rate estimate across every model, matching the flag scripts/sage-usage-summary.mjs already uses. Until either is supplied, the report shows token counts and run-rate projections but marks the dollar cost column 'n/a (no price configured)' rather than fabricating a figure."
+  }
+}
