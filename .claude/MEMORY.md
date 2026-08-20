@@ -32,6 +32,7 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 - **Where we left off**: PR #149 open against `main`, rebased onto #147/#148 (MEMORY.md conflict resolved by keeping both entries). Note for whoever runs local evals next: the 26b model was unloaded to free the GPU (`ollama stop gemma4:26b-a4b-it-qat`) because 15 GB + 9.6 GB do not co-reside, and requests stall swapping models.
 
 ## Open Items
+- [ ] No-PII-in-logs sweep (follow-up to the 2026-08-20 audit.ts fix): 27 logger sites in src/lib still put `studentId` in server-log payloads — notifications.ts:168/170/187 also log the email destination and phone number (direct PII, fix first regardless). Before sweeping, resolve the policy conflict: `.claude/skills/student-data-privacy` ("use student IDs, never names/emails" in logs) sanctions bare studentId while the 2026-08-20 audit treats it as PII to remove — update one or the other. Full site list re-derivable by parsing multi-line `logger.*` payloads for `studentId` (grep context lines overcount). Consider an ESLint `no-restricted-syntax` guard once swept
 - [ ] **USER**: confirm retention durations in docs/DATA_RETENTION_POLICY.md (OWNER-CONFIRM markers)
 - [ ] Product call: exempt or supply a PDF for `ai-data-consent` (release-of-information packet now ends pending-verification)
 - [ ] Decide whether StudentSavedJob should carry verification fields (Application is covered)
