@@ -77,8 +77,11 @@ export async function recordStudentView(input: StudentViewInput): Promise<void> 
     });
   } catch (error: unknown) {
     // Read auditing must never break or delay the request that triggered it.
+    // No student identifier here: server logs must stay PII-free
+    // (.claude/rules/security.md); actor + surface localize the failure.
     logger.warn("recordStudentView failed", {
-      targetStudentId: input.targetStudentId,
+      actorId: input.actorId,
+      actorRole: input.actorRole,
       surface: input.surface,
       error: error instanceof Error ? error.message : String(error),
     });
