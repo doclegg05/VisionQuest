@@ -15,6 +15,7 @@ import WelcomeFlow, {
   PathChoiceCard,
   QuickWinCard,
   QuickWinsNav,
+  SCORE_ADVANCE_DELAY_MS,
   ScoreCard,
   ScoreSlot,
   createAutoAdvance,
@@ -506,6 +507,26 @@ describe("QuickWinsNav", () => {
 // otherwise drag them back out of wherever they went. An escape hatch you get
 // pulled out of is not an escape hatch.
 // ---------------------------------------------------------------------------
+
+describe("SCORE_ADVANCE_DELAY_MS", () => {
+  // Owner call, 2026-08-20. The score card is the student's only confirmation
+  // that their first quick-win saved, and at this program's grade-5 reading
+  // level two seconds did not cover one sentence plus a count — the
+  // celebration was gone before it was read. A floor, not an equality: raising
+  // it later is fine, quietly trimming it back to "feels snappier" is not.
+  const READING_FLOOR_MS = 8000;
+
+  it("holds the card long enough to read it", () => {
+    assert.ok(
+      SCORE_ADVANCE_DELAY_MS >= READING_FLOOR_MS,
+      `the score card must hold at least ${READING_FLOOR_MS}ms, got ${SCORE_ADVANCE_DELAY_MS}`,
+    );
+  });
+
+  it("still ends — an advance that never fires strands the student on step 2", () => {
+    assert.ok(Number.isFinite(SCORE_ADVANCE_DELAY_MS) && SCORE_ADVANCE_DELAY_MS > 0);
+  });
+});
 
 describe("createAutoAdvance", () => {
   function fakeClock() {

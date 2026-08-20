@@ -23,8 +23,20 @@ interface WelcomeFlowProps {
 
 const TOTAL_STEPS = 4;
 
-/** How long the score card holds before the flow moves on. */
-const SCORE_ADVANCE_DELAY_MS = 2000;
+/**
+ * How long the score card holds before the flow moves on.
+ *
+ * Eight seconds, not two (owner call, 2026-08-20). The card is the student's
+ * only confirmation that their first quick-win actually saved, and at the
+ * grade-5 reading level this program serves, two seconds did not cover reading
+ * one sentence and a count — the celebration was gone before it was read. The
+ * timer stays because the student can already leave sooner: QuickWinsNav is on
+ * screen the whole time and every manual navigation revokes this advance.
+ *
+ * Exported so the floor is testable — this is a product decision, not a tuning
+ * knob to trim when something feels slow.
+ */
+export const SCORE_ADVANCE_DELAY_MS = 8000;
 
 type ScheduleFn = (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
 type CancelFn = (handle: ReturnType<typeof setTimeout>) => void;
