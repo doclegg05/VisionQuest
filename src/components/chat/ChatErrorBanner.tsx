@@ -2,6 +2,13 @@ import Link from "next/link";
 
 interface ChatErrorBannerProps {
   message: string;
+  /**
+   * Where this viewer's settings actually live (`getRoleSettingsPath`).
+   * Staff chat renders inside the (teacher) group, and `/settings` bounces
+   * them back out, so the href cannot be hardcoded. `null` means the role has
+   * no settings surface — render no link rather than a redirect.
+   */
+  settingsHref?: string | null;
 }
 
 function isApiKeyIssue(message: string): boolean {
@@ -15,7 +22,7 @@ function isApiKeyIssue(message: string): boolean {
  * render carries a second path out: the Help page, and a reminder that a
  * teacher is always a valid fallback.
  */
-export function ChatErrorBanner({ message }: ChatErrorBannerProps) {
+export function ChatErrorBanner({ message, settingsHref = "/settings" }: ChatErrorBannerProps) {
   const apiKeyIssue = isApiKeyIssue(message);
 
   return (
@@ -24,9 +31,9 @@ export function ChatErrorBanner({ message }: ChatErrorBannerProps) {
       className="mx-4 mb-2 rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-4 py-3 text-sm text-[var(--chat-error-text)]"
     >
       <p>{message}</p>
-      {apiKeyIssue && (
+      {apiKeyIssue && settingsHref && (
         <Link
-          href="/settings"
+          href={settingsHref}
           prefetch={false}
           className="mt-2 inline-block font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
         >

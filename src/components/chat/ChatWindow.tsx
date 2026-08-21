@@ -15,6 +15,7 @@ import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
+import { getRoleSettingsPath } from "@/lib/role-home";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
 import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome";
 import { useProgression } from "@/components/progression/ProgressionProvider";
@@ -745,7 +746,9 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           </div>
         )}
 
-        {chatError && <ChatErrorBanner message={chatError} />}
+        {chatError && (
+          <ChatErrorBanner message={chatError} settingsHref={getRoleSettingsPath(role)} />
+        )}
 
         <ChatInput onSend={handleSend} disabled={isLoading} role={role} />
       </div>
