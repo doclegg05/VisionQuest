@@ -22,7 +22,7 @@ export interface ClassroomConfirmationResult {
   noSignal: boolean;
 }
 
-const DETECTION_PROMPT = `You analyze a single turn from a student talking with Sage (an AI mentor). Determine whether the student just identified their classroom (either explicitly, by instructor name, or by day/time). Sage asked them one turn earlier.
+export const DETECTION_PROMPT = `You analyze a single turn from a student talking with Sage (an AI mentor). Determine whether the student just identified their classroom (either explicitly, by instructor name, or by day/time). Sage asked them one turn earlier.
 
 Return valid JSON in this exact format:
 {

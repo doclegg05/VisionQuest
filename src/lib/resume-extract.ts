@@ -28,7 +28,7 @@ export async function extractTextFromFile(buffer: Buffer, mimeType: string): Pro
   throw new Error("Unsupported file type. Upload a PDF or Word document.");
 }
 
-const EXTRACT_PROMPT = `You are an expert resume parser. Extract structured resume data from the raw text provided.
+export const EXTRACT_PROMPT = `You are an expert resume parser. Extract structured resume data from the raw text provided.
 
 Rules:
 - Extract ALL information faithfully — names, dates, employers, titles, skills, education, certifications.

@@ -9,6 +9,13 @@
  * Usage:
  *   const { provider, label } = await resolveEvalProvider();
  *   const { provider, label } = await resolveEvalProvider(["--provider=ollama"]);
+ *   const { provider, label } = await resolveEvalProvider(["--provider=ollama", "--model=gemma4:e4b"]);
+ *
+ * `--provider` selects the provider CLASS; `--model` selects the model tag
+ * within it, overriding OLLAMA_MODEL / GEMINI_MODEL. This is the single
+ * chokepoint every model-driving eval resolves through, so a model flag added
+ * here reaches all of them — which is what makes a per-model bake-off possible
+ * without mutating global configuration between arms.
  */
 
 export async function resolveEvalProvider(argvOrEnv = process.argv.slice(2)) {
@@ -16,32 +23,52 @@ export async function resolveEvalProvider(argvOrEnv = process.argv.slice(2)) {
   const requested = (flag ? flag.slice("--provider=".length) : process.env.SAGE_EVAL_PROVIDER || "gemini")
     .trim()
     .toLowerCase();
+  const modelOverride = readModelOverride(argvOrEnv);
 
   if (requested === "ollama") {
-    return resolveOllamaProvider();
+    return resolveOllamaProvider(modelOverride);
   }
   if (requested !== "gemini") {
     throw new Error(`Unknown --provider "${requested}" — expected "gemini" or "ollama".`);
   }
-  return resolveGeminiProvider();
+  return resolveGeminiProvider(modelOverride);
 }
 
-async function resolveGeminiProvider() {
+/**
+ * `--model=<tag>`. Returns null when absent so each provider keeps its own
+ * env default; an explicitly empty `--model=` is a mistake worth surfacing
+ * rather than silently ignoring.
+ */
+export function readModelOverride(argvOrEnv = process.argv.slice(2)) {
+  const flag = argvOrEnv.find((arg) => arg.startsWith("--model="));
+  if (!flag) return null;
+  const value = flag.slice("--model=".length).trim();
+  if (!value) throw new Error("--model= was passed with no model tag.");
+  return value;
+}
+
+async function resolveGeminiProvider(modelOverride = null) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY missing — required for --provider=gemini.");
   }
+  // GeminiProvider reads its model from the GEMINI_MODEL env var at import
+  // time, so a --model override has to be written back into the environment
+  // rather than passed as an argument.
+  if (modelOverride) process.env.GEMINI_MODEL = modelOverride;
   const { GeminiProvider } = await import("../../src/lib/ai/gemini-provider.ts");
   const provider = new GeminiProvider(apiKey);
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
-  return { provider, label: `gemini (${model})` };
+  return { provider, model, label: `gemini (${model})` };
 }
 
-async function resolveOllamaProvider() {
+async function resolveOllamaProvider(modelOverride = null) {
   const url = process.env.OLLAMA_URL?.trim();
-  const model = process.env.OLLAMA_MODEL?.trim();
+  const model = modelOverride || process.env.OLLAMA_MODEL?.trim();
   if (!url) throw new Error("OLLAMA_URL missing — required for --provider=ollama.");
-  if (!model) throw new Error("OLLAMA_MODEL missing — required for --provider=ollama.");
+  if (!model) {
+    throw new Error("OLLAMA_MODEL missing — required for --provider=ollama (or pass --model=).");
+  }
 
   const { OllamaProvider } = await import("../../src/lib/ai/ollama-provider.ts");
   const { resolveLocalAiAuthMode } = await import("../../src/lib/ai/local-auth.ts");
@@ -63,5 +90,5 @@ async function resolveOllamaProvider() {
   };
 
   const provider = new OllamaProvider(url, model, authConfig);
-  return { provider, label: `ollama (${model} @ ${url})` };
+  return { provider, model, url, label: `ollama (${model} @ ${url})` };
 }

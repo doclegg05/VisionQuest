@@ -441,10 +441,16 @@ export class OllamaProvider implements AIProvider {
   private static readonly STRUCTURED_MAX_OUTPUT_TOKENS = 512;
 
   /**
-   * How long Ollama should keep the model resident in VRAM after a request.
+   * How long Ollama should keep the model resident after a request.
    * Set to 8h to cover the SPOKES workday (7:30 AM – 3:30 PM) so the model
    * stays warm between messages instead of unloading after each idle gap.
    * Pair with the "Sage Model Warmup" scheduled task to pre-load on login.
+   *
+   * REACHES THE SERVER ONLY ON THE NATIVE SURFACE. Ollama's OpenAI-compatible
+   * /v1/chat/completions ignores `keep_alive` (ollama/ollama#11458), and
+   * `postChat` tries /v1 first, so on a stock Ollama this value is inert
+   * unless the instance is pinned to native — see `pinnedToNativeForKeepAlive`.
+   * Residency there is governed by the host's OLLAMA_KEEP_ALIVE instead.
    */
   private static readonly KEEP_ALIVE = "8h";
 
@@ -463,6 +469,18 @@ export class OllamaProvider implements AIProvider {
   static readonly SECONDARY_KEEP_ALIVE = "5m";
 
   private readonly keepAlive: string;
+  /**
+   * True when this instance was given an explicit keep-alive and must
+   * therefore talk to /api/chat, the only surface that applies it.
+   *
+   * The cost is real and worth stating: the native surface hides
+   * `finish_reason`, so a turn that ends in an undeclared tool call comes back
+   * as an empty string with no signal (see .claude/MEMORY.md). That is
+   * acceptable for the background roles this applies to — their prompts
+   * advertise no tools — and `done_reason: "length"` still surfaces
+   * truncation, which is the failure mode those roles actually hit.
+   */
+  private readonly pinnedToNativeForKeepAlive: boolean;
   private readonly structuredMaxOutputTokens: number;
 
   /**
@@ -540,7 +558,18 @@ export class OllamaProvider implements AIProvider {
       typeof explicitStallTimeout === "number" && explicitStallTimeout > 0
         ? explicitStallTimeout
         : OllamaProvider.STREAM_STALL_TIMEOUT_MS;
-    this.keepAlive = structuredConfig?.keepAlive?.trim() || OllamaProvider.KEEP_ALIVE;
+    const explicitKeepAlive = structuredConfig?.keepAlive?.trim();
+    this.keepAlive = explicitKeepAlive || OllamaProvider.KEEP_ALIVE;
+    // A caller that asked for a specific residency gets the only surface that
+    // honors it. /v1 silently drops `keep_alive`, which would leave a
+    // background role's model resident on the host default and holding memory
+    // against the model students are waiting on — the starvation this option
+    // exists to prevent. Skipped for `apiStyle: "openai"` endpoints (LM Studio,
+    // vLLM), which have no /api/chat at all and no residency semantics to fix.
+    this.pinnedToNativeForKeepAlive = Boolean(explicitKeepAlive) && !this.openAiOnly;
+    if (this.pinnedToNativeForKeepAlive) {
+      this.apiMode = "native";
+    }
     const explicitStructuredMax = structuredConfig?.structuredMaxOutputTokens;
     this.structuredMaxOutputTokens =
       typeof explicitStructuredMax === "number" && explicitStructuredMax > 0

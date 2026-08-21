@@ -47,6 +47,7 @@
     "sage:freshness:eval": "tsx scripts/sage-freshness-eval.mjs",
     "sage:briefing:report": "node scripts/sage-briefing-report.mjs",
     "sage:load:test": "tsx scripts/sage-load-test.mjs",
+    "sage:model:bakeoff": "tsx scripts/sage-model-bakeoff.mjs",
     "sage:ai:accountability": "node scripts/sage-ai-accountability.mjs",
     "sage:rag:triage:worksheet": "tsx scripts/sage-rag-triage.mjs worksheet",
     "sage:rag:triage:apply": "tsx scripts/sage-rag-triage.mjs apply",
