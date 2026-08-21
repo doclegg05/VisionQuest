@@ -1,3 +1,7 @@
+---
+name: deploy
+description: Deploying VisionQuest to Render — build and start commands, standalone output mode, env vars, migration-on-deploy, and post-deploy verification. Use when shipping to production or debugging a deploy.
+---
 # Deploy Skill
 
 Automatically invoked for deployment-related tasks.

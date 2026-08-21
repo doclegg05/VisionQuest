@@ -113,6 +113,13 @@ Review → Ship. Rendered flowchart: `docs/diagrams/ci-pipeline.md`.
     unvalidated input? dead code? weakened tests?).
   - Remaining MEDIUM/LOW review findings.
   - `Closes #<n>` when issue-sourced.
+- **Update the handoff** before finishing: rewrite `Current Status` and
+  `Last Session` in `.claude/MEMORY.md` (the project memory `CLAUDE.md`
+  imports), reconcile `Open Items` this run closed or uncovered, and append a
+  `Key Decisions Log` row for anything the plan gate settled. Committed on the
+  branch as a `docs:` commit so it lands in the same draft PR. An unattended
+  run must never end with a fresh PR and a stale handoff — the handoff is the
+  only artifact the *next* session reads.
 - The PR stays a **draft**; the pipeline **never merges**. Marking ready and
   merging is the owner's Ship action; Render auto-deploys `main`.
 
@@ -167,3 +174,8 @@ it stays with the orchestrator.
 7. The command references the named reusable agents by their
    `.claude/agents/` paths (scout, builder, gate-runner, code-reviewer) so the
    roles are identifiable and shareable across the `<gate>-pipeline` family.
+8. The Ship stage instructs a `.claude/MEMORY.md` handoff update naming at
+   least `Current Status` and `Last Session`, committed on the branch (added
+   2026-07-27, after a memory-system review found no pipeline step touched
+   project memory — an unattended run could deliver a PR and leave the next
+   session reading a stale handoff).

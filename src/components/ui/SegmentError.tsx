@@ -41,17 +41,25 @@ export function SegmentError({
       <div className="flex gap-3">
         <button
           onClick={reset}
-          className="rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           Try again
         </button>
         <a
           href={backHref}
-          className="rounded-full border border-[var(--border)] px-5 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
+          className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] px-5 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
         >
           {backLabel}
         </a>
       </div>
+      {/* Shared across every student segment: a page that failed to load is
+          a dead end on its own — give it a way to the Help page too. */}
+      <a
+        href="/help"
+        className="text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
+      >
+        Still stuck? Visit the Help page.
+      </a>
     </div>
   );
 }

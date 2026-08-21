@@ -5,6 +5,7 @@ import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
 import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
+import { recordGoalConfirmationMemory } from "@/lib/sage/memory/operation-memory";
 
 export const PATCH = withTeacherAuth(async (
   session,
@@ -89,6 +90,20 @@ export const PATCH = withTeacherAuth(async (
   });
 
   invalidatePrefix(`goals:${studentId}`);
+
+  // Operation-sourced memory: a confirmation is the moment a proposal becomes
+  // the student's real plan, and Sage was blind to it until now. Templated,
+  // idempotent on the goal id, and fire-and-forget — a memory failure must
+  // never fail the teacher's confirmation.
+  if (updates.confirmedAt) {
+    void recordGoalConfirmationMemory({
+      studentId,
+      goalId: updatedGoal.id,
+      level: updatedGoal.level,
+      content: updatedGoal.content,
+      at: updates.confirmedAt,
+    });
+  }
 
   if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
     await ensureGoalLevelProgression(studentId, [updatedGoal.level]);

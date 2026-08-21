@@ -8,7 +8,8 @@ The primary agent MUST read this CLAUDE.md first, then follow the Documentation 
 Agents should read docs based on what they are doing. Do not read everything — follow the routing below.
 
 ### Level 0: Always Read First
-- **This file (CLAUDE.md)** — project overview, architecture, operating rules, key decisions
+- **This file (CLAUDE.md)** — project overview, operating rules, production environment, design context
+- **[.claude/MEMORY.md](./.claude/MEMORY.md)** — project state and handoff: current status, last session, open items, engineering decisions log, architecture notes, known issues (imported below, so it loads with this file)
 
 ### Level 1: Product-Shaping Work
 Read before any change that affects what users see or how workflows behave.
@@ -30,68 +31,41 @@ Read when deciding what to build, cut, simplify, or automate.
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
 | SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| Recursive self-improving loop (Ouroboros) — **DRAFT** | [docs/plans/self-improving-loop-architecture.md](./docs/plans/self-improving-loop-architecture.md) |
+| Org-knowledge catalog (OKF) + the two agent memory systems | [docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md](./docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md) |
+| `<gate>-pipeline` command contracts (CI-enforced) | [docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md](./docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md) |
+
+### Level 4: The dated plan/spec corpus — search it, don't enumerate it
+`docs/plans/` and `docs/superpowers/{plans,specs}/` hold ~80 dated working documents. They are
+deliberately NOT listed here — listing them would bloat every session — but they are load-bearing,
+and an agent that doesn't know they exist will draw confident, incomplete conclusions.
+
+- **Naming**: `YYYY-MM-DD-<slug>.md`. A `plans/` file and its `specs/` counterpart usually pair up.
+- **Status**: point-in-time records, not current state. On any conflict, `.claude/MEMORY.md` and
+  `docs/PRODUCT_DECISIONS.md` win. A doc may describe something planned, deferred, or since undone —
+  verify against the code before treating it as fact.
+- **Before architecture, memory, or AI-infrastructure work, grep the corpus first**:
+  `grep -ril "<subject>" docs/plans docs/superpowers`
+  Do not declare a survey of any such subject complete without running it. This rule exists because a
+  2026-07-27 review of the memory system mapped six layers and called the map complete, having missed
+  two more that were described only here (MemPalace, CodeGraph).
 
 ### Archived (do not read unless explicitly asked)
 - `docs/archive/GAMIFICATION_BACKLOG.md` — frozen planning artifact
 - `docs/archive/SETUP_WIZARD_PLAN.md` — frozen planning artifact
 
-## Project Overview
-- **Name**: VisionQuest
-- **Description**: AI-coach-driven program portal for SPOKES workforce development (adults on TANF/SNAP). AI coach named "Sage" guides students through goal-setting, orientation, certification tracking, portfolio building, and employability skills.
-- **Tech stack**: Next.js 16 (App Router), TypeScript, Prisma 6, Supabase (PostgreSQL + Storage), Google Gemini 3.1 Flash Lite, Tailwind CSS 4, Sentry
-- **Hosting**: Render.com (free tier)
-- **Repo**: https://github.com/doclegg05/VisionQuest.git
-- **Live URL**: https://visionquest.onrender.com
+## Project Memory (state, handoff, engineering decisions)
+The live handoff — current status, last session, open items, engineering decisions log, architecture notes, and known issues — is maintained in `.claude/MEMORY.md` and imported here so it loads with this file. Update it at the end of every session.
 
-## Architecture Notes
-- Auth: JWT in httpOnly cookies (SameSite=strict), scrypt password hashing (legacy PBKDF2 rehashed on login), TOTP MFA, `sessionVersion` invalidation
-- AI providers: `src/lib/ai/` abstraction — Gemini (cloud) + Ollama (local), routed by data sensitivity (`resolveAiProvider`; student_record/staff_entered are local-only per FERPA policy); explicit safetySettings; transient-failure retry pre-first-token; prompt revisions stamped via `SAGE_PROMPT_REVISION`
-- Chat: SSE streaming from `/api/chat/send` (heartbeats, disconnect handling), two-call pattern (conversation + prioritized async extraction in `src/lib/chat/post-response.ts`); token-budget-aware history trimming
-- RAG: live hybrid pgvector + FTS retrieval with RRF (`src/lib/sage/hybrid-retrieval.ts`), `ProgramDocument` corpus + `catalog/` OKF layer, gating red-team/guardrail evals in CI (`.github/workflows/sage-evals.yml`)
-- Safety: deterministic crisis detection (English + Spanish) with 988 safety net, structured crisis context cards to assigned instructors, failed extractions dead-lettered for teacher review
-- Verification layer: orientation instructor-led steps, Sage-proposed goals, and certifications require human confirmation (intervention-queue-driven); staff reads of student data are audited
-- File storage: local `./uploads/` in dev, Supabase Storage (S3-compatible) in prod
-- CSRF: Origin header validation middleware for all POST/PUT/PATCH/DELETE to /api/*; Postgres RLS with spoofable-header stripping in `src/proxy.ts`
-- Student routes: `(student)` route group, Teacher routes: `(teacher)` route group
-- Data lifecycle: retention policy in `docs/DATA_RETENTION_POLICY.md` (durations pending OWNER-CONFIRM), admin-only offboarding with export-before-deactivate
+@.claude/MEMORY.md
 
 ## Production Environment
-- **Render Start Command**: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
-- **Render Build Command**: `npm ci && npx prisma generate && npm run build`
+- Render build/start commands live in `render.yaml` — read it rather than trusting a copy here.
 - **TEACHER_KEY**: Stored in Render env vars and `.env.local` only (not tracked in git)
 
 ## Product Scope Authority
 - **Authoritative doc**: `docs/PRODUCT_DECISIONS.md` — governs all product scope decisions (5-step framework: Question → Delete → Simplify → Accelerate → Automate)
 - **Key decision (April 1, 2026, superseded June 10, 2026)**: Vision Board, Files, and Resources features are retained; the chat-first redesign (user-approved 2026-06-09) moved Resources into Learning and renamed Files to "Documents" in nav. See the 2026-06-10 entry in PRODUCT_DECISIONS.md.
-
-## Key Decisions Log
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-03-11 | Next.js + Prisma + Gemini stack | Full framework, free AI tier, conversation-first UX |
-| 2026-03-11 | Named AI coach "Sage" | Wise, calm, non-judgmental mentor personality |
-| 2026-03-13 | Supabase Storage over Cloudflare R2 | Single service for DB + files, simpler architecture |
-| 2026-03-13 | Sentry for error tracking | Client + server + edge, free tier sufficient |
-| 2026-03-13 | Standalone output mode via render.yaml | Uses `node .next/standalone/server.js` for smaller container |
-| 2026-03-13 | All deps in dependencies (no devDeps) | Render sets NODE_ENV=production before build, skips devDeps |
-| 2026-03-13 | Gemini 2.5-flash with model-level systemInstruction | 2.0-flash retired; chat-level systemInstruction breaks streaming |
-| 2026-03-13 | Separate /teacher-register page | Clear UX separation, requires TEACHER_KEY for authorization |
-| 2026-04-01 | Product docs consolidated into PRODUCT_GUIDE + PRODUCT_DECISIONS | Resolves conflicts — Vision Board, Files, Resources retained |
-| 2026-04-01 | StudentDetail split into 4-tab layout | 2043→472 line parent; tabs: Overview, Goals & Plan, Progress, Operations |
-| 2026-04-01 | Intervention queue as primary teacher dashboard | Urgency-scored student list above ClassOverview |
-| 2026-04-01 | Goal confirmation model added | `confirmed` status, `confirmedAt`, `confirmedBy`, `lastReviewedAt` fields on Goal |
-| 2026-04-01 | Unified readiness computation | Single `fetchStudentReadinessData()` used by all 6 consumers |
-| 2026-04-01 | CSP headers with nonce-based scripts/styles | Hardened via `src/proxy.ts`; Gemini, Credly, Sentry, Google Fonts whitelisted |
-| 2026-05-07 | Phase 2 and Phase 3 outcomes tracked as GitHub milestones | Single source of truth between `docs/PRODUCT_GUIDE.md` 90-Day Outcomes and the issue tracker. Milestones #1 (Phase 2, due 2026-05-17) and #2 (Phase 3, due 2026-06-21) with tracking issues #37–#40 carry outcome-style "definition of done" so risk-scout can flag slippage |
-| 2026-06-10 | Chat-first student home (Phase 4) | Sage conversation is the home surface; ambient rail carries vitals; classic dashboard kept at /dashboard/classic as a one-release parity fallback, retired 2026-07-20 — the route now redirects to /dashboard (issue #76 closed as satisfied by the redirect per PRODUCT_DECISIONS.md) |
-| 2026-05-07 | Project Autopilot installed locally | Read-only Claude Code orchestrator at `project-autopilot/` (gitignored) generates morning digests, weekly reviews, and triage sweeps over the GitHub repo. Deny list blocks all `gh` writes; agents propose, humans apply |
-| 2026-07-20 | Maturity repair session (see docs/MATURITY_REVIEW.md) | Verification layer added across orientation/goals/certs; crisis alerts get context cards (no transcript access — owner decision); classic dashboard deleted; crisis routing scoped to assigned instructors; data lifecycle v1; extraction dead-letter; Spanish crisis patterns |
-
-## Known Issues
-- ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (no sleep). Verified 2026-04-29 in `render.yaml` (`plan: starter`).
-- ~~OAuth users get random password hash~~ — Fixed (2026-04-01): passwordHash is now null for OAuth users
-- ~~No CSP headers configured~~ — Fixed (2026-04-01): nonce-based CSP in `src/proxy.ts`
-- ~~docs-upload/sage-context/ is intended for RAG grounding documents~~ — Stale; that directory exists but is empty and has no bucket mapping (ingest reports it as `unmapped`). Grounding documents live as `ProgramDocument` rows in Supabase Storage, curated via the teacher documents sage-context API (`src/app/api/teacher/documents/sage-context/`) and the `catalog/` OKF (org-knowledge) layer.
-- ~~Render free tier may not execute cron jobs~~ — Resolved: cron jobs migrated to Supabase pg_cron in Phase 1 of supabase-optimization. See `prisma/migrations/20260421000000_add_pg_cron_jobs` and `docs/plans/pg-cron-setup-runbook.md`. `scripts/run-*.mjs` files are kept as manual-trigger fallbacks.
 
 ## Design Context
 - **Full design context**: See [.impeccable.md](./.impeccable.md) for complete design principles, color system, typography, and accessibility requirements

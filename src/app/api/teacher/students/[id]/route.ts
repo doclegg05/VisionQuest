@@ -13,6 +13,7 @@ import { buildGoalPlanEntries } from "@/lib/goal-plan";
 import { serializeGoalPlanEntries, toGoalResourceLinkView } from "@/lib/goal-resource-links";
 import { parseState } from "@/lib/progression/engine";
 import { FORMS } from "@/lib/spokes/forms";
+import { parseAndNormalizeStoredNationalClusters } from "@/lib/spokes/national-clusters";
 import { normalizeProgramType } from "@/lib/program-type";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 
@@ -96,6 +97,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       certifications: {
         select: {
           id: true,
+          certType: true,
           status: true,
           startedAt: true,
           completedAt: true,
@@ -404,20 +406,19 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     progressionState: parsedProgression,
     formSubmissions: student.formSubmissions,
     orientationProgress: student.orientationProgress,
-    certification: student.certifications[0]
-      ? {
-          status: student.certifications[0].status,
-          startedAt: student.certifications[0].startedAt,
-          completedAt: student.certifications[0].completedAt,
-          requirements: student.certifications[0].requirements.map((requirement) => ({
-            templateId: requirement.templateId,
-            completed: requirement.completed,
-            completedAt: requirement.completedAt,
-            verifiedBy: requirement.verifiedBy,
-            verifiedAt: requirement.verifiedAt,
-          })),
-        }
-      : null,
+    certifications: student.certifications.map((certification) => ({
+      certType: certification.certType,
+      status: certification.status,
+      startedAt: certification.startedAt,
+      completedAt: certification.completedAt,
+      requirements: certification.requirements.map((requirement) => ({
+        templateId: requirement.templateId,
+        completed: requirement.completed,
+        completedAt: requirement.completedAt,
+        verifiedBy: requirement.verifiedBy,
+        verifiedAt: requirement.verifiedAt,
+      })),
+    })),
     portfolioItems: student.portfolioItems,
     resumeData: student.resumeData,
     publicCredentialPage: student.publicCredentialPage,
@@ -520,7 +521,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           circumstances: safeJsonParse(student.careerDiscovery.circumstances),
           riasecScores: safeJsonParse(student.careerDiscovery.riasecScores),
           hollandCode: student.careerDiscovery.hollandCode,
-          nationalClusters: safeJsonParse(student.careerDiscovery.nationalClusters),
+          // Read through the taxonomy normalizer so legacy 16-framework rows
+          // reach the teacher UI under their modernized cluster names.
+          nationalClusters: parseAndNormalizeStoredNationalClusters(
+            student.careerDiscovery.nationalClusters,
+          ),
           transferableSkills: safeJsonParse(student.careerDiscovery.transferableSkills),
           workValues: safeJsonParse(student.careerDiscovery.workValues),
           assessmentSummary: student.careerDiscovery.assessmentSummary,

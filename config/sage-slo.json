@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "perProviderP95Ms": {
+    "sage_chat": {
+      "gemini": 6000,
+      "ollama": 90000
+    }
+  },
+  "defaultP95Ms": 45000,
+  "notes": {
+    "sage_chat.gemini": "Cloud chat path, the one the student is actively waiting on. The nightly chat harness measures a real p50 of 1283ms and p95 of 1816ms against Gemini. This bar (6000ms) sits well above that baseline so ordinary network/provider jitter never pages anyone, but it is tight enough to catch roughly a 3x regression in the path students feel most directly.",
+    "sage_chat.ollama": "Local chat path (used when ai_provider=\"local\"). Accepted production behavior is ~20-70s/turn with reasoning disabled by default (see PR #147 in .claude/MEMORY.md); docs/plans/2026-07-02-local-model-acceptance-report.md:48 recorded local latency around 70s and set no target at the time. This bar (90000ms / 90s) sits just above that accepted range so normal local-model turns pass, while a genuine stall or an accidental reasoning-enabled deployment still breaches.",
+    "defaultP95Ms": "Background/extraction callSites (sage_post.goals/discovery/mood/classroom, sage_auto.briefing, sage_agent.*, sage_embedding_*, sage_memory_*, sage_form_search_*, chat_file_gist). These run off the critical path (fire-and-forget or async), so the bar is looser than cloud chat, but it is not split per provider the way sage_chat is: this is a best-guess default (45000ms / 45s), picked to sit comfortably above typical short-prompt local latency without reaching all the way to the full local chat bar. Revisit once the script's own p95 output accumulates real background-call data — see docs/SLO.md."
+  }
+}

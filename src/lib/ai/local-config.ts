@@ -15,6 +15,10 @@ const EMBEDDING_MODEL_ENV_VARS = ["AI_PROVIDER_EMBEDDING_MODEL"] as const;
 
 const API_STYLE_ENV_VARS = ["AI_PROVIDER_API_STYLE"] as const;
 
+const REASONING_ENV_VARS = ["AI_PROVIDER_REASONING"] as const;
+
+const MAX_OUTPUT_TOKENS_ENV_VARS = ["AI_PROVIDER_MAX_OUTPUT_TOKENS"] as const;
+
 const CLOUDFLARE_CLIENT_ID_ENV_VARS = [
   "AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID",
   "CF_ACCESS_CLIENT_ID",
@@ -36,6 +40,10 @@ export interface LocalAiProviderConfig {
   /** SystemConfig "ai_provider_api_style" (+ env fallback AI_PROVIDER_API_STYLE). Defaults to "ollama". */
   apiStyle: LocalAiApiStyle;
   numCtxRaw: string | null;
+  /** SystemConfig "ai_provider_reasoning" (+ env fallback AI_PROVIDER_REASONING). */
+  reasoningRaw: string | null;
+  /** SystemConfig "ai_provider_max_output_tokens" (+ env AI_PROVIDER_MAX_OUTPUT_TOKENS). */
+  maxOutputTokensRaw: string | null;
   apiKey: string | null;
   apiKeySource: "config" | "env" | null;
   cloudflareAccessClientId: string | null;
@@ -82,6 +90,8 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     authModeRaw,
     apiStyleConfig,
     numCtxRaw,
+    reasoningConfig,
+    maxOutputTokensConfig,
     apiKeyResult,
     cloudflareAccessClientIdResult,
     cloudflareAccessClientSecretResult,
@@ -92,6 +102,8 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     getPlainConfigValue("ai_provider_auth_mode"),
     getPlainConfigValue("ai_provider_api_style"),
     getPlainConfigValue("ai_provider_num_ctx"),
+    getPlainConfigValue("ai_provider_reasoning"),
+    getPlainConfigValue("ai_provider_max_output_tokens"),
     getSecretConfigOrEnv("ai_provider_api_key", API_KEY_ENV_VARS),
     getSecretConfigOrEnv(
       "ai_provider_cloudflare_access_client_id",
@@ -110,6 +122,9 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     authMode: resolveLocalAiAuthMode(authModeRaw),
     apiStyle: resolveLocalAiApiStyle(apiStyleConfig || firstEnvValue(API_STYLE_ENV_VARS)),
     numCtxRaw,
+    reasoningRaw: reasoningConfig || firstEnvValue(REASONING_ENV_VARS),
+    maxOutputTokensRaw:
+      maxOutputTokensConfig || firstEnvValue(MAX_OUTPUT_TOKENS_ENV_VARS),
     apiKey: apiKeyResult.value,
     apiKeySource: apiKeyResult.source,
     cloudflareAccessClientId: cloudflareAccessClientIdResult.value,
@@ -128,7 +143,7 @@ export function toLocalAiAuthConfig(
     | "cloudflareAccessClientSecret"
     | "apiStyle"
   >,
-  options: { numCtx?: number } = {},
+  options: { numCtx?: number; reasoning?: boolean; maxOutputTokens?: number } = {},
 ): LocalAIAuthConfig {
   return {
     authMode: config.authMode,
@@ -137,5 +152,7 @@ export function toLocalAiAuthConfig(
     cloudflareAccessClientSecret: config.cloudflareAccessClientSecret,
     numCtx: options.numCtx,
     apiStyle: config.apiStyle,
+    reasoning: options.reasoning,
+    maxOutputTokens: options.maxOutputTokens,
   };
 }

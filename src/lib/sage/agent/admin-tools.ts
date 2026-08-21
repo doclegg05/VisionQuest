@@ -175,22 +175,31 @@ const setSystemConfig: AgentTool = {
       return { status: "error", summary: validated.error };
     }
 
+    // actsOnStudent: false — system-scope write; a student target on the
+    // staff chat must not be ledgered as this operation's target.
     const gate = await confirmationGate(
       "set_system_config",
       { key, value: validated.value },
       ctx,
       `Change system setting "${key}" to "${validated.value}"? This affects AI for all users.`,
       `Set ${key}`,
+      { actsOnStudent: false },
     );
     if (gate) return gate;
 
-    return executeAndLedger("set_system_config", { key, value: validated.value }, ctx, async () => {
-      await setPlainConfigValue(key as SystemConfigKey, validated.value, ctx.session.id);
-      return {
-        summary: `Updated "${key}" to "${validated.value}".`,
-        data: { key, value: validated.value },
-      };
-    });
+    return executeAndLedger(
+      "set_system_config",
+      { key, value: validated.value },
+      ctx,
+      async () => {
+        await setPlainConfigValue(key as SystemConfigKey, validated.value, ctx.session.id);
+        return {
+          summary: `Updated "${key}" to "${validated.value}".`,
+          data: { key, value: validated.value },
+        };
+      },
+      { actsOnStudent: false },
+    );
   },
 };
 

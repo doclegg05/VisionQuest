@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { prisma } from "./db";
+import { loadPrerequisiteMap } from "./progression-edges";
 import { CAREER_CLUSTERS, getClusterById } from "./spokes/career-clusters";
 import { CERTIFICATIONS } from "./spokes/certifications";
 import { PLATFORMS } from "./spokes/platforms";
@@ -29,34 +30,61 @@ export interface LearningPathway {
   estimatedWeeksRemaining: number;
 }
 
+/**
+ * Discriminated result of loading a student's learning pathway. Distinguishes
+ * two states that used to both collapse to `null`:
+ *
+ * - "not_started": career discovery itself is not complete.
+ * - "awaiting_cluster": discovery IS complete, but there is no usable
+ *   pathway to build yet — either the Sage extractor (or a teacher's
+ *   discovery-override PATCH, src/app/api/teacher/students/[id]/discovery)
+ *   never recorded a top cluster, or the recorded cluster id doesn't match a
+ *   configured SPOKES cluster or has no pathway steps configured.
+ *
+ * Collapsing these two into one falsy value was the discovery-override
+ * circular dead end: a student whose discovery the system already marked
+ * complete was shown "Complete your career discovery" — telling them to redo
+ * a step that was already done, with no way out.
+ */
+export type LearningPathwayResult =
+  | { status: "ready"; pathway: LearningPathway }
+  | { status: "awaiting_cluster" }
+  | { status: "not_started" };
+
 // Average hours per week a SPOKES student is expected to work on certs
 const HOURS_PER_WEEK = 5;
 
 export async function getLearningPathway(
   studentId: string,
-): Promise<LearningPathway | null> {
+): Promise<LearningPathwayResult> {
   const careerDiscovery = await prisma.careerDiscovery.findUnique({
     where: { studentId },
     select: { status: true, topClusters: true },
   });
 
   if (!careerDiscovery || careerDiscovery.status !== "complete") {
-    return null;
+    return { status: "not_started" };
   }
 
   const topClusterId = careerDiscovery.topClusters[0];
-  if (!topClusterId) return null;
+  if (!topClusterId) return { status: "awaiting_cluster" };
 
   const cluster = getClusterById(topClusterId);
-  if (!cluster) return null;
+  if (!cluster) return { status: "awaiting_cluster" };
 
-  if (!cluster.pathwayOrder || cluster.pathwayOrder.length === 0) return null;
+  if (!cluster.pathwayOrder || cluster.pathwayOrder.length === 0) {
+    return { status: "awaiting_cluster" };
+  }
 
   // Fetch all Certification records for this student (certType matches SPOKES cert IDs)
   const dbCertRecords = await prisma.certification.findMany({
     where: { studentId },
     select: { certType: true, status: true },
   });
+
+  // Prerequisite structure now lives in ProgressionEdge rows (issue #140);
+  // an empty table falls back to the static arrays inside the loader.
+  const prereqMap = await loadPrerequisiteMap();
 
   const certStatusMap = new Map<string, "complete" | "in_progress">();
   for (const record of dbCertRecords) {
@@ -82,7 +110,7 @@ export async function getLearningPathway(
       name = certMeta.shortName;
       description = certMeta.description;
       estimatedHours = certMeta.estimatedHours;
-      prerequisites = certMeta.prerequisites;
+      prerequisites = prereqMap.get(stepId) ?? [];
       type = "certification";
     } else if (platformMeta) {
       name = platformMeta.name;
@@ -142,12 +170,15 @@ export async function getLearningPathway(
   const estimatedWeeksRemaining = Math.ceil(remainingHours / HOURS_PER_WEEK);
 
   return {
-    clusterId: cluster.id,
-    clusterName: cluster.label,
-    steps: finalSteps,
-    completedCount,
-    totalCount,
-    estimatedWeeksRemaining,
+    status: "ready",
+    pathway: {
+      clusterId: cluster.id,
+      clusterName: cluster.label,
+      steps: finalSteps,
+      completedCount,
+      totalCount,
+      estimatedWeeksRemaining,
+    },
   };
 }
 

@@ -357,13 +357,18 @@ model SpokesRecord {
   unsubsidizedEmploymentAt        DateTime? @db.Date
   employerName                    String?
   hourlyWage                      Float?
+  // Phase 0A placement bridge: which verified accepted Application produced
+  // this employment entry. Null = staff recorded employment manually.
+  // Unique so one application can never back two placement records.
+  placementApplicationId          String?   @unique
   nonCompleterAt                  DateTime? @db.Date
   nonCompleterReason              String?   @db.Text
   notes                           String?   @db.Text
   createdAt                       DateTime  @default(now())
   updatedAt                       DateTime  @updatedAt
 
-  student             Student?                   @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  student              Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  placementApplication Application? @relation("PlacementProvenance", fields: [placementApplicationId], references: [id], onDelete: SetNull)
   checklistProgress   SpokesChecklistProgress[]
   moduleProgress      SpokesModuleProgress[]
   employmentFollowUps SpokesEmploymentFollowUp[]
@@ -824,9 +829,21 @@ model Application {
   verificationStatus String?
   verifiedBy         String?
   verifiedAt         DateTime?
+  // Pathway provenance — what the student's suggested SPOKES career pathway
+  // WAS at the moment this application row was created, copied from
+  // CareerDiscovery.topClusters[0]. Null = no cluster existed then, or a
+  // legacy row created before this field. WRITE-ONCE by design: never
+  // updated when discovery changes later. The whole point is to ask "did the
+  // pathway we suggested at the time lead to a placement" (via
+  // SpokesRecord.placementApplicationId), and a retroactive rewrite would
+  // destroy the only evidence that question has. See src/lib/pathway-
+  // provenance.ts (capture) and src/lib/pathway-outcomes.ts (report).
+  pathwayClusterId   String?
+  pathwaySnapshotAt  DateTime?
 
-  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  spokesPlacement SpokesRecord? @relation("PlacementProvenance")
 
   @@unique([studentId, opportunityId])
   @@index([studentId, status])
@@ -940,6 +957,22 @@ model RateLimitEntry {
   updatedAt DateTime @updatedAt
 
   @@index([resetTime])
+  @@schema("visionquest")
+}
+
+/// Consumed Sage confirm-card tokens: one row per executed confirmation,
+/// keyed by token sha256. /api/chat/tool-confirm claims insert-first
+/// (src/lib/sage/agent/confirmation-use.ts), so a duplicate insert is a
+/// replay and is refused — a token authorizes exactly one execution. Rows
+/// stop mattering once expiresAt passes (HMAC verification already rejects
+/// expired tokens) and are swept opportunistically on claim.
+model SageConfirmationUse {
+  tokenHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
   @@schema("visionquest")
 }
 
@@ -1201,6 +1234,25 @@ model SageMemoryEdge {
   @@schema("visionquest")
 }
 
+// Certification/platform progression structure as data (issue #140).
+// fromId depends on toId (kind "prerequisite"). Endpoints are static ids
+// from src/lib/spokes/{certifications,platforms}.ts — no FK targets exist,
+// so referential integrity is locked by progression-edges.test.ts instead.
+// Program-wide reference data: read-open, admin-only writes (RLS Pattern L).
+model ProgressionEdge {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  kind      String   @default("prerequisite")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromId, toId, kind])
+  @@index([fromId])
+  @@index([toId])
+  @@schema("visionquest")
+}
+
 // Recorded student consent (Phase 3). Active consent = grantedAt set and
 // revokedAt null for the scope. History preserved: revocation closes the row;
 // re-granting creates a new one. scope: cloud_file_processing (Gemini Files
@@ -1228,6 +1280,12 @@ model SageOperation {
   id            String   @id
   actorType     String // student | teacher | admin | system
   actorId       String
+  // The student the operation acted ON (actorType/actorId is the invoker).
+  // Equals actorId for student self-service writes; the target student for
+  // staff on-behalf-of writes. Null = legacy row (pre-2026-08) or no student
+  // target. No FK on purpose — like actorId, ledger rows must survive
+  // student offboarding.
+  targetStudentId String?
   toolName      String
   status        String // proposed | confirmed | executed | failed | rejected
   payload       Json
@@ -1236,6 +1294,7 @@ model SageOperation {
   updatedAt     DateTime @updatedAt
 
   @@index([actorType, actorId])
+  @@index([targetStudentId])
   @@index([toolName, status])
   @@schema("visionquest")
 }
@@ -1434,6 +1493,13 @@ model CareerDiscovery {
   transferableSkills String?   @db.Text // JSON: [{skill, category, evidence}]
   workValues         String?   @db.Text // JSON: [{value, importance}]
   assessmentSummary  String?   @db.Text // 3-5 sentence instructor-facing summary
+  // Provenance of the RIASEC profile (string union by convention):
+  // sage_inferred | student_reported_cos | cos_api. Assessed sources
+  // (student_reported_cos, cos_api) must never be silently stomped back to
+  // inference by the discovery extractor — see src/lib/career-discovery.ts.
+  profileSource      String    @default("sage_inferred")
+  assessedAt         DateTime?
+  assessmentPayload  Json? // raw student-reported (or API) assessment results
   conversationId     String?
   completedAt        DateTime?
   createdAt          DateTime  @default(now())

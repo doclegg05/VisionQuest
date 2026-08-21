@@ -431,6 +431,7 @@ REQUIRED FORMS (FY26):
 14. Password Log Template — secure password tracking
 
 ADDITIONAL ORIENTATION:
+- Watch the required Sage welcome video at the top of Orientation. It is about one minute, earns a one-time 25 XP reward after the student finishes it, and does not replace forms, signatures, or instructor verification.
 - 4-week schedule orientation (two example schedules available)
 - Career discovery conversation with Sage (replaces the former CFWV Career Exploration Worksheet)
 - WorkKeys account creation instructions

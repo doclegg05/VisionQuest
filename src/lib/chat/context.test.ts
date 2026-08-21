@@ -49,6 +49,9 @@ test("buildCareerProfileContext formats top-level career profile sections", () =
     topClusters: ["Office & Admin", "Finance"],
     hollandCode: "CES",
     riasecScores: JSON.stringify({ Conventional: 0.88, Enterprising: 0.62 }),
+    // "Finance" is a retired 16-framework name (→ Financial Services);
+    // "Office Administration" was never a national cluster and must pass
+    // through untouched rather than be destroyed at read time.
     nationalClusters: JSON.stringify([
       { cluster_name: "Office Administration", score: 0.91 },
       { cluster_name: "Finance", score: 0.73 },
@@ -70,6 +73,11 @@ test("buildCareerProfileContext formats top-level career profile sections", () =
   assert.match(output!, /RIASEC Scores:/);
   assert.match(output!, /Transferable Skills:/);
   assert.match(output!, /Top Career Clusters:/);
+  // Legacy stored name renders as its modernized cluster; unknown names
+  // pass through unchanged.
+  assert.match(output!, /Financial Services \(73% match\)/);
+  assert.match(output!, /Office Administration \(91% match\)/);
+  assert.doesNotMatch(output!, /- Finance \(/);
   assert.match(output!, /Assessment Summary:/);
 });
 

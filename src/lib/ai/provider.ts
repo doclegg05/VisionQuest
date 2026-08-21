@@ -40,6 +40,31 @@ function parseNumCtxOverride(raw: string | null): number | undefined {
   return parsed;
 }
 
+// Bounds for the output-token cap. 128 is the floor for a usable coaching
+// reply; the ceiling stays under the smallest supported num_ctx so the cap
+// can never squeeze out the prompt itself.
+const MAX_OUTPUT_TOKENS_MIN = 128;
+const MAX_OUTPUT_TOKENS_MAX = 32768;
+
+function parseMaxOutputTokensOverride(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return undefined;
+  if (parsed < MAX_OUTPUT_TOKENS_MIN || parsed > MAX_OUTPUT_TOKENS_MAX) return undefined;
+  return parsed;
+}
+
+/**
+ * Reasoning is OFF unless explicitly enabled: on a thinking model the
+ * reasoning channel draws from the same output budget as the reply and can
+ * consume all of it, leaving the caller with nothing.
+ */
+function parseReasoningOverride(raw: string | null): boolean {
+  if (!raw) return false;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "on" || normalized === "true" || normalized === "1";
+}
+
 async function getLocalProvider(): Promise<AIProvider> {
   const config = await readLocalAiProviderConfig();
   if (!config.url) {
@@ -57,6 +82,8 @@ async function getLocalProvider(): Promise<AIProvider> {
     config.model || DEFAULT_OLLAMA_MODEL,
     toLocalAiAuthConfig(config, {
       numCtx: parseNumCtxOverride(config.numCtxRaw),
+      reasoning: parseReasoningOverride(config.reasoningRaw),
+      maxOutputTokens: parseMaxOutputTokensOverride(config.maxOutputTokensRaw),
     }),
   );
 }

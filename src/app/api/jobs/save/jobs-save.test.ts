@@ -88,21 +88,27 @@ describe("POST /api/jobs/save", () => {
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
   });
 
-  it("sets appliedAt when the student moves a job into the applied pipeline", async () => {
-    const req = mockRequest("/api/jobs/save", {
-      method: "POST",
-      body: { jobListingId: "cjld2cyuq0000t3t37ch82xgg", status: "applied", notes: "Applied through employer site" },
+  for (const status of ["applied", "interviewing", "offered"] as const) {
+    it(`sets appliedAt when the student first moves a job to ${status}`, async () => {
+      const req = mockRequest("/api/jobs/save", {
+        method: "POST",
+        body: {
+          jobListingId: "cjld2cyuq0000t3t37ch82xgg",
+          status,
+          notes: "Applied through employer site",
+        },
+      });
+
+      const res = await route.POST(req as never);
+      const body = await res.json();
+
+      assert.equal(res.status, 200);
+      assert.equal(mockJobFindFirst.mock.calls[0]?.arguments[0].where.classConfig.classId, "class-1");
+      assert.equal(mockSavedJobUpsert.mock.callCount(), 1);
+      assert.ok(mockSavedJobUpsert.mock.calls[0]?.arguments[0].create.appliedAt instanceof Date);
+      assert.ok(body.savedJob.appliedAt);
     });
-
-    const res = await route.POST(req as never);
-    const body = await res.json();
-
-    assert.equal(res.status, 200);
-    assert.equal(mockJobFindFirst.mock.calls[0]?.arguments[0].where.classConfig.classId, "class-1");
-    assert.equal(mockSavedJobUpsert.mock.callCount(), 1);
-    assert.ok(mockSavedJobUpsert.mock.calls[0]?.arguments[0].create.appliedAt instanceof Date);
-    assert.ok(body.savedJob.appliedAt);
-  });
+  }
 
   it("does not overwrite an existing appliedAt timestamp on later status changes", async () => {
     const existingAppliedAt = new Date("2026-05-01T12:00:00.000Z");

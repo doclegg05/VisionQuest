@@ -1,3 +1,6 @@
+---
+description: Create and apply a Prisma migration — validate, generate, review the SQL, then migrate dev or deploy.
+---
 # /project:migrate
 
 Create and apply a Prisma migration.

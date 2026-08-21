@@ -47,13 +47,17 @@ function makeLink(
 
 const NOW = new Date("2026-03-23");
 
+// Denominator for orientation readiness — ALL orientation items. Most tests
+// here have no completed orientation rows, so any total yields the same score.
+const ORIENTATION_TOTAL = 2;
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("computeAcademicKpis", () => {
   it("returns zeroed payload for empty student list", () => {
-    const result = computeAcademicKpis([], NOW);
+    const result = computeAcademicKpis([], NOW, ORIENTATION_TOTAL);
     assert.equal(result.goalAdoption.totalStudents, 0);
     assert.equal(result.goalAdoption.withBhag, 0);
     assert.equal(result.goalAdoption.withBhagPct, 0);
@@ -80,7 +84,7 @@ describe("computeAcademicKpis", () => {
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.goalAdoption.withBhag, 2);
     assert.equal(result.goalAdoption.withBhagPct, 67);
   });
@@ -101,7 +105,7 @@ describe("computeAcademicKpis", () => {
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.goalAdoption.withMonthlyGoal, 2);
     assert.equal(result.goalAdoption.withWeeklyGoal, 1);
   });
@@ -136,13 +140,13 @@ describe("computeAcademicKpis", () => {
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.goalAdoption.totalActiveGoals, 4);
     assert.equal(result.goalAdoption.goalsWithLinkedResources, 2);
     assert.equal(result.goalAdoption.goalsWithResourcesPct, 50);
   });
 
-  it("computes resource-to-evidence pipeline", () => {
+  it("counts only started or completed links as resource activity", () => {
     const students = [
       makeStudent({
         id: "s1",
@@ -165,17 +169,18 @@ describe("computeAcademicKpis", () => {
             resourceLinks: [
               makeLink({ id: "l4", status: "assigned" }),
               makeLink({ id: "l5", status: "blocked" }),
+              makeLink({ id: "l6", status: "dismissed" }),
             ],
           }),
         ],
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
-    assert.equal(result.resourcePipeline.totalAssignedLinks, 5);
-    assert.equal(result.resourcePipeline.linksWithEvidence, 3); // in_progress, completed, blocked
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
+    assert.equal(result.resourcePipeline.totalAssignedLinks, 6);
+    assert.equal(result.resourcePipeline.linksWithActivity, 2);
     assert.equal(result.resourcePipeline.linksCompleted, 1);
-    assert.equal(result.resourcePipeline.studentsWithAnyEvidence, 2);
+    assert.equal(result.resourcePipeline.studentsWithAnyActivity, 1);
   });
 
   it("computes median and average days to first goal", () => {
@@ -192,12 +197,12 @@ describe("computeAcademicKpis", () => {
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.timeToMilestone.medianDaysToFirstGoal, 15);
     assert.equal(result.timeToMilestone.avgDaysToFirstGoal, 15);
   });
 
-  it("computes time from goal to resource and resource to evidence", () => {
+  it("computes time from goal to resource and resource to first activity", () => {
     const students = [
       makeStudent({
         id: "s1",
@@ -216,9 +221,27 @@ describe("computeAcademicKpis", () => {
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.timeToMilestone.medianDaysGoalToResource, 5);
-    assert.equal(result.timeToMilestone.medianDaysResourceToEvidence, 5);
+    assert.equal(result.timeToMilestone.medianDaysResourceToActivity, 5);
+  });
+
+  it("scores orientation readiness against the all-items total", () => {
+    // Rows are completed items only — the route query filters completed: true.
+    const students = [
+      makeStudent({
+        id: "partial",
+        orientationProgress: [{ itemId: "item-1" }],
+      }),
+      makeStudent({
+        id: "complete",
+        orientationProgress: [{ itemId: "item-1" }, { itemId: "item-2" }],
+      }),
+    ];
+
+    const result = computeAcademicKpis(students, NOW, 2);
+    assert.equal(result.readinessDistribution.avgScore, 7.5);
+    assert.equal(result.readinessDistribution.medianScore, 7.5);
   });
 
   it("bins readiness scores into correct buckets", () => {
@@ -242,7 +265,7 @@ describe("computeAcademicKpis", () => {
       makeStudent({ id: "s3", progressionState: makeProgState(5, 19) }), // high score
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.readinessDistribution.distribution.length, 5);
     const totalBucketed = result.readinessDistribution.distribution.reduce(
       (sum, b) => sum + b.count,
@@ -280,7 +303,7 @@ describe("computeAcademicKpis", () => {
       }),
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.academicFunnel[0].label, "Enrolled");
     assert.equal(result.academicFunnel[0].value, 3);
     assert.equal(result.academicFunnel[1].label, "First Sage conversation");
@@ -291,7 +314,7 @@ describe("computeAcademicKpis", () => {
     assert.equal(result.academicFunnel[3].value, 1);
     assert.equal(result.academicFunnel[4].label, "Assigned resource");
     assert.equal(result.academicFunnel[4].value, 1);
-    assert.equal(result.academicFunnel[5].label, "Evidence submitted");
+    assert.equal(result.academicFunnel[5].label, "Resource activity");
     assert.equal(result.academicFunnel[5].value, 1);
     assert.equal(result.academicFunnel[6].label, "Certification progress");
     assert.equal(result.academicFunnel[6].value, 1);
@@ -319,7 +342,7 @@ describe("computeAcademicKpis", () => {
       makeStudent({ id: "s3", progressionState: null }),       // score = 0
     ];
 
-    const result = computeAcademicKpis(students, NOW);
+    const result = computeAcademicKpis(students, NOW, ORIENTATION_TOTAL);
     assert.equal(result.readinessDistribution.studentsAbove50, 2);
     assert.equal(result.readinessDistribution.studentsAbove75, 2);
     assert.equal(result.readinessDistribution.studentsAbove50Pct, 67);

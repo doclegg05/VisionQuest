@@ -35,6 +35,30 @@ function actorTypeFor(role: string): OperationActorType {
 }
 
 /**
+ * The student a tool invocation acts ON, for ledger attribution: staff pass
+ * an explicit target; students act on themselves. Null for a staff call
+ * with no target (ownership checks then find nothing to act on anyway).
+ */
+function actedOnStudentId(ctx: AgentToolContext): string | null {
+  if (ctx.targetStudentId) return ctx.targetStudentId;
+  return actorTypeFor(ctx.session.role) === "student" ? ctx.session.id : null;
+}
+
+export interface LedgerOptions {
+  /**
+   * Set false for tools that act on no student (system/admin scope). The
+   * executor threads one conversation-level staff target onto every call in
+   * the turn, so without this a system-config write in a student-targeted
+   * staff chat would falsely ledger that student as its target.
+   */
+  actsOnStudent?: boolean;
+}
+
+function ledgerTargetStudentId(ctx: AgentToolContext, opts?: LedgerOptions): string | null {
+  return opts?.actsOnStudent === false ? null : actedOnStudentId(ctx);
+}
+
+/**
  * Confirmation gate shared by consequential tools. Returns null when the
  * call is confirmed (proceed); otherwise returns the proposal result.
  */
@@ -44,6 +68,7 @@ export async function confirmationGate(
   ctx: AgentToolContext,
   proposalSummary: string,
   confirmLabel: string,
+  opts?: LedgerOptions,
 ): Promise<AgentToolResult | null> {
   const token = ctx.confirmedToken;
   const payload = {
@@ -65,6 +90,7 @@ export async function confirmationGate(
     actorType: actorTypeFor(ctx.session.role),
     actorId: ctx.session.id,
     actorRole: ctx.session.role,
+    targetStudentId: ledgerTargetStudentId(ctx, opts),
     toolName,
     status: "proposed",
     payload: args as never,
@@ -91,6 +117,7 @@ export async function executeAndLedger(
   args: Record<string, unknown>,
   ctx: AgentToolContext,
   work: () => Promise<{ summary: string; data?: unknown }>,
+  opts?: LedgerOptions,
 ): Promise<AgentToolResult> {
   const now = new Date();
   const operationId = operationIdFor(`${toolName}-${ctx.session.id}`, now);
@@ -101,6 +128,7 @@ export async function executeAndLedger(
       actorType: actorTypeFor(ctx.session.role),
       actorId: ctx.session.id,
       actorRole: ctx.session.role,
+      targetStudentId: ledgerTargetStudentId(ctx, opts),
       toolName,
       status: "executed",
       payload: args as never,
@@ -115,6 +143,7 @@ export async function executeAndLedger(
       actorType: actorTypeFor(ctx.session.role),
       actorId: ctx.session.id,
       actorRole: ctx.session.role,
+      targetStudentId: ledgerTargetStudentId(ctx, opts),
       toolName,
       status: "failed",
       payload: args as never,

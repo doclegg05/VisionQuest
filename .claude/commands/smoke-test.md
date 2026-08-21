@@ -1,3 +1,6 @@
+---
+description: Run smoke tests against public routes (and authenticated routes when a local server is up).
+---
 # /project:smoke-test
 
 Run smoke tests against public and authenticated routes.

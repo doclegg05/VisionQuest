@@ -124,7 +124,15 @@ gate-editing while in this role.
      heading hierarchy broken? weakened/skipped/deleted tests or filtered axe rules?
    - Remaining SUGGESTION-level review findings from Stage 4.
    - `Closes #<n>` when the ticket came from an issue.
-2. The PR stays a **draft**; this pipeline **never merges**. Marking the PR ready and
+2. **Update the handoff.** Edit `.claude/MEMORY.md` — the project memory CLAUDE.md
+   imports — so the next session starts current: rewrite **Current Status** and
+   **Last Session** (today's date, what the ticket changed, where the PR stands),
+   tick or add **Open Items** this run closed or uncovered (a11y sweeps in particular
+   tend to leave follow-on routes and components), and append a **Key Decisions Log**
+   row for anything the plan gate settled. Commit it on the branch as a `docs:` commit
+   so it lands in the same draft PR. An unattended run must never finish with a fresh
+   PR and a stale handoff.
+3. The PR stays a **draft**; this pipeline **never merges**. Marking the PR ready and
    merging is the owner's Ship action — Render auto-deploys `main` after merge.
 
 ## Failure and safety posture

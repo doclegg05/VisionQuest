@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Point `dark:` at the app's theme instead of the operating system's.
+ *
+ * This app themes with `data-theme` on <html> — a cookie read server-side in
+ * layout.tsx and toggled by ThemeProvider — while Tailwind's stock `dark:`
+ * variant keys off the `prefers-color-scheme` media query. Unwired, the two
+ * disagree whenever a student's OS setting differs from their in-app choice,
+ * and only half of every `bg-x-50 dark:bg-x-950` pair lands: light surfaces on
+ * a dark page, dark text on a light one. That is how a completed quick-win card
+ * shipped white body text on pale green (2026-08-20).
+ *
+ * Matching the attribute holder AND its descendants matters: data-theme sits on
+ * <html>, so almost every `dark:` utility is on a descendant. `:where()` keeps
+ * the variant at zero specificity, so `dark:` still behaves like a plain
+ * utility rather than outranking the class next to it.
+ *
+ * Guarded by src/app/globals.theme-variant.test.ts and e2e/theme-variant.spec.ts.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root,
 [data-theme="light"] {
   /* Tell the browser to render native form controls (select dropdowns,

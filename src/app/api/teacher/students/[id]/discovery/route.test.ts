@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() is deliberately loose for test scaffolding. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 
 const mockFindUnique = mock.fn(async () => null) as any;
 const mockUpsert = mock.fn(async () => ({ id: "cd-1" })) as any;
@@ -150,6 +151,116 @@ describe("PATCH /api/teacher/students/[id]/discovery", () => {
     const payload = await res.json();
     assert.equal(payload.alreadyComplete, true);
 
+    assert.equal(mockUpsert.mock.callCount(), 0);
+    assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+  });
+});
+
+describe("PATCH /api/teacher/students/[id]/discovery — cluster pick", () => {
+  const [firstCluster, secondCluster] = CAREER_CLUSTERS;
+
+  beforeEach(() => {
+    mockFindUnique.mock.resetCalls();
+    mockUpsert.mock.resetCalls();
+    mockLogAuditEvent.mock.resetCalls();
+    mockAssertStaffCanManageStudent.mock.resetCalls();
+    mockFindUnique.mock.mockImplementation(async () => null);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => ({
+      id: "stu-1",
+      studentId: "SPK-001",
+      displayName: "Student One",
+      role: "student",
+      isActive: true,
+    }));
+  });
+
+  it("stays backward compatible: a no-cluster call still works and leaves topClusters untouched", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "in_progress",
+      completedAt: null,
+      topClusters: [],
+    }));
+
+    const res = await PATCH(makeRequest({ status: "complete" }), { params });
+    assert.equal(res.status, 200);
+    assert.equal(mockUpsert.mock.callCount(), 1);
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.equal("topClusters" in upsertArgs.update, false);
+    assert.equal("topClusters" in upsertArgs.create, false);
+  });
+
+  it("accepts a valid clusterId and writes it into topClusters on a fresh discovery", async () => {
+    mockFindUnique.mock.mockImplementation(async () => null);
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: firstCluster.id }),
+      { params },
+    );
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.alreadyComplete, false);
+
+    assert.equal(mockUpsert.mock.callCount(), 1);
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.deepEqual(upsertArgs.create.topClusters, [firstCluster.id]);
+    assert.deepEqual(upsertArgs.update.topClusters, [firstCluster.id]);
+
+    const auditArgs = mockLogAuditEvent.mock.calls[0].arguments[0];
+    assert.equal(auditArgs.metadata.clusterId, firstCluster.id);
+  });
+
+  it("rejects an unknown clusterId with 400 and performs no write", async () => {
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: "not-a-real-cluster" }),
+      { params },
+    );
+    assert.equal(res.status, 400);
+    assert.equal(mockUpsert.mock.callCount(), 0);
+    assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+  });
+
+  it("closes the circular dead-end: unsticks a discovery already marked complete with no topClusters", async () => {
+    // This is the exact stuck state the extractor leaves behind: status is
+    // already "complete" (route.ts:45-47 used to short-circuit here and
+    // never reach the upsert), so a teacher picking a cluster after the
+    // fact must still be written through.
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "complete",
+      completedAt: new Date("2026-06-01T12:00:00.000Z"),
+      topClusters: [],
+    }));
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: secondCluster.id }),
+      { params },
+    );
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.alreadyComplete, false);
+
+    assert.equal(mockUpsert.mock.callCount(), 1);
+    const upsertArgs = mockUpsert.mock.calls[0].arguments[0];
+    assert.deepEqual(upsertArgs.update.topClusters, [secondCluster.id]);
+
+    const auditArgs = mockLogAuditEvent.mock.calls[0].arguments[0];
+    assert.equal(auditArgs.metadata.clusterId, secondCluster.id);
+    assert.equal(auditArgs.metadata.previousStatus, "complete");
+  });
+
+  it("stays idempotent when the requested clusterId already matches the stored top cluster", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      status: "complete",
+      completedAt: new Date("2026-06-01T12:00:00.000Z"),
+      topClusters: [firstCluster.id],
+    }));
+
+    const res = await PATCH(
+      makeRequest({ status: "complete", clusterId: firstCluster.id }),
+      { params },
+    );
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.equal(payload.alreadyComplete, true);
     assert.equal(mockUpsert.mock.callCount(), 0);
     assert.equal(mockLogAuditEvent.mock.callCount(), 0);
   });

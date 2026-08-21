@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CareerDiscoveryData } from "@/lib/career-discovery";
+import { careerProvenanceLabel } from "@/lib/career-provenance";
 import type { RiasecScores, NationalClusterScore, TransferableSkill, WorkValue } from "@/lib/sage/discovery-extractor";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 
@@ -11,15 +12,15 @@ interface CareerProfileProps {
   discovery: CareerDiscoveryData;
 }
 
-// ─── RIASEC Radar Chart ───────────────────────────────────────────────────────
+// ─── Career interest chart ────────────────────────────────────────────────────
 
 const RIASEC_LABELS: { key: keyof RiasecScores; label: string; abbr: string }[] = [
-  { key: "realistic",     label: "Realistic",     abbr: "R" },
-  { key: "investigative", label: "Investigative", abbr: "I" },
-  { key: "artistic",      label: "Artistic",      abbr: "A" },
-  { key: "social",        label: "Social",        abbr: "S" },
-  { key: "enterprising",  label: "Enterprising",  abbr: "E" },
-  { key: "conventional",  label: "Conventional",  abbr: "C" },
+  { key: "realistic",     label: "Hands-on",               abbr: "R" },
+  { key: "investigative", label: "Problem-solving",        abbr: "I" },
+  { key: "artistic",      label: "Creative",               abbr: "A" },
+  { key: "social",        label: "Helping people",         abbr: "S" },
+  { key: "enterprising",  label: "Leading and persuading", abbr: "E" },
+  { key: "conventional",  label: "Organizing details",     abbr: "C" },
 ];
 
 const CHART_SIZE = 260;
@@ -55,7 +56,7 @@ function RadarChart({ scores }: { scores: RiasecScores }) {
       viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
       width={CHART_SIZE}
       height={CHART_SIZE}
-      aria-label="RIASEC radar chart"
+      aria-label="Career interest profile chart"
       role="img"
       className="mx-auto"
     >
@@ -129,26 +130,38 @@ function RadarChart({ scores }: { scores: RiasecScores }) {
   );
 }
 
-// ─── Section A: RIASEC ────────────────────────────────────────────────────────
+// ─── Section A: Career interests ──────────────────────────────────────────────
 
 function RiasecSection({
   scores,
   hollandCode,
+  provenanceLabel,
 }: {
   scores: RiasecScores;
   hollandCode: string | null;
+  provenanceLabel: string;
 }) {
   return (
     <div className="surface-section p-5">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-        Holland Interest Profile
+        Career interest profile
+      </p>
+      {/* Honest provenance: assessed results vs Sage's inference. */}
+      <p className="mt-2 inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1 text-xs font-medium text-[var(--ink-muted)]">
+        {provenanceLabel}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+        This is sometimes called a Holland or RIASEC profile. It compares six kinds of work.
+        These are hands-on, problem-solving, creative, helping people, leading, and organizing.
       </p>
       {hollandCode && (
-        <div className="mt-2 flex items-baseline gap-3">
+        <div className="mt-3 flex flex-wrap items-baseline gap-3">
           <span className="font-display text-5xl font-bold text-[var(--accent-strong)]">
             {hollandCode}
           </span>
-          <span className="text-sm text-[var(--ink-muted)]">Holland Code</span>
+          <span className="text-sm text-[var(--ink-muted)]">
+            Your three strongest interest areas
+          </span>
         </div>
       )}
 
@@ -353,9 +366,13 @@ export function CareerProfile({ discovery }: CareerProfileProps) {
 
   return (
     <div className="space-y-4">
-      {/* Section A: RIASEC */}
+      {/* Section A: Career interests */}
       {riasecScores && (
-        <RiasecSection scores={riasecScores} hollandCode={hollandCode} />
+        <RiasecSection
+          scores={riasecScores}
+          hollandCode={hollandCode}
+          provenanceLabel={careerProvenanceLabel(discovery.profileSource, discovery.assessedAt)}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -391,7 +408,7 @@ export function CareerProfile({ discovery }: CareerProfileProps) {
           <Link
             href="/chat?stage=career_profile_review"
             prefetch={false}
-            className="primary-button shrink-0 px-5 py-3 text-sm"
+            className="primary-button inline-flex min-h-11 shrink-0 items-center justify-center px-5 py-3 text-sm"
           >
             Talk to Sage
           </Link>

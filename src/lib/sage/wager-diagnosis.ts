@@ -1,4 +1,5 @@
 import { prismaAdmin } from "@/lib/db";
+import { invalidateChatContext } from "@/lib/cache";
 import { withRlsContext } from "@/lib/rls-context";
 import { assembleStudentContextBundle } from "@/lib/sage/context-bundle";
 import { sanitizeForPrompt } from "@/lib/sage/system-prompts";
@@ -91,6 +92,11 @@ export async function diagnoseWager(wagerId: string): Promise<void> {
       knowledgeUpdateId: insight.id,
     },
   });
+
+  // prismaAdmin bypasses the app client's chat-context write-through
+  // extension (src/lib/db.ts), so the new insight must drop the student's
+  // cached chat context explicitly or Sage won't see it until TTL expiry.
+  invalidateChatContext(wager.studentId);
 
   logger.info("Wager diagnosis recorded", {
     wagerId,

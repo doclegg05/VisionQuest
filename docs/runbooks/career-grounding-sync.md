@@ -13,31 +13,19 @@ Phase B staging record: `.planning/career-grounding/phase-b-staging-manifest.md`
 
 ## 1. Preconditions — Britt's Q1–Q8 decision state
 
-Adopted leans already baked into Phase B (reverse them before upload if you
-disagree):
+**Resolved 2026-07-23** in `.planning/career-grounding/phase-a-inventory.md` §6 / §6a. Adopt these before upload; reverse only if Britt changes course.
 
-| Q | State | What Phase B did |
-|---|-------|------------------|
-| Q3 | **Adopted** | WIOA Referral Form staged under `forms/` (bucket key `forms/WIOA Referral Form.pdf`), beside the DFA referral rows — the deviation Phase A flagged. |
-| Q6 | **Adopted** | Overlap cross-references authored instead of merging: `career-pathways-bridge-descriptors2020.md` names the corpus "IETP Description of Adult Education Bridge Programs" in When-NOT-to-use; `spokes-certifications.md` names "SPOKES Modules 2025" and the `knowledge-base.ts` cert list. Nothing was double-loaded or blended. |
-| Q7 | **Adopted (caveat)** | Nicholas County IET node carries an explicit "2021-dated, currency unconfirmed (Q7)" caveat plus a source-document inconsistency note (Nursing-Assistant line in a Food-Service course description). |
-
-Still **OPEN — decide before or alongside this sync** (none block the upload):
-
-| Q | Open question |
-|---|---------------|
-| Q1 | ECP audience gap: the only ECP FY25 row is TEACHER_GUIDE/TEACHER — stage a student-audience ECP rendition? (Not part of the 15.) |
-| Q2 | piiRisk confirmations for 4 excluded files (`Career_Discovery_Gemini_Prompts.docx`, `Career_Pathfinder_Day_3_Assignment.docx`, `Healthcare_Career_Guide.docx`, `SPOKES_Goal_Tracker.xlsx`). |
-| Q5 | Interest-assessment gap: fill via Phase C CareerOneStop APIs (existing `COS_USER_ID` / `COS_API_TOKEN` env pair) or a printable instrument. |
-| Q8 | Rubric Record "-2" revision refresh in the bucket. |
-
-Q4 note (audience mechanics): the ingest derives audience from the folder —
-`students/` rows mint **STUDENT**, `forms/` and `presentation/` mint **BOTH**.
-Phase A proposed BOTH for several `students/` candidates (#3, #4, #9, #11,
-#12, #14, #15); the catalog nodes record the folder-derived values so
-post-sync parity passes. `config/sage-overrides.json` supports category — not
-audience — overrides, so widening audience needs either a code change or a
-manual DB update that the next sync can silently revert. Treat as open.
+| Q | Decision | Phase B / later action |
+|---|----------|------------------------|
+| Q1 | Students need `ECP_AE_and_SPOKES_Fillable_FY25`; dual-stage `students/` + `orientation/` | **Not in the original 15** — add ECP student + orientation copies as a Phase B+ staging delta before or with sync |
+| Q2 | Four piiRisk files cleared; wire interview instruments; **profile fields + per-student `.md`**; occupation guides **gated by COS career-cluster** (e.g. Healthcare guide only if Healthcare cluster) | Promote Pathfinder / Healthcare / Gemini prompts in a follow-on staging batch; Goal Tracker needs PDF (or xlsx ingest); cluster gating waits on Q5 |
+| Q3 | WIOA Referral = **instructor profiles only** | Re-stage under **`teachers/`** → bucket `teachers/guides/WIOA Referral Form.pdf`, audience **TEACHER** (supersedes earlier `forms/` staging) |
+| Q4 | Purpose-based audience (not blind folder map) | Demand list BOTH; WIOA Fact Sheet **instructor/policy** (move off `students/` → `teachers/`); Cert catalog + Curriculum = Sage ref + presentation; Bridge descriptors **IETP-only**. Per-doc audience may need manual DB set if folder mint disagrees (`sage-overrides.json` cannot override audience today) |
+| Q5 | Skip until O*NET / CareerOneStop access | No Phase B work |
+| Q6 #11 | Same continuum as image-only RAG PDF — stage DOCX under `students/` | Keep #11; fix OKF "different document" claim (done in catalog node) |
+| Q6 #14 | **Three-layer cert offer:** FY catalog SoT now; slim KB post-sync; classroom overlay + assignment in **future sprints** | Stage #14; post-sync KB slim + precedence rule (runbook §6); Phase C Classroom model |
+| Q7 | Nicholas County 2021 still valid | Keep; drop "currency unconfirmed" caveat to "still valid FY26/27" |
+| Q8 | Refresh Rubric Record with **"-2"** revision | Separate bucket refresh (not in the 15) |
 
 Mechanical preconditions:
 
@@ -52,10 +40,16 @@ Mechanical preconditions:
    outside its ownership) AND/OR widen the bucket allowlist.
 2. **Secrets present (names only):** `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`
    (S3 upload); `DATABASE_URL`, `GEMINI_API_KEY`, `STORAGE_*`/`R2_*` (sync);
-   never print values.
-3. **Worktree intact:** `docs-upload/` in the `sage-career-grounding` worktree
-   holds exactly the 15 staged files (3 folders: `students/` ×13, `forms/` ×1,
-   `presentation/` ×1), sha256-verified against sources in the Phase B manifest.
+   never print values. **Mac note (2026-07-23):** this checkout's `.env.local`
+   has empty `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` / `STORAGE_ENDPOINT` —
+   upload cannot run here until those are set.
+3. **Worktree / docs-upload intact:** Original Phase B staged 15 files on the
+   Windows `sage-career-grounding` worktree. **This Mac checkout does not
+   currently hold those binaries** (`docs-upload/students/` lacks the career
+   batch). Copy from Windows or re-stage before upload. After Q3/Q4 decisions,
+   also move WIOA Referral → `teachers/` and WIOA Fact Sheet → `teachers/`
+   before dry-run.
+4. **Never live-sync from a partial `docs-upload/` tree** — orphan trap (see §3).
 
 ## 2. Upload — GOVERNED, BRITT EXECUTES
 
@@ -122,7 +116,8 @@ npm run catalog:sync -- --apply      # write overlay + re-embed curated notes
    SELECT "storageKey", title, category, audience, "usedBySage", "isActive"
    FROM visionquest."ProgramDocument"
    WHERE "storageKey" IN (
-     'forms/WIOA Referral Form.pdf',
+     'teachers/guides/WIOA Referral Form.pdf',
+     'teachers/guides/New WIOA Fact Sheet 7.11.24.pdf',
      'presentations/fy27-updates-final-transcript.md',
      'students/resources/CFWV Career Exploration Worksheet.pdf',
      'students/resources/Career Discovery Prompts.pdf',
@@ -130,7 +125,6 @@ npm run catalog:sync -- --apply      # write overlay + re-embed curated notes
      'students/resources/ChatGPT Interview Practice Prompts.pdf',
      'students/resources/Handout_4_SMART_Goal.pdf',
      'students/resources/Handout_5_Career_Planning.pdf',
-     'students/resources/New WIOA Fact Sheet 7.11.24.pdf',
      'students/resources/Nicholas_County_IET_Food_Service_Management_with_CTE_Career_Pathway.docx',
      'students/resources/Pub_PathwaySccss_Flier_DEVO_AIM.pdf',
      'students/resources/Region 1 Demand Occupation List 2024.pdf',
@@ -162,21 +156,26 @@ npm run catalog:sync -- --apply      # write overlay + re-embed curated notes
 Phase B intentionally left `src/lib/sage/knowledge-base.ts` behaviorally
 unchanged except one verified factual fix (NCRC exam list: "Business Writing"
 → "Graphic Literacy", per the staged `SPOKES_Certifications.docx`). After
-steps 2–5 verify green, reconcile in a normal gated PR:
+steps 2–5 verify green, reconcile in a normal gated PR (Phase A Q6/#14
+three-layer architecture, locked 2026-07-23):
 
 1. ~~`src/lib/spokes/certifications.ts` NCRC correction~~ — already applied on
    this branch (commit `d0345b6`, alongside the knowledge-base.ts fix). No
    post-sync action needed.
-2. Decide whether `SPOKES_KNOWLEDGE`'s 14-item certification list slims down
-   to the brief + a pointer, deferring detail to the now-retrievable
-   `spokes-certifications` node (token savings vs. always-on accuracy; run
-   `sage:chat:harness` families before/after).
-3. Decide Q4 audience widening (see precondition table) if Sage's student
-   retrieval should NOT see teacher-leaning docs, or teachers should see
-   student rows.
+2. **Slim `SPOKES_KNOWLEDGE` cert enumeration** to brief + pointer; defer
+   detail to the retrievable `spokes-certifications` node (FY catalog =
+   source of truth). Add standing precedence: *if another document names a
+   cert not in the current catalog, treat it as historical.* Run
+   `sage:chat:harness` families before/after.
+3. **Phase C (future sprint):** Classroom/site model + instructor elective
+   overlay (add/emphasize only; never remove core) + assignment logic
+   (`base ∩ classroom`, ranked by student cluster/goals). Not blocking sync.
 4. Optionally update the `onboarding` topic prose about the CFWV worksheet
    (it currently says the Sage conversation replaced it; the worksheet is now
    also a retrievable resource).
+5. Q4 audience: after folder moves (WIOA Referral + Fact Sheet → `teachers/`),
+   verify minted TEACHER rows; Demand List BOTH may still need a manual
+   audience set if folder mint is STUDENT-only.
 
 ## 7. Rollback
 

@@ -13,10 +13,12 @@ export default async function GoalsPage() {
   const session = await getSession();
   if (!session) return null;
 
+  // One readiness fetch, shared with the next-step engine (still parallel).
+  const readinessPromise = fetchStudentReadinessData(session.id);
   const [{ goals: initialGoals, goalPlans: initialGoalPlans }, { state, readiness }, nextStep] = await Promise.all([
     getStudentGoalPlanData(session.id),
-    fetchStudentReadinessData(session.id),
-    getStudentNextStep(session.id),
+    readinessPromise,
+    getStudentNextStep(session.id, readinessPromise),
   ]);
 
   return (
@@ -29,6 +31,7 @@ export default async function GoalsPage() {
         actionLabel={nextStep.actionLabel}
         actionLink={nextStep.actionLink}
         steps={nextStep.steps}
+        variant="compact"
       />
       <div className="surface-section mb-4 overflow-hidden p-0">
         <MountainProgressLazy

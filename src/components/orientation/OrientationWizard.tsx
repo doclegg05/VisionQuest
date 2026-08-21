@@ -12,6 +12,7 @@ import SignaturePad from "@/components/ui/SignaturePad";
 import StudentProfileFormStep from "./StudentProfileFormStep";
 import WizardStepIndicator from "./WizardStepIndicator";
 import WizardCompletion from "./WizardCompletion";
+import { WELCOME_VIDEO_ORIENTATION_ITEM_ID } from "@/lib/orientation-welcome-video";
 
 interface OrientationItem {
   id: string;
@@ -77,6 +78,10 @@ export async function postOrientationCompletion(
 function deriveSteps(items: OrientationItem[]): WizardStep[] {
   const steps: WizardStep[] = [];
   for (const item of items) {
+    // The welcome video is a required Orientation milestone, but it is
+    // completed from the dedicated player above the wizard rather than as a
+    // generic instructor-led document step.
+    if (item.id === WELCOME_VIDEO_ORIENTATION_ITEM_ID) continue;
     // Pending-verification items were already claimed by the student and are
     // waiting on the instructor — no step to redo, and never a blocker.
     if (item.completed || item.verificationStatus === "pending") continue;

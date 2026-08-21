@@ -6,7 +6,10 @@ import { withAuth } from "@/lib/api-error";
 import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 import { logger } from "@/lib/logger";
 import { deleteFile } from "@/lib/storage";
+import { NO_PATHWAY_PROVENANCE, resolvePathwayProvenance } from "@/lib/pathway-provenance";
 import { parseBody, opportunityApplicationSchema } from "@/lib/schemas";
+
+const APPLIED_STATUSES = new Set(["applied", "interviewing", "offer"]);
 
 async function cleanupDetachedGeneratedResumeFile(
   studentId: string,
@@ -89,7 +92,7 @@ export const POST = withAuth(async (session, req: Request) => {
           opportunityId,
         },
       },
-      select: { id: true, resumeFileId: true },
+      select: { id: true, resumeFileId: true, appliedAt: true },
     }),
   ]);
   if (!opportunity) {
@@ -98,6 +101,17 @@ export const POST = withAuth(async (session, req: Request) => {
   if (resumeFileId && !file) {
     return NextResponse.json({ error: "Resume file not found." }, { status: 400 });
   }
+
+  const shouldSetAppliedAt = APPLIED_STATUSES.has(status) && !existingApplication?.appliedAt;
+  const appliedAt = shouldSetAppliedAt ? new Date() : undefined;
+
+  // Pathway provenance is a creation-time snapshot, so it is read only when
+  // there is no row yet — and it appears only in the upsert's `create`
+  // branch below. An existing application keeps the pathway it was filed
+  // under, whatever the student's discovery says today.
+  const pathwayProvenance = existingApplication
+    ? NO_PATHWAY_PROVENANCE
+    : await resolvePathwayProvenance(prisma, session.id);
 
   const application = await prisma.application.upsert({
     where: {
@@ -114,7 +128,7 @@ export const POST = withAuth(async (session, req: Request) => {
       status,
       notes: notes || null,
       resumeFileId: resumeFileId || null,
-      appliedAt: status === "applied" ? new Date() : undefined,
+      appliedAt,
       verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
       verifiedBy: null,
       verifiedAt: null,
@@ -125,8 +139,10 @@ export const POST = withAuth(async (session, req: Request) => {
       status,
       notes: notes || null,
       resumeFileId: resumeFileId || null,
-      appliedAt: status === "applied" ? new Date() : null,
+      appliedAt: APPLIED_STATUSES.has(status) ? (appliedAt ?? new Date()) : null,
       verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
+      pathwayClusterId: pathwayProvenance.pathwayClusterId,
+      pathwaySnapshotAt: pathwayProvenance.pathwaySnapshotAt,
     },
   });
 

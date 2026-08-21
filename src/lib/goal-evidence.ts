@@ -65,6 +65,7 @@ export interface GoalEvidenceCertificationRequirement {
 }
 
 export interface GoalEvidenceCertification {
+  certType: string;
   status: string | null;
   startedAt: Date | string | null;
   completedAt: Date | string | null;
@@ -352,6 +353,31 @@ function evidenceFromPortfolioTask(
   return manualEvidence(link);
 }
 
+// FOLLOW-UP: certification rows are created with the hardcoded certType
+// "ready-to-work" (src/app/api/certifications/route.ts:28-45), while
+// certification goal links carry one of the ~20 catalog ids from
+// src/lib/spokes/certifications.ts — so an exact certType match can never
+// see the tracked Ready-to-Work credential. Until cert rows carry
+// catalog-aligned certTypes, links to the catalog's Ready-to-Work family
+// soft-match the student's "ready-to-work" certification. The family is
+// the catalog's career-readiness credential ("workkeys-ncrc", ACT WorkKeys
+// NCRC) — the only catalog entry denoting the Ready-to-Work certificate
+// track (see the career-readiness SPOKES module family in seed data).
+const READY_TO_WORK_CERT_TYPE = "ready-to-work";
+export const READY_TO_WORK_FAMILY_CERT_IDS: readonly string[] = ["workkeys-ncrc"];
+
+function resolveCertificationForLink(
+  resourceId: string,
+  certificationsByType: Map<string, GoalEvidenceCertification>,
+): GoalEvidenceCertification | null {
+  const exact = certificationsByType.get(resourceId);
+  if (exact) return exact;
+  if (READY_TO_WORK_FAMILY_CERT_IDS.includes(resourceId)) {
+    return certificationsByType.get(READY_TO_WORK_CERT_TYPE) ?? null;
+  }
+  return null;
+}
+
 function evidenceFromCertification(
   link: GoalResourceLinkView,
   certification: GoalEvidenceCertification | null,
@@ -380,7 +406,7 @@ function evidenceFromCertification(
       evidenceSource: "teacher_review" as const,
       reviewNeeded: false,
       evidenceLabel: "Certification complete",
-      summary: "Ready to Work certification is complete.",
+      summary: `${link.title} is complete.`,
       lastObservedAt: certification.completedAt,
     };
   }
@@ -502,7 +528,7 @@ export function buildGoalEvidenceEntries({
   progressionState,
   formSubmissions = [],
   orientationProgress = [],
-  certification = null,
+  certifications = [],
   portfolioItems = [],
   resumeData = null,
   publicCredentialPage = null,
@@ -513,7 +539,7 @@ export function buildGoalEvidenceEntries({
   progressionState: ProgressionState | null;
   formSubmissions?: GoalEvidenceFormSubmission[];
   orientationProgress?: GoalEvidenceOrientationProgress[];
-  certification?: GoalEvidenceCertification | null;
+  certifications?: GoalEvidenceCertification[];
   portfolioItems?: GoalEvidencePortfolioItem[];
   resumeData?: GoalEvidenceResumeData | null;
   publicCredentialPage?: GoalEvidencePublicCredentialPage | null;
@@ -522,6 +548,9 @@ export function buildGoalEvidenceEntries({
 }): GoalEvidenceEntry[] {
   const submissionsByFormId = new Map(formSubmissions.map((submission) => [submission.formId, submission]));
   const progressByItemId = new Map(orientationProgress.map((item) => [item.itemId, item]));
+  const certificationsByType = new Map(
+    certifications.map((certification) => [certification.certType, certification]),
+  );
 
   return links.map((link) => {
     const observed = (() => {
@@ -535,7 +564,10 @@ export function buildGoalEvidenceEntries({
         case "portfolio_task":
           return evidenceFromPortfolioTask(link, portfolioItems, resumeData, publicCredentialPage);
         case "certification":
-          return evidenceFromCertification(link, certification);
+          return evidenceFromCertification(
+            link,
+            resolveCertificationForLink(link.resourceId, certificationsByType),
+          );
         case "career_step":
           return evidenceFromCareerStep(link, applications, eventRegistrations);
         case "document":

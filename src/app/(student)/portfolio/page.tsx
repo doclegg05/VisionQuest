@@ -20,11 +20,12 @@ export default async function Portfolio() {
         actionLabel={nextStep.actionLabel}
         actionLink={nextStep.actionLink}
         steps={nextStep.steps}
+        variant="compact"
       />
       <PageIntro
         eyebrow="Career story"
         title="Portfolio"
-        description="Showcase your work, certifications, and build a resume you can share with confidence."
+        description="Show off your work and certifications. Build a resume you can share with confidence."
       />
       <PortfolioPage />
     </div>

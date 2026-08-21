@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type EnhancedGenerateContentResponse, type FunctionDeclaration, type GenerateContentStreamResult, type Part, type SafetySetting, type Schema, type Tool, type UsageMetadata } from "@google/generative-ai";
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type EnhancedGenerateContentResponse, type FunctionDeclaration, type GenerateContentStreamResult, type Part, type SafetySetting, type Schema, type SingleRequestOptions, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
 import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
@@ -64,6 +64,86 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ---------------------------------------------------------------------------
+// Deadlines
+// ---------------------------------------------------------------------------
+// The SDK imposes no wall clock unless one is handed to it, and the retry
+// above fires only on classified errors — never on a hang. Nothing else in
+// the stack ends a dead turn either: the chat route's 15s SSE heartbeat keeps
+// the connection (and the student's spinner) alive indefinitely. The local
+// provider already aborts before Cloudflare's 100s 524 threshold "so callers
+// get a clear timeout error instead of a cryptic 524"; these are the cloud
+// path's equivalent.
+//
+// Each is a PER-ATTEMPT budget, so the retry ladder bounds the total:
+// 3 attempts plus 500ms + 1500ms of backoff.
+
+/** Whole non-streaming call, per attempt (~92s worst case across the ladder). */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+/** Request send through first streamed chunk, per attempt (~62s worst case). */
+const DEFAULT_STREAM_ESTABLISH_TIMEOUT_MS = 20_000;
+
+/**
+ * Gap between streamed chunks once the stream is live. Outside the retry
+ * boundary on purpose — output has already reached the caller, so a retry
+ * would duplicate it.
+ */
+const DEFAULT_STREAM_STALL_TIMEOUT_MS = 30_000;
+
+export interface GeminiTimeoutConfig {
+  requestTimeoutMs?: number;
+  streamEstablishTimeoutMs?: number;
+  streamStallTimeoutMs?: number;
+}
+
+/**
+ * A deadline breach. Distinct from the SDK's own errors so `isRetryableError`
+ * can classify it deliberately rather than by matching message text.
+ */
+class GeminiTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GeminiTimeoutError";
+  }
+}
+
+function abortableRequestOptions(signal: AbortSignal): SingleRequestOptions {
+  return { signal };
+}
+
+/**
+ * Rejects with a GeminiTimeoutError if `work` has not settled within `ms`,
+ * running `onTimeout` first so the in-flight request can be aborted instead
+ * of left dangling. `Promise.race` handles the abandoned promise's later
+ * rejection, so no unhandled rejection escapes.
+ */
+async function withDeadline<T>(
+  work: Promise<T>,
+  ms: number,
+  message: string,
+  onTimeout: () => void,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          onTimeout();
+          reject(new GeminiTimeoutError(message));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function timeoutMessage(what: string, ms: number): string {
+  return `Gemini ${what} timed out after ${Math.round(ms / 1000)} seconds.`;
+}
+
 /**
  * True for transient failures (HTTP 429/500/502/503/504 and status-less
  * network errors). Status is checked FIRST so a GoogleGenerativeAIFetchError
@@ -72,6 +152,10 @@ function sleep(ms: number): Promise<void> {
  * neither a status nor a network-shaped message, so they fall through to false.
  */
 function isRetryableError(error: unknown): boolean {
+  // A hang is the transient class this ladder exists for: nothing reached the
+  // caller, the request was aborted, and re-issuing is safe. Each attempt
+  // carries its own deadline, so retrying a timeout stays bounded.
+  if (error instanceof GeminiTimeoutError) return true;
   if (error && typeof error === "object" && "status" in error) {
     const status = (error as { status?: unknown }).status;
     if (typeof status === "number") return RETRYABLE_STATUSES.has(status);
@@ -111,27 +195,70 @@ async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promi
  * retry boundary and propagates errors untouched.
  */
 async function establishStream(
-  send: () => Promise<GenerateContentStreamResult>,
+  send: (options: SingleRequestOptions) => Promise<GenerateContentStreamResult>,
   label: string,
+  establishTimeoutMs: number,
 ): Promise<{
   result: GenerateContentStreamResult;
   iterator: AsyncIterator<EnhancedGenerateContentResponse>;
   first: IteratorResult<EnhancedGenerateContentResponse>;
+  /** Aborts the live request. Survives establishment so the stall guard can use it. */
+  controller: AbortController;
 }> {
   return withTransientRetry(async () => {
-    const result = await send();
-    const iterator = result.stream[Symbol.asyncIterator]();
-    const first = await iterator.next();
-    return { result, iterator, first };
+    // One controller per attempt: aborting a timed-out attempt must not
+    // poison the retry that follows it.
+    const controller = new AbortController();
+    const established = (async () => {
+      const result = await send(abortableRequestOptions(controller.signal));
+      const iterator = result.stream[Symbol.asyncIterator]();
+      // The SDK builds `result.response` eagerly. Mark it handled now so an
+      // abort later cannot surface as an unhandled rejection; the success
+      // path still awaits it and still sees any real failure.
+      void result.response.catch(() => undefined);
+      const first = await iterator.next();
+      return { result, iterator, first, controller };
+    })();
+
+    return withDeadline(
+      established,
+      establishTimeoutMs,
+      timeoutMessage("stream establishment", establishTimeoutMs),
+      () => controller.abort(),
+    );
   }, label);
 }
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
   private readonly apiKey: string;
+  private readonly requestTimeoutMs: number;
+  private readonly streamEstablishTimeoutMs: number;
+  private readonly streamStallTimeoutMs: number;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, timeouts?: GeminiTimeoutConfig) {
     this.apiKey = apiKey;
+    this.requestTimeoutMs = timeouts?.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    this.streamEstablishTimeoutMs =
+      timeouts?.streamEstablishTimeoutMs ?? DEFAULT_STREAM_ESTABLISH_TIMEOUT_MS;
+    this.streamStallTimeoutMs =
+      timeouts?.streamStallTimeoutMs ?? DEFAULT_STREAM_STALL_TIMEOUT_MS;
+  }
+
+  /**
+   * Pulls the next streamed chunk under the inter-chunk stall clock. A stream
+   * that goes quiet mid-reply is aborted rather than waited on forever.
+   */
+  private nextChunk(
+    iterator: AsyncIterator<EnhancedGenerateContentResponse>,
+    controller: AbortController,
+  ): Promise<IteratorResult<EnhancedGenerateContentResponse>> {
+    return withDeadline(
+      iterator.next(),
+      this.streamStallTimeoutMs,
+      timeoutMessage("stream", this.streamStallTimeoutMs),
+      () => controller.abort(),
+    );
   }
 
   static get modelName(): string {
@@ -170,11 +297,29 @@ export class GeminiProvider implements AIProvider {
         })),
       });
 
-      const result = await chat.sendMessage(lastMessage.content);
+      const result = await this.withRequestDeadline((requestOptions) =>
+        chat.sendMessage(lastMessage.content, requestOptions),
+      );
       const text = result.response.text();
       reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
       return text;
     }, "generateResponse");
+  }
+
+  /**
+   * Runs one non-streaming attempt under the whole-request deadline, aborting
+   * the request on breach so a black-holed call cannot outlive its budget.
+   */
+  private withRequestDeadline<T>(
+    send: (options: SingleRequestOptions) => Promise<T>,
+  ): Promise<T> {
+    const controller = new AbortController();
+    return withDeadline(
+      send(abortableRequestOptions(controller.signal)),
+      this.requestTimeoutMs,
+      timeoutMessage("request", this.requestTimeoutMs),
+      () => controller.abort(),
+    );
   }
 
   async *streamResponse(
@@ -190,16 +335,20 @@ export class GeminiProvider implements AIProvider {
     // A fresh ChatSession is built per attempt so no SDK-internal state
     // leaks across retries. Once anything has been yielded, errors
     // propagate untouched — retrying then would duplicate partial output.
-    const { result, iterator, first } = await establishStream(() => {
-      const model = this.getModel(systemPrompt, options);
-      const chat = model.startChat({
-        history: messages.slice(0, -1).map((m) => ({
-          role: m.role,
-          parts: [{ text: m.content }],
-        })),
-      });
-      return chat.sendMessageStream(lastMessage.content);
-    }, "streamResponse");
+    const { result, iterator, first, controller } = await establishStream(
+      (requestOptions) => {
+        const model = this.getModel(systemPrompt, options);
+        const chat = model.startChat({
+          history: messages.slice(0, -1).map((m) => ({
+            role: m.role,
+            parts: [{ text: m.content }],
+          })),
+        });
+        return chat.sendMessageStream(lastMessage.content, requestOptions);
+      },
+      "streamResponse",
+      this.streamEstablishTimeoutMs,
+    );
 
     let outputChars = 0;
     let next = first;
@@ -209,7 +358,7 @@ export class GeminiProvider implements AIProvider {
         outputChars += text.length;
         yield text;
       }
-      next = await iterator.next();
+      next = await this.nextChunk(iterator, controller);
     }
 
     const finalResponse = await result.response;
@@ -245,7 +394,9 @@ export class GeminiProvider implements AIProvider {
         })),
       });
 
-      const result = await chat.sendMessage(lastMessage.content);
+      const result = await this.withRequestDeadline((requestOptions) =>
+        chat.sendMessage(lastMessage.content, requestOptions),
+      );
       const text = result.response.text();
       reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
       return text;
@@ -301,9 +452,10 @@ export class GeminiProvider implements AIProvider {
       // client-visible output for its response either, so re-issuing is just
       // as safe as on hop 1 — tool handlers are NOT re-run, only the model
       // request. Once a chunk has arrived, errors propagate untouched.
-      const { result, iterator, first } = await establishStream(
-        () => model.generateContentStream({ contents }),
+      const { result, iterator, first, controller } = await establishStream(
+        (requestOptions) => model.generateContentStream({ contents }, requestOptions),
         "streamWithTools",
+        this.streamEstablishTimeoutMs,
       );
 
       // Stream text as it arrives, keeping every raw part verbatim: the SDK's
@@ -321,7 +473,7 @@ export class GeminiProvider implements AIProvider {
             yield { kind: "text", text: part.text };
           }
         }
-        next = await iterator.next();
+        next = await this.nextChunk(iterator, controller);
       }
 
       // After the stream completes, inspect for function calls.

@@ -1,3 +1,6 @@
+---
+description: Review the current branch for code quality, security, and consistency — eslint, prisma validate, typecheck, then a manual pass.
+---
 # /project:review
 
 Review the current branch for code quality, security, and consistency.

@@ -283,5 +283,64 @@
     "forbiddenTools": [
       "propose_resume_edit"
     ]
+  },
+  {
+    "id": "career-wages-medical-assistant",
+    "watch": true,
+    "message": "How much do medical assistants make around here?",
+    "expectedTool": "career_wages",
+    "acceptableTools": [
+      "career_occupation_profile"
+    ],
+    "note": "First eval coverage for the five CareerOneStop grounding tools (career-grounding-tools.ts), which were registered in tools.ts and then appeared in no fixture in any of the six eval configs. Measures ROUTING only — selection runs through a no-op handler, so nothing here needs COS_USER_ID / COS_API_TOKEN. Whether Sage stays honest once a tool comes back not-configured is the chat harness's 'career' family. \"watch\": true keeps all six out of the --min-accuracy denominator until nightlies establish their rate; the promotion rule is documented at the top of scripts/sage-agent-eval.mjs."
+  },
+  {
+    "id": "career-profile-cna-daily",
+    "watch": true,
+    "message": "What does a nursing assistant actually do all day, and what schooling does it take?",
+    "expectedTool": "career_occupation_profile",
+    "acceptableTools": [
+      "career_training_programs"
+    ]
+  },
+  {
+    "id": "career-training-welding-beckley",
+    "watch": true,
+    "message": "Where near Beckley could I go to get trained in welding?",
+    "expectedTool": "career_training_programs",
+    "acceptableTools": [
+      "career_occupation_profile"
+    ]
+  },
+  {
+    "id": "career-tools-tech-medical-assistant",
+    "watch": true,
+    "message": "What equipment and software would I be using every day as a medical assistant?",
+    "expectedTool": "career_tools_technology",
+    "acceptableTools": [
+      "career_occupation_profile"
+    ]
+  },
+  {
+    "id": "career-skills-match-unsure",
+    "watch": true,
+    "message": "I don't know what job would even fit me. Can we figure out what I'm actually good at?",
+    "expectedTool": "career_skills_match",
+    "acceptableTools": [
+      "career_occupation_profile"
+    ],
+    "note": "The one case here that competes with plain coaching — 'help me figure out what I'm good at' is also a discovery conversation. acceptableTools stays narrow rather than adding acceptNoTool: a miss should be visible as routing data, not defined away. The watch tier is what makes that safe to say out loud."
+  },
+  {
+    "id": "career-tailor-application-cna",
+    "watch": true,
+    "message": "Can you tailor my resume and cover letter for that CNA job before I apply?",
+    "context": "STUDENT'S SAVED JOBS:\n- jobListingId job-cna-1: CNA at Beckley ARH (Beckley, WV)\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution (Mount Hope, WV)",
+    "expectedTool": "tailor_application",
+    "acceptableTools": [
+      "lookup_saved_jobs",
+      "analyze_job_match"
+    ],
+    "note": "tailor_application is mutate_consequential and had no fixture either. The saved-jobs context mirrors job-match-cna because the tool requires a jobListingId — without it the model can only guess or fetch first, which is what acceptableTools allows."
   }
 ]
