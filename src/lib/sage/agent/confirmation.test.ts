@@ -5,9 +5,11 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum
 
 let createConfirmationToken: typeof import("./confirmation").createConfirmationToken;
 let verifyConfirmationToken: typeof import("./confirmation").verifyConfirmationToken;
+let confirmationTokenExpiry: typeof import("./confirmation").confirmationTokenExpiry;
 
 before(async () => {
-  ({ createConfirmationToken, verifyConfirmationToken } = await import("./confirmation"));
+  ({ createConfirmationToken, verifyConfirmationToken, confirmationTokenExpiry } =
+    await import("./confirmation"));
 });
 
 const payload = {
@@ -130,5 +132,17 @@ describe("confirmation tokens", () => {
   it("rejects malformed tokens", () => {
     assert.equal(verifyConfirmationToken("garbage", payload, NOW), false);
     assert.equal(verifyConfirmationToken("123.deadbeef", payload, NOW), false);
+  });
+});
+
+describe("confirmationTokenExpiry", () => {
+  it("reads the expiry a created token was stamped with (TTL = 10 min)", () => {
+    const token = createConfirmationToken(payload, NOW);
+    assert.equal(confirmationTokenExpiry(token)?.getTime(), NOW.getTime() + 10 * 60 * 1000);
+  });
+
+  it("returns null when the prefix does not parse", () => {
+    assert.equal(confirmationTokenExpiry("no-separator"), null);
+    assert.equal(confirmationTokenExpiry("notanumber.deadbeef"), null);
   });
 });

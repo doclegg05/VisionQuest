@@ -960,6 +960,22 @@ model RateLimitEntry {
   @@schema("visionquest")
 }
 
+/// Consumed Sage confirm-card tokens: one row per executed confirmation,
+/// keyed by token sha256. /api/chat/tool-confirm claims insert-first
+/// (src/lib/sage/agent/confirmation-use.ts), so a duplicate insert is a
+/// replay and is refused — a token authorizes exactly one execution. Rows
+/// stop mattering once expiresAt passes (HMAC verification already rejects
+/// expired tokens) and are swept opportunistically on claim.
+model SageConfirmationUse {
+  tokenHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@schema("visionquest")
+}
+
 model AuditLog {
   id         String   @id @default(cuid())
   actorId    String?
