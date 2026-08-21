@@ -34,6 +34,9 @@ const ALL_ROLES: PlatformRole[] = ["student", "teacher", "coordinator", "admin"]
 export const ROUTE_IGNORE: string[] = [
   "/profile",
   "/settings",
+  // Staff twin of /settings — same plain account-utility surface, mounted in
+  // the (teacher) group because the (student) layout redirects staff away.
+  "/teacher/settings",
   "/dashboard/classic",
   "/welcome",
   "/forms/[templateId]",
