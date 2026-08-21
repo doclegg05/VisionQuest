@@ -105,6 +105,7 @@ async function main() {
   const { applyStudentOrientationCompletion } = await import("../src/lib/orientation-completion.ts");
   const { recomputeCertificationStatus } = await import("../src/lib/certification-service.ts");
   const { awardEvent } = await import("../src/lib/progression/events.ts");
+  const { recordChatSession } = await import("../src/lib/progression/engine.ts");
   const { FORMS } = await import("../src/lib/spokes/forms.ts");
 
   // ---------------------------------------------------------------------
@@ -607,6 +608,40 @@ async function main() {
         SNAPSHOT_TTL_SECONDS,
         () => prisma.goal.create({ data: { studentId: STUDENT_ID, level: "bhag", content: `${marker} pharmacy tech cert`, status: "active" } }),
         ({ snapshot }) => ({ pass: typeof snapshot === "string" && snapshot.includes(marker), evidence: typeof snapshot === "string" ? `"${snippet(snapshot, marker)}"` : "snapshot null" }),
+      );
+    }
+
+    // B7. XP awarded → snapshot "Level N, X XP" line (chat:snapshot, 180s).
+    // This is the case whose absence let Progression ship unwatched: XP
+    // reaches the snapshot indirectly (fetchStudentReadinessData reads
+    // prisma.progression), so no marker-in-text probe covered it. `mutate`
+    // is required — awardEvent only writes ProgressionEvent without it, and
+    // ProgressionEvent is deliberately unwatched.
+    {
+      const xpOf = (snapshot) => {
+        const match = typeof snapshot === "string" ? snapshot.match(/Level\s+\d+,\s+(\d+)\s+XP/) : null;
+        return match ? Number(match[1]) : null;
+      };
+      await runGroupB(
+        "xp-awarded → snapshot Level/XP line",
+        SNAPSHOT_TTL_SECONDS,
+        () =>
+          awardEvent({
+            studentId: STUDENT_ID,
+            eventType: "chat_session",
+            sourceType: "conversation",
+            sourceId: mk("b7-xp"),
+            xp: 10,
+            mutate: (state) => recordChatSession(state),
+          }),
+        ({ snapshot }, warm) => {
+          const before = xpOf(warm.snapshot);
+          const after = xpOf(snapshot);
+          return {
+            pass: before !== null && after !== null && after > before,
+            evidence: `XP ${before ?? "?"} -> ${after ?? "?"}`,
+          };
+        },
       );
     }
 
