@@ -86,6 +86,17 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+(od|overdose)\b/i },
   { category: "self_harm", pattern: /\boverdos(e|ed|ing)\s+(on|myself)\b/i },
   { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
+  // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
+  // all my pills tonight"). The two entries above between them only covered
+  // intent toward the bare verb ("gonna od") and the completed act ("took all
+  // my pills"), so intent naming the method fell through — while the Spanish
+  // entry below already matched its equivalent. Doubly bounded, same as the
+  // past-act entry: the verb must come from the crisis-intent list (so the bare
+  // present "i take all my pills every morning" and obligation modals like
+  // "i need to take all my meds before bed" stay silent) AND a quantity word
+  // must precede a medication noun (so "i want to take all my certifications"
+  // stays silent). Verb list is deliberately identical to the od/overdose entry.
+  { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+take\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
   { category: "harm_others", pattern: /\b(want|going)\s+to\s+(hurt|kill)\s+(someone|him|her|them|people|everyone)\b/i },
   { category: "abuse", pattern: /\b(be(ing)?\s+abused|he\s+hits\s+me|she\s+hits\s+me|they\s+hit\s+me|hits?\s+me\s+at\s+home|hurt(s|ing)?\s+me\s+at\s+home|being\s+(hurt|hit)\s+at\s+home)\b/i },
 
