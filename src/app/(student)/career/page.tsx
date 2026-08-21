@@ -55,6 +55,7 @@ export default async function CareerPage() {
         actionLabel={nextStep.actionLabel}
         actionLink={nextStep.actionLink}
         steps={nextStep.steps}
+        variant="compact"
       />
       <PageIntro
         eyebrow="Career"
