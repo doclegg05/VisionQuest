@@ -26,6 +26,31 @@ describe("ChatErrorBanner", () => {
     assert.ok(!genericHtml.includes('href="/settings"'));
   });
 
+  it("points the Settings link at the caller's role settings surface", () => {
+    // Staff chat lives in the (teacher) group; /settings would redirect them
+    // straight back out, so the banner must link where the role can actually go.
+    const html = renderToString(
+      <ChatErrorBanner
+        message="Sage is not configured for this account (no API key)."
+        settingsHref="/teacher/settings"
+      />,
+    );
+    assert.ok(html.includes('href="/teacher/settings"'));
+    assert.ok(!html.includes('href="/settings"'));
+  });
+
+  it("drops the Settings link entirely for roles with no settings surface", () => {
+    const html = renderToString(
+      <ChatErrorBanner
+        message="Sage is not configured for this account (no API key)."
+        settingsHref={null}
+      />,
+    );
+    assert.ok(!html.includes("Open Settings"));
+    // Help is never conditional, even when the settings path is.
+    assert.ok(html.includes('href="/help"'));
+  });
+
   it("keeps the Help link even on an API-key error — help is never conditional", () => {
     const html = renderToString(
       <ChatErrorBanner message="Sage is not configured for this account (no API key)." />,
