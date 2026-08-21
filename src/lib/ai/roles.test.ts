@@ -8,6 +8,7 @@ import {
   isAiRole,
   roleForTask,
 } from "./roles";
+import { findMissingRoleModels, isModelInstalled } from "./capabilities";
 import { SYSTEM_CONFIG_KEYS } from "@/lib/system-config";
 import type { AiTask } from "./types";
 
@@ -113,5 +114,45 @@ describe("AI role taxonomy", () => {
       (role) => AI_ROLE_PROFILES[role].outputContract === "stream_with_tools",
     );
     assert.deepEqual(toolRoles, ["chat"]);
+  });
+});
+
+describe("role model install checks", () => {
+  it("matches an exact tag", () => {
+    assert.equal(isModelInstalled("gemma4:12b", ["gemma4:12b", "nomic-embed-text"]), true);
+  });
+
+  it("treats a bare name as its :latest tag, the way Ollama resolves it", () => {
+    assert.equal(isModelInstalled("gemma4", ["gemma4:latest"]), true);
+  });
+
+  it("does NOT treat a truncated tag as a prefix match", () => {
+    // "gemma4:12" is a typo for "gemma4:12b", not a prefix of it. Accepting it
+    // is how a typo reaches production and fails inside a background job.
+    assert.equal(isModelInstalled("gemma4:12", ["gemma4:12b"]), false);
+  });
+
+  it("rejects an empty tag", () => {
+    assert.equal(isModelInstalled("", ["gemma4:12b"]), false);
+    assert.equal(isModelInstalled("   ", ["gemma4:12b"]), false);
+  });
+
+  it("reports only the roles whose model is genuinely absent", () => {
+    const missing = findMissingRoleModels(
+      { chat: "gemma4:26b", extract: "gemma4:e4b", document: "", draft: null },
+      ["gemma4:26b", "nomic-embed-text"],
+    );
+    assert.deepEqual(missing, [{ role: "extract", model: "gemma4:e4b" }]);
+  });
+
+  it("reports nothing when no role is overridden", () => {
+    assert.deepEqual(findMissingRoleModels({}, ["gemma4:26b"]), []);
+  });
+
+  it("stays silent when the installed list is unavailable", () => {
+    // An empty list means the probe could not enumerate models, not that the
+    // server has none. Warning on every role there would train the operator to
+    // ignore the warning.
+    assert.deepEqual(findMissingRoleModels({ chat: "gemma4:26b" }, []), []);
   });
 });
