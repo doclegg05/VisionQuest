@@ -158,7 +158,11 @@ export function withUsageLogging(
   provider: AIProvider,
   ctx: WithUsageLoggingContext,
 ): AIProvider {
-  const model = ctx.model ?? provider.name;
+  // Prefer the provider's own model tag over its class name. Recording
+  // "ollama" for every local row makes a per-role model split unmeasurable
+  // the moment it ships — no query could tell which model served a call.
+  const model =
+    ctx.model ?? (provider as { model?: string }).model?.trim() ?? provider.name;
 
   const record = (usage: TokenUsage, durationMs: number): void => {
     void logLlmCall({

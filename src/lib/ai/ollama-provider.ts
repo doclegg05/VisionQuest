@@ -392,7 +392,17 @@ function toOpenAIMessages(
 export class OllamaProvider implements AIProvider {
   readonly name = "ollama";
   private readonly baseUrl: string;
-  private readonly model: string;
+  /**
+   * The model tag actually serving this instance.
+   *
+   * Public because the usage ledger has to record WHICH model served a call,
+   * not just which provider class. With per-role models that distinction is
+   * the whole point: a ledger that stores "ollama" for every row cannot answer
+   * "is the extract model keeping up?" — the question roles exist to let an
+   * operator ask. Mirrors `OllamaEmbeddingProvider.model`, which is already
+   * public for the same reason.
+   */
+  readonly model: string;
   private readonly authConfig: LocalAIAuthConfig;
   /**
    * When true, this endpoint is a generic OpenAI-compatible server (LM

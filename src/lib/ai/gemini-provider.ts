@@ -231,6 +231,8 @@ async function establishStream(
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
+  /** The model tag serving this instance — see OllamaProvider.model. */
+  readonly model = MODEL;
   private readonly apiKey: string;
   private readonly requestTimeoutMs: number;
   private readonly streamEstablishTimeoutMs: number;
