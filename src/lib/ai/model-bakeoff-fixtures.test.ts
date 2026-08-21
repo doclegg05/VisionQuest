@@ -8,6 +8,9 @@ import {
   parseArgs,
   repetitionRatio,
   resolveFieldPath,
+  runChatCase,
+  runDraftCase,
+  runStructuredCase,
   wordCount,
 } from "../../../scripts/sage-model-bakeoff.mjs";
 import { AI_ROLES } from "./roles";
@@ -281,5 +284,233 @@ describe("sage-model-bakeoff arguments", () => {
 
   it("rejects a non-integer repeat count instead of coercing it", () => {
     assert.throws(() => parseArgs(["--models=a", "--repeats=many"]), /integer/);
+  });
+});
+
+/**
+ * Role runners, against a stub provider.
+ *
+ * These are the composition that turns a model's bytes into a per-role
+ * pass/fail — the output the whole exercise exists to produce. A wiring bug
+ * here produces a plausible-looking table and sends the wrong model to a role.
+ * The leaf scoring helpers above are covered; this covers the assembly.
+ */
+describe("sage-model-bakeoff role runners", () => {
+  const assessReadability = (text: string) => ({
+    scorable: text.trim().split(/\s+/).length > 5,
+    grade: 5,
+  });
+  const maxGrade = 8;
+  const parseModelJson = (raw: string) => {
+    try {
+      return JSON.parse(raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, ""));
+    } catch {
+      return null;
+    }
+  };
+  const prompts = { memory: "memory prompt", classroom: "classroom prompt", resume: "resume prompt" };
+
+  function chatProvider(events: Array<Record<string, unknown>>) {
+    return {
+      async *streamWithTools() {
+        for (const event of events) yield event;
+      },
+    };
+  }
+
+  it("passes a chat case when the model calls an acceptable tool", async () => {
+    const outcome = await runChatCase(
+      { provider: chatProvider([{ kind: "tool_call", name: "present_form" }]), toolDeclarations: [], assessReadability, maxGrade },
+      { id: "t", message: "m", expectTool: "search_forms", acceptableTools: ["search_forms", "present_form"] },
+    );
+    assert.equal(outcome.pass, true);
+    assert.equal(outcome.checks.toolSelection, true);
+    assert.equal(outcome.detail.picked, "present_form");
+  });
+
+  it("fails a chat case when the model calls the wrong tool", async () => {
+    const outcome = await runChatCase(
+      { provider: chatProvider([{ kind: "tool_call", name: "career_wages" }]), toolDeclarations: [], assessReadability, maxGrade },
+      { id: "t", message: "m", expectTool: "search_forms", acceptableTools: ["search_forms"] },
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.toolSelection, false);
+  });
+
+  it("fails a chat case when the model calls no tool at all", async () => {
+    // The empty-turn failure this repo has hit three separate ways.
+    const outcome = await runChatCase(
+      { provider: chatProvider([]), toolDeclarations: [], assessReadability, maxGrade },
+      { id: "t", message: "m", expectTool: "search_forms" },
+    );
+    assert.equal(outcome.pass, false);
+  });
+
+  it("fails a no-tool case that returns an empty turn", async () => {
+    const outcome = await runChatCase(
+      { provider: chatProvider([]), toolDeclarations: [], assessReadability, maxGrade },
+      { id: "t", message: "m", expectTool: null, mustNotCallAny: true },
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.visibleContent, false);
+  });
+
+  it("fails a no-tool case when the model over-triggers a tool", async () => {
+    const outcome = await runChatCase(
+      {
+        provider: chatProvider([
+          { kind: "text", text: "Let me look that up for you right now." },
+          { kind: "tool_call", name: "career_wages" },
+        ]),
+        toolDeclarations: [],
+        assessReadability,
+        maxGrade,
+      },
+      { id: "t", message: "m", expectTool: null, mustNotCallAny: true },
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.noOverTrigger, false);
+  });
+
+  it("never reports a pass with no checks applied", async () => {
+    // Object.values({}).every(Boolean) is true — a case that applies no checks
+    // would score as a pass and inflate a model's rate.
+    for (const testCase of [
+      { id: "a", message: "m", expectTool: null },
+      { id: "b", message: "m", expectTool: "search_forms" },
+    ]) {
+      const outcome = await runChatCase(
+        { provider: chatProvider([{ kind: "tool_call", name: "search_forms" }]), toolDeclarations: [], assessReadability, maxGrade },
+        testCase,
+      );
+      assert.ok(Object.keys(outcome.checks).length > 0, `case ${testCase.id} applied no checks`);
+    }
+  });
+
+  function jsonProvider(raw: string) {
+    return { generateStructuredResponse: async () => raw };
+  }
+
+  it("passes a structured case that conforms and carries the gold fact", async () => {
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('{"memories":["takes the bus to class"]}'), prompts, parseModelJson },
+      { id: "s", prompt: "memory", expectJsonArrayOf: "memories", expectMinItems: 1, mustContainAny: ["bus"] },
+      {},
+    );
+    assert.equal(outcome.pass, true);
+  });
+
+  it("accepts a bare array as well as the wrapper key, matching production", async () => {
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('["takes the bus to class"]'), prompts, parseModelJson },
+      { id: "s", prompt: "memory", expectJsonArrayOf: "memories", expectMinItems: 1 },
+      {},
+    );
+    assert.equal(outcome.checks.arrayShape, true);
+  });
+
+  it("fails and flags truncation when JSON stops mid-structure", async () => {
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('{"memories":["takes the bus'), prompts, parseModelJson },
+      { id: "s", prompt: "memory", expectJsonArrayOf: "memories", expectMinItems: 1 },
+      {},
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.parsesAsJson, false);
+    assert.equal(outcome.detail.truncated, true);
+  });
+
+  it("fails an empty structured reply rather than scoring it as nothing-to-extract", async () => {
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider(""), prompts, parseModelJson },
+      { id: "s", prompt: "memory", expectJsonArrayOf: "memories" },
+      {},
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.visibleContent, false);
+  });
+
+  it("catches over-extraction on an empty exchange", async () => {
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('{"memories":["a","b","c"]}'), prompts, parseModelJson },
+      { id: "s", prompt: "memory", expectJsonArrayOf: "memories", expectMaxItems: 1 },
+      {},
+    );
+    assert.equal(outcome.checks.noOverExtraction, false);
+  });
+
+  it("resolves nested field paths against the real contract shape", async () => {
+    const outcome = await runStructuredCase(
+      {
+        provider: jsonProvider('{"resume":{"contact":{},"experience":[]},"improvements":[]}'),
+        prompts,
+        parseModelJson,
+      },
+      { id: "d", prompt: "resume", documentFixture: "doc", expectJsonObject: true, expectFields: ["resume.contact", "improvements"] },
+      { documentFixtures: { doc: "raw resume text" } },
+    );
+    assert.equal(outcome.checks.requiredFields, true);
+  });
+
+  it("checks a false field value rather than treating it as missing", async () => {
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('{"confirmed":false,"confidence":0}'), prompts, parseModelJson },
+      { id: "s", prompt: "classroom", expectJsonObject: true, expectFieldValues: { confirmed: false } },
+      {},
+    );
+    assert.equal(outcome.checks.fieldValues, true);
+  });
+
+  function proseProvider(text: string) {
+    return { generateResponse: async () => text };
+  }
+
+  it("passes a draft case inside its length band with the gold fact", async () => {
+    const text = Array.from({ length: 80 }, (_, i) => `word${i}`).join(" ") + " Ridgeline";
+    const outcome = await runDraftCase({ provider: proseProvider(text), assessReadability, maxGrade }, {
+      id: "d",
+      systemPrompt: "s",
+      messages: [],
+      minWords: 60,
+      maxWords: 400,
+      mustContainAny: ["Ridgeline"],
+    });
+    assert.equal(outcome.pass, true);
+  });
+
+  it("fails a draft case that is cut short", async () => {
+    const outcome = await runDraftCase({ provider: proseProvider("Too short."), assessReadability, maxGrade }, {
+      id: "d",
+      systemPrompt: "s",
+      messages: [],
+      minWords: 60,
+    });
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.minLength, false);
+  });
+
+  it("fails a draft case that loops, even though it passes every length check", async () => {
+    const looped = Array(30).fill("you should apply for the job today").join(" ");
+    const outcome = await runDraftCase({ provider: proseProvider(looped), assessReadability, maxGrade }, {
+      id: "d",
+      systemPrompt: "s",
+      messages: [],
+      minWords: 60,
+      maxWords: 400,
+    });
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.checks.notDegenerate, false);
+  });
+
+  it("fails a draft case that leaves a placeholder in", async () => {
+    const text = Array.from({ length: 80 }, (_, i) => `word${i}`).join(" ") + " [EMPLOYER NAME]";
+    const outcome = await runDraftCase({ provider: proseProvider(text), assessReadability, maxGrade }, {
+      id: "d",
+      systemPrompt: "s",
+      messages: [],
+      minWords: 60,
+      mustNotContain: ["[", "]"],
+    });
+    assert.equal(outcome.checks.noPlaceholders, false);
   });
 });

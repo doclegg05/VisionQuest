@@ -21,16 +21,26 @@ import {
 // undefined. roles.ts is pure constants with no side effects.
 import {
   AI_ROLES,
+  AI_ROLE_MAX_OUTPUT_CONFIG_KEYS,
   AI_ROLE_MODEL_CONFIG_KEYS,
   AI_ROLE_PROFILES,
   type AiRole,
 } from "@/lib/ai/roles";
-import { readLocalAiRoleModels, resolveRoleModel } from "@/lib/ai/local-config";
+import {
+  readLocalAiRoleMaxOutputTokensRaw,
+  readLocalAiRoleModels,
+  readLocalAiRoleModelSources,
+  resolveRoleModel,
+} from "@/lib/ai/local-config";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import { z } from "zod";
 
 const NUM_CTX_MIN = 1024;
 const NUM_CTX_MAX = 131072;
+
+// Mirrors the bounds provider.ts enforces when reading the cap back.
+const MAX_OUTPUT_TOKENS_MIN = 128;
+const MAX_OUTPUT_TOKENS_MAX = 32768;
 
 // Accept either an integer in range or null (sent to clear the override).
 const numCtxField = z
@@ -61,14 +71,53 @@ const providerSchema = z.object({
     )
     .partial()
     .optional(),
+  // Per-role output caps. `null` clears; absent leaves untouched. Bounded here
+  // with the same limits the provider enforces at read time, so an
+  // out-of-range value is refused at the boundary instead of silently ignored
+  // later — the operator would otherwise see a saved value that does nothing.
+  roleMaxOutputTokens: z
+    .object(
+      Object.fromEntries(
+        AI_ROLES.map((role) => [
+          role,
+          z
+            .union([
+              z.number().int().min(MAX_OUTPUT_TOKENS_MIN).max(MAX_OUTPUT_TOKENS_MAX),
+              z.literal(null),
+            ])
+            .optional(),
+        ]),
+      ) as unknown as Record<AiRole, z.ZodOptional<z.ZodTypeAny>>,
+    )
+    .partial()
+    .optional(),
 });
 
 export const GET = withAdminAuth(async () => {
-  const [provider, localConfig, roleModels] = await Promise.all([
-    getPlainConfigValue("ai_provider"),
-    readLocalAiProviderConfig(),
-    readLocalAiRoleModels(),
-  ]);
+  const [provider, localConfig, roleModels, roleModelSources, roleMaxOutputRaw] =
+    await Promise.all([
+      getPlainConfigValue("ai_provider"),
+      readLocalAiProviderConfig(),
+      readLocalAiRoleModels(),
+      readLocalAiRoleModelSources(),
+      Promise.all(
+        AI_ROLES.map(async (role) => [role, await readLocalAiRoleMaxOutputTokensRaw(role)] as const),
+      ),
+    ]);
+
+  // Echo back only values the provider will actually honor. A stored value
+  // outside the bounds is ignored at read time, so rendering it in the box
+  // would show the operator a setting that does nothing.
+  const roleMaxOutputTokens = Object.fromEntries(
+    roleMaxOutputRaw.map(([role, raw]) => {
+      const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+      const valid =
+        Number.isInteger(parsed) &&
+        parsed >= MAX_OUTPUT_TOKENS_MIN &&
+        parsed <= MAX_OUTPUT_TOKENS_MAX;
+      return [role, valid ? parsed : null];
+    }),
+  ) as Record<AiRole, number | null>;
 
   const parsedNumCtx = localConfig.numCtxRaw
     ? Number.parseInt(localConfig.numCtxRaw, 10)
@@ -91,6 +140,7 @@ export const GET = withAdminAuth(async () => {
     numCtx: validNumCtx,
     numCtxBounds: { min: NUM_CTX_MIN, max: NUM_CTX_MAX, default: 8192 },
     roleModels,
+    roleMaxOutputTokens,
     roleProfiles: AI_ROLES.map((role) => ({
       role,
       label: AI_ROLE_PROFILES[role].label,
@@ -99,6 +149,9 @@ export const GET = withAdminAuth(async () => {
       // What this role will ACTUALLY use once the fallback is applied, so the
       // operator never has to work it out from a blank field.
       effectiveModel: resolveRoleModel(role, roleModels, localConfig.model || "gemma4:26b"),
+      // An env-pinned role cannot be cleared from this screen — deleting the
+      // config row just hands control back to the env var.
+      source: roleModelSources[role],
     })),
     hasApiKey: !!localConfig.apiKey,
     hasCloudflareAccessClientId: !!localConfig.cloudflareAccessClientId,
@@ -174,6 +227,21 @@ export const PUT = withAdminAuth(async (session, req: NextRequest) => {
       } else {
         // Empty string clears the override; the role falls back to `model`.
         await deleteConfigValue(AI_ROLE_MODEL_CONFIG_KEYS[role]);
+      }
+    }
+  }
+  if (body.roleMaxOutputTokens !== undefined) {
+    for (const role of AI_ROLES) {
+      const value = body.roleMaxOutputTokens[role];
+      if (value === undefined) continue;
+      if (value === null) {
+        await deleteConfigValue(AI_ROLE_MAX_OUTPUT_CONFIG_KEYS[role]);
+      } else {
+        await setPlainConfigValue(
+          AI_ROLE_MAX_OUTPUT_CONFIG_KEYS[role],
+          String(value),
+          session.id,
+        );
       }
     }
   }

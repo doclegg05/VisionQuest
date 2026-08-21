@@ -67,7 +67,7 @@
  *   every model, which means the fixtures — not the models — need attention.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { percentile } from "./lib/percentile.mjs";
 
@@ -107,6 +107,11 @@ export function parseArgs(argv) {
   }
 
   const roles = get("roles", null) ? list(get("roles", "")) : [...ALL_ROLES];
+  if (roles.length === 0) {
+    // `--roles=" "` filters to nothing. Without this the run prints an empty
+    // matrix and exits 0, indistinguishable from a completed comparison.
+    throw new Error('--roles was given but named no role. Omit it to run all four.');
+  }
   for (const role of roles) {
     if (!ALL_ROLES.includes(role)) {
       throw new Error(`Unknown role "${role}" — expected one of ${ALL_ROLES.join(", ")}.`);
@@ -122,6 +127,12 @@ export function parseArgs(argv) {
     repeats,
     url: (get("url", process.env.OLLAMA_URL || DEFAULT_URL) || DEFAULT_URL).replace(/\/+$/, ""),
     maxOutputTokens: getInt("max-output-tokens", 768),
+    // Production's structured path defaults to 512, NOT the free-text 768.
+    // Benchmarking the strict-JSON roles at 768 would score them with 50% more
+    // headroom than they get in production, so a model could pass `document`
+    // here and truncate in the app. An explicit --max-output-tokens applies to
+    // both, which is how you find out whether a role is cap-bound.
+    structuredMaxOutputTokens: getInt("max-output-tokens", 512),
     numCtx: getInt("num-ctx", 8192),
     fixturePath: get("fixture", DEFAULT_FIXTURE),
     jsonOut: get("json-out", null),
@@ -271,7 +282,7 @@ export function repetitionRatio(text) {
  * rather than only that it scored low.
  */
 
-async function runChatCase({ provider, toolDeclarations, assessReadability, maxGrade }, testCase) {
+export async function runChatCase({ provider, toolDeclarations, assessReadability, maxGrade }, testCase) {
   const checks = {};
   const calls = [];
   let text = "";
@@ -329,7 +340,7 @@ async function runChatCase({ provider, toolDeclarations, assessReadability, maxG
   };
 }
 
-async function runStructuredCase({ provider, prompts, parseModelJson }, testCase, fixture) {
+export async function runStructuredCase({ provider, prompts, parseModelJson }, testCase, fixture) {
   const checks = {};
   let systemPrompt;
   let messages;
@@ -400,7 +411,7 @@ async function runStructuredCase({ provider, prompts, parseModelJson }, testCase
   };
 }
 
-async function runDraftCase({ provider, assessReadability, maxGrade }, testCase) {
+export async function runDraftCase({ provider, assessReadability, maxGrade }, testCase) {
   const checks = {};
   const text = await provider.generateResponse(testCase.systemPrompt, testCase.messages);
 
@@ -432,7 +443,7 @@ async function runDraftCase({ provider, assessReadability, maxGrade }, testCase)
   };
 }
 
-const CHAT_SYSTEM_PROMPT = `You are Sage, the AI coach for SPOKES workforce-development students.
+export const CHAT_SYSTEM_PROMPT = `You are Sage, the AI coach for SPOKES workforce-development students.
 You can call tools to act for the student. Use a tool when the student's request maps to one; answer in plain text when none applies.
 For consequential actions (filing forms, changing goals) the system will ask the user to confirm — just make the appropriate tool call.
 Write at a 6th-grade reading level. Be direct, warm, and practical.`;
@@ -506,8 +517,9 @@ async function main() {
       `${options.models.length * totalCases * options.repeats} model calls\n`,
   );
   console.log(
-    `Caps: max_output_tokens=${options.maxOutputTokens}, num_ctx=${options.numCtx}, ` +
-      `eviction ${options.evict ? "ON" : "OFF"}\n`,
+    `Caps: free-text ${options.maxOutputTokens} tok, JSON mode ` +
+      `${options.structuredMaxOutputTokens} tok (production defaults), ` +
+      `num_ctx=${options.numCtx}, eviction ${options.evict ? "ON" : "OFF"}\n`,
   );
 
   /** @type {Array<object>} */
@@ -531,7 +543,7 @@ async function main() {
       apiKey: process.env.AI_PROVIDER_API_KEY || process.env.OLLAMA_API_KEY || null,
       numCtx: options.numCtx,
       maxOutputTokens: options.maxOutputTokens,
-      structuredMaxOutputTokens: options.maxOutputTokens,
+      structuredMaxOutputTokens: options.structuredMaxOutputTokens,
       reasoning: false,
     });
 
@@ -571,19 +583,38 @@ async function main() {
     process.stdout.write("\n");
   }
 
-  report(runs, options);
-
+  // Written BEFORE the report so an hour of model calls is never lost to a
+  // formatting bug, and with the directory created because the documented
+  // invocation writes to reports/, which is not in the repo.
   if (options.jsonOut) {
-    writeFileSync(path.resolve(process.cwd(), options.jsonOut), JSON.stringify(runs, null, 2));
+    const outPath = path.resolve(process.cwd(), options.jsonOut);
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify(runs, null, 2));
     console.log(`\nFull results written to ${options.jsonOut}`);
   }
+
+  report(runs, options);
 
   // A role that failed every case for every model is a fixture problem, not a
   // model verdict. Say so loudly rather than reporting a bake-off "winner" of
   // 0% vs 0%.
-  const brokenRoles = options.roles.filter((role) =>
-    runs.filter((run) => run.role === role).every((run) => !run.pass),
+  const brokenRoles = options.roles.filter((role) => {
+    const roleRuns = runs.filter((run) => run.role === role);
+    // `[].every()` is true, so a role with NO runs would otherwise be reported
+    // as "no model passed any case" — a fixture-loading problem dressed up as
+    // a model verdict.
+    return roleRuns.length > 0 && roleRuns.every((run) => !run.pass);
+  });
+  const emptyRoles = options.roles.filter(
+    (role) => runs.filter((run) => run.role === role).length === 0,
   );
+  if (emptyRoles.length > 0) {
+    console.error(
+      `\nNo cases ran for: ${emptyRoles.join(", ")}. The fixture file has no cases for ` +
+        `${emptyRoles.length === 1 ? "that role" : "those roles"} — nothing was measured.`,
+    );
+    process.exitCode = 1;
+  }
   if (brokenRoles.length > 0) {
     console.error(
       `\nNo model passed ANY case for: ${brokenRoles.join(", ")}. ` +
@@ -655,9 +686,32 @@ function report(runs, options) {
       }
     }
 
+    // The error text lives only in --json-out otherwise, and an operator
+    // reading "err 3" has no idea whether that was a 404 or a timeout.
+    const errorMessages = new Map();
+    for (const run of roleRuns) {
+      const message = run.detail?.error;
+      if (!message) continue;
+      const key = `${run.model} :: ${message}`;
+      errorMessages.set(key, (errorMessages.get(key) ?? 0) + 1);
+    }
+    if (errorMessages.size > 0) {
+      console.log("  provider errors:");
+      for (const [key, count] of [...errorMessages.entries()].sort((a, b) => b[1] - a[1])) {
+        console.log(`    ${key} x${count}`);
+      }
+    }
+
     const best = [...rows].sort(
       (a, b) => b.passPct - a.passPct || a.p50 - b.p50,
     )[0];
+    if (!best || best.passPct === 0) {
+      // The "=>" line is the one thing in this report that looks like a
+      // decision. Printing it under an all-failing role hands the operator a
+      // recommendation drawn from a run where nothing worked.
+      console.log("  => no recommendation: no model passed a single case for this role\n");
+      continue;
+    }
     const tied = rows.filter((row) => row.passPct === best.passPct);
     console.log(
       tied.length > 1

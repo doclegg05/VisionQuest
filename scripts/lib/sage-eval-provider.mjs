@@ -53,12 +53,29 @@ async function resolveGeminiProvider(modelOverride = null) {
     throw new Error("GEMINI_API_KEY missing — required for --provider=gemini.");
   }
   // GeminiProvider reads its model from the GEMINI_MODEL env var at import
-  // time, so a --model override has to be written back into the environment
-  // rather than passed as an argument.
+  // time, so a --model override has to be in the environment when the module
+  // is first imported — it cannot be passed as an argument.
+  //
+  // The variable is then RESTORED, because it is not private to this function:
+  // sage-quality-eval.mjs reads GEMINI_MODEL to choose its LLM judge. Leaving
+  // the override in place would swap the grader along with the subject, so a
+  // run would be scored by a different rubric than the recorded baseline and
+  // silently incomparable to it. The module const has already captured the
+  // override by the time we put the old value back, so the SUBJECT still uses
+  // the requested model.
+  const previous = process.env.GEMINI_MODEL;
   if (modelOverride) process.env.GEMINI_MODEL = modelOverride;
-  const { GeminiProvider } = await import("../../src/lib/ai/gemini-provider.ts");
-  const provider = new GeminiProvider(apiKey);
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
+  let provider;
+  try {
+    const { GeminiProvider } = await import("../../src/lib/ai/gemini-provider.ts");
+    provider = new GeminiProvider(apiKey);
+  } finally {
+    if (modelOverride) {
+      if (previous === undefined) delete process.env.GEMINI_MODEL;
+      else process.env.GEMINI_MODEL = previous;
+    }
+  }
+  const model = modelOverride || previous?.trim() || "gemini-3.1-flash-lite";
   return { provider, model, label: `gemini (${model})` };
 }
 

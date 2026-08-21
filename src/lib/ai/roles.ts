@@ -151,3 +151,25 @@ const TASK_ROLES: Record<AiTask, AiRole | null> = {
 export function roleForTask(task: AiTask): AiRole | null {
   return TASK_ROLES[task] ?? null;
 }
+
+/**
+ * Do two model tags name the same loaded model?
+ *
+ * Ollama resolves a bare name to its `:latest` tag, so "gemma4" and
+ * "gemma4:latest" are one model on the server even though the strings differ.
+ * That matters for the residency rule: `keep_alive` is applied by the server
+ * PER MODEL, so treating an alias of the chat model as "a different model"
+ * would attach the short keep-alive to the very model students are waiting on
+ * and cut its residency to minutes.
+ *
+ * Deliberately not a prefix match — "gemma4:12" is a typo for "gemma4:12b",
+ * not an alias of it.
+ */
+export function isSameModelTag(a: string, b: string): boolean {
+  const left = a.trim();
+  const right = b.trim();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const canonical = (tag: string) => (tag.includes(":") ? tag : `${tag}:latest`);
+  return canonical(left) === canonical(right);
+}

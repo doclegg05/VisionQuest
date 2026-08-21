@@ -161,8 +161,10 @@ export function withUsageLogging(
   // Prefer the provider's own model tag over its class name. Recording
   // "ollama" for every local row makes a per-role model split unmeasurable
   // the moment it ships — no query could tell which model served a call.
-  const model =
-    ctx.model ?? (provider as { model?: string }).model?.trim() ?? provider.name;
+  // `||` not `??`: a provider exposing an empty/whitespace model tag must fall
+  // back to its class name. A blank `model` on an LlmCallLog row reads as a
+  // data bug, and is strictly worse than the "ollama" this change replaced.
+  const model = ctx.model || (provider as { model?: string }).model?.trim() || provider.name;
 
   const record = (usage: TokenUsage, durationMs: number): void => {
     void logLlmCall({

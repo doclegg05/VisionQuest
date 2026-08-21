@@ -1,11 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   AI_ROLES,
   AI_ROLE_MODEL_CONFIG_KEYS,
   AI_ROLE_PROFILES,
   isAiRole,
+  isSameModelTag,
   roleForTask,
 } from "./roles";
 import { findMissingRoleModels, isModelInstalled } from "./capabilities";
@@ -17,6 +19,20 @@ import type { AiTask } from "./types";
  * from the source map so that adding a task to `AiTask` without classifying it
  * fails HERE, loudly, instead of silently inheriting the global model.
  */
+/**
+ * The task keys roles.ts itself classifies, read from the source rather than
+ * the type — `AiTask[]` accepts a subset, so a literal list alone cannot prove
+ * the union is fully covered.
+ */
+function declaredTaskKeys(): string[] {
+  const source = readFileSync("src/lib/ai/roles.ts", "utf8");
+  const body = source.slice(
+    source.indexOf("const TASK_ROLES"),
+    source.indexOf("export function roleForTask"),
+  );
+  return [...body.matchAll(/^\s{2}([a-z_]+):/gm)].map((match) => match[1]);
+}
+
 const ALL_TASKS: AiTask[] = [
   "legacy",
   "sage_student_chat",
@@ -33,7 +49,17 @@ const ALL_TASKS: AiTask[] = [
 ];
 
 describe("AI role taxonomy", () => {
-  it("classifies every declared AiTask", () => {
+  it("classifies every declared AiTask, and only these are unclassified", () => {
+    // The weaker form of this test — "role is null or a valid role" — passed
+    // with the ENTIRE classification layer deleted, since null satisfies it.
+    // Pin the exact set that is allowed to be unclassified instead, so both
+    // deleting a mapping and adding an unclassified task fail here.
+    const unclassified = ALL_TASKS.filter((task) => roleForTask(task) === null);
+    assert.deepEqual(
+      unclassified.sort(),
+      ["legacy", "public_form_lookup"],
+      "a task became unclassified (or stopped being) — it would silently fall back to the global model",
+    );
     for (const task of ALL_TASKS) {
       const role = roleForTask(task);
       assert.ok(
@@ -41,6 +67,18 @@ describe("AI role taxonomy", () => {
         `task "${task}" resolved to an unrecognized role: ${String(role)}`,
       );
     }
+  });
+
+  it("covers the whole AiTask union, so a new task cannot slip past this file", () => {
+    // ALL_TASKS is typed AiTask[], which accepts a SUBSET — adding a task to
+    // the union would not fail here on typing alone. Compare against the
+    // source map's own keys so a new task shows up as a missing entry.
+    const mapped = declaredTaskKeys();
+    assert.deepEqual(
+      [...mapped].sort(),
+      [...ALL_TASKS].sort(),
+      "ALL_TASKS is out of sync with the TASK_ROLES map in roles.ts",
+    );
   });
 
   it("routes the two interactive chat tasks to the chat role", () => {
@@ -109,11 +147,18 @@ describe("AI role taxonomy", () => {
     }
   });
 
-  it("marks exactly one role as tool-driven and interactive", () => {
+  it("marks exactly one role as tool-driven, and marks it interactive", () => {
     const toolRoles = AI_ROLES.filter(
       (role) => AI_ROLE_PROFILES[role].outputContract === "stream_with_tools",
     );
     assert.deepEqual(toolRoles, ["chat"]);
+    // `latency` is surfaced to the operator through the admin GET and pairs
+    // with the keep-alive rule the whole design rests on. Telling an operator
+    // that the model students wait on is background work inverts the advice.
+    assert.equal(AI_ROLE_PROFILES.chat.latency, "interactive");
+    assert.equal(AI_ROLE_PROFILES.document.latency, "interactive");
+    assert.equal(AI_ROLE_PROFILES.extract.latency, "background");
+    assert.equal(AI_ROLE_PROFILES.draft.latency, "background");
   });
 });
 
@@ -154,5 +199,34 @@ describe("role model install checks", () => {
     // server has none. Warning on every role there would train the operator to
     // ignore the warning.
     assert.deepEqual(findMissingRoleModels({ chat: "gemma4:26b" }, []), []);
+  });
+});
+
+describe("model tag identity (residency guard)", () => {
+  it("treats a bare name and its :latest tag as the same model", () => {
+    // Ollama resolves them to one loaded model, and keep_alive is applied per
+    // model — so calling them different would attach the SHORT keep-alive to
+    // the model students are waiting on.
+    assert.equal(isSameModelTag("gemma4", "gemma4:latest"), true);
+    assert.equal(isSameModelTag("gemma4:latest", "gemma4"), true);
+  });
+
+  it("treats identical tags as the same model", () => {
+    assert.equal(isSameModelTag("gemma4:26b", "gemma4:26b"), true);
+    assert.equal(isSameModelTag(" gemma4:26b ", "gemma4:26b"), true);
+  });
+
+  it("treats genuinely different tags as different", () => {
+    assert.equal(isSameModelTag("gemma4:26b", "gemma4:12b"), false);
+    assert.equal(isSameModelTag("gemma4", "gemma4:26b"), false);
+  });
+
+  it("does NOT alias a truncated tag onto the real one", () => {
+    assert.equal(isSameModelTag("gemma4:12", "gemma4:12b"), false);
+  });
+
+  it("never calls an empty tag the same as anything", () => {
+    assert.equal(isSameModelTag("", ""), false);
+    assert.equal(isSameModelTag("", "gemma4:26b"), false);
   });
 });

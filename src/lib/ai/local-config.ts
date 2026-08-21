@@ -180,10 +180,35 @@ export function toLocalAiAuthConfig(
  * behaves exactly as it did before roles existed.
  */
 export async function readLocalAiRoleModel(role: AiRole): Promise<string | null> {
-  const configKey = AI_ROLE_MODEL_CONFIG_KEYS[role];
-  const configured = await getPlainConfigValue(configKey);
-  if (configured?.trim()) return configured.trim();
-  return firstEnvValue([`AI_PROVIDER_MODEL_${role.toUpperCase()}`]);
+  return (await readLocalAiRoleModelWithSource(role)).value;
+}
+
+/**
+ * The role's model plus WHERE it came from.
+ *
+ * The source matters to the admin surface: clearing a role's field deletes its
+ * SystemConfig row, but an `AI_PROVIDER_MODEL_<ROLE>` env var then takes over
+ * rather than the main model. Without the source, the panel would show a
+ * cleared-then-repopulated field in an editable box and the operator would
+ * believe they had unset something they had not.
+ */
+export async function readLocalAiRoleModelWithSource(
+  role: AiRole,
+): Promise<{ value: string | null; source: "config" | "env" | null }> {
+  const configured = await getPlainConfigValue(AI_ROLE_MODEL_CONFIG_KEYS[role]);
+  if (configured?.trim()) return { value: configured.trim(), source: "config" };
+  const fromEnv = firstEnvValue([`AI_PROVIDER_MODEL_${role.toUpperCase()}`]);
+  return fromEnv ? { value: fromEnv, source: "env" } : { value: null, source: null };
+}
+
+/** Which roles are pinned by an environment variable the admin UI cannot clear. */
+export async function readLocalAiRoleModelSources(): Promise<
+  Record<AiRole, "config" | "env" | null>
+> {
+  const entries = await Promise.all(
+    AI_ROLES.map(async (role) => [role, (await readLocalAiRoleModelWithSource(role)).source] as const),
+  );
+  return Object.fromEntries(entries) as Record<AiRole, "config" | "env" | null>;
 }
 
 /**

@@ -68,24 +68,37 @@ function localConfig(overrides: Record<string, string> = {}) {
   };
 }
 
-/** Env fallbacks are read when SystemConfig has no value; keep them out. */
-function withoutRoleEnv<T>(run: () => T): T {
-  const names = [
-    "AI_PROVIDER_MODEL_CHAT",
-    "AI_PROVIDER_MODEL_EXTRACT",
-    "AI_PROVIDER_MODEL_DOCUMENT",
-    "AI_PROVIDER_MODEL_DRAFT",
-  ];
+/**
+ * Env fallbacks are read when SystemConfig has no value; keep them out.
+ *
+ * MUST await `run()` before restoring. The subject is async and reads the
+ * environment inside its own awaits, so a synchronous wrapper would put every
+ * variable back before the first config read — isolation in appearance only.
+ * Verified: with the sync version and AI_PROVIDER_MODEL_EXTRACT set in the
+ * ambient environment, this file went 14 pass / 4 fail.
+ */
+async function withoutEnv<T>(names: readonly string[], run: () => Promise<T>): Promise<T> {
   const saved = names.map((name) => [name, process.env[name]] as const);
   for (const name of names) delete process.env[name];
   try {
-    return run();
+    return await run();
   } finally {
     for (const [name, value] of saved) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
   }
+}
+
+const ROLE_MODEL_ENV = [
+  "AI_PROVIDER_MODEL_CHAT",
+  "AI_PROVIDER_MODEL_EXTRACT",
+  "AI_PROVIDER_MODEL_DOCUMENT",
+  "AI_PROVIDER_MODEL_DRAFT",
+];
+
+function withoutRoleEnv<T>(run: () => Promise<T>): Promise<T> {
+  return withoutEnv(ROLE_MODEL_ENV, run);
 }
 
 describe("per-role local model selection", () => {
@@ -269,6 +282,29 @@ describe("per-role keep-alive (memory residency)", () => {
     assert.equal(keepAliveOf(provider), "8h");
   });
 
+  it("does not shorten the chat model's residency via an alias of itself", async () => {
+    // "gemma4" and "gemma4:latest" are ONE loaded model on the server, and
+    // keep_alive is applied per model. A raw string compare would call them
+    // different and attach the 5m timer to the model students wait on.
+    mockGetPlain.mock.mockImplementation(
+      localConfig({
+        ai_provider_model: "gemma4:latest",
+        ai_provider_model_extract: "gemma4",
+      }),
+    );
+
+    const provider = await withoutRoleEnv(() =>
+      resolveAiProvider({
+        studentId: "student-123",
+        task: "sage_post_response",
+        sensitivity: "student_record",
+      }),
+    );
+
+    assert.equal(modelOf(provider), "gemma4");
+    assert.equal(keepAliveOf(provider), "8h");
+  });
+
   it("compares against the chat role's model, not the global default", async () => {
     // chat is overridden and extract is not: extract resolves to the GLOBAL
     // model, which differs from chat's — so it is secondary weight.
@@ -350,24 +386,18 @@ describe("per-role output budget", () => {
     return (provider as { structuredMaxOutputTokens: number }).structuredMaxOutputTokens;
   }
 
-  function withoutCapEnv<T>(run: () => T): T {
-    const names = [
-      "AI_PROVIDER_MAX_OUTPUT_TOKENS",
-      "AI_PROVIDER_MAX_OUTPUT_TOKENS_CHAT",
-      "AI_PROVIDER_MAX_OUTPUT_TOKENS_EXTRACT",
-      "AI_PROVIDER_MAX_OUTPUT_TOKENS_DOCUMENT",
-      "AI_PROVIDER_MAX_OUTPUT_TOKENS_DRAFT",
-    ];
-    const saved = names.map((name) => [name, process.env[name]] as const);
-    for (const name of names) delete process.env[name];
-    try {
-      return run();
-    } finally {
-      for (const [name, value] of saved) {
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
-      }
-    }
+  function withoutCapEnv<T>(run: () => Promise<T>): Promise<T> {
+    return withoutEnv(
+      [
+        "AI_PROVIDER_MAX_OUTPUT_TOKENS",
+        "AI_PROVIDER_MAX_OUTPUT_TOKENS_CHAT",
+        "AI_PROVIDER_MAX_OUTPUT_TOKENS_EXTRACT",
+        "AI_PROVIDER_MAX_OUTPUT_TOKENS_DOCUMENT",
+        "AI_PROVIDER_MAX_OUTPUT_TOKENS_DRAFT",
+        ...ROLE_MODEL_ENV,
+      ],
+      run,
+    );
   }
 
   it("keeps the provider defaults when no role cap is set", async () => {

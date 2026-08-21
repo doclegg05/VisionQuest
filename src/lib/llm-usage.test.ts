@@ -141,6 +141,17 @@ describe("withUsageLogging", () => {
     assert.equal(loggedRows()[0].model, "gemma4:e4b");
   });
 
+  it("falls back to the provider name for a blank model tag, not an empty string", async () => {
+    const provider = fakeProvider({ model: "   " } as Partial<AIProvider>);
+    const logged = withUsageLogging(provider, {
+      studentId: "student-1",
+      callSite: "sage_post.goals",
+    });
+    await logged.generateResponse("sys", MESSAGES);
+
+    assert.equal(loggedRows()[0].model, "fake");
+  });
+
   it("falls back to the provider name when it exposes no model tag", async () => {
     const logged = withUsageLogging(fakeProvider(), {
       studentId: "student-1",

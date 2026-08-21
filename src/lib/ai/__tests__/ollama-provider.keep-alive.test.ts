@@ -149,3 +149,82 @@ describe("OllamaProvider keep-alive residency", { concurrency: false }, () => {
     assert.match(OllamaProvider.SECONDARY_KEEP_ALIVE, /^\d+[smh]$/);
   });
 });
+
+/**
+ * Per-role option parity across the two API surfaces.
+ *
+ * The keep-alive bug above was not a one-off: it is a bug CLASS. Ollama's
+ * OpenAI-compatible /v1 and its native /api/chat take different parameter
+ * names for the same knob and each silently ignores the other's, and postChat
+ * prefers /v1 — so an option added to only one body is inert on the live path
+ * and looks correct in review. It has now happened twice in this repo
+ * (reasoning knobs, then keep-alive).
+ *
+ * These assert the option reaches the wire on whichever surface is used, so
+ * the next tunable cannot be severed from the request with the suite green.
+ */
+describe("per-role options reach the wire on both surfaces", { concurrency: false }, () => {
+  beforeEach(() => {
+    mockFetch.mock.resetCalls();
+  });
+
+  it("sends the role output cap to JSON mode on the OpenAI surface", async () => {
+    mockFetch.mock.mockImplementation(async () => openAiOk("{}"));
+
+    const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
+      authMode: "none",
+      structuredMaxOutputTokens: 2048,
+    });
+    await provider.generateStructuredResponse("system", [{ role: "user", content: "hi" }]);
+
+    assert.match(urlOf(0), /\/v1\/chat\/completions$/);
+    assert.equal(bodyOf(0).max_tokens, 2048);
+    assert.deepEqual(bodyOf(0).response_format, { type: "json_object" });
+  });
+
+  it("sends the role output cap to JSON mode on the native surface", async () => {
+    let calls = 0;
+    mockFetch.mock.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) return new Response("Not Found", { status: 404 });
+      return nativeOk('{"ok":true}');
+    });
+
+    const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
+      authMode: "none",
+      structuredMaxOutputTokens: 2048,
+    });
+    await provider.generateStructuredResponse("system", [{ role: "user", content: "hi" }]);
+
+    assert.match(urlOf(1), /\/api\/chat$/);
+    assert.equal((bodyOf(1).options as Record<string, unknown>).num_predict, 2048);
+    assert.equal(bodyOf(1).format, "json");
+  });
+
+  it("keeps JSON mode on its own default when no role cap is given", async () => {
+    mockFetch.mock.mockImplementation(async () => openAiOk("{}"));
+
+    const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
+      authMode: "none",
+      // A raised GLOBAL free-text cap must not leak into JSON mode — that is
+      // the compatibility promise made to deployments that raised it to make
+      // room for reasoning tokens.
+      maxOutputTokens: 3072,
+    });
+    await provider.generateStructuredResponse("system", [{ role: "user", content: "hi" }]);
+
+    assert.equal(bodyOf(0).max_tokens, 512);
+  });
+
+  it("sends the role output cap to free-text generation on the OpenAI surface", async () => {
+    mockFetch.mock.mockImplementation(async () => openAiOk());
+
+    const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
+      authMode: "none",
+      maxOutputTokens: 1536,
+    });
+    await provider.generateResponse("system", [{ role: "user", content: "hi" }]);
+
+    assert.equal(bodyOf(0).max_tokens, 1536);
+  });
+});

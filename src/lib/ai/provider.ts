@@ -8,7 +8,7 @@ import {
   readLocalAiRoleModel,
   toLocalAiAuthConfig,
 } from "./local-config";
-import { roleForTask, type AiRole } from "./roles";
+import { isSameModelTag, roleForTask, type AiRole } from "./roles";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
 import type {
@@ -99,7 +99,11 @@ async function resolveLocalModelForRole(
   if (role === "chat") return { model, maxOutputTokens };
 
   const chatModel = (await readLocalAiRoleModel("chat"))?.trim() || globalModel;
-  return model === chatModel
+  // Tag equality is not string equality: Ollama resolves a bare name to its
+  // `:latest` tag, and keep_alive is applied by the server per MODEL. Treating
+  // an alias of the chat model as "different" would attach the short
+  // keep-alive to the model students are waiting on.
+  return isSameModelTag(model, chatModel)
     ? { model, maxOutputTokens }
     : { model, maxOutputTokens, keepAlive: OllamaProvider.SECONDARY_KEEP_ALIVE };
 }

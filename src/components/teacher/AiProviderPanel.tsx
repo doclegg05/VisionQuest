@@ -66,6 +66,20 @@ export default function AiProviderPanel() {
     document: "",
     draft: "",
   });
+  // Empty string = "provider default". The strict-JSON roles default to 512
+  // output tokens in production, which the resume and career-discovery
+  // contracts do not fit inside — raising it is a real fix an operator needs
+  // to be able to make.
+  const [roleMaxOutput, setRoleMaxOutput] = useState<Record<AiRole, string>>({
+    chat: "",
+    extract: "",
+    document: "",
+    draft: "",
+  });
+  // Which roles are pinned by an env var, and so cannot be cleared here.
+  const [roleModelSources, setRoleModelSources] = useState<
+    Partial<Record<AiRole, "config" | "env" | null>>
+  >({});
   const [numCtxInput, setNumCtxInput] = useState(""); // empty string = use default
   const [numCtxBounds, setNumCtxBounds] = useState<NumCtxBounds>(DEFAULT_NUM_CTX_BOUNDS);
   const [bearerToken, setBearerToken] = useState("");
@@ -95,6 +109,8 @@ export default function AiProviderPanel() {
               url?: string;
               model?: string;
               roleModels?: Partial<Record<AiRole, string | null>>;
+              roleMaxOutputTokens?: Partial<Record<AiRole, number | null>>;
+              roleProfiles?: Array<{ role: AiRole; source: "config" | "env" | null }>;
               embeddingModel?: string;
               authMode?: LocalAuthMode;
               apiStyle?: LocalApiStyle;
@@ -137,6 +153,23 @@ export default function AiProviderPanel() {
             draft: data.roleModels.draft ?? "",
           });
         }
+        if (data.roleMaxOutputTokens) {
+          setRoleMaxOutput({
+            chat: data.roleMaxOutputTokens.chat ? String(data.roleMaxOutputTokens.chat) : "",
+            extract: data.roleMaxOutputTokens.extract
+              ? String(data.roleMaxOutputTokens.extract)
+              : "",
+            document: data.roleMaxOutputTokens.document
+              ? String(data.roleMaxOutputTokens.document)
+              : "",
+            draft: data.roleMaxOutputTokens.draft ? String(data.roleMaxOutputTokens.draft) : "",
+          });
+        }
+        if (data.roleProfiles) {
+          setRoleModelSources(
+            Object.fromEntries(data.roleProfiles.map((p) => [p.role, p.source])),
+          );
+        }
         setNumCtxInput(typeof data.numCtx === "number" ? String(data.numCtx) : "");
         if (data.numCtxBounds) setNumCtxBounds(data.numCtxBounds);
         setHasBearerToken(Boolean(data.hasApiKey));
@@ -175,7 +208,12 @@ export default function AiProviderPanel() {
 
     const body: Record<
       string,
-      string | number | null | undefined | Record<AiRole, string>
+      | string
+      | number
+      | null
+      | undefined
+      | Record<AiRole, string>
+      | Record<AiRole, number | null>
     > = {
       provider,
       url: url || undefined,
@@ -184,6 +222,16 @@ export default function AiProviderPanel() {
       // Sent whole so clearing a field clears the override server-side; an
       // empty string means "fall back to the main model", not "skip this key".
       roleModels: provider === "local" ? roleModels : undefined,
+      // null clears the cap; a blank field means "provider default".
+      roleMaxOutputTokens:
+        provider === "local"
+          ? (Object.fromEntries(
+              AI_ROLES.map((role) => [
+                role,
+                roleMaxOutput[role].trim() ? Number(roleMaxOutput[role].trim()) : null,
+              ]),
+            ) as Record<AiRole, number | null>)
+          : undefined,
       authMode: provider === "local" ? authMode : undefined,
       apiStyle: provider === "local" ? apiStyle : undefined,
     };
@@ -474,6 +522,39 @@ export default function AiProviderPanel() {
                     {AI_ROLE_PROFILES[role].latency === "interactive"
                       ? "Someone is waiting on this — speed matters."
                       : "Runs in the background — quality matters more than speed."}
+                  </p>
+                  {roleModelSources[role] === "env" && (
+                    <p className="mt-1 text-xs text-[var(--warn-ink,var(--ink-strong))]">
+                      Set by a server environment variable. Clearing this box will not
+                      change it — remove AI_PROVIDER_MODEL_{role.toUpperCase()} on the
+                      server instead.
+                    </p>
+                  )}
+                  <label
+                    htmlFor={`role-cap-${role}`}
+                    className="mt-3 mb-1 block text-xs font-medium text-[var(--ink-strong)]"
+                  >
+                    Longest answer (tokens)
+                  </label>
+                  <input
+                    id={`role-cap-${role}`}
+                    type="number"
+                    min={128}
+                    max={32768}
+                    value={roleMaxOutput[role]}
+                    onChange={(e) => {
+                      setRoleMaxOutput((prev) => ({ ...prev, [role]: e.target.value }));
+                      resetMessages();
+                    }}
+                    placeholder={
+                      AI_ROLE_PROFILES[role].outputContract === "strict_json" ? "512" : "768"
+                    }
+                    className="field w-full px-4 py-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                    {AI_ROLE_PROFILES[role].outputContract === "strict_json"
+                      ? "Leave blank for the default. Raise it if answers come back cut off — a cut-off answer here looks the same as no answer at all."
+                      : "Leave blank for the default. Raise it if longer writing gets cut off."}
                   </p>
                 </div>
               ))}
