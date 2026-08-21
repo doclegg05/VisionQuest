@@ -83,8 +83,13 @@ interface OpenAIChatResponse {
       content?: string;
       /** Reasoning channel on thinking models. Never shown to students. */
       reasoning?: string;
+      /** Present when the turn ended by calling a tool. */
+      tool_calls?: OpenAIToolCallMessage[];
     };
-    /** "length" when the model hit the output-token cap mid-generation. */
+    /**
+     * "length" when the model hit the output-token cap mid-generation,
+     * "tool_calls" when it ended the turn by calling a tool.
+     */
     finish_reason?: string | null;
   }>;
   usage?: OpenAIUsage;
@@ -124,6 +129,13 @@ interface NativeChatResponse {
 }
 
 type OllamaApiMode = "unknown" | "openai" | "native";
+
+/** The clock a single `reader.read()` runs against. */
+interface StreamDeadline {
+  /** Epoch ms at which the read is abandoned. */
+  at: number;
+  kind: "first-content" | "stall";
+}
 
 class LocalAiStreamError extends Error {
   readonly switchToNative: boolean;
@@ -260,6 +272,88 @@ function isTruncated(reason: string | null | undefined): boolean {
 }
 
 /**
+ * Why a completion came back with no visible text.
+ *
+ * `unknown` is a real answer, not a gap: native /api/chat reports NOTHING
+ * when a model calls a tool the request never declared, so on that surface
+ * the cause genuinely is not observable. Naming it keeps the error honest.
+ */
+type EmptyCompletionCause =
+  | { kind: "truncated"; reasoningChars: number }
+  | { kind: "tool_call"; toolName: string | null }
+  | { kind: "unknown" };
+
+/**
+ * Classifies an empty completion from whatever the surface admits.
+ *
+ * The two surfaces admit different amounts. `/v1/chat/completions` reports
+ * `finish_reason: "tool_calls"` and may carry the parsed call; native
+ * `/api/chat` carries `message.tool_calls` only when the caller declared
+ * tools, and is silent otherwise. Checked in that order because a turn cut
+ * off by the output cap is a budget problem regardless of what else it was
+ * doing.
+ */
+function classifyEmptyCompletion(
+  mode: Exclude<OllamaApiMode, "unknown">,
+  data: OpenAIChatResponse | NativeChatResponse,
+): EmptyCompletionCause {
+  if (mode === "openai") {
+    const choice = (data as OpenAIChatResponse).choices?.[0];
+    if (isTruncated(choice?.finish_reason)) {
+      return { kind: "truncated", reasoningChars: (choice?.message?.reasoning ?? "").length };
+    }
+    const calls = choice?.message?.tool_calls ?? [];
+    if (choice?.finish_reason === "tool_calls" || calls.length > 0) {
+      return { kind: "tool_call", toolName: calls[0]?.function?.name ?? null };
+    }
+    return { kind: "unknown" };
+  }
+
+  const native = data as NativeChatResponse;
+  if (isTruncated(native.done_reason)) {
+    return { kind: "truncated", reasoningChars: (native.message?.thinking ?? "").length };
+  }
+  const calls = native.message?.tool_calls ?? [];
+  if (calls.length > 0) {
+    return { kind: "tool_call", toolName: calls[0]?.function?.name ?? null };
+  }
+  return { kind: "unknown" };
+}
+
+/**
+ * Builds the error thrown when a turn ends by calling a tool and says nothing.
+ *
+ * The model routed the question to a tool the request never offered, so the
+ * call was dropped and the reply is empty. This is the bug class that cost
+ * two debugging sessions: the fix is either to declare the tool or to tell
+ * the model it has none, never to pass the "" along.
+ */
+function toolCallWithoutContentError(model: string, toolName: string | null): Error {
+  const named = toolName ? ` (${toolName})` : "";
+  return new Error(
+    `Local AI model "${model}" ended its turn with a tool call${named} and no visible content.` +
+      ` The request declared no matching tool, so the call was dropped and nothing was left to say.` +
+      ` Declare the tool, or state in the prompt that this call has none.`,
+  );
+}
+
+/**
+ * Builds the error thrown when a turn is empty and the surface says why.
+ *
+ * Deliberately claims no cause. Native /api/chat with no tools declared
+ * returns `{"role":"assistant","content":""}` with `done_reason: "stop"` for
+ * a dropped tool call — the same bytes it returns for any other empty turn —
+ * so guessing here would send the next reader down the wrong path.
+ */
+function emptyCompletionError(model: string): Error {
+  return new Error(
+    `Local AI model "${model}" returned an empty reply and the turn ended normally.` +
+      ` This API surface reports no cause: Ollama's native /api/chat is silent when a model calls a tool the request never declared.` +
+      ` Diagnose with /api/generate raw:true, which shows the literal emitted tokens.`,
+  );
+}
+
+/**
  * Builds the error thrown when a turn ends with no visible content.
  *
  * Reasoning models draw reasoning tokens from the SAME budget as the reply,
@@ -332,6 +426,17 @@ export class OllamaProvider implements AIProvider {
    */
   private static readonly FIRST_CONTENT_TIMEOUT_MS = 45_000;
 
+  /**
+   * Time allowed between model deltas once the stream is producing.
+   *
+   * An inter-DELTA clock, not an inter-chunk one: the relay keeps sending
+   * heartbeat frames while a wedged model emits nothing, so only content,
+   * reasoning, or a tool-call delta may reset it. Roomier than the
+   * first-content window because a mid-reply pause on loaded CPU hardware is
+   * normal where a stalled start is not.
+   */
+  private static readonly STREAM_STALL_TIMEOUT_MS = 60_000;
+
   private static readonly DEFAULT_MAX_OUTPUT_TOKENS = 768;
   private static readonly STRUCTURED_MAX_OUTPUT_TOKENS = 512;
 
@@ -364,6 +469,7 @@ export class OllamaProvider implements AIProvider {
    */
   private readonly reasoningEnabled: boolean;
   private readonly maxOutputTokens: number;
+  private readonly streamStallTimeoutMs: number;
 
   constructor(
     baseUrl: string,
@@ -412,6 +518,11 @@ export class OllamaProvider implements AIProvider {
       typeof explicitMaxOutput === "number" && explicitMaxOutput > 0
         ? explicitMaxOutput
         : OllamaProvider.DEFAULT_MAX_OUTPUT_TOKENS;
+    const explicitStallTimeout = structuredConfig?.streamStallTimeoutMs;
+    this.streamStallTimeoutMs =
+      typeof explicitStallTimeout === "number" && explicitStallTimeout > 0
+        ? explicitStallTimeout
+        : OllamaProvider.STREAM_STALL_TIMEOUT_MS;
   }
 
   /**
@@ -597,9 +708,18 @@ export class OllamaProvider implements AIProvider {
   }
 
   /**
-   * Fail loudly when a turn was cut off by the output cap without producing
-   * any visible text. Truncated-but-present content is still usable and
-   * passes through; only the all-or-nothing case throws.
+   * Fail loudly on a completion with no visible text, whatever the cause.
+   *
+   * Empty is never a valid answer here. Every caller either shows the string
+   * to a student (chat send's non-streaming path emits it as a text event and
+   * persists it), stores it (conversation summaries overwrite a real summary
+   * with ""), or JSON.parses it (every structured extractor, where "" throws
+   * a SyntaxError logged as a malformed response — fatal already, just
+   * misattributed). The one caller that tolerates "" is the warmup ping,
+   * which discards the value and already swallows errors.
+   *
+   * Truncated-but-present content is still usable and passes through; only
+   * the all-or-nothing case throws.
    */
   private assertVisibleContent(
     mode: Exclude<OllamaApiMode, "unknown">,
@@ -609,18 +729,15 @@ export class OllamaProvider implements AIProvider {
   ): void {
     if (text) return;
 
-    const truncated =
-      mode === "openai"
-        ? isTruncated((data as OpenAIChatResponse).choices?.[0]?.finish_reason)
-        : isTruncated((data as NativeChatResponse).done_reason);
-    if (!truncated) return;
-
-    const reasoningChars =
-      mode === "openai"
-        ? ((data as OpenAIChatResponse).choices?.[0]?.message?.reasoning ?? "").length
-        : ((data as NativeChatResponse).message?.thinking ?? "").length;
-
-    throw noVisibleContentError(this.model, budget, reasoningChars);
+    const cause = classifyEmptyCompletion(mode, data);
+    switch (cause.kind) {
+      case "truncated":
+        throw noVisibleContentError(this.model, budget, cause.reasoningChars);
+      case "tool_call":
+        throw toolCallWithoutContentError(this.model, cause.toolName);
+      case "unknown":
+        throw emptyCompletionError(this.model);
+    }
   }
 
   /**
@@ -706,11 +823,16 @@ export class OllamaProvider implements AIProvider {
     let sawTruncation = false;
     const firstContentDeadlineAt =
       Date.now() + OllamaProvider.FIRST_CONTENT_TIMEOUT_MS;
+    /** When the model last proved it was alive. Null until its first delta. */
+    let lastDeltaAt: number | null = null;
+    const noteDelta = (): void => {
+      lastDeltaAt = Date.now();
+    };
 
     while (true) {
       const { done, value } = await this.readStreamChunk(
         reader,
-        yieldedContent || reasoningChars > 0 ? null : firstContentDeadlineAt,
+        this.nextStreamDeadline(firstContentDeadlineAt, lastDeltaAt),
       );
       if (done) break;
 
@@ -728,10 +850,15 @@ export class OllamaProvider implements AIProvider {
             if (!nativeParsed) continue;
             const upstreamError = payloadErrorMessage(nativeParsed);
             if (upstreamError) throw new LocalAiStreamError(upstreamError);
-            reasoningChars += (nativeParsed.message?.thinking ?? "").length;
+            const thinking = nativeParsed.message?.thinking;
+            if (thinking) {
+              reasoningChars += thinking.length;
+              noteDelta();
+            }
             const content = nativeParsed.message?.content;
             if (content) {
               yieldedContent = true;
+              noteDelta();
               yield content;
             }
             if (nativeParsed.done) {
@@ -771,11 +898,16 @@ export class OllamaProvider implements AIProvider {
             const usage = usageFromOpenAI(parsed.usage);
             if (usage) usageSink.usage = usage;
           }
-          reasoningChars += (parsed.choices?.[0]?.delta?.reasoning ?? "").length;
+          const reasoningDelta = parsed.choices?.[0]?.delta?.reasoning;
+          if (reasoningDelta) {
+            reasoningChars += reasoningDelta.length;
+            noteDelta();
+          }
           if (isTruncated(parsed.choices?.[0]?.finish_reason)) sawTruncation = true;
           const content = streamChunkContent(parsed);
           if (content) {
             yieldedContent = true;
+            noteDelta();
             yield content;
           }
           continue;
@@ -791,10 +923,15 @@ export class OllamaProvider implements AIProvider {
         if (upstreamError) {
           throw new LocalAiStreamError(upstreamError);
         }
-        reasoningChars += (parsed.message?.thinking ?? "").length;
+        const thinking = parsed.message?.thinking;
+        if (thinking) {
+          reasoningChars += thinking.length;
+          noteDelta();
+        }
         const content = parsed.message?.content;
         if (content) {
           yieldedContent = true;
+          noteDelta();
           yield content;
         }
         if (parsed.done) {
@@ -952,23 +1089,60 @@ export class OllamaProvider implements AIProvider {
     if (lastError) throw lastError;
   }
 
+  /**
+   * The clock on a live stream. Before the model's first delta it is the
+   * first-content window; after it, the inter-delta stall window. There is
+   * never a bare read: an unclocked `reader.read()` is what let one token
+   * followed by silence hold a turn open indefinitely.
+   */
+  private nextStreamDeadline(
+    firstContentDeadlineAt: number,
+    lastDeltaAt: number | null,
+  ): StreamDeadline {
+    return lastDeltaAt === null
+      ? { at: firstContentDeadlineAt, kind: "first-content" }
+      : { at: lastDeltaAt + this.streamStallTimeoutMs, kind: "stall" };
+  }
+
+  /**
+   * Error for a breached stream deadline.
+   *
+   * The stall variant says "timed out" on purpose: `isRetryableStartupError`
+   * matches that word, so a stall that happened before anything was yielded
+   * (a tool hop, say) gets the startup retry, while one after yielded output
+   * is refused by the `!yieldedAny` guard that would otherwise duplicate it.
+   * A first-content breach stays non-retryable, as it was.
+   */
+  private streamDeadlineError(kind: StreamDeadline["kind"]): LocalAiStreamError {
+    if (kind === "stall") {
+      return new LocalAiStreamError(
+        `Local AI stream timed out after ${Math.round(
+          this.streamStallTimeoutMs / 1000,
+        )} seconds with no new content from the model.`,
+        { retryable: true },
+      );
+    }
+    return new LocalAiStreamError(
+      `Local AI did not produce a first content token within ${Math.round(
+        OllamaProvider.FIRST_CONTENT_TIMEOUT_MS / 1000,
+      )} seconds.`,
+      { retryable: false },
+    );
+  }
+
   private async readStreamChunk(
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    firstContentDeadlineAt: number | null,
+    deadline: StreamDeadline,
   ): Promise<ReadableStreamReadResult<Uint8Array>> {
-    if (firstContentDeadlineAt === null) {
-      return reader.read();
-    }
+    const cancelReason =
+      deadline.kind === "stall"
+        ? "Local AI stream stalled"
+        : "Local AI first content timeout";
 
-    const remainingMs = firstContentDeadlineAt - Date.now();
+    const remainingMs = deadline.at - Date.now();
     if (remainingMs <= 0) {
-      await reader.cancel("Local AI first content timeout").catch(() => undefined);
-      throw new LocalAiStreamError(
-        `Local AI did not produce a first content token within ${Math.round(
-          OllamaProvider.FIRST_CONTENT_TIMEOUT_MS / 1000,
-        )} seconds.`,
-        { retryable: false },
-      );
+      await reader.cancel(cancelReason).catch(() => undefined);
+      throw this.streamDeadlineError(deadline.kind);
     }
 
     let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -976,16 +1150,13 @@ export class OllamaProvider implements AIProvider {
       return await Promise.race([
         reader.read(),
         new Promise<never>((_, reject) => {
-          timeout = setTimeout(async () => {
-            await reader.cancel("Local AI first content timeout").catch(() => undefined);
-            reject(
-              new LocalAiStreamError(
-                `Local AI did not produce a first content token within ${Math.round(
-                  OllamaProvider.FIRST_CONTENT_TIMEOUT_MS / 1000,
-                )} seconds.`,
-                { retryable: false },
-              ),
-            );
+          timeout = setTimeout(() => {
+            // Reject BEFORE cancelling. Cancelling resolves the pending
+            // read with `{ done: true }`, which would win the race and end
+            // the stream silently — the deadline would look enforced while
+            // the caller got a truncated reply and no error.
+            reject(this.streamDeadlineError(deadline.kind));
+            void reader.cancel(cancelReason).catch(() => undefined);
           }, remainingMs);
         }),
       ]);
@@ -1216,18 +1387,22 @@ export class OllamaProvider implements AIProvider {
     const toolCalls = new Map<number, AccumulatedToolCall>();
     // Native mode doesn't have a stable index per call; use insertion order.
     let nativeIndex = 0;
-    let receivedModelPayload = false;
     let reasoningChars = 0;
     let sawTruncation = false;
     let yieldedText = false;
     let usage: TokenUsage | null = null;
     const firstContentDeadlineAt =
       Date.now() + OllamaProvider.FIRST_CONTENT_TIMEOUT_MS;
+    /** When the model last proved it was alive. Null until its first delta. */
+    let lastDeltaAt: number | null = null;
+    const noteDelta = (): void => {
+      lastDeltaAt = Date.now();
+    };
 
     while (true) {
       const { done, value } = await this.readStreamChunk(
         reader,
-        receivedModelPayload ? null : firstContentDeadlineAt,
+        this.nextStreamDeadline(firstContentDeadlineAt, lastDeltaAt),
       );
       if (done) break;
 
@@ -1270,19 +1445,19 @@ export class OllamaProvider implements AIProvider {
           const reasoningDelta = choice?.delta?.reasoning;
           if (reasoningDelta) {
             reasoningChars += reasoningDelta.length;
-            receivedModelPayload = true;
+            noteDelta();
           }
           if (isTruncated(choice?.finish_reason)) sawTruncation = true;
           const text = choice?.delta?.content;
           if (text) {
-            receivedModelPayload = true;
+            noteDelta();
             yieldedText = true;
             yield text;
           }
 
           const callDeltas = choice?.delta?.tool_calls;
           if (callDeltas) {
-            receivedModelPayload = true;
+            noteDelta();
             for (const delta of callDeltas) {
               accumulateOpenAIToolCall(toolCalls, delta);
             }
@@ -1303,19 +1478,19 @@ export class OllamaProvider implements AIProvider {
         const thinking = parsed.message?.thinking;
         if (thinking) {
           reasoningChars += thinking.length;
-          receivedModelPayload = true;
+          noteDelta();
         }
 
         const text = parsed.message?.content;
         if (text) {
-          receivedModelPayload = true;
+          noteDelta();
           yieldedText = true;
           yield text;
         }
 
         const calls = parsed.message?.tool_calls;
         if (calls) {
-          receivedModelPayload = true;
+          noteDelta();
           for (const call of calls) {
             const id = `native-${nativeIndex++}-${randomUUID().slice(0, 8)}`;
             const argString =

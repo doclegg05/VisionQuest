@@ -229,7 +229,7 @@ export default function SettingsPage() {
         description={
           sessionRole === "teacher" || sessionRole === "admin"
             ? "Manage staff account security and your personal Sage access."
-            : "Manage Sage access and the classroom-only recovery questions used for internal password resets."
+            : "Manage Sage access and your classroom recovery questions for password resets."
         }
       />
 
@@ -245,8 +245,8 @@ export default function SettingsPage() {
             <p className="page-eyebrow text-[var(--ink-muted)]">Profile</p>
             <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal info</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
-              Your birthdate helps your teacher report enrollment accurately to DoHS.
-              It&apos;s only shared with SPOKES program staff.
+              Your birthdate helps your teacher report your enrollment to DoHS.
+              We only share it with SPOKES staff.
             </p>
           </div>
 
@@ -303,7 +303,7 @@ export default function SettingsPage() {
               Recovery questions
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
-              This lower-security reset option is meant only for your classroom deployment. If you forget your password, you can answer these questions and choose a new one without email.
+              This reset option is only for your classroom account. If you forget your password, answer these questions to choose a new one — no email needed.
             </p>
           </div>
           <span
@@ -319,7 +319,7 @@ export default function SettingsPage() {
 
         {recoveryConfigured && (
           <p className="mt-4 text-sm text-[var(--ink-muted)]">
-            Updating the questions here replaces your previous classroom recovery answers. You will need to enter all three answers again to save changes.
+            Updating these questions replaces your old answers. You will need to enter all three again to save.
           </p>
         )}
 
@@ -419,7 +419,7 @@ export default function SettingsPage() {
                 title: "Check the default setup",
                 body: platformKeyConfigured
                   ? "Your program already configured Sage for everyone. You only need a personal key if you want to override it."
-                  : "If your program has not configured Sage yet, you can add a personal Gemini API key here.",
+                  : "If your program has not set up Sage yet, add your own Gemini API key here.",
               },
               {
                 step: "2",
@@ -434,7 +434,7 @@ export default function SettingsPage() {
               {
                 step: "4",
                 title: "Copy and save it",
-                body: "Gemini keys usually begin with AIza. Paste it below and VisionQuest will verify it before saving.",
+                body: "Gemini keys usually start with AIza. Paste yours below, and we will check it before saving.",
               },
             ].map((item) => (
               <div key={item.step} className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
@@ -453,7 +453,7 @@ export default function SettingsPage() {
         <div className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
           {platformKeyConfigured && (
             <p className="mb-3 text-sm text-[var(--ink-muted)]">
-              A program-managed Gemini key is already active. Adding a personal key here is optional and will override the shared setup for your account.
+              Your program already set up a Gemini key. Adding your own key here is optional, and it will replace the shared key for your account.
             </p>
           )}
 

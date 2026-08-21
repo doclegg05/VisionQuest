@@ -29,32 +29,36 @@ function getSecret(): string {
   return secret;
 }
 
-/** Canonical JSON: sorted keys so semantically-equal args hash identically. */
+/** Canonical JSON, matching JSON.stringify's treatment of undefined: object
+ *  entries with undefined values are omitted (so an absent optional field and
+ *  an explicitly-undefined one sign the same, and neither collides with ""),
+ *  and undefined array elements become null. Keys sort by codepoint, not
+ *  localeCompare — the sort must not depend on process locale/ICU, or the
+ *  same payload could sign differently on create and verify. */
 function canonicalize(value: unknown): string {
   if (Array.isArray(value)) {
-    return `[${value.map(canonicalize).join(",")}]`;
+    const elements = value.map((element) =>
+      element === undefined ? "null" : canonicalize(element),
+    );
+    return `[${elements.join(",")}]`;
   }
   if (value !== null && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([key, entryValue]) => `${JSON.stringify(key)}:${canonicalize(entryValue)}`);
     return `{${entries.join(",")}}`;
   }
   return JSON.stringify(value);
 }
 
+/** The signature input is canonical JSON, never a delimiter-joined field list —
+ *  JSON quoting keeps every field boundary unambiguous. The payload sits under
+ *  its own key so future payload fields are covered automatically and can
+ *  never be shadowed by the sibling expiry entry. */
 function signatureFor(payload: ConfirmationPayload, expiresAt: number): string {
   return createHmac("sha256", getSecret())
-    .update(
-      [
-        payload.toolName,
-        canonicalize(payload.args),
-        payload.sessionId,
-        payload.conversationId,
-        payload.targetStudentId ?? "",
-        String(expiresAt),
-      ].join("|"),
-    )
+    .update(canonicalize({ expiresAt, payload }))
     .digest("hex");
 }
 

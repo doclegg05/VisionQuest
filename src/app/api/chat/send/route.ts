@@ -4,8 +4,9 @@ import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
-import { getMemoryContext } from "@/lib/sage/memory/retrieve";
+import { getMemoryContext, getStaffMemoryContext } from "@/lib/sage/memory/retrieve";
 import { getStudentProfile } from "@/lib/sage/memory/profile";
+import { extractAndStoreStaffMemories } from "@/lib/sage/memory/staff-extract";
 import {
   findRelevantForms,
   getDirectFormAnswer,
@@ -33,6 +34,7 @@ import {
   selfMetricLineFromBundle,
 } from "@/lib/sage/context-bundle";
 import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
+import { renderRecentActivity } from "@/lib/sage/recent-activity";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
 import {
   buildStaffStudentContext,
@@ -489,6 +491,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // Build system prompt — staff (teacher/admin/coordinator) get a streamlined path
   let systemPrompt: string;
+  let recentActivityBlock = "";
 
   if (isStaffChat) {
     const staffStage = isAdmin
@@ -555,12 +558,37 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         coachingArcContext: promptContext.coachingArcContext,
         selfMetricsLine: selfMetricLineFromBundle(bundle),
       }, promptTier);
+
+    // RECENT ACTIVITY — what actually happened since the last conversation,
+    // built from bundle fields every turn already pays to fetch
+    // (recentEvents + alert descriptors); before this the queries ran and the
+    // results were discarded. Skipped for discovery (first meeting — nothing
+    // to reference), matching the situational-snapshot rule. Deliberately
+    // INCLUDED on the compact/local tier, unlike the snapshot: the block is
+    // hard-bounded by construction (≤5 event + ≤3 alert lines, each ≤120
+    // chars, ~1KB worst case), and on the local/FERPA path it is the only
+    // recency signal Sage gets — the snapshot exclusion was about unbounded
+    // cached prose under the 3k-token budget, not about recency itself.
+    if (conversationStage !== "discovery") {
+      recentActivityBlock = renderRecentActivity({
+        events: bundle.recentEvents,
+        alerts: bundle.alerts,
+      });
+    }
   }
 
   // Per-section prompt-size instrumentation (sage.prompt.size below). Tracks
   // chars contributed by each block as it's appended, mirroring the existing
   // documentContextChars/formContextChars vars this replaces/extends.
   const sectionSizes: Record<string, number> = { systemBase: systemPrompt.length };
+
+  // Appended after the base prompt (same pattern as the RAG/memory blocks) so
+  // its cost shows up as its own row in the sage.prompt.size sections map.
+  if (recentActivityBlock) {
+    const block = `\n\n${recentActivityBlock}`;
+    systemPrompt += block;
+    sectionSizes.recentActivity = block.length;
+  }
 
   // Inject document-based context from ProgramDocument (RAG layer).
   // Skip RAG for trivial messages — short pleasantries don't benefit from
@@ -588,21 +616,33 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       sectionSizes.form = formContextChars;
     }
 
-    // Durable memory (Phase 2): what Sage remembers about this student from
-    // previous sessions. Student-subject only — staff chat gets student
-    // context via staff-student-context, not memories.
-    if (!isStaffChat && process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
-      // Always-on durable profile (who the student fundamentally is) + the
-      // query-relevant recall (what's relevant to this message), deduped.
-      const profile = await getStudentProfile(session.id);
-      if (profile.block) {
-        systemPrompt += `\n\n${profile.block}`;
-        sectionSizes.memoryProfile = profile.block.length;
-      }
-      const memoryContext = await getMemoryContext(session.id, userMessage, undefined, profile.contents);
-      if (memoryContext) {
-        systemPrompt += memoryContext;
-        sectionSizes.memoryRecall = memoryContext.length;
+    // Durable memory (Phase 2): what Sage remembers from previous sessions.
+    // Two audiences, strictly separated — a student turn reads only
+    // student-subject memories, a staff turn reads only that staff member's
+    // own teacher-subject memories. The pairing is enforced in
+    // memory/retrieve.ts (assertViewerMaySeeSubject), not by these call sites.
+    // Staff still get student context from staff-student-context, which is
+    // classroom-scoped and audited; memory is not a second door onto it.
+    if (process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
+      if (isStaffChat) {
+        const staffMemoryContext = await getStaffMemoryContext(session.id, userMessage);
+        if (staffMemoryContext) {
+          systemPrompt += staffMemoryContext;
+          sectionSizes.memoryStaffRecall = staffMemoryContext.length;
+        }
+      } else {
+        // Always-on durable profile (who the student fundamentally is) + the
+        // query-relevant recall (what's relevant to this message), deduped.
+        const profile = await getStudentProfile(session.id);
+        if (profile.block) {
+          systemPrompt += `\n\n${profile.block}`;
+          sectionSizes.memoryProfile = profile.block.length;
+        }
+        const memoryContext = await getMemoryContext(session.id, userMessage, undefined, profile.contents);
+        if (memoryContext) {
+          systemPrompt += memoryContext;
+          sectionSizes.memoryRecall = memoryContext.length;
+        }
       }
     }
   }
@@ -1030,6 +1070,24 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             programType: studentProgramType,
             classroomConfirmedAt: studentClassroomConfirmedAt,
           }).catch((err) => logger.error("Post-response error", { error: String(err) }));
+        } else {
+          // Staff post-processing is memory extraction and nothing else.
+          // handlePostResponse is student-shaped end to end (crisis scan, goal
+          // proposals, discovery upsert, mood, review XP, classroom
+          // confirmation) and every step keys off a studentId a staff account
+          // does not have — so staff call the one step they should get
+          // directly, instead of entering that pipeline behind a flag.
+          // Reuses the already-resolved chat `provider`, so the staff_entered
+          // FERPA routing decided at the top of this route is inherited.
+          void extractAndStoreStaffMemories({
+            provider,
+            staffId: session.id,
+            staffRole: session.role,
+            conversationId: conversation.id,
+            messages: [...allMessages, { role: "model" as const, content: fullResponse }],
+          }).catch((err) =>
+            logger.error("Staff memory extraction error", { error: String(err) }),
+          );
         }
 
         sendEvent({ done: true, conversationId: conversation.id }, "done");

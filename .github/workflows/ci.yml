@@ -59,6 +59,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: ui-copy readability gate
+        # Flesch-Kincaid gate on student-facing UI copy (scripts/ui-copy-
+        # readability.mjs), sharing PLAIN_LANGUAGE_MAX_GRADE with the Sage
+        # chat-reply gate in src/lib/sage/readability.ts. New gate as of the
+        # 2026-08-20 UI-copy rewrite pass: red baseline was 48 strings over
+        # the grade-8 ceiling before that pass landed — see that commit's
+        # before/after report for the red-baseline proof. DB-free, filesystem
+        # only.
+        run: npx tsx scripts/ui-copy-readability.mjs --gate
+
       - name: Audit API auth wrappers
         # Static scan of every route file; exits 1 on any FOOTGUN finding
         # (withErrorHandler + getSession() + prisma — the 2026-04-24 bug).
@@ -112,6 +122,19 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RLS_TEST_ENABLED: "true"
 
+      - name: Run rate-limiter concurrency integration tests
+        # Guards the 2026-08-20 bug where concurrent logins from one IP
+        # contended on a single RateLimitEntry row and returned HTTP 500. The
+        # failure is a Postgres concurrency behavior, so it only reproduces
+        # against a real database — the in-process suites in `npm test` cover
+        # the limiter's contract, not its store. Reuses the hermetic Postgres
+        # migrated for the RLS step above.
+        run: npm run test:ratelimit
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          RATE_LIMIT_DB_TEST_ENABLED: "true"
+
       - name: Build
         run: npm run build
 
@@ -125,3 +148,94 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_SERVER_SCRIPT: start
+
+  # --- Browser-level workflow gate: Playwright E2E + a11y ------------------
+  # Runs the journey-critical specs against a REAL built server and a
+  # hermetic, migrated, seeded Postgres — the same recipe as the RLS job
+  # above. Deliberately excluded from the gating run:
+  #   - e2e/placement-bridge.spec.ts and e2e/orientation-student-profile
+  #     .spec.ts: both hard-read DATABASE_URL from .env.local (absent in CI)
+  #     and expect `npm run db:seed` data — dev-DB-coupled; porting them to
+  #     the env-first helper in e2e/helpers/db.ts is a follow-up.
+  #   - e2e/a11y-authenticated.spec.ts runs in the SOAK step below instead:
+  #     authenticated pages do not meet the zero-violation bar yet (known
+  #     findings: color-contrast on /learning, /teacher, and student detail;
+  #     link-name + nested-interactive on /teacher; select-name on student
+  #     detail). The step fails honestly on every run — the red baseline for
+  #     the page-fixing phase — but does not block the job. Promote it into
+  #     the gating step once the pages are fixed. House rule: violations are
+  #     fixed in the page, never by filtering axe rules.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionquest_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_e2e"
+      # Hermetic CI Postgres has no pooler, so direct == pooled (schema.prisma
+      # declares directUrl and the CLI validates it — same note as the RLS job).
+      DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_e2e"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
+      BASE_URL: "http://localhost:3000"
+      # playwright.config.ts webServer honors this: boot the built standalone
+      # server (scripts/start-production.mjs), matching the smoke-test boot
+      # path, instead of `next dev`.
+      PLAYWRIGHT_WEB_SERVER: "npm run start"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Apply migrations to E2E database
+        run: npx prisma migrate deploy
+
+      - name: Seed E2E fixture users
+        # Idempotent marker fixtures (e2e-* logins, *@test.local emails):
+        # teacher, established student (enrolled class, orientation progress
+        # incl. one pending verification, confirmed goal), day-1 journey
+        # student. Removable with --clean.
+        run: npx tsx scripts/seed-e2e-users.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E gate — public a11y + journeys + hermetic suites
+        run: >-
+          npx playwright test
+          e2e/a11y.spec.ts
+          e2e/public-routes.spec.ts
+          e2e/student-login-chat.spec.ts
+          e2e/teacher-dashboard.spec.ts
+          e2e/student-journey.spec.ts
+          e2e/teacher-loop.spec.ts
+          --reporter=line --timeout=120000
+
+      - name: Authenticated a11y scans (soak — red baseline, non-blocking)
+        # Zero-violation bar per route; fails today by design (see the job
+        # comment). continue-on-error keeps CI green while making the full
+        # violation inventory visible on every run.
+        continue-on-error: true
+        run: npx playwright test e2e/a11y-authenticated.spec.ts --reporter=line --timeout=180000

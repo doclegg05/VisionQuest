@@ -3,7 +3,11 @@ import CredlyBadges from "@/components/certifications/CredlyBadges";
 import CredlyConnect from "@/components/certifications/CredlyConnect";
 import GoalPlanFocus from "@/components/goals/GoalPlanFocus";
 import StudentPathwayPlan from "@/components/goals/StudentPathwayPlan";
-import { LearningPathway, LearningPathwayEmpty } from "@/components/career/LearningPathway";
+import {
+  LearningPathway,
+  LearningPathwayAwaitingCluster,
+  LearningPathwayEmpty,
+} from "@/components/career/LearningPathway";
 import CoursesHub from "@/components/lms/CoursesHub";
 import AskSageLink from "@/components/sage/AskSageLink";
 import PageIntro from "@/components/ui/PageIntro";
@@ -17,7 +21,7 @@ export default async function LearningPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [[{ goals, goalPlans }, pathway], nextStep] = await Promise.all([
+  const [[{ goals, goalPlans }, pathwayResult], nextStep] = await Promise.all([
     Promise.all([
       getStudentGoalPlanData(session.id),
       getLearningPathway(session.id),
@@ -39,7 +43,7 @@ export default async function LearningPage() {
       <PageIntro
         eyebrow="Learning"
         title="Learning"
-        description="Keep your goal-aligned platforms, certification progress, and required training work in one place."
+        description="See your training platforms and certification progress. All your required work is in one place."
       />
 
       {/* Phase 4 consolidation: the Resource Center moved out of the nav and lives here. */}
@@ -57,8 +61,10 @@ export default async function LearningPage() {
 
       <section id="roadmap" className="mt-6">
         <h2 className="sr-only">Your Learning Roadmap</h2>
-        {pathway ? (
-          <LearningPathway pathway={pathway} />
+        {pathwayResult.status === "ready" ? (
+          <LearningPathway pathway={pathwayResult.pathway} />
+        ) : pathwayResult.status === "awaiting_cluster" ? (
+          <LearningPathwayAwaitingCluster />
         ) : (
           <LearningPathwayEmpty />
         )}
@@ -68,14 +74,14 @@ export default async function LearningPage() {
 
       <GoalPlanFocus
         title="Goal-aligned training"
-        description="These are the platforms and certification paths that best support the goals you are actively working."
+        description="These platforms and certifications match the goals you are working on now."
         goals={goals}
         goalPlans={goalPlans}
         resourceTypes={["platform", "certification"]}
         emptyMessage="Confirm a goal first. Then this page will show training platforms and certification paths that match what you are working toward."
         emptyAction={
           <AskSageLink
-            prompt="Help me choose the certification or learning platform I should focus on next based on my confirmed goals."
+            prompt="Help me choose a certification or platform to focus on next. Base it on my confirmed goals."
             label="Ask Sage what to study next"
           />
         }
@@ -95,7 +101,7 @@ export default async function LearningPage() {
         <div className="mb-4">
           <h2 className="font-display text-2xl text-[var(--ink-strong)]">Credentials</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
-            Track badge visibility and required certification steps without switching to a second tab.
+            See your badges and required certification steps here. No need to open a new tab.
           </p>
         </div>
         <CredlyConnect />

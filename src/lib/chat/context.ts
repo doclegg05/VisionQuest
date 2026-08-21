@@ -14,6 +14,7 @@ import {
   buildPathwayContextString,
   getLearningPathway,
 } from "@/lib/learning-pathway";
+import { normalizeNationalClusterScores } from "@/lib/spokes/national-clusters";
 import { type ConversationStage } from "@/lib/sage/system-prompts";
 
 const BASE_CONTEXT_TTL_SECONDS = 300;
@@ -146,10 +147,12 @@ export function buildCareerProfileContext(
   }
   if (careerDiscovery.nationalClusters) {
     try {
-      const clusters = JSON.parse(careerDiscovery.nationalClusters) as Array<{
-        cluster_name: string;
-        score: number;
-      }>;
+      const clusters = normalizeNationalClusterScores(
+        JSON.parse(careerDiscovery.nationalClusters) as Array<{
+          cluster_name: string;
+          score: number;
+        }>,
+      );
       if (clusters.length > 0) {
         const topClusters = clusters
           .slice()
@@ -362,8 +365,10 @@ export async function getStudentPromptContext(
             `chat:pathway:${studentId}`,
             SUPPLEMENTAL_CONTEXT_TTL_SECONDS,
             async () => {
-              const pathway = await getLearningPathway(studentId);
-              return pathway ? buildPathwayContextString(pathway) : undefined;
+              const result = await getLearningPathway(studentId);
+              return result.status === "ready"
+                ? buildPathwayContextString(result.pathway)
+                : undefined;
             },
           )
         : Promise.resolve(undefined),

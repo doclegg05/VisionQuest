@@ -182,11 +182,40 @@ export function LearningPathwayEmpty() {
         Your Learning Roadmap
       </p>
       <p className="mt-3 text-sm text-[var(--ink-muted)]">
-        Complete your career discovery with Sage to see your personalized learning pathway.
+        Complete career discovery with Sage. Then you&apos;ll see your personal learning pathway.
       </p>
       <AskSageLink
-        prompt="Help me complete career discovery so VisionQuest can build a learning pathway that fits my goals."
+        prompt="Help me complete career discovery. Then VisionQuest can build a learning pathway for my goals."
         label="Start with Sage"
+        variant="button"
+        className="mt-4"
+      />
+    </div>
+  );
+}
+
+/**
+ * Shown when career discovery is already complete but no career area is set
+ * yet — e.g. a teacher unblocked a stuck discovery before choosing a
+ * cluster. This must NEVER say "complete your career discovery": that step
+ * is genuinely done, and telling the student to redo it is the exact
+ * circular dead end this state exists to close.
+ */
+export function LearningPathwayAwaitingCluster() {
+  return (
+    <div className="surface-section p-6 text-center">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        Your Learning Roadmap
+      </p>
+      <p className="mt-3 text-sm text-[var(--ink-muted)]">
+        Your career discovery is done. Your coach is now picking your career area.
+      </p>
+      <p className="mt-1 text-sm text-[var(--ink-muted)]">
+        Ask Sage for an update, or message your coach.
+      </p>
+      <AskSageLink
+        prompt="My career discovery is done, but I don't see my learning pathway yet. Can you check on my career area with my coach?"
+        label="Ask Sage for an update"
         variant="button"
         className="mt-4"
       />

@@ -1,11 +1,16 @@
 import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
-import { NATIONAL_CAREER_CLUSTERS } from "@/lib/spokes/national-clusters";
+import {
+  NATIONAL_CAREER_CLUSTERS,
+  normalizeNationalClusterName,
+  normalizeNationalClusterScores,
+} from "@/lib/spokes/national-clusters";
 
 const clusterIds = CAREER_CLUSTERS.map((c) => `"${c.id}"`).join(", ");
 
-const DISCOVERY_EXTRACTION_PROMPT = `You analyze conversations between Sage (an AI mentor) and a student in a career discovery phase of a workforce development program.
+/** Exported for the prompt-contract test only — not part of the public API. */
+export const DISCOVERY_EXTRACTION_PROMPT = `You analyze conversations between Sage (an AI mentor) and a student in a career discovery phase of a workforce development program.
 
 Extract career assessment signals from the conversation. Only extract signals the student has clearly expressed or agreed with — do not invent signals they haven't shared.
 
@@ -33,7 +38,7 @@ Return valid JSON in this exact format:
 
   "national_career_clusters": [
     {
-      "cluster_name": "one of the 16 national career clusters",
+      "cluster_name": "one of the 14 national career clusters",
       "score": 0.0,
       "spokes_mapping": ["matching SPOKES cluster IDs"]
     }
@@ -70,7 +75,7 @@ Score each Holland dimension 0.0 to 1.0 based on conversational evidence:
 - conventional: organizing, detail-oriented, systematic, data-focused, following procedures
 
 NATIONAL CAREER CLUSTERS:
-Score relevance to these 16 clusters (include ONLY those scoring >= 0.3):
+Score relevance to these 14 clusters (include ONLY those scoring >= 0.3):
 ${NATIONAL_CAREER_CLUSTERS.join(", ")}
 
 TRANSFERABLE SKILLS:
@@ -178,7 +183,8 @@ const RIASEC_KEYS: (keyof RiasecScores)[] = [
   "conventional",
 ];
 
-function computeHollandCode(scores: RiasecScores): string {
+/** Top-3 letter code from RIASEC scores (exported for assessed-profile writes). */
+export function computeHollandCode(scores: RiasecScores): string {
   return RIASEC_KEYS
     .filter((k) => scores[k] > 0)
     .sort((a, b) => scores[b] - scores[a])
@@ -207,21 +213,30 @@ function validateRiasec(raw: unknown): RiasecScores {
 
 function validateNationalClusters(raw: unknown): NationalClusterScore[] {
   if (!Array.isArray(raw)) return [];
-  const validNames = new Set(NATIONAL_CAREER_CLUSTERS);
-  return raw
+  const canonicalized = raw
     .filter(
       (item): item is { cluster_name: string; score: number; spokes_mapping: string[] } =>
         item &&
         typeof item === "object" &&
         typeof item.cluster_name === "string" &&
-        validNames.has(item.cluster_name as typeof NATIONAL_CAREER_CLUSTERS[number]) &&
         typeof item.score === "number",
     )
-    .map((item) => ({
-      cluster_name: item.cluster_name,
-      score: clampScore(item.score),
-      spokes_mapping: Array.isArray(item.spokes_mapping) ? item.spokes_mapping : [],
-    }))
+    .flatMap((item) => {
+      // Write boundary: names outside both frameworks are rejected here;
+      // legacy/variant spellings canonicalize to the modernized cluster.
+      const canonical = normalizeNationalClusterName(item.cluster_name);
+      if (!canonical) return [];
+      return [{
+        cluster_name: canonical,
+        score: clampScore(item.score),
+        spokes_mapping: Array.isArray(item.spokes_mapping)
+          ? item.spokes_mapping.filter((id): id is string => typeof id === "string")
+          : [],
+      }];
+    });
+  // Two names collapsing onto one cluster merge by MAX score + SPOKES union.
+  return normalizeNationalClusterScores(canonicalized)
+    .map((item) => ({ ...item, spokes_mapping: item.spokes_mapping ?? [] }))
     .filter((item) => item.score >= 0.3);
 }
 

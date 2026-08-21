@@ -73,7 +73,7 @@ export default async function AppointmentsPage() {
         title="Appointments & Follow-Up"
         description={
           appointments.length > 0
-            ? "See your advising schedule, complete follow-ups, and stay current on anything that needs attention."
+            ? "See your appointments and follow-ups. Stay on top of what needs your attention."
             : "Your advisors can add appointments and follow-ups here as your plan takes shape."
         }
       />

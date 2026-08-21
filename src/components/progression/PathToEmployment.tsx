@@ -131,6 +131,7 @@ export function PathToEmployment({
 
         <Link
           href={actionLink}
+          data-testid="current-target-cta"
           className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-full px-5 py-2.5 text-sm transition-all hover:translate-x-0.5 shadow-sm min-h-[48px] shrink-0 self-start md:self-auto"
         >
           <span>{actionLabel}</span>

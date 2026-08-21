@@ -6,6 +6,7 @@ import { withAuth } from "@/lib/api-error";
 import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 import { logger } from "@/lib/logger";
 import { deleteFile } from "@/lib/storage";
+import { NO_PATHWAY_PROVENANCE, resolvePathwayProvenance } from "@/lib/pathway-provenance";
 import { parseBody, opportunityApplicationSchema } from "@/lib/schemas";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -105,6 +106,14 @@ export const POST = withAuth(async (session, req: Request) => {
   const shouldSetAppliedAt = APPLIED_STATUSES.has(status) && !existingApplication?.appliedAt;
   const appliedAt = shouldSetAppliedAt ? new Date() : undefined;
 
+  // Pathway provenance is a creation-time snapshot, so it is read only when
+  // there is no row yet — and it appears only in the upsert's `create`
+  // branch below. An existing application keeps the pathway it was filed
+  // under, whatever the student's discovery says today.
+  const pathwayProvenance = existingApplication
+    ? NO_PATHWAY_PROVENANCE
+    : await resolvePathwayProvenance(prisma, session.id);
+
   const application = await prisma.application.upsert({
     where: {
       studentId_opportunityId: {
@@ -133,6 +142,8 @@ export const POST = withAuth(async (session, req: Request) => {
       resumeFileId: resumeFileId || null,
       appliedAt: APPLIED_STATUSES.has(status) ? (appliedAt ?? new Date()) : null,
       verificationStatus: OUTCOME_VERIFICATION.SELF_REPORTED,
+      pathwayClusterId: pathwayProvenance.pathwayClusterId,
+      pathwaySnapshotAt: pathwayProvenance.pathwaySnapshotAt,
     },
   });
 

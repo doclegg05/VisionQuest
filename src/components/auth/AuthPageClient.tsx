@@ -151,8 +151,8 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 Build momentum, one brave step at a time.
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/80 sm:text-base sm:leading-7 md:mt-5 md:text-lg">
-                VisionQuest gives students a grounded, hopeful place to set goals,
-                stay organized, and keep moving toward work, stability, and self-sufficiency.
+                VisionQuest gives you a hopeful place to set goals and stay
+                organized. Keep moving toward a steady job and a life of your own.
               </p>
             </div>
 
@@ -214,7 +214,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 {mfaRequired
-                  ? "Enter the 6-digit code from your authenticator app or one of your saved backup codes."
+                  ? "Enter the 6-digit code from your authenticator app, or use a saved backup code."
                   : "Sign in with your username or email and password."}
               </p>
             </div>

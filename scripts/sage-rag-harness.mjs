@@ -25,6 +25,7 @@ import {
   loadEnvFile,
   parseArgs,
 } from "./lib/sage-rag-utils.mjs";
+import { percentile } from "./lib/percentile.mjs";
 
 loadEnvFile();
 
@@ -226,12 +227,10 @@ async function main() {
   // warm-up), so it is reported separately and excluded from nothing — both
   // numbers below include every question, honestly.
   const latencies = results.map((result) => result.latencyMs).sort((a, b) => a - b);
-  const percentile = (p) =>
-    latencies.length ? latencies[Math.min(latencies.length - 1, Math.ceil(p * latencies.length) - 1)] : 0;
   const latencySummary = {
     coldFirstCallMs: results[0]?.latencyMs ?? 0,
-    p50Ms: percentile(0.5),
-    p95Ms: percentile(0.95),
+    p50Ms: percentile(latencies, 50) ?? 0,
+    p95Ms: percentile(latencies, 95) ?? 0,
     maxMs: latencies[latencies.length - 1] ?? 0,
   };
 

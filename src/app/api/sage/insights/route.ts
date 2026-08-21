@@ -4,8 +4,10 @@
  * GET:  student sees their own insights; teacher/admin can pass
  *       ?studentId= to view a managed student's insights.
  * POST: only Sage tooling writes here (registry tool sage.record_insight).
- *       In Tier A this is invoked from the chat post-response loop
- *       (step 7 of the plan); in Tier B it becomes a Gemini tool-call.
+ *       The chat post-response loop writes insights directly via
+ *       recordInsight() (src/lib/chat/post-response.ts — no HTTP hop);
+ *       this route is the Sage-tooling surface and the Tier B tool-call
+ *       target.
  */
 
 import { NextResponse, type NextRequest } from "next/server";

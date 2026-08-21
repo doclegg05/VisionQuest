@@ -56,7 +56,7 @@ export default function RecoverySetupForm({ redirectTo }: RecoverySetupFormProps
         disabled={status === "saving"}
         onChange={setAnswers}
         title="Set up your account recovery"
-        description="Answer these three questions. If you ever forget your password, you'll use them to get back into your account. Pick answers you'll always remember."
+        description="Answer these three questions. If you ever forget your password, you'll use them to get back into your account. Anyone who knows your answers could get into your account. Pick answers only you know."
       />
 
       {error && (

@@ -12,6 +12,18 @@ interface AwardEventParams {
   metadata?: Record<string, unknown>;
   /** Mutation to apply to the progression state snapshot (same as engine functions). */
   mutate?: (state: ProgressionState) => void;
+  /**
+   * When true, a non-P2002 create failure is rethrown instead of being
+   * swallowed into a `false` return. Default false preserves the original
+   * contract for every existing caller, where `false` means "no-op" without
+   * distinguishing "already recorded" (P2002 — genuinely idempotent) from
+   * "the write actually failed" (any other error). A caller that needs a
+   * real failure to surface as an error (e.g. an API route that must 500,
+   * not 200, when the ledger write breaks) opts in per-call. P2002 still
+   * returns false either way — this only changes what happens to a REAL
+   * failure, never the idempotent path.
+   */
+  rethrowOnFailure?: boolean;
 }
 
 /**
@@ -40,6 +52,7 @@ export async function awardEvent({
   xp,
   metadata,
   mutate,
+  rethrowOnFailure = false,
 }: AwardEventParams): Promise<boolean> {
   let createdEventId: string;
   try {
@@ -68,6 +81,7 @@ export async function awardEvent({
       sourceId,
       error: String(err),
     });
+    if (rethrowOnFailure) throw err;
     return false;
   }
 

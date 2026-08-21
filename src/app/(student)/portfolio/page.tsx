@@ -24,7 +24,7 @@ export default async function Portfolio() {
       <PageIntro
         eyebrow="Career story"
         title="Portfolio"
-        description="Showcase your work, certifications, and build a resume you can share with confidence."
+        description="Show off your work and certifications. Build a resume you can share with confidence."
       />
       <PortfolioPage />
     </div>

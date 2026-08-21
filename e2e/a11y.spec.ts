@@ -8,9 +8,11 @@ import AxeBuilder from "@axe-core/playwright";
  * workflow. Scans assert zero violations against the WCAG 2.0/2.1 A+AA
  * rulesets — fix the page, never filter the rule.
  *
- * Scope: public routes only. Authenticated pages (dashboard, chat, teacher
- * views) need a seeded test user before they can be scanned — see
- * docs/superpowers/plans/2026-06-10-a11y-results.md "Honest scope notes".
+ * Scope: public routes only. Authenticated pages are scanned by
+ * e2e/a11y-authenticated.spec.ts against seeded fixture users
+ * (scripts/seed-e2e-users.ts); that spec stays in the CI soak lane until
+ * today's authenticated pages meet the zero-violation bar — see the notes in
+ * that file and the e2e job in .github/workflows/ci.yml.
  */
 const PUBLIC_ROUTES = [
   { path: "/", name: "landing page" },

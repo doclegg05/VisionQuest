@@ -18,6 +18,11 @@ const mockMessageCount = mock.fn<(args: unknown) => Promise<number>>(async () =>
 const mockExtractGoals = mock.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
   goals_found: [],
   stage_complete: false,
+  insight: null,
+}));
+const mockRecordInsight = mock.fn<(args: unknown) => Promise<unknown>>(async () => ({
+  status: "created",
+  insightId: "insight-1",
 }));
 const mockExtractDiscoverySignals = mock.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
   interests: [],
@@ -54,7 +59,7 @@ const mockLoggerWarn = mock.fn<(msg: string, meta?: Record<string, unknown>) => 
 const mockLoggerError = mock.fn<(msg: string, meta?: Record<string, unknown>) => void>();
 
 mock.module("@/lib/db", {
-  namedExports: {
+  exports: {
     prisma: {
       goal: { findMany: mockGoalFindMany },
       careerDiscovery: { upsert: mockCareerDiscoveryUpsert, findUnique: mockCareerDiscoveryFindUnique },
@@ -65,13 +70,13 @@ mock.module("@/lib/db", {
 });
 
 mock.module("@/lib/ai", {
-  namedExports: {
+  exports: {
     resolveAiProvider: async () => ({ name: "ollama" }),
   },
 });
 
 mock.module("@/lib/ai/audit", {
-  namedExports: {
+  exports: {
     getProviderClass: () => "local",
     logAiAuditEvent: mockLogAiAuditEvent,
     policyDecisionForProvider: () => "local_only",
@@ -79,90 +84,94 @@ mock.module("@/lib/ai/audit", {
 });
 
 mock.module("@/lib/llm-usage", {
-  namedExports: {
+  exports: {
     withUsageLogging: (provider: unknown) => provider,
   },
 });
 
 mock.module("@/lib/goals", {
-  namedExports: {
+  exports: {
     GOAL_PLANNING_STATUSES: ["confirmed", "active"],
     isGoalLevel: () => true,
   },
 });
 
 mock.module("@/lib/sage/goal-extractor", {
-  namedExports: { extractGoals: mockExtractGoals },
+  exports: { extractGoals: mockExtractGoals },
 });
 
 mock.module("@/lib/sage/propose-goal", {
-  namedExports: { proposeGoal: async () => ({ status: "created" }) },
+  exports: { proposeGoal: async () => ({ status: "created" }) },
+});
+
+mock.module("@/lib/sage/record-insight", {
+  exports: { recordInsight: mockRecordInsight },
 });
 
 mock.module("@/lib/sage/propose-goal-wager", {
-  namedExports: { maybeCreateGoalProposalWager: async () => undefined },
+  exports: { maybeCreateGoalProposalWager: async () => undefined },
 });
 
 mock.module("@/lib/sage/mood-extractor", {
-  namedExports: { extractMoodFromConversation: mockExtractMood },
+  exports: { extractMoodFromConversation: mockExtractMood },
 });
 
 mock.module("@/lib/sage/discovery-extractor", {
-  namedExports: {
+  exports: {
     extractDiscoverySignals: mockExtractDiscoverySignals,
     topClusterIds: () => [],
   },
 });
 
 mock.module("@/lib/sage/system-prompts", {
-  namedExports: { determineStage: () => "planning" },
+  exports: { determineStage: () => "planning" },
 });
 
 mock.module("@/lib/sage/classroom-confirmation", {
-  namedExports: { detectAndRecordClassroomConfirmation: mockClassroomConfirmation },
+  exports: { detectAndRecordClassroomConfirmation: mockClassroomConfirmation },
 });
 
 mock.module("@/lib/sage/memory/extract", {
-  namedExports: { extractAndStoreMemories: mockExtractMemories },
+  exports: { extractAndStoreMemories: mockExtractMemories },
 });
 
 mock.module("@/lib/rate-limit", {
-  namedExports: { rateLimitDaily: mockRateLimitDaily },
+  exports: { rateLimitDaily: mockRateLimitDaily },
 });
 
 mock.module("@/lib/sage/crisis-detection", {
-  namedExports: {
+  exports: {
     detectCrisisSignal: mockDetectCrisisSignal,
     recordWellbeingConcern: mockRecordWellbeingConcern,
   },
 });
 
 mock.module("@/lib/sage/readability", {
-  namedExports: {
+  exports: {
     assessReadability: () => ({ scorable: false, withinTarget: true, grade: 0, ease: 0, words: 0 }),
     PLAIN_LANGUAGE_MAX_GRADE: 8,
   },
 });
 
 mock.module("@/lib/sage/retry", {
-  namedExports: {
+  exports: {
     retryWithBackoff: async (fn: () => Promise<unknown>) => fn(),
   },
 });
 
 mock.module("@/lib/progression/engine", {
-  namedExports: {
+  exports: {
     recordWeeklyReview: () => undefined,
     recordMonthlyReview: () => undefined,
   },
 });
 
 mock.module("@/lib/progression/events", {
-  namedExports: { awardEvent: mockAwardEvent },
+  exports: { awardEvent: mockAwardEvent },
 });
 
 mock.module("@/lib/logger", {
-  namedExports: {
+  exports: {
     logger: {
       info: mockLoggerInfo,
       warn: mockLoggerWarn,
@@ -173,7 +182,7 @@ mock.module("@/lib/logger", {
 });
 
 mock.module("./conversation", {
-  namedExports: { generateConversationTitle: mockGenerateTitle },
+  exports: { generateConversationTitle: mockGenerateTitle },
 });
 
 let postResponseModule: typeof import("./post-response");
@@ -219,6 +228,7 @@ const ALL_MOCKS = [
   mockConversationUpdate,
   mockMessageCount,
   mockExtractGoals,
+  mockRecordInsight,
   mockExtractDiscoverySignals,
   mockExtractMood,
   mockClassroomConfirmation,
@@ -244,6 +254,15 @@ describe("handlePostResponse priority order and per-turn cap", () => {
       success: true,
       remaining: 10,
       resetTime: 0,
+    }));
+    mockExtractGoals.mock.mockImplementation(async () => ({
+      goals_found: [],
+      stage_complete: false,
+      insight: null,
+    }));
+    mockRecordInsight.mock.mockImplementation(async () => ({
+      status: "created",
+      insightId: "insight-1",
     }));
     delete process.env.SAGE_POST_RESPONSE_MAX_CALLS;
     delete process.env.SAGE_MEMORY_ENABLED;
@@ -413,5 +432,115 @@ describe("handlePostResponse priority order and per-turn cap", () => {
       "classroom_confirmation:not_eligible",
       "memory:not_eligible",
     ]);
+  });
+});
+
+// The insight loop closes here: the extraction schema can flag at most ONE
+// observation per turn, and post-response records it via recordInsight
+// (src/lib/sage/record-insight.ts) fire-and-forget. Red-baseline: before the
+// wiring existed, recordInsight had NO caller in this pipeline — the
+// SageInsightList UI read a perpetually-empty table — so the "fires on a
+// flagged extraction" test fails against the old code.
+describe("handlePostResponse — insight recording", () => {
+  beforeEach(() => {
+    for (const fn of ALL_MOCKS) {
+      fn.mock.resetCalls();
+    }
+    mockDetectCrisisSignal.mock.mockImplementation(() => ({ matched: false }));
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 10,
+      resetTime: 0,
+    }));
+    mockExtractGoals.mock.mockImplementation(async () => ({
+      goals_found: [],
+      stage_complete: false,
+      insight: null,
+    }));
+    mockRecordInsight.mock.mockImplementation(async () => ({
+      status: "created",
+      insightId: "insight-1",
+    }));
+    delete process.env.SAGE_POST_RESPONSE_MAX_CALLS;
+    delete process.env.SAGE_MEMORY_ENABLED;
+  });
+
+  it("records exactly one insight when the extraction flags an observation", async () => {
+    mockExtractGoals.mock.mockImplementation(async () => ({
+      goals_found: [],
+      stage_complete: false,
+      insight: {
+        category: "barrier",
+        content: "Transportation is a barrier — no car, relies on the bus.",
+        confidence: 0.9,
+      },
+    }));
+
+    await postResponseModule.handlePostResponse(baseParams());
+
+    assert.equal(mockRecordInsight.mock.callCount(), 1);
+    const input = mockRecordInsight.mock.calls[0].arguments[0] as Record<string, unknown>;
+    assert.equal(input.studentId, "student-1");
+    assert.equal(input.category, "barrier");
+    assert.equal(input.content, "Transportation is a barrier — no car, relies on the bus.");
+    assert.equal(input.invokedBy, "student-1");
+    assert.equal(input.conversationId, "conv-1");
+    assert.equal(input.sourceMessageId, "msg-1");
+    assert.equal(input.confidence, 0.9);
+  });
+
+  it("records nothing on a clean extraction (insight: null)", async () => {
+    await postResponseModule.handlePostResponse(baseParams());
+    assert.equal(mockRecordInsight.mock.callCount(), 0);
+  });
+
+  it("records nothing during discovery (goal extraction never runs there)", async () => {
+    await postResponseModule.handlePostResponse(baseParams({ conversationStage: "discovery" }));
+    assert.equal(mockExtractGoals.mock.callCount(), 0);
+    assert.equal(mockRecordInsight.mock.callCount(), 0);
+  });
+
+  it("a failing recordInsight never blocks or fails the turn", async () => {
+    mockExtractGoals.mock.mockImplementation(async () => ({
+      goals_found: [],
+      stage_complete: false,
+      insight: { category: "concern", content: "Sounded very discouraged today.", confidence: 0.85 },
+    }));
+    mockRecordInsight.mock.mockImplementation(async () => {
+      throw new Error("db down");
+    });
+
+    await postResponseModule.handlePostResponse(baseParams());
+    // The write is fire-and-forget; give its rejection handler a tick to run.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const errors = mockLoggerError.mock.calls.map((call) => call.arguments[0]);
+    assert.ok(
+      errors.some((message) => String(message).includes("Failed to record Sage insight")),
+      `expected an insight-failure log, got: ${JSON.stringify(errors)}`,
+    );
+    // The rest of the pipeline still completed (title generation ran).
+    assert.equal(mockGenerateTitle.mock.callCount(), 1);
+  });
+
+  it("a rejected insight (validation) is surfaced as a warning, not an error", async () => {
+    mockExtractGoals.mock.mockImplementation(async () => ({
+      goals_found: [],
+      stage_complete: false,
+      insight: { category: "barrier", content: "x", confidence: 0.9 },
+    }));
+    mockRecordInsight.mock.mockImplementation(async () => ({
+      status: "rejected",
+      reason: "content is empty",
+    }));
+
+    await postResponseModule.handlePostResponse(baseParams());
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const warnings = mockLoggerWarn.mock.calls.map((call) => call.arguments[0]);
+    assert.ok(
+      warnings.some((message) => String(message).includes("Sage insight rejected")),
+      `expected a rejection warning, got: ${JSON.stringify(warnings)}`,
+    );
   });
 });

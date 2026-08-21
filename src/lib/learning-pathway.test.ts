@@ -165,8 +165,13 @@ test("parity: DB-derived pathway equals static-derived pathway for every cluster
   for (const cluster of CAREER_CLUSTERS) {
     await withPatchedPrisma(cluster.id, [], derivedEdgeRows(), async () => {
       const actual = await getLearningPathway("student-1");
-      const expected = buildExpected(cluster.id, []);
-      assert.deepEqual(actual, expected, `cluster ${cluster.id} diverged`);
+      const expectedPathway = buildExpected(cluster.id, []);
+      assert.ok(expectedPathway, `cluster ${cluster.id} has no expected pathway`);
+      assert.deepEqual(
+        actual,
+        { status: "ready", pathway: expectedPathway },
+        `cluster ${cluster.id} diverged`,
+      );
     });
   }
 });
@@ -178,12 +183,13 @@ test("parity holds with completed and in-progress cert records (office cluster)"
   ];
   await withPatchedPrisma("office-admin", certRecords, derivedEdgeRows(), async () => {
     const actual = await getLearningPathway("student-1");
-    const expected = buildExpected("office-admin", certRecords);
-    assert.deepEqual(actual, expected);
+    const expectedPathway = buildExpected("office-admin", certRecords);
+    assert.ok(expectedPathway);
+    assert.deepEqual(actual, { status: "ready", pathway: expectedPathway });
 
     // Interesting statuses asserted explicitly, not just via deepEqual:
-    assert.ok(actual);
-    const byId = new Map(actual.steps.map((s) => [s.id, s]));
+    assert.ok(actual.status === "ready");
+    const byId = new Map(actual.pathway.steps.map((s) => [s.id, s]));
     assert.equal(byId.get("ic3")?.status, "complete");
     assert.equal(byId.get("mos-word")?.status, "in_progress");
     assert.equal(byId.get("mos-word")?.isCurrent, true);
@@ -203,8 +209,13 @@ test("empty ProgressionEdge table falls back to static behavior (fail-safe)", as
   for (const cluster of CAREER_CLUSTERS) {
     await withPatchedPrisma(cluster.id, [], "empty", async () => {
       const actual = await getLearningPathway("student-1");
-      const expected = buildExpected(cluster.id, []);
-      assert.deepEqual(actual, expected, `cluster ${cluster.id} diverged on empty table`);
+      const expectedPathway = buildExpected(cluster.id, []);
+      assert.ok(expectedPathway, `cluster ${cluster.id} has no expected pathway`);
+      assert.deepEqual(
+        actual,
+        { status: "ready", pathway: expectedPathway },
+        `cluster ${cluster.id} diverged on empty table`,
+      );
     });
   }
 });
@@ -212,9 +223,53 @@ test("empty ProgressionEdge table falls back to static behavior (fail-safe)", as
 test("locked steps stay locked when the edge table is empty", async () => {
   await withPatchedPrisma("office-admin", [], "empty", async () => {
     const actual = await getLearningPathway("student-1");
-    assert.ok(actual);
-    const access = actual.steps.find((s) => s.id === "mos-access");
+    assert.ok(actual.status === "ready");
+    const access = actual.pathway.steps.find((s) => s.id === "mos-access");
     assert.equal(access?.status, "locked");
     assert.deepEqual(access?.prerequisites, ["ic3", "mos-excel"]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Closing the discovery-override circular dead end: a discovery the teacher
+// override marked "complete" without a cluster (route.ts, the extractor
+// never firing) must be a state the student-facing page can tell apart from
+// "discovery not started" — both used to collapse to `null`, which is why
+// LearningPathwayEmpty told an already-unblocked student to redo a step the
+// system already recorded as done.
+// ---------------------------------------------------------------------------
+
+test("complete-but-empty-topClusters is a distinct, named state — not the same as not-started", async () => {
+  const originalDiscovery = prisma.careerDiscovery.findUnique;
+  try {
+    (prisma.careerDiscovery.findUnique as unknown as AnyAsyncFn) = async () => ({
+      status: "complete",
+      topClusters: [],
+    });
+    const awaitingCluster = await getLearningPathway("student-1");
+
+    (prisma.careerDiscovery.findUnique as unknown as AnyAsyncFn) = async () => null;
+    const notStarted = await getLearningPathway("student-1");
+
+    // The core regression check: these must not collapse to the same value.
+    assert.notDeepEqual(awaitingCluster, notStarted);
+    assert.deepEqual(awaitingCluster, { status: "awaiting_cluster" });
+    assert.deepEqual(notStarted, { status: "not_started" });
+  } finally {
+    prisma.careerDiscovery.findUnique = originalDiscovery;
+  }
+});
+
+test("awaiting_cluster also covers an unknown/misconfigured cluster id on an otherwise-complete discovery", async () => {
+  const originalDiscovery = prisma.careerDiscovery.findUnique;
+  try {
+    (prisma.careerDiscovery.findUnique as unknown as AnyAsyncFn) = async () => ({
+      status: "complete",
+      topClusters: ["not-a-real-cluster-id"],
+    });
+    const actual = await getLearningPathway("student-1");
+    assert.deepEqual(actual, { status: "awaiting_cluster" });
+  } finally {
+    prisma.careerDiscovery.findUnique = originalDiscovery;
+  }
 });
