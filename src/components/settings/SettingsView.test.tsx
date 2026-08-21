@@ -34,6 +34,16 @@ describe("SettingsView role split", () => {
     assert.ok(!html.includes("Loading MFA settings"));
   });
 
+  it("hides the cloud-file-processing consent toggle from staff", () => {
+    // api/chat/upload gates the cloud path on role === "student", so the
+    // control cannot deliver what its copy promises for staff.
+    const staff = renderToString(<SettingsView initialRole="teacher" />);
+    assert.ok(!staff.includes("files you hand to Sage in chat"));
+
+    const student = renderToString(<SettingsView initialRole="student" />);
+    assert.ok(student.includes("files you hand to Sage in chat"));
+  });
+
   it("defaults to the student-safe render when no role is supplied", () => {
     // The (student) route renders <SettingsView /> with no prop — the session
     // fetch resolves the role after mount, exactly as before the extraction.

@@ -71,7 +71,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           notifRes.json(),
         ]);
 
-        const role = sessionData?.student?.role ?? "student";
+        const role = sessionData?.student?.role ?? initialRole ?? "student";
         setSessionRole(role);
 
         setHasKey(apiKeyData.hasKey);
@@ -106,7 +106,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
     }
 
     void loadSettings();
-  }, []);
+  }, [initialRole]);
 
   const saveNotificationPreferences = async (
     overrides: { email?: boolean; sms?: boolean; phone?: string } = {},
@@ -400,7 +400,11 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
         </div>
       )}
 
-      <ConsentSection />
+      {/* Student-only: the consent copy describes chat-upload cloud processing,
+          which `api/chat/upload` gates on role === "student". Staff flipping it
+          would change nothing there while still affecting classify_attachment,
+          so the control would promise more than it delivers. */}
+      {sessionRole !== "teacher" && sessionRole !== "admin" && <ConsentSection />}
 
       <div className="surface-section p-6">
         <div className="mb-6">
