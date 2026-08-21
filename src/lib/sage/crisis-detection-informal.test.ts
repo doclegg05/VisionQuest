@@ -29,10 +29,14 @@ const MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i want to unalive myself", "unalive"],
   ["thinking about unaliving myself", "unaliving"],
 
-  // Abbreviations.
+  // Abbreviations. "kys" is the real abbreviation ("kill yourself"); the
+  // original entry pinned "ksy", a transposition of it, so the abbreviation
+  // students actually type was a verified MISS while a typo was guarded.
   ["kms", "kms alone"],
   ["i might kms tonight", "kms in a sentence"],
-  ["ksy tonight", "ksy variant"],
+  ["kys", "kys alone"],
+  ["kys tonight", "kys in a sentence"],
+  ["gonna kms", "kms after an intent verb"],
 
   // Method-adjacent disclosure — a concrete plan is higher risk than ideation.
   ["im gonna od tonight", "od"],
@@ -56,6 +60,18 @@ const MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   // "ending things" — the existing pattern only covered "my life" / "it all".
   ["thinking about ending things", "ending things"],
   ["i want to end things", "end things"],
+
+  // First-person overdose disclosure. The "on" branch now requires an "i"
+  // frame (see the third-person guards below); these pin that the frame is
+  // tolerant of contractions and a short adverbial gap.
+  ["i overdosed on my meds", "i + overdosed on"],
+  ["i'm overdosing on these pills", "i'm contraction"],
+  ["i nearly overdosed on tylenol last night", "one adverb between i and the verb"],
+
+  // "die my hair" is exempted as the dye homophone, but the exemption must end
+  // at a word boundary — "my hairbrush" is a different word, so the disclosure
+  // in front of it must still alert.
+  ["i wanna die my hairbrush is broken", "hair* is not hair"],
 
   // Passive phrasing without "want".
   ["everyone would be better off if i wasnt here", "wasnt here"],
@@ -85,6 +101,31 @@ const MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i have to take all my medication with food", "have to — obligation, not intent"],
   ["i wanna work in healthcare", "wanna + career"],
   ["that overdose documentary was sad", "overdose in third person"],
+  // Third-person overdose disclosure — someone else's, usually grief, and the
+  // most common way this noun shows up in coaching conversation. The module
+  // comment already claimed third person stayed quiet; only "overdose" with no
+  // object was actually guarded, so "overdosed on X" fired on both of these.
+  ["my brother overdosed on fentanyl last year", "brother's overdose, not the student's"],
+  ["my mom overdosed on pills when i was little", "trailing 'i' must not supply the frame"],
+
+  // "kms" is also kilometres. The pattern is unanchored, so it fired on
+  // distances — and, because it carries no lang tag, a Spanish speaker writing
+  // about distance got the ENGLISH 988 block. That was the file's only
+  // cross-language leak.
+  ["i walked 5 kms today", "kms as kilometres, digit before"],
+  ["caminé 5 kms hoy", "kilometres in Spanish — must not serve the English block"],
+  ["the office is a few kms from here", "kilometres without a digit, distance frame"],
+
+  // Relationship talk is what students bring to a coach; "end things with X" is
+  // the dominant benign sense of the phrase and the single highest-frequency
+  // false positive both reviews found.
+  ["i want to end things with my boyfriend", "breakup, not ideation"],
+  ["im ending things with my ex this weekend", "breakup, progressive"],
+  ["i need to end things with my landlord", "ending an arrangement"],
+
+  // The dye homophone stays exempt — the guard above narrows it, it must not
+  // remove it.
+  ["i wanna die my hair blue", "die my hair + modifier"],
 ];
 
 describe("crisis detector — informal register (VQ-R-004)", () => {

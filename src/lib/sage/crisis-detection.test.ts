@@ -182,6 +182,10 @@ const SPANISH_SHOULD_MATCH: { text: string; category: string }[] = [
   { text: "me tome un monton de pastillas", category: "self_harm" },
   { text: "me tomé todos los medicamentos", category: "self_harm" },
   { text: "quiero darme una sobredosis", category: "self_harm" },
+  // Clitic climbing — Spanish allows the pronoun to raise onto the finite verb
+  // ("me quiero dar" == "quiero darme"), and every other Spanish pair in the
+  // detector handles both directions ("me quiero morir" / "quiero morirme").
+  { text: "me quiero dar una sobredosis", category: "self_harm" },
   { text: "me voy a dar una sobredosis", category: "self_harm" },
   { text: "pensando en tomarme una sobredosis", category: "self_harm" },
   { text: "he pensado en una sobredosis", category: "self_harm" },
@@ -249,6 +253,19 @@ const SPANISH_SHOULD_NOT_MATCH = [
   "las pastillas que me recetaron me ayudan",
   "mi primo murió de una sobredosis",
   "vi un documental sobre las sobredosis de fentanilo",
+  // VERB-REGISTER PARITY (the guards above dodge the branch by omitting the
+  // quantifier, which is test rot — they prove nothing about the register).
+  // These carry the quantifier AND the medication noun, exactly like the
+  // disclosures, so the only thing that may keep them quiet is the verb: a
+  // bare habitual present, an obligation modal, or a subjunctive after "que"
+  // is adherence talk, not disclosure. English pins the identical set ("i take
+  // all my pills every morning", "i need to take all my meds before bed").
+  "me tomo todas las pastillas cada mañana con el desayuno",
+  "me tomo todas las pastillas todos los dias con el desayuno",
+  "necesito tomarme todas las pastillas antes de dormir",
+  "tengo que tomarme todas las pastillas con comida",
+  "el doctor me dijo que me tome todas las pastillas",
+  "el doctor me dijo que debo tomarme todas las pastillas",
 ];
 
 for (const text of SPANISH_SHOULD_NOT_MATCH) {

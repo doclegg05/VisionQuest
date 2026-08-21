@@ -69,22 +69,51 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // pins the false-positive guards ("wanna die my hair", "took my medication"),
   // because an alert stream staff learn to ignore is a dead safety net.
   // Contractions of the die/disappear family.
-  { category: "self_harm", pattern: /\b(wanna|gonna|needa)\s+die\b(?!\s+my\s+hair)/i },
+  // The "die my hair" exemption is the dye homophone and must end at a word
+  // boundary: without the trailing \b it also swallowed "die my hairbrush …",
+  // suppressing a real disclosure because the next word merely starts with
+  // "hair".
+  { category: "self_harm", pattern: /\b(wanna|gonna|needa)\s+die\b(?!\s+my\s+hair\b)/i },
   { category: "self_harm", pattern: /\bdon'?t\s+wanna\s+(live|be\s+here)\b/i },
   { category: "self_harm", pattern: /\bwanna\s+(just\s+)?disappear\b/i },
   // Filter-evading euphemism, common in online/text register.
   { category: "self_harm", pattern: /\bunaliv(e|ed|ing)\b/i },
-  // Abbreviations. "kms" as kilometres is implausible for this US cohort, and
-  // recall wins per the module policy above.
-  { category: "self_harm", pattern: /\b(kms|ksy)\b/i },
+  // Abbreviations. "kys" ("kill yourself") is the abbreviation students
+  // actually type; the entry here previously pinned "ksy", a transposition of
+  // it, so the real form was a verified MISS while a typo was guarded.
+  //
+  // "kms" is also kilometres, and this entry carries no lang tag — so
+  // "caminé 5 kms hoy" served a Spanish speaker the ENGLISH 988 block, the
+  // file's only cross-language leak. Two narrow guards, both on senses that
+  // are unambiguously distance: a digit immediately before (with or without a
+  // space), and a following "away"/"from". Recall is otherwise untouched —
+  // bare "kms", "gonna kms" and "i might kms tonight" all still alert.
+  { category: "self_harm", pattern: /(?<!\d)(?<!\d\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)/i },
   // "ending things" — the formal pattern only covered "my life" / "it all".
-  { category: "self_harm", pattern: /\bend(ing)?\s+things\b/i },
+  // PRECISION EXCEPTION to this module's recall-first policy, written down so
+  // the owner can veto it in review: "end things WITH <someone>" is a breakup,
+  // and relationship talk is precisely what students bring to a coach, so both
+  // 2026-08-21 reviews scored the unguarded form the highest-frequency false
+  // positive in the file. The exemption is only the "with" frame; "thinking
+  // about ending things" and "i want to end things" still alert.
+  { category: "self_harm", pattern: /\bend(?:ing)?\s+things\b(?!\s+with\b)/i },
   { category: "self_harm", pattern: /\bbetter\s+off\s+if\s+i\s+(wasn'?t|was\s+not|weren'?t)\s+here\b/i },
   // Method-adjacent disclosure: a stated plan or a past act outranks ideation.
   // Both are bounded so third-person mentions ("that overdose documentary")
   // and ordinary adherence ("took my medication this morning") stay silent.
   { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+(od|overdose)\b/i },
-  { category: "self_harm", pattern: /\boverdos(e|ed|ing)\s+(on|myself)\b/i },
+  // "overdose myself" is inherently first-person, so it fires on its own.
+  // "overdose ON <thing>" is not: the object phrase is at least as natural
+  // about someone else, and "my brother overdosed on fentanyl last year" is
+  // grief, not disclosure — yet it alerted, contradicting the comment above.
+  // The frame is an "i", tolerating contractions and a bounded two-word gap
+  // ("i'm overdosing on", "i nearly overdosed on", "i think i overdosed on"),
+  // so a distant "i" elsewhere in the sentence cannot supply it — "my mom
+  // overdosed on pills when i was little" stays silent. The Spanish
+  // "sobredosis" twin below has required a first-person frame all along; this
+  // restores the parity.
+  { category: "self_harm", pattern: /\boverdos(?:e|ed|ing)\s+myself\b/i },
+  { category: "self_harm", pattern: /\bi(?:'m|'ve|'d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
   { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
   // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
   // all my pills tonight"). The two entries above between them only covered
@@ -131,8 +160,46 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // first-person frame so third-person mentions ("mi primo murió de una
   // sobredosis") stay silent — the same bounds that keep "took my medication"
   // and "that overdose documentary" quiet in English.
-  { category: "self_harm", lang: "es", pattern: /\b(me\s+voy\s+a\s+tomar|voy\s+a\s+tomarme|tomarme|me\s+tom(o|e|é|ar(e|é))|tom(e|é|ar(e|é)))\s+(tod[ao]s\s+(l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(as|os)\s+|un\s+(mont(o|ó)n|pu(ñ|n)ado)\s+de\s+)(pastillas|p(í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
-  { category: "self_harm", lang: "es", pattern: /\b(darme|tomarme|meterme|me\s+(di|doy|dar(e|é)|tom(o|e|é)|voy\s+a\s+(dar|tomar|meter))|(pienso|pens(e|é|ado|ando))\s+en)\s+una\s+sobredosis\b/i },
+  //
+  // VERB REGISTER (es) — the adherence invariant, mirrored from English.
+  // A quantity word plus a medication noun is NOT sufficient evidence of
+  // disclosure: that is also exactly how a student describes a prescription.
+  // What separates the two is the VERB. English pins this with two entries — a
+  // past act (L88, "took all my pills") and a stated intent (L99, "gonna take
+  // all my pills") — and pins the silence of bare present and obligation
+  // modals ("i take all my pills every morning", "i need to take all my meds
+  // before bed"). The single Spanish entry that stood here accepted bare
+  // present ("me tomo") and bare infinitive ("tomarme"), so ordinary Spanish
+  // adherence talk alerted while its English equivalent was pinned silent —
+  // a real cross-language asymmetry, not a style difference.
+  //
+  // The two entries below are therefore an ALLOWLIST of crisis-register verbs.
+  // Everything outside it falls through silent by construction: bare habitual
+  // present ("me tomo todas las pastillas cada mañana"), obligation modals
+  // ("necesito / tengo que / debo tomarme todas las pastillas") and the
+  // subjunctive after "que" ("el doctor me dijo que me tome todas las
+  // pastillas"). Quantifier + noun groups are unchanged, so nothing that used
+  // to alert on the NOUN side stops alerting.
+  //
+  // 1. Past act. Accented "tomé" is unambiguously the preterite and fires
+  //    freely. Unaccented "tome" is also the present subjunctive, so it takes
+  //    a "que" guard — that is the whole difference between "me tome todas mis
+  //    pastillas" (fires) and "…dijo que me tome todas las pastillas"
+  //    (silent). The guard spans the optional clitic so the bare-verb
+  //    alternative cannot re-enter the match after "que me".
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tomé|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?tome)\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
+  // 2. Stated intent: an intent verb ("quiero/quisiera", "voy a"/"me voy a",
+  //    "pienso en", "pensé en") governing the take-verb, the synthetic future
+  //    ("me tomaré"), or a time-of-intent marker framing the bare present
+  //    ("esta noche me tomo …"). The marker is prefix-only and refuses a
+  //    preceding "cada"/"la"/"las", because "cada mañana" and "por la mañana"
+  //    are habitual, not a time of intent.
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:quiero|quisiera|pienso(?:\s+en)?|pens(?:é|e|ado|ando)\s+en|(?:me\s+)?voy\s+a)\s+tomar(?:me)?|(?:me\s+)?tomar(?:é|e)|(?<!\b(?:cada|la|las)\s+)(?:esta\s+noche|hoy|ma(?:ñ|n)ana)\s+(?:me\s+)?tomo)\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
+  // "sobredosis" — clitic climbing is grammatical in Spanish and every other
+  // pair in this file handles both directions ("me quiero morir" /
+  // "quiero morirme"), so "me quiero dar una sobredosis" must match exactly as
+  // "quiero darme una sobredosis" already did.
+  { category: "self_harm", lang: "es", pattern: /\b(?:darme|tomarme|meterme|me\s+(?:di|doy|dar(?:e|é)|tom(?:o|e|é)|voy\s+a\s+(?:dar|tomar|meter)|(?:quiero|quisiera)\s+(?:dar|tomar|meter))|(?:pienso|pens(?:e|é|ado|ando))\s+en)\s+una\s+sobredosis\b/i },
   // harm_others (es) — a person object (attached clitic or personal "a") is
   // required, mirroring the English object list; that keeps "matar el tiempo"
   // ("kill time") from false-positive while catching "quiero matar a mi jefe".
