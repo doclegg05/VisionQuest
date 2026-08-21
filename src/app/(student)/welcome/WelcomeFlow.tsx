@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type WelcomePath } from "@/lib/progression/welcome-routing";
@@ -22,6 +22,59 @@ interface WelcomeFlowProps {
 }
 
 const TOTAL_STEPS = 4;
+
+/**
+ * How long the score card holds before the flow moves on.
+ *
+ * Eight seconds, not two (owner call, 2026-08-20). The card is the student's
+ * only confirmation that their first quick-win actually saved, and at the
+ * grade-5 reading level this program serves, two seconds did not cover reading
+ * one sentence and a count — the celebration was gone before it was read. The
+ * timer stays because the student can already leave sooner: QuickWinsNav is on
+ * screen the whole time and every manual navigation revokes this advance.
+ *
+ * Exported so the floor is testable — this is a product decision, not a tuning
+ * knob to trim when something feels slow.
+ */
+export const SCORE_ADVANCE_DELAY_MS = 8000;
+
+type ScheduleFn = (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+type CancelFn = (handle: ReturnType<typeof setTimeout>) => void;
+
+export interface AutoAdvance {
+  start(callback: () => void, delayMs: number): void;
+  cancel(): void;
+}
+
+/**
+ * The quick-wins celebration's auto-advance, as a handle the flow can revoke.
+ *
+ * The celebration keeps its navigation on screen, so the student can leave
+ * before the timer fires — and an escape hatch that drops them somewhere else
+ * two seconds later is not an escape hatch. Every manual navigation cancels
+ * the pending advance. The scheduler is injectable so the cancel path is
+ * unit-testable without a DOM or a real clock. Exported for tests.
+ */
+export function createAutoAdvance(
+  schedule: ScheduleFn = setTimeout,
+  cancel: CancelFn = clearTimeout,
+): AutoAdvance {
+  let handle: ReturnType<typeof setTimeout> | null = null;
+  return {
+    start(callback, delayMs) {
+      if (handle !== null) cancel(handle);
+      handle = schedule(() => {
+        handle = null;
+        callback();
+      }, delayMs);
+    },
+    cancel() {
+      if (handle === null) return;
+      cancel(handle);
+      handle = null;
+    },
+  };
+}
 
 /**
  * Posts a single quick-win orientation item as complete. Returns whether the
@@ -160,7 +213,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
         }}
         className={`group flex items-start gap-4 rounded-[1.5rem] border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
           hasError
-            ? "border-red-300"
+            ? "border-[var(--badge-error-text)]"
             : choice.recommended
               ? "border-2 border-[var(--accent-strong)]"
               : "border-[var(--border)]"
@@ -184,7 +237,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
         </div>
       </Link>
       {hasError && (
-        <p role="alert" className="mt-2 text-left text-xs font-medium text-red-700">
+        <p role="alert" className="mt-2 text-left text-xs font-medium text-[var(--badge-error-text)]">
           That didn&apos;t save. Tap to try again.
         </p>
       )}
@@ -207,19 +260,23 @@ interface QuickWinCardProps {
  * cycle, mirroring the repo's OrientationWizard test pattern.
  */
 export function QuickWinCard({ item, done, saving, hasError, onComplete }: QuickWinCardProps) {
+  // Colors come from theme tokens, not hardcoded light values: the app themes
+  // with [data-theme], while Tailwind's dark: variant keys off the OS setting,
+  // so a `bg-green-50` card left white body text on pale green whenever the
+  // two disagreed.
   return (
     <div
       className={`rounded-xl border p-4 transition-colors ${
         done
-          ? "border-green-200 bg-green-50"
+          ? "border-[var(--border)] bg-[var(--badge-success-bg)]"
           : hasError
-            ? "border-red-200 bg-red-50"
+            ? "border-[var(--border)] bg-[var(--badge-error-bg)]"
             : "border-[var(--border)] bg-[var(--surface-raised)]"
       }`}
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-medium ${done ? "text-green-800" : "text-[var(--ink-strong)]"}`}>
+          <p className="text-sm font-medium text-[var(--ink-strong)]">
             {done && <span className="mr-1.5">✓</span>}
             {item.label}
           </p>
@@ -239,7 +296,7 @@ export function QuickWinCard({ item, done, saving, hasError, onComplete }: Quick
         )}
       </div>
       {!done && hasError && (
-        <p role="alert" className="mt-2 text-xs font-medium text-red-700">
+        <p role="alert" className="mt-2 text-xs font-medium text-[var(--badge-error-text)]">
           That didn&apos;t save. Tap to try again.
         </p>
       )}
@@ -263,27 +320,118 @@ interface ScoreCardProps {
  * the word "readiness" for a number that will not match the dashboard's
  * 100-point composite score. Exported (named) so the copy is directly
  * testable via renderToString, mirroring PathChoiceCard/QuickWinCard.
+ *
+ * It waits for an explicit Continue. A 2s auto-advance used to take the
+ * message away mid-sentence for a slower reader — and this card is their only
+ * confirmation that the first win actually saved.
  */
 export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProps) {
   return (
-    <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
+    <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--badge-success-bg)] p-4">
       {percent !== null ? (
         <>
-          <p className="text-sm font-medium text-green-800">
+          <p className="text-sm font-medium text-[var(--ink-strong)]">
             🎉 Nice! You&apos;ve finished {completedCount} of {totalCount} orientation items.
           </p>
-          <div className="mt-2 h-2 rounded-full bg-green-200 overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={completedCount}
+            aria-valuemin={0}
+            aria-valuemax={totalCount}
+            aria-valuetext={`${completedCount} of ${totalCount} orientation items done`}
+            className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+          >
             <div
-              className="h-full rounded-full bg-green-500 transition-all duration-1000"
+              className="h-full rounded-full bg-[var(--accent-green)] transition-all duration-1000"
               style={{ width: `${percent}%` }}
             />
           </div>
         </>
       ) : (
-        <p className="text-sm font-medium text-green-800">
+        <p className="text-sm font-medium text-[var(--ink-strong)]">
           🎉 Nice! You&apos;re off to a great start.
         </p>
       )}
+    </div>
+  );
+}
+
+interface ScoreSlotProps extends ScoreCardProps {
+  /** False until every quick win is done — the card is present either way. */
+  shown: boolean;
+}
+
+/**
+ * Holds the score card's space from the moment step 2 renders.
+ *
+ * The card appears ABOVE the navigation the instant the last save resolves.
+ * Inserting it at that moment pushed "← Back" down 57px (measured in a
+ * browser at 375px) and dropped "Continue →" onto the pixel Back had just
+ * vacated — so a student reaching for Back as the save landed hit the
+ * opposite action. Keeping the card mounted all along and only revealing it
+ * holds the row still. `invisible` is visibility:hidden, which also keeps the
+ * unrevealed copy out of the accessibility tree, so nothing is announced
+ * before it is true. Exported for tests.
+ */
+export function ScoreSlot({ shown, ...card }: ScoreSlotProps) {
+  return (
+    <div className={shown ? undefined : "invisible"}>
+      <ScoreCard {...card} />
+    </div>
+  );
+}
+
+interface QuickWinsNavProps {
+  hasQuickWins: boolean;
+  allWinsDone: boolean;
+  onAdvance: () => void;
+  onBack: () => void;
+}
+
+/**
+ * Step 2's navigation, rendered unconditionally — and that is the point.
+ *
+ * It used to be swapped out the moment the last quick-win save resolved, so a
+ * student reaching for "Skip for now" during the round trip had the control
+ * vanish from under their finger; a tap landing in the last frame hit a
+ * detaching element. Now it stays mounted through the save and the score card
+ * alike, so a tap always lands on a live control that does what the student
+ * meant, and there is a way out at every instant.
+ *
+ * It deliberately does NOT go inert while a save is in flight: the POST has no
+ * timeout, so disabling would leave a student on a stalled connection with no
+ * working control anywhere on the step. Leaving mid-save is safe — the save
+ * still records, and the advance it schedules is revocable (createAutoAdvance).
+ * Exported (named) so these states are directly testable via renderToString,
+ * mirroring ScoreCard and QuickWinCard.
+ */
+export function QuickWinsNav({ hasQuickWins, allWinsDone, onAdvance, onBack }: QuickWinsNavProps) {
+  return (
+    <div className="mt-8 flex flex-col items-center gap-3">
+      {/* Every variant carries the same 44px floor, so the row keeps its
+          height when the label flips — otherwise "← Back" jumps the moment
+          the save lands, which is the same hazard in a different costume. */}
+      {hasQuickWins && !allWinsDone ? (
+        <button
+          onClick={onAdvance}
+          className="inline-flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+        >
+          Skip for now →
+        </button>
+      ) : (
+        <button
+          onClick={onAdvance}
+          className="primary-button inline-flex min-h-11 items-center justify-center px-8 py-3 text-sm"
+        >
+          {hasQuickWins ? "Continue →" : "Next →"}
+        </button>
+      )}
+      <button
+        onClick={onBack}
+        className="inline-flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+      >
+        ← Back
+      </button>
     </div>
   );
 }
@@ -302,6 +450,24 @@ export default function WelcomeFlow({
   const [showScore, setShowScore] = useState(false);
   const [savingPath, setSavingPath] = useState<WelcomePath | null>(null);
   const [errorPath, setErrorPath] = useState<WelcomePath | null>(null);
+
+  const autoAdvance = useRef<AutoAdvance>(createAutoAdvance());
+  useEffect(() => {
+    const timer = autoAdvance.current;
+    return () => timer.cancel();
+  }, []);
+
+  /**
+   * Every manual navigation in this flow, and the one place the pending
+   * auto-advance is revoked. Going through it uniformly is what stops the
+   * celebration's timer from resurfacing steps later: skip mid-save, land on
+   * the path chooser, tap back, and a still-armed timer would push forward
+   * again from under the student.
+   */
+  function goToStep(nextStep: number) {
+    autoAdvance.current.cancel();
+    setStep(nextStep);
+  }
 
   const hasQuickWins = quickWinItems.length > 0;
   const allWinsDone = hasQuickWins && completedWins.size >= quickWinItems.length;
@@ -322,10 +488,15 @@ export default function WelcomeFlow({
       return;
     }
     setCompletedWins((prev) => new Set(prev).add(itemId));
-    // If all done, show score animation briefly
     if (completedWins.size + 1 >= quickWinItems.length) {
       setShowScore(true);
-      setTimeout(() => setStep(3), 2000);
+      autoAdvance.current.start(
+        // The student can leave while the save is in flight — the navigation
+        // stays live on purpose — so this schedules AFTER they may already be
+        // somewhere else. Advance only from the step it was scheduled for.
+        () => setStep((current) => (current === 2 ? 3 : current)),
+        SCORE_ADVANCE_DELAY_MS,
+      );
     }
   }
 
@@ -374,7 +545,7 @@ export default function WelcomeFlow({
                 </div>
               ))}
             </div>
-            <button onClick={() => setStep(1)} className="primary-button mt-8 px-8 py-3 text-sm">
+            <button onClick={() => goToStep(1)} className="primary-button mt-8 px-8 py-3 text-sm">
               Let&apos;s get started →
             </button>
           </div>
@@ -402,11 +573,11 @@ export default function WelcomeFlow({
                 </div>
               ))}
             </div>
-            <button onClick={() => setStep(2)} className="primary-button mt-8 px-8 py-3 text-sm">
+            <button onClick={() => goToStep(2)} className="primary-button mt-8 px-8 py-3 text-sm">
               Next →
             </button>
             <button
-              onClick={() => setStep(0)}
+              onClick={() => goToStep(0)}
               className="mx-auto mt-3 flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               ← Back
@@ -442,37 +613,23 @@ export default function WelcomeFlow({
               </div>
             )}
 
-            {/* Score card after all wins */}
-            {showScore && (
-              <ScoreCard
+            {/* Score card after all wins — its space is held from the start
+                so revealing it never moves the navigation below it. */}
+            {hasQuickWins && (
+              <ScoreSlot
+                shown={showScore}
                 completedCount={completedOrientationTotal}
                 totalCount={totalOrientationItems}
                 percent={scorePct}
               />
             )}
 
-            {!showScore && (
-              <div className="mt-8 flex flex-col items-center gap-3">
-                {hasQuickWins && !allWinsDone ? (
-                  <button
-                    onClick={() => setStep(3)}
-                    className="inline-flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                  >
-                    Skip for now →
-                  </button>
-                ) : (
-                  <button onClick={() => setStep(3)} className="primary-button px-8 py-3 text-sm">
-                    {hasQuickWins ? "Continue →" : "Next →"}
-                  </button>
-                )}
-                <button
-                  onClick={() => setStep(1)}
-                  className="inline-flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                >
-                  ← Back
-                </button>
-              </div>
-            )}
+            <QuickWinsNav
+              hasQuickWins={hasQuickWins}
+              allWinsDone={allWinsDone}
+              onAdvance={() => goToStep(3)}
+              onBack={() => goToStep(1)}
+            />
           </div>
         )}
 
@@ -496,7 +653,7 @@ export default function WelcomeFlow({
               ))}
             </div>
             <button
-              onClick={() => setStep(2)}
+              onClick={() => goToStep(2)}
               className="mt-4 flex min-h-11 items-center justify-center text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               ← Back

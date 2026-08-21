@@ -31,6 +31,7 @@ export default async function GoalsPage() {
         actionLabel={nextStep.actionLabel}
         actionLink={nextStep.actionLink}
         steps={nextStep.steps}
+        variant="compact"
       />
       <div className="surface-section mb-4 overflow-hidden p-0">
         <MountainProgressLazy
