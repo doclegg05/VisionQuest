@@ -6,6 +6,7 @@ import { notFound } from "@/lib/api-error";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { logger } from "@/lib/logger";
 import { estimateTokens } from "@/lib/llm-usage-estimate";
+import { studentLogKey } from "@/lib/log-keys";
 
 /**
  * Load an existing conversation or create a new one.
@@ -393,7 +394,7 @@ export async function maybeUpdateSummary(
 
   logger.info("Rolling conversation summary updated", {
     conversationId,
-    studentId,
+    student: studentLogKey(studentId),
     messagesCompacted: messagesToSummarize.length,
     summaryLength: updatedSummary.length,
   });

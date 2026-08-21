@@ -14,6 +14,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, loginSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -77,7 +78,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         data: { passwordHash: newHash },
       });
     } catch (err) {
-      logger.warn("Password rehash failed", { studentId: student.id, error: String(err) });
+      logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: String(err) });
     }
   }
 

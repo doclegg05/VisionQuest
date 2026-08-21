@@ -22,6 +22,7 @@ import type { Session } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import { runAgentTurn } from "./loop";
 import { getEnabledTools } from "./tools";
+import { studentLogKey } from "@/lib/log-keys";
 
 export const BRIEFING_TOOL_ALLOWLIST: ReadonlyArray<string> = [
   "lookup_cert_progress",
@@ -131,7 +132,7 @@ export async function runHeadlessReadonlyTurn(
   const guarded = guardProvider(provider, allowed, (toolName) => {
     violation = toolName;
     logger.error("headless: blocked non-allowlisted tool call", {
-      studentId,
+      student: studentLogKey(studentId),
       conversationId,
       toolName,
     });
@@ -169,7 +170,7 @@ export async function runHeadlessReadonlyTurn(
         if (!allowed.has(event.tool) && !violation) {
           violation = event.tool;
           logger.error("headless: off-list tool_call event observed", {
-            studentId,
+            student: studentLogKey(studentId),
             conversationId,
             toolName: event.tool,
           });

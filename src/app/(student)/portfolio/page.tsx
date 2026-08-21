@@ -20,6 +20,7 @@ export default async function Portfolio() {
         actionLabel={nextStep.actionLabel}
         actionLink={nextStep.actionLink}
         steps={nextStep.steps}
+        variant="compact"
       />
       <PageIntro
         eyebrow="Career story"

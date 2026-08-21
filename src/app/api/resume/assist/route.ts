@@ -13,6 +13,7 @@ import {
 } from "@/lib/resume";
 import { generateResumeDraft } from "@/lib/resume-ai";
 import { CERTIFICATIONS } from "@/lib/spokes/certifications";
+import { studentLogKey } from "@/lib/log-keys";
 
 const CERTIFICATION_NAME_BY_ID = new Map(CERTIFICATIONS.map((item) => [item.id, item.name]));
 
@@ -152,7 +153,7 @@ export const POST = withAuth(async (session, req: Request) => {
     return NextResponse.json(result);
   } catch (error) {
     logger.error("Resume assist failed", {
-      studentId: session.id,
+      student: studentLogKey(session.id),
       error: String(error),
     });
     await logAiAuditEvent({

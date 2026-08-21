@@ -178,8 +178,38 @@ test("conversation summary write resolves to the student (prior-conversation con
   assert.deepEqual(res, { scope: "students", studentIds: [SID] });
 });
 
-test("unwatched models resolve to none (Message, Progression, ProgressionEvent, Student)", () => {
-  for (const model of ["Message", "Progression", "ProgressionEvent", "Student"]) {
+// Progression IS watched: getSituationalSnapshot caches the rendered
+// `Level N, X XP` line under chat:snapshot for 180s, so an XP award that
+// does not invalidate leaves Sage quoting the student's old level back at
+// them. updateProgression writes through the extended client as
+// `updateMany({ where: { studentId, version } })` — the real shape below.
+test("progression updateMany invalidates the student (XP/level are cached in chat:snapshot)", () => {
+  const res = resolveChatContextInvalidation(
+    "Progression",
+    "updateMany",
+    { where: { studentId: SID, version: 3 }, data: { state: "{}", version: 4 } },
+    { count: 1 },
+  );
+  assert.deepEqual(res, { scope: "students", studentIds: [SID] });
+});
+
+test("progression upsert invalidates the student", () => {
+  const res = resolveChatContextInvalidation(
+    "Progression",
+    "upsert",
+    { where: { studentId: SID }, create: { studentId: SID, state: "{}" }, update: { state: "{}" } },
+    { id: "p1", studentId: SID },
+  );
+  assert.deepEqual(res, { scope: "students", studentIds: [SID] });
+});
+
+// Message/ProgressionEvent/Student stay unwatched on their original
+// reasoning: they are written on essentially every turn and the surfaces
+// they feed (message count, recentEvents in the bundle) are genuinely read
+// uncached. Progression was removed from this list because that second
+// claim was false for it — see the two tests above.
+test("unwatched models resolve to none (Message, ProgressionEvent, Student)", () => {
+  for (const model of ["Message", "ProgressionEvent", "Student"]) {
     const res = resolveChatContextInvalidation(model, "create", { data: { studentId: SID } }, { id: "x" });
     assert.deepEqual(res, { scope: "none" }, model);
   }

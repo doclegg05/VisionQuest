@@ -4,6 +4,7 @@ import { prisma } from "./db";
 import { downloadFile, uploadFile } from "./storage";
 import { FORMS } from "./spokes/forms";
 import { logger } from "./logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 const FORM_BY_ID = new Map(FORMS.map((f) => [f.id, f]));
 
@@ -240,7 +241,7 @@ export async function generateStudentArchive(
   await uploadFile(storageKey, zipBuffer, "application/zip");
 
   logger.info("Student archive created", {
-    studentId,
+    student: studentLogKey(studentId),
     fileCount: manifest.fileCount,
     archiveSize: zipBuffer.length,
     storageKey,

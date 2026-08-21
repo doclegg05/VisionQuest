@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { sanitizeForPrompt } from "../system-prompts";
+import { studentLogKey } from "@/lib/log-keys";
 
 /** The enduring, identity-defining memory categories (vs. topical recall). */
 export const PROFILE_CATEGORIES = ["circumstance", "preference"] as const;
@@ -72,7 +73,7 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
     });
   } catch (err) {
     logger.warn("Student profile load failed; continuing without it", {
-      studentId,
+      student: studentLogKey(studentId),
       error: err instanceof Error ? err.message : String(err),
     });
     return { block: "", contents: [] };

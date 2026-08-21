@@ -31,6 +31,7 @@ import {
   panelSpecSchema,
   type PanelSpec,
 } from "@/lib/sage/panel-spec";
+import { studentLogKey } from "@/lib/log-keys";
 
 export function isAutopilotEnabled(): boolean {
   return process.env.SAGE_AUTOPILOT_ENABLED === "true" && agentMode() !== "off";
@@ -112,7 +113,7 @@ async function stripForeignTaskIds(spec: PanelSpec, studentId: string): Promise<
         select: { id: true },
       });
       if (owned) return card;
-      logger.warn("briefing: dropped foreign/unknown taskId from panel card", { studentId });
+      logger.warn("briefing: dropped foreign/unknown taskId from panel card", { student: studentLogKey(studentId) });
       const { taskId: _dropped, ...rest } = card;
       return rest;
     }),
@@ -144,7 +145,7 @@ export async function runDailyBriefing(
   options: BriefingOptions = {},
 ): Promise<void> {
   if (!isAutopilotEnabled()) {
-    logger.info("briefing: autopilot disabled, skipping", { studentId });
+    logger.info("briefing: autopilot disabled, skipping", { student: studentLogKey(studentId) });
     return;
   }
 

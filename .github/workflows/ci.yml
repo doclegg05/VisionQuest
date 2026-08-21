@@ -122,6 +122,19 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RLS_TEST_ENABLED: "true"
 
+      - name: Run rate-limiter concurrency integration tests
+        # Guards the 2026-08-20 bug where concurrent logins from one IP
+        # contended on a single RateLimitEntry row and returned HTTP 500. The
+        # failure is a Postgres concurrency behavior, so it only reproduces
+        # against a real database — the in-process suites in `npm test` cover
+        # the limiter's contract, not its store. Reuses the hermetic Postgres
+        # migrated for the RLS step above.
+        run: npm run test:ratelimit
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          RATE_LIMIT_DB_TEST_ENABLED: "true"
+
       - name: Build
         run: npm run build
 
@@ -218,6 +231,7 @@ jobs:
           e2e/teacher-dashboard.spec.ts
           e2e/student-journey.spec.ts
           e2e/teacher-loop.spec.ts
+          e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
 
       - name: Authenticated a11y scans (soak — red baseline, non-blocking)

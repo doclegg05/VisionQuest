@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth, badRequest, isStaffRole } from "@/lib/api-error";
 import { executeAgentTool } from "@/lib/sage/agent/executor";
 import { verifyConfirmationToken } from "@/lib/sage/agent/confirmation";
+import { claimConfirmationToken } from "@/lib/sage/agent/confirmation-use";
 
 const confirmSchema = z.object({
   toolName: z.string().min(1).max(64),
@@ -40,6 +41,18 @@ export const POST = withAuth(async (session, req: Request) => {
   );
   if (!valid) {
     throw badRequest("This confirmation has expired or is invalid. Ask Sage again.");
+  }
+
+  // A verified token authorizes exactly ONE execution. Claim it before the
+  // executor runs — the claim is an atomic insert, so a repeated or
+  // concurrent confirm of the same card loses the race and is refused here,
+  // closing the replay window that used to span the whole 10-minute TTL.
+  // Ordering matters both ways: claim AFTER verify (unverified requests must
+  // not write claim rows) and BEFORE execute (the attempt burns the claim
+  // even if the tool then fails — see confirmation-use.ts).
+  const claim = await claimConfirmationToken(token, new Date());
+  if (claim === "replayed") {
+    throw badRequest("This confirmation was already used. Ask Sage again.");
   }
 
   const record = await executeAgentTool({

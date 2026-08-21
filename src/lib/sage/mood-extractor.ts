@@ -3,6 +3,7 @@ import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { recordWellbeingConcern } from "./crisis-detection";
 import { retryWithBackoff } from "./retry";
+import { studentLogKey } from "@/lib/log-keys";
 
 // A self-reported mood/motivation score at or below this (out of 10) raises a
 // wellbeing concern for staff review.
@@ -94,7 +95,7 @@ export async function extractMoodFromConversation(
       });
     } catch (err) {
       logger.error("Mood extraction: failed to save MoodEntry", {
-        studentId,
+        student: studentLogKey(studentId),
         score,
         error: String(err),
       });
@@ -106,7 +107,7 @@ export async function extractMoodFromConversation(
         await recordWellbeingConcern({ studentId, conversationId, reason: "low_mood" });
       } catch (err) {
         logger.error("Mood extraction: failed to record wellbeing concern", {
-          studentId,
+          student: studentLogKey(studentId),
           score,
           error: String(err),
         });

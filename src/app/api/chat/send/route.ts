@@ -49,6 +49,7 @@ import { getStudentProgramType } from "@/lib/program-type-server";
 import { runAgentTurn } from "@/lib/sage/agent/loop";
 import { executeAgentTool, executeSlashCommand } from "@/lib/sage/agent/executor";
 import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
+import { studentLogKey } from "@/lib/log-keys";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -307,7 +308,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
     const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
 
-    logger.error("AI provider initialization failed", { error: errorMsg, studentId: session.id });
+    logger.error("AI provider initialization failed", { error: errorMsg, student: studentLogKey(session.id) });
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,

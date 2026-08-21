@@ -77,6 +77,14 @@ const STUDENT_SCOPED_MODEL_LIST: readonly Prisma.ModelName[] = [
   "ResumeData",
   "PortfolioItem",
   "PublicCredentialPage",
+  // Progression carries the XP/level state that getSituationalSnapshot
+  // renders as "Level N, X XP" INSIDE the cached chat:snapshot layer
+  // (situational-snapshot.ts, 180s TTL) via fetchStudentReadinessData. It
+  // is safe to watch despite XP moving often, because awardEvent is
+  // idempotent on (sourceType, sourceId) and returns before touching
+  // Progression on a duplicate — the chat award keys on the conversation
+  // id, so it fires once per conversation, not once per turn.
+  "Progression",
 ];
 
 /**
@@ -98,12 +106,18 @@ const GLOBAL_MODEL_LIST: readonly Prisma.ModelName[] = [
 const CONVERSATION_MODEL: Prisma.ModelName = "Conversation";
 
 // Deliberately NOT watched, with reasons:
-//   - Message, Progression, ProgressionEvent: written on essentially every
-//     chat turn (messages, XP). The surfaces they feed (message count, XP /
-//     recentEvents in the bundle) are read uncached; watching them would
-//     invalidate the whole context every turn.
+//   - Message, ProgressionEvent: written on essentially every chat turn. The
+//     surfaces they feed (message count, recentEvents) are read through
+//     context-bundle.ts, which is NOT wrapped in a `cached("chat:...")` call
+//     — so there is no cached copy of them to go stale.
 //   - Student: frequent auth/activity writes; no asserted context surface
 //     reads mutable Student fields.
+//
+// Progression used to sit in this list on the same reasoning, and that was a
+// bug: XP and level ARE cached, in the chat:snapshot layer. Before adding a
+// model here, check every `cached("chat:...")` call site for a transitive
+// read of it — situational-snapshot.ts reaches Progression indirectly
+// through fetchStudentReadinessData, which is exactly how it was missed.
 const STUDENT_SCOPED_MODELS: ReadonlySet<string> = new Set(STUDENT_SCOPED_MODEL_LIST);
 const GLOBAL_MODELS: ReadonlySet<string> = new Set(GLOBAL_MODEL_LIST);
 

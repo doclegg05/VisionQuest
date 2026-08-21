@@ -33,7 +33,11 @@ care as healthcare or financial records.
 ## Logging & Monitoring
 - Sentry: configured to scrub PII fields before sending error reports
 - AuditLog: records actor, action, target — but NOT the full data payload
-- Server logs: no PII at any log level — use student IDs, never names/emails
+- Server logs: no student identifier at any log level. Names and emails are the obvious cases, and `studentId` counts too, because it resolves to exactly one student's record for anyone who can also read the database. Log the staff `actorId`, the surface, and the error message instead
+- The failure path of `recordStudentView` in `src/lib/audit.ts` is the reference shape, and `src/lib/audit.test.ts` shows how to assert a log payload carries no student id
+- When a failure needs a per-student key to be debuggable, log `studentLogKey(id)` from `src/lib/log-keys.ts`. It is a one-way sha256 prefix (`stu_a1b2c3d4e5f6`): two log lines for one student correlate, and the log alone identifies nobody. Use it especially on paths that are logged *because* nothing reached the database, where the log line is the only trace
+- Third-party error text quotes contact details (SMTP bounces quote the address, Twilio quotes the number), so wrap provider errors in `redactContactInfo` from `src/lib/log-redaction.ts` before logging them
+- This is enforced, not advisory: the `no-restricted-syntax` rule in `eslint.config.mjs` fails CI on a student identifier inside any `logger.*` call. Fix the log line rather than disabling the rule
 - Chat messages: stored in DB only, never logged to stdout or Sentry
 
 ## Data Export
