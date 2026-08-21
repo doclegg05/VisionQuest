@@ -125,6 +125,26 @@ describe("recordStudentView", () => {
     assert.equal(mockWarn.mock.callCount(), 1);
     assert.equal(mockWarn.mock.calls[0].arguments[1].error, "insert failed");
   });
+
+  it("failure-path warning contains no student identifier (no PII in server logs)", async () => {
+    mockFindFirst.mock.mockImplementation(async () => {
+      throw new Error("db down");
+    });
+
+    await audit.recordStudentView(baseInput);
+
+    assert.equal(mockWarn.mock.callCount(), 1);
+    const serialized = JSON.stringify(mockWarn.mock.calls[0].arguments);
+    assert.ok(
+      !serialized.includes(baseInput.targetStudentId),
+      `warn payload leaked the student id: ${serialized}`,
+    );
+    // Non-identifying context must survive so sampling failures stay debuggable.
+    const payload = mockWarn.mock.calls[0].arguments[1];
+    assert.equal(payload.surface, "student_detail");
+    assert.equal(payload.actorId, "teacher-1");
+    assert.equal(payload.error, "db down");
+  });
 });
 
 describe("logAuditEvent", () => {

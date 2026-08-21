@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { invalidatePrefix } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { parseState, createInitialState, type ProgressionState } from "./engine";
+import { studentLogKey } from "@/lib/log-keys";
 
 const MAX_RETRIES = 3;
 
@@ -62,14 +63,14 @@ export async function updateProgression(
 
     // Version conflict — retry with fresh state
     logger.warn("Progression version conflict, retrying", {
-      studentId,
+      student: studentLogKey(studentId),
       attempt: attempt + 1,
       expectedVersion: version,
     });
   }
 
   // All retries exhausted — log and return last state without saving
-  logger.error("Progression update failed after retries", { studentId });
+  logger.error("Progression update failed after retries", { student: studentLogKey(studentId) });
   const { state } = await getProgression(studentId);
   return state;
 }

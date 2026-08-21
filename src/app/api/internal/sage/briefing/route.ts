@@ -3,6 +3,7 @@ import { prismaAdmin as prisma } from "@/lib/db";
 import { enqueueJob } from "@/lib/jobs";
 import { logger } from "@/lib/logger";
 import { isAutopilotEnabled, utcPanelDate } from "@/lib/sage/briefing";
+import { studentLogKey } from "@/lib/log-keys";
 
 /**
  * Alpha-stage safety cap on per-run fan-out (a handful of real students
@@ -67,7 +68,7 @@ async function handle(req: Request): Promise<NextResponse> {
       if (jobId) enqueued++;
     } catch (err) {
       logger.error("briefing: failed to enqueue", {
-        studentId: student.id,
+        student: studentLogKey(student.id),
         error: err instanceof Error ? err.message : String(err),
       });
     }

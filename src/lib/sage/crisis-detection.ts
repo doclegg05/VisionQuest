@@ -10,6 +10,7 @@ import {
   formatWellbeingCardSummary,
   type WellbeingMoodSnapshot,
 } from "./wellbeing-card";
+import { studentLogKey } from "@/lib/log-keys";
 
 /**
  * Wellbeing / crisis safety-net.
@@ -193,7 +194,7 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
     assigned = await findAssignedInstructors(studentId);
   } catch (err) {
     logger.error("Wellbeing: instructor resolution failed; falling back to all active teachers", {
-      studentId,
+      student: studentLogKey(studentId),
       alert: "wellbeing_instructor_resolution_failed",
       error: String(err),
     });
@@ -225,7 +226,7 @@ async function findRecentMood(studentId: string, now: Date): Promise<WellbeingMo
     return { score: entry.score, recordedAt: entry.extractedAt };
   } catch (err) {
     logger.error("Wellbeing: mood lookup for crisis card failed", {
-      studentId,
+      student: studentLogKey(studentId),
       alert: "wellbeing_mood_lookup_failed",
       error: String(err),
     });
@@ -299,7 +300,7 @@ export async function recordWellbeingConcern({
     });
   } catch (err) {
     logger.error("Wellbeing: failed to upsert StudentAlert", {
-      studentId,
+      student: studentLogKey(studentId),
       reason,
       alert: "wellbeing_alert_failed",
       error: String(err),
@@ -365,7 +366,7 @@ export async function recordWellbeingConcern({
     );
   } catch (err) {
     logger.error("Wellbeing: failed to notify staff", {
-      studentId,
+      student: studentLogKey(studentId),
       reason,
       alert: "wellbeing_notify_failed",
       error: String(err),
