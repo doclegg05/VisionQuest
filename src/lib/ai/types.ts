@@ -1,5 +1,9 @@
 // src/lib/ai/types.ts
 
+// Type-only, so this is erased at compile time and no runtime cycle exists
+// with roles.ts (which imports AiTask from here).
+import type { AiRole } from "./roles";
+
 export interface ChatMessage {
   role: "user" | "model";
   content: string;
@@ -179,6 +183,17 @@ export interface AIProviderRequest {
    * Sensitive tasks ignore this and remain local-only.
    */
   preferCloud?: boolean;
+  /**
+   * Override the AI role this call belongs to. Defaults to the role its
+   * `task` maps to (src/lib/ai/roles.ts), which is right for every call site
+   * today. Set it explicitly when one task covers work with genuinely
+   * different capability needs — e.g. a prose generation filed under a task
+   * whose other call sites all emit strict JSON.
+   *
+   * Affects only WHICH local model serves the call. It cannot change the
+   * FERPA provider decision, which keys off `sensitivity` alone.
+   */
+  role?: AiRole;
 }
 
 export interface LocalAIAuthConfig {
@@ -213,6 +228,27 @@ export interface LocalAIAuthConfig {
    * provider cancels it. Defaults to the provider's built-in fallback.
    */
   streamStallTimeoutMs?: number;
+  /**
+   * Override Ollama's `keep_alive` (how long the model stays resident after
+   * a request). Defaults to the provider's workday-length default, which is
+   * right for the interactive chat model and wrong for every other one:
+   * Ollama keeps EVERY touched model resident for the full keep-alive, so a
+   * background role running a second model holds unified memory against the
+   * model students are waiting on. Measured consequence of not doing this is
+   * in .claude/MEMORY.md ("keep-alive 8h starves other models").
+   */
+  keepAlive?: string;
+  /**
+   * Override the output cap used by `generateStructuredResponse` (JSON mode).
+   *
+   * Separate from `maxOutputTokens` on purpose. The structured path has always
+   * used its own smaller constant and has never honored the global cap, so
+   * folding the two together would silently change every deployment that had
+   * raised the global one (typically to make room for reasoning tokens on the
+   * free-text path). Only a per-role cap sets this, so an operator who has set
+   * nothing sees exactly the previous behavior.
+   */
+  structuredMaxOutputTokens?: number;
 }
 
 export interface AIProviderConfig {

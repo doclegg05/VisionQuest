@@ -7,6 +7,21 @@ export const SYSTEM_CONFIG_KEYS = [
   "ai_provider",
   "ai_provider_url",
   "ai_provider_model",
+  // Per-role local model overrides. Unset → the role uses
+  // `ai_provider_model`, i.e. the single-model behavior that predates roles.
+  // A role is a capability profile, not a call site — see src/lib/ai/roles.ts
+  // for what each one has to be good at and which AiTasks map to it.
+  "ai_provider_model_chat",
+  "ai_provider_model_extract",
+  "ai_provider_model_document",
+  "ai_provider_model_draft",
+  // Per-role output-token caps. Unset → the provider's global default
+  // (768 free-text / 512 structured), i.e. unchanged. Raise the roles whose
+  // output does not fit — see src/lib/ai/roles.ts.
+  "ai_provider_max_output_tokens_chat",
+  "ai_provider_max_output_tokens_extract",
+  "ai_provider_max_output_tokens_document",
+  "ai_provider_max_output_tokens_draft",
   "ai_provider_embedding_model",
   "ai_provider_auth_mode",
   // "ollama" (default) | "openai" — generic OpenAI-compatible endpoint mode.

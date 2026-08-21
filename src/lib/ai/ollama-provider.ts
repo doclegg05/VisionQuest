@@ -449,6 +449,23 @@ export class OllamaProvider implements AIProvider {
   private static readonly KEEP_ALIVE = "8h";
 
   /**
+   * Keep-alive for a model that is NOT the interactive chat model.
+   *
+   * Ollama holds every model it has served resident for the full keep-alive,
+   * so once roles can point at different models the workday-length default
+   * turns each background role into a standing claim on unified memory —
+   * exactly the starvation documented in .claude/MEMORY.md, where a resident
+   * large model pushed the next model's calls into the 300s timeout and
+   * inverted an A/B result. Five minutes covers a burst of background work
+   * (a chat turn's extractions all fire together) and then gives the memory
+   * back.
+   */
+  static readonly SECONDARY_KEEP_ALIVE = "5m";
+
+  private readonly keepAlive: string;
+  private readonly structuredMaxOutputTokens: number;
+
+  /**
    * Default KV-cache window size when no SystemConfig override is set.
    * Bumped from 4096 to 8192 to give multi-turn agent transcripts (text +
    * tool_calls + tool results across hops) more headroom before clipping.
@@ -523,6 +540,12 @@ export class OllamaProvider implements AIProvider {
       typeof explicitStallTimeout === "number" && explicitStallTimeout > 0
         ? explicitStallTimeout
         : OllamaProvider.STREAM_STALL_TIMEOUT_MS;
+    this.keepAlive = structuredConfig?.keepAlive?.trim() || OllamaProvider.KEEP_ALIVE;
+    const explicitStructuredMax = structuredConfig?.structuredMaxOutputTokens;
+    this.structuredMaxOutputTokens =
+      typeof explicitStructuredMax === "number" && explicitStructuredMax > 0
+        ? explicitStructuredMax
+        : OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS;
   }
 
   /**
@@ -676,7 +699,7 @@ export class OllamaProvider implements AIProvider {
           num_predict: this.maxOutputTokens,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
-        keep_alive: OllamaProvider.KEEP_ALIVE,
+        keep_alive: this.keepAlive,
       },
     );
 
@@ -796,7 +819,7 @@ export class OllamaProvider implements AIProvider {
           num_predict: this.maxOutputTokens,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
-        keep_alive: OllamaProvider.KEEP_ALIVE,
+        keep_alive: this.keepAlive,
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
     );
@@ -1364,7 +1387,7 @@ export class OllamaProvider implements AIProvider {
         num_predict: this.maxOutputTokens,
         ...(temperature !== undefined ? { temperature } : {}),
       },
-      keep_alive: OllamaProvider.KEEP_ALIVE,
+      keep_alive: this.keepAlive,
     };
 
     const { mode, response } = await this.postChat(
@@ -1563,7 +1586,7 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         response_format: { type: "json_object" },
-        max_tokens: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+        max_tokens: this.structuredMaxOutputTokens,
         num_ctx: this.numCtx,
         ...this.openAiReasoningParams,
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
@@ -1576,10 +1599,10 @@ export class OllamaProvider implements AIProvider {
         ...this.nativeReasoningParams,
         options: {
           num_ctx: this.numCtx,
-          num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+          num_predict: this.structuredMaxOutputTokens,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
-        keep_alive: OllamaProvider.KEEP_ALIVE,
+        keep_alive: this.keepAlive,
       },
     );
 
@@ -1608,7 +1631,7 @@ export class OllamaProvider implements AIProvider {
       mode,
       data,
       text,
-      OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+      this.structuredMaxOutputTokens,
     );
     return text;
   }

@@ -15,6 +15,17 @@ import {
   resolveLocalAiAuthMode,
   resolveLocalAiApiStyle,
 } from "@/lib/ai";
+// Imported from the leaf modules rather than the "@/lib/ai" barrel: the role
+// constants are read at module-evaluation time to build the request schema,
+// and suites that mock the barrel with a partial export set would leave them
+// undefined. roles.ts is pure constants with no side effects.
+import {
+  AI_ROLES,
+  AI_ROLE_MODEL_CONFIG_KEYS,
+  AI_ROLE_PROFILES,
+  type AiRole,
+} from "@/lib/ai/roles";
+import { readLocalAiRoleModels, resolveRoleModel } from "@/lib/ai/local-config";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import { z } from "zod";
 
@@ -40,12 +51,23 @@ const providerSchema = z.object({
   cloudflareAccessClientId: z.string().max(500).optional(),
   cloudflareAccessClientSecret: z.string().max(500).optional(),
   numCtx: numCtxField,
+  // Per-role model overrides. An empty string clears the override, putting
+  // that role back on `model`. Absent leaves it untouched.
+  roleModels: z
+    .object(
+      Object.fromEntries(
+        AI_ROLES.map((role) => [role, z.string().max(100).optional()]),
+      ) as Record<AiRole, z.ZodOptional<z.ZodString>>,
+    )
+    .partial()
+    .optional(),
 });
 
 export const GET = withAdminAuth(async () => {
-  const [provider, localConfig] = await Promise.all([
+  const [provider, localConfig, roleModels] = await Promise.all([
     getPlainConfigValue("ai_provider"),
     readLocalAiProviderConfig(),
+    readLocalAiRoleModels(),
   ]);
 
   const parsedNumCtx = localConfig.numCtxRaw
@@ -68,6 +90,16 @@ export const GET = withAdminAuth(async () => {
     apiStyle: localConfig.apiStyle,
     numCtx: validNumCtx,
     numCtxBounds: { min: NUM_CTX_MIN, max: NUM_CTX_MAX, default: 8192 },
+    roleModels,
+    roleProfiles: AI_ROLES.map((role) => ({
+      role,
+      label: AI_ROLE_PROFILES[role].label,
+      discriminator: AI_ROLE_PROFILES[role].discriminator,
+      latency: AI_ROLE_PROFILES[role].latency,
+      // What this role will ACTUALLY use once the fallback is applied, so the
+      // operator never has to work it out from a blank field.
+      effectiveModel: resolveRoleModel(role, roleModels, localConfig.model || "gemma4:26b"),
+    })),
     hasApiKey: !!localConfig.apiKey,
     hasCloudflareAccessClientId: !!localConfig.cloudflareAccessClientId,
     hasCloudflareAccessClientSecret: !!localConfig.cloudflareAccessClientSecret,
@@ -131,6 +163,19 @@ export const PUT = withAdminAuth(async (session, req: NextRequest) => {
   }
   if (body.model !== undefined) {
     await setPlainConfigValue("ai_provider_model", body.model, session.id);
+  }
+  if (body.roleModels !== undefined) {
+    for (const role of AI_ROLES) {
+      const value = body.roleModels[role];
+      if (value === undefined) continue;
+      const trimmed = value.trim();
+      if (trimmed) {
+        await setPlainConfigValue(AI_ROLE_MODEL_CONFIG_KEYS[role], trimmed, session.id);
+      } else {
+        // Empty string clears the override; the role falls back to `model`.
+        await deleteConfigValue(AI_ROLE_MODEL_CONFIG_KEYS[role]);
+      }
+    }
   }
   if (body.embeddingModel !== undefined) {
     await setPlainConfigValue(

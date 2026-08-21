@@ -1,5 +1,11 @@
 import { getConfigValue, getPlainConfigValue } from "@/lib/system-config";
 import { resolveLocalAiAuthMode } from "./local-auth";
+import {
+  AI_ROLES,
+  AI_ROLE_MAX_OUTPUT_CONFIG_KEYS,
+  AI_ROLE_MODEL_CONFIG_KEYS,
+  type AiRole,
+} from "./roles";
 import type { LocalAIAuthConfig, LocalAIAuthMode, LocalAiApiStyle } from "./types";
 
 export const DEFAULT_OLLAMA_MODEL = "gemma4:26b";
@@ -143,7 +149,13 @@ export function toLocalAiAuthConfig(
     | "cloudflareAccessClientSecret"
     | "apiStyle"
   >,
-  options: { numCtx?: number; reasoning?: boolean; maxOutputTokens?: number } = {},
+  options: {
+    numCtx?: number;
+    reasoning?: boolean;
+    maxOutputTokens?: number;
+    keepAlive?: string;
+    structuredMaxOutputTokens?: number;
+  } = {},
 ): LocalAIAuthConfig {
   return {
     authMode: config.authMode,
@@ -154,5 +166,61 @@ export function toLocalAiAuthConfig(
     apiStyle: config.apiStyle,
     reasoning: options.reasoning,
     maxOutputTokens: options.maxOutputTokens,
+    keepAlive: options.keepAlive,
+    structuredMaxOutputTokens: options.structuredMaxOutputTokens,
   };
+}
+
+/**
+ * Read the model override for one role, with an env fallback so an operator
+ * can pin a role without a database write (`AI_PROVIDER_MODEL_CHAT`, …).
+ *
+ * Returns null when the role has no override — the caller must then fall back
+ * to `ai_provider_model`. Null is the safe answer: an unconfigured role
+ * behaves exactly as it did before roles existed.
+ */
+export async function readLocalAiRoleModel(role: AiRole): Promise<string | null> {
+  const configKey = AI_ROLE_MODEL_CONFIG_KEYS[role];
+  const configured = await getPlainConfigValue(configKey);
+  if (configured?.trim()) return configured.trim();
+  return firstEnvValue([`AI_PROVIDER_MODEL_${role.toUpperCase()}`]);
+}
+
+/**
+ * Read every role's model override at once. Used by the admin surface, the
+ * AI-provider capability probe, and `sage:model:bakeoff` — anything that has
+ * to show or verify the whole mapping rather than serve one call.
+ */
+export async function readLocalAiRoleModels(): Promise<Record<AiRole, string | null>> {
+  const entries = await Promise.all(
+    AI_ROLES.map(async (role) => [role, await readLocalAiRoleModel(role)] as const),
+  );
+  return Object.fromEntries(entries) as Record<AiRole, string | null>;
+}
+
+/**
+ * Read the raw output-token cap override for one role, with an env fallback
+ * (`AI_PROVIDER_MAX_OUTPUT_TOKENS_CHAT`, …). Returned unparsed — the caller
+ * bounds it, the same way the global cap is bounded in provider.ts.
+ */
+export async function readLocalAiRoleMaxOutputTokensRaw(
+  role: AiRole,
+): Promise<string | null> {
+  const configured = await getPlainConfigValue(AI_ROLE_MAX_OUTPUT_CONFIG_KEYS[role]);
+  if (configured?.trim()) return configured.trim();
+  return firstEnvValue([`AI_PROVIDER_MAX_OUTPUT_TOKENS_${role.toUpperCase()}`]);
+}
+
+/**
+ * The model that will actually serve `role`, given the global default.
+ * Centralized so the admin surface, the bake-off, and the provider factory
+ * can never disagree about which model a role resolves to.
+ */
+export function resolveRoleModel(
+  role: AiRole | null,
+  roleModels: Partial<Record<AiRole, string | null>>,
+  globalModel: string,
+): string {
+  if (!role) return globalModel;
+  return roleModels[role]?.trim() || globalModel;
 }
