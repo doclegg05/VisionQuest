@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 /**
  * Dead-letter store for failed background AI extractions (P2-1).
@@ -62,7 +63,7 @@ export async function recordFailedExtraction(input: FailedExtractionInput): Prom
     });
   } catch (error: unknown) {
     logger.warn("Failed to record failed extraction", {
-      studentId: input.studentId,
+      student: studentLogKey(input.studentId),
       extractorKey: input.extractorKey,
       error: String(error),
     });

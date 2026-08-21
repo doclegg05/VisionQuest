@@ -5,6 +5,7 @@ import { sendMultiChannelNotification } from "@/lib/notifications";
 import { gatherDailyPromptContext } from "@/lib/sage/daily-prompt-data";
 import { selectDailyPrompt } from "@/lib/sage/daily-prompts";
 import { getOrCreateCoachingArc, advanceArcWeek } from "@/lib/sage/coaching-arcs";
+import { studentLogKey } from "@/lib/log-keys";
 
 const COOLDOWN_HOURS = 20;
 
@@ -50,7 +51,7 @@ export async function GET(req: Request): Promise<NextResponse> {
           }
         }
       } catch (arcErr) {
-        logger.error("Arc advancement failed", { studentId: student.id, error: String(arcErr) });
+        logger.error("Arc advancement failed", { student: studentLogKey(student.id), error: String(arcErr) });
       }
 
       const ctx = await gatherDailyPromptContext(student.id);
@@ -69,13 +70,13 @@ export async function GET(req: Request): Promise<NextResponse> {
       if (channels.inApp) {
         sent++;
         logger.info("Daily prompt sent", {
-          studentId: student.id,
+          student: studentLogKey(student.id),
           channels,
         });
       }
     } catch (err) {
       logger.error("Failed to send daily coaching prompt", {
-        studentId: student.id,
+        student: studentLogKey(student.id),
         error: String(err),
       });
     }

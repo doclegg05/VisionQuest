@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { logger } from "./logger";
+import { studentLogKey } from "./log-keys";
 
 /** Structural client type so the route, scripts, and tests share one helper. */
 export interface PathwayDiscoveryReader {
@@ -84,7 +85,7 @@ export async function resolvePathwayProvenance(
     // Reporting provenance is never worth failing a student's application
     // over. Loud in the server log, invisible to the student.
     logger.warn("Pathway provenance read failed; application recorded without a pathway", {
-      studentId,
+      student: studentLogKey(studentId),
       error: String(error),
     });
     return NO_PATHWAY_PROVENANCE;

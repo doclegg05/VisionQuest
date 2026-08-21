@@ -7,6 +7,7 @@ import { parseBody } from "@/lib/schemas";
 import { awardEvent } from "@/lib/progression/events";
 import { recordPortfolioItem } from "@/lib/progression/engine";
 import { EMPTY_RESUME, parseStoredResumeData, normalizeResumeContent, resumeSaveSchema } from "@/lib/resume";
+import { studentLogKey } from "@/lib/log-keys";
 
 // GET - get student's resume data
 export const GET = withAuth(async (session) => {
@@ -42,7 +43,7 @@ export const POST = withAuth(async (session, req: Request) => {
     });
   } catch (err) {
     logger.warn("Failed to record resume progression", {
-      studentId: session.id,
+      student: studentLogKey(session.id),
       resumeId: stored.id,
       error: String(err),
     });

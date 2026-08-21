@@ -31,6 +31,22 @@ const eslintConfig = defineConfig([
           message:
             "Hardcoded navy rgba() is not dark-mode safe. Use theme tokens from globals.css.",
         },
+        // Students are TANF/SNAP recipients; server logs carry no student
+        // identifier at any level (.claude/rules/security.md, Data Privacy).
+        // Log studentLogKey(id) from src/lib/log-keys.ts when a failure needs to
+        // be correlated, and redactContactInfo() for provider error text.
+        {
+          selector:
+            "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber)$/]",
+          message:
+            "No student identifier in server logs. Use studentLogKey(studentId) from @/lib/log-keys for a correlation key, or drop the field.",
+        },
+        {
+          selector:
+            "CallExpression[callee.object.name='logger'] Property[shorthand=false][value.name=/^(studentId|targetStudentId)$/]",
+          message:
+            "No student identifier in server logs, even under a different key. Use studentLogKey(studentId) from @/lib/log-keys.",
+        },
       ],
     },
   },

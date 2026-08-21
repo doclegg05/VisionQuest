@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { logger } from "./logger";
+import { redactContactInfo } from "./log-redaction";
 import { sendEmail, isEmailDeliveryConfigured } from "./email";
 import { sendSms } from "./sms";
 import { buildNotificationEmail } from "./email-templates";
@@ -84,10 +85,13 @@ export async function sendNotification(
       await writer.write(chunk);
     } catch {
       dead.push(writer);
-      logger.debug("Removed dead SSE connection", { userId });
     }
   }
   for (const w of dead) set.delete(w);
+  if (dead.length > 0) {
+    // No userId: it is the student UUID, and server logs carry no student identifier.
+    logger.debug("Removed dead SSE connections", { removed: dead.length, remaining: set.size });
+  }
   if (set.size === 0) connections.delete(userId);
 }
 
@@ -165,9 +169,13 @@ export async function sendMultiChannelNotification(
             text: `${payload.title}\n\n${payload.body}\n\n${actionUrl}`,
             html: buildNotificationEmail(payload.title, payload.body, actionUrl),
           });
-          logger.info("Notification email sent", { studentId, to: destination });
+          logger.info("Notification email sent", { channel: "email", type: payload.type });
         } catch (err) {
-          logger.error("Notification email failed", { studentId, error: String(err) });
+          logger.error("Notification email failed", {
+            channel: "email",
+            type: payload.type,
+            error: redactContactInfo(String(err)),
+          });
         }
       })();
       result.email = true;
@@ -184,7 +192,7 @@ export async function sendMultiChannelNotification(
         const smsBody = raw.length > maxLen ? raw.slice(0, maxLen - 1) + "…" : raw;
         const sent = await sendSms(phoneNumber, smsBody);
         if (sent) {
-          logger.info("Notification SMS sent", { studentId, to: phoneNumber });
+          logger.info("Notification SMS sent", { channel: "sms", type: payload.type });
         }
       })();
       result.sms = true;

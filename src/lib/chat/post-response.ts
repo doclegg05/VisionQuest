@@ -60,6 +60,7 @@ import {
 import { awardEvent } from "@/lib/progression/events";
 import { upsertDiscoveryFromExtraction } from "@/lib/career-discovery";
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 import { generateConversationTitle } from "./conversation";
 import type { ProgramType } from "@/lib/program-type";
 
@@ -382,7 +383,7 @@ async function runPostResponse(
       fullResponse,
     ).catch((err) =>
       logger.error("Classroom confirmation extractor failed", {
-        studentId,
+        student: studentLogKey(studentId),
         error: String(err),
       }),
     );
@@ -414,7 +415,7 @@ async function runPostResponse(
     if (!extractionRl.success) {
       plan.markLimited("memory");
       logger.warn("Sage memory extraction daily limit reached; skipping extraction for this turn", {
-        studentId,
+        student: studentLogKey(studentId),
         conversationId,
         extractionLimit,
       });
@@ -430,7 +431,7 @@ async function runPostResponse(
         ],
       }).catch((err) =>
         logger.error("Memory extraction failed", {
-          studentId,
+          student: studentLogKey(studentId),
           error: String(err),
         }),
       );

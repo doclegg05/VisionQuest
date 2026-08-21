@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -106,7 +107,7 @@ export const POST = withAdminAuth(
       archive = await generateStudentArchive(studentId, session.id);
     } catch (error) {
       logger.error("Offboarding archive generation failed", {
-        studentId,
+        student: studentLogKey(studentId),
         error: String(error),
       });
       return NextResponse.json(

@@ -4,6 +4,7 @@ import {
 } from "./advising-scheduling";
 import { prisma } from "./db";
 import { logger } from "./logger";
+import { studentLogKey } from "@/lib/log-keys";
 export { buildStudentAlertDescriptors } from "./advising-alerts";
 export {
   buildBookableAdvisorSlots,
@@ -184,7 +185,7 @@ export async function syncStudentAlerts(studentId: string) {
       });
     } catch (error) {
       logger.error("Failed to sync intervention notifications", {
-        studentId,
+        student: studentLogKey(studentId),
         error: String(error),
       });
     }

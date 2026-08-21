@@ -5,6 +5,7 @@ import { parseStoredResumeData, isResumeEmpty } from "@/lib/resume";
 import { generateResumePdfArrayBuffer } from "@/lib/resume-pdf";
 import { generateStorageKey, uploadFile } from "@/lib/storage";
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 function sanitizeFileName(value: string) {
   return value
@@ -54,7 +55,7 @@ export const POST = withAuth(async (session) => {
     return Response.json({ file });
   } catch (error) {
     logger.error("Failed to generate application resume file", {
-      studentId: session.id,
+      student: studentLogKey(session.id),
       error: String(error),
     });
     throw badRequest("Could not generate the resume PDF right now. Please try again.");
