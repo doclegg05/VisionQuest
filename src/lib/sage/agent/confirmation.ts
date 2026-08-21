@@ -11,7 +11,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const TOKEN_TTL_MS = 10 * 60 * 1000;
+export const TOKEN_TTL_MS = 10 * 60 * 1000;
 
 export interface ConfirmationPayload {
   toolName: string;
@@ -66,6 +66,19 @@ function signatureFor(payload: ConfirmationPayload, expiresAt: number): string {
 export function createConfirmationToken(payload: ConfirmationPayload, clock: Date): string {
   const expiresAt = clock.getTime() + TOKEN_TTL_MS;
   return `${expiresAt}.${signatureFor(payload, expiresAt)}`;
+}
+
+/**
+ * The expiry stamped in a token's prefix, or null when the prefix doesn't
+ * parse. Purely syntactic — it proves nothing about the signature, so only
+ * use it on tokens that already passed verifyConfirmationToken (the claim
+ * store uses it to know when a consumed-token row stops mattering).
+ */
+export function confirmationTokenExpiry(token: string): Date | null {
+  const separator = token.indexOf(".");
+  if (separator === -1) return null;
+  const expiresAt = Number.parseInt(token.slice(0, separator), 10);
+  return Number.isFinite(expiresAt) ? new Date(expiresAt) : null;
 }
 
 export function verifyConfirmationToken(
