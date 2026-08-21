@@ -1,0 +1,252 @@
+{
+  "$comment": "Fixtures for scripts/sage-model-bakeoff.mjs — a per-ROLE, per-MODEL bake-off of local models. Every case is scored deterministically (no LLM judge) so results are comparable across models and across runs. Prompts are imported from production at runtime, never copied here, so a prompt change is reflected in the next bake-off automatically. See docs/plans/2026-08-21-local-ai-role-models.md.",
+  "roles": {
+    "chat": {
+      "$comment": "Tool selection against the real student registry, plus reply readability. Discriminator: does the model emit a well-formed tool call at all? A dropped or malformed call comes back as an empty turn, not an error.",
+      "cases": [
+        {
+          "id": "chat-tool-forms",
+          "message": "I need the form to report that I missed class on Tuesday.",
+          "expectTool": "search_forms",
+          "acceptableTools": [
+            "search_forms",
+            "present_form"
+          ]
+        },
+        {
+          "id": "chat-tool-certs",
+          "message": "What certifications can I earn here in the program?",
+          "expectTool": "find_certification",
+          "acceptableTools": [
+            "find_certification",
+            "lookup_program_info"
+          ]
+        },
+        {
+          "id": "chat-tool-cert-progress",
+          "message": "How am I doing on my Ready-to-Work checklist? What's left?",
+          "expectTool": "lookup_cert_progress",
+          "acceptableTools": [
+            "lookup_cert_progress",
+            "review_portfolio"
+          ]
+        },
+        {
+          "id": "chat-tool-wages",
+          "message": "How much do dietary aides usually get paid around here?",
+          "expectTool": "career_wages",
+          "acceptableTools": [
+            "career_wages",
+            "career_occupation_profile"
+          ]
+        },
+        {
+          "id": "chat-no-tool",
+          "message": "I'm feeling pretty discouraged about job hunting this week.",
+          "expectTool": null,
+          "$comment": "No tool maps to this. A model that reaches for one anyway is over-triggering; a plain supportive reply is correct. This is also where an empty turn shows up — the failure this repo has hit three separate ways.",
+          "mustNotCallAny": true,
+          "readability": true
+        },
+        {
+          "id": "chat-prose-quality",
+          "message": "What should I say when someone asks about a gap in my work history?",
+          "expectTool": null,
+          "mustNotCallAny": false,
+          "readability": true,
+          "$comment": "Scored on Flesch-Kincaid grade against the plain-language ceiling. Students read at roughly a 6th-grade level, and the gate is grade 8."
+        }
+      ]
+    },
+    "extract": {
+      "$comment": "Strict JSON over short transcript windows, using the production memory-extraction and classroom-confirmation prompts. Discriminator: JSON-mode conformance. The 2026-08-20 failure here was silent — json_object mode could not emit the bare array the prompt asked for, so 0 memories were stored with zero errors.",
+      "cases": [
+        {
+          "id": "extract-memory-basic",
+          "prompt": "memory",
+          "messages": [
+            {
+              "role": "user",
+              "content": "I have two kids and I can only come to class on Tuesdays and Thursdays because of childcare."
+            },
+            {
+              "role": "model",
+              "content": "That's really helpful to know. Tuesdays and Thursdays it is."
+            },
+            {
+              "role": "user",
+              "content": "Also my car broke down last week so I've been taking the bus, it takes about an hour each way."
+            }
+          ],
+          "expectJsonArrayOf": "memories",
+          "expectMinItems": 2,
+          "mustContainAny": [
+            "childcare",
+            "Tuesday",
+            "Thursday",
+            "bus",
+            "car"
+          ]
+        },
+        {
+          "id": "extract-memory-nothing",
+          "prompt": "memory",
+          "messages": [
+            {
+              "role": "user",
+              "content": "ok"
+            },
+            {
+              "role": "model",
+              "content": "Sounds good. Anything else on your mind?"
+            },
+            {
+              "role": "user",
+              "content": "nope thanks"
+            }
+          ],
+          "expectJsonArrayOf": "memories",
+          "expectMaxItems": 1,
+          "$comment": "An empty exchange must produce an empty or near-empty array, not invented facts. Over-extraction is the failure mode here."
+        },
+        {
+          "id": "extract-classroom-explicit",
+          "prompt": "classroom",
+          "messages": [
+            {
+              "role": "model",
+              "content": "Which class are you in?"
+            },
+            {
+              "role": "user",
+              "content": "I'm in Ms. Rivera's Tuesday morning class."
+            }
+          ],
+          "expectJsonObject": true,
+          "expectFields": [
+            "confirmed",
+            "confidence"
+          ],
+          "expectFieldValues": {
+            "confirmed": true
+          }
+        },
+        {
+          "id": "extract-classroom-negative",
+          "prompt": "classroom",
+          "messages": [
+            {
+              "role": "model",
+              "content": "Which class are you in?"
+            },
+            {
+              "role": "user",
+              "content": "I'm not sure, I'd have to check my paperwork."
+            }
+          ],
+          "expectJsonObject": true,
+          "expectFields": [
+            "confirmed",
+            "confidence"
+          ],
+          "expectFieldValues": {
+            "confirmed": false
+          }
+        }
+      ]
+    },
+    "document": {
+      "$comment": "Long, messy document input to conforming JSON, using the production resume-parser prompt. Discriminator: long-input degradation plus output-budget headroom — a whole resume object does not fit in the 512-token structured default, and a truncated parse is indistinguishable from 'no data'.",
+      "cases": [
+        {
+          "id": "document-resume-parse",
+          "prompt": "resume",
+          "documentFixture": "resume-short",
+          "expectJsonObject": true,
+          "expectFields": [
+            "resume.contact",
+            "resume.experience",
+            "improvements"
+          ],
+          "mustContainAny": [
+            "Marcus",
+            "Bellwood",
+            "forklift",
+            "Forklift"
+          ]
+        },
+        {
+          "id": "document-resume-parse-messy",
+          "prompt": "resume",
+          "documentFixture": "resume-messy",
+          "expectJsonObject": true,
+          "expectFields": [
+            "resume.contact",
+            "resume.experience",
+            "improvements"
+          ],
+          "mustContainAny": [
+            "Tanya",
+            "Ridgeline",
+            "cashier",
+            "Cashier"
+          ],
+          "$comment": "Same contract over OCR-style text with broken line breaks and inconsistent dates — closer to what students actually upload."
+        }
+      ]
+    },
+    "draft": {
+      "$comment": "Sustained prose a person reads and acts on. Discriminator: output-length headroom and non-degenerate generation, not tool use or strict formatting.",
+      "cases": [
+        {
+          "id": "draft-summary",
+          "systemPrompt": "You summarize a coaching conversation for the coach's own reference. Write 2-3 short paragraphs covering what the student is working on, what is blocking them, and what they committed to. Plain language, no bullet points, no headings.",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Student said: I finally got my ServSafe scheduled for the 14th. I'm nervous about the math part. My ride fell through last week so I missed the practice session. I told my instructor I'd come in early Thursday to make it up. Also I'm still waiting to hear back from the two applications I sent to Bellwood Foods and the hospital cafeteria."
+            }
+          ],
+          "minWords": 60,
+          "maxWords": 400,
+          "mustContainAny": [
+            "ServSafe",
+            "Thursday",
+            "Bellwood"
+          ],
+          "readability": true
+        },
+        {
+          "id": "draft-cover-letter",
+          "systemPrompt": "You write a short cover letter for an adult workforce-development student. 3-4 short paragraphs at a 6th-8th grade reading level. Use only facts given; invent nothing.",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Job: Dietary Aide at Ridgeline Care Center. Student: Tanya Brooks, ServSafe certified, 2 years cashier experience at a grocery store, reliable, comfortable with food safety rules, available mornings."
+            }
+          ],
+          "minWords": 120,
+          "maxWords": 500,
+          "mustContainAny": [
+            "Tanya",
+            "Ridgeline",
+            "ServSafe"
+          ],
+          "mustNotContain": [
+            "[",
+            "]",
+            "XXX",
+            "TODO",
+            "Lorem"
+          ],
+          "readability": true,
+          "$comment": "300-450 words is what generate_cover_letter asks for. At the 768-token default this truncates; the case exists to make that visible per model rather than in production."
+        }
+      ]
+    }
+  },
+  "documentFixtures": {
+    "resume-short": "MARCUS D. HALE\n412 Cedar Street, Apt 3B\nBellwood, WV 26003\n(304) 555-0138 | mhale91@example.com\n\nOBJECTIVE\nReliable warehouse worker looking for full-time work with room to move up.\n\nEXPERIENCE\nWarehouse Associate — Bellwood Foods Distribution, Bellwood WV\nMarch 2023 - Present\n- Pick and pack orders for grocery routes, 40-60 pallets per shift\n- Operate sit-down forklift, certified January 2024\n- Train new hires on safe lifting and pallet jack use\n\nStocker — Value Mart, Bellwood WV\nJune 2021 - February 2023\n- Overnight stocking and shelf resets\n- Ran register during holiday coverage\n\nEDUCATION\nBellwood High School, diploma 2019\n\nCERTIFICATIONS\nForklift Operator (OSHA-compliant), 2024\nOSHA 10 General Industry, 2023\n\nSKILLS\nPallet jack, RF scanner, inventory counts, basic Excel, reliable transportation",
+    "resume-messy": "tanya brooks\nridgeline wv * (304)555 0177 * tbrooks.wv @ example.com\n\nWORK\nCashier , Hilltop Grocery -- Ridgeline WV\n2022 to now\n* run register, handle cash and cards, close out drawer\n* stock cooler and rotate dated product\n* covered deli counter when short staffed\n\nfood prep (part time) Ridgeline Care Center\nsummer 2021\n- portioned trays for resident meals\n- followed temp logs\n\nSCHOOL\nRidgeline High - GED 2021\n\nCERTS\nServSafe Food Handler 2024\n\nother: available mornings, no car right now but bus stops at the corner"
+  }
+}

@@ -126,6 +126,42 @@ describe("withUsageLogging", () => {
     assert.equal(loggedRows()[0].callSite, "sage_post.discovery");
   });
 
+  it("records the provider's own model tag, not its class name", async () => {
+    // Per-role models make this load-bearing: a ledger that stores "ollama"
+    // for every local row cannot answer which model served a call, which is
+    // the question roles exist to let an operator ask.
+    const provider = fakeProvider({ model: "gemma4:e4b" } as Partial<AIProvider>);
+
+    const logged = withUsageLogging(provider, {
+      studentId: "student-1",
+      callSite: "sage_post.goals",
+    });
+    await logged.generateResponse("sys", MESSAGES);
+
+    assert.equal(loggedRows()[0].model, "gemma4:e4b");
+  });
+
+  it("falls back to the provider name for a blank model tag, not an empty string", async () => {
+    const provider = fakeProvider({ model: "   " } as Partial<AIProvider>);
+    const logged = withUsageLogging(provider, {
+      studentId: "student-1",
+      callSite: "sage_post.goals",
+    });
+    await logged.generateResponse("sys", MESSAGES);
+
+    assert.equal(loggedRows()[0].model, "fake");
+  });
+
+  it("falls back to the provider name when it exposes no model tag", async () => {
+    const logged = withUsageLogging(fakeProvider(), {
+      studentId: "student-1",
+      callSite: "sage_post.goals",
+    });
+    await logged.generateResponse("sys", MESSAGES);
+
+    assert.equal(loggedRows()[0].model, "fake");
+  });
+
   it("uses ctx.model to override the logged model name when provided", async () => {
     const provider = fakeProvider({
       generateResponse: (mock.fn(async (_sys: string, _msgs: ChatMessage[], onUsage?: (u: TokenUsage) => void) => {

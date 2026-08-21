@@ -4,8 +4,11 @@ import { isSafeAiProviderUrl } from "@/lib/validation";
 import {
   DEFAULT_OLLAMA_MODEL,
   readLocalAiProviderConfig,
+  readLocalAiRoleMaxOutputTokensRaw,
+  readLocalAiRoleModel,
   toLocalAiAuthConfig,
 } from "./local-config";
+import { isSameModelTag, roleForTask, type AiRole } from "./roles";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
 import type {
@@ -65,7 +68,47 @@ function parseReasoningOverride(raw: string | null): boolean {
   return normalized === "on" || normalized === "true" || normalized === "1";
 }
 
-async function getLocalProvider(): Promise<AIProvider> {
+/**
+ * Resolve the local model for `role` and decide how long it may stay resident.
+ *
+ * Two rules, both fail-safe:
+ *  - An unset role override falls back to `ai_provider_model`, so a role
+ *    nobody has tuned behaves exactly as it did before roles existed.
+ *  - Only the model serving interactive chat gets the workday-length
+ *    keep-alive. Any role resolving to a *different* model is background
+ *    weight and gets the short one, so it cannot hold unified memory against
+ *    the model students are waiting on. A role that resolves to the same
+ *    model as chat shares chat's residency and keeps the long keep-alive —
+ *    the single-model deployment is unchanged in every respect.
+ */
+async function resolveLocalModelForRole(
+  role: AiRole | null,
+  globalModel: string,
+): Promise<{ model: string; keepAlive?: string; maxOutputTokens?: number }> {
+  if (!role) return { model: globalModel };
+
+  const [roleModel, roleMaxOutputRaw] = await Promise.all([
+    readLocalAiRoleModel(role),
+    readLocalAiRoleMaxOutputTokensRaw(role),
+  ]);
+  const model = roleModel?.trim() || globalModel;
+  // Bounded by the same parser the global cap uses, so an out-of-range or
+  // non-numeric role value falls back to the global cap rather than throwing.
+  const maxOutputTokens = parseMaxOutputTokensOverride(roleMaxOutputRaw);
+
+  if (role === "chat") return { model, maxOutputTokens };
+
+  const chatModel = (await readLocalAiRoleModel("chat"))?.trim() || globalModel;
+  // Tag equality is not string equality: Ollama resolves a bare name to its
+  // `:latest` tag, and keep_alive is applied by the server per MODEL. Treating
+  // an alias of the chat model as "different" would attach the short
+  // keep-alive to the model students are waiting on.
+  return isSameModelTag(model, chatModel)
+    ? { model, maxOutputTokens }
+    : { model, maxOutputTokens, keepAlive: OllamaProvider.SECONDARY_KEEP_ALIVE };
+}
+
+async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider> {
   const config = await readLocalAiProviderConfig();
   if (!config.url) {
     throw new Error(
@@ -77,13 +120,22 @@ async function getLocalProvider(): Promise<AIProvider> {
       "Local AI server URL is invalid. Use localhost/127.0.0.1/::1 or a public http/https endpoint.",
     );
   }
+  const { model, keepAlive, maxOutputTokens } = await resolveLocalModelForRole(
+    role,
+    config.model || DEFAULT_OLLAMA_MODEL,
+  );
   return new OllamaProvider(
     config.url,
-    config.model || DEFAULT_OLLAMA_MODEL,
+    model,
     toLocalAiAuthConfig(config, {
       numCtx: parseNumCtxOverride(config.numCtxRaw),
       reasoning: parseReasoningOverride(config.reasoningRaw),
-      maxOutputTokens: parseMaxOutputTokensOverride(config.maxOutputTokensRaw),
+      maxOutputTokens:
+        maxOutputTokens ?? parseMaxOutputTokensOverride(config.maxOutputTokensRaw),
+      // Role-derived only — see LocalAIAuthConfig.structuredMaxOutputTokens
+      // for why the global cap deliberately does not reach JSON mode.
+      structuredMaxOutputTokens: maxOutputTokens,
+      keepAlive,
     }),
   );
 }
@@ -101,10 +153,13 @@ function isLocalOnlySensitivity(sensitivity: DataSensitivity): boolean {
  * Prefer resolveAiProvider() for new call sites so the task's data
  * sensitivity is explicit.
  */
-export async function getProvider(studentId: string): Promise<AIProvider> {
+export async function getProvider(
+  studentId: string,
+  role: AiRole | null = null,
+): Promise<AIProvider> {
   const providerType = await getConfiguredProviderType();
   return providerType === "local"
-    ? getLocalProvider()
+    ? getLocalProvider(role)
     : getCloudProvider(studentId);
 }
 
@@ -119,10 +174,16 @@ export async function getProvider(studentId: string): Promise<AIProvider> {
 export async function resolveAiProvider(
   request: AIProviderRequest,
 ): Promise<AIProvider> {
+  // The role decides WHICH local model serves the call; sensitivity still
+  // decides WHETHER a local model serves it at all. Roles never widen the
+  // FERPA routing rule below, and the cloud provider ignores roles entirely
+  // (Gemini is one model for every job).
+  const role = request.role ?? roleForTask(request.task);
+
   if (isLocalOnlySensitivity(request.sensitivity)) {
     const providerType = await getConfiguredProviderType();
     if (providerType === "local") {
-      return getLocalProvider();
+      return getLocalProvider(role);
     }
     return getCloudProvider(request.studentId);
   }
@@ -131,7 +192,7 @@ export async function resolveAiProvider(
     return getCloudProvider(request.studentId);
   }
 
-  return getProvider(request.studentId);
+  return getProvider(request.studentId, role);
 }
 
 export function getPromptTier(provider: AIProvider): PromptTier {

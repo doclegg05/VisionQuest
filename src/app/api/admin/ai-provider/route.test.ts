@@ -276,6 +276,220 @@ describe("admin AI provider routes", () => {
     );
   });
 
+  it("persists a per-role model override", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        roleModels: { extract: "gemma4:e4b" },
+        authMode: "none",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+
+    assert.equal(res.status, 200);
+    assert.ok(
+      mockSetPlainConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) =>
+          call.arguments[0] === "ai_provider_model_extract" &&
+          call.arguments[1] === "gemma4:e4b",
+      ),
+      "the extract role model was never written",
+    );
+  });
+
+  it("DELETES a role override when its field is cleared, rather than storing an empty model", async () => {
+    // setPlainConfigValue vs deleteConfigValue is the difference between the
+    // role falling back to the main model and the role being pinned to "".
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        roleModels: { extract: "" },
+        authMode: "none",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+
+    assert.equal(res.status, 200);
+    assert.ok(
+      mockDeleteConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) => call.arguments[0] === "ai_provider_model_extract",
+      ),
+      "clearing a role must delete its config row",
+    );
+    assert.ok(
+      !mockSetPlainConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) => call.arguments[0] === "ai_provider_model_extract",
+      ),
+      "clearing a role must not write an empty string",
+    );
+  });
+
+  it("leaves role overrides untouched when the payload omits them", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        authMode: "none",
+      },
+    });
+
+    await configRoute.PUT(req as never);
+
+    const touched = [
+      ...mockSetPlainConfigValue.mock.calls,
+      ...mockDeleteConfigValue.mock.calls,
+    ].filter((call: { arguments: unknown[] }) =>
+      String(call.arguments[0]).startsWith("ai_provider_model_"),
+    );
+    assert.equal(touched.length, 0, "an omitted roleModels must not clobber stored overrides");
+  });
+
+  it("persists a per-role output cap", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        roleMaxOutputTokens: { document: 2048 },
+        authMode: "none",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+
+    assert.equal(res.status, 200);
+    assert.ok(
+      mockSetPlainConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) =>
+          call.arguments[0] === "ai_provider_max_output_tokens_document" &&
+          call.arguments[1] === "2048",
+      ),
+      "the document role output cap was never written",
+    );
+  });
+
+  it("clears a per-role output cap when it is sent as null", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        roleMaxOutputTokens: { document: null },
+        authMode: "none",
+      },
+    });
+
+    await configRoute.PUT(req as never);
+
+    assert.ok(
+      mockDeleteConfigValue.mock.calls.some(
+        (call: { arguments: unknown[] }) =>
+          call.arguments[0] === "ai_provider_max_output_tokens_document",
+      ),
+    );
+  });
+
+  it("rejects a per-role output cap outside the supported bounds", async () => {
+    const req = mockRequest("/api/admin/ai-provider", {
+      method: "PUT",
+      body: {
+        provider: "local",
+        url: "http://localhost:11434",
+        model: "gemma4:26b",
+        roleMaxOutputTokens: { document: 999999 },
+        authMode: "none",
+      },
+    });
+
+    const res = await configRoute.PUT(req as never);
+    assert.equal(res.status, 400);
+  });
+
+  it("returns role models and their effective resolution from GET", async () => {
+    mockGetPlainConfigValue.mock.mockImplementation(async (key: string) =>
+      key === "ai_provider" ? "local" : key === "ai_provider_model_extract" ? "gemma4:e4b" : null,
+    );
+    mockReadLocalAiProviderConfig.mock.mockImplementation(async () => ({
+      url: "http://localhost:11434",
+      model: "gemma4:26b",
+      embeddingModel: "nomic-embed-text",
+      authMode: "none" as const,
+      apiStyle: "ollama" as const,
+      numCtxRaw: null,
+      reasoningRaw: null,
+      maxOutputTokensRaw: null,
+      apiKey: null,
+      apiKeySource: null,
+      cloudflareAccessClientId: null,
+      cloudflareAccessClientIdSource: null,
+      cloudflareAccessClientSecret: null,
+      cloudflareAccessClientSecretSource: null,
+    }));
+
+    const res = await configRoute.GET();
+    const body = (await res.json()) as {
+      roleModels: Record<string, string | null>;
+      roleProfiles: Array<{ role: string; effectiveModel: string; label: string }>;
+    };
+
+    assert.equal(body.roleModels.extract, "gemma4:e4b");
+    assert.equal(body.roleModels.chat, null);
+
+    const byRole = Object.fromEntries(body.roleProfiles.map((p) => [p.role, p]));
+    // The panel shows what a role will ACTUALLY use, so an unset role must
+    // resolve to the main model rather than rendering blank.
+    assert.equal(byRole.extract.effectiveModel, "gemma4:e4b");
+    assert.equal(byRole.chat.effectiveModel, "gemma4:26b");
+    assert.ok(byRole.chat.label.length > 0);
+  });
+
+  it("reports a role model the server does not have from the connection test", async () => {
+    // The typo-catch is only useful if it is actually wired into the response
+    // the panel reads; deleting it from the payload previously left this suite
+    // green and the operator back to discovering a bad tag hours later.
+    mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider_url") return "http://localhost:11434";
+      if (key === "ai_provider_model") return "gemma4:26b";
+      if (key === "ai_provider_model_extract") return "gemma4:e4";
+      return null;
+    });
+
+    const res = await testRoute.POST();
+    const body = (await res.json()) as {
+      missingRoleModels?: Array<{ role: string; model: string }>;
+    };
+
+    assert.deepEqual(body.missingRoleModels, [{ role: "extract", model: "gemma4:e4" }]);
+  });
+
+  it("reports no missing role models when every override is installed", async () => {
+    mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
+      if (key === "ai_provider_url") return "http://localhost:11434";
+      if (key === "ai_provider_model") return "gemma4:26b";
+      if (key === "ai_provider_model_extract") return "gemma4:26b";
+      return null;
+    });
+
+    const res = await testRoute.POST();
+    const body = (await res.json()) as {
+      missingRoleModels?: Array<{ role: string; model: string }>;
+    };
+
+    assert.deepEqual(body.missingRoleModels, []);
+  });
+
   it("persists apiStyle 'openai' and defaults to 'ollama' when omitted", async () => {
     const req = mockRequest("/api/admin/ai-provider", {
       method: "PUT",
