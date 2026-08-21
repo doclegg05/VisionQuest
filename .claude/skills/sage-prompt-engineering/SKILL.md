@@ -24,7 +24,7 @@ Automatically invoked when modifying Sage AI behavior, system prompts, or chat l
 ## Crisis Handling (988)
 - Crisis resource is **988** (Suicide & Crisis Lifeline) — mandated by `GUARDRAILS`, and enforced deterministically even if the model forgets:
   - `detectCrisisSignal()` in `src/lib/sage/crisis-detection.ts` — regex phrase detector, no AI call, runs every turn
-  - `ensureCrisisResources()` in `src/lib/chat/crisis-safety-net.ts` appends the 988 resource block when the incoming message matches and the reply lacks "988"
+  - `ensureCrisisResources()` in `src/lib/chat/crisis-safety-net.ts` appends the 988 resource block when the incoming message matches and the reply lacks "988" — in English or Spanish, selected by the `lang` tag of the pattern that matched (`CRISIS_RESOURCE_BLOCK` / `CRISIS_RESOURCE_BLOCK_ES`), never by inferring the language of free text
   - `recordWellbeingConcern()` raises a CRITICAL `StudentAlert` and notifies staff — NO message text is ever stored on the alert (privacy)
 
 ## Two-Call Pattern & Goal Proposals

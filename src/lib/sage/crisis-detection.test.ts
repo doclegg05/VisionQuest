@@ -166,6 +166,29 @@ const SPANISH_SHOULD_MATCH: { text: string; category: string }[] = [
   { text: "quiero hacerme dano", category: "self_harm" },
   { text: "ya no puedo mas con todo esto", category: "self_harm" },
   { text: "estaria mejor muerta", category: "self_harm" },
+  // self_harm — method-adjacent disclosure (es). Mirrors the English VQ-R-004
+  // entries: a stated plan or a past act outranks ideation. Every phrase below
+  // passed the detector silently while the English equivalents ("took all my
+  // pills", "gonna od") matched.
+  { text: "esta noche me tomo todas las pastillas", category: "self_harm" },
+  { text: "quiero tomarme todas las pastillas", category: "self_harm" },
+  { text: "me tomé todas las pastillas", category: "self_harm" },
+  { text: "me tome todas mis pastillas", category: "self_harm" },
+  { text: "voy a tomarme todas las pastillas", category: "self_harm" },
+  { text: "me voy a tomar todas las pastillas", category: "self_harm" },
+  { text: "me tomaré todas las pastillas mañana", category: "self_harm" },
+  { text: "tomé demasiadas pastillas anoche", category: "self_harm" },
+  { text: "me tomé un montón de pastillas", category: "self_harm" },
+  { text: "me tome un monton de pastillas", category: "self_harm" },
+  { text: "me tomé todos los medicamentos", category: "self_harm" },
+  { text: "quiero darme una sobredosis", category: "self_harm" },
+  // Clitic climbing — Spanish allows the pronoun to raise onto the finite verb
+  // ("me quiero dar" == "quiero darme"), and every other Spanish pair in the
+  // detector handles both directions ("me quiero morir" / "quiero morirme").
+  { text: "me quiero dar una sobredosis", category: "self_harm" },
+  { text: "me voy a dar una sobredosis", category: "self_harm" },
+  { text: "pensando en tomarme una sobredosis", category: "self_harm" },
+  { text: "he pensado en una sobredosis", category: "self_harm" },
   // harm_others — accented / standard spelling
   { text: "quiero hacerle daño a mi supervisor", category: "harm_others" },
   { text: "quiero matar a mi jefe", category: "harm_others" },
@@ -218,6 +241,31 @@ const SPANISH_SHOULD_NOT_MATCH = [
   // "tengo miedo de mi ..." is bounded to partner nouns.
   "tengo miedo de mi examen final",
   "quiero terminar el curso este mes",
+  // Method-adjacent guards (es) — ordinary medication adherence and
+  // third-person overdose mentions must stay silent, mirroring the English
+  // informal-corpus guards ("i took my medication this morning", "that
+  // overdose documentary was sad"). A quantifier ("todas las", "demasiadas")
+  // or a first-person frame is what separates disclosure from adherence.
+  "me tomé la pastilla de la presión esta mañana",
+  "ya me tomé mis pastillas hoy",
+  "tengo que tomarme las pastillas con comida",
+  "el doctor me dijo que tome las pastillas por la noche",
+  "las pastillas que me recetaron me ayudan",
+  "mi primo murió de una sobredosis",
+  "vi un documental sobre las sobredosis de fentanilo",
+  // VERB-REGISTER PARITY (the guards above dodge the branch by omitting the
+  // quantifier, which is test rot — they prove nothing about the register).
+  // These carry the quantifier AND the medication noun, exactly like the
+  // disclosures, so the only thing that may keep them quiet is the verb: a
+  // bare habitual present, an obligation modal, or a subjunctive after "que"
+  // is adherence talk, not disclosure. English pins the identical set ("i take
+  // all my pills every morning", "i need to take all my meds before bed").
+  "me tomo todas las pastillas cada mañana con el desayuno",
+  "me tomo todas las pastillas todos los dias con el desayuno",
+  "necesito tomarme todas las pastillas antes de dormir",
+  "tengo que tomarme todas las pastillas con comida",
+  "el doctor me dijo que me tome todas las pastillas",
+  "el doctor me dijo que debo tomarme todas las pastillas",
 ];
 
 for (const text of SPANISH_SHOULD_NOT_MATCH) {
@@ -251,6 +299,37 @@ test("detectCrisisSignal classifies Spanish self-directed phrasing as self_harm,
   const result = detectCrisisSignal("quiero matarme");
   assert.equal(result.matched, true);
   assert.equal(result.category, "self_harm");
+});
+
+// ---------------------------------------------------------------------------
+// Language tagging — the chat safety net localizes the student-facing 988
+// resource block by the language of the MATCHED PATTERN (deterministic; no
+// free-text language inference). English families report "en", Spanish
+// families report "es", no match reports null.
+// ---------------------------------------------------------------------------
+
+test("detectCrisisSignal tags English pattern matches with lang 'en'", () => {
+  const result = detectCrisisSignal("I'm done, I want to end it all");
+  assert.equal(result.matched, true);
+  assert.equal(result.lang, "en");
+});
+
+test("detectCrisisSignal tags Spanish pattern matches with lang 'es'", () => {
+  const result = detectCrisisSignal("ya no aguanto, me quiero morir");
+  assert.equal(result.matched, true);
+  assert.equal(result.lang, "es");
+});
+
+test("detectCrisisSignal tags Spanish method-adjacent matches with lang 'es'", () => {
+  const result = detectCrisisSignal("esta noche me tomo todas las pastillas");
+  assert.equal(result.matched, true);
+  assert.equal(result.lang, "es");
+});
+
+test("detectCrisisSignal reports lang null when nothing matches", () => {
+  const result = detectCrisisSignal("quiero terminar el curso este mes");
+  assert.equal(result.matched, false);
+  assert.equal(result.lang, null);
 });
 
 // ---------------------------------------------------------------------------
