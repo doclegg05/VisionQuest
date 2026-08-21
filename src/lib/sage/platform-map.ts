@@ -84,8 +84,9 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "A conversational career assessment (inside Chat) that surfaces interests, transferable skills, and work values without ever naming RIASEC/Holland codes to the student.",
     compact: "career discovery (chat-based interest/skills assessment)",
     mechanics:
-      "Runs as the discovery conversation stage. Produces a Career Profile with a Holland Interest Profile, transferable skills, work values, and top career clusters.",
-    seeAlso: ["career-profile"],
+      "Runs as the discovery conversation stage. Produces a Career Profile with a Holland Interest Profile, transferable skills, work values, and top career clusters. If the student takes a real assessment on their own (CareerOneStop Skills Matcher, O*NET Interest Profiler, or another one), record_assessment_results saves what they report — after they confirm it — and those real results replace the scores Sage inferred from conversation.",
+    tools: ["record_assessment_results"],
+    seeAlso: ["career-profile", "career-dna-detail"],
   },
   {
     id: "career-profile",
@@ -96,7 +97,23 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "The student's results from Career Discovery — Holland code, transferable skills, work values, and top career clusters — reviewed together with Sage.",
     compact: "career profile results review",
     mechanics: "Bridges into goal-setting: Sage connects clusters to concrete SPOKES certifications.",
-    seeAlso: ["career-discovery", "goals"],
+    seeAlso: ["career-discovery", "goals", "career-dna-detail"],
+  },
+  // NOTE on `compact` for student entries: the student compact render already
+  // sits at the 650-char budget ceiling, so career-dna-detail, help,
+  // student-memory, and career-data-lookup deliberately carry no `compact`
+  // phrase — adding one would push every student compact prompt over the limit
+  // and fail the compact-budget rule. They still render in the full tier.
+  {
+    id: "career-dna-detail",
+    name: "Career DNA Details",
+    roles: ["student"],
+    route: "/career/profile",
+    summary:
+      "The full write-up of the student's Career DNA — top interests, transferable skills, work values, and the career paths that fit — opened from the Career page.",
+    mechanics:
+      "Says where each result came from: a real assessment the student took, or what Sage picked up in their chats. Until Career Discovery has enough to show, the page explains what is still missing instead of showing made-up results.",
+    seeAlso: ["career-discovery", "career-profile"],
   },
   {
     id: "goals",
@@ -186,7 +203,10 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "prepare_for_interview",
       "generate_cover_letter",
       "update_application_status",
+      "tailor_application",
     ],
+    mechanics:
+      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved.",
   },
   {
     id: "chat",
@@ -230,6 +250,28 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     route: "/dashboard",
     summary: "Shows XP, streaks, achievements, and progress across every module.",
     compact: "dashboard (XP, streaks, achievements)",
+  },
+  {
+    id: "help",
+    name: "Get Help",
+    roles: ["student"],
+    route: "/help",
+    summary:
+      "The plain-language help page: what to do when something will not load, how to reach a teacher or coach, what Sage can help with, and how to reset a password.",
+    mechanics:
+      "This is the student's guaranteed human exit — it has to work even when Sage is down, so it only links to surfaces that really exist (Advising, password reset) and never lists invented contacts.",
+    seeAlso: ["appointments", "chat"],
+  },
+  {
+    id: "student-memory",
+    name: "What Sage Remembers",
+    roles: ["student"],
+    route: "/memory",
+    summary:
+      "The student's own view of the short notes Sage keeps from their chats, so nothing Sage remembers about them is hidden from them.",
+    mechanics:
+      "Sage writes a short note after some chats so it does not ask the same question twice. The page is read-only for the student: if a note is wrong, they tell their teacher, who can fix or remove it. Teachers can see these notes too.",
+    seeAlso: ["chat"],
   },
 
   // ─── Teacher ────────────────────────────────────────────────────────────
@@ -277,6 +319,17 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     route: "/teacher/orientation",
     summary: "Review and approve student orientation form submissions.",
     compact: "orientation review (approve student submissions)",
+  },
+  {
+    id: "teacher-failed-extractions",
+    name: "AI Review (Failed Extractions)",
+    roles: ["teacher"],
+    route: "/teacher/failed-extractions",
+    summary:
+      "Listed in the teacher nav as AI Review: the dead-letter list of Sage background analyses that failed after their retries, so nothing a student said is quietly lost.",
+    compact: "AI review (replay or dismiss failed Sage extractions)",
+    mechanics:
+      "Each row keeps the conversation snapshot. Staff either replay the goal extraction or dismiss a failure they have already handled by hand.",
   },
   {
     id: "teacher-manage",
@@ -372,6 +425,27 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     summary:
       "Platform usage patterns and student outcome trends, surfaced through admin chat and reporting — supports analysis, never predicts outcomes.",
     compact: "outcome/usage analysis",
+  },
+
+  // ─── Every role ─────────────────────────────────────────────────────────
+  {
+    id: "career-data-lookup",
+    name: "Live Career Data (CareerOneStop)",
+    // No `compact` phrase: the student compact render is already at its
+    // 650-char ceiling (see the note in the student section above).
+    roles: ["student", "teacher", "coordinator", "admin"],
+    summary:
+      "Real occupation data Sage looks up during a conversation: what a job is like day to day, typical pay, the tools and equipment used on it, local training programs, and a skills matcher that turns self-rated skills into real job matches.",
+    mechanics:
+      "Read-only lookups with no page of their own — Sage runs them in chat and reports what came back. West Virginia is the default area. The skills matcher is a two-step tool: first it returns the rating questions to ask a few at a time, then it takes the collected 1-5 ratings back. If CareerOneStop credentials are missing or the service is unreachable, Sage says so plainly and never invents a wage, a program, or a school name.",
+    tools: [
+      "career_skills_match",
+      "career_occupation_profile",
+      "career_wages",
+      "career_training_programs",
+      "career_tools_technology",
+    ],
+    seeAlso: ["career-discovery", "career-dna-detail", "jobs", "learning"],
   },
 
   // ─── Utility pages (student) — intentionally thin/no entry needed for chat ───
