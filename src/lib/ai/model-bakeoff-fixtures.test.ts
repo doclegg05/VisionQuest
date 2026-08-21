@@ -502,6 +502,39 @@ describe("sage-model-bakeoff role runners", () => {
     assert.equal(outcome.checks.notDegenerate, false);
   });
 
+  it("marks a truncated structured reply so the report can call it cap-bound", async () => {
+    // The strict-JSON roles run at production's 512-token budget, which this
+    // repo has established does not fit the resume or discovery contracts. A
+    // role that fails for EVERY model by truncation is a verdict on the
+    // budget, not on any model — the report keys that diagnosis off this flag,
+    // so it has to be set even though the case simply fails.
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('{"resume":{"contact":{"email":"a@b.c"'), prompts, parseModelJson },
+      { id: "d", prompt: "resume", documentFixture: "doc", expectJsonObject: true },
+      { documentFixtures: { doc: "raw resume text" } },
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.detail.truncated, true);
+  });
+
+  it("does not mark a well-formed but wrong reply as truncated", async () => {
+    // Otherwise a model that simply answers badly would be excused as a budget
+    // problem, and raising the cap would be the recommended non-fix.
+    const outcome = await runStructuredCase(
+      { provider: jsonProvider('{"resume":{},"improvements":[]}'), prompts, parseModelJson },
+      {
+        id: "d",
+        prompt: "resume",
+        documentFixture: "doc",
+        expectJsonObject: true,
+        expectFields: ["resume.contact"],
+      },
+      { documentFixtures: { doc: "raw resume text" } },
+    );
+    assert.equal(outcome.pass, false);
+    assert.equal(outcome.detail.truncated, false);
+  });
+
   it("fails a draft case that leaves a placeholder in", async () => {
     const text = Array.from({ length: 80 }, (_, i) => `word${i}`).join(" ") + " [EMPLOYER NAME]";
     const outcome = await runDraftCase({ provider: proseProvider(text), assessReadability, maxGrade }, {

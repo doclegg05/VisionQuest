@@ -615,12 +615,26 @@ async function main() {
     );
     process.exitCode = 1;
   }
-  if (brokenRoles.length > 0) {
+  // A role every arm failed BY TRUNCATION is cap-bound, already diagnosed as
+  // such above, and is a legitimate finding rather than a broken harness.
+  const capBoundRoles = brokenRoles.filter((role) => {
+    const roleRuns = runs.filter((run) => run.role === role);
+    return roleRuns.filter((run) => run.detail?.truncated).length >= roleRuns.length / 2;
+  });
+  const unexplainedRoles = brokenRoles.filter((role) => !capBoundRoles.includes(role));
+  if (unexplainedRoles.length > 0) {
     console.error(
-      `\nNo model passed ANY case for: ${brokenRoles.join(", ")}. ` +
-        `That is a fixture or connectivity problem, not a model ranking — do not read it as a result.`,
+      `\nNo model passed ANY case for: ${unexplainedRoles.join(", ")}, and not because of ` +
+        `truncation. That is a fixture or connectivity problem, not a model ranking — ` +
+        `do not read it as a result.`,
     );
     process.exitCode = 1;
+  }
+  if (capBoundRoles.length > 0) {
+    console.error(
+      `\nEvery model failed ${capBoundRoles.join(", ")} by running out of output budget. ` +
+        `Re-run with --max-output-tokens=2048 to rank the models; the current run ranks the cap.`,
+    );
   }
 }
 
@@ -700,6 +714,24 @@ function report(runs, options) {
       for (const [key, count] of [...errorMessages.entries()].sort((a, b) => b[1] - a[1])) {
         console.log(`    ${key} x${count}`);
       }
+    }
+
+    // Truncation is a CAP verdict, not a model verdict. The strict-JSON roles
+    // run at production's 512-token structured default, which this repo has
+    // already established does not fit the resume or career-discovery
+    // contracts — so a role can fail for every arm identically and say nothing
+    // about any model. Diagnose that explicitly rather than letting it read as
+    // "these models are bad" or, worse, as a broken fixture.
+    const truncatedRuns = roleRuns.filter((run) => run.detail?.truncated).length;
+    const failedRuns = roleRuns.filter((run) => !run.pass).length;
+    const capBound = failedRuns > 0 && truncatedRuns >= failedRuns / 2;
+    if (capBound) {
+      console.log(
+        `  CAP-BOUND: ${truncatedRuns}/${failedRuns} failures stopped mid-structure at the ` +
+          `${options.structuredMaxOutputTokens}-token JSON budget. That is the budget, not the model — ` +
+          `re-run this role with --max-output-tokens=2048 to compare the models themselves,\n` +
+          `             and set ai_provider_max_output_tokens_<role> before deploying whichever wins.`,
+      );
     }
 
     const best = [...rows].sort(

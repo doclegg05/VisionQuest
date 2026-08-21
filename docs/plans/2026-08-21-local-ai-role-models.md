@@ -80,11 +80,24 @@ npm run sage:model:bakeoff -- \
   --repeats=3 --json-out=reports/bakeoff-2026-08-21.json
 ```
 
-Then the cap-bound question separately — same models, raised budget. If a role's failures move from `requiredFields`/`parsesAsJson` to passing when the cap rises, the problem was never the model:
+The first run uses **production's** budgets — 768 free-text, 512 JSON mode — so a
+model that passes there will not truncate in the app. That is deliberate, and it
+has a known consequence worth expecting: `document` may fail for *every* model,
+because 512 tokens provably does not fit the resume contract. The report calls
+that out as `CAP-BOUND` rather than ranking the models or blaming the fixtures —
+it is a verdict on the budget.
+
+When you see it, re-run that role with room to answer. Only now are you
+comparing models:
 
 ```bash
 npm run sage:model:bakeoff -- --models=... --roles=document,draft --max-output-tokens=2048
 ```
+
+Then set `ai_provider_max_output_tokens_document` (Program Setup → AI Provider →
+Model per job → "Longest answer") to whatever the second run needed. Picking the
+winner without also setting the cap ships a model that truncates in production —
+the two decisions are one decision.
 
 And the two chat-role capabilities the bake-off deliberately does not duplicate, now that `--model=` exists:
 
