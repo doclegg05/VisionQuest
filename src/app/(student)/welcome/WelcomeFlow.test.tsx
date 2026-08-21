@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { renderToString } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
@@ -11,7 +14,11 @@ import { WELCOME_PATHS } from "@/lib/progression/welcome-routing";
 import WelcomeFlow, {
   PathChoiceCard,
   QuickWinCard,
+  QuickWinsNav,
+  SCORE_ADVANCE_DELAY_MS,
   ScoreCard,
+  ScoreSlot,
+  createAutoAdvance,
   WELCOME_PATH_CHOICES,
   computeOrientationCompletionPercent,
   postQuickWinCompletion,
@@ -399,4 +406,233 @@ describe("ScoreCard", () => {
     const html = renderToString(<ScoreCard completedCount={1} totalCount={0} percent={percent} />);
     assert.ok(html.includes("off to a great start"));
   });
+
+  // The card itself carries no button: QuickWinsNav renders the way forward
+  // unconditionally right below it (see its own suite), so a Continue here
+  // would stack two of them. What this card owes assistive tech is the meaning
+  // of its progress bar, which was a bare styled div.
+  it("exposes the progress bar to assistive tech in real item counts", () => {
+    const html = renderToString(
+      <ScoreCard completedCount={6} totalCount={24} percent={25} />,
+    );
+
+    assert.match(html, /role="progressbar"/);
+    assert.match(html, /aria-valuenow="6"/);
+    assert.match(html, /aria-valuemin="0"/);
+    assert.match(html, /aria-valuemax="24"/);
+  });
+
+  it("announces no progress bar when there is no real total to measure", () => {
+    const html = renderToString(<ScoreCard completedCount={0} totalCount={0} percent={null} />);
+
+    assert.ok(!/role="progressbar"/.test(html), "no bar without a real total");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Step 2's navigation must never move under the student's finger
+//
+// Completing the LAST quick win posts to /api/orientation, and the student
+// reaches for "Skip for now" while that round trip is in flight. The save
+// resolving used to unmount both navigation buttons mid-reach — Playwright
+// caught it as "element is not stable" then "element was detached from the
+// DOM". This audience (adult learners, mobile, 44x44px touch targets) is the
+// least well served by a control that vanishes, so the contract is: the
+// navigation stays on screen the whole time, stays actionable, and keeps the
+// same footprint when its label flips.
+// ---------------------------------------------------------------------------
+
+describe("QuickWinsNav", () => {
+  it("keeps both navigation buttons on screen while a quick-win save is in flight", () => {
+    const html = renderToString(
+      <QuickWinsNav hasQuickWins allWinsDone={false} onAdvance={() => {}} onBack={() => {}} />,
+    );
+
+    assert.match(html, /Skip for now/, "the skip escape hatch must stay on screen");
+    assert.match(html, /← Back/, "the back escape hatch must stay on screen");
+  });
+
+  it("keeps an escape hatch on screen once every win is done — the celebration never traps", () => {
+    // showScore no longer gates this block; the same nav renders throughout.
+    const html = renderToString(
+      <QuickWinsNav hasQuickWins allWinsDone onAdvance={() => {}} onBack={() => {}} />,
+    );
+
+    assert.match(html, /Continue/, "the celebration must still offer a way forward");
+    assert.match(html, /← Back/, "and a way back");
+  });
+
+  it("never disables the navigation — a stalled save must not leave the step with no way out", () => {
+    // postQuickWinCompletion has no timeout, so a hung POST holds `saving`
+    // forever. Disabling the navigation for the duration would trap the
+    // student on a bad connection, which is worse than the bug being fixed.
+    for (const allWinsDone of [true, false]) {
+      const html = renderToString(
+        <QuickWinsNav hasQuickWins allWinsDone={allWinsDone} onAdvance={() => {}} onBack={() => {}} />,
+      );
+
+      assert.ok(!/disabled/.test(html), `navigation must stay actionable, got: ${html}`);
+    }
+  });
+
+  it("gives every variant the same 44px minimum box, so nothing shifts when the label flips", () => {
+    // Skip and Continue render into the same slot; a height change between
+    // them shifts "← Back" underneath at the exact moment the save resolves —
+    // the same moving-target hazard in a different costume.
+    const skip = renderToString(
+      <QuickWinsNav hasQuickWins allWinsDone={false} onAdvance={() => {}} onBack={() => {}} />,
+    );
+    const cont = renderToString(
+      <QuickWinsNav hasQuickWins allWinsDone onAdvance={() => {}} onBack={() => {}} />,
+    );
+
+    assert.equal(
+      (skip.match(/min-h-11/g) ?? []).length,
+      2,
+      `skip variant and back must both carry the 44px floor, got: ${skip}`,
+    );
+    assert.equal(
+      (cont.match(/min-h-11/g) ?? []).length,
+      2,
+      `continue variant and back must both carry the 44px floor, got: ${cont}`,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The auto-advance timer must never override a student's own choice
+//
+// Keeping the navigation on screen through the celebration gives the student
+// a control they can actually press — which means the pending 2s timer would
+// otherwise drag them back out of wherever they went. An escape hatch you get
+// pulled out of is not an escape hatch.
+// ---------------------------------------------------------------------------
+
+describe("SCORE_ADVANCE_DELAY_MS", () => {
+  // Owner call, 2026-08-20. The score card is the student's only confirmation
+  // that their first quick-win saved, and at this program's grade-5 reading
+  // level two seconds did not cover one sentence plus a count — the
+  // celebration was gone before it was read. A floor, not an equality: raising
+  // it later is fine, quietly trimming it back to "feels snappier" is not.
+  const READING_FLOOR_MS = 8000;
+
+  it("holds the card long enough to read it", () => {
+    assert.ok(
+      SCORE_ADVANCE_DELAY_MS >= READING_FLOOR_MS,
+      `the score card must hold at least ${READING_FLOOR_MS}ms, got ${SCORE_ADVANCE_DELAY_MS}`,
+    );
+  });
+
+  it("still ends — an advance that never fires strands the student on step 2", () => {
+    assert.ok(Number.isFinite(SCORE_ADVANCE_DELAY_MS) && SCORE_ADVANCE_DELAY_MS > 0);
+  });
+});
+
+describe("createAutoAdvance", () => {
+  function fakeClock() {
+    const scheduled = new Map<number, () => void>();
+    let nextHandle = 1;
+    return {
+      schedule: (callback: () => void) => {
+        const handle = nextHandle++;
+        scheduled.set(handle, callback);
+        return handle as unknown as ReturnType<typeof setTimeout>;
+      },
+      cancel: (handle: ReturnType<typeof setTimeout>) => {
+        scheduled.delete(handle as unknown as number);
+      },
+      /** Fire everything still scheduled, as the real clock eventually would. */
+      tick: () => {
+        for (const callback of [...scheduled.values()]) callback();
+      },
+      pending: () => scheduled.size,
+    };
+  }
+
+  it("fires the advance when the student leaves the celebration alone", () => {
+    const clock = fakeClock();
+    const timer = createAutoAdvance(clock.schedule, clock.cancel);
+    let advanced = 0;
+
+    timer.start(() => advanced++, 2000);
+    clock.tick();
+
+    assert.equal(advanced, 1);
+  });
+
+  it("never fires after a cancel — a manual choice wins over the pending timer", () => {
+    const clock = fakeClock();
+    const timer = createAutoAdvance(clock.schedule, clock.cancel);
+    let advanced = 0;
+
+    timer.start(() => advanced++, 2000);
+    timer.cancel();
+    clock.tick();
+
+    assert.equal(advanced, 0, "the student navigated; the timer must not drag them elsewhere");
+    assert.equal(clock.pending(), 0);
+  });
+
+  it("tolerates a cancel with nothing scheduled, and a double cancel", () => {
+    const clock = fakeClock();
+    const timer = createAutoAdvance(clock.schedule, clock.cancel);
+
+    assert.doesNotThrow(() => timer.cancel());
+    timer.start(() => {}, 2000);
+    timer.cancel();
+    assert.doesNotThrow(() => timer.cancel());
+  });
+
+  it("routes every navigation button through goToStep, the one place that cancels", () => {
+    // A nav button wired straight to setStep skips the cancel, and the timer
+    // resurfaces steps later: skip mid-save, land on the path chooser, tap
+    // back, get pushed forward again. Reading the source is how that stays
+    // impossible to reintroduce — mirroring useAnchorTabSwitch.test.ts, which
+    // pins its invariant the same way.
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "WelcomeFlow.tsx"),
+      "utf8",
+    );
+
+    const directNavHandlers = source.match(/onClick=\{\(\) => setStep\(/g) ?? [];
+    assert.equal(
+      directNavHandlers.length,
+      0,
+      `${directNavHandlers.length} navigation button(s) call setStep directly and so never cancel the pending auto-advance — route them through goToStep`,
+    );
+    assert.ok(/onClick=\{\(\) => goToStep\(/.test(source), "the flow should still navigate");
+  });
+});
+
+describe("ScoreSlot", () => {
+  const card = { completedCount: 4, totalCount: 24, percent: 17 };
+
+  it("holds the card's space before it is revealed, so the navigation below never moves", () => {
+    // The card mounts either way; only its visibility changes. Measured in a
+    // browser at 375px, inserting it on reveal pushed "← Back" down 57px and
+    // put "Continue →" on the pixel Back had just vacated — a student
+    // reaching for Back as the save landed hit the opposite action.
+    const hidden = renderToString(<ScoreSlot shown={false} {...card} />);
+    const shown = renderToString(<ScoreSlot shown {...card} />);
+
+    // `invisible` is visibility:hidden, which reserves the box AND stays out
+    // of the accessibility tree — unlike opacity-0, which would announce the
+    // celebration before it is true.
+    assert.match(hidden, /class="invisible"/, "the unrevealed slot must still occupy its box");
+    assert.ok(!/class="invisible"/.test(shown), "the revealed slot must not stay hidden");
+    assert.ok(
+      hidden.includes("finished") && shown.includes("finished"),
+      "the card itself must be mounted in BOTH states — that is what reserves the height",
+    );
+  });
+
+  it("reserves the same box it will fill, so the reveal is a visibility change only", () => {
+    const hidden = renderToString(<ScoreSlot shown={false} {...card} />);
+    const shown = renderToString(<ScoreSlot shown {...card} />);
+
+    // Identical but for the wrapper's visibility class: same card, same
+    // content, therefore the same rendered height.
+    assert.equal(hidden.replace(' class="invisible"', ""), shown);
+  });
+
 });

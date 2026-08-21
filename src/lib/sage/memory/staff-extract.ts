@@ -109,18 +109,11 @@ export async function extractAndStoreStaffMemories({
 
     // Independent daily ceiling, separate from the student extractor's. Staff
     // turns are cheap and infrequent; this is a runaway guard, not a limiter.
-    // Fails OPEN — a broken limiter must not silently disable memory.
-    let limiter: Awaited<ReturnType<typeof rateLimitDaily>>;
+    // Fails OPEN — a broken limiter must not silently disable memory — and
+    // rateLimitDaily() carries that policy itself: it never throws, and logs
+    // when it falls back (see the failure-policy note in @/lib/rate-limit).
     const limit = staffExtractDailyLimit();
-    try {
-      limiter = await rateLimitDaily(`sage-staff-memory-extract:${staffId}`, limit);
-    } catch (err) {
-      logger.error("Staff memory extraction rate limit check failed", {
-        conversationId,
-        error: String(err),
-      });
-      limiter = { success: true, remaining: limit, resetTime: 0 };
-    }
+    const limiter = await rateLimitDaily(`sage-staff-memory-extract:${staffId}`, limit);
     if (!limiter.success) {
       logger.warn("Staff memory extraction daily limit reached; skipping this turn", {
         conversationId,

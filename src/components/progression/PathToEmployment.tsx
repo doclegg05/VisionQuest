@@ -2,16 +2,53 @@
 
 import Link from "next/link";
 import { CheckCircle, Lock, Sparkle, WarningCircle, ArrowRight } from "@phosphor-icons/react";
-import type { PathStep } from "@/lib/progression/student-next-step";
+import type { PathStep, PathStepKey } from "@/lib/progression/student-next-step";
 
-interface PathToEmploymentProps {
-  currentStepKey: string;
+export interface PathToEmploymentProps {
+  currentStepKey: PathStepKey;
   title: string;
   description: string;
   whyItMatters: string;
   actionLabel: string;
   actionLink: string;
   steps: PathStep[];
+  /**
+   * "full" carries the whole journey — the step strip plus the do-this-next
+   * card — and belongs on the dashboard alone. Every other student page takes
+   * "compact": one line naming the same next step, so the page's own content
+   * starts at the top of the viewport instead of a screen below it.
+   */
+  variant?: "full" | "compact";
+}
+
+/**
+ * A step's state as a sentence a person can read and a screen reader can
+ * announce. Replaces the `title` tooltip this strip used to lean on — which
+ * touch users could never open and keyboard users could never reach — and the
+ * raw `(locked)` / `(active)` enum values it used to read out.
+ *
+ * A blocked step says so even when it is the current one: "needs attention" is
+ * the more urgent fact, and losing it to the current-step phrasing is what
+ * would make a stalled journey sound like a healthy one. Exported for tests.
+ */
+export function stepStatusPhrase(step: PathStep, isCurrent: boolean): string {
+  if (step.status === "blocked") return "Needs attention.";
+  if (isCurrent) return "This is your next step.";
+
+  switch (step.status) {
+    case "complete":
+      return "Done.";
+    case "available":
+      return "Ready to start.";
+    case "active":
+      return "This is your next step.";
+    case "locked":
+      return "Locked. Finish the earlier steps first.";
+    default: {
+      const exhaustive: never = step.status;
+      return exhaustive;
+    }
+  }
 }
 
 export function PathToEmployment({
@@ -22,109 +59,171 @@ export function PathToEmployment({
   actionLabel,
   actionLink,
   steps,
+  variant = "full",
 }: PathToEmploymentProps) {
+  const currentIndex = steps.findIndex((step) => step.key === currentStepKey);
+  const currentStep = currentIndex >= 0 ? steps[currentIndex] : undefined;
+  const isBlockedNow = currentStep?.status === "blocked";
+  const completedCount = steps.filter((step) => step.status === "complete").length;
+
+  // Both variants lead with the student's place on the path. Built as one
+  // string so it reaches the DOM as a single text node — a screen reader says
+  // "Step 2 of 8" rather than three fragments to reassemble.
+  const positionLabel =
+    currentIndex >= 0 ? `Step ${currentIndex + 1} of ${steps.length}` : null;
+
+  if (variant === "compact") {
+    return (
+      <Link
+        href={actionLink}
+        data-testid="current-target-cta"
+        className="surface-section flex min-h-[56px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)]"
+      >
+        <span className="min-w-0">
+          {positionLabel && (
+            <span className="block text-xs text-[var(--ink-muted)]">{positionLabel}</span>
+          )}
+          <span className="block truncate text-sm font-semibold text-[var(--ink-strong)]">
+            {currentStep ? `Next: ${currentStep.label}` : "Next step"}
+          </span>
+          {isBlockedNow && (
+            <span className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-[var(--badge-error-text)]">
+              <WarningCircle size={14} weight="fill" aria-hidden="true" />
+              Needs attention.
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 items-center text-[var(--accent-strong)]">
+          <span className="sr-only">{actionLabel}</span>
+          <ArrowRight size={20} weight="bold" aria-hidden="true" />
+        </span>
+      </Link>
+    );
+  }
+
   return (
-    <div className="surface-section p-6 rounded-2xl border border-[var(--border)] shadow-sm w-full mb-6">
-      {/* Horizontal Steps Bar */}
-      <nav aria-label="Employment journey path" className="w-full mb-6">
-        <ol className="flex flex-wrap items-center justify-between gap-y-4 md:flex-nowrap md:gap-x-2">
-          {steps.map((step, idx) => {
-            const isActive = step.key === currentStepKey;
-            const isComplete = step.status === "complete";
-            const isLocked = step.status === "locked";
-            const isBlocked = step.status === "blocked";
+    <div className="surface-section mb-6 w-full rounded-2xl border border-[var(--border)] p-5 shadow-sm sm:p-6">
+      {/* Phone: one step, named and counted. Eight circles at 375px wrapped
+          into four rows of mostly-locked padlocks, which pushed the page's own
+          content a full viewport down and told the student nothing. */}
+      <div data-testid="journey-step-summary" className="mb-5 md:hidden">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold text-[var(--ink-strong)]">
+            {positionLabel ?? "Your path"}
+            {currentStep && (
+              <span className="font-normal text-[var(--ink-muted)]">{`: ${currentStep.label}`}</span>
+            )}
+          </p>
+          <p className="shrink-0 text-xs text-[var(--ink-muted)]">{`${completedCount} done`}</p>
+        </div>
+        <div
+          role="progressbar"
+          aria-valuenow={completedCount}
+          aria-valuemin={0}
+          aria-valuemax={steps.length}
+          aria-valuetext={`${completedCount} of ${steps.length} steps done`}
+          className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+        >
+          <div
+            className="h-full rounded-full bg-[var(--accent-green)] transition-[width] duration-500"
+            style={{ width: `${steps.length > 0 ? (completedCount / steps.length) * 100 : 0}%` }}
+          />
+        </div>
+      </div>
 
-            return (
-              <li
-                key={step.key}
-                className="flex items-center flex-1 min-w-[120px] md:min-w-0"
-              >
-                <div className="flex flex-col items-center text-center w-full relative">
-                  {/* Line connector between steps */}
-                  {idx > 0 && (
-                    <div
-                      className={`absolute top-5 left-[-50%] right-[50%] h-0.5 -z-10 hidden md:block ${
-                        isLocked
-                          ? "bg-slate-200 dark:bg-slate-800"
-                          : isComplete
-                          ? "bg-emerald-500"
-                          : "bg-indigo-300 dark:bg-indigo-900/50"
-                      }`}
-                    />
-                  )}
+      {/* Tablet and up: the full journey, where there is room for it. */}
+      <ol
+        data-testid="journey-steps"
+        aria-label="Your path to employment"
+        className="mb-6 hidden w-full items-start justify-between gap-x-2 md:flex"
+      >
+        {steps.map((step, idx) => {
+          const isActive = step.key === currentStepKey;
+          const isComplete = step.status === "complete";
+          const isLocked = step.status === "locked";
+          const isBlocked = step.status === "blocked";
 
-                  {/* Icon Indicator */}
+          return (
+            <li key={step.key} className="flex flex-1 items-center">
+              <div className="relative flex w-full flex-col items-center text-center">
+                {idx > 0 && (
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${
-                      isActive
-                        ? "bg-indigo-600 text-white shadow-md ring-4 ring-indigo-500/20 scale-105 animate-glow-pulse"
-                        : isComplete
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                        : isBlocked
-                        ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300 ring-2 ring-red-500/20"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-800/60 dark:text-slate-600"
+                    className={`absolute top-5 left-[-50%] right-[50%] -z-10 h-0.5 ${
+                      isComplete ? "bg-[var(--accent-green)]" : "bg-[var(--border-strong)]"
                     }`}
-                    title={step.label + ": " + step.description}
-                  >
-                    {isComplete ? (
-                      <CheckCircle size={20} weight="fill" />
-                    ) : isBlocked ? (
-                      <WarningCircle size={20} weight="fill" />
-                    ) : isLocked ? (
-                      <Lock size={16} />
-                    ) : (
-                      <Sparkle size={18} weight={isActive ? "fill" : "regular"} />
-                    )}
-                  </div>
+                  />
+                )}
 
-                  {/* Label */}
-                  <span
-                    className={`mt-2 text-xs font-semibold tracking-wide ${
-                      isActive
-                        ? "text-indigo-600 dark:text-indigo-400 font-bold"
-                        : isComplete
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${
+                    isActive
+                      ? "animate-glow-pulse scale-105 bg-[var(--accent-strong)] text-white shadow-md"
+                      : isComplete
+                        ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
+                        : isBlocked
+                          ? "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
+                          : "bg-[var(--surface-muted)] text-[var(--ink-faint)]"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {isComplete ? (
+                    <CheckCircle size={20} weight="fill" />
+                  ) : isBlocked ? (
+                    <WarningCircle size={20} weight="fill" />
+                  ) : isLocked ? (
+                    <Lock size={16} />
+                  ) : (
+                    <Sparkle size={18} weight={isActive ? "fill" : "regular"} />
+                  )}
+                </div>
+
+                <span
+                  className={`mt-2 text-xs font-semibold tracking-wide ${
+                    isActive
+                      ? "font-bold text-[var(--ink-strong)]"
+                      : isComplete
                         ? "text-[var(--ink-strong)]"
                         : "text-[var(--ink-muted)]"
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                  
-                  {/* Subtle status text for accessibility */}
-                  <span className="sr-only">({step.status})</span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+                  }`}
+                >
+                  {step.label}
+                </span>
 
-      {/* Next Step Focus Card */}
-      <div className="bg-slate-50/50 dark:bg-[#1b1c20]/45 border border-[var(--border)] rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="space-y-2 flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-3xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded">
-              Current Target
+                {/* What the tooltip used to hide. */}
+                <span className="sr-only">
+                  {`${step.description}. ${stepStatusPhrase(step, isActive)}`}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      {/* The next step itself. It sits on the card rather than in a second
+          card inside it — one surface, one border, nothing nested. */}
+      <div className="flex flex-col justify-between gap-5 border-t border-[var(--border)] pt-5 md:flex-row md:items-center">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md bg-[var(--badge-info-bg)] px-2 py-1 text-xs font-bold text-[var(--badge-info-text)]">
+              Do this next
             </span>
-            {steps.find(s => s.key === currentStepKey)?.status === "blocked" && (
-              <span className="text-3xs font-bold uppercase tracking-widest text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded">
-                Needs Attention
+            {isBlockedNow && (
+              <span className="rounded-md bg-[var(--badge-error-bg)] px-2 py-1 text-xs font-bold text-[var(--badge-error-text)]">
+                Needs attention
               </span>
             )}
           </div>
-          
-          <h2 className="font-display text-lg text-[var(--ink-strong)] font-semibold leading-snug">
+
+          <h2 className="font-display text-lg leading-snug font-semibold text-[var(--ink-strong)]">
             {title}
           </h2>
-          
-          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            {description}
-          </p>
 
-          {/* "Why This Matters" employability callout */}
-          <div className="border-l-2 border-indigo-400 pl-3 mt-3">
-            <p className="text-xs italic text-[var(--ink-muted)] leading-normal">
-              <strong>Why this matters for your career:</strong> {whyItMatters}
+          <p className="text-sm leading-relaxed text-[var(--ink-muted)]">{description}</p>
+
+          <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3">
+            <p className="text-sm leading-normal text-[var(--ink-strong)]">
+              <strong className="font-semibold">Why this matters for your career:</strong>{" "}
+              {whyItMatters}
             </p>
           </div>
         </div>
@@ -132,10 +231,10 @@ export function PathToEmployment({
         <Link
           href={actionLink}
           data-testid="current-target-cta"
-          className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-full px-5 py-2.5 text-sm transition-all hover:translate-x-0.5 shadow-sm min-h-[48px] shrink-0 self-start md:self-auto"
+          className="primary-button min-h-[48px] shrink-0 self-start px-5 py-2.5 text-sm md:self-auto"
         >
           <span>{actionLabel}</span>
-          <ArrowRight size={16} />
+          <ArrowRight size={16} weight="bold" aria-hidden="true" />
         </Link>
       </div>
     </div>

@@ -39,6 +39,7 @@ export default async function LearningPage() {
         actionLabel={nextStep.actionLabel}
         actionLink={nextStep.actionLink}
         steps={nextStep.steps}
+        variant="compact"
       />
       <PageIntro
         eyebrow="Learning"

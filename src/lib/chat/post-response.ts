@@ -403,25 +403,14 @@ async function runPostResponse(
   // routine limiter.
   if (plan.allows("memory")) {
     const extractionLimit = getMemoryExtractDailyLimit();
-    // The rate-limit check itself must not be able to take down the rest of
+    // The rate-limit check must not be able to take down the rest of
     // handlePostResponse (goal extraction, discovery extraction, stage
-    // updates, review XP, title generation). rateLimitDaily() can throw
-    // (non-retryable Prisma errors, or after exhausting P2034 retries), so a
-    // transient rate-limit-table contention error must not propagate out of
-    // this function. Fail OPEN here — if the circuit-breaker itself is
-    // broken, let extraction proceed as normal rather than skipping it;
-    // fail-closed is what caused the original blast-radius bug.
-    let extractionRl: Awaited<ReturnType<typeof rateLimitDaily>>;
-    try {
-      extractionRl = await rateLimitDaily(`sage-memory-extract:${studentId}`, extractionLimit);
-    } catch (err) {
-      logger.error("Memory extraction rate limit check failed", {
-        studentId,
-        conversationId,
-        error: String(err),
-      });
-      extractionRl = { success: true, remaining: extractionLimit, resetTime: 0 };
-    }
+    // updates, review XP, title generation). It cannot: rateLimitDaily()
+    // never throws — a broken counter store resolves to a logged, fail-open
+    // result (see the failure-policy note in @/lib/rate-limit). Fail OPEN is
+    // right here too; fail-closed is what caused the original blast-radius
+    // bug, silently disabling extraction whenever the table misbehaved.
+    const extractionRl = await rateLimitDaily(`sage-memory-extract:${studentId}`, extractionLimit);
     if (!extractionRl.success) {
       plan.markLimited("memory");
       logger.warn("Sage memory extraction daily limit reached; skipping extraction for this turn", {
