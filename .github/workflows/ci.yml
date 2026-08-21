@@ -231,6 +231,7 @@ jobs:
           e2e/teacher-dashboard.spec.ts
           e2e/student-journey.spec.ts
           e2e/teacher-loop.spec.ts
+          e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
 
       - name: Authenticated a11y scans (soak — red baseline, non-blocking)
