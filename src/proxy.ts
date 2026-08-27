@@ -14,26 +14,46 @@ const SESSION_COOKIE_NAME = "vq-session";
 
 // Next.js 16 proxy (middleware) convention — filename must be `proxy.ts` and the
 // exported function must be named `proxy`. Handles:
-//   1. CSRF protection via Origin / Referer validation for state-changing API requests
-//   2. Per-request CSP nonce generation (replaces static unsafe-inline)
-//   3. X-API-Version response header on /api/* responses
-//   4. RLS context headers derived from the session JWT (Slice B).
+//   1. Auth redirect for gated routes (student/teacher/admin) to prevent "Loading..." flash
+//   2. CSRF protection via Origin / Referer validation for state-changing API requests
+//   3. Per-request CSP nonce generation (replaces static unsafe-inline)
+//   4. X-API-Version response header on /api/* responses
+//   5. RLS context headers derived from the session JWT (Slice B).
 // The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
 
 export function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // --- Auth redirect for gated routes ---
+  // Redirect unauthenticated users hitting student/teacher/admin routes to the sign-in page.
+  // This happens before the page renders, preventing the "Loading..." flash.
+  const gatedPrefixes = ["/dashboard", "/welcome", "/forms", "/vision-board", "/orientation", "/settings", "/memory", "/files", "/resources", "/profile", "/portfolio", "/learning", "/jobs", "/chat", "/appointments", "/career", "/goals", "/help", "/teacher", "/admin", "/coordinator"];
+  const isGatedRoute = gatedPrefixes.some((prefix) => pathname.startsWith(prefix));
+
+  if (isGatedRoute) {
+    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const claims = token ? verifyToken(token) : null;
+    
+    if (!claims) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+  }
+
   // --- CSRF protection (state-changing API requests only) ---
   const method = request.method.toUpperCase();
-  const isApi = request.nextUrl.pathname.startsWith("/api/");
+  const isApi = pathname.startsWith("/api/");
   const isStateChanging = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
 
-  if (isStateChanging && isApi && request.nextUrl.pathname !== "/api/health") {
+  if (isStateChanging && isApi && pathname !== "/api/health") {
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
     const host = request.headers.get("host");
     const authorization = request.headers.get("authorization");
 
     const isInternal = isAuthorizedInternalRequest(
-      request.nextUrl.pathname,
+      pathname,
       authorization,
       process.env.CRON_SECRET,
     );
