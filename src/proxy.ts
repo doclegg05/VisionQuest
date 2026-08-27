@@ -27,8 +27,12 @@ export function proxy(request: NextRequest) {
   // --- Auth redirect for gated routes ---
   // Redirect unauthenticated users hitting student/teacher/admin routes to the sign-in page.
   // This happens before the page renders, preventing the "Loading..." flash.
+  // Match exact paths or paths followed by "/" to avoid false positives
+  // (e.g., /teacher is gated but /teacher-register is public).
   const gatedPrefixes = ["/dashboard", "/welcome", "/forms", "/vision-board", "/orientation", "/settings", "/memory", "/files", "/resources", "/profile", "/portfolio", "/learning", "/jobs", "/chat", "/appointments", "/career", "/goals", "/help", "/teacher", "/admin", "/coordinator"];
-  const isGatedRoute = gatedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const isGatedRoute = gatedPrefixes.some((prefix) => 
+    pathname === prefix || pathname.startsWith(prefix + "/")
+  );
 
   if (isGatedRoute) {
     const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
