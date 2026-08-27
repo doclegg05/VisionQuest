@@ -18,15 +18,15 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 const HIGHLIGHTS = [
-  "AI coaching that turns big goals into weekly and daily action.",
-  "A calm student portal for courses, certifications, files, and portfolios.",
-  "Teacher tools that keep progress visible without overwhelming learners.",
+  "Set career goals and break them into weekly and daily actions.",
+  "Track your courses, certifications, files, and portfolio in one place.",
+  "Your teacher sees your progress and can help when you get stuck.",
 ];
 
 const MODULE_SPOTLIGHT = [
-  { icon: Target, label: "Goal mapping", copy: "From BHAG to today's next step." },
-  { icon: Books, label: "Learning hub", copy: "Courses and certifications in one place." },
-  { icon: Briefcase, label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
+  { icon: Target, label: "Goals", copy: "Your career goals and the actions to reach them." },
+  { icon: Books, label: "Learning", copy: "Courses and certifications tracked in one place." },
+  { icon: Briefcase, label: "Portfolio", copy: "Resume and proof of what you've completed." },
 ];
 
 interface AuthPageClientProps {
@@ -144,15 +144,14 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               <BrandLockup
                 size="md"
                 theme="dark"
-                subtitle="SPOKES Workforce Development"
+                subtitle="Skills for Life"
                 priority
               />
               <h1 className="mt-4 text-balance font-display text-4xl leading-[1] tracking-normal sm:text-5xl md:text-6xl xl:text-7xl">
-                Build momentum, one brave step at a time.
+                Your portal for program requirements, certifications, and job readiness.
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/80 sm:text-base sm:leading-7 md:mt-5 md:text-lg">
-                VisionQuest gives you a hopeful place to set goals and stay
-                organized. Keep moving toward a steady job and a life of your own.
+                Complete orientation, set career goals, track your courses and certifications, and build a portfolio that shows what you can do.
               </p>
             </div>
 
@@ -191,15 +190,15 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             <div className="mt-6 grid gap-3 pt-6 sm:mt-auto sm:grid-cols-3 sm:pt-8">
               <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Sage</p>
-                <p className="mt-2 text-lg font-semibold">Coaching with context</p>
+                <p className="mt-2 text-lg font-semibold">Coach who knows your goals</p>
               </div>
               <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/75">Progression</p>
-                <p className="mt-2 text-lg font-semibold">Wins that stay visible</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/75">Progress</p>
+                <p className="mt-2 text-lg font-semibold">Track what you've completed</p>
               </div>
               <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Portfolio</p>
-                <p className="mt-2 text-lg font-semibold">Proof of readiness</p>
+                <p className="mt-2 text-lg font-semibold">Proof of what you can do</p>
               </div>
             </div>
           </div>
