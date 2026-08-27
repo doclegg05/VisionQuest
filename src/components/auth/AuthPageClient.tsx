@@ -148,7 +148,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 priority
               />
               <h1 className="mt-4 text-balance font-display text-4xl leading-[1] tracking-normal sm:text-5xl md:text-6xl xl:text-7xl">
-                See today's next step toward a job.
+                {"See today's next step toward a job."}
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/80 sm:text-base sm:leading-7 md:mt-5 md:text-lg">
                 This is the SPOKES Skills for Life portal. Sign in to set a goal, do the work, and keep proof of your progress.
