@@ -1,3 +1,4 @@
+import Link from "next/link";
 import CertTracker from "@/components/certifications/CertTracker";
 import CredlyBadges from "@/components/certifications/CredlyBadges";
 import CredlyConnect from "@/components/certifications/CredlyConnect";
@@ -48,7 +49,7 @@ export default async function LearningPage() {
       />
 
       {/* Phase 4 consolidation: the Resource Center moved out of the nav and lives here. */}
-      <a
+      <Link
         href="/resources"
         className="mt-4 block rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 transition-colors hover:bg-[var(--surface-interactive)]"
       >
@@ -58,7 +59,7 @@ export default async function LearningPage() {
         <p className="mt-1 text-sm text-[var(--ink-strong)]">
           Program guides, handouts, and reference materials →
         </p>
-      </a>
+      </Link>
 
       <section id="roadmap" className="mt-6">
         <h2 className="sr-only">Your Learning Roadmap</h2>
