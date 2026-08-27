@@ -161,7 +161,7 @@ test("verify → queue item → prefilled SPOKES save → provenance + resolved 
   await page.goto("/");
   await page.getByLabel(/username or email/i).fill(TEACHER_LOGIN);
   await page.getByLabel(/password/i).fill(TEACHER_PASSWORD);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
   await page.waitForURL(/teacher/, { timeout: 20_000 });
 
   // Verify the self-reported accepted outcome (same endpoint the Progress

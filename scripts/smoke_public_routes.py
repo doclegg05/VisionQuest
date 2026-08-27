@@ -75,8 +75,8 @@ def run() -> None:
                 "Landing page hero heading did not render.",
             )
             expect(
-                page.get_by_role("button", name="Sign In").first.is_visible(),
-                "Sign-in tab is missing on the landing page.",
+                page.get_by_role("button", name="Sign in to see what to do today.").first.is_visible(),
+                "Sign-in button is missing on the landing page.",
             )
 
             page.get_by_role("link", name="Forgot your password?").click()

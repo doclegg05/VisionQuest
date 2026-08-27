@@ -16,9 +16,9 @@ test.describe("Student login flow", () => {
   test("landing page loads with sign-in form", async ({ page }) => {
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: /build momentum/i }),
+      page.getByRole("heading", { name: /see today.*next step/i }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sign In" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in to see what to do today." }).first()).toBeVisible();
     await expect(page.getByLabel(/username or email/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
   });
@@ -28,7 +28,7 @@ test.describe("Student login flow", () => {
 
     const usernameInput = page.getByLabel(/username or email/i);
     const passwordInput = page.getByLabel(/password/i);
-    const signInButton = page.getByRole("button", { name: "Sign In" }).first();
+    const signInButton = page.getByRole("button", { name: "Sign in to see what to do today." }).first();
 
     await expect(usernameInput).toBeVisible();
     await expect(passwordInput).toBeVisible();
@@ -43,7 +43,7 @@ test.describe("Student login flow", () => {
 
     await page.getByLabel(/username or email/i).fill("nonexistent-user");
     await page.getByLabel(/password/i).fill("wrongpassword");
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
 
     await expect(
       page.getByText(/invalid|incorrect|not found|too many/i),

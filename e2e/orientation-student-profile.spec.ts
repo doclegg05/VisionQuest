@@ -113,7 +113,7 @@ test("student completes the Student Profile orientation step in the browser", as
   await page.goto("/");
   await page.getByLabel(/username or email/i).fill(STUDENT_LOGIN);
   await page.getByLabel(/password/i).fill(STUDENT_PASSWORD);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
   await page.waitForURL(/dashboard|welcome/, { timeout: 20_000 });
 
   // The orientation wizard opens on the Student Profile step as an HTML form.
