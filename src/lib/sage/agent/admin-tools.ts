@@ -34,6 +34,16 @@ const READABLE_CONFIG: { key: SystemConfigKey; label: string }[] = [
   { key: "ai_provider_model", label: "Local AI model" },
   { key: "ai_provider_auth_mode", label: "Local AI auth mode" },
   { key: "ai_provider_num_ctx", label: "Local AI context window" },
+  // Per-role overrides. Without these, "what am I running?" reports a
+  // single-model setup whether or not roles are pointed elsewhere, which
+  // makes a stale or typo'd override invisible on the surface a non-specialist
+  // owner is most likely to check. Read-only here on purpose: setting a role
+  // model belongs in Program Setup, where the connection test can verify the
+  // model actually exists on the server.
+  { key: "ai_provider_model_chat", label: "Local AI model — coaching chat" },
+  { key: "ai_provider_model_extract", label: "Local AI model — transcript extraction" },
+  { key: "ai_provider_model_document", label: "Local AI model — document understanding" },
+  { key: "ai_provider_model_draft", label: "Local AI model — long-form drafting" },
 ];
 
 // Secrets we only report as set/unset — never their value.

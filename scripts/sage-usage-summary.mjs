@@ -57,13 +57,43 @@ function loadSloConfig(path) {
   return JSON.parse(raw);
 }
 
-/** Look up the p95 bar (ms) for a callSite/model pair, falling back to defaultP95Ms. */
-function getSloBarMs(callSite, model, sloConfig) {
+/**
+ * Look up the p95 bar (ms) for a callSite/model pair.
+ *
+ * Resolution order, most specific first:
+ *   1. An entry keyed by the exact model tag ("gemma4:e4b"). With per-role
+ *      models this is the useful level — a small extraction model should not
+ *      be held to the same bar as the big chat model.
+ *   2. The provider bucket the tag belongs to, via `modelProviders`.
+ *   3. `defaultP95Ms`, and the caller is told so.
+ *
+ * The third case is why this returns a source rather than a bare number.
+ * `LlmCallLog.model` used to hold the provider CLASS ("gemini", "ollama"),
+ * which happened to match these keys exactly; it now holds the real model tag,
+ * so an unmapped tag silently falls through to a default that is 7.5x too
+ * loose for cloud chat and 2x too TIGHT for local chat — one direction hides a
+ * regression, the other invents breaches. Silence is the failure mode, so the
+ * report names any model it could not map.
+ */
+export function getSloBarMs(callSite, model, sloConfig) {
   const perModel = sloConfig.perProviderP95Ms?.[callSite];
   if (perModel && Object.prototype.hasOwnProperty.call(perModel, model)) {
-    return perModel[model];
+    return { barMs: perModel[model], source: "model" };
   }
-  return sloConfig.defaultP95Ms;
+
+  const provider = sloConfig.modelProviders?.[model];
+  if (provider && perModel && Object.prototype.hasOwnProperty.call(perModel, provider)) {
+    return { barMs: perModel[provider], source: "provider", provider };
+  }
+
+  return {
+    barMs: sloConfig.defaultP95Ms,
+    source: "default",
+    // Only a callSite that HAS bars can be silently de-tuned by falling
+    // through. A background callSite has always used the default and is not
+    // worth a warning.
+    unmapped: Boolean(perModel),
+  };
 }
 
 function parseSince(value) {
@@ -155,6 +185,11 @@ async function main() {
   // no per-row "source" flag yet, so the split column reports "n/a" until a
   // future migration adds one — see REPORT deviation notes.
   const sloBreaches = [];
+  // Models on a callSite that HAS configured bars but which matched none of
+  // them. These fall through to defaultP95Ms, which for sage_chat is both far
+  // too loose (cloud) and too tight (local) — a silently wrong bar in either
+  // direction, so it gets named rather than swallowed.
+  const unmappedModels = [];
 
   const callSiteRows = [...byCallSite.entries()]
     .map(([callSite, callRows]) => {
@@ -167,16 +202,21 @@ async function main() {
       const byModel = models.map((model) => {
         const modelRows = callRows.filter((r) => r.model === model);
         const modelDuration = summarizeDuration(modelRows.map((r) => r.durationMs));
-        const sloP95BarMs = getSloBarMs(callSite, model, sloConfig);
+        const bar = getSloBarMs(callSite, model, sloConfig);
+        const sloP95BarMs = bar.barMs;
         const breached = modelDuration.count > 0 && modelDuration.p95 > sloP95BarMs;
         if (breached) {
           sloBreaches.push({ callSite, model, p95: modelDuration.p95, sloP95BarMs });
+        }
+        if (bar.unmapped) {
+          unmappedModels.push({ callSite, model });
         }
         return {
           model,
           calls: modelRows.length,
           durationMs: modelDuration,
           sloP95BarMs,
+          barSource: bar.source,
           breached,
         };
       });
@@ -268,8 +308,9 @@ async function main() {
         continue;
       }
       const status = modelRow.breached ? "SLO BREACH" : "ok";
+      const barNote = modelRow.barSource === "default" ? " — DEFAULT, no bar for this model" : "";
       console.log(
-        `      ${modelRow.model}: n=${modelRow.durationMs.count} p50=${modelRow.durationMs.p50} p95=${modelRow.durationMs.p95} max=${modelRow.durationMs.max} (bar ${modelRow.sloP95BarMs}ms) [${status}]`,
+        `      ${modelRow.model}: n=${modelRow.durationMs.count} p50=${modelRow.durationMs.p50} p95=${modelRow.durationMs.p95} max=${modelRow.durationMs.max} (bar ${modelRow.sloP95BarMs}ms${barNote}) [${status}]`,
       );
       if (modelRow.breached) {
         console.log(
@@ -283,6 +324,16 @@ async function main() {
   }
 
   console.log("\nSLO check:");
+  if (unmappedModels.length > 0) {
+    console.log(
+      `  ${unmappedModels.length} model(s) checked against defaultP95Ms because no bar names them:`,
+    );
+    for (const entry of unmappedModels) {
+      console.log(
+        `    NO SLO BAR: ${entry.callSite}/${entry.model} — add it to perProviderP95Ms["${entry.callSite}"], or map it in modelProviders, in config/sage-slo.json`,
+      );
+    }
+  }
   if (sloBreaches.length === 0) {
     console.log("  No SLO breaches — every callSite/model p95 is within its bar.");
   } else {
@@ -299,9 +350,15 @@ async function main() {
   }
 }
 
-main()
-  .catch((error) => {
-    console.error("Usage summary failed:", error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Only auto-run when executed directly — importing this module for
+// getSloBarMs (contract tests) must not open a database connection. Same
+// guard as scripts/sage-agent-eval.mjs.
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main()
+    .catch((error) => {
+      console.error("Usage summary failed:", error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

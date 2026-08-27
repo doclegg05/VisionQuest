@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+// Pure constants with no server dependencies (roles.ts imports only a type),
+// so this is safe in a client bundle and keeps the panel from drifting out of
+// sync with the roles the router actually honors.
+import { AI_ROLES, AI_ROLE_PROFILES, type AiRole } from "@/lib/ai/roles";
 
 type ProviderType = "local" | "cloud";
 type LocalAuthMode = "none" | "bearer" | "cloudflare_service_token";
@@ -52,6 +56,30 @@ export default function AiProviderPanel() {
   const [embeddingModel, setEmbeddingModel] = useState("nomic-embed-text");
   const [authMode, setAuthMode] = useState<LocalAuthMode>("none");
   const [apiStyle, setApiStyle] = useState<LocalApiStyle>("ollama");
+  // Per-role model overrides. Empty string = "same as the main model", which is
+  // both the default and a legitimate final answer: every distinct model kept
+  // resident is a standing claim on the host's memory, so pointing several
+  // roles at one model is usually right. See src/lib/ai/roles.ts.
+  const [roleModels, setRoleModels] = useState<Record<AiRole, string>>({
+    chat: "",
+    extract: "",
+    document: "",
+    draft: "",
+  });
+  // Empty string = "provider default". The strict-JSON roles default to 512
+  // output tokens in production, which the resume and career-discovery
+  // contracts do not fit inside — raising it is a real fix an operator needs
+  // to be able to make.
+  const [roleMaxOutput, setRoleMaxOutput] = useState<Record<AiRole, string>>({
+    chat: "",
+    extract: "",
+    document: "",
+    draft: "",
+  });
+  // Which roles are pinned by an env var, and so cannot be cleared here.
+  const [roleModelSources, setRoleModelSources] = useState<
+    Partial<Record<AiRole, "config" | "env" | null>>
+  >({});
   const [numCtxInput, setNumCtxInput] = useState(""); // empty string = use default
   const [numCtxBounds, setNumCtxBounds] = useState<NumCtxBounds>(DEFAULT_NUM_CTX_BOUNDS);
   const [bearerToken, setBearerToken] = useState("");
@@ -80,6 +108,9 @@ export default function AiProviderPanel() {
               provider?: ProviderType;
               url?: string;
               model?: string;
+              roleModels?: Partial<Record<AiRole, string | null>>;
+              roleMaxOutputTokens?: Partial<Record<AiRole, number | null>>;
+              roleProfiles?: Array<{ role: AiRole; source: "config" | "env" | null }>;
               embeddingModel?: string;
               authMode?: LocalAuthMode;
               apiStyle?: LocalApiStyle;
@@ -114,6 +145,31 @@ export default function AiProviderPanel() {
         setEmbeddingModel(data.embeddingModel ?? "nomic-embed-text");
         setAuthMode(data.authMode || "none");
         setApiStyle(data.apiStyle || "ollama");
+        if (data.roleModels) {
+          setRoleModels({
+            chat: data.roleModels.chat ?? "",
+            extract: data.roleModels.extract ?? "",
+            document: data.roleModels.document ?? "",
+            draft: data.roleModels.draft ?? "",
+          });
+        }
+        if (data.roleMaxOutputTokens) {
+          setRoleMaxOutput({
+            chat: data.roleMaxOutputTokens.chat ? String(data.roleMaxOutputTokens.chat) : "",
+            extract: data.roleMaxOutputTokens.extract
+              ? String(data.roleMaxOutputTokens.extract)
+              : "",
+            document: data.roleMaxOutputTokens.document
+              ? String(data.roleMaxOutputTokens.document)
+              : "",
+            draft: data.roleMaxOutputTokens.draft ? String(data.roleMaxOutputTokens.draft) : "",
+          });
+        }
+        if (data.roleProfiles) {
+          setRoleModelSources(
+            Object.fromEntries(data.roleProfiles.map((p) => [p.role, p.source])),
+          );
+        }
         setNumCtxInput(typeof data.numCtx === "number" ? String(data.numCtx) : "");
         if (data.numCtxBounds) setNumCtxBounds(data.numCtxBounds);
         setHasBearerToken(Boolean(data.hasApiKey));
@@ -150,11 +206,32 @@ export default function AiProviderPanel() {
     setSaving(true);
     resetMessages();
 
-    const body: Record<string, string | number | null | undefined> = {
+    const body: Record<
+      string,
+      | string
+      | number
+      | null
+      | undefined
+      | Record<AiRole, string>
+      | Record<AiRole, number | null>
+    > = {
       provider,
       url: url || undefined,
       model: model || undefined,
       embeddingModel: provider === "local" ? embeddingModel || undefined : undefined,
+      // Sent whole so clearing a field clears the override server-side; an
+      // empty string means "fall back to the main model", not "skip this key".
+      roleModels: provider === "local" ? roleModels : undefined,
+      // null clears the cap; a blank field means "provider default".
+      roleMaxOutputTokens:
+        provider === "local"
+          ? (Object.fromEntries(
+              AI_ROLES.map((role) => [
+                role,
+                roleMaxOutput[role].trim() ? Number(roleMaxOutput[role].trim()) : null,
+              ]),
+            ) as Record<AiRole, number | null>)
+          : undefined,
       authMode: provider === "local" ? authMode : undefined,
       apiStyle: provider === "local" ? apiStyle : undefined,
     };
@@ -246,6 +323,7 @@ export default function AiProviderPanel() {
         chatValidated?: boolean;
         modelUsed?: string;
         capabilities?: ModelCapabilities;
+        missingRoleModels?: Array<{ role: AiRole; model: string }>;
       };
 
       if (!res.ok) {
@@ -276,6 +354,15 @@ export default function AiProviderPanel() {
         `Connected to local AI server. Loaded models: ${modelList}. Chat path: ${apiModeLabel}. Auth: ${authLabel}.${chatLabel}`,
       );
       setCapabilities(data.capabilities ?? null);
+      // A per-role model is only exercised by the job that uses it, so a typo
+      // would otherwise show up hours later as that job quietly failing.
+      if (data.missingRoleModels?.length) {
+        setError(
+          `The server does not have ${data.missingRoleModels
+            .map((entry) => `"${entry.model}" (${AI_ROLE_PROFILES[entry.role].label})`)
+            .join(" or ")}. Pull it, or clear that job to use the main model.`,
+        );
+      }
     } catch {
       setError("Could not contact the server.");
     } finally {
@@ -392,6 +479,87 @@ export default function AiProviderPanel() {
                 : "Run Test Connection to see installed models as suggestions. Free text is always allowed."}
             </p>
           </div>
+
+          <details className="rounded-lg border border-[var(--line)] p-4">
+            <summary className="cursor-pointer text-sm font-medium text-[var(--ink-strong)]">
+              Model per job (optional)
+            </summary>
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Sage asks the local AI to do four different jobs. Leave a job blank to use
+              the main model above — that is the default, and often the right answer.
+              Every extra model you name stays loaded in memory alongside the others, so
+              add one only when a bake-off shows it earns its place.
+            </p>
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Compare models with{" "}
+              <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5">
+                npm run sage:model:bakeoff -- --models=a,b,c
+              </code>
+              .
+            </p>
+            <div className="mt-4 space-y-4">
+              {AI_ROLES.map((role) => (
+                <div key={role}>
+                  <label
+                    htmlFor={`role-model-${role}`}
+                    className="mb-1 block text-sm font-medium text-[var(--ink-strong)]"
+                  >
+                    {AI_ROLE_PROFILES[role].label}
+                  </label>
+                  <input
+                    id={`role-model-${role}`}
+                    type="text"
+                    list="ollama-chat-model-options"
+                    value={roleModels[role]}
+                    onChange={(e) => {
+                      setRoleModels((prev) => ({ ...prev, [role]: e.target.value }));
+                      resetMessages();
+                    }}
+                    placeholder={model || "Same as the main model"}
+                    className="field w-full px-4 py-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                    {AI_ROLE_PROFILES[role].latency === "interactive"
+                      ? "Someone is waiting on this — speed matters."
+                      : "Runs in the background — quality matters more than speed."}
+                  </p>
+                  {roleModelSources[role] === "env" && (
+                    <p className="mt-1 text-xs text-[var(--warn-ink,var(--ink-strong))]">
+                      Set by a server environment variable. Clearing this box will not
+                      change it — remove AI_PROVIDER_MODEL_{role.toUpperCase()} on the
+                      server instead.
+                    </p>
+                  )}
+                  <label
+                    htmlFor={`role-cap-${role}`}
+                    className="mt-3 mb-1 block text-xs font-medium text-[var(--ink-strong)]"
+                  >
+                    Longest answer (tokens)
+                  </label>
+                  <input
+                    id={`role-cap-${role}`}
+                    type="number"
+                    min={128}
+                    max={32768}
+                    value={roleMaxOutput[role]}
+                    onChange={(e) => {
+                      setRoleMaxOutput((prev) => ({ ...prev, [role]: e.target.value }));
+                      resetMessages();
+                    }}
+                    placeholder={
+                      AI_ROLE_PROFILES[role].outputContract === "strict_json" ? "512" : "768"
+                    }
+                    className="field w-full px-4 py-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                    {AI_ROLE_PROFILES[role].outputContract === "strict_json"
+                      ? "Leave blank for the default. Raise it if answers come back cut off — a cut-off answer here looks the same as no answer at all."
+                      : "Leave blank for the default. Raise it if longer writing gets cut off."}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </details>
 
           <div>
             <label htmlFor="local-api-style" className="mb-1 block text-sm font-medium text-[var(--ink-strong)]">

@@ -6,6 +6,11 @@ import {
   readLocalAiProviderConfig,
   toLocalAiAuthConfig,
 } from "@/lib/ai";
+// From the leaf modules, not the "@/lib/ai" barrel: suites that mock the
+// barrel with a partial export set would otherwise leave these undefined.
+// `findMissingRoleModels` is a pure function and wants the real impl anyway.
+import { findMissingRoleModels } from "@/lib/ai/capabilities";
+import { readLocalAiRoleModels } from "@/lib/ai/local-config";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 
 export const POST = withAdminAuth(async () => {
@@ -45,9 +50,16 @@ export const POST = withAdminAuth(async () => {
     authConfig,
   });
 
+  // A per-role model is only exercised by the job that uses it, so a typo in
+  // the `extract` model would otherwise surface hours later as extractions
+  // silently storing nothing. Check it while the operator is still looking.
+  const roleModels = await readLocalAiRoleModels();
+  const missingRoleModels = findMissingRoleModels(roleModels, health.models ?? []);
+
   return NextResponse.json({
     success: true,
     models: health.models,
+    missingRoleModels,
     apiMode: health.apiMode,
     chatValidated: health.chatValidated,
     modelUsed: health.modelUsed,

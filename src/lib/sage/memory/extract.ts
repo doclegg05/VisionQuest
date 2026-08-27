@@ -27,7 +27,7 @@ import { storeMemoryCandidates } from "./store";
 
 export const MAX_MEMORIES_PER_CONVERSATION = 5;
 
-const EXTRACTION_PROMPT = `You are a memory extractor for Sage, an AI coach for adult workforce-development students.
+export const EXTRACTION_PROMPT = `You are a memory extractor for Sage, an AI coach for adult workforce-development students.
 
 From the conversation, extract up to ${MAX_MEMORIES_PER_CONVERSATION} NEW durable facts worth remembering about the student in future sessions.
 

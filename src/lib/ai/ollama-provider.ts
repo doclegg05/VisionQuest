@@ -392,7 +392,17 @@ function toOpenAIMessages(
 export class OllamaProvider implements AIProvider {
   readonly name = "ollama";
   private readonly baseUrl: string;
-  private readonly model: string;
+  /**
+   * The model tag actually serving this instance.
+   *
+   * Public because the usage ledger has to record WHICH model served a call,
+   * not just which provider class. With per-role models that distinction is
+   * the whole point: a ledger that stores "ollama" for every row cannot answer
+   * "is the extract model keeping up?" — the question roles exist to let an
+   * operator ask. Mirrors `OllamaEmbeddingProvider.model`, which is already
+   * public for the same reason.
+   */
+  readonly model: string;
   private readonly authConfig: LocalAIAuthConfig;
   /**
    * When true, this endpoint is a generic OpenAI-compatible server (LM
@@ -441,12 +451,47 @@ export class OllamaProvider implements AIProvider {
   private static readonly STRUCTURED_MAX_OUTPUT_TOKENS = 512;
 
   /**
-   * How long Ollama should keep the model resident in VRAM after a request.
+   * How long Ollama should keep the model resident after a request.
    * Set to 8h to cover the SPOKES workday (7:30 AM – 3:30 PM) so the model
    * stays warm between messages instead of unloading after each idle gap.
    * Pair with the "Sage Model Warmup" scheduled task to pre-load on login.
+   *
+   * REACHES THE SERVER ONLY ON THE NATIVE SURFACE. Ollama's OpenAI-compatible
+   * /v1/chat/completions ignores `keep_alive` (ollama/ollama#11458), and
+   * `postChat` tries /v1 first, so on a stock Ollama this value is inert
+   * unless the instance is pinned to native — see `pinnedToNativeForKeepAlive`.
+   * Residency there is governed by the host's OLLAMA_KEEP_ALIVE instead.
    */
   private static readonly KEEP_ALIVE = "8h";
+
+  /**
+   * Keep-alive for a model that is NOT the interactive chat model.
+   *
+   * Ollama holds every model it has served resident for the full keep-alive,
+   * so once roles can point at different models the workday-length default
+   * turns each background role into a standing claim on unified memory —
+   * exactly the starvation documented in .claude/MEMORY.md, where a resident
+   * large model pushed the next model's calls into the 300s timeout and
+   * inverted an A/B result. Five minutes covers a burst of background work
+   * (a chat turn's extractions all fire together) and then gives the memory
+   * back.
+   */
+  static readonly SECONDARY_KEEP_ALIVE = "5m";
+
+  private readonly keepAlive: string;
+  /**
+   * True when this instance was given an explicit keep-alive and must
+   * therefore talk to /api/chat, the only surface that applies it.
+   *
+   * The cost is real and worth stating: the native surface hides
+   * `finish_reason`, so a turn that ends in an undeclared tool call comes back
+   * as an empty string with no signal (see .claude/MEMORY.md). That is
+   * acceptable for the background roles this applies to — their prompts
+   * advertise no tools — and `done_reason: "length"` still surfaces
+   * truncation, which is the failure mode those roles actually hit.
+   */
+  private readonly pinnedToNativeForKeepAlive: boolean;
+  private readonly structuredMaxOutputTokens: number;
 
   /**
    * Default KV-cache window size when no SystemConfig override is set.
@@ -523,6 +568,23 @@ export class OllamaProvider implements AIProvider {
       typeof explicitStallTimeout === "number" && explicitStallTimeout > 0
         ? explicitStallTimeout
         : OllamaProvider.STREAM_STALL_TIMEOUT_MS;
+    const explicitKeepAlive = structuredConfig?.keepAlive?.trim();
+    this.keepAlive = explicitKeepAlive || OllamaProvider.KEEP_ALIVE;
+    // A caller that asked for a specific residency gets the only surface that
+    // honors it. /v1 silently drops `keep_alive`, which would leave a
+    // background role's model resident on the host default and holding memory
+    // against the model students are waiting on — the starvation this option
+    // exists to prevent. Skipped for `apiStyle: "openai"` endpoints (LM Studio,
+    // vLLM), which have no /api/chat at all and no residency semantics to fix.
+    this.pinnedToNativeForKeepAlive = Boolean(explicitKeepAlive) && !this.openAiOnly;
+    if (this.pinnedToNativeForKeepAlive) {
+      this.apiMode = "native";
+    }
+    const explicitStructuredMax = structuredConfig?.structuredMaxOutputTokens;
+    this.structuredMaxOutputTokens =
+      typeof explicitStructuredMax === "number" && explicitStructuredMax > 0
+        ? explicitStructuredMax
+        : OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS;
   }
 
   /**
@@ -676,7 +738,7 @@ export class OllamaProvider implements AIProvider {
           num_predict: this.maxOutputTokens,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
-        keep_alive: OllamaProvider.KEEP_ALIVE,
+        keep_alive: this.keepAlive,
       },
     );
 
@@ -796,7 +858,7 @@ export class OllamaProvider implements AIProvider {
           num_predict: this.maxOutputTokens,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
-        keep_alive: OllamaProvider.KEEP_ALIVE,
+        keep_alive: this.keepAlive,
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
     );
@@ -1364,7 +1426,7 @@ export class OllamaProvider implements AIProvider {
         num_predict: this.maxOutputTokens,
         ...(temperature !== undefined ? { temperature } : {}),
       },
-      keep_alive: OllamaProvider.KEEP_ALIVE,
+      keep_alive: this.keepAlive,
     };
 
     const { mode, response } = await this.postChat(
@@ -1563,7 +1625,7 @@ export class OllamaProvider implements AIProvider {
         messages: openAIMessages,
         stream: false,
         response_format: { type: "json_object" },
-        max_tokens: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+        max_tokens: this.structuredMaxOutputTokens,
         num_ctx: this.numCtx,
         ...this.openAiReasoningParams,
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
@@ -1576,10 +1638,10 @@ export class OllamaProvider implements AIProvider {
         ...this.nativeReasoningParams,
         options: {
           num_ctx: this.numCtx,
-          num_predict: OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+          num_predict: this.structuredMaxOutputTokens,
           ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
         },
-        keep_alive: OllamaProvider.KEEP_ALIVE,
+        keep_alive: this.keepAlive,
       },
     );
 
@@ -1608,7 +1670,7 @@ export class OllamaProvider implements AIProvider {
       mode,
       data,
       text,
-      OllamaProvider.STRUCTURED_MAX_OUTPUT_TOKENS,
+      this.structuredMaxOutputTokens,
     );
     return text;
   }

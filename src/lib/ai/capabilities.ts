@@ -14,6 +14,7 @@ import { checkOllamaHealth } from "./health";
 import { buildLocalAiHeaders } from "./local-auth";
 import { OllamaEmbeddingProvider } from "./ollama-embedding-provider";
 import { EMBEDDING_DIMENSIONS } from "./embedding-types";
+import { AI_ROLES, type AiRole } from "./roles";
 import type { LocalAIAuthConfig } from "./types";
 
 export interface ModelCapabilities {
@@ -413,6 +414,43 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
  * Never throws — every failure mode becomes a warning string so the admin
  * UI can render a partial capability panel instead of erroring out.
  */
+/**
+ * Is `tag` served by a model this server actually has?
+ *
+ * Ollama resolves a bare name to its `:latest` tag, so "gemma4" and
+ * "gemma4:latest" name the same model and neither should be reported missing.
+ * Everything else is an exact match: "gemma4:12" is a typo for "gemma4:12b",
+ * not a prefix of it, and treating it as a match is how a typo reaches
+ * production and fails inside a background job.
+ */
+export function isModelInstalled(tag: string, installed: readonly string[]): boolean {
+  const wanted = tag.trim();
+  if (!wanted) return false;
+  if (installed.includes(wanted)) return true;
+  return !wanted.includes(":") && installed.includes(`${wanted}:latest`);
+}
+
+/**
+ * Role model overrides that name a model the server does not have.
+ *
+ * A per-role model is only ever exercised by the job that uses it — a typo in
+ * the `extract` model surfaces as a background extraction failing silently
+ * hours later, not as an error the operator sees while configuring. Checking
+ * it at Test Connection time is the difference between a typo caught in
+ * seconds and one found by noticing that memories stopped being stored.
+ */
+export function findMissingRoleModels(
+  roleModels: Partial<Record<AiRole, string | null>>,
+  installed: readonly string[],
+): Array<{ role: AiRole; model: string }> {
+  if (installed.length === 0) return [];
+  return AI_ROLES.flatMap((role) => {
+    const tag = roleModels[role]?.trim();
+    if (!tag) return [];
+    return isModelInstalled(tag, installed) ? [] : [{ role, model: tag }];
+  });
+}
+
 export async function detectModelCapabilities(
   cfg: DetectCapabilitiesConfig,
 ): Promise<ModelCapabilities> {
