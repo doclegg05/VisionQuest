@@ -24,7 +24,7 @@ const HIGHLIGHTS = [
 ];
 
 const MODULE_SPOTLIGHT = [
-  { icon: Target, label: "Goal mapping", copy: "From BHAG to today's next step." },
+  { icon: Target, label: "Goal mapping", copy: "From long-term goals to today's next step." },
   { icon: Books, label: "Learning hub", copy: "Courses and certifications in one place." },
   { icon: Briefcase, label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
 ];
@@ -144,7 +144,6 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               <BrandLockup
                 size="md"
                 theme="dark"
-                subtitle="SPOKES Workforce Development"
                 priority
               />
               <h1 className="mt-4 text-balance font-display text-4xl leading-[1] tracking-normal sm:text-5xl md:text-6xl xl:text-7xl">
@@ -378,7 +377,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
               </div>
               <p className="text-xs uppercase font-semibold tracking-widest text-[var(--ink-muted)]">
-                SPOKES Workforce Development Program
+                Skills for Life
               </p>
             </div>
           </div>

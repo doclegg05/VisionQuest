@@ -38,7 +38,7 @@ const SIZE_MAP = {
 export default function BrandLockup({
   href,
   title = "VisionQuest",
-  subtitle = "SPOKES Workforce Development",
+  subtitle = "Skills for Life",
   size = "md",
   theme = "light",
   align = "left",
