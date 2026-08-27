@@ -320,7 +320,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   disabled={loading}
                   className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Please wait..." : "Sign In"}
+                  {loading ? "Please wait..." : "Sign in to see what to do today."}
                 </button>
 
                 <a
