@@ -24,7 +24,7 @@ const HIGHLIGHTS = [
 ];
 
 const MODULE_SPOTLIGHT = [
-  { icon: Target, label: "Goal mapping", copy: "From BHAG to today's next step." },
+  { icon: Target, label: "Goal mapping", copy: "From long-term goals to today's next step." },
   { icon: Books, label: "Learning hub", copy: "Courses and certifications in one place." },
   { icon: Briefcase, label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
 ];

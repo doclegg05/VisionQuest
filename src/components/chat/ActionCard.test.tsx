@@ -30,7 +30,7 @@ describe("ActionCard", () => {
         target="/goals"
         label="Open Goals"
         title="Goals"
-        description="Your active goals and BHAG."
+        description="Your active goals and long-term career goal."
         dismissible={false}
       />,
     );

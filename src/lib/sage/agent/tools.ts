@@ -676,7 +676,7 @@ const STATIC_RESOURCES: Record<string, { label: string; href: string; summary: s
   goals: {
     label: "Goals",
     href: "/goals",
-    summary: "Your active goals and BHAG.",
+    summary: "Your active goals and long-term career goal.",
   },
   portfolio: {
     label: "Portfolio",
