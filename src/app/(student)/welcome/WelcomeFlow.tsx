@@ -536,7 +536,7 @@ export default function WelcomeFlow({
             <div className="mt-8 space-y-3 text-left">
               {[
                 { icon: "📋", text: "Complete orientation forms and get set up for the program" },
-                { icon: "🎯", text: "Set career goals and track your progress with AI coaching" },
+                { icon: "🎯", text: "Set career goals and track your progress with your coach" },
                 { icon: "🏆", text: "Earn industry certifications and build your professional portfolio" },
               ].map((item) => (
                 <div key={item.text} className="flex items-start gap-3 rounded-xl bg-[var(--surface-raised)] p-3">

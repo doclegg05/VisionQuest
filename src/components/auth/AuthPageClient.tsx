@@ -18,9 +18,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 const HIGHLIGHTS = [
-  "AI coaching that turns big goals into weekly and daily action.",
-  "A calm student portal for courses, certifications, files, and portfolios.",
-  "Teacher tools that keep progress visible without overwhelming learners.",
+  "Turn a long-term job goal into this week's work.",
+  "Courses, certifications, files, and your portfolio stay in one place.",
+  "Teachers can see progress and help when you get stuck.",
 ];
 
 const MODULE_SPOTLIGHT = [
@@ -144,14 +144,14 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               <BrandLockup
                 size="md"
                 theme="dark"
+                subtitle="Skills for Life"
                 priority
               />
               <h1 className="mt-4 text-balance font-display text-4xl leading-[1] tracking-normal sm:text-5xl md:text-6xl xl:text-7xl">
-                Build momentum, one brave step at a time.
+                {"See today's next step toward a job."}
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/80 sm:text-base sm:leading-7 md:mt-5 md:text-lg">
-                VisionQuest gives you a hopeful place to set goals and stay
-                organized. Keep moving toward a steady job and a life of your own.
+                This is the SPOKES Skills for Life portal. Sign in to set a goal, do the work, and keep proof of your progress.
               </p>
             </div>
 
@@ -320,7 +320,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   disabled={loading}
                   className="primary-button w-full px-6 py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Please wait..." : "Sign In"}
+                  {loading ? "Please wait..." : "Sign in to see what to do today."}
                 </button>
 
                 <a

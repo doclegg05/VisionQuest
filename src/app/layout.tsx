@@ -17,7 +17,7 @@ const sora = Sora({
 
 export const metadata: Metadata = {
   title: "VisionQuest — SPOKES Program Portal",
-  description: "Your journey to self-sufficiency starts here.",
+  description: "SPOKES Skills for Life student portal. Sign in to see today's next step toward a job.",
   applicationName: "VisionQuest",
   icons: {
     icon: "/spokes-logo.png",
