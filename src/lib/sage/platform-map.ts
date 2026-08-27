@@ -122,7 +122,7 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     route: "/goals",
     summary:
       "Conversation-based goal system: long-term career goal broken into monthly, weekly, daily goals and tasks.",
-    compact: "goals (long-term -> monthly -> weekly -> daily -> tasks, Sage proposes + you confirm)",
+    compact: "goals (long-term -> monthly -> weekly -> daily, Sage proposes + confirm)",
     mechanics:
       "Hierarchy is long-term career goal -> monthly -> weekly -> daily -> task. Sage proposes goals during conversation; the student confirms them before they're recorded — this is the wager/goal-proposal-confirmation mechanic. Sage tracks its own proposal hit rate (how often proposed goals get confirmed) to calibrate how confidently it proposes future goals.",
     tools: ["update_goal_status"],
