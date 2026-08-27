@@ -11,9 +11,9 @@
  * Keeps Sage oriented without injecting ~5,000 tokens of certification detail.
  * The full block is still available via getRelevantContent() keyword matching.
  */
-export const SPOKES_BRIEF = `SPOKES PROGRAM OVERVIEW (brief): SPOKES (Skills, Preparation, Opportunities, Knowledge, Employment, Success) is a West Virginia workforce training program for adults receiving TANF/SNAP benefits, focused on employment and self-sufficiency. Students can earn industry certifications including IC3 Digital Literacy, Microsoft Office Specialist, QuickBooks, ACT WorkKeys, and more through platforms like GMetrix, Essential Education, and Khan Academy. If you need detailed certification requirements, platform setup steps, or program forms, just ask — full program details are available.`;
+export const SPOKES_BRIEF = `SPOKES PROGRAM OVERVIEW (brief): SPOKES (Strategic Planning in Occupational Knowledge for Employment and Success) is a West Virginia workforce training program focused on employment and self-sufficiency. Students can earn industry certifications including IC3 Digital Literacy, Microsoft Office Specialist, QuickBooks, ACT WorkKeys, and more through platforms like GMetrix, Essential Education, and Khan Academy. If you need detailed certification requirements, platform setup steps, or program forms, just ask — full program details are available.`;
 
-export const COMPACT_SPOKES_KNOWLEDGE = `SPOKES PROGRAM OVERVIEW (compact): SPOKES is a West Virginia workforce training program for adults receiving TANF/SNAP benefits through WV Works. The goal is employment, self-sufficiency, and the Ready to Work Certificate.
+export const COMPACT_SPOKES_KNOWLEDGE = `SPOKES PROGRAM OVERVIEW (compact): SPOKES (Strategic Planning in Occupational Knowledge for Employment and Success) is a West Virginia workforce training program through WV Works. The goal is employment, self-sufficiency, and the Ready to Work Certificate.
 
 Certifications and credentials include IC3 Digital Literacy, Microsoft Office Specialist, Adobe Certified Associate, Intuit/QuickBooks, ACT WorkKeys NCRC, IT Specialist Cybersecurity, Customer Service, AI Foundations, Professional Communications, Computer Essentials, Work Essentials, Money Essentials, Burlington English, and Bring Your A Game.
 
@@ -55,7 +55,7 @@ export const SPOKES_KNOWLEDGE = `SPOKES PROGRAM KNOWLEDGE BASE
 You have detailed knowledge of the SPOKES program. Use this to answer specific questions.
 
 WHAT IS SPOKES?
-SPOKES stands for Skills, Preparation, Opportunities, Knowledge, Employment, Success. It is a workforce training program operated under West Virginia Adult Education for adults receiving TANF/SNAP benefits through WV Works. The goal is employment and self-sufficiency.
+SPOKES stands for Strategic Planning in Occupational Knowledge for Employment and Success. It is a workforce training program operated under West Virginia Adult Education through WV Works. The goal is employment and self-sufficiency.
 
 CERTIFICATIONS AVAILABLE (students can earn these):
 1. IC3 Digital Literacy (Internet and Computing Core Certification)
@@ -216,12 +216,12 @@ PROGRAM STRUCTURE & TYPICAL STUDENT JOURNEY:
 - Intake → TABE Locator + full TABE → Individual Learning Plan (ILP) with subject priorities and subtest targets.
 - Instruction is open-entry / open-exit and adapts to the student's subtests remaining and EFL.
 - Progress is measured by (a) EFL gain on re-tested TABE, (b) subtest passes on GED Ready practice tests, (c) actual GED subtest passes, and (d) earning the full credential.
-- Typical BHAG framing for an AE student: "Earn my GED" (or "pass the last two subtests," "move from EFL 3 to EFL 4").
+- Typical long-term goal framing for an AE student: "Earn my GED" (or "pass the last two subtests," "move from EFL 3 to EFL 4").
 - Monthly/weekly goals typically target a specific subtest or TABE benchmark (e.g., "pass GED Ready for Math," "raise TABE Reading one EFL," "finish Aztec Algebra I unit").
 
 POST-GED PATHWAYS (mention only if the student raises career/next-step):
 - College enrollment (many WV community & technical colleges waive placement with 165+ GED scores)
-- Workforce programs (including SPOKES for TANF/SNAP-eligible adults)
+- Workforce programs (including SPOKES workforce training)
 - Registered Apprenticeship / industry certifications
 - Direct employment
 

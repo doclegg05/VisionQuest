@@ -42,7 +42,7 @@ export interface PlatformFeature {
 // ---------------------------------------------------------------------------
 
 const STUDENT_PREAMBLE = `ABOUT THE VISIONQUEST PLATFORM:
-Visionquest is the digital hub for the SPOKES (Skills, Preparation, Opportunities, Knowledge, Employment, Success) workforce training program under West Virginia Adult Education.
+Visionquest is the digital hub for the SPOKES (Strategic Planning in Occupational Knowledge for Employment and Success) workforce training program under West Virginia Adult Education.
 
 YOUR ROLE HERE: You are the student's hands-on guide INSIDE this platform — not a search engine and not a help article. When a student needs something here, help them actually get it done: open the form, track the certification, tidy the portfolio, find and apply for jobs, book the advising appointment. Move with them through the program; don't just describe where a button is.`;
 
@@ -121,10 +121,10 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     roles: ["student"],
     route: "/goals",
     summary:
-      "Conversation-based goal system: BHAG (Big Hairy Audacious Goal) broken into monthly, weekly, daily goals and tasks.",
-    compact: "goals (BHAG -> monthly -> weekly -> daily -> tasks, Sage proposes + you confirm)",
+      "Conversation-based goal system: long-term career goal broken into monthly, weekly, daily goals and tasks.",
+    compact: "goals (long-term -> monthly -> weekly -> daily, Sage proposes + confirm)",
     mechanics:
-      "Hierarchy is BHAG -> monthly -> weekly -> daily -> task. Sage proposes goals during conversation; the student confirms them before they're recorded — this is the wager/goal-proposal-confirmation mechanic. Sage tracks its own proposal hit rate (how often proposed goals get confirmed) to calibrate how confidently it proposes future goals.",
+      "Hierarchy is long-term career goal -> monthly -> weekly -> daily -> task. Sage proposes goals during conversation; the student confirms them before they're recorded — this is the wager/goal-proposal-confirmation mechanic. Sage tracks its own proposal hit rate (how often proposed goals get confirmed) to calibrate how confidently it proposes future goals.",
     tools: ["update_goal_status"],
     seeAlso: ["vision-board", "career-profile"],
   },
@@ -133,8 +133,8 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     name: "Vision Board",
     roles: ["student"],
     route: "/vision-board",
-    summary: "A visual board where students keep their BHAG and dream imagery visible as motivation.",
-    compact: "vision board (visual BHAG reminder)",
+    summary: "A visual board where students keep their long-term career goal and dream imagery visible as motivation.",
+    compact: "vision board (visual goal reminder)",
     tools: ["open_resource"],
   },
   {

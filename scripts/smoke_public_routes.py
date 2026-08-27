@@ -71,7 +71,7 @@ def run() -> None:
             goto_with_retry(page, f"{BASE_URL}/")
 
             expect(
-                page.get_by_role("heading", name="Your portal for program requirements, certifications, and job readiness.").is_visible(),
+                page.get_by_role("heading", name="See today's next step toward a job.").is_visible(),
                 "Landing page hero heading did not render.",
             )
             expect(
