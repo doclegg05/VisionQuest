@@ -93,7 +93,7 @@ test.describe("Day-1 student journey", () => {
     await page.goto("/");
     await page.getByLabel(/username or email/i).fill(E2E_JOURNEY_STUDENT.login);
     await page.getByLabel(/password/i).fill(E2E_JOURNEY_STUDENT.password);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
 
     // Login lands every student on /dashboard, which sends a day-1 student to
     // the welcome flow. Nothing is stubbed here: the ProgressionProvider that

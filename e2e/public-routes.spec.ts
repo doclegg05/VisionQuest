@@ -20,8 +20,8 @@ test.describe("Health check", () => {
 test.describe("Public pages", () => {
   test("landing page renders hero and sign-in", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /build momentum/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sign In" }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /see today.*next step/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in to see what to do today." }).first()).toBeVisible();
   });
 
   test("forgot password page renders", async ({ page }) => {
