@@ -45,7 +45,7 @@ export default async function GoalsPage() {
         title="My Goals"
         description="Build your goal ladder here, then use Sage whenever you want coaching help refining it."
         actions={(
-          <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
+          <Link href="/chat" className="primary-button px-5 py-3 text-sm">
             Talk to Sage
           </Link>
         )}

@@ -206,7 +206,6 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <Link
         key={item.href}
         href={item.href}
-        prefetch={false}
         className={`premium-nav-link mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
           active
             ? "premium-nav-link-active bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
@@ -270,7 +269,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const IconComponent = item.icon;
             const active = isActive(item.href);
             return (
-              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
+              <Link href={item.href} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
                 <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
@@ -284,7 +283,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const IconComponent = item.icon;
             const active = isActive(item.href);
             return (
-              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
+              <Link href={item.href} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
                 <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
@@ -295,7 +294,6 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {/* Tab 3: Sage — elevated center FAB */}
           <Link
             href="/chat"
-            prefetch={false}
             className="flex flex-col items-center gap-0.5 px-3"
             aria-label="Open Sage chat"
           >
@@ -311,7 +309,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const IconComponent = item.icon;
             const active = isActive(item.href);
             return (
-              <Link href={item.href} prefetch={false} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
+              <Link href={item.href} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
                 <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
                 <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
@@ -355,7 +353,6 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(item.href)
@@ -372,7 +369,6 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
               {settingsHref && (
                 <Link
                   href={settingsHref}
-                  prefetch={false}
                   onClick={() => setMoreOpen(false)}
                   className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(settingsHref)
@@ -458,7 +454,6 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
               {settingsHref && (
                 <Link
                   href={settingsHref}
-                  prefetch={false}
                   onClick={() => setProfileOpen(false)}
                   className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                   role="menuitem"
