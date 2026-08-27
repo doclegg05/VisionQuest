@@ -1,0 +1,29 @@
+name: Keep Render Warm
+
+on:
+  schedule:
+    # Every 12 minutes (5 times per hour). Render Starter plan should not
+    # auto-sleep, but QA measured a 5-7s cold start on first dashboard hit
+    # after idle. This ping keeps the instance warm without hammering.
+    - cron: '*/12 * * * *'
+  workflow_dispatch:
+    # Allow manual trigger for testing
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          response=$(curl -f -s -w "\n%{http_code}" https://visionquest.onrender.com/api/health)
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          if [ "$http_code" = "200" ]; then
+            echo "✓ Health check passed (HTTP $http_code)"
+            echo "$body" | jq '.'
+          else
+            echo "✗ Health check failed (HTTP $http_code)"
+            echo "$body"
+            exit 1
+          fi

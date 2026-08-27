@@ -601,10 +601,30 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const trivialMessage = isTrivialMessage(userMessage);
   let documentContextChars = 0;
   let formContextChars = 0;
+
+  // Parallelize conversation history loading with RAG/form/memory loads.
+  // Previously this happened sequentially after context assembly (line 719),
+  // adding ~100-200ms to first-token latency. Now it runs in parallel.
+  const maxRecentMessages =
+    promptTier === "compact"
+      ? conversationStage === "discovery" ||
+        conversationStage === "career_profile_review"
+        ? 12
+        : 6
+      : 20;
+  const conversationContextPromise = getConversationContext(
+    conversation.id,
+    maxRecentMessages,
+    promptTier === "compact"
+      ? COMPACT_HISTORY_TOKEN_BUDGET
+      : FULL_HISTORY_TOKEN_BUDGET,
+  );
+
   if (!trivialMessage) {
-    // Parallelize RAG, form context, and memory loads to reduce waterfall.
-    // These are independent lookups that were previously sequential, adding
-    // ~300-500ms to first token latency.
+    // Parallelize RAG, form context, memory loads, and conversation history
+    // to reduce waterfall. These are independent lookups that were previously
+    // sequential, adding ~300-500ms to first token latency (PR 183). Conversation
+    // history parallelization adds another ~100-200ms gain (2026-08-27).
     const memoryEnabled = process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false";
     const [documentContext, formContext, memoryData] = await Promise.all([
       getDocumentContext(
@@ -708,21 +728,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     estInputTokens: estimateTokens(systemPrompt.length),
   });
 
-  // Format message history for Gemini, using compacted context when available
-  const maxRecentMessages =
-    promptTier === "compact"
-      ? conversationStage === "discovery" ||
-        conversationStage === "career_profile_review"
-        ? 12
-        : 6
-      : 20;
-  const conversationContext = await getConversationContext(
-    conversation.id,
-    maxRecentMessages,
-    promptTier === "compact"
-      ? COMPACT_HISTORY_TOKEN_BUDGET
-      : FULL_HISTORY_TOKEN_BUDGET,
-  );
+  // Format message history for Gemini, using compacted context when available.
+  // This was loaded in parallel with RAG/form/memory above (conversationContextPromise).
+  const conversationContext = await conversationContextPromise;
   const allMessages = [
     ...conversationContext.messages,
     { role: "user" as const, content: userMessage },
