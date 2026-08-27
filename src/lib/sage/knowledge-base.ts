@@ -216,7 +216,7 @@ PROGRAM STRUCTURE & TYPICAL STUDENT JOURNEY:
 - Intake → TABE Locator + full TABE → Individual Learning Plan (ILP) with subject priorities and subtest targets.
 - Instruction is open-entry / open-exit and adapts to the student's subtests remaining and EFL.
 - Progress is measured by (a) EFL gain on re-tested TABE, (b) subtest passes on GED Ready practice tests, (c) actual GED subtest passes, and (d) earning the full credential.
-- Typical BHAG framing for an AE student: "Earn my GED" (or "pass the last two subtests," "move from EFL 3 to EFL 4").
+- Typical long-term goal framing for an AE student: "Earn my GED" (or "pass the last two subtests," "move from EFL 3 to EFL 4").
 - Monthly/weekly goals typically target a specific subtest or TABE benchmark (e.g., "pass GED Ready for Math," "raise TABE Reading one EFL," "finish Aztec Algebra I unit").
 
 POST-GED PATHWAYS (mention only if the student raises career/next-step):

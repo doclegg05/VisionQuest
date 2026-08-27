@@ -121,10 +121,10 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     roles: ["student"],
     route: "/goals",
     summary:
-      "Conversation-based goal system: BHAG (Big Hairy Audacious Goal) broken into monthly, weekly, daily goals and tasks.",
-    compact: "goals (BHAG -> monthly -> weekly -> daily -> tasks, Sage proposes + you confirm)",
+      "Conversation-based goal system: long-term career goal broken into monthly, weekly, daily goals and tasks.",
+    compact: "goals (long-term -> monthly -> weekly -> daily -> tasks, Sage proposes + you confirm)",
     mechanics:
-      "Hierarchy is BHAG -> monthly -> weekly -> daily -> task. Sage proposes goals during conversation; the student confirms them before they're recorded — this is the wager/goal-proposal-confirmation mechanic. Sage tracks its own proposal hit rate (how often proposed goals get confirmed) to calibrate how confidently it proposes future goals.",
+      "Hierarchy is long-term career goal -> monthly -> weekly -> daily -> task. Sage proposes goals during conversation; the student confirms them before they're recorded — this is the wager/goal-proposal-confirmation mechanic. Sage tracks its own proposal hit rate (how often proposed goals get confirmed) to calibrate how confidently it proposes future goals.",
     tools: ["update_goal_status"],
     seeAlso: ["vision-board", "career-profile"],
   },
@@ -133,8 +133,8 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     name: "Vision Board",
     roles: ["student"],
     route: "/vision-board",
-    summary: "A visual board where students keep their BHAG and dream imagery visible as motivation.",
-    compact: "vision board (visual BHAG reminder)",
+    summary: "A visual board where students keep their long-term career goal and dream imagery visible as motivation.",
+    compact: "vision board (visual goal reminder)",
     tools: ["open_resource"],
   },
   {
