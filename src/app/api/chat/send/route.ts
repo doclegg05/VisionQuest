@@ -55,12 +55,13 @@ import { studentLogKey } from "@/lib/log-keys";
 
 const CHAT_SSE_HEARTBEAT_MS = 15_000;
 
-const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|bye|goodbye|cya)[!.,?]*$/i;
+const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|yeah|nah|yup|hm|hmm|wow|oh|ah|lol|haha|bye|goodbye|cya)[!.,?]*$/i;
 
 /**
  * Detects messages that don't benefit from RAG retrieval — short pleasantries,
  * acknowledgements, single-word replies. Skipping RAG on these saves the
- * embedding lookup + ~6,000 chars of prompt bloat per turn.
+ * embedding lookup + ~6,000 chars of prompt bloat + ~200-300ms first-token delay.
+ * Expanded 2026-08-27 to catch more simple responses (yeah/nah/yup/hm/wow/etc).
  */
 function isTrivialMessage(message: string): boolean {
   const trimmed = message.trim();
@@ -71,6 +72,9 @@ function isTrivialMessage(message: string): boolean {
   // continuations of prior context — Sage's history covers them.
   const tokens = trimmed.split(/\s+/);
   if (tokens.length <= 3 && !/[?]/.test(trimmed)) return true;
+  // Expand: 2-3 word responses without question marks are usually simple
+  // reactions or confirmations that don't need RAG context.
+  if (tokens.length <= 2) return true;
   return false;
 }
 
@@ -598,18 +602,37 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   let documentContextChars = 0;
   let formContextChars = 0;
   if (!trivialMessage) {
-    const documentContext = await getDocumentContext(
-      userMessage,
-      isStaffChat ? "staff" : "student",
-      3,
-      promptTier === "compact" ? 2000 : 6000,
-    );
+    // Parallelize RAG, form context, and memory loads to reduce waterfall.
+    // These are independent lookups that were previously sequential, adding
+    // ~300-500ms to first token latency.
+    const memoryEnabled = process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false";
+    const [documentContext, formContext, memoryData] = await Promise.all([
+      getDocumentContext(
+        userMessage,
+        isStaffChat ? "staff" : "student",
+        3,
+        promptTier === "compact" ? 2000 : 6000,
+      ),
+      Promise.resolve(getFormContext(userMessage)),
+      memoryEnabled
+        ? (async () => {
+            if (isStaffChat) {
+              const staffMemory = await getStaffMemoryContext(session.id, userMessage);
+              return { type: "staff" as const, staffMemory };
+            } else {
+              const profile = await getStudentProfile(session.id);
+              const memoryContext = await getMemoryContext(session.id, userMessage, undefined, profile.contents);
+              return { type: "student" as const, profile, memoryContext };
+            }
+          })()
+        : Promise.resolve(null),
+    ]);
+
     if (documentContext) {
       documentContextChars = documentContext.length;
       systemPrompt += documentContext;
       sectionSizes.docRag = documentContextChars;
     }
-    const formContext = getFormContext(userMessage);
     if (formContext) {
       formContextChars = formContext.length;
       systemPrompt += formContext;
@@ -623,25 +646,18 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     // memory/retrieve.ts (assertViewerMaySeeSubject), not by these call sites.
     // Staff still get student context from staff-student-context, which is
     // classroom-scoped and audited; memory is not a second door onto it.
-    if (process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false") {
-      if (isStaffChat) {
-        const staffMemoryContext = await getStaffMemoryContext(session.id, userMessage);
-        if (staffMemoryContext) {
-          systemPrompt += staffMemoryContext;
-          sectionSizes.memoryStaffRecall = staffMemoryContext.length;
+    if (memoryData) {
+      if (memoryData.type === "staff" && memoryData.staffMemory) {
+        systemPrompt += memoryData.staffMemory;
+        sectionSizes.memoryStaffRecall = memoryData.staffMemory.length;
+      } else if (memoryData.type === "student") {
+        if (memoryData.profile.block) {
+          systemPrompt += `\n\n${memoryData.profile.block}`;
+          sectionSizes.memoryProfile = memoryData.profile.block.length;
         }
-      } else {
-        // Always-on durable profile (who the student fundamentally is) + the
-        // query-relevant recall (what's relevant to this message), deduped.
-        const profile = await getStudentProfile(session.id);
-        if (profile.block) {
-          systemPrompt += `\n\n${profile.block}`;
-          sectionSizes.memoryProfile = profile.block.length;
-        }
-        const memoryContext = await getMemoryContext(session.id, userMessage, undefined, profile.contents);
-        if (memoryContext) {
-          systemPrompt += memoryContext;
-          sectionSizes.memoryRecall = memoryContext.length;
+        if (memoryData.memoryContext) {
+          systemPrompt += memoryData.memoryContext;
+          sectionSizes.memoryRecall = memoryData.memoryContext.length;
         }
       }
     }

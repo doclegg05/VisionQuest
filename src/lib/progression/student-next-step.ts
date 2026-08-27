@@ -293,22 +293,16 @@ export async function getStudentNextStep(
    */
   preloadedReadinessData?: StudentReadinessData | Promise<StudentReadinessData>,
 ): Promise<StudentNextStepResult> {
-  const readinessData = await (preloadedReadinessData ?? fetchStudentReadinessData(studentId));
-  const { state, bhagCompleted } = readinessData;
-
-  // Journey step 0. buildReadinessSnapshot already resolved the all-items
-  // convention into state.orientationComplete (persisted flag OR every
-  // orientation item complete); an unseeded checklist never blocks.
-  const orientationComplete =
-    state.orientationComplete || readinessData.orientationProgress.total === 0;
-
   // Planning statuses that can still be awaiting instructor confirmation —
   // "confirmed" and "completed" goals are settled by definition.
   const unconfirmablePlanningStatuses = GOAL_PLANNING_STATUSES.filter(
     (status) => status !== "confirmed" && status !== "completed",
   );
 
+  // Run ALL queries in parallel, including readiness data if not preloaded.
+  // This reduces waterfall from (readiness → 10 queries) to (readiness + 10 queries).
   const [
+    readinessData,
     careerDiscovery,
     goalCount,
     monthlyGoalsCount,
@@ -320,6 +314,7 @@ export async function getStudentNextStep(
     openAlertsCount,
     openTasksCount,
   ] = await Promise.all([
+    preloadedReadinessData ?? fetchStudentReadinessData(studentId),
     prisma.careerDiscovery.findUnique({
       where: { studentId },
       select: { status: true },
@@ -365,6 +360,14 @@ export async function getStudentNextStep(
       where: { studentId, status: { in: ["open", "in_progress"] } },
     }),
   ]);
+
+  const { state, bhagCompleted } = readinessData;
+
+  // Journey step 0. buildReadinessSnapshot already resolved the all-items
+  // convention into state.orientationComplete (persisted flag OR every
+  // orientation item complete); an unseeded checklist never blocks.
+  const orientationComplete =
+    state.orientationComplete || readinessData.orientationProgress.total === 0;
 
   return resolveStudentNextStep({
     state,
