@@ -184,13 +184,16 @@ function installStudentStore(
   });
   mockUpdateMany.mock.mockImplementation(
     async (args: {
-      where: { id: string; mfaBackupCodes?: { equals: string[] } };
+      where: { id: string; mfaBackupCodes?: { equals: string[] }; mfaLastUsedCounter?: number | null };
       data: Partial<StudentRow>;
     }) => {
-      const expected = args.where.mfaBackupCodes?.equals;
-      const matches =
-        args.where.id === row.id && (expected === undefined || sameList(expected, row.mfaBackupCodes));
-      if (!matches) return { count: 0 };
+      const expectedCodes = args.where.mfaBackupCodes?.equals;
+      const codesMatch = expectedCodes === undefined || sameList(expectedCodes, row.mfaBackupCodes);
+      // An absent key is no condition; `null` means IS NULL, as in Prisma.
+      const counterMatch =
+        !("mfaLastUsedCounter" in args.where) ||
+        args.where.mfaLastUsedCounter === row.mfaLastUsedCounter;
+      if (args.where.id !== row.id || !codesMatch || !counterMatch) return { count: 0 };
       row = { ...row, ...args.data };
       return { count: 1 };
     },
@@ -317,14 +320,10 @@ describe("POST /api/auth/mfa/challenge", () => {
     );
     assert.deepEqual(accountCall?.arguments, [`mfa-challenge:user:${STUDENT.id}`, 5, 15 * 60 * 1000]);
 
-    // Lockout is recorded for the account, and the server log carries only
-    // the correlation key, never the id.
-    assert.deepEqual(auditActions(), ["mfa.challenge_locked_out"]);
-    assert.equal(mockLogAuditEvent.mock.calls[0]?.arguments[0]?.targetId, STUDENT.id);
-    assert.equal(mockLoggerWarn.mock.callCount(), 1);
-    const [, context] = mockLoggerWarn.mock.calls[0]!.arguments as [string, Record<string, unknown>];
-    assert.equal(context.student, studentLogKey(STUDENT.id));
-    assert.doesNotMatch(JSON.stringify(mockLoggerWarn.mock.calls[0]!.arguments), /tch-1/);
+    // An over-limit request writes nothing: the audit row and the warn log
+    // are written once per window, when the last admitted attempt lands.
+    assert.deepEqual(auditActions(), []);
+    assert.equal(mockLoggerWarn.mock.callCount(), 0);
   });
 
   it("applies the per-account limit to backup-code attempts as well", async () => {
@@ -336,6 +335,28 @@ describe("POST /api/auth/mfa/challenge", () => {
     assert.equal(mockFindUnique.mock.callCount(), 0);
     assert.equal(mockUpdateMany.mock.callCount(), 0);
     assert.equal(mockUpdate.mock.callCount(), 0);
+  });
+
+  it("records the lockout once, when the last admitted attempt lands", async () => {
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key === `mfa-challenge:user:${STUDENT.id}`
+        ? { success: true, remaining: 0, resetTime: Date.now() + 60_000, degraded: false }
+        : okLimit(),
+    );
+    const { code } = totpFor(TOTP_SECRET, -5);
+
+    const res = await challengeRoute.POST(challengeRequest(code) as never);
+
+    // The last admitted attempt still runs (and fails here). The lockout row
+    // is written alongside it, keyed to the account, and the server log
+    // carries only the correlation key.
+    assert.equal(res.status, 401);
+    assert.deepEqual(auditActions(), ["mfa.challenge_locked_out", "mfa.challenge_failed"]);
+    assert.equal(mockLogAuditEvent.mock.calls[0]?.arguments[0]?.targetId, STUDENT.id);
+    assert.equal(mockLoggerWarn.mock.callCount(), 1);
+    const [, context] = mockLoggerWarn.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+    assert.equal(context.student, studentLogKey(STUDENT.id));
+    assert.doesNotMatch(JSON.stringify(mockLoggerWarn.mock.calls[0]!.arguments), /tch-1/);
   });
 
   it("issues the session on a valid TOTP code and records the counter", async () => {
@@ -355,6 +376,12 @@ describe("POST /api/auth/mfa/challenge", () => {
     assert.equal(store.current().mfaLastUsedCounter, counter);
     assert.ok(store.current().mfaVerifiedAt instanceof Date);
     assert.deepEqual(auditActions(), ["mfa.challenge_success"]);
+
+    // The counter advances by one conditional write carrying the value that
+    // was read; no unconditional update remains on this path.
+    assert.equal(mockUpdateMany.mock.callCount(), 1);
+    assert.equal(mockUpdateMany.mock.calls[0]?.arguments[0]?.where?.mfaLastUsedCounter, null);
+    assert.equal(mockUpdate.mock.callCount(), 0);
   });
 
   it("rejects a replayed TOTP code", async () => {
@@ -376,6 +403,24 @@ describe("POST /api/auth/mfa/challenge", () => {
     assert.equal(res.status, 401);
     assert.equal(cookieSets.length, 0);
     assert.equal(mockUpdate.mock.callCount(), 0);
+  });
+
+  it("accepts a TOTP code posted twice at once exactly once", async () => {
+    const { code, counter } = totpFor(TOTP_SECRET);
+    // Both requests read mfaLastUsedCounter before either writes, so both
+    // pass verifyTotp; only the write that still sees the read value lands.
+    const store = installStudentStore(makeRow(), { readBarrier: latch(2) });
+
+    const responses = await Promise.all([
+      challengeRoute.POST(challengeRequest(code) as never),
+      challengeRoute.POST(challengeRequest(code) as never),
+    ]);
+    const statuses = responses.map((res) => res.status).sort();
+
+    assert.deepEqual(statuses, [200, 401]);
+    assert.equal(store.current().mfaLastUsedCounter, counter);
+    assert.equal(cookieSets.length, 1, "exactly one session is issued");
+    assert.equal(mfaCookieClears.length, 1);
   });
 
   it("accepts a backup code once, through a conditional write, and reports the remaining count", async () => {

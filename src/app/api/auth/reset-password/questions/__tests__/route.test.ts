@@ -207,14 +207,20 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(cookieSets.length, 0);
   });
 
-  it("returns 429 in plain language once the account has used its answer attempts", async () => {
+  it("answers a locked account with the generic reset error, so the response does not confirm the account exists", async () => {
+    mockFindFirst.mock.mockImplementation(async () => null);
+    const unknownRes = await questionsRoute.POST(resetRequest() as never);
+    const unknownBody = (await unknownRes.json()) as { error: string };
+
+    mockFindFirst.mock.mockImplementation(async () => studentRecord());
     blockLimiterWhen((key) => key === `reset-password-questions:user:${STUDENT.id}`);
 
     const res = await questionsRoute.POST(resetRequest() as never);
     const body = (await res.json()) as { error: string };
 
-    assert.equal(res.status, 429);
-    assert.match(body.error, /too many tries/i);
+    assert.equal(unknownRes.status, 400);
+    assert.equal(res.status, 400);
+    assert.deepEqual(body, unknownBody, "locked and unknown accounts get the same response");
     assert.equal(mockVerifySecurityAnswer.mock.callCount(), 0, "answers are not checked once locked");
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
@@ -230,8 +236,26 @@ describe("POST /api/auth/reset-password/questions", () => {
       60 * 60 * 1000,
     ]);
 
-    // Lockout is recorded against the account; the server log carries only
-    // the correlation key, never the id.
+    // An over-limit request writes nothing: the audit row and the warn log
+    // are written once per window, when the last admitted attempt lands.
+    assert.deepEqual(auditActions(), []);
+    assert.equal(mockLoggerWarn.mock.callCount(), 0);
+  });
+
+  it("records the lockout once, when the last admitted answer attempt lands", async () => {
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key === `reset-password-questions:user:${STUDENT.id}`
+        ? { success: true, remaining: 0, resetTime: Date.now() + 60_000, degraded: false }
+        : okLimit(),
+    );
+    mockVerifySecurityAnswer.mock.mockImplementation(() => false);
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    // The last admitted guess still runs (and fails here). The lockout row is
+    // written alongside it, keyed to the account, and the server log carries
+    // only the correlation key.
+    assert.equal(res.status, 400);
     assert.deepEqual(auditActions(), ["auth.password.reset.security_questions_locked_out"]);
     assert.equal(mockLogAuditEvent.mock.calls[0]?.arguments[0]?.targetId, STUDENT.id);
     assert.equal(mockLoggerWarn.mock.callCount(), 1);

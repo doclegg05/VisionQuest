@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   claimBackupCode,
+  claimTotpCounter,
   consumeBackupCode,
   hashBackupCodes,
   type BackupCodeClaimClient,
+  type TotpCounterClaimClient,
 } from "./mfa";
 
 describe("consumeBackupCode", () => {
@@ -141,5 +143,87 @@ describe("claimBackupCode", () => {
     // removal is never overwritten by a stale list.
     assert.equal(results.filter((result) => result.claimed).length, 1);
     assert.deepEqual(store.current().mfaBackupCodes, [stored[1], stored[2]]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// claimTotpCounter — the same conditional-write shape for the replay counter.
+// Two requests carrying the same 6-digit code both pass verifyTotp when they
+// read `mfaLastUsedCounter` before either writes; only the write that still
+// sees the value it read may advance the counter and issue a session.
+// ---------------------------------------------------------------------------
+
+interface FakeCounterRow {
+  mfaLastUsedCounter: number | null;
+  mfaVerifiedAt: Date | null;
+}
+
+function fakeCounterStore(initial: number | null) {
+  let row: FakeCounterRow = { mfaLastUsedCounter: initial, mfaVerifiedAt: null };
+  const writes: number[] = [];
+
+  const client: TotpCounterClaimClient = {
+    student: {
+      async updateMany(args) {
+        const matches =
+          args.where.id === STUDENT_ID && args.where.mfaLastUsedCounter === row.mfaLastUsedCounter;
+        if (!matches) {
+          writes.push(0);
+          return { count: 0 };
+        }
+        row = {
+          mfaLastUsedCounter: args.data.mfaLastUsedCounter,
+          mfaVerifiedAt: args.data.mfaVerifiedAt,
+        };
+        writes.push(1);
+        return { count: 1 };
+      },
+    },
+  };
+
+  return { client, current: () => row, writes };
+}
+
+describe("claimTotpCounter", () => {
+  it("advances a never-used counter with a conditional write", async () => {
+    const store = fakeCounterStore(null);
+
+    const claimed = await claimTotpCounter(store.client, STUDENT_ID, null, 100);
+
+    assert.equal(claimed, true);
+    assert.equal(store.current().mfaLastUsedCounter, 100);
+    assert.ok(store.current().mfaVerifiedAt instanceof Date);
+  });
+
+  it("advances the counter from the value that was read", async () => {
+    const store = fakeCounterStore(99);
+
+    const claimed = await claimTotpCounter(store.client, STUDENT_ID, 99, 100);
+
+    assert.equal(claimed, true);
+    assert.equal(store.current().mfaLastUsedCounter, 100);
+  });
+
+  it("refuses when the counter moved since the read", async () => {
+    const store = fakeCounterStore(100);
+
+    const claimed = await claimTotpCounter(store.client, STUDENT_ID, 99, 100);
+
+    assert.equal(claimed, false);
+    assert.deepEqual(store.writes, [0]);
+    assert.equal(store.current().mfaLastUsedCounter, 100);
+  });
+
+  it("accepts exactly one of two interleaved claims of the same code", async () => {
+    const store = fakeCounterStore(null);
+
+    const results = await Promise.all([
+      claimTotpCounter(store.client, STUDENT_ID, null, 100),
+      claimTotpCounter(store.client, STUDENT_ID, null, 100),
+    ]);
+
+    assert.equal(results.filter(Boolean).length, 1);
+    assert.equal(store.current().mfaLastUsedCounter, 100);
+    assert.deepEqual(store.writes, [1, 0]);
   });
 });
