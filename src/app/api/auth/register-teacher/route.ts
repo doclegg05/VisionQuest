@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
-import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
+import {
+  hashPassword,
+  invalidateSessionCache,
+  normalizeEmail,
+  normalizeStudentId,
+  setSessionCookie,
+} from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 import { parseBody, registerStaffSchema } from "@/lib/schemas";
 
 function normalizeKey(value: unknown): string {
@@ -15,6 +22,21 @@ function normalizeKey(value: unknown): string {
 
 const TEACHER_KEY = normalizeKey(process.env.TEACHER_KEY || "");
 const ADMIN_KEY = normalizeKey(process.env.ADMIN_KEY || "");
+
+/**
+ * Audit actor for promotions performed with the shared ADMIN_KEY. The key is a
+ * registration secret, not an authenticated identity, so the audit row must
+ * not be attributed to the promoted account (review 2026-09-01, F11 / SEC-05).
+ */
+const ADMIN_KEY_ACTOR = "admin-key";
+
+/** Request fields the promotion path deliberately ignores. */
+const PROMOTION_IGNORED_FIELDS = ["password", "displayName"] as const;
+
+const PROMOTION_MESSAGE =
+  "The teacher account was promoted to admin. The password and display name in this request were ignored: " +
+  "the account keeps its existing credentials and MFA. Every existing session for the account was signed out. " +
+  "Sign in with the account's current password to continue.";
 
 function timingSafeCompare(a: string, b: string): boolean {
   const bufA = crypto.createHmac("sha256", "vq-key-compare").update(a).digest();
@@ -63,24 +85,38 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     select: { id: true, studentId: true, email: true, role: true, sessionVersion: true, displayName: true },
   });
 
-  // Admin registration can promote an existing teacher account
+  // Admin registration can promote an existing teacher account. ADMIN_KEY is a
+  // shared registration secret, not an authenticated identity, so promotion
+  // changes the role and nothing else: the supplied password and display name
+  // are ignored, MFA state is untouched, sessionVersion is bumped so every
+  // pre-promotion session dies, and no session is issued here. The promoted
+  // user signs in with the credentials they already hold (F11 / SEC-05).
   if (existing && existing.email === email && role === "admin" && existing.role === "teacher") {
-    const { hash } = hashPassword(password);
     const promoted = await prisma.student.update({
       where: { id: existing.id },
-      data: { role: "admin", passwordHash: hash, displayName },
+      data: { role: "admin", sessionVersion: { increment: 1 } },
+      select: { id: true, studentId: true, displayName: true, role: true },
     });
+    invalidateSessionCache(promoted.id);
 
-    await setSessionCookie(promoted.id, promoted.role, existing.sessionVersion);
-
+    const targetLogKey = studentLogKey(promoted.id);
     await logAuditEvent({
-      actorId: promoted.id,
-      actorRole: promoted.role,
+      actorId: ADMIN_KEY_ACTOR,
+      actorRole: ADMIN_KEY_ACTOR,
       action: "auth.promote_to_admin",
       targetType: "student",
       targetId: promoted.id,
-      summary: `Teacher promoted to admin: ${promoted.displayName} (${email}).`,
-      metadata: { ip },
+      summary:
+        `Teacher promoted to admin with ADMIN_KEY (${targetLogKey}); ` +
+        "password, display name and MFA unchanged; existing sessions invalidated.",
+      metadata: {
+        ip,
+        actor: ADMIN_KEY_ACTOR,
+        targetLogKey,
+        previousRole: existing.role,
+        newRole: promoted.role,
+        ignoredFields: [...PROMOTION_IGNORED_FIELDS],
+      },
     });
 
     return NextResponse.json({
@@ -90,6 +126,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         displayName: promoted.displayName,
         role: promoted.role,
       },
+      promoted: true,
+      sessionIssued: false,
+      ignoredFields: [...PROMOTION_IGNORED_FIELDS],
+      message: PROMOTION_MESSAGE,
     });
   }
 
