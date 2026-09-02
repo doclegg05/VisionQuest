@@ -435,5 +435,71 @@ if (!SHOULD_RUN) {
         assert.equal(rows.length, 2);
       });
     });
+
+    describe("staff notification from a student context (F2 regression pins)", () => {
+      // The crisis path (src/lib/sage/crisis-detection.ts) and teacher nudges
+      // (src/lib/advising-interventions.ts) run inside the STUDENT's RLS
+      // context. These cases pin why both resolve staff and write staff
+      // Notification rows through prismaAdmin: under the student's context the
+      // app client sees no teacher row and cannot insert a Notification whose
+      // studentId is a teacher, so the alert silently reached nobody.
+      const staffNotification = {
+        type: "wellbeing.concern",
+        title: "Wellbeing check-in needed",
+        body: "A student may need support. Please check in with them directly.",
+      };
+
+      it("student context cannot insert a Notification addressed to a teacher", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.notification.create({
+                data: { studentId: fixtures.teacher, ...staffNotification },
+              }),
+            ),
+          /row.level security|violates|permission/i,
+        );
+      });
+
+      it("student context resolves zero active teachers", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.student.findMany({
+            where: { role: "teacher", isActive: true },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows, [], "the all-active-teachers fallback is empty under student RLS");
+      });
+
+      it("postgres (prismaAdmin) path resolves the teacher and inserts the same Notification", async () => {
+        const teachers = await db.student.findMany({
+          where: { role: "teacher", isActive: true },
+          select: { id: true },
+        });
+        assert.ok(
+          teachers.some((teacher) => teacher.id === fixtures.teacher),
+          "the admin path sees the fixture teacher",
+        );
+
+        const created = await db.notification.create({
+          data: { studentId: fixtures.teacher, ...staffNotification },
+          select: { id: true },
+        });
+        try {
+          const seen = await asRole("teacher", fixtures.teacher, (tx) =>
+            tx.notification.findMany({ where: { id: created.id }, select: { id: true } }),
+          );
+          assert.deepEqual(
+            seen.map((row) => row.id),
+            [created.id],
+            "the teacher can read the row the admin path wrote",
+          );
+        } finally {
+          // Notification cascades on Student delete, so destroyFixtures would
+          // catch this too; delete here so a mid-test failure leaves nothing.
+          await db.notification.deleteMany({ where: { id: created.id } });
+        }
+      });
+    });
   });
 }
