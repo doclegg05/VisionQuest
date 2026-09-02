@@ -186,6 +186,25 @@ describe("scanStudentMessageForCrisis", () => {
     assert.equal(mockRecordWellbeingConcern.mock.callCount(), 1);
   });
 
+  it("ignores VISIONQUEST_DISABLE_RATE_LIMITS in production and consults the counter (review F19)", async () => {
+    // Indexed by a string variable: Next's types mark NODE_ENV itself read-only.
+    const nodeEnv: string = "NODE_ENV";
+    const previousNodeEnv = process.env[nodeEnv];
+    process.env.VISIONQUEST_DISABLE_RATE_LIMITS = "true";
+    process.env[nodeEnv] = "production";
+    detectorMatches("harm_others");
+
+    try {
+      await runScan();
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env[nodeEnv];
+      else process.env[nodeEnv] = previousNodeEnv;
+    }
+
+    assert.equal(mockRateLimit.mock.callCount(), 1);
+    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 1);
+  });
+
   it("never throws when the alert sink fails; the log carries the log key and category, not the id or text", async () => {
     detectorMatches("self_harm");
     mockRecordWellbeingConcern.mock.mockImplementation(async () => {

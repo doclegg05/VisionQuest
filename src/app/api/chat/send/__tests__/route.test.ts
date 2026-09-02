@@ -25,6 +25,7 @@ let toolCapturedBy_withRegistry: string | null = null;
 
 const mockRateLimit = mock.fn() as any;
 const mockRateLimitDaily = mock.fn() as any;
+const mockRateLimitsDisabled = mock.fn() as any;
 const mockResolveAiProvider = mock.fn() as any;
 const mockGetPromptTier = mock.fn() as any;
 const mockGetProviderClass = mock.fn() as any;
@@ -129,6 +130,12 @@ mock.module("@/lib/rate-limit", {
   namedExports: {
     rateLimit: mockRateLimit,
     rateLimitDaily: mockRateLimitDaily,
+  },
+});
+
+mock.module("@/lib/rate-limit-switch", {
+  namedExports: {
+    rateLimitsDisabled: mockRateLimitsDisabled,
   },
 });
 
@@ -347,6 +354,7 @@ function resetMocks() {
   for (const m of [
     mockRateLimit,
     mockRateLimitDaily,
+    mockRateLimitsDisabled,
     mockResolveAiProvider,
     mockGetPromptTier,
     mockGetProviderClass,
@@ -579,6 +587,27 @@ describe("POST /api/chat/send — rate limiting", () => {
     assert.equal(res.status, 429);
     // Conversation save should not happen on rate-limit reject.
     assert.equal(mockSaveMessage.mock.callCount(), 0);
+  });
+
+  // Review F19 / SEC-07 (2026-09-01): the route no longer reads
+  // VISIONQUEST_DISABLE_RATE_LIMITS itself; the shared predicate in
+  // src/lib/rate-limit-switch.ts owns the variable and its production guard.
+  it("skips both counters only when the shared rateLimitsDisabled predicate says so", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRateLimitsDisabled.mock.mockImplementation(() => true);
+    try {
+      const req = mockRequest("/api/chat/send", {
+        method: "POST",
+        body: { message: "Hello, can you help me?" },
+      });
+      const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+      assert.notEqual(res.status, 429);
+      assert.equal(mockRateLimit.mock.callCount(), 0);
+      assert.equal(mockRateLimitDaily.mock.callCount(), 0);
+      assert.equal(mockRateLimitsDisabled.mock.callCount(), 1);
+    } finally {
+      mockRateLimitsDisabled.mock.mockImplementation(() => false);
+    }
   });
 });
 
