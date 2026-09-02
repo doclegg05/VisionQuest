@@ -180,3 +180,114 @@ describe("formatCronHealthReport", () => {
     assert.match(text, /VERDICT: FAIL/);
   });
 });
+
+// net.http_post/http_get are asynchronous: a cron run is recorded `succeeded`
+// whether the app answered 200, 401, 404, or 500. The HTTP outcome lives only
+// in net._http_response, for pg_net's ttl (default 6 hours).
+describe("evaluateCronHealth: net._http_response", () => {
+  const ok = (id: number, created: string) => ({ id, status_code: 200, error_msg: null, timed_out: false, created });
+
+  it("fails on any non-200, errored, or timed-out response, as one aggregate line", () => {
+    const result = evaluateCronHealth({
+      jobs: healthyJobs(),
+      latestRuns: healthyRuns(),
+      httpResponses: {
+        available: true,
+        windowHours: 6,
+        rows: [
+          ok(1, "2026-09-02T06:00:00Z"),
+          { id: 2, status_code: 401, error_msg: null, timed_out: false, created: "2026-09-02T07:00:00Z" },
+          { id: 3, status_code: 401, error_msg: null, timed_out: false, created: "2026-09-02T08:00:00Z" },
+          { id: 4, status_code: null, error_msg: null, timed_out: true, created: "2026-09-02T09:00:00Z" },
+          { id: 5, status_code: null, error_msg: "Couldn't resolve host name", timed_out: false, created: "2026-09-02T10:00:00Z" },
+          ok(6, "2026-09-02T11:00:00Z"),
+        ],
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.problems, [
+      "net._http_response: 4 of 6 responses in the last 6h failed: status 401 x2, timed_out x1, error x1; latest failure 2026-09-02T10:00:00.000Z",
+    ]);
+    assert.deepEqual(result.httpResponses, { available: true, windowHours: 6, total: 6, failed: 4 });
+  });
+
+  it("is ok when every response in the window is 200", () => {
+    const result = evaluateCronHealth({
+      jobs: healthyJobs(),
+      latestRuns: healthyRuns(),
+      httpResponses: { available: true, windowHours: 6, rows: [ok(1, "2026-09-02T10:00:00Z"), ok(2, "2026-09-02T10:10:00Z")] },
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.httpResponses, { available: true, windowHours: 6, total: 2, failed: 0 });
+  });
+
+  it("does not fail when net._http_response is unavailable, but records the reason", () => {
+    const result = evaluateCronHealth({
+      jobs: healthyJobs(),
+      latestRuns: healthyRuns(),
+      httpResponses: { available: false, reason: 'relation "net._http_response" does not exist' },
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.problems, []);
+    assert.deepEqual(result.httpResponses, { available: false, reason: 'relation "net._http_response" does not exist' });
+  });
+
+  it("treats an omitted httpResponses argument as unavailable", () => {
+    const result = evaluateCronHealth({ jobs: healthyJobs(), latestRuns: healthyRuns() });
+    assert.equal(result.ok, true);
+    assert.equal(result.httpResponses.available, false);
+  });
+
+  it("still reports cron problems alongside an HTTP problem, cron first", () => {
+    const result = evaluateCronHealth({
+      jobs: healthyJobs().filter((j) => j.jobname !== "job-processor"),
+      latestRuns: healthyRuns(),
+      httpResponses: {
+        available: true,
+        windowHours: 6,
+        rows: [{ id: 1, status_code: 500, error_msg: null, timed_out: false, created: "2026-09-02T10:00:00Z" }],
+      },
+    });
+    assert.deepEqual(result.problems, [
+      "job-processor: missing from cron.job",
+      "net._http_response: 1 of 1 responses in the last 6h failed: status 500 x1; latest failure 2026-09-02T10:00:00.000Z",
+    ]);
+  });
+});
+
+describe("formatCronHealthReport: net._http_response line", () => {
+  const base = {
+    backgroundJobs: { countsByStatus: [], oldestPendingCreatedAt: null },
+    connection: { host: "localhost", database: "x", role: "postgres" },
+    generatedAt: "2026-09-02T12:00:00.000Z",
+  };
+
+  it("prints totals when available", () => {
+    const evaluation = evaluateCronHealth({
+      jobs: healthyJobs(),
+      latestRuns: healthyRuns(),
+      httpResponses: {
+        available: true,
+        windowHours: 6,
+        rows: [
+          { id: 1, status_code: 200, error_msg: null, timed_out: false, created: "2026-09-02T10:00:00Z" },
+          { id: 2, status_code: 401, error_msg: null, timed_out: false, created: "2026-09-02T11:00:00Z" },
+        ],
+      },
+    });
+    const text = formatCronHealthReport({ evaluation, ...base }).join("\n");
+    assert.match(text, /net\._http_response \(last 6h\): 2 responses, 1 ok, 1 failed/);
+    assert.match(text, /VERDICT: FAIL/);
+  });
+
+  it("says unavailable, with the reason, when it could not be read", () => {
+    const evaluation = evaluateCronHealth({
+      jobs: healthyJobs(),
+      latestRuns: healthyRuns(),
+      httpResponses: { available: false, reason: "permission denied for schema net" },
+    });
+    const text = formatCronHealthReport({ evaluation, ...base }).join("\n");
+    assert.match(text, /net\._http_response: unavailable \(permission denied for schema net\)/);
+    assert.match(text, /VERDICT: OK/);
+  });
+});
