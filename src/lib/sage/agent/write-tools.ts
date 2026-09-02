@@ -21,12 +21,32 @@ import { formatCohortDateTime } from "@/lib/timezone";
 import { isValidUrl } from "@/lib/validation";
 import { normalizePortfolioItemType, PORTFOLIO_ITEM_TYPES } from "@/lib/portfolio";
 import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
+import type { GoalStatus } from "@/lib/goals";
+import { applyGoalTransition, decideGoalTransition, goalActorFor } from "@/lib/goals/transition-goal-status";
 import { markRequirementComplete } from "../cert-actions";
 import { operationIdFor, recordOperation, type OperationActorType } from "../operations";
 import { createConfirmationToken, verifyConfirmationToken } from "./confirmation";
 import type { AgentTool, AgentToolContext, AgentToolResult } from "./types";
 
 const GOAL_STATUS_TRANSITIONS = ["active", "paused", "completed"] as const;
+type ToolGoalStatus = (typeof GOAL_STATUS_TRANSITIONS)[number];
+
+/**
+ * Tool vocabulary → stored lifecycle status. "paused" has no lifecycle status
+ * of its own (GOAL_STATUSES in @/lib/goals); "blocked" is the closest, and it
+ * keeps the goal out of the plan count the same way the old raw write did not.
+ */
+const TOOL_GOAL_STATUS: Record<ToolGoalStatus, GoalStatus> = {
+  active: "active",
+  paused: "blocked",
+  completed: "completed",
+};
+
+function toolGoalStatus(value: string): GoalStatus | null {
+  return (GOAL_STATUS_TRANSITIONS as ReadonlyArray<string>).includes(value)
+    ? TOOL_GOAL_STATUS[value as ToolGoalStatus]
+    : null;
+}
 
 function actorTypeFor(role: string): OperationActorType {
   if (role === "teacher") return "teacher";
@@ -335,14 +355,22 @@ const updateGoalStatus: AgentTool = {
     const status = String(args.status ?? "");
     const studentId = ctx.targetStudentId ?? ctx.session.id;
 
-    if (!(GOAL_STATUS_TRANSITIONS as ReadonlyArray<string>).includes(status)) {
+    const to = toolGoalStatus(status);
+    if (!to) {
       return { status: "error", summary: "Goals can only be set to active, paused, or completed here." };
     }
     const goal = await prisma.goal.findFirst({
       where: { id: goalId, studentId },
-      select: { id: true, content: true, status: true },
+      select: { id: true, studentId: true, level: true, content: true, status: true, sourceMessageId: true },
     });
     if (!goal) return { status: "error", summary: "That goal was not found on this account." };
+
+    // Same policy as PATCH /api/goals/[id]. Decide BEFORE the confirm card so
+    // the student is never asked to confirm a change the server will refuse.
+    const actor = goalActorFor(ctx.session);
+    const decision = decideGoalTransition(actor, goal, { to });
+    if (!decision.ok) return { status: "error", summary: decision.message };
+    if (!decision.change) return { status: "success", summary: `That goal is already ${to}.` };
 
     const gate = await confirmationGate(
       "update_goal_status",
@@ -354,8 +382,11 @@ const updateGoalStatus: AgentTool = {
     if (gate) return gate;
 
     return executeAndLedger("update_goal_status", { goalId, status }, ctx, async () => {
-      await prisma.goal.update({ where: { id: goalId }, data: { status } });
-      return { summary: `Goal updated to ${status}.`, data: { goalId, status } };
+      // The shared transition path: write + goals cache invalidation +
+      // level progression + BHAG XP, exactly what the HTTP route does.
+      const result = await applyGoalTransition({ actor, goal, request: { to } });
+      if (!result.ok) throw new Error(result.message);
+      return { summary: `Goal updated to ${to}.`, data: { goalId, status: to } };
     });
   },
 };

@@ -281,3 +281,44 @@ describe("PATCH /api/teacher/students/[id]/goals/[goalId] — sanctioned staff p
     assert.equal(updateData.confirmedBy, teacherSession.id, "teacher recorded as confirmer");
   });
 });
+
+describe("PATCH /api/goals/[id] — shared transition effects (F22 / VQ-R-011)", () => {
+  // Same effects the Sage update_goal_status tool now emits (write-tools.test.ts):
+  // both callers go through src/lib/goals/transition-goal-status.ts.
+  beforeEach(() => {
+    mockGoalFindFirst.mock.resetCalls();
+    mockGoalUpdate.mock.resetCalls();
+    mockInvalidatePrefix.mock.resetCalls();
+    mockEnsureGoalLevelProgression.mock.resetCalls();
+    mockUpdateProgression.mock.resetCalls();
+    mockGoalUpdate.mock.mockImplementation(async ({ data }) => ({
+      ...studentCreatedGoal,
+      id: "goal-bhag",
+      level: "bhag",
+      status: "confirmed",
+      ...data,
+    }));
+  });
+
+  it("completing a confirmed BHAG invalidates the goals cache, records level progression, and awards BHAG XP", async () => {
+    mockGoalFindFirst.mock.mockImplementation(async () => ({
+      ...studentCreatedGoal,
+      id: "goal-bhag",
+      level: "bhag",
+      status: "confirmed",
+    }));
+
+    const res = await studentRoute.PATCH(patchRequest({ id: "goal-bhag" }, { status: "completed" }), studentCtx("goal-bhag"));
+
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.goal.status, "completed");
+    assert.deepEqual(
+      mockInvalidatePrefix.mock.calls.map((c) => c.arguments[0]),
+      [`goals:${studentSession.id}`],
+    );
+    assert.deepEqual(mockEnsureGoalLevelProgression.mock.calls[0].arguments, [studentSession.id, ["bhag"]]);
+    assert.equal(mockUpdateProgression.mock.callCount(), 1);
+    assert.equal(mockUpdateProgression.mock.calls[0].arguments[0], studentSession.id);
+  });
+});
