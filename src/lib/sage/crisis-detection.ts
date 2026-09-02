@@ -336,10 +336,23 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
   // prismaAdmin for the same reason as findAssignedInstructors: through the
   // app client this query returns zero rows under the student's context, and
   // a silent empty fallback is exactly the failure the fallback exists to stop.
-  return prismaAdmin.student.findMany({
+  const everyone = await prismaAdmin.student.findMany({
     where: { role: "teacher", isActive: true },
     select: { id: true, email: true },
   });
+
+  if (everyone.length === 0) {
+    // A CRITICAL alert with nobody to notify must never be quiet. This is the
+    // signal that would have exposed F2 in production, and it is what fires
+    // if ADMIN_DATABASE_URL is unset: prismaAdmin then falls back to vq_app
+    // with empty GUCs and every staff read returns [] (src/lib/db.ts).
+    logger.error("Wellbeing: no staff recipients resolved; nobody was notified", {
+      student: studentLogKey(studentId),
+      alert: "wellbeing_no_recipients",
+    });
+  }
+
+  return everyone;
 }
 
 /**
