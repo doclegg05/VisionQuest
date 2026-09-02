@@ -3,6 +3,7 @@ import StudentAdvisingHub from "@/components/advising/StudentAdvisingHub";
 import { getSession } from "@/lib/auth";
 import { listBookableAdvisors } from "@/lib/advising";
 import { prisma } from "@/lib/db";
+import { listStudentVisibleAlerts } from "@/lib/student-alerts";
 
 export default async function AppointmentsPage() {
   const session = await getSession();
@@ -49,20 +50,7 @@ export default async function AppointmentsPage() {
       },
       orderBy: [{ status: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
     }),
-    prisma.studentAlert.findMany({
-      where: {
-        studentId: session.id,
-        status: "open",
-      },
-      select: {
-        id: true,
-        severity: true,
-        title: true,
-        summary: true,
-        detectedAt: true,
-      },
-      orderBy: { detectedAt: "desc" },
-    }),
+    listStudentVisibleAlerts(session.id),
     listBookableAdvisors(),
   ]);
 
