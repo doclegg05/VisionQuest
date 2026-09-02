@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { lookupErrorMessage } from "./error-message-lookup";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to sign in.",
@@ -48,8 +49,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const router = useRouter();
 
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const oauthError = searchParams.get("error");
-  const oauthErrorMessage = oauthError ? (ERROR_MESSAGES[oauthError] || "An error occurred. Please try again.") : null;
+  const oauthErrorMessage = lookupErrorMessage(ERROR_MESSAGES, searchParams.get("error"));
 
   // A Google sign-in on an MFA-enabled account lands here with `?mfa=1`. The
   // param only flips this form into code-entry mode; the httpOnly challenge

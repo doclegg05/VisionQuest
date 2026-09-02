@@ -318,10 +318,12 @@ describe("GET /api/auth/google/callback", () => {
     const res = await route.GET(callbackRequest() as never);
 
     assert.equal(mockUpdate.mock.callCount(), 1, "exactly one write to bind the Google sub");
-    const [updateArgs] = mockUpdate.mock.calls[0].arguments as [{ where: { id: string }; data: Record<string, unknown> }];
+    const [updateArgs] = mockUpdate.mock.calls[0].arguments as [{ where: { id: string; AND?: unknown }; data: Record<string, unknown> }];
     assert.equal(updateArgs.where.id, "stu-1");
+    assert.deepEqual(updateArgs.where.AND, [{ googleId: null }], "the link claims the row only while googleId is still null");
     assert.equal(updateArgs.data.googleId, GOOGLE_SUB, "the sub is persisted so later sign-ins match by sub");
     assert.equal("displayName" in updateArgs.data, false, "linking must not rewrite the display name from the Google profile");
+    assert.equal(mockCreate.mock.callCount(), 0, "an email match never creates a second account");
 
     assert.equal(res.status, 307);
     assert.equal(redirectTarget(res), "/chat");
@@ -337,6 +339,33 @@ describe("GET /api/auth/google/callback", () => {
     assert.equal(mockUpdate.mock.callCount(), 0);
     assert.equal(mockCreate.mock.callCount(), 0);
     assert.equal(auditActions().includes("auth.google_link"), false);
+  });
+
+  it("does not bind the sub on an MFA-enabled unbound account: challenge only, no write", async () => {
+    seedLookup({ bySub: null, byEmail: student({ googleId: null, mfaEnabled: true }) });
+
+    const res = await route.GET(callbackRequest() as never);
+
+    assert.equal(redirectTarget(res), "/?mfa=1");
+    assert.deepEqual(mfaCookieSets, ["mfa-token-for-stu-1"]);
+    assert.equal(cookieSets.length, 0);
+    assert.equal(mockUpdate.mock.callCount(), 0, "the bind waits for a full session (follow-up F67 moves it after TOTP)");
+    assert.equal(auditActions().includes("auth.google_link"), false);
+  });
+
+  it("treats a lost link race (P2025) as a mismatch: refused, no session", async () => {
+    seedLookup({ bySub: null, byEmail: student({ googleId: null }) });
+    mockUpdate.mock.mockImplementation(async () => {
+      throw Object.assign(new Error("Record to update not found."), { code: "P2025" });
+    });
+
+    const res = await route.GET(callbackRequest() as never);
+
+    assert.equal(redirectTarget(res), "/?error=oauth_account_mismatch");
+    assert.equal(cookieSets.length, 0);
+    assert.equal(mfaCookieSets.length, 0);
+    assert.equal(mockLoggerError.mock.callCount(), 0, "a lost race is a refusal, not a server error");
+    auditEvent("auth.google_login_refused_account_mismatch");
   });
 
   // (e) plain non-MFA account → session as before
@@ -370,6 +399,52 @@ describe("GET /api/auth/google/callback", () => {
     assert.equal(cookieSets[0].studentId, "stu-new");
   });
 
+  it("signs in the row a concurrent callback created when create hits the googleId or email unique index", async () => {
+    const raced = student({ id: "stu-raced", role: "student", authProvider: "google", passwordHash: null, googleId: GOOGLE_SUB });
+    let subLookups = 0;
+    mockFindUnique.mock.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => {
+      if (where.googleId !== undefined) {
+        subLookups += 1;
+        // First lookup misses; by the second, the racing insert has landed.
+        return subLookups === 1 ? null : raced;
+      }
+      return null;
+    });
+    mockCreate.mock.mockImplementation(async () => {
+      throw Object.assign(new Error("Unique constraint failed"), { code: "P2002", meta: { target: ["googleId"] } });
+    });
+
+    const res = await route.GET(callbackRequest() as never);
+
+    assert.equal(mockCreate.mock.callCount(), 1, "a googleId or email collision must not be retried as a studentId collision");
+    assert.equal(redirectTarget(res), "/chat");
+    assert.deepEqual(cookieSets, [{ studentId: "stu-raced", role: "student", sessionVersion: 3 }]);
+    assert.equal(mockLoggerError.mock.callCount(), 0, "the race is not an error");
+    auditEvent("auth.google_login");
+  });
+
+  it("retries with a suffixed studentId only when the studentId unique index is the one violated", async () => {
+    let attempts = 0;
+    mockCreate.mock.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw Object.assign(new Error("Unique constraint failed"), { code: "P2002", meta: { target: ["studentId"] } });
+      }
+      return student({ id: "stu-new", role: "student", authProvider: "google", passwordHash: null, ...data });
+    });
+
+    const res = await route.GET(callbackRequest() as never);
+
+    assert.equal(mockCreate.mock.callCount(), 2);
+    const [first, second] = mockCreate.mock.calls.map(
+      (c: { arguments: [{ data: { studentId: string } }] }) => c.arguments[0].data.studentId,
+    );
+    assert.equal(first, "teacher");
+    assert.match(second, /^teacher\d{4}$/);
+    assert.equal(redirectTarget(res), "/chat");
+    assert.equal(cookieSets.length, 1);
+  });
+
   it("still refuses a deactivated account before any cookie is set", async () => {
     seedLookup({ bySub: student({ googleId: GOOGLE_SUB, isActive: false, mfaEnabled: true }) });
 
@@ -378,5 +453,16 @@ describe("GET /api/auth/google/callback", () => {
     assert.equal(redirectTarget(res), "/?error=account_deactivated");
     assert.equal(cookieSets.length, 0);
     assert.equal(mfaCookieSets.length, 0, "a deactivated account gets no MFA challenge either");
+  });
+
+  it("does not link a deactivated unbound account: refused before any write", async () => {
+    seedLookup({ bySub: null, byEmail: student({ googleId: null, isActive: false }) });
+
+    const res = await route.GET(callbackRequest() as never);
+
+    assert.equal(redirectTarget(res), "/?error=account_deactivated");
+    assert.equal(mockUpdate.mock.callCount(), 0);
+    assert.equal(mockCreate.mock.callCount(), 0);
+    assert.equal(cookieSets.length + mfaCookieSets.length, 0);
   });
 });
