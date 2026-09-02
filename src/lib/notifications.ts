@@ -1,4 +1,5 @@
-import { prisma } from "./db";
+import { prisma, prismaAdmin } from "./db";
+import { isStaffRole } from "./api-error";
 import { logger } from "./logger";
 import { redactContactInfo } from "./log-redaction";
 import { sendEmail, isEmailDeliveryConfigured } from "./email";
@@ -13,6 +14,28 @@ const connections = new Map<string, Set<WritableStreamDefaultWriter<Uint8Array>>
 
 const encoder = new TextEncoder();
 const MAX_CONNECTIONS_PER_USER = 5;
+
+/**
+ * Which Prisma client persists a Notification and reads its cooldown window.
+ *
+ * "app" (default) runs under the caller's RLS context. Right when the
+ * recipient is the current actor, or a teacher's managed student.
+ *
+ * "admin" is for STAFF recipients written from a student's request context:
+ * crisis alerts and teacher nudges raised while a student chats or checks in.
+ * Under vq_app the student's context cannot see a row whose studentId is a
+ * teacher (so the cooldown read is blind) and `notification_access` WITH CHECK
+ * rejects inserting one; Promise.allSettled at the call sites swallowed the
+ * rejection, so no staff notification was ever written. prismaAdmin never
+ * injects RLS context. Notification is not a chat-context watched model, so an
+ * admin write needs no cache invalidation (see the prismaAdmin doc block in
+ * src/lib/db.ts).
+ */
+export type NotificationClient = "app" | "admin";
+
+export interface NotificationOptions {
+  client?: NotificationClient;
+}
 
 /**
  * Register an SSE writer for a user. Returns a cleanup function.
@@ -48,22 +71,55 @@ export function addConnection(
 }
 
 /**
+ * The admin option is an RLS bypass, so it is bounded here and not only at
+ * the call sites: the recipient must be a staff account. One prismaAdmin
+ * read per staff notification; an unknown id fails closed. The message
+ * carries no identifier because callers log it.
+ */
+async function assertStaffRecipient(userId: string): Promise<void> {
+  const recipient = await prismaAdmin.student.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!recipient || !isStaffRole(recipient.role)) {
+    throw new Error("Admin-client notifications are limited to staff recipients.");
+  }
+}
+
+/**
  * Push a notification to a user's active SSE connections and persist it.
  * userId must be the Prisma student UUID (student.id).
+ * Pass `{ client: "admin" }` for a staff recipient reached from a student's
+ * request context (see NotificationClient).
  */
 export async function sendNotification(
   userId: string,
   payload: { type: string; title: string; body?: string },
+  options: NotificationOptions = {},
 ): Promise<void> {
-  // Persist to DB
-  const notification = await prisma.notification.create({
-    data: {
-      studentId: userId,
-      type: payload.type,
-      title: payload.title,
-      body: payload.body || null,
-    },
-  });
+  const client = options.client ?? "app";
+  if (client === "admin") await assertStaffRecipient(userId);
+  await persistAndPush(userId, payload, client);
+}
+
+/** Persist the row through `client` and push it to live SSE writers. */
+async function persistAndPush(
+  userId: string,
+  payload: { type: string; title: string; body?: string },
+  client: NotificationClient,
+): Promise<void> {
+  const record = {
+    studentId: userId,
+    type: payload.type,
+    title: payload.title,
+    body: payload.body || null,
+  };
+  // Persist to DB. Each branch stays monomorphic: the app client is an
+  // extended PrismaClient whose delegate type does not unify with prismaAdmin's.
+  const notification =
+    client === "admin"
+      ? await prismaAdmin.notification.create({ data: record })
+      : await prisma.notification.create({ data: record });
 
   // Push to active connections
   const set = connections.get(userId);
@@ -99,24 +155,35 @@ export async function sendNotificationWithCooldown(
   userId: string,
   payload: { type: string; title: string; body?: string },
   cooldownHours: number,
+  options: NotificationOptions = {},
 ): Promise<boolean> {
+  const client = options.client ?? "app";
+  // Refuse before any admin read: the cooldown lookup is harmless on its own,
+  // but a non-staff id must not reach prismaAdmin at all.
+  if (client === "admin") await assertStaffRecipient(userId);
+
   const cutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
-  const existing = await prisma.notification.findFirst({
-    where: {
-      studentId: userId,
-      type: payload.type,
-      title: payload.title,
-      body: payload.body || null,
-      createdAt: { gte: cutoff },
-    },
-    select: { id: true },
-  });
+  const where = {
+    studentId: userId,
+    type: payload.type,
+    title: payload.title,
+    body: payload.body || null,
+    createdAt: { gte: cutoff },
+  };
+  // The cooldown read must use the same client as the write: under a
+  // student's RLS context the app client cannot see a teacher's rows, which
+  // would re-send on every turn once the write itself succeeds.
+  const existing =
+    client === "admin"
+      ? await prismaAdmin.notification.findFirst({ where, select: { id: true } })
+      : await prisma.notification.findFirst({ where, select: { id: true } });
 
   if (existing) {
     return false;
   }
 
-  await sendNotification(userId, payload);
+  // Not sendNotification: the staff check above already ran once for this call.
+  await persistAndPush(userId, payload, client);
   return true;
 }
 

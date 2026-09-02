@@ -435,5 +435,108 @@ if (!SHOULD_RUN) {
         assert.equal(rows.length, 2);
       });
     });
+
+    describe("staff notification from a student context (F2 regression pins)", () => {
+      // The crisis path (src/lib/sage/crisis-detection.ts) and teacher nudges
+      // (src/lib/advising-interventions.ts) run inside the STUDENT's RLS
+      // context. These cases pin why both resolve staff and write staff
+      // Notification rows through prismaAdmin: under the student's context the
+      // app client sees no teacher row and cannot insert a Notification whose
+      // studentId is a teacher, so the alert silently reached nobody.
+      const staffNotification = {
+        type: "wellbeing.concern",
+        title: "Wellbeing check-in needed",
+        body: "A student may need support. Please check in with them directly.",
+      };
+
+      it("student context cannot insert a Notification addressed to a teacher", async () => {
+        // Narrow on purpose: /violates|permission/ would also match an FK or
+        // unique violation, so a fixture defect could keep this green for the
+        // wrong reason. Only the policy rejection counts.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.notification.create({
+                data: { studentId: fixtures.teacher, ...staffNotification },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("student context cannot resolve assigned instructors through the production join", async () => {
+        // Exact shape of findAssignedInstructors in crisis-detection.ts. The
+        // enrollment, class, and instructor-link rows are all visible to the
+        // enrolled student, but the instructor's Student row is not
+        // (student_self_access), so Prisma meets a required to-one relation
+        // with no row behind it and raises an inconsistency error instead of
+        // returning instructors. resolveWellbeingRecipients catches that and
+        // falls back to the all-active-teachers list, which is also empty
+        // under this context (previous case): zero recipients either way.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentClassEnrollment.findMany({
+                where: {
+                  studentId: fixtures.studentA,
+                  status: { in: ["active", "inactive", "completed", "withdrawn"] },
+                },
+                select: {
+                  class: {
+                    select: {
+                      instructors: {
+                        select: {
+                          instructor: { select: { id: true, email: true, isActive: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              }),
+            ),
+          /required to return data|inconsistent query result/i,
+        );
+      });
+
+      it("student context resolves zero active teachers", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.student.findMany({
+            where: { role: "teacher", isActive: true },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows, [], "the all-active-teachers fallback is empty under student RLS");
+      });
+
+      it("postgres (prismaAdmin) path resolves the teacher and inserts the same Notification", async () => {
+        const teachers = await db.student.findMany({
+          where: { role: "teacher", isActive: true },
+          select: { id: true },
+        });
+        assert.ok(
+          teachers.some((teacher) => teacher.id === fixtures.teacher),
+          "the admin path sees the fixture teacher",
+        );
+
+        const created = await db.notification.create({
+          data: { studentId: fixtures.teacher, ...staffNotification },
+          select: { id: true },
+        });
+        try {
+          const seen = await asRole("teacher", fixtures.teacher, (tx) =>
+            tx.notification.findMany({ where: { id: created.id }, select: { id: true } }),
+          );
+          assert.deepEqual(
+            seen.map((row) => row.id),
+            [created.id],
+            "the teacher can read the row the admin path wrote",
+          );
+        } finally {
+          // Notification cascades on Student delete, so destroyFixtures would
+          // catch this too; delete here so a mid-test failure leaves nothing.
+          await db.notification.deleteMany({ where: { id: created.id } });
+        }
+      });
+    });
   });
 }

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendNotificationWithCooldown } from "@/lib/notifications";
 import { enqueueJobWithCooldown } from "@/lib/jobs";
@@ -269,9 +269,15 @@ const MANAGED_ENROLLMENT_STATUSES = ["active", "inactive", "completed", "withdra
  * student is (non-archived) enrolled in. Returns [] when none resolve; any
  * thrown error is handled by the caller, which falls back to all active
  * teachers.
+ *
+ * RLS: this runs inside the STUDENT's context (chat and mood routes). Under
+ * vq_app the student branch of `student_self_access` hides every teacher row,
+ * so the instructor join through the app client is always empty. Staff
+ * recipient reads therefore use prismaAdmin, which never injects RLS context.
+ * Only staff identities are read here; the student's own rows stay on `prisma`.
  */
 async function findAssignedInstructors(studentId: string): Promise<StaffRecipient[]> {
-  const enrollments = await prisma.studentClassEnrollment.findMany({
+  const enrollments = await prismaAdmin.studentClassEnrollment.findMany({
     where: {
       studentId,
       status: { in: [...MANAGED_ENROLLMENT_STATUSES] },
@@ -327,10 +333,26 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
 
   if (assigned.length > 0) return assigned;
 
-  return prisma.student.findMany({
+  // prismaAdmin for the same reason as findAssignedInstructors: through the
+  // app client this query returns zero rows under the student's context, and
+  // a silent empty fallback is exactly the failure the fallback exists to stop.
+  const everyone = await prismaAdmin.student.findMany({
     where: { role: "teacher", isActive: true },
     select: { id: true, email: true },
   });
+
+  if (everyone.length === 0) {
+    // A CRITICAL alert with nobody to notify must never be quiet. This is the
+    // signal that would have exposed F2 in production, and it is what fires
+    // if ADMIN_DATABASE_URL is unset: prismaAdmin then falls back to vq_app
+    // with empty GUCs and every staff read returns [] (src/lib/db.ts).
+    logger.error("Wellbeing: no staff recipients resolved; nobody was notified", {
+      student: studentLogKey(studentId),
+      alert: "wellbeing_no_recipients",
+    });
+  }
+
+  return everyone;
 }
 
 /**
@@ -437,6 +459,10 @@ export async function recordWellbeingConcern({
   //    student, data gap, or a failed lookup) fall back to ALL active teachers.
   //    The audience is never narrower than the pre-scoping behavior — for a
   //    crisis signal, over-notifying is the safe failure mode.
+  //    Staff Notification rows are written with `client: "admin"`: under the
+  //    student's RLS context `notification_access` WITH CHECK rejects a row
+  //    whose studentId is a teacher, and allSettled would swallow it. The
+  //    email job path already runs on prismaAdmin (src/lib/jobs.ts).
   try {
     const [student, recipients] = await Promise.all([
       prisma.student.findUnique({
@@ -460,7 +486,9 @@ export async function recordWellbeingConcern({
       recipients.map((recipient) =>
         // 12h cooldown so repeated signals in a day don't re-ping, but the
         // alert itself stays open and visible on the dashboard.
-        sendNotificationWithCooldown(recipient.id, { type: NOTIFY_TYPE, title, body }, 12),
+        sendNotificationWithCooldown(recipient.id, { type: NOTIFY_TYPE, title, body }, 12, {
+          client: "admin",
+        }),
       ),
     );
 

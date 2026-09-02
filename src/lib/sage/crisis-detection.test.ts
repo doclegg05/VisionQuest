@@ -7,9 +7,19 @@ import { parseWellbeingCardSummary } from "./wellbeing-card";
 // Module mocks (must be registered before crisis-detection is imported)
 // ---------------------------------------------------------------------------
 
-const mockEnrollmentFindMany = mock.fn() as any;
+// Staff recipient reads (enrollment -> instructors, and the all-active-teachers
+// fallback) go through prismaAdmin: recordWellbeingConcern runs inside the
+// STUDENT's RLS context on the chat and mood paths, and under vq_app the
+// student branch of `student_self_access` hides every teacher row. The
+// app-client twins below model exactly that: they return [] no matter what is
+// configured, so a regression back to the app client turns the recipient tests
+// red instead of passing on rows production would never return.
+const mockEnrollmentFindMany = mock.fn() as any; // prismaAdmin.studentClassEnrollment.findMany
+const mockStudentFindMany = mock.fn() as any; // prismaAdmin.student.findMany (fallback)
+const mockAppEnrollmentFindMany = mock.fn() as any; // prisma.studentClassEnrollment.findMany
+const mockAppStudentFindMany = mock.fn() as any; // prisma.student.findMany
+// The student's OWN rows stay on the app client: own record, alert, mood.
 const mockStudentFindUnique = mock.fn() as any;
-const mockStudentFindMany = mock.fn() as any;
 const mockAlertUpsert = mock.fn() as any;
 const mockMoodFindFirst = mock.fn() as any;
 const mockSendNotification = mock.fn() as any;
@@ -18,18 +28,26 @@ const mockEnqueueJob = mock.fn() as any;
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
-      studentClassEnrollment: { findMany: mockEnrollmentFindMany },
-      student: { findUnique: mockStudentFindUnique, findMany: mockStudentFindMany },
+      studentClassEnrollment: { findMany: mockAppEnrollmentFindMany },
+      student: { findUnique: mockStudentFindUnique, findMany: mockAppStudentFindMany },
       studentAlert: { upsert: mockAlertUpsert },
       moodEntry: { findFirst: mockMoodFindFirst },
+    },
+    prismaAdmin: {
+      studentClassEnrollment: { findMany: mockEnrollmentFindMany },
+      student: { findMany: mockStudentFindMany },
     },
   },
 });
 
+// logger.error is observable: a CRITICAL alert with zero recipients must log
+// loudly, and that log line must carry no raw student id.
+const mockLoggerError = mock.fn() as any;
+
 mock.module("@/lib/logger", {
   namedExports: {
     logger: {
-      error: () => {},
+      error: mockLoggerError,
       info: () => {},
       warn: () => {},
       debug: () => {},
@@ -359,12 +377,20 @@ function emailedTo(): string[] {
 
 function resetWellbeingMocks() {
   mockEnrollmentFindMany.mock.resetCalls();
+  mockAppEnrollmentFindMany.mock.resetCalls();
   mockStudentFindUnique.mock.resetCalls();
   mockStudentFindMany.mock.resetCalls();
+  mockAppStudentFindMany.mock.resetCalls();
   mockAlertUpsert.mock.resetCalls();
   mockMoodFindFirst.mock.resetCalls();
   mockSendNotification.mock.resetCalls();
   mockEnqueueJob.mock.resetCalls();
+  mockLoggerError.mock.resetCalls();
+
+  // What the app client returns for staff rows under the student's RLS
+  // context: nothing. Never configure these to return teachers.
+  mockAppEnrollmentFindMany.mock.mockImplementation(async () => []);
+  mockAppStudentFindMany.mock.mockImplementation(async () => []);
 
   mockEnrollmentFindMany.mock.mockImplementation(async () => []);
   mockStudentFindUnique.mock.mockImplementation(async () => ({
@@ -485,6 +511,112 @@ describe("recordWellbeingConcern", { skip: SKIP_IN_CI }, () => {
     );
 
     assert.equal(mockAlertUpsert.mock.callCount(), 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F2 regression pins: staff recipients and staff notifications must go through
+// the admin client. The chat and mood routes run recordWellbeingConcern inside
+// the STUDENT's RLS context; under vq_app the app client cannot see a teacher
+// row, and `notification_access` WITH CHECK rejects a Notification whose
+// studentId is a teacher. Promise.allSettled swallowed both, so production had
+// zero wellbeing notifications. src/lib/rls.test.ts pins the policy side.
+// ---------------------------------------------------------------------------
+
+describe("recordWellbeingConcern under the student's RLS context", { skip: SKIP_IN_CI }, () => {
+  beforeEach(resetWellbeingMocks);
+
+  it("resolves assigned instructors through the admin client, never the app client", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => [
+      enrollmentWithInstructors([{ id: "instructor-1", email: "one@example.test", isActive: true }]),
+    ]);
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.equal(mockEnrollmentFindMany.mock.callCount(), 1, "enrollment read runs on prismaAdmin");
+    assert.equal(
+      mockAppEnrollmentFindMany.mock.callCount(),
+      0,
+      "the app client sees no instructor rows under the student's RLS context",
+    );
+    assert.deepEqual(notifiedIds(), ["instructor-1"]);
+  });
+
+  it("resolves the all-active-teachers fallback through the admin client, never the app client", async () => {
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.equal(mockStudentFindMany.mock.callCount(), 1, "fallback runs on prismaAdmin");
+    assert.equal(
+      mockAppStudentFindMany.mock.callCount(),
+      0,
+      "the app client returns no teachers under the student's RLS context",
+    );
+    assert.deepEqual(notifiedIds().sort(), ["teacher-all-1", "teacher-all-2"]);
+  });
+
+  it("persists every staff notification through the admin notification client", async () => {
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "low_mood",
+    });
+
+    assert.equal(mockSendNotification.mock.callCount(), ALL_TEACHERS.length);
+    for (const call of mockSendNotification.mock.calls) {
+      assert.deepEqual(
+        call.arguments[3],
+        { client: "admin" },
+        "a staff Notification row must be written outside the student's RLS context",
+      );
+    }
+  });
+
+  it("keeps the student's own alert, record, and mood reads on the app client", async () => {
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    // These mocks exist only on `prisma`; moving any of them to prismaAdmin
+    // would throw inside the module and drop the count to zero.
+    assert.equal(mockAlertUpsert.mock.callCount(), 1, "StudentAlert upsert stays on the app client");
+    assert.equal(mockStudentFindUnique.mock.callCount(), 1, "own-record read stays on the app client");
+    assert.equal(mockMoodFindFirst.mock.callCount(), 1, "own mood read stays on the app client");
+  });
+
+  it("logs a loud error when the fallback resolves zero recipients, with no raw student id", async () => {
+    // This is the signal that would have exposed F2 in production, and what
+    // fires if ADMIN_DATABASE_URL is unset (prismaAdmin then runs as vq_app
+    // with empty GUCs and every staff read returns []).
+    mockStudentFindMany.mock.mockImplementation(async () => []);
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    const noRecipients = mockLoggerError.mock.calls.filter(
+      (call: any) => call.arguments[1]?.alert === "wellbeing_no_recipients",
+    );
+    assert.equal(noRecipients.length, 1, "exactly one wellbeing_no_recipients error log");
+    const meta = noRecipients[0].arguments[1];
+    assert.match(meta.student, /^stu_[0-9a-f]{12}$/, "student is the one-way log key");
+    assert.ok(
+      !JSON.stringify(noRecipients[0].arguments).includes("student-1"),
+      "the log line must not carry the raw student id",
+    );
+    assert.equal(mockSendNotification.mock.callCount(), 0, "nobody to notify");
+    assert.equal(mockAlertUpsert.mock.callCount(), 1, "the CRITICAL alert row is still written");
   });
 });
 

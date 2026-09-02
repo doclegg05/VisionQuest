@@ -8,6 +8,13 @@ const STUDENT_PHONE = "+15551234567";
 
 const mockNotificationCreate = mock.fn() as any;
 const mockNotificationFindFirst = mock.fn() as any;
+// prismaAdmin twins: staff recipients (crisis alerts, teacher nudges) are
+// written from a student's request context and must bypass its RLS scope.
+const mockAdminNotificationCreate = mock.fn() as any;
+const mockAdminNotificationFindFirst = mock.fn() as any;
+// The admin path is bounded at the helper: it resolves the recipient's role
+// through prismaAdmin and refuses anyone who is not staff.
+const mockAdminStudentFindUnique = mock.fn() as any;
 const mockStudentFindUnique = mock.fn() as any;
 const mockPreferenceFindMany = mock.fn() as any;
 const mockSendEmail = mock.fn() as any;
@@ -37,6 +44,21 @@ mock.module("@/lib/db", {
       notificationPreference: {
         get findMany() {
           return mockPreferenceFindMany;
+        },
+      },
+    },
+    prismaAdmin: {
+      notification: {
+        get create() {
+          return mockAdminNotificationCreate;
+        },
+        get findFirst() {
+          return mockAdminNotificationFindFirst;
+        },
+      },
+      student: {
+        get findUnique() {
+          return mockAdminStudentFindUnique;
         },
       },
     },
@@ -194,5 +216,181 @@ describe("sendMultiChannelNotification logging", () => {
 
     const logged = loggedText();
     assert.ok(!logged.includes(STUDENT_ID), `SSE eviction log leaked the student id: ${logged}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Staff recipients (F2). A Notification for a teacher raised from a student's
+// request context (crisis alert, teacher nudge) must be read and written
+// through prismaAdmin: under vq_app the student's RLS context cannot see a row
+// whose studentId is a teacher (so the cooldown read is blind) and
+// `notification_access` WITH CHECK rejects inserting one. The SSE push is
+// keyed on the recipient id and must fire exactly as before.
+// ---------------------------------------------------------------------------
+
+const TEACHER_ID = "clteacher0000abcdefghijkl";
+const staffPayload = {
+  type: "wellbeing.concern",
+  title: "Wellbeing check-in needed",
+  body: "A student may need support. Please check in with them directly.",
+};
+
+describe("sendNotificationWithCooldown for staff recipients", () => {
+  beforeEach(() => {
+    for (const m of [
+      mockNotificationCreate,
+      mockNotificationFindFirst,
+      mockAdminNotificationCreate,
+      mockAdminNotificationFindFirst,
+      mockAdminStudentFindUnique,
+      mockDebug,
+      mockInfo,
+      mockWarn,
+      mockError,
+    ]) {
+      m.mock.resetCalls();
+    }
+
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ role: "teacher" }));
+    mockNotificationFindFirst.mock.mockImplementation(async () => null);
+    mockNotificationCreate.mock.mockImplementation(async () => ({
+      id: "app-notif-1",
+      type: payload.type,
+      title: payload.title,
+      body: payload.body,
+      createdAt: new Date("2026-09-01T12:00:00.000Z"),
+    }));
+    mockAdminNotificationFindFirst.mock.mockImplementation(async () => null);
+    mockAdminNotificationCreate.mock.mockImplementation(async () => ({
+      id: "admin-notif-1",
+      type: staffPayload.type,
+      title: staffPayload.title,
+      body: staffPayload.body,
+      createdAt: new Date("2026-09-01T12:00:00.000Z"),
+    }));
+  });
+
+  it("reads the cooldown window and writes the row through prismaAdmin, not the app client", async () => {
+    const sent = await notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+      client: "admin",
+    });
+
+    assert.equal(sent, true);
+    assert.equal(mockAdminNotificationFindFirst.mock.callCount(), 1, "cooldown read on prismaAdmin");
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 1, "insert on prismaAdmin");
+    assert.equal(
+      mockNotificationFindFirst.mock.callCount(),
+      0,
+      "an app-client cooldown read runs under the student's RLS context and sees nothing",
+    );
+    assert.equal(
+      mockNotificationCreate.mock.callCount(),
+      0,
+      "an app-client insert is rejected by notification_access WITH CHECK",
+    );
+    assert.equal(mockAdminNotificationCreate.mock.calls[0].arguments[0].data.studentId, TEACHER_ID);
+  });
+
+  it("honors the cooldown through the admin client", async () => {
+    mockAdminNotificationFindFirst.mock.mockImplementation(async () => ({ id: "recent" }));
+
+    const sent = await notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+      client: "admin",
+    });
+
+    assert.equal(sent, false);
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 0);
+    assert.equal(mockNotificationCreate.mock.callCount(), 0);
+  });
+
+  it("still pushes the persisted row to the recipient's live SSE connection", async () => {
+    const chunks: string[] = [];
+    const writer = {
+      write: async (chunk: Uint8Array) => {
+        chunks.push(new TextDecoder().decode(chunk));
+      },
+      close: async () => undefined,
+    } as unknown as WritableStreamDefaultWriter<Uint8Array>;
+
+    const remove = notifications.addConnection(TEACHER_ID, writer);
+    try {
+      await notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+        client: "admin",
+      });
+    } finally {
+      remove();
+    }
+
+    assert.equal(chunks.length, 1, "one SSE event for the teacher");
+    const event = JSON.parse(chunks[0].replace(/^data: /, "").trim());
+    assert.equal(event.id, "admin-notif-1", "the pushed row is the one prismaAdmin persisted");
+    assert.equal(event.type, staffPayload.type);
+  });
+
+  it("defaults to the app client when no client option is given", async () => {
+    await notifications.sendNotificationWithCooldown(STUDENT_ID, payload, 24);
+
+    assert.equal(mockNotificationFindFirst.mock.callCount(), 1);
+    assert.equal(mockNotificationCreate.mock.callCount(), 1);
+    assert.equal(mockAdminNotificationFindFirst.mock.callCount(), 0);
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 0);
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 0, "no role lookup on the app path");
+  });
+
+  // The admin option is an RLS bypass. It is bounded here, not only at the
+  // call sites: the recipient's role is resolved through prismaAdmin and
+  // anyone who is not staff is refused before any admin read or write.
+
+  it("resolves the recipient's role through prismaAdmin before inserting for a teacher", async () => {
+    await notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+      client: "admin",
+    });
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 1, "one role read per notification");
+    assert.deepEqual(mockAdminStudentFindUnique.mock.calls[0].arguments[0], {
+      where: { id: TEACHER_ID },
+      select: { role: true },
+    });
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 1);
+  });
+
+  it("refuses a student-role recipient on the admin path and inserts nothing", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ role: "student" }));
+
+    await assert.rejects(
+      () =>
+        notifications.sendNotificationWithCooldown(STUDENT_ID, staffPayload, 12, {
+          client: "admin",
+        }),
+      (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        assert.ok(!message.includes(STUDENT_ID), `error message leaked the id: ${message}`);
+        assert.match(message, /staff/i);
+        return true;
+      },
+    );
+    await assert.rejects(
+      () => notifications.sendNotification(STUDENT_ID, staffPayload, { client: "admin" }),
+      /staff/i,
+    );
+
+    assert.equal(mockAdminNotificationFindFirst.mock.callCount(), 0, "refused before the cooldown read");
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 0, "nothing inserted via prismaAdmin");
+    assert.equal(mockNotificationCreate.mock.callCount(), 0, "nothing inserted via the app client");
+  });
+
+  it("refuses an unknown recipient on the admin path (fail closed)", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => null);
+
+    await assert.rejects(
+      () =>
+        notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+          client: "admin",
+        }),
+      /staff/i,
+    );
+
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 0);
+    assert.equal(mockNotificationCreate.mock.callCount(), 0);
   });
 });

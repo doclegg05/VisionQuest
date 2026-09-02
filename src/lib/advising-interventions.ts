@@ -9,7 +9,7 @@ import {
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
 import { isEmailDeliveryConfigured } from "./email";
-import { prisma } from "./db";
+import { prismaAdmin } from "./db";
 import type { AlertDescriptor } from "./advising-alerts";
 
 export async function syncInterventionNotifications({
@@ -97,7 +97,18 @@ export async function syncInterventionNotifications({
     return;
   }
 
-  const teachers = await prisma.student.findMany({
+  // Teacher resolution and the teacher nudge rows below use prismaAdmin: via
+  // syncStudentAlerts this runs inside a STUDENT's RLS context on student
+  // routes, where the app client returns zero teacher rows and
+  // `notification_access` WITH CHECK rejects a Notification addressed to a
+  // teacher. Only staff identities are read here; the student's own nudge
+  // above stays on the app client.
+  //
+  // Audience: ALL active teachers is main's pre-RLS intent for nudges. It is
+  // broader than the crisis path's assigned-instructor-first scoping in
+  // src/lib/sage/crisis-detection.ts. Narrowing it is an open product
+  // decision (D8, 2026-09-01 review) and is deliberately not changed here.
+  const teachers = await prismaAdmin.student.findMany({
     where: {
       role: "teacher",
       isActive: true,
@@ -120,6 +131,7 @@ export async function syncInterventionNotifications({
             body: spec.body,
           },
           spec.cooldownHours,
+          { client: "admin" },
         ),
       ),
     ),
