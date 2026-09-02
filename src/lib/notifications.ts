@@ -1,4 +1,4 @@
-import { prisma } from "./db";
+import { prisma, prismaAdmin } from "./db";
 import { logger } from "./logger";
 import { redactContactInfo } from "./log-redaction";
 import { sendEmail, isEmailDeliveryConfigured } from "./email";
@@ -13,6 +13,28 @@ const connections = new Map<string, Set<WritableStreamDefaultWriter<Uint8Array>>
 
 const encoder = new TextEncoder();
 const MAX_CONNECTIONS_PER_USER = 5;
+
+/**
+ * Which Prisma client persists a Notification and reads its cooldown window.
+ *
+ * "app" (default) runs under the caller's RLS context. Right when the
+ * recipient is the current actor, or a teacher's managed student.
+ *
+ * "admin" is for STAFF recipients written from a student's request context:
+ * crisis alerts and teacher nudges raised while a student chats or checks in.
+ * Under vq_app the student's context cannot see a row whose studentId is a
+ * teacher (so the cooldown read is blind) and `notification_access` WITH CHECK
+ * rejects inserting one; Promise.allSettled at the call sites swallowed the
+ * rejection, so no staff notification was ever written. prismaAdmin never
+ * injects RLS context. Notification is not a chat-context watched model, so an
+ * admin write needs no cache invalidation (see the prismaAdmin doc block in
+ * src/lib/db.ts).
+ */
+export type NotificationClient = "app" | "admin";
+
+export interface NotificationOptions {
+  client?: NotificationClient;
+}
 
 /**
  * Register an SSE writer for a user. Returns a cleanup function.
@@ -50,20 +72,26 @@ export function addConnection(
 /**
  * Push a notification to a user's active SSE connections and persist it.
  * userId must be the Prisma student UUID (student.id).
+ * Pass `{ client: "admin" }` for a staff recipient reached from a student's
+ * request context (see NotificationClient).
  */
 export async function sendNotification(
   userId: string,
   payload: { type: string; title: string; body?: string },
+  options: NotificationOptions = {},
 ): Promise<void> {
-  // Persist to DB
-  const notification = await prisma.notification.create({
-    data: {
-      studentId: userId,
-      type: payload.type,
-      title: payload.title,
-      body: payload.body || null,
-    },
-  });
+  const record = {
+    studentId: userId,
+    type: payload.type,
+    title: payload.title,
+    body: payload.body || null,
+  };
+  // Persist to DB. Each branch stays monomorphic: the app client is an
+  // extended PrismaClient whose delegate type does not unify with prismaAdmin's.
+  const notification =
+    options.client === "admin"
+      ? await prismaAdmin.notification.create({ data: record })
+      : await prisma.notification.create({ data: record });
 
   // Push to active connections
   const set = connections.get(userId);
@@ -99,24 +127,29 @@ export async function sendNotificationWithCooldown(
   userId: string,
   payload: { type: string; title: string; body?: string },
   cooldownHours: number,
+  options: NotificationOptions = {},
 ): Promise<boolean> {
   const cutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
-  const existing = await prisma.notification.findFirst({
-    where: {
-      studentId: userId,
-      type: payload.type,
-      title: payload.title,
-      body: payload.body || null,
-      createdAt: { gte: cutoff },
-    },
-    select: { id: true },
-  });
+  const where = {
+    studentId: userId,
+    type: payload.type,
+    title: payload.title,
+    body: payload.body || null,
+    createdAt: { gte: cutoff },
+  };
+  // The cooldown read must use the same client as the write: under a
+  // student's RLS context the app client cannot see a teacher's rows, which
+  // would re-send on every turn once the write itself succeeds.
+  const existing =
+    options.client === "admin"
+      ? await prismaAdmin.notification.findFirst({ where, select: { id: true } })
+      : await prisma.notification.findFirst({ where, select: { id: true } });
 
   if (existing) {
     return false;
   }
 
-  await sendNotification(userId, payload);
+  await sendNotification(userId, payload, options);
   return true;
 }
 
