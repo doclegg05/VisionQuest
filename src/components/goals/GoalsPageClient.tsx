@@ -15,6 +15,7 @@ import {
 import { isLockedByProposal, PROPOSED_TOGGLE_HINT } from "./goal-locks";
 import { AskSageModal } from "./AskSageModal";
 import { createConfettiEngine, type ConfettiEngine } from "./confetti";
+import { GoalRowActions } from "./GoalRowActions";
 import {
   Square,
   CheckSquare,
@@ -441,29 +442,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
               <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
             </form>
           ) : (
-            <div className="flex items-start justify-between group/item">
+            <div className="flex items-start justify-between">
               <span className={`text-sm leading-relaxed break-words ${item.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                 {item.content}
               </span>
-              <div className="opacity-0 group-hover/item:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                <button
-                  onClick={() => {
-                    setEditingGoalId(item.id);
-                    setEditingGoalContent(item.content);
-                  }}
-                  className="text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                  aria-label={`Edit ${label}`}
-                >
-                  <PencilSimple size={12} />
-                </button>
-                <button
-                  onClick={() => handleDismissGoal(item.id)}
-                  className="text-[var(--ink-muted)] hover:text-red-500"
-                  aria-label={`Dismiss ${label}`}
-                >
-                  <X size={12} />
-                </button>
-              </div>
+              <GoalRowActions
+                label={label}
+                iconSize={12}
+                onEdit={() => {
+                  setEditingGoalId(item.id);
+                  setEditingGoalContent(item.content);
+                }}
+                onDismiss={() => handleDismissGoal(item.id)}
+              />
             </div>
           )}
         </div>
@@ -694,25 +685,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         <h3 className={`font-display text-lg text-[var(--ink-strong)] leading-snug break-words ${monthly.status === "completed" ? "line-through opacity-60" : ""}`}>
                           {monthly.content}
                         </h3>
-                        <div className="opacity-0 group-hover:opacity-100 flex gap-2 ml-2 shrink-0">
-                          <button
-                            onClick={() => {
-                              setEditingGoalId(monthly.id);
-                              setEditingGoalContent(monthly.content);
-                            }}
-                            className="text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                            aria-label="Edit Monthly"
-                          >
-                            <PencilSimple size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDismissGoal(monthly.id)}
-                            className="text-[var(--ink-muted)] hover:text-red-500"
-                            aria-label="Dismiss Monthly"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
+                        <GoalRowActions
+                          label="Monthly"
+                          iconSize={16}
+                          onEdit={() => {
+                            setEditingGoalId(monthly.id);
+                            setEditingGoalContent(monthly.content);
+                          }}
+                          onDismiss={() => handleDismissGoal(monthly.id)}
+                        />
                       </div>
                     )}
                   </div>
@@ -836,29 +817,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
                             </form>
                           ) : (
-                            <div className="flex items-start justify-between group/wline">
+                            <div className="flex items-start justify-between">
                               <span className={`text-sm font-semibold leading-relaxed break-words ${weekly.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                                 {weekly.content}
                               </span>
-                              <div className="opacity-0 group-hover/wline:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                                <button
-                                  onClick={() => {
-                                    setEditingGoalId(weekly.id);
-                                    setEditingGoalContent(weekly.content);
-                                  }}
-                                  className="p-2 -m-2 text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center justify-center"
-                                  aria-label="Edit Weekly"
-                                >
-                                  <PencilSimple size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleDismissGoal(weekly.id)}
-                                  className="p-2 -m-2 text-[var(--ink-muted)] hover:text-red-500 flex items-center justify-center"
-                                  aria-label="Dismiss Weekly"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
+                              <GoalRowActions
+                                label="Weekly"
+                                iconSize={14}
+                                onEdit={() => {
+                                  setEditingGoalId(weekly.id);
+                                  setEditingGoalContent(weekly.content);
+                                }}
+                                onDismiss={() => handleDismissGoal(weekly.id)}
+                              />
                             </div>
                           )}
                         </div>
@@ -906,29 +877,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                     <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
                                   </form>
                                 ) : (
-                                  <div className="flex items-start justify-between group/tline">
+                                  <div className="flex items-start justify-between">
                                     <span className={`text-sm leading-relaxed break-words ${task.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                                       {task.content}
                                     </span>
-                                    <div className="opacity-0 group-hover/tline:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                                      <button
-                                        onClick={() => {
-                                          setEditingGoalId(task.id);
-                                          setEditingGoalContent(task.content);
-                                        }}
-                                        className="p-2 -m-2 text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center justify-center"
-                                        aria-label="Edit Task"
-                                      >
-                                        <PencilSimple size={12} />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDismissGoal(task.id)}
-                                        className="p-2 -m-2 text-[var(--ink-muted)] hover:text-red-500 flex items-center justify-center"
-                                        aria-label="Dismiss Task"
-                                      >
-                                        <X size={12} />
-                                      </button>
-                                    </div>
+                                    <GoalRowActions
+                                      label="Task"
+                                      iconSize={12}
+                                      onEdit={() => {
+                                        setEditingGoalId(task.id);
+                                        setEditingGoalContent(task.content);
+                                      }}
+                                      onDismiss={() => handleDismissGoal(task.id)}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -1018,29 +979,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                             <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
                           </form>
                         ) : (
-                          <div className="flex items-start justify-between group/item">
+                          <div className="flex items-start justify-between">
                             <span className={`text-sm leading-relaxed break-words ${item.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                               {item.content}
                             </span>
-                            <div className="opacity-0 group-hover/item:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                              <button
-                                onClick={() => {
-                                  setEditingGoalId(item.id);
-                                  setEditingGoalContent(item.content);
-                                }}
-                                className="p-2 -m-2 text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center justify-center"
-                                aria-label="Edit Item"
-                              >
-                                <PencilSimple size={12} />
-                              </button>
-                              <button
-                                onClick={() => handleDismissGoal(item.id)}
-                                className="p-2 -m-2 text-[var(--ink-muted)] hover:text-red-500 flex items-center justify-center"
-                                aria-label="Dismiss Item"
-                              >
-                                <X size={12} />
-                              </button>
-                            </div>
+                            <GoalRowActions
+                              label="Item"
+                              iconSize={12}
+                              onEdit={() => {
+                                setEditingGoalId(item.id);
+                                setEditingGoalContent(item.content);
+                              }}
+                              onDismiss={() => handleDismissGoal(item.id)}
+                            />
                           </div>
                         )}
                       </div>
