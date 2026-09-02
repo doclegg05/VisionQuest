@@ -477,7 +477,7 @@ if (!SHOULD_RUN) {
                 data: { studentId: fixtures.studentB, level: "daily", content: "forged" },
               }),
             ),
-          /row.level security|violates|permission/i,
+          /row-level security/i,
         );
       });
     });
