@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import {
   GOAL_LEVEL_META,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/goal-resource-links";
 import { isLockedByProposal, PROPOSED_TOGGLE_HINT } from "./goal-locks";
 import { AskSageModal } from "./AskSageModal";
+import { createConfettiEngine, type ConfettiEngine } from "./confetti";
 import {
   Square,
   CheckSquare,
@@ -59,84 +60,6 @@ function resourceStatusOptions(currentStatus: GoalResourceLinkStatus): GoalResou
   return [...new Set([...STUDENT_LINK_STATUSES, currentStatus])];
 }
 
-interface ConfettiParticle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  size: number;
-  rotation: number;
-  rotationSpeed: number;
-}
-
-const activeParticles: ConfettiParticle[] = [];
-let animationFrameId: number | null = null;
-
-function triggerConfetti(clientX: number, clientY: number) {
-  const canvas = document.getElementById("confetti-canvas") as HTMLCanvasElement | null;
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  // Sync canvas size to screen
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  const colors = ["#37b550", "#2a8a3c", "#007baf", "#d3b257", "#ad8806"];
-
-  for (let i = 0; i < 40; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 3 + Math.random() * 5;
-    activeParticles.push({
-      x: clientX,
-      y: clientY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 2.5, // upward bias
-      color: colors[Math.floor(Math.random() * colors.length)],
-      size: 5 + Math.random() * 5,
-      rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: -0.1 + Math.random() * 0.2,
-    });
-  }
-
-  function update() {
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (let i = activeParticles.length - 1; i >= 0; i--) {
-      const p = activeParticles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.2; // gravity
-      p.vx *= 0.97; // friction
-      p.rotation += p.rotationSpeed;
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-      ctx.restore();
-
-      if (p.y > canvas.height || p.x < 0 || p.x > canvas.width) {
-        activeParticles.splice(i, 1);
-      }
-    }
-
-    if (activeParticles.length > 0) {
-      animationFrameId = requestAnimationFrame(update);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      animationFrameId = null;
-    }
-  }
-
-  if (animationFrameId === null) {
-    update();
-  }
-}
-
 export default function GoalsPageClient({ initialGoals, initialGoalPlans }: GoalsPageClientProps) {
   const { checkProgression } = useProgression();
   const [goals, setGoals] = useState(initialGoals);
@@ -171,6 +94,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   // Parent lookup for the proposed-goal lock (F23): a weekly or task under a
   // Sage proposal cannot be checked off until the instructor confirms it.
   const goalsById = new Map<string, GoalRecord>(goals.map((g) => [g.id, g]));
+
+  // Confetti state lives on this instance, not the module (F36 / FE-01), so
+  // celebrations cannot interfere and unmount cancels the frame loop.
+  const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
+  const confettiRef = useRef<ConfettiEngine | null>(null);
+  useEffect(() => {
+    const engine = createConfettiEngine({ getCanvas: () => confettiCanvasRef.current });
+    confettiRef.current = engine;
+    return () => {
+      engine.dispose();
+      confettiRef.current = null;
+    };
+  }, []);
 
   // Read Aloud Text-to-Speech Handler
   function handleReadAloud(id: string, text: string) {
@@ -316,7 +252,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     const nextStatus: GoalStatus = currentStatus === "completed" ? "active" : "completed";
 
     if (nextStatus === "completed" && event) {
-      triggerConfetti(event.clientX, event.clientY);
+      confettiRef.current?.burst(event.clientX, event.clientY);
     }
 
     setSavingGoalId(goalId);
@@ -538,7 +474,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   return (
     <div className="space-y-6">
       {/* Confetti canvas overlay */}
-      <canvas id="confetti-canvas" className="pointer-events-none fixed inset-0 z-50 h-screen w-screen" />
+      <canvas ref={confettiCanvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-50 h-screen w-screen" />
 
       <div className="surface-section p-5">
         <p className="text-sm leading-relaxed text-[var(--ink-muted)]">
