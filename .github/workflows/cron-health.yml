@@ -1,0 +1,64 @@
+name: Cron Health
+
+# Nightly read-only check of the scheduled layer: the seven Supabase pg_cron
+# jobs and the BackgroundJob queue they drain (scripts/cron-health-check.mjs).
+#
+# Needs the CRON_CHECK_DATABASE_URL repository secret, a postgres-role
+# connection string (docs/plans/pg-cron-setup-runbook.md, "Repair, 2026-09").
+# Without it the check cannot run, and the job says so with a ::warning::
+# annotation and a step summary instead of passing quietly. A check that goes
+# silent when unconfigured is the failure mode the catalog-drift job in
+# sage-evals.yml fell into (2026-09-01 review, F54).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 6 * * *" # nightly ~06:41 UTC
+
+jobs:
+  cron-health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Scheduled-layer health check
+        env:
+          CRON_CHECK_DATABASE_URL: ${{ secrets.CRON_CHECK_DATABASE_URL }}
+        run: |
+          if [ -z "$CRON_CHECK_DATABASE_URL" ]; then
+            echo "::warning::CRON_CHECK_DATABASE_URL repository secret is not set; the scheduled-layer health check did not run."
+            {
+              echo "## Scheduled-layer health check: NOT RUN"
+              echo
+              echo "The repository secret \`CRON_CHECK_DATABASE_URL\` is not set, so nothing was checked."
+              echo "Set it to the postgres-role connection string (docs/plans/pg-cron-setup-runbook.md, Repair 2026-09) and re-run this workflow."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          set +e
+          npm run cron:health > cron-health.txt 2>&1
+          status=$?
+          set -e
+          cat cron-health.txt
+          {
+            if [ "$status" -eq 0 ]; then
+              echo "## Scheduled-layer health check: OK"
+            else
+              echo "## Scheduled-layer health check: FAILED (exit $status)"
+            fi
+            echo
+            echo '```'
+            cat cron-health.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
