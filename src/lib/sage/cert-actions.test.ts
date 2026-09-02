@@ -14,6 +14,9 @@ const mockRecompute = mock.fn(async () => ({ status: "in_progress", requirements
 const mockValidate = mock.fn(() => null) as any;
 const mockSyncAlerts = mock.fn(async () => undefined) as any;
 const mockAwardEvent = mock.fn(async () => undefined) as any;
+const mockTemplateFindMany = mock.fn(async () => []) as any;
+const mockCertificationFindUnique = mock.fn(async () => null) as any;
+const mockCertificationCreate = mock.fn(async () => ({})) as any;
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -29,6 +32,17 @@ mock.module("@/lib/db", {
       certification: {
         get update() {
           return mockCertificationUpdate;
+        },
+        get findUnique() {
+          return mockCertificationFindUnique;
+        },
+        get create() {
+          return mockCertificationCreate;
+        },
+      },
+      certTemplate: {
+        get findMany() {
+          return mockTemplateFindMany;
         },
       },
       fileUpload: {
@@ -170,5 +184,80 @@ describe("markRequirementComplete (P1-4 self-report stamp)", () => {
 
     assert.equal(result.ok, false);
     assert.equal(mockCertificationUpdate.mock.callCount(), 0);
+  });
+});
+
+// SAGE-03 / VQ-R-009: lookup_cert_progress is a read-tier tool. Its helper
+// must never create the Certification row or award the cert_started XP;
+// that happens when the student opens the Certifications page.
+describe("lookupCertProgress (read-only)", () => {
+  const templates = [
+    { id: "tpl-1", label: "Resume draft", required: true, needsFile: false, needsVerify: true, sortOrder: 1 },
+    { id: "tpl-2", label: "Mock interview", required: false, needsFile: false, needsVerify: false, sortOrder: 2 },
+  ];
+
+  beforeEach(() => {
+    mockTemplateFindMany.mock.resetCalls();
+    mockCertificationFindUnique.mock.resetCalls();
+    mockCertificationCreate.mock.resetCalls();
+    mockAwardEvent.mock.resetCalls();
+    mockRecompute.mock.resetCalls();
+    mockTemplateFindMany.mock.mockImplementation(async () => templates);
+  });
+
+  it("returns a not-started view without creating a row or awarding XP when no certification exists", async () => {
+    mockCertificationFindUnique.mock.mockImplementation(async () => null);
+
+    const progress = await certActions.lookupCertProgress(STUDENT_ID);
+
+    assert.ok(progress, "templates exist, so a view is returned");
+    assert.equal(progress.started, false);
+    assert.equal(progress.total, 1, "only required templates count");
+    assert.deepEqual(
+      progress.requirements.map((r) => r.label),
+      ["Resume draft", "Mock interview"],
+    );
+    assert.equal(mockCertificationCreate.mock.callCount(), 0);
+    assert.equal(mockAwardEvent.mock.callCount(), 0);
+    assert.equal(mockRecompute.mock.callCount(), 0);
+  });
+
+  it("returns the existing row's progress unchanged, still without creating or awarding", async () => {
+    const cert = {
+      id: CERTIFICATION_ID,
+      certType: "ready-to-work",
+      status: "in_progress",
+      requirements: [
+        { id: REQUIREMENT_ID, templateId: "tpl-1", completed: true, fileId: null, verifiedBy: null },
+        { id: "req-2", templateId: "tpl-2", completed: false, fileId: null, verifiedBy: null },
+      ],
+    };
+    mockCertificationFindUnique.mock.mockImplementation(async () => cert);
+    mockRecompute.mock.mockImplementation(async () => cert);
+
+    const progress = await certActions.lookupCertProgress(STUDENT_ID);
+
+    assert.ok(progress);
+    assert.equal(progress.started, true);
+    if (progress.started) {
+      assert.equal(progress.certificationId, CERTIFICATION_ID);
+      assert.equal(progress.status, "in_progress");
+      assert.equal(progress.done, 1);
+      assert.equal(progress.total, 1);
+      const resume = progress.requirements.find((r) => r.label === "Resume draft");
+      assert.equal(resume?.requirementId, REQUIREMENT_ID);
+      assert.equal(resume?.completed, true);
+      assert.equal(resume?.awaitingVerification, true);
+    }
+    assert.equal(mockCertificationCreate.mock.callCount(), 0);
+    assert.equal(mockAwardEvent.mock.callCount(), 0);
+  });
+
+  it("returns null when no templates are seeded", async () => {
+    mockTemplateFindMany.mock.mockImplementation(async () => []);
+
+    assert.equal(await certActions.lookupCertProgress(STUDENT_ID), null);
+    assert.equal(mockCertificationFindUnique.mock.callCount(), 0);
+    assert.equal(mockCertificationCreate.mock.callCount(), 0);
   });
 });

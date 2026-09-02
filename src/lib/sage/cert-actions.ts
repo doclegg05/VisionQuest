@@ -1,11 +1,14 @@
 /**
  * Certification self-report actions for Sage tools.
  *
- * Mirrors the logic in /api/certifications (GET ensure + POST self-report) so
- * `lookup_cert_progress` and `mark_certification_complete` behave identically
- * to the Certifications page: same auto-create, same validation, same
- * idempotent XP award on completion. Kept in one module so the two tools can't
- * drift from each other or from the route.
+ * Mirrors the logic in /api/certifications so `lookup_cert_progress` and
+ * `mark_certification_complete` behave like the Certifications page: same
+ * validation, same idempotent XP award on completion. Kept in one module so
+ * the two tools can't drift from each other or from the route.
+ *
+ * The lookup is read-only. The Certification row (and its cert_started XP)
+ * is created by GET /api/certifications when the student opens the
+ * Certifications page — never by a read-tier agent tool (SAGE-03 / VQ-R-009).
  */
 
 import { prisma } from "@/lib/db";
@@ -13,93 +16,88 @@ import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 import { syncStudentAlerts } from "@/lib/advising";
 import { validateRequirementUpdate } from "@/lib/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
-import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
+import { recordCertificationEarned } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
-import { logger } from "@/lib/logger";
 
 const CERT_TYPE = "ready-to-work";
 
-export interface CertRequirementView {
-  requirementId: string;
+/** A checklist item as its template defines it — what the student will need to do. */
+export interface CertTemplateView {
   label: string;
   required: boolean;
   needsFile: boolean;
   needsVerify: boolean;
+}
+
+/** A checklist item on the student's own certification, with the id needed to mark it. */
+export interface CertRequirementView extends CertTemplateView {
+  requirementId: string;
   completed: boolean;
   hasFile: boolean;
   /** Completed by the student but still pending instructor verification. */
   awaitingVerification: boolean;
 }
 
-export interface CertProgress {
-  certificationId: string;
-  status: string;
-  requirements: CertRequirementView[];
-  done: number;
-  total: number;
-}
+export type CertProgress =
+  /** No Certification row yet: the checklist exists only as templates. */
+  | { started: false; total: number; requirements: CertTemplateView[] }
+  | {
+      started: true;
+      certificationId: string;
+      status: string;
+      requirements: CertRequirementView[];
+      done: number;
+      total: number;
+    };
 
 /**
- * Ensure the student has a Ready-to-Work certification (auto-creating it from
- * templates the first time, exactly like the GET route) and return its
- * requirements with the ids needed to mark them complete.
+ * The student's Ready-to-Work progress, read-only. Returns null when no
+ * templates are seeded, a not-started view when the student has no
+ * Certification row, and otherwise the row's requirements with the ids
+ * `mark_certification_complete` needs.
  */
-export async function ensureStudentCertification(studentId: string): Promise<CertProgress | null> {
+export async function lookupCertProgress(studentId: string): Promise<CertProgress | null> {
   const templates = await prisma.certTemplate.findMany({
     where: { certType: CERT_TYPE },
     orderBy: { sortOrder: "asc" },
   });
   if (templates.length === 0) return null;
 
-  let cert = await prisma.certification.findUnique({
-    where: { studentId_certType: { studentId, certType: CERT_TYPE } },
-    include: { requirements: true },
-  });
+  const total = templates.filter((t) => t.required).length;
 
-  if (!cert) {
-    cert = await prisma.certification.create({
-      data: {
-        studentId,
-        certType: CERT_TYPE,
-        requirements: { create: templates.map((t) => ({ templateId: t.id })) },
-      },
-      include: { requirements: true },
-    });
-    try {
-      await awardEvent({
-        studentId,
-        eventType: "cert_started",
-        sourceType: "certification",
-        sourceId: cert.id,
-        xp: 25,
-        mutate: (state) => recordCertificationStarted(state),
-      });
-    } catch (err) {
-      logger.error("ensureStudentCertification: cert_started award failed", { error: String(err) });
-    }
+  const existing = await prisma.certification.findUnique({
+    where: { studentId_certType: { studentId, certType: CERT_TYPE } },
+    select: { id: true, certType: true },
+  });
+  if (!existing) {
+    return { started: false, total, requirements: templates.map(toTemplateView) };
   }
 
-  cert = await recomputeCertificationStatus(cert.id, cert.certType);
+  const cert = await recomputeCertificationStatus(existing.id, existing.certType);
 
   const requirements: CertRequirementView[] = templates.map((t) => {
-    const req = cert!.requirements.find((r) => r.templateId === t.id);
+    const req = cert.requirements.find((r) => r.templateId === t.id);
     const completed = req?.completed ?? false;
     return {
+      ...toTemplateView(t),
       requirementId: req?.id ?? "",
-      label: t.label,
-      required: t.required,
-      needsFile: t.needsFile,
-      needsVerify: t.needsVerify,
       completed,
       hasFile: Boolean(req?.fileId),
       awaitingVerification: completed && t.needsVerify && !req?.verifiedBy,
     };
   });
-
-  const total = requirements.filter((r) => r.required).length;
   const done = requirements.filter((r) => r.required && r.completed).length;
 
-  return { certificationId: cert.id, status: cert.status, requirements, done, total };
+  return { started: true, certificationId: cert.id, status: cert.status, requirements, done, total };
+}
+
+function toTemplateView(template: CertTemplateView): CertTemplateView {
+  return {
+    label: template.label,
+    required: template.required,
+    needsFile: template.needsFile,
+    needsVerify: template.needsVerify,
+  };
 }
 
 export type MarkRequirementResult =
