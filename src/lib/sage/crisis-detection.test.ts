@@ -40,10 +40,14 @@ mock.module("@/lib/db", {
   },
 });
 
+// logger.error is observable: a CRITICAL alert with zero recipients must log
+// loudly, and that log line must carry no raw student id.
+const mockLoggerError = mock.fn() as any;
+
 mock.module("@/lib/logger", {
   namedExports: {
     logger: {
-      error: () => {},
+      error: mockLoggerError,
       info: () => {},
       warn: () => {},
       debug: () => {},
@@ -381,6 +385,7 @@ function resetWellbeingMocks() {
   mockMoodFindFirst.mock.resetCalls();
   mockSendNotification.mock.resetCalls();
   mockEnqueueJob.mock.resetCalls();
+  mockLoggerError.mock.resetCalls();
 
   // What the app client returns for staff rows under the student's RLS
   // context: nothing. Never configure these to return teachers.
@@ -586,6 +591,32 @@ describe("recordWellbeingConcern under the student's RLS context", { skip: SKIP_
     assert.equal(mockAlertUpsert.mock.callCount(), 1, "StudentAlert upsert stays on the app client");
     assert.equal(mockStudentFindUnique.mock.callCount(), 1, "own-record read stays on the app client");
     assert.equal(mockMoodFindFirst.mock.callCount(), 1, "own mood read stays on the app client");
+  });
+
+  it("logs a loud error when the fallback resolves zero recipients, with no raw student id", async () => {
+    // This is the signal that would have exposed F2 in production, and what
+    // fires if ADMIN_DATABASE_URL is unset (prismaAdmin then runs as vq_app
+    // with empty GUCs and every staff read returns []).
+    mockStudentFindMany.mock.mockImplementation(async () => []);
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    const noRecipients = mockLoggerError.mock.calls.filter(
+      (call: any) => call.arguments[1]?.alert === "wellbeing_no_recipients",
+    );
+    assert.equal(noRecipients.length, 1, "exactly one wellbeing_no_recipients error log");
+    const meta = noRecipients[0].arguments[1];
+    assert.match(meta.student, /^stu_[0-9a-f]{12}$/, "student is the one-way log key");
+    assert.ok(
+      !JSON.stringify(noRecipients[0].arguments).includes("student-1"),
+      "the log line must not carry the raw student id",
+    );
+    assert.equal(mockSendNotification.mock.callCount(), 0, "nobody to notify");
+    assert.equal(mockAlertUpsert.mock.callCount(), 1, "the CRITICAL alert row is still written");
   });
 });
 

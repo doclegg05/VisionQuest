@@ -12,6 +12,9 @@ const mockNotificationFindFirst = mock.fn() as any;
 // written from a student's request context and must bypass its RLS scope.
 const mockAdminNotificationCreate = mock.fn() as any;
 const mockAdminNotificationFindFirst = mock.fn() as any;
+// The admin path is bounded at the helper: it resolves the recipient's role
+// through prismaAdmin and refuses anyone who is not staff.
+const mockAdminStudentFindUnique = mock.fn() as any;
 const mockStudentFindUnique = mock.fn() as any;
 const mockPreferenceFindMany = mock.fn() as any;
 const mockSendEmail = mock.fn() as any;
@@ -51,6 +54,11 @@ mock.module("@/lib/db", {
         },
         get findFirst() {
           return mockAdminNotificationFindFirst;
+        },
+      },
+      student: {
+        get findUnique() {
+          return mockAdminStudentFindUnique;
         },
       },
     },
@@ -234,6 +242,7 @@ describe("sendNotificationWithCooldown for staff recipients", () => {
       mockNotificationFindFirst,
       mockAdminNotificationCreate,
       mockAdminNotificationFindFirst,
+      mockAdminStudentFindUnique,
       mockDebug,
       mockInfo,
       mockWarn,
@@ -242,6 +251,7 @@ describe("sendNotificationWithCooldown for staff recipients", () => {
       m.mock.resetCalls();
     }
 
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ role: "teacher" }));
     mockNotificationFindFirst.mock.mockImplementation(async () => null);
     mockNotificationCreate.mock.mockImplementation(async () => ({
       id: "app-notif-1",
@@ -324,5 +334,63 @@ describe("sendNotificationWithCooldown for staff recipients", () => {
     assert.equal(mockNotificationCreate.mock.callCount(), 1);
     assert.equal(mockAdminNotificationFindFirst.mock.callCount(), 0);
     assert.equal(mockAdminNotificationCreate.mock.callCount(), 0);
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 0, "no role lookup on the app path");
+  });
+
+  // The admin option is an RLS bypass. It is bounded here, not only at the
+  // call sites: the recipient's role is resolved through prismaAdmin and
+  // anyone who is not staff is refused before any admin read or write.
+
+  it("resolves the recipient's role through prismaAdmin before inserting for a teacher", async () => {
+    await notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+      client: "admin",
+    });
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 1, "one role read per notification");
+    assert.deepEqual(mockAdminStudentFindUnique.mock.calls[0].arguments[0], {
+      where: { id: TEACHER_ID },
+      select: { role: true },
+    });
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 1);
+  });
+
+  it("refuses a student-role recipient on the admin path and inserts nothing", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ role: "student" }));
+
+    await assert.rejects(
+      () =>
+        notifications.sendNotificationWithCooldown(STUDENT_ID, staffPayload, 12, {
+          client: "admin",
+        }),
+      (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        assert.ok(!message.includes(STUDENT_ID), `error message leaked the id: ${message}`);
+        assert.match(message, /staff/i);
+        return true;
+      },
+    );
+    await assert.rejects(
+      () => notifications.sendNotification(STUDENT_ID, staffPayload, { client: "admin" }),
+      /staff/i,
+    );
+
+    assert.equal(mockAdminNotificationFindFirst.mock.callCount(), 0, "refused before the cooldown read");
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 0, "nothing inserted via prismaAdmin");
+    assert.equal(mockNotificationCreate.mock.callCount(), 0, "nothing inserted via the app client");
+  });
+
+  it("refuses an unknown recipient on the admin path (fail closed)", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => null);
+
+    await assert.rejects(
+      () =>
+        notifications.sendNotificationWithCooldown(TEACHER_ID, staffPayload, 12, {
+          client: "admin",
+        }),
+      /staff/i,
+    );
+
+    assert.equal(mockAdminNotificationCreate.mock.callCount(), 0);
+    assert.equal(mockNotificationCreate.mock.callCount(), 0);
   });
 });

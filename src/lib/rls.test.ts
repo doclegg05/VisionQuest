@@ -450,6 +450,9 @@ if (!SHOULD_RUN) {
       };
 
       it("student context cannot insert a Notification addressed to a teacher", async () => {
+        // Narrow on purpose: /violates|permission/ would also match an FK or
+        // unique violation, so a fixture defect could keep this green for the
+        // wrong reason. Only the policy rejection counts.
         await assert.rejects(
           () =>
             asRole("student", fixtures.studentA, (tx) =>
@@ -457,7 +460,41 @@ if (!SHOULD_RUN) {
                 data: { studentId: fixtures.teacher, ...staffNotification },
               }),
             ),
-          /row.level security|violates|permission/i,
+          /row-level security/i,
+        );
+      });
+
+      it("student context cannot resolve assigned instructors through the production join", async () => {
+        // Exact shape of findAssignedInstructors in crisis-detection.ts. The
+        // enrollment, class, and instructor-link rows are all visible to the
+        // enrolled student, but the instructor's Student row is not
+        // (student_self_access), so Prisma meets a required to-one relation
+        // with no row behind it and raises an inconsistency error instead of
+        // returning instructors. resolveWellbeingRecipients catches that and
+        // falls back to the all-active-teachers list, which is also empty
+        // under this context (previous case): zero recipients either way.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentClassEnrollment.findMany({
+                where: {
+                  studentId: fixtures.studentA,
+                  status: { in: ["active", "inactive", "completed", "withdrawn"] },
+                },
+                select: {
+                  class: {
+                    select: {
+                      instructors: {
+                        select: {
+                          instructor: { select: { id: true, email: true, isActive: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              }),
+            ),
+          /required to return data|inconsistent query result/i,
         );
       });
 
