@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
+import { afterWrite } from "@/lib/after-write";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
@@ -147,27 +148,41 @@ export const POST = withAuth(async (session, req: Request) => {
     },
   });
 
-  await cleanupDetachedGeneratedResumeFile(
-    session.id,
-    existingApplication?.resumeFileId,
-    resumeFileId || null,
-    application.id,
+  // The application is saved. Everything below is best-effort: a failure is
+  // logged, never reported to the student as a failed application.
+  await afterWrite(
+    () =>
+      cleanupDetachedGeneratedResumeFile(
+        session.id,
+        existingApplication?.resumeFileId,
+        resumeFileId || null,
+        application.id,
+      ),
+    { surface: "applications", effect: "cleanupDetachedGeneratedResumeFile", studentId: session.id },
   );
 
-  await logAuditEvent({
-    actorId: session.id,
-    actorRole: session.role,
-    action: "application.updated",
-    targetType: "opportunity",
-    targetId: opportunityId,
-    summary: `Set application for "${opportunity.title}" to ${status}.`,
-    metadata: {
-      applicationId: application.id,
-      status,
-    },
-  });
+  await afterWrite(
+    () =>
+      logAuditEvent({
+        actorId: session.id,
+        actorRole: session.role,
+        action: "application.updated",
+        targetType: "opportunity",
+        targetId: opportunityId,
+        summary: `Set application for "${opportunity.title}" to ${status}.`,
+        metadata: {
+          applicationId: application.id,
+          status,
+        },
+      }),
+    { surface: "applications", effect: "logAuditEvent", studentId: session.id, level: "error" },
+  );
 
-  await syncStudentAlerts(session.id);
+  await afterWrite(() => syncStudentAlerts(session.id), {
+    surface: "applications",
+    effect: "syncStudentAlerts",
+    studentId: session.id,
+  });
 
   return NextResponse.json({ application });
 });
