@@ -9,5 +9,6 @@ if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
     replaysOnErrorSampleRate: 1.0,
     environment: process.env.NODE_ENV,
     beforeSend: scrubPii,
+    beforeSendTransaction: scrubPii,
   });
 }
