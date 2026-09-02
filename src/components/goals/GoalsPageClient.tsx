@@ -13,6 +13,7 @@ import {
   type GoalResourceLinkStatus,
 } from "@/lib/goal-resource-links";
 import { apiFetch } from "@/lib/api";
+import { isLockedByProposal, PROPOSED_TOGGLE_HINT } from "./goal-locks";
 import {
   Square,
   CheckSquare,
@@ -168,6 +169,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   const [sageModalGoal, setSageModalGoal] = useState<GoalRecord | null>(null);
   const [sageModalLoading, setSageModalLoading] = useState(false);
   const [sageResponse, setSageResponse] = useState<string>("");
+
+  // Parent lookup for the proposed-goal lock (F23): a weekly or task under a
+  // Sage proposal cannot be checked off until the instructor confirms it.
+  const goalsById = new Map<string, GoalRecord>(goals.map((g) => [g.id, g]));
 
   // Read Aloud Text-to-Speech Handler
   function handleReadAloud(id: string, text: string) {
@@ -351,8 +356,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   }
 
   async function handleToggleGoalStatus(goalId: string, currentStatus: GoalStatus, event?: React.MouseEvent) {
+    const target = goalsById.get(goalId);
+    if (target && isLockedByProposal(target, goalsById)) {
+      setMessage({ tone: "error", text: PROPOSED_TOGGLE_HINT });
+      return;
+    }
+
     const nextStatus: GoalStatus = currentStatus === "completed" ? "active" : "completed";
-    
+
     if (nextStatus === "completed" && event) {
       triggerConfetti(event.clientX, event.clientY);
     }
@@ -663,6 +674,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           const totalDescendants = descendants.length;
           const completedDescendants = descendants.filter((g) => g.status === "completed").length;
           const progressPercent = totalDescendants > 0 ? Math.round((completedDescendants / totalDescendants) * 100) : 0;
+          const lockedInCard = totalDescendants > 0 && descendants.some((g) => isLockedByProposal(g, goalsById));
+          const proposedHintId = `${monthly.id}-proposed-hint`;
 
           return (
             <article key={monthly.id} className="organic-paper-card w-full shadow-md relative overflow-hidden transition-transform duration-300 hover:shadow-lg">
@@ -802,11 +815,17 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
               </div>
 
               {/* Checklist Items: Weekly Goals & Tasks */}
+              {lockedInCard && (
+                <p id={proposedHintId} className="mb-2 text-xs text-[var(--ink-muted)]">
+                  {PROPOSED_TOGGLE_HINT}
+                </p>
+              )}
               <div className="space-y-3 mb-2">
                 {/* Render Weekly Goals inside Monthly Card */}
                 {mWeekly.map((weekly) => {
                   const isWEditing = editingGoalId === weekly.id;
                   const wTasks = dailyGoals.concat(tasks).filter((t) => t.parentId === weekly.id);
+                  const wLocked = isLockedByProposal(weekly, goalsById);
 
                   return (
                     <div key={weekly.id} className="pl-1">
@@ -815,7 +834,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         <button
                           type="button"
                           onClick={(e) => handleToggleGoalStatus(weekly.id, weekly.status, e)}
-                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center"
+                          disabled={wLocked}
+                          aria-describedby={wLocked ? proposedHintId : undefined}
+                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={weekly.status === "completed" ? "Mark incomplete" : "Mark complete"}
                         >
                           {weekly.status === "completed" ? (
@@ -877,12 +898,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       <div className="pl-6 border-l border-dashed border-[var(--border)] ml-2.5 mt-1.5 space-y-1.5">
                         {wTasks.map((task) => {
                           const isTEditing = editingGoalId === task.id;
+                          const tLocked = isLockedByProposal(task, goalsById);
                           return (
                             <div key={task.id} className="flex items-start gap-2 group/task">
                               <button
                                 type="button"
                                 onClick={(e) => handleToggleGoalStatus(task.id, task.status, e)}
-                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center"
+                                disabled={tLocked}
+                                aria-describedby={tLocked ? proposedHintId : undefined}
+                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={task.status === "completed" ? "Mark incomplete" : "Mark complete"}
                               >
                                 {task.status === "completed" ? (
@@ -986,12 +1010,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {/* Direct tasks/milestones on this Monthly Plan (not grouped by Weekly Goal) */}
                 {mDirectTasks.map((item) => {
                   const isItemEditing = editingGoalId === item.id;
+                  const itemLocked = isLockedByProposal(item, goalsById);
                   return (
                     <div key={item.id} className="pl-1 py-1 flex items-start gap-2.5 group">
                       <button
                         type="button"
                         onClick={(e) => handleToggleGoalStatus(item.id, item.status, e)}
-                        className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-center"
+                        disabled={itemLocked}
+                        aria-describedby={itemLocked ? proposedHintId : undefined}
+                        className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
                       >
                         {item.status === "completed" ? (
@@ -1195,15 +1222,24 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
               </div>
             </div>
 
+            {orphanGoals.some((g) => isLockedByProposal(g, goalsById)) && (
+              <p id="orphan-proposed-hint" className="mb-2 text-xs text-[var(--ink-muted)]">
+                {PROPOSED_TOGGLE_HINT}
+              </p>
+            )}
             <div className="space-y-3">
               {orphanGoals.filter((g) => g.level === "weekly" || g.parentId === null).map((weeklyOrOrphan) => {
                 const isItemEditing = editingGoalId === weeklyOrOrphan.id;
+                const orphanLocked = isLockedByProposal(weeklyOrOrphan, goalsById);
                 return (
                   <div key={weeklyOrOrphan.id} className="pl-1 py-1 flex items-start gap-2.5 group">
                     <button
                       type="button"
-                      onClick={() => handleToggleGoalStatus(weeklyOrOrphan.id, weeklyOrOrphan.status)}
-                      className="mt-1 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0"
+                      onClick={(e) => handleToggleGoalStatus(weeklyOrOrphan.id, weeklyOrOrphan.status, e)}
+                      disabled={orphanLocked}
+                      aria-describedby={orphanLocked ? "orphan-proposed-hint" : undefined}
+                      aria-label={weeklyOrOrphan.status === "completed" ? "Mark incomplete" : "Mark complete"}
+                      className="mt-1 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {weeklyOrOrphan.status === "completed" ? (
                         <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)]" />
