@@ -1054,14 +1054,12 @@ if (!SHOULD_RUN) {
       });
 
       it("Teacher B does NOT see Student A's Conversation", async () => {
-        // DELIBERATE RED (this commit only): the query below runs as postgres
-        // instead of `asRole("teacher", fixtures.teacherB, ...)`, which is
-        // what conversation_access looks like with its teacher branch wide
-        // open. CI must fail here; the next commit restores the role.
-        const rows = await db.conversation.findMany({
-          where: { id: fixtures.conversationA },
-          select: { id: true },
-        });
+        // Red-proven in PR #191's first CI run: with this query run as
+        // postgres instead of Teacher B (the shape of a wide-open teacher
+        // branch) it failed with `[ { id: conversationA } ] !== []`.
+        const rows = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.conversation.findMany({ where: { id: fixtures.conversationA }, select: { id: true } }),
+        );
         assert.deepEqual(rows, []);
       });
 
