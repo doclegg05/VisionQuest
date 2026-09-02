@@ -52,6 +52,34 @@ const studentAlertDirectRead = {
     "Student-facing code must not read StudentAlert directly; the table is the staff queue and RLS admits the student's own rows. Use listStudentVisibleAlerts / countStudentVisibleAlerts from src/lib/student-alerts.ts, the only sanctioned reader for student surfaces.",
 };
 
+// Code with no request session: pg_cron reaches these routes with only a
+// bearer secret, and job handlers run from the processor. Nothing seeds an
+// RLS context, so the app client fails closed under vq_app (reads empty,
+// writes rejected) and a per-student catch turns that into a silent "0 of
+// N" (review F5/F62, 2026-09-01). Cross-student rows go through prismaAdmin;
+// per-student lib helpers run inside withStudentRlsContext
+// (src/lib/rls-context.ts). This catches the direct import only; a lib
+// module that imports the app client is caught when a test exercises the
+// path under RLS_CONTEXT_STRICT=true (CI).
+const appPrismaImportWithoutSession = {
+  files: ["src/app/api/internal/**", "src/app/api/cron/**", "src/lib/jobs-registry.ts"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            regex: "(^|/)db$",
+            importNames: ["prisma"],
+            message:
+              "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
+          },
+        ],
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -91,6 +119,7 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead],
     },
   },
+  appPrismaImportWithoutSession,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
