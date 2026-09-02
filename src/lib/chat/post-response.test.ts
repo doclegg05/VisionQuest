@@ -337,8 +337,6 @@ describe("handlePostResponse priority order and per-turn cap", () => {
     assert.equal(mockExtractGoals.mock.callCount(), 1);
     assert.equal(mockClassroomConfirmation.mock.callCount(), 0);
     assert.equal(mockExtractMemories.mock.callCount(), 0);
-    // The deterministic wellbeing scan is outside the budget entirely.
-    assert.equal(mockDetectCrisisSignal.mock.callCount(), 1);
 
     const skipped = infoEvents("sage.post_response.skipped");
     assert.deepEqual(
@@ -352,7 +350,13 @@ describe("handlePostResponse priority order and per-turn cap", () => {
     assert.equal(summary.skipped, 2);
   });
 
-  it("records a wellbeing concern even under the tightest cap", async () => {
+  it("never scans for crisis signals itself — the single call site is the chat route", async () => {
+    // The request-time scan (src/lib/chat/crisis-scan.ts) runs before provider
+    // resolution and must stay the only message-signal call site: the alert
+    // row is idempotent per day, but the staff-notification cooldowns are
+    // read-then-write, so a second scan here would race them. Coverage for
+    // the scan itself (reason, category, no message text, every exit path)
+    // lives in src/app/api/chat/send/__tests__/route.test.ts.
     process.env.SAGE_POST_RESPONSE_MAX_CALLS = "1";
     mockDetectCrisisSignal.mock.mockImplementation(() => ({
       matched: true,
@@ -361,10 +365,8 @@ describe("handlePostResponse priority order and per-turn cap", () => {
 
     await postResponseModule.handlePostResponse(baseParams());
 
-    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 1);
-    const concern = mockRecordWellbeingConcern.mock.calls[0].arguments[0] as Record<string, unknown>;
-    assert.equal(concern.studentId, "student-1");
-    assert.equal(concern.category, "self_harm");
+    assert.equal(mockDetectCrisisSignal.mock.callCount(), 0);
+    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 0);
   });
 
   it("preserves the discovery-stage early return: discovery runs, goals never does", async () => {

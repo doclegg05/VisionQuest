@@ -62,6 +62,7 @@ const mockExecuteAgentTool = mock.fn() as any;
 const mockAssembleStudentContextBundle = mock.fn() as any;
 const mockSelfMetricLineFromBundle = mock.fn() as any;
 const mockGetSituationalSnapshot = mock.fn() as any;
+const mockRecordWellbeingConcern = mock.fn() as any;
 
 // ---------------------------------------------------------------------------
 // withRegistry passthrough — mirrors the withTeacherAuth pattern in
@@ -324,6 +325,18 @@ async function readSseBody(res: Response): Promise<string> {
 let route: Awaited<typeof import("../route")>;
 
 before(async () => {
+  // Crisis detection: keep the real deterministic detector (the 988
+  // safety-net and request-time scan suites prove real patterns match) and
+  // stub only the DB/notification sink. The real module is loaded here, after
+  // the prisma/logger mocks above, so nothing reaches a database.
+  const realCrisisDetection = await import("@/lib/sage/crisis-detection");
+  mock.module("@/lib/sage/crisis-detection", {
+    namedExports: {
+      ...realCrisisDetection,
+      recordWellbeingConcern: mockRecordWellbeingConcern,
+    },
+  });
+
   route = await import("../route");
 });
 
@@ -367,12 +380,14 @@ function resetMocks() {
     mockRunAgentTurn,
     mockExecuteSlashCommand,
     mockExecuteAgentTool,
+    mockRecordWellbeingConcern,
     mockLogger.error,
     mockLogger.warn,
     mockLogger.info,
   ]) {
     m.mock.resetCalls();
   }
+  mockRecordWellbeingConcern.mock.mockImplementation(async () => undefined);
 
   session = mockStudentSession();
   getSessionReturnsNull = false;
@@ -847,5 +862,224 @@ describe("POST /api/chat/send — form commitment → present_form", () => {
     assert.equal(mockGetDirectFormAnswer.mock.callCount(), 0);
     assert.equal(mockRunAgentTurn.mock.callCount(), 0);
     assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Request-time crisis scan (VQ-R-001 / review F4). The deterministic scan must
+// record a wellbeing concern for every student message that carries a crisis
+// signal, on every exit from the handler: provider failure, rate limit,
+// direct answers that never call a model, and stream errors. It passes the
+// category only, never the message text, and staff chat is exempt.
+// ---------------------------------------------------------------------------
+describe("POST /api/chat/send — request-time crisis scan", () => {
+  // Drives the classic streamResponse() path so a mid-stream throw is a real
+  // stream error (the agent loop is mocked to yield nothing).
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const CRISIS_MESSAGE = "I just want to end it all";
+  const REQUESTED_CONVERSATION_ID = "cm1234567890abcdefghijklm";
+
+  function assertConcernRecordedOnce(expected: { studentId: string; category: string }) {
+    assert.equal(
+      mockRecordWellbeingConcern.mock.callCount(),
+      1,
+      "expected exactly one recordWellbeingConcern call",
+    );
+    const [args] = mockRecordWellbeingConcern.mock.calls[0].arguments;
+    // Exact shape: studentId, conversationId, reason, category. Nothing else
+    // — in particular no message text — crosses this boundary.
+    assert.deepEqual(Object.keys(args).sort(), ["category", "conversationId", "reason", "studentId"]);
+    assert.equal(args.studentId, expected.studentId);
+    // The conversation id is never taken from the client (it would land in
+    // StudentAlert.sourceId unverified); the alert keys on student and day.
+    assert.equal(args.conversationId, null);
+    assert.equal(args.reason, "message_signal");
+    assert.equal(args.category, expected.category);
+    assert.doesNotMatch(JSON.stringify(args), /end it all/);
+    // The per-student record cap sits in front of the write on every path.
+    assert.ok(
+      mockRateLimit.mock.calls.some((call) => call.arguments[0] === `crisis:${expected.studentId}`),
+      "expected the per-student crisis record cap to be consulted",
+    );
+  }
+
+  function makeMidStreamFailingProvider(name = "ollama") {
+    return {
+      name,
+      async generateResponse() {
+        throw new Error("upstream connection reset");
+      },
+      async *streamResponse() {
+        yield "I hear ";
+        throw new Error("upstream connection reset");
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+  }
+
+  it("(a) records the concern when provider resolution throws (503)", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => {
+      throw new Error("Local AI server unreachable");
+    });
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: CRISIS_MESSAGE },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 503);
+    assertConcernRecordedOnce({ studentId: session.id, category: "self_harm" });
+  });
+
+  it("(b) records the concern when the hourly rate limit rejects (429); the client-supplied conversation id is not stored", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    // The hourly chat limiter and the crisis record cap are separate keys;
+    // only the chat key is exhausted here.
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key.startsWith("chat:")
+        ? { success: false, remaining: 0, resetTime: Date.now() + 3600_000, degraded: false }
+        : { success: true, remaining: 2, resetTime: Date.now() + 600_000, degraded: false },
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: CRISIS_MESSAGE, conversationId: REQUESTED_CONVERSATION_ID },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 429);
+    assert.equal(mockSaveMessage.mock.callCount(), 0);
+    assertConcernRecordedOnce({ studentId: session.id, category: "self_harm" });
+  });
+
+  it("(c) records the concern when a direct form answer returns without a model call", async () => {
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      {
+        form: { id: "student-profile", title: "SPOKES Student Profile" },
+        url: "/api/forms/download?formId=student-profile&mode=view",
+        score: 40,
+      },
+    ]);
+    mockGetDirectFormAnswer.mock.mockImplementation(
+      () => "Here is the [SPOKES Student Profile](/api/forms/download?formId=student-profile&mode=view).",
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: `${CRISIS_MESSAGE}. Where is the student profile form?` },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    await readSseBody(res);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0, "direct answer must not resolve a provider");
+    assertConcernRecordedOnce({ studentId: session.id, category: "self_harm" });
+  });
+
+  it("(d) records the concern when the stream errors mid-reply", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeMidStreamFailingProvider());
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: CRISIS_MESSAGE },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+    assert.match(body, /"error"/);
+    assert.doesNotMatch(body, /"done":true/);
+    assert.ok(
+      mockLogger.error.mock.calls.some((call) => call.arguments[0] === "Stream error"),
+      "expected the stream error to be logged",
+    );
+    assertConcernRecordedOnce({ studentId: session.id, category: "self_harm" });
+  });
+
+  it("(e) does not scan staff (teacher) chat", async () => {
+    session = mockTeacherSession();
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "A student told me they want to end it all — how should I respond?" },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    await readSseBody(res);
+    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 0);
+    assert.ok(
+      mockRateLimit.mock.calls.every((call) => !String(call.arguments[0]).startsWith("crisis:")),
+      "staff chat must not touch the crisis record cap",
+    );
+  });
+
+  it("(f) on the success path records the concern exactly once, before the provider is resolved", async () => {
+    const order: string[] = [];
+    mockRecordWellbeingConcern.mock.mockImplementation(async () => {
+      order.push("scan");
+    });
+    mockResolveAiProvider.mock.mockImplementation(async () => {
+      order.push("provider");
+      return makeFakeProvider("ollama", ["I hear you, ", "that sounds really hard."]);
+    });
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: CRISIS_MESSAGE },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+    assert.match(body, /"done":true/);
+    assertConcernRecordedOnce({ studentId: session.id, category: "self_harm" });
+    assert.deepEqual(order, ["scan", "provider"]);
+  });
+
+  it("(g) when the per-student record cap is exhausted the reply still streams with 988 and nothing is recorded", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeFakeProvider("ollama", ["I hear you, ", "that sounds really hard."]),
+    );
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key.startsWith("crisis:")
+        ? { success: false, remaining: 0, resetTime: Date.now() + 600_000, degraded: false }
+        : { success: true, remaining: 39, resetTime: Date.now() + 3600_000, degraded: false },
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: CRISIS_MESSAGE },
+    });
+
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+    assert.match(body, /"done":true/);
+    assert.match(body, /988/);
+    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 0);
+    assert.ok(
+      mockLogger.info.mock.calls.some((call) => call.arguments[0] === "Crisis record burst capped"),
+      "expected the capped burst to be logged at info",
+    );
   });
 });
