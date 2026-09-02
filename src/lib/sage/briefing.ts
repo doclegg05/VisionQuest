@@ -222,7 +222,9 @@ export async function runDailyBriefing(
   }
   if (turn.stopReason === "error" || !turn.finalText.trim()) {
     await markFailed(panel.id, "agent_turn_failed", baseMeta);
-    throw new Error(`briefing: agent turn failed for student ${studentId}`); // job retries
+    // Log key, not the id: this message lands in BackgroundJob.error and the
+    // job runner's log line (review F59, 2026-09-01).
+    throw new Error(`briefing: agent turn failed for student ${studentLogKey(studentId)}`); // job retries
   }
 
   // Phase 2 — shape observations into a validated spec (deterministic).
