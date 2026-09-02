@@ -1697,3 +1697,95 @@ describe("POST /api/chat/send — chat limit charged on a reply, not on a confir
     assert.deepEqual(refundCalls(), []);
   });
 });
+
+describe("POST /api/chat/send — interrupted reply on the agent-loop path (F28, R2)", () => {
+  // Default student path: SAGE_AGENT_MODE "full". runAgentTurn catches the
+  // provider failure itself and yields agent_stop { reason: "error" }, so
+  // the route must treat that as a stream error, not a completed reply.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+  const PARTIAL = "Here is the first step: ";
+
+  function post(message: string) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  function agentTurnStoppingWith(reason: "error" | "complete") {
+    return async function* () {
+      yield { type: "text", text: PARTIAL };
+      yield { type: "agent_stop", reason, transcript: [], finalText: PARTIAL };
+    };
+  }
+
+  function assistantSaves() {
+    return mockSaveMessage.mock.calls.filter((call) => call.arguments[2] === "assistant");
+  }
+
+  function auditStatuses(): string[] {
+    return mockLogAiAuditEvent.mock.calls.map((call) => call.arguments[0].status);
+  }
+
+  it("agent_stop error after partial text: marker persisted, error event, failed audit, no XP, no post-response", async () => {
+    mockRunAgentTurn.mock.mockImplementation(agentTurnStoppingWith("error"));
+
+    const res = await post("How do I start on my weekly goal?");
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+
+    assert.match(body, /"error"/);
+    assert.doesNotMatch(body, /"done":true/);
+
+    const saves = assistantSaves();
+    assert.equal(saves.length, 1);
+    const content = String(saves[0].arguments[3]);
+    assert.ok(content.startsWith(PARTIAL), `expected the partial, got: ${content}`);
+    assert.ok(content.endsWith(CUT_OFF_MARKER), `expected the cut-off marker, got: ${content}`);
+
+    assert.ok(auditStatuses().includes("failed"), "expected a failed audit row");
+    assert.ok(!auditStatuses().includes("completed"), "a cut-off turn must not audit as completed");
+    assert.equal(mockAwardEvent.mock.callCount(), 0, "no XP for a cut-off turn");
+    assert.equal(mockHandlePostResponse.mock.callCount(), 0, "no post-response for a cut-off turn");
+  });
+
+  it("agent_stop error on a crisis message: the error event carries the 988 block", async () => {
+    mockRunAgentTurn.mock.mockImplementation(agentTurnStoppingWith("error"));
+
+    const res = await post("I just want to end it all");
+    const body = await readSseBody(res);
+    const line = body.split("\n").find((l) => l.startsWith("data: ") && l.includes('"error"'));
+    assert.ok(line, "expected an SSE error event");
+    const errorText = String((JSON.parse(line!.slice("data: ".length)) as { error: string }).error);
+    assert.match(errorText, /call or text 988/);
+  });
+
+  it("agent_stop complete is still a completed reply (done, completed audit, XP)", async () => {
+    mockRunAgentTurn.mock.mockImplementation(agentTurnStoppingWith("complete"));
+
+    const res = await post("How do I start on my weekly goal?");
+    const body = await readSseBody(res);
+
+    assert.match(body, /"done":true/);
+    assert.doesNotMatch(body, /"error"/);
+    const content = String(assistantSaves()[0].arguments[3]);
+    assert.equal(content, PARTIAL);
+    assert.ok(auditStatuses().includes("completed"));
+    assert.equal(mockAwardEvent.mock.callCount(), 1);
+  });
+});

@@ -1089,9 +1089,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
                 },
                 "action",
               );
+            } else if (event.type === "agent_stop" && event.reason === "error") {
+              // runAgentTurn catches the provider failure itself and reports
+              // it as agent_stop { reason: "error" }, so this loop would
+              // otherwise end normally and a cut-off reply would be persisted,
+              // audited, and rewarded as complete. Throw so the catch below
+              // runs: cut-off marker, 988 block, error event, no XP.
+              throw new Error("The reply stopped before it finished. Please send your message again.");
             }
-            // agent_stop events are internal — chat route drives done/error
-            // via the surrounding try/catch + sendEvent({ done: true }) below.
+            // Other agent_stop reasons (complete, max_hops) are internal —
+            // the route drives done via sendEvent({ done: true }) below.
           }
         } else if (useNonStreaming) {
           fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages);
