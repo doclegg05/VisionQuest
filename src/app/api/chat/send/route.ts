@@ -190,11 +190,14 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Crisis scan — request-time, student-only, never throws. Runs before the
   // direct-answer branches, provider resolution, and rate limits so every
   // exit below still raises the staff alert (VQ-R-001). Single call site:
-  // handlePostResponse does not scan again.
+  // handlePostResponse does not scan again. Notification fan-out is bounded
+  // by the helper's own per-student record cap, not by the hourly chat
+  // limiter below. The exemption covers teacher, admin, and coordinator; a
+  // `cdc` role exists (src/lib/role-home.ts) and would be scanned as a
+  // student if it were ever granted sage.chat (it is not: scripts/seed-rbac.ts).
   if (!isStaffChat) {
     await scanStudentMessageForCrisis({
       studentId: session.id,
-      conversationId,
       userMessage,
     });
   }
