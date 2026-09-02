@@ -1,4 +1,5 @@
 import { studentLogKey } from "./log-keys";
+import { redactContactInfo } from "./log-redaction";
 import { logger } from "./logger";
 
 interface AfterWriteContext {
@@ -23,6 +24,10 @@ interface AfterWriteContext {
  *
  * Only for effects the record stays consistent without. An effect the write
  * depends on belongs before the write, not here.
+ *
+ * The error text is passed through redactContactInfo: effects such as
+ * syncStudentAlerts reach email and SMS delivery, whose errors quote the
+ * recipient's address or number.
  */
 export async function afterWrite(
   effect: () => Promise<unknown> | unknown,
@@ -36,7 +41,7 @@ export async function afterWrite(
       surface: context.surface,
       effect: context.effect,
       student: studentLogKey(context.studentId),
-      error: String(error),
+      error: redactContactInfo(String(error)),
     });
   }
 }

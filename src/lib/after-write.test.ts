@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { studentLogKey } from "@/lib/log-keys";
+import { REDACTED_EMAIL, REDACTED_PHONE } from "@/lib/log-redaction";
 
 const mockWarn = mock.fn<(message: string, context?: Record<string, unknown>) => void>();
 const mockError = mock.fn<(message: string, context?: Record<string, unknown>) => void>();
@@ -85,5 +86,20 @@ describe("afterWrite", () => {
 
     assert.equal(mockWarn.mock.callCount(), 1);
     assert.equal(mockWarn.mock.calls[0].arguments[1]?.error, "Error: sync throw");
+  });
+  it("redacts contact details quoted by a provider error before logging it", async () => {
+    // syncStudentAlerts reaches email and SMS delivery, and SMTP/Twilio error
+    // text quotes the recipient verbatim.
+    await afterWrite(async () => {
+      throw new Error("550 5.1.1 <jane.doe@example.com> rejected; callback +15551234567");
+    }, context);
+
+    assert.equal(mockWarn.mock.callCount(), 1);
+    const logged = String(mockWarn.mock.calls[0].arguments[1]?.error);
+    assert.ok(!logged.includes("jane.doe@example.com"), `email leaked: ${logged}`);
+    assert.ok(!logged.includes("+15551234567"), `phone leaked: ${logged}`);
+    assert.ok(logged.includes(REDACTED_EMAIL), `email not masked: ${logged}`);
+    assert.ok(logged.includes(REDACTED_PHONE), `phone not masked: ${logged}`);
+    assert.ok(logged.includes("550 5.1.1"), "keeps the provider status code");
   });
 });
