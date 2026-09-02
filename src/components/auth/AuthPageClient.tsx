@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
@@ -14,6 +14,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   oauth_token_failed: "Google sign-in failed to authenticate. Please try again or use the form below.",
   oauth_userinfo_failed: "Could not retrieve your Google account info. Please try again or use the form below.",
   oauth_failed: "Google sign-in failed. Please try again or use the form below.",
+  oauth_email_unverified: "Google has not confirmed this email address yet. Confirm it in your Google account, or use the form below to sign in.",
+  oauth_account_mismatch: "This email is already linked to a different Google account. Use the form below to sign in, or ask your teacher for help.",
   auth_failed: "Google sign-in failed. Please try again or use the form below.",
 };
 
@@ -48,6 +50,16 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const oauthError = searchParams.get("error");
   const oauthErrorMessage = oauthError ? (ERROR_MESSAGES[oauthError] || "An error occurred. Please try again.") : null;
+
+  // A Google sign-in on an MFA-enabled account lands here with `?mfa=1`. The
+  // param only flips this form into code-entry mode; the httpOnly challenge
+  // cookie the callback set is the real gate, and /api/auth/mfa/challenge
+  // refuses without it. Read on mount so the server render stays unchanged.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("mfa") !== "1") return;
+    setMfaRequired(true);
+    setMfaMessage("Google sign-in accepted. Enter your 6-digit authenticator code or a saved backup code to finish signing in.");
+  }, []);
 
   const finishLogin = (role: string) => {
     const nextPath =
@@ -229,9 +241,11 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
             {mfaRequired ? (
               <form onSubmit={handleMfaSubmit} className="space-y-4" aria-label="MFA sign in">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-                  Signing in as <span className="font-semibold text-[var(--ink-strong)]">{studentId}</span>.
-                </div>
+                {studentId && (
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+                    Signing in as <span className="font-semibold text-[var(--ink-strong)]">{studentId}</span>.
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="mfaToken" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">Authenticator code or backup code</label>
