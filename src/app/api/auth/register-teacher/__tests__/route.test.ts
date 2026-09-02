@@ -2,7 +2,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest } from "@/lib/test-helpers";
-import { studentLogKey } from "@/lib/log-keys";
 
 // ---------------------------------------------------------------------------
 // register-teacher (staff registration) route — request-level tests
@@ -23,6 +22,9 @@ import { studentLogKey } from "@/lib/log-keys";
 
 type CookieRecord = { studentId: string; role: string; sessionVersion: number };
 const cookieSets: CookieRecord[] = [];
+
+/** Order of the DB update and the session-cache invalidation on the promotion path. */
+const callOrder: string[] = [];
 
 const mockFindFirst = mock.fn() as any;
 const mockCreate = mock.fn() as any;
@@ -116,11 +118,14 @@ function promotionRequest(overrides: Record<string, unknown> = {}) {
 
 function stubExistingTeacherPromotion() {
   mockFindFirst.mock.mockImplementation(async () => ({ ...EXISTING_TEACHER }));
-  mockUpdate.mock.mockImplementation(async () => ({
-    ...EXISTING_TEACHER,
-    role: "admin",
-    sessionVersion: EXISTING_TEACHER.sessionVersion + 1,
-  }));
+  mockUpdate.mock.mockImplementation(async () => {
+    callOrder.push("update");
+    return {
+      ...EXISTING_TEACHER,
+      role: "admin",
+      sessionVersion: EXISTING_TEACHER.sessionVersion + 1,
+    };
+  });
 }
 
 before(async () => {
@@ -147,6 +152,7 @@ after(() => {
 describe("POST /api/auth/register-teacher (staff registration)", () => {
   beforeEach(() => {
     cookieSets.length = 0;
+    callOrder.length = 0;
     mockFindFirst.mock.resetCalls();
     mockCreate.mock.resetCalls();
     mockUpdate.mock.resetCalls();
@@ -161,13 +167,18 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       resetTime: Date.now() + 60_000,
     }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
-    mockInvalidateSessionCache.mock.mockImplementation(() => undefined);
-    mockUpdate.mock.mockImplementation(async () => ({
-      id: "tch-1",
-      studentId: "alice",
-      displayName: "Alice",
-      role: "teacher",
-    }));
+    mockInvalidateSessionCache.mock.mockImplementation(() => {
+      callOrder.push("invalidate");
+    });
+    mockUpdate.mock.mockImplementation(async () => {
+      callOrder.push("update");
+      return {
+        id: "tch-1",
+        studentId: "alice",
+        displayName: "Alice",
+        role: "teacher",
+      };
+    });
   });
 
   describe("ADMIN_KEY promotion of an existing teacher (review F11 / SEC-05)", () => {
@@ -175,7 +186,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       stubExistingTeacherPromotion();
 
       const res = await registerRoute.POST(promotionRequest() as never);
-      const body = (await res.json()) as { student: { id: string; displayName: string; role: string } };
+      const body = (await res.json()) as { student: Record<string, unknown> };
 
       assert.equal(res.status, 200);
       assert.equal(mockUpdate.mock.callCount(), 1, "expected exactly one student update");
@@ -198,13 +209,20 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       );
       assert.equal(mockInvalidateSessionCache.mock.callCount(), 1);
       assert.equal(mockInvalidateSessionCache.mock.calls[0].arguments[0], EXISTING_TEACHER.id);
+      assert.deepEqual(
+        callOrder,
+        ["update", "invalidate"],
+        "the cache entry must be dropped after the row changes, or a stale read can be re-cached",
+      );
 
-      assert.equal(body.student.id, EXISTING_TEACHER.id);
-      assert.equal(body.student.role, "admin");
-      assert.equal(body.student.displayName, EXISTING_TEACHER.displayName);
+      assert.deepEqual(
+        body.student,
+        { id: EXISTING_TEACHER.id, role: "admin" },
+        "promotion returns id and role only, never the stored displayName or studentId",
+      );
     });
 
-    it("audits the promotion as the admin key, keyed by studentLogKey, not as the promoted account", async () => {
+    it("audits the promotion as the admin key, not as the promoted account", async () => {
       stubExistingTeacherPromotion();
 
       await registerRoute.POST(promotionRequest() as never);
@@ -217,13 +235,18 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.equal(event.targetType, "student");
       assert.equal(event.targetId, EXISTING_TEACHER.id);
 
-      const logKey = studentLogKey(EXISTING_TEACHER.id);
-      assert.match(event.summary, new RegExp(logKey));
-      assert.equal(event.metadata.targetLogKey, logKey);
       assert.equal(event.metadata.actor, "admin-key");
       assert.equal(event.metadata.previousRole, "teacher");
       assert.equal(event.metadata.newRole, "admin");
-      assert.doesNotMatch(event.summary, /alice@example\.com|Mallory/i, "summary must not carry the email or request name");
+      assert.equal("targetLogKey" in event.metadata, false, "the log-key digest is for logs, not storage");
+
+      const identifying = /alice@example\.com|Alice|Mallory/i;
+      assert.doesNotMatch(event.summary, identifying, "summary must not carry the email or any name");
+      assert.doesNotMatch(
+        JSON.stringify(event.metadata),
+        identifying,
+        "metadata must not carry the email or any name",
+      );
     });
 
     it("issues no session cookie and leaves MFA state untouched", async () => {

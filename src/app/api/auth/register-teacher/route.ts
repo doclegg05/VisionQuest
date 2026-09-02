@@ -12,7 +12,6 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
-import { studentLogKey } from "@/lib/log-keys";
 import { parseBody, registerStaffSchema } from "@/lib/schemas";
 
 function normalizeKey(value: unknown): string {
@@ -95,11 +94,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     const promoted = await prisma.student.update({
       where: { id: existing.id },
       data: { role: "admin", sessionVersion: { increment: 1 } },
-      select: { id: true, studentId: true, displayName: true, role: true },
+      select: { id: true, role: true },
     });
     invalidateSessionCache(promoted.id);
 
-    const targetLogKey = studentLogKey(promoted.id);
+    // targetId identifies the row; no log key here because the digest is a
+    // logging aid that must not be stored (src/lib/log-keys.ts).
     await logAuditEvent({
       actorId: ADMIN_KEY_ACTOR,
       actorRole: ADMIN_KEY_ACTOR,
@@ -107,25 +107,21 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       targetType: "student",
       targetId: promoted.id,
       summary:
-        `Teacher promoted to admin with ADMIN_KEY (${targetLogKey}); ` +
+        "Teacher promoted to admin with ADMIN_KEY; " +
         "password, display name and MFA unchanged; existing sessions invalidated.",
       metadata: {
         ip,
         actor: ADMIN_KEY_ACTOR,
-        targetLogKey,
         previousRole: existing.role,
         newRole: promoted.role,
         ignoredFields: [...PROMOTION_IGNORED_FIELDS],
       },
     });
 
+    // id and role only: the key holder is not authenticated as anyone, so the
+    // response carries nothing about the account beyond what they supplied.
     return NextResponse.json({
-      student: {
-        id: promoted.id,
-        studentId: promoted.studentId,
-        displayName: promoted.displayName,
-        role: promoted.role,
-      },
+      student: { id: promoted.id, role: promoted.role },
       promoted: true,
       sessionIssued: false,
       ignoredFields: [...PROMOTION_IGNORED_FIELDS],
