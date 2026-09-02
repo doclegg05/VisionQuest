@@ -1251,3 +1251,118 @@ describe("POST /api/chat/send — student-safe alert context (F61)", () => {
     assert.doesNotMatch(captured.systemPrompt, /archiv/i);
   });
 });
+
+describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
+  // Classic streamResponse() path so a mid-stream throw is a real stream
+  // error (the agent loop is mocked to yield nothing).
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  // Student-facing marker on the persisted partial (grade-6 copy). Pinned
+  // here so a wording change is a deliberate test change.
+  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+
+  function makeProviderFailingAfter(chunks: string[]) {
+    return {
+      name: "ollama",
+      async generateResponse() {
+        throw new Error("upstream connection reset");
+      },
+      async *streamResponse() {
+        for (const chunk of chunks) yield chunk;
+        throw new Error("upstream connection reset");
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+  }
+
+  function assistantSaves() {
+    return mockSaveMessage.mock.calls.filter((call) => call.arguments[2] === "assistant");
+  }
+
+  it("persists the partial reply marked as cut off, and still sends the SSE error event", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeProviderFailingAfter(["Here is the first step: ", "open your goal list."]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How do I start on my weekly goal?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+
+    // The client still learns the turn failed.
+    assert.match(body, /"error"/);
+    assert.doesNotMatch(body, /"done":true/);
+
+    // The transcript stays two-sided: user message + partial assistant reply.
+    const saves = assistantSaves();
+    assert.equal(saves.length, 1, "expected exactly one assistant saveMessage call");
+    const [conversationId, studentId, , content] = saves[0].arguments;
+    assert.equal(conversationId, "conv-1");
+    assert.equal(studentId, session.id);
+    assert.ok(
+      String(content).startsWith("Here is the first step: open your goal list."),
+      `partial text should be persisted verbatim, got: ${String(content)}`,
+    );
+    assert.ok(String(content).endsWith(CUT_OFF_MARKER), `expected the cut-off marker, got: ${String(content)}`);
+  });
+
+  it("does not persist an empty assistant turn when the stream fails before the first token", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeProviderFailingAfter([]));
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How do I start on my weekly goal?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.match(body, /"error"/);
+    assert.equal(assistantSaves().length, 0, "nothing streamed, nothing to persist");
+  });
+
+  it("still sends the SSE error event when persisting the partial reply fails", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeProviderFailingAfter(["Here is the first step: "]),
+    );
+    mockSaveMessage.mock.mockImplementation(async (_c: string, _s: string, role: string) => {
+      if (role === "assistant") throw new Error("db write failed");
+      return { id: "test-msg-id" };
+    });
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How do I start on my weekly goal?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.match(body, /"error"/);
+    assert.equal(assistantSaves().length, 1, "the persist was attempted");
+    assert.ok(
+      mockLogger.error.mock.calls.some((call) => call.arguments[0] === "Failed to persist interrupted reply"),
+      "expected the failed persist to be logged",
+    );
+    // The original stream error is still the one reported to the client.
+    assert.match(body, /upstream connection reset/);
+  });
+});

@@ -59,6 +59,25 @@ import { studentLogKey } from "@/lib/log-keys";
 
 const CHAT_SSE_HEARTBEAT_MS = 15_000;
 
+/**
+ * Ceiling on a persisted assistant message so a model that goes off the
+ * rails cannot produce an unbounded DB write (40k chars ≈ 10k tokens).
+ */
+const MAX_ASSISTANT_CHARS = 40_000;
+const TRUNCATED_REPLY_SUFFIX = "\n[…truncated by server — response exceeded length cap]";
+/**
+ * Appended to a partial reply persisted after a mid-stream failure, so the
+ * transcript stays two-sided and the student can see why it stops short.
+ * Student-facing copy: keep it plain (grade-6 reading level).
+ */
+const INTERRUPTED_REPLY_SUFFIX = "\n\n[Sage got cut off here. Send your message again to keep going.]";
+
+function capForPersist(text: string): string {
+  return text.length > MAX_ASSISTANT_CHARS
+    ? text.slice(0, MAX_ASSISTANT_CHARS) + TRUNCATED_REPLY_SUFFIX
+    : text;
+}
+
 const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|yeah|nah|yup|hm|hmm|wow|oh|ah|lol|haha|bye|goodbye|cya)[!.,?]*$/i;
 
 /**
@@ -1061,12 +1080,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }
         }
 
-        // Save assistant message (truncate to avoid unbounded DB writes if the
-        // model goes off the rails — 40k chars ≈ 10k tokens, generous ceiling).
-        const MAX_ASSISTANT_CHARS = 40_000;
-        const persisted = fullResponse.length > MAX_ASSISTANT_CHARS
-          ? fullResponse.slice(0, MAX_ASSISTANT_CHARS) + "\n[…truncated by server — response exceeded length cap]"
-          : fullResponse;
+        // Save assistant message (capped — see capForPersist).
+        const persisted = capForPersist(fullResponse);
         if (persisted.length !== fullResponse.length) {
           logger.warn("Assistant message truncated before persist", {
             conversationId: conversation.id,
@@ -1161,6 +1176,25 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           logger.warn("Chat SSE client disconnected", logPayload);
         } else {
           logger.error("Stream error", logPayload);
+        }
+        // Keep the transcript two-sided: persist whatever Sage streamed
+        // before the failure, marked so the student knows it was cut off.
+        // A failed persist is logged and never hides the original error
+        // from the client below.
+        if (fullResponse.length > 0) {
+          try {
+            await saveMessage(
+              conversation.id,
+              session.id,
+              "assistant",
+              capForPersist(fullResponse) + INTERRUPTED_REPLY_SUFFIX,
+            );
+          } catch (persistError) {
+            logger.error("Failed to persist interrupted reply", {
+              conversationId: conversation.id,
+              error: String(persistError),
+            });
+          }
         }
         await logAiAuditEvent({
           actorId: session.id,
