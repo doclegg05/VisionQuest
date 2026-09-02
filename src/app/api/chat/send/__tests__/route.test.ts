@@ -163,6 +163,9 @@ mock.module("@/lib/logger", {
 mock.module("@/lib/sage/system-prompts", {
   namedExports: {
     buildSystemPrompt: mockBuildSystemPrompt,
+    // renderRecentActivity sanitizes alert lines through this; identity is
+    // enough here — the sanitizer has its own tests.
+    sanitizeForPrompt: (text: string) => text,
     // ConversationStage is a type-only export — not needed at runtime.
   },
 });
@@ -1110,5 +1113,141 @@ describe("POST /api/chat/send — request-time crisis scan", () => {
       mockLogger.info.mock.calls.some((call) => call.arguments[0] === "Crisis record burst capped"),
       "expected the capped burst to be logged at info",
     );
+  });
+});
+
+describe("POST /api/chat/send — student-safe alert context (F61)", () => {
+  // Classic streamResponse() path so a capturing provider double can read
+  // the assembled system prompt the route hands to the model.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  function makePromptCapturingProvider() {
+    const captured = { systemPrompt: "" };
+    const provider = {
+      name: "ollama",
+      async generateResponse(systemPrompt: string) {
+        captured.systemPrompt = systemPrompt;
+        return "ok";
+      },
+      async *streamResponse(systemPrompt: string) {
+        captured.systemPrompt = systemPrompt;
+        yield "ok";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+    return { provider, captured };
+  }
+
+  function bundleWithAlerts(alerts: Array<{ type: string; severity: string; title: string; summary: string }>) {
+    return {
+      chatPromptContext: {
+        priorConversationContext: "",
+        goalsByLevel: {},
+        goalsSummary: "",
+      },
+      recentEvents: [],
+      alerts: alerts.map((alert) => ({ ...alert, alertKey: `${alert.type}:stu` })),
+      meta: { selfMetrics: undefined },
+    };
+  }
+
+  it("keeps a staff-only descriptor (inactive_student_90) out of the student prompt", async () => {
+    const { provider, captured } = makePromptCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () =>
+      bundleWithAlerts([
+        {
+          type: "inactive_student_90",
+          severity: "critical",
+          title: "Inactive 90+ days",
+          summary: "No recorded student activity since Jun 1. Consider archiving the student.",
+        },
+      ]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hi Sage, I'm back. What did I miss?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+
+    assert.ok(captured.systemPrompt.length > 0, "provider should have received a system prompt");
+    assert.doesNotMatch(captured.systemPrompt, /ACTIVE ALERTS/);
+    assert.doesNotMatch(captured.systemPrompt, /archiv/i);
+    assert.doesNotMatch(captured.systemPrompt, /Inactive 90/);
+  });
+
+  it("still renders a student-visible descriptor (overdue_task) as an ACTIVE ALERTS line", async () => {
+    const { provider, captured } = makePromptCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () =>
+      bundleWithAlerts([
+        {
+          type: "overdue_task",
+          severity: "warning",
+          title: "Overdue task",
+          summary: "Finish the resume draft was due Aug 30.",
+        },
+      ]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hi Sage, I'm back. What did I miss?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+
+    assert.match(captured.systemPrompt, /ACTIVE ALERTS/);
+    assert.match(captured.systemPrompt, /Overdue task/);
+  });
+
+  it("drops the staff-only descriptor and keeps the student-visible one when both are present", async () => {
+    const { provider, captured } = makePromptCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () =>
+      bundleWithAlerts([
+        {
+          type: "inactive_student_90",
+          severity: "critical",
+          title: "Inactive 90+ days",
+          summary: "Consider archiving the student.",
+        },
+        {
+          type: "missed_appointment",
+          severity: "warning",
+          title: "Missed appointment",
+          summary: "Advising check-in on Aug 28 was missed.",
+        },
+      ]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hi Sage, I'm back. What did I miss?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+
+    assert.match(captured.systemPrompt, /Missed appointment/);
+    assert.doesNotMatch(captured.systemPrompt, /archiv/i);
   });
 });

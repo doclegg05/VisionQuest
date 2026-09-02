@@ -34,7 +34,9 @@ import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
 import {
   assembleStudentContextBundle,
   selfMetricLineFromBundle,
+  type AlertSummary,
 } from "@/lib/sage/context-bundle";
+import { STUDENT_VISIBLE_ALERT_TYPES } from "@/lib/student-alerts";
 import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
 import { renderRecentActivity } from "@/lib/sage/recent-activity";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
@@ -89,6 +91,21 @@ function getDirectSmallTalkAnswer(message: string): string | null {
     return "You're welcome. Send me the next thing you want help with when you're ready.";
   }
   return null;
+}
+
+const STUDENT_VISIBLE_ALERT_TYPE_SET: ReadonlySet<string> = new Set(STUDENT_VISIBLE_ALERT_TYPES);
+
+/**
+ * Alert descriptors a student may read. bundle.alerts is built from the
+ * staff-facing advising descriptors (inactivity stages say "consider
+ * archiving", certification stalls name the instructor's next step), and
+ * without this filter those lines reached the student's own Sage prompt. Only
+ * the types whose copy is written for the student pass (the same set the
+ * Advising page shows). With today's bundle inputs — no tasks or appointments
+ * are passed to the descriptor builder — that is no alerts at all.
+ */
+function studentVisibleAlerts(alerts: readonly AlertSummary[] | undefined): AlertSummary[] {
+  return (alerts ?? []).filter((alert) => STUDENT_VISIBLE_ALERT_TYPE_SET.has(alert.type));
 }
 
 function formatStreamErrorForClient(message: string, cause?: string): string {
@@ -594,7 +611,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     if (conversationStage !== "discovery") {
       recentActivityBlock = renderRecentActivity({
         events: bundle.recentEvents,
-        alerts: bundle.alerts,
+        alerts: studentVisibleAlerts(bundle.alerts),
       });
     }
   }
