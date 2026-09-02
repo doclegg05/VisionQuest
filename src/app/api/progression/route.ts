@@ -1,44 +1,17 @@
 import { NextResponse } from "next/server";
-import { getXpProgress, getAchievementsWithDefs, recordDailyCheckin, checkReadinessAchievements } from "@/lib/progression/engine";
+import { getXpProgress, getAchievementsWithDefs } from "@/lib/progression/engine";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
-import { awardEvent, getRecentEvents } from "@/lib/progression/events";
+import { getRecentEvents } from "@/lib/progression/events";
 import { withAuth } from "@/lib/api-error";
 
+/**
+ * Read-only progression snapshot. The daily check-in that used to be awarded
+ * here lives at POST /api/progression/checkin (2026-09-01 review F25 /
+ * VQ-R-006): a GET must not mint XP or record achievements.
+ */
 export const GET = withAuth(async (session) => {
-  // Daily check-in: award XP if the student hasn't checked in today
-  const today = new Date().toISOString().slice(0, 10);
-  await awardEvent({
-    studentId: session.id,
-    eventType: "daily_checkin",
-    sourceType: "checkin",
-    sourceId: today,
-    xp: 15,
-    mutate: (state) => recordDailyCheckin(state),
-  });
-
-  // Re-read after potential daily checkin write, then check readiness achievements
-  const readinessData = await fetchStudentReadinessData(session.id);
-  const freshState = readinessData.state;
-  const readiness = readinessData.readiness;
-
-  const prevAchievementCount = freshState.achievements.length;
-  checkReadinessAchievements(freshState, readiness.score);
-  if (freshState.achievements.length > prevAchievementCount) {
-    await awardEvent({
-      studentId: session.id,
-      eventType: "readiness_check",
-      sourceType: "readiness",
-      sourceId: today,
-      xp: 0,
-      mutate: (state) => checkReadinessAchievements(state, readiness.score),
-    });
-  }
-
-  // Final read for display
-  const finalReadinessData = await fetchStudentReadinessData(session.id);
-  const state = finalReadinessData.state;
+  const { state, readiness } = await fetchStudentReadinessData(session.id);
   const xpProgress = getXpProgress(state);
-  const finalReadiness = finalReadinessData.readiness;
   const achievements = getAchievementsWithDefs(state);
 
   // Recent activity: last 5 achievements with timestamps (from achievements array order)
@@ -56,8 +29,8 @@ export const GET = withAuth(async (session) => {
     achievementsWithDefs: achievements,
     recentAchievements,
     lastLevelUp,
-    readinessScore: finalReadiness.score,
-    readinessBreakdown: finalReadiness.breakdown,
+    readinessScore: readiness.score,
+    readinessBreakdown: readiness.breakdown,
     recentEvents,
   });
 });
