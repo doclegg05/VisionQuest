@@ -29,8 +29,9 @@ import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
-import { ensureCrisisResources } from "@/lib/chat/crisis-safety-net";
+import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
+import { detectCrisisSignal } from "@/lib/sage/crisis-detection";
 import {
   assembleStudentContextBundle,
   selfMetricLineFromBundle,
@@ -238,6 +239,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       userMessage,
     });
   }
+  // The student-facing 988 block for every exit below. The scan above keeps
+  // its detection to itself (it only raises the staff alert), so this is the
+  // one extra detection per request; no path detects again. Staff: null.
+  const crisisSignal = isStaffChat ? null : detectCrisisSignal(userMessage);
+  /** `text` plus the 988 block when the message carried a crisis signal. */
+  const withCrisisResources = (text: string): string =>
+    text + (crisisResourceBlockFor(crisisSignal, "") ?? "");
 
   // Deterministic form lookup — bypasses discovery/goal stage prompts so a
   // student who asks for a form gets it even mid-onboarding.
@@ -386,9 +394,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
     return new Response(
       JSON.stringify({
-        error: isOffline
-          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
-          : "Sage is temporarily unavailable. Please try again in a moment.",
+        error: withCrisisResources(
+          isOffline
+            ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
+            : "Sage is temporarily unavailable. Please try again in a moment.",
+        ),
       }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
@@ -441,7 +451,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
     if (!hourlyRl.success) {
       return new Response(
-        JSON.stringify({ error: "Too many messages this hour. Please wait before sending more." }),
+        JSON.stringify({
+          error: withCrisisResources("Too many messages this hour. Please wait before sending more."),
+        }),
         { status: 429 },
       );
     }
@@ -453,7 +465,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       const dailyRl = await rateLimitDaily(`chat-daily:${session.id}`, dailyLimit);
       if (!dailyRl.success) {
         return new Response(
-          JSON.stringify({ error: "I've reached my daily limit. I'll be fresh and ready tomorrow! For urgent questions, please ask your instructor." }),
+          JSON.stringify({
+            error: withCrisisResources(
+              "I've reached my daily limit. I'll be fresh and ready tomorrow! For urgent questions, please ask your instructor.",
+            ),
+          }),
           { status: 429 },
         );
       }
@@ -467,7 +483,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     : { allowed: true, warning: null };
   if (!quota.allowed) {
     return new Response(
-      JSON.stringify({ error: quota.warning }),
+      JSON.stringify({ error: withCrisisResources(quota.warning ?? "") }),
       { status: 429, headers: { "Content-Type": "application/json" } },
     );
   }
@@ -1073,7 +1089,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         // the reply itself, and folded into fullResponse BEFORE persisting so
         // conversation history matches exactly what the student saw.
         if (!isStaffChat) {
-          const crisisBlock = ensureCrisisResources(fullResponse, userMessage);
+          const crisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse);
           if (crisisBlock) {
             fullResponse += crisisBlock;
             sendEvent({ type: "text", text: crisisBlock }, "text");
@@ -1177,6 +1193,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         } else {
           logger.error("Stream error", logPayload);
         }
+        // 988 for the student in the moment, on the error event and in the
+        // persisted partial alike; skipped when the streamed text already
+        // carries it. Decided once here for both uses.
+        const crisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse) ?? "";
         // Keep the transcript two-sided: persist whatever Sage streamed
         // before the failure, marked so the student knows it was cut off.
         // A failed persist is logged and never hides the original error
@@ -1187,7 +1207,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
               conversation.id,
               session.id,
               "assistant",
-              capForPersist(fullResponse) + INTERRUPTED_REPLY_SUFFIX,
+              capForPersist(fullResponse) + INTERRUPTED_REPLY_SUFFIX + crisisBlock,
             );
           } catch (persistError) {
             logger.error("Failed to persist interrupted reply", {
@@ -1221,7 +1241,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         });
         if (!clientClosed) {
           try {
-            sendEvent({ error: formatStreamErrorForClient(msg, cause) }, "error");
+            sendEvent({ error: formatStreamErrorForClient(msg, cause) + crisisBlock }, "error");
           } catch {
             // The client went away while we were reporting the original error.
           }

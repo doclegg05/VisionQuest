@@ -1366,3 +1366,199 @@ describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
     assert.match(body, /upstream connection reset/);
   });
 });
+
+describe("POST /api/chat/send — 988 resources on error paths (F60)", () => {
+  // Classic streamResponse() path so a mid-stream throw is a real stream error.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const CRISIS_MESSAGE = "I just want to end it all";
+  const CRISIS_MESSAGE_ES = "ya no aguanto, me quiero morir";
+  const NORMAL_MESSAGE = "How do I finish my OSHA 10 certification?";
+  // Distinctive substrings of the two existing blocks (crisis-safety-net.ts).
+  const EN_BLOCK = /call or text 988/;
+  const ES_BLOCK = /oprime 2 para español/;
+
+  function post(message: string) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  function providerDown() {
+    mockResolveAiProvider.mock.mockImplementation(async () => {
+      throw new Error("Local AI server unreachable");
+    });
+  }
+
+  function hourlyLimitExhausted() {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key.startsWith("chat:")
+        ? { success: false, remaining: 0, resetTime: Date.now() + 3600_000, degraded: false }
+        : { success: true, remaining: 2, resetTime: Date.now() + 600_000, degraded: false },
+    );
+  }
+
+  function makeMidStreamFailingProvider(chunks: string[]) {
+    return {
+      name: "ollama",
+      async generateResponse() {
+        throw new Error("upstream connection reset");
+      },
+      async *streamResponse() {
+        for (const chunk of chunks) yield chunk;
+        throw new Error("upstream connection reset");
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+  }
+
+  describe("provider failure (503)", () => {
+    it("includes the 988 block in the error body for a crisis message", async () => {
+      providerDown();
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.match(body.error, /Sage is offline right now/);
+      assert.match(body.error, EN_BLOCK);
+    });
+
+    it("localizes the block to Spanish for a Spanish-pattern match", async () => {
+      providerDown();
+      const res = await post(CRISIS_MESSAGE_ES);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.match(body.error, ES_BLOCK);
+      assert.doesNotMatch(body.error, EN_BLOCK);
+    });
+
+    it("keeps the error body plain for a normal message", async () => {
+      providerDown();
+      const res = await post(NORMAL_MESSAGE);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.doesNotMatch(body.error, /988/);
+    });
+
+    it("does not add the block for staff (teacher) chat", async () => {
+      session = mockTeacherSession();
+      providerDown();
+      const res = await post("A student told me they want to end it all — what do I do?");
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.doesNotMatch(body.error, /988/);
+    });
+  });
+
+  describe("rate limits (429)", () => {
+    it("hourly cap: includes the 988 block for a crisis message", async () => {
+      hourlyLimitExhausted();
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.match(body.error, /Too many messages this hour/);
+      assert.match(body.error, EN_BLOCK);
+    });
+
+    it("hourly cap: keeps the error body plain for a normal message", async () => {
+      hourlyLimitExhausted();
+      const res = await post(NORMAL_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.doesNotMatch(body.error, /988/);
+    });
+
+    it("daily cap: includes the 988 block for a crisis message", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+      mockRateLimitDaily.mock.mockImplementation(async () => ({
+        success: false,
+        remaining: 0,
+        resetTime: Date.now() + 3600_000,
+        degraded: false,
+      }));
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.match(body.error, /daily limit/);
+      assert.match(body.error, EN_BLOCK);
+    });
+
+    it("token quota: includes the 988 block for a crisis message", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+      mockCheckTokenQuota.mock.mockImplementation(async () => ({
+        allowed: false,
+        warning: "You have used all of today's Sage time. Please try again tomorrow.",
+      }));
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.match(body.error, /Sage time/);
+      assert.match(body.error, EN_BLOCK);
+    });
+  });
+
+  describe("stream error (SSE error event)", () => {
+    function errorEventText(body: string): string {
+      const line = body
+        .split("\n")
+        .find((l) => l.startsWith("data: ") && l.includes('"error"'));
+      assert.ok(line, "expected an SSE error event");
+      return String((JSON.parse(line!.slice("data: ".length)) as { error: string }).error);
+    }
+
+    it("includes the 988 block in the error event for a crisis message, and in the persisted partial", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () =>
+        makeMidStreamFailingProvider(["I hear you, "]),
+      );
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 200);
+      const body = await readSseBody(res);
+      const errorText = errorEventText(body);
+      assert.match(errorText, /AI streaming failed/);
+      assert.match(errorText, EN_BLOCK);
+
+      // Transcript parity: what the student saw in the moment is what the
+      // reload shows.
+      const assistantCall = mockSaveMessage.mock.calls.find((call) => call.arguments[2] === "assistant");
+      assert.ok(assistantCall, "expected the partial to be persisted");
+      assert.match(String(assistantCall!.arguments[3]), EN_BLOCK);
+    });
+
+    it("does not repeat the block when the streamed partial already carries 988", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () =>
+        makeMidStreamFailingProvider(["Please call or text 988 right now. "]),
+      );
+      const res = await post(CRISIS_MESSAGE);
+      const body = await readSseBody(res);
+      const errorText = errorEventText(body);
+      assert.doesNotMatch(errorText, /988/);
+      const occurrences = (body.match(/988/g) ?? []).length;
+      assert.equal(occurrences, 1, "988 appears once — from the streamed text, not a second block");
+    });
+
+    it("keeps the error event plain for a normal message", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () =>
+        makeMidStreamFailingProvider(["Sure, first "]),
+      );
+      const res = await post(NORMAL_MESSAGE);
+      const body = await readSseBody(res);
+      assert.doesNotMatch(body, /988/);
+    });
+  });
+});
