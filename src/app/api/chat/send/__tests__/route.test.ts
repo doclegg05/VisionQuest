@@ -1350,7 +1350,16 @@ describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
       makeProviderFailingAfter(["Here is the first step: "]),
     );
     mockSaveMessage.mock.mockImplementation(async (_c: string, _s: string, role: string) => {
-      if (role === "assistant") throw new Error("db write failed");
+      if (role === "assistant") {
+        // Shaped like a Prisma known-request error: its message quotes the
+        // invocation, which includes the reply text (student chat content).
+        const err = new Error(
+          "Invalid `prisma.message.create()` invocation: content: 'Here is the first step: ' value too long",
+        ) as Error & { code: string };
+        err.name = "PrismaClientKnownRequestError";
+        err.code = "P2000";
+        throw err;
+      }
       return { id: "test-msg-id" };
     });
 
@@ -1363,10 +1372,15 @@ describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
 
     assert.match(body, /"error"/);
     assert.equal(assistantSaves().length, 1, "the persist was attempted");
-    assert.ok(
-      mockLogger.error.mock.calls.some((call) => call.arguments[0] === "Failed to persist interrupted reply"),
-      "expected the failed persist to be logged",
+    const logCall = mockLogger.error.mock.calls.find(
+      (call) => call.arguments[0] === "Failed to persist interrupted reply",
     );
+    assert.ok(logCall, "expected the failed persist to be logged");
+    const payload = logCall!.arguments[1] as Record<string, unknown>;
+    // Chat content never reaches logs: name and Prisma code only.
+    assert.doesNotMatch(JSON.stringify(payload), /Here is the first step/);
+    assert.equal(payload.errorName, "PrismaClientKnownRequestError");
+    assert.equal(payload.code, "P2000");
     // The original stream error is still the one reported to the client.
     assert.match(body, /upstream connection reset/);
   });
@@ -1787,5 +1801,79 @@ describe("POST /api/chat/send — interrupted reply on the agent-loop path (F28,
     assert.equal(content, PARTIAL);
     assert.ok(auditStatuses().includes("completed"));
     assert.equal(mockAwardEvent.mock.callCount(), 1);
+  });
+});
+
+describe("POST /api/chat/send — 988 resources on the form-lookup exits (F60, R3)", () => {
+  beforeEach(() => {
+    resetMocks();
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      {
+        form: { id: "student-profile", title: "SPOKES Student Profile" },
+        url: "/api/forms/download?formId=student-profile&mode=view",
+        score: 40,
+      },
+    ]);
+    mockGetDirectFormAnswer.mock.mockImplementation(
+      () => "Here is the [SPOKES Student Profile](/api/forms/download?formId=student-profile&mode=view).",
+    );
+  });
+
+  const CRISIS_FORM_ASK = "I just want to end it all. Where is the student profile form?";
+  const NORMAL_FORM_ASK = "Where is the student profile form?";
+  const EN_BLOCK = /call or text 988/;
+
+  async function postWithAgentMode(mode: "off" | "full", message: string) {
+    const previousMode = process.env.SAGE_AGENT_MODE;
+    const previousFlag = process.env.SAGE_AGENT_ENABLED;
+    process.env.SAGE_AGENT_MODE = mode;
+    delete process.env.SAGE_AGENT_ENABLED;
+    try {
+      const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+      const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+      return readSseBody(res);
+    } finally {
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
+      if (previousFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+      else process.env.SAGE_AGENT_ENABLED = previousFlag;
+    }
+  }
+
+  function persistedAssistant(): string {
+    const call = mockSaveMessage.mock.calls.find((c) => c.arguments[2] === "assistant");
+    assert.ok(call, "expected an assistant saveMessage call");
+    return String(call!.arguments[3]);
+  }
+
+  it("direct form answer (agent loop off): the reply and the persisted message carry the block", async () => {
+    const body = await postWithAgentMode("off", CRISIS_FORM_ASK);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0, "direct answer must not resolve a provider");
+    assert.match(body, EN_BLOCK);
+    assert.match(persistedAssistant(), EN_BLOCK);
+    assert.match(persistedAssistant(), /SPOKES Student Profile/);
+  });
+
+  it("present_form card (agent loop on): the reply and the persisted message carry the block", async () => {
+    const body = await postWithAgentMode("full", CRISIS_FORM_ASK);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0, "direct answer must not resolve a provider");
+    assert.match(body, /"open_form"/);
+    assert.match(body, EN_BLOCK);
+    assert.match(persistedAssistant(), EN_BLOCK);
+  });
+
+  it("a plain form ask stays plain on both paths", async () => {
+    const offBody = await postWithAgentMode("off", NORMAL_FORM_ASK);
+    assert.doesNotMatch(offBody, /988/);
+    resetMocks();
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      {
+        form: { id: "student-profile", title: "SPOKES Student Profile" },
+        url: "/api/forms/download?formId=student-profile&mode=view",
+        score: 40,
+      },
+    ]);
+    const onBody = await postWithAgentMode("full", NORMAL_FORM_ASK);
+    assert.doesNotMatch(onBody, /988/);
   });
 });

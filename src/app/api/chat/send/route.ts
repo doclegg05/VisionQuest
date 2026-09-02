@@ -73,6 +73,13 @@ const TRUNCATED_REPLY_SUFFIX = "\n[…truncated by server — response exceeded 
  */
 const INTERRUPTED_REPLY_SUFFIX = "\n\n[Sage got cut off here. Send your message again to keep going.]";
 
+/** Prisma's `code` on a known-request error, when present; nothing else is read. */
+function prismaErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+  const code = (error as { code: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
 function capForPersist(text: string): string {
   return text.length > MAX_ASSISTANT_CHARS
     ? text.slice(0, MAX_ASSISTANT_CHARS) + TRUNCATED_REPLY_SUFFIX
@@ -258,12 +265,15 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const directSmallTalkAnswer = getDirectSmallTalkAnswer(userMessage);
 
   if (directFormAnswer) {
+    // A crisis message that also names a form exits here without a model
+    // call; the 988 block rides on the reply the same as every other exit.
+    const reply = withCrisisResources(directFormAnswer);
     const conversation = isStaffChat
       ? await getOrCreateTeacherConversation(session.id, conversationId)
       : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
     await saveMessage(conversation.id, session.id, "user", userMessage);
-    await saveMessage(conversation.id, session.id, "assistant", directFormAnswer);
+    await saveMessage(conversation.id, session.id, "assistant", reply);
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -277,11 +287,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       providerClass: "none",
       allowCloud: true,
       inputChars: userMessage.length,
-      outputChars: directFormAnswer.length,
+      outputChars: reply.length,
       reason: "Matched a public blank-form request in the deterministic SPOKES form registry.",
     });
 
-    return createSseResponse(conversation.id, directFormAnswer);
+    return createSseResponse(conversation.id, reply);
   }
 
   // Agent mode: same high-confidence form match, but emit present_form action
@@ -301,10 +311,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       args: { query: top.form.id },
     });
     const morePending = directFormMatches.length > 1;
-    const reply =
+    // Same no-model exit as above: the 988 block rides on the reply.
+    const reply = withCrisisResources(
       record.result.status === "success"
         ? formCommitmentReply(top.form.title, morePending)
-        : record.result.summary;
+        : record.result.summary,
+    );
 
     await saveMessage(conversation.id, session.id, "assistant", reply);
     await logAiAuditEvent({
@@ -1124,11 +1136,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }
         }
 
-        // Charge the chat limit for a reply, not for a proposal: a turn whose
-        // outcome is a confirm card gives its units back, since the student
-        // can decline the card with nothing having happened. Bounded: the
-        // executor's per-tool consequential limit counts proposals, so this
-        // cannot be looped to bypass host protection. Never throws.
+        // The chat units were consumed BEFORE the model call (the limiter
+        // above; host protection is unchanged). This gives them back when the
+        // completed turn's outcome is a confirm card, since the student can
+        // decline the card with nothing having happened. Bound: proposals
+        // count against the executor's per-tool consequential limit (10
+        // student tools x 5/day), so at most 50 refunded turns per student
+        // per day on top of the hourly cap. Never throws.
         if (confirmCardProposed && consumedChatLimits.length > 0) {
           await Promise.all(
             consumedChatLimits.map(({ key, resetTime }) => refundRateLimit(key, resetTime)),
@@ -1249,9 +1263,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
               capForPersist(fullResponse) + INTERRUPTED_REPLY_SUFFIX + crisisBlock,
             );
           } catch (persistError) {
+            // Name and Prisma code only: a Prisma validation error quotes the
+            // invocation, which would put the reply text in the log.
             logger.error("Failed to persist interrupted reply", {
               conversationId: conversation.id,
-              error: String(persistError),
+              errorName: persistError instanceof Error ? persistError.name : typeof persistError,
+              code: prismaErrorCode(persistError),
             });
           }
         }
