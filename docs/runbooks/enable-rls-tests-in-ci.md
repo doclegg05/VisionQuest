@@ -1,6 +1,10 @@
 # Runbook: Enable RLS Integration Tests in CI
 
-**Status:** Not yet enabled. Tests auto-skip on every CI run.
+**Status:** Enabled via Option A below. `.github/workflows/ci.yml` runs the
+suite on every push and PR against a `pgvector/pgvector:pg16` service
+container (steps "Apply migrations to RLS test database" and "Run RLS
+integration tests"). Last count: 48 cases in 13 suites, PR #191 (2026-09-02).
+Locally the suite still auto-skips because no dev database exists.
 **Owner:** CI / infra maintainer.
 **Related:** [docs/plans/rls-enforcement-runbook.md](../plans/rls-enforcement-runbook.md) (Slice C, 2026-04-23 cutover)
 
@@ -8,33 +12,55 @@
 
 ## Problem
 
-`src/lib/rls.test.ts` contains 13 cross-tenant integration tests that verify
-the migration `20260423120000_rls_policy_recovery` enforces the intended
-access matrix when queries run as the `vq_app` role. They cover:
+`src/lib/rls.test.ts` contains 48 cross-tenant integration cases (13 suites)
+that verify the policies in the baseline migration (which absorbed
+`20260423120000_rls_policy_recovery`) plus
+`20260701141000_scope_sage_memory_teacher_rls` and
+`20260820140000_tighten_sage_operation_read_rls` enforce the intended
+access matrix when queries run as the `vq_app` role. Tables covered:
+Student, Conversation, Goal, CaseNote, SageMemory, SystemConfig,
+Notification, AuditLog, CoachingArc, StudentAlert, SageOperation, and
+StudentClassEnrollment (through the crisis-path join). They cover:
 
-- Student A cannot see Student B's Conversations / Goals / Student rows
-- Students cannot see CaseNotes at all (teacher-only policy)
+- Student A cannot see Student B's Conversation / Goal / Student /
+  CoachingArc / StudentAlert / SageOperation rows
+- Students cannot see CaseNote or AuditLog rows at all (teacher-only and
+  admin-only policies)
 - Students cannot insert rows on behalf of other students (WITH CHECK denies)
-- Teachers see managed students but not unmanaged
+- Teachers see managed students but not unmanaged; a second teacher with a
+  second class and student sees and updates none of the first teacher's
+  students' Conversation, Goal, CaseNote, SageMemory, StudentAlert, or
+  SageOperation rows
+- Teachers cannot write AuditLog through the app role (audit writes go
+  through `prismaAdmin`, the DB-03 shape from the 2026-09-01 DB review)
+- Staff Notification writes from a student context are rejected (the #188
+  crisis-notification regression pins)
+- SageOperation: students see own actor rows only; teachers see rows about
+  managed students through both branches of the tightened read policy; the
+  INSERT/UPDATE teacher branch is still unscoped and is documented as a
+  known gap (F17, DB-07 in the 2026-09-01 DB review) rather than asserted
+  correct
 - Admins see everything
-- No-RLS-context returns zero rows (fail-closed)
+- No-RLS-context returns zero rows (fail-closed) on every table above
 - The `prismaAdmin` bypass (postgres role) still sees all rows
 
 These are the only automated guard against a regression that re-exposes
 cross-tenant data — a P0 bug for VisionQuest given its TANF/SNAP user
 population.
 
-**Today these tests are silently skipped in CI.** The test file gates on:
+**Before Option A shipped, these tests were silently skipped in CI.** The
+test file gates on:
 
 ```ts
 const SHOULD_RUN = process.env.RLS_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
 ```
 
-`.github/workflows/ci.yml` sets `DATABASE_URL` to a fake string
-(`postgresql://fake:fake@localhost:5432/fake`) and never sets
-`RLS_TEST_ENABLED`. Result: the `else` branch in `rls.test.ts` is never
-reached, and the suite reports a single passing "SKIPPED" placeholder.
-A regression in RLS policies would not be caught by CI.
+The job-level `DATABASE_URL` in `.github/workflows/ci.yml` is still a fake
+string (`postgresql://fake:fake@localhost:5432/fake`), so the main `npm test`
+step reports the single "SKIPPED" placeholder. The dedicated `npm run
+test:rls` step overrides `DATABASE_URL`, `DIRECT_URL`, and
+`RLS_TEST_ENABLED` for the container, and that step is where the 48 cases
+run. Read that step's log, not the `npm test` one, for the count.
 
 ## What the tests need to actually run
 
@@ -65,7 +91,7 @@ The connection used by the test must:
 
 ## Two valid implementation options
 
-### Option A — Postgres service container in the CI job
+### Option A — Postgres service container in the CI job (shipped)
 
 Add a service container to the `verify` job in `.github/workflows/ci.yml`
 and run all migrations against it before `npm test`. This keeps CI
@@ -155,7 +181,7 @@ Caveats:
     cancel-in-progress: false
   ```
 - Network latency to Supabase will make the suite noticeably slower
-  than a local container. Acceptable for 13 tests; would be painful at
+  than a local container. Acceptable for 48 tests; would be painful at
   scale.
 
 ## The exact one-line edit once a DB is provisioned
@@ -178,7 +204,7 @@ env:
   `rls.test.ts` only consumes `DATABASE_URL`; if a future test needs
   the admin connection, document that addition here.
 - Running RLS tests on every PR vs. nightly. Recommend every PR — the
-  suite is 13 tests and finishes in seconds against a local container.
+  suite is 48 tests and finishes in under a second against a local container.
 - Handling multi-tenant fixture cleanup beyond what the current
   `after()` hook does. If concurrent runs become a problem, scope
   fixtures by a per-run namespace (e.g., `${RUNNER_ID}-${Date.now()}`).
