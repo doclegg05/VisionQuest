@@ -9,6 +9,11 @@
  * write-through in src/lib/db.ts (Goal is a watched model) and needs no call
  * here.
  *
+ * It is also where the proposed-goal guard lives (F23 / VQ-R-005): the
+ * transition matrix below decides which status moves each actor may make, so
+ * a student can no longer complete a Sage-proposed goal, or its proposed
+ * weekly and task children, through either caller.
+ *
  * Callers load the goal with an ownership-scoped query (`where: { id,
  * studentId }`) and pass the snapshot. This module never widens that scope;
  * every side effect keys on `goal.studentId`, not the actor.
@@ -17,7 +22,7 @@
 import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
 import { ensureGoalLevelProgression } from "@/lib/goal-progression";
-import { goalCountsTowardPlan, isGoalLevel, type GoalStatus } from "@/lib/goals";
+import { GOAL_STATUS_LABELS, goalCountsTowardPlan, isGoalLevel, isGoalStatus, type GoalStatus } from "@/lib/goals";
 import { recordBhagCompleted } from "@/lib/progression/engine";
 import { updateProgression } from "@/lib/progression/service";
 
@@ -78,6 +83,70 @@ export type GoalTransitionResult =
 
 const CONFIRMABLE_FROM: ReadonlyArray<string> = ["proposed", "active", "in_progress"];
 
+/**
+ * A status the matrix may move a goal TO. `proposed` is entered only by
+ * src/lib/sage/propose-goal.ts and `confirmed` only by the confirm branch of
+ * decideGoalTransition, so neither is representable as a matrix target.
+ */
+export type GoalTransitionTarget = Exclude<GoalStatus, "proposed" | "confirmed">;
+
+export type GoalTransitionTable = Readonly<Record<GoalStatus, ReadonlyArray<GoalTransitionTarget>>>;
+
+/**
+ * Transition matrix (F23 / VQ-R-005). Row = the goal's current status;
+ * entries = statuses the actor may move it to. Confirmation is decided above
+ * the matrix because it depends on who wrote the goal (Sage-proposed needs
+ * staff; self-written may be confirmed by the student).
+ *
+ *   from \ to      active  in_progress  blocked  completed  abandoned
+ *   proposed       staff   staff        staff    staff      both
+ *   active         -       both         both     both       both
+ *   in_progress    both    -            both     both       both
+ *   confirmed      both    both         both     both       both
+ *   blocked        both    both         -        both       both
+ *   completed      both    both         both     -          both
+ *   abandoned      both    both         both     both       -
+ *
+ * A student may only DISMISS a proposed goal (or confirm it when they wrote
+ * it themselves). Activating or completing it is staff work, and that covers
+ * the proposed weekly and task children the goals page renders toggles for.
+ */
+const STUDENT_TRANSITIONS: GoalTransitionTable = {
+  proposed: ["abandoned"],
+  active: ["in_progress", "blocked", "completed", "abandoned"],
+  in_progress: ["active", "blocked", "completed", "abandoned"],
+  confirmed: ["active", "in_progress", "blocked", "completed", "abandoned"],
+  blocked: ["active", "in_progress", "completed", "abandoned"],
+  completed: ["active", "in_progress", "blocked", "abandoned"],
+  abandoned: ["active", "in_progress", "blocked", "completed"],
+};
+
+const STAFF_TRANSITIONS: GoalTransitionTable = {
+  ...STUDENT_TRANSITIONS,
+  proposed: ["active", "in_progress", "blocked", "completed", "abandoned"],
+};
+
+export const GOAL_TRANSITIONS: Readonly<Record<GoalActor["kind"], GoalTransitionTable>> = {
+  student: STUDENT_TRANSITIONS,
+  staff: STAFF_TRANSITIONS,
+};
+
+function statusWord(status: GoalStatus): string {
+  return GOAL_STATUS_LABELS[status].toLowerCase();
+}
+
+function matrixRefusal(goal: GoalTransitionSnapshot, from: GoalStatus, to: GoalTransitionTarget): GoalTransitionRefusal {
+  if (from === "proposed") {
+    return goal.sourceMessageId
+      ? refuse(
+          "forbidden",
+          `Sage suggested this goal and your instructor has not confirmed it yet. Ask them to confirm it before you mark it ${statusWord(to)}, or dismiss it if it is not right.`,
+        )
+      : refuse("forbidden", `Confirm this goal first, then you can mark it ${statusWord(to)}.`);
+  }
+  return refuse("forbidden", `This goal cannot move from ${statusWord(from)} to ${statusWord(to)}.`);
+}
+
 function refuse(kind: GoalTransitionRefusal["kind"], message: string): GoalTransitionRefusal {
   return { ok: false, kind, message };
 }
@@ -109,6 +178,16 @@ export function decideGoalTransition(
   }
 
   if (to === undefined) return { ok: true, change: null };
+  if (to === "proposed") {
+    return refuse("invalid", "A goal cannot be moved back to proposed.");
+  }
+
+  // A stored value outside the lifecycle (legacy rows) reads as `active` so
+  // the goal can still be repaired instead of being stuck.
+  const from: GoalStatus = isGoalStatus(goal.status) ? goal.status : "active";
+  if (!GOAL_TRANSITIONS[actor.kind][from].includes(to)) {
+    return matrixRefusal(goal, from, to);
+  }
   return { ok: true, change: { to, confirms: false } };
 }
 

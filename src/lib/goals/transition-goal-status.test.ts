@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding must accept many signatures */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { GOAL_STATUSES } from "@/lib/goals";
 
 // ---------------------------------------------------------------------------
 // applyGoalTransition — the ONE goal status transition path shared by
@@ -205,5 +206,102 @@ describe("applyGoalTransition — confirmation rules", () => {
 
     assert.deepEqual(result, { ok: false, kind: "invalid", message: "Cannot confirm a goal with status 'completed'." });
     assert.equal(mockGoalUpdate.mock.callCount(), 0);
+  });
+});
+
+describe("decideGoalTransition — transition matrix (F23 / VQ-R-005)", () => {
+  const sageProposed = () => goal({ status: "proposed", sourceMessageId: "msg-1" });
+  const selfProposed = () => goal({ status: "proposed", sourceMessageId: null });
+
+  it("publishes one row per lifecycle status for each actor, and no row targets proposed or confirmed", () => {
+    for (const actor of ["student", "staff"] as const) {
+      const table = helper.GOAL_TRANSITIONS[actor];
+      assert.deepEqual(Object.keys(table).sort(), [...GOAL_STATUSES].sort(), `${actor} rows`);
+      for (const [from, targets] of Object.entries(table)) {
+        assert.ok(!targets.includes("proposed" as never), `${actor} ${from} must not target proposed`);
+        assert.ok(!targets.includes("confirmed" as never), `${actor} ${from} must not target confirmed (confirm branch owns it)`);
+        assert.ok(!targets.includes(from as never), `${actor} ${from} must not list itself`);
+      }
+    }
+  });
+
+  it("student may only dismiss a Sage-proposed goal; every other exit is refused in plain language", () => {
+    for (const to of ["active", "in_progress", "blocked", "completed"] as const) {
+      const decision = helper.decideGoalTransition(STUDENT, sageProposed(), { to });
+      assert.equal(decision.ok, false, `proposed -> ${to} must be refused`);
+      if (decision.ok) continue;
+      assert.equal(decision.kind, "forbidden");
+      assert.match(decision.message, /instructor/);
+      assert.doesNotMatch(decision.message, /—/, "no em dash in new student-facing copy");
+    }
+    assert.deepEqual(helper.decideGoalTransition(STUDENT, sageProposed(), { to: "abandoned" }), {
+      ok: true,
+      change: { to: "abandoned", confirms: false },
+    });
+  });
+
+  it("student must confirm a self-written proposed goal before completing it", () => {
+    const refused = helper.decideGoalTransition(STUDENT, selfProposed(), { to: "completed" });
+    assert.equal(refused.ok, false);
+    if (!refused.ok) {
+      assert.equal(refused.kind, "forbidden");
+      assert.match(refused.message, /[Cc]onfirm this goal first/);
+    }
+    assert.deepEqual(helper.decideGoalTransition(STUDENT, selfProposed(), { to: "confirmed" }), {
+      ok: true,
+      change: { to: "confirmed", confirms: true },
+    });
+  });
+
+  it("student may complete a Sage goal once staff confirmed it", () => {
+    const confirmedSageGoal = goal({ status: "confirmed", sourceMessageId: "msg-1" });
+    assert.deepEqual(helper.decideGoalTransition(STUDENT, confirmedSageGoal, { to: "completed" }), {
+      ok: true,
+      change: { to: "completed", confirms: false },
+    });
+  });
+
+  it("nothing moves back to proposed, for either actor", () => {
+    for (const actor of [STUDENT, STAFF]) {
+      const decision = helper.decideGoalTransition(actor, goal({ status: "active" }), { to: "proposed" });
+      assert.equal(decision.ok, false);
+      if (!decision.ok) assert.equal(decision.kind, "invalid");
+    }
+  });
+
+  it("staff may move a Sage-proposed goal anywhere the matrix allows, including completed", () => {
+    assert.deepEqual(helper.decideGoalTransition(STAFF, sageProposed(), { to: "completed" }), {
+      ok: true,
+      change: { to: "completed", confirms: false },
+    });
+    assert.deepEqual(helper.decideGoalTransition(STAFF, sageProposed(), { to: "active" }), {
+      ok: true,
+      change: { to: "active", confirms: false },
+    });
+  });
+
+  it("a stored status outside the lifecycle (legacy 'paused') is treated as active so it can be repaired", () => {
+    assert.deepEqual(helper.decideGoalTransition(STUDENT, goal({ status: "paused" }), { to: "completed" }), {
+      ok: true,
+      change: { to: "completed", confirms: false },
+    });
+  });
+});
+
+describe("applyGoalTransition — proposed-goal guard writes nothing (F23)", () => {
+  beforeEach(resetAll);
+
+  it("a refused student transition never reaches prisma or the side effects", async () => {
+    const result = await helper.applyGoalTransition({
+      actor: STUDENT,
+      goal: goal({ level: "task", status: "proposed", sourceMessageId: "msg-1" }),
+      request: { to: "completed" },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(mockGoalUpdate.mock.callCount(), 0);
+    assert.equal(mockInvalidatePrefix.mock.callCount(), 0);
+    assert.equal(mockEnsureGoalLevelProgression.mock.callCount(), 0);
+    assert.equal(mockUpdateProgression.mock.callCount(), 0);
   });
 });

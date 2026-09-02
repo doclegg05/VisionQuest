@@ -712,3 +712,66 @@ describe("update_goal_status — shared transition path (F22 / VQ-R-011)", () =>
     assert.equal(mockEnsureGoalLevelProgression.mock.calls[0].arguments[0], "stu-2");
   });
 });
+
+describe("update_goal_status — proposed-goal guard (F23 / VQ-R-005)", () => {
+  function sageProposed(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "goal-1",
+      studentId: "stu-1",
+      level: "weekly",
+      content: "Earn the OSHA-10 card",
+      status: "proposed",
+      sourceMessageId: "msg-1",
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    mockGoalFindFirst.mock.resetCalls();
+    mockGoalUpdate.mock.resetCalls();
+    mockRecordOperation.mock.resetCalls();
+    mockInvalidatePrefix.mock.resetCalls();
+    mockEnsureGoalLevelProgression.mock.resetCalls();
+    mockGoalFindFirst.mock.mockImplementation(async () => sageProposed());
+    mockGoalUpdate.mock.mockImplementation(async ({ where, data }: any) => ({ ...sageProposed(), id: where.id, ...data }));
+  });
+
+  for (const status of ["completed", "active"]) {
+    it(`a student asking Sage to mark a proposed goal '${status}' gets a plain refusal, no confirm card, no write`, async () => {
+      const record = await executeAgentTool({
+        session: studentSession(),
+        conversationId: "conv-1",
+        toolName: "update_goal_status",
+        args: { goalId: "goal-1", status },
+      });
+
+      assert.equal(record.result.status, "error");
+      assert.match(record.result.summary, /instructor/);
+      assert.equal(record.result.action, undefined, "no confirmation card for a change the server refuses");
+      assert.equal(mockGoalUpdate.mock.callCount(), 0);
+      assert.equal(mockRecordOperation.mock.callCount(), 0, "nothing proposed to the ledger");
+    });
+  }
+
+  it("a teacher acting on the student may complete the proposed goal (staff matrix), with effects", async () => {
+    mockGoalFindFirst.mock.mockImplementation(async () => sageProposed({ studentId: "stu-2" }));
+    const args = { goalId: "goal-1", status: "completed" };
+    const token = createConfirmationToken(
+      { toolName: "update_goal_status", args, sessionId: "teach-1", conversationId: "conv-1", targetStudentId: "stu-2" },
+      new Date(),
+    );
+
+    const record = await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "update_goal_status",
+      args,
+      targetStudentId: "stu-2",
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockGoalUpdate.mock.calls[0].arguments[0].data.status, "completed");
+    assert.deepEqual(mockInvalidatePrefix.mock.calls.map((c: any) => c.arguments[0]), ["goals:stu-2"]);
+  });
+});
