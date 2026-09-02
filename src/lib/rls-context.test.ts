@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { withRlsContext, getRlsContext, type RlsContext } from "./rls-context";
+import {
+  withRlsContext,
+  withStudentRlsContext,
+  getRlsContext,
+  type RlsContext,
+} from "./rls-context";
 
 describe("rls-context", () => {
   describe("getRlsContext", () => {
@@ -129,5 +134,40 @@ describe("rls-context", () => {
 
       assert.equal(result, 42, "withRlsContext should pass through the return value");
     });
+  });
+});
+
+describe("withStudentRlsContext", () => {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+  it("runs the callback as the student themself", () => {
+    withStudentRlsContext("student-a", () => {
+      assert.deepEqual(getRlsContext(), {
+        userId: "student-a",
+        role: "student",
+        studentId: "student-a",
+      });
+    });
+  });
+
+  it("returns the callback value and leaves no context behind", async () => {
+    const value = await withStudentRlsContext("student-a", async () => {
+      await tick();
+      return getRlsContext()?.studentId;
+    });
+    assert.equal(value, "student-a");
+    assert.equal(getRlsContext(), undefined);
+  });
+
+  it("keeps concurrent students in their own scopes", async () => {
+    const seen = await Promise.all(
+      ["student-a", "student-b"].map((id) =>
+        withStudentRlsContext(id, async () => {
+          await tick();
+          return getRlsContext()?.userId;
+        }),
+      ),
+    );
+    assert.deepEqual(seen, ["student-a", "student-b"]);
   });
 });

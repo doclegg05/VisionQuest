@@ -169,3 +169,48 @@ describe("logAuditEvent", () => {
     assert.equal(data.metadata, JSON.stringify({ classId: "class-1" }));
   });
 });
+
+describe("tryLogAuditEvent", () => {
+  beforeEach(() => {
+    mockCreate.mock.resetCalls();
+    mockWarn.mock.resetCalls();
+    mockCreate.mock.mockImplementation(async () => ({ id: "audit-1" }));
+  });
+
+  const input = {
+    actorId: "teacher-1",
+    actorRole: "teacher",
+    action: "teacher.student.archive",
+    targetType: "student",
+    targetId: "student-1",
+    summary: "Archived 3 files",
+    metadata: { fileCount: 3 },
+  };
+
+  it("writes the row through the admin client and reports success", async () => {
+    const written = await audit.tryLogAuditEvent(input);
+
+    assert.equal(written, true);
+    assert.equal(mockCreate.mock.callCount(), 1);
+    const data = mockCreate.mock.calls[0].arguments[0].data;
+    assert.equal(data.action, "teacher.student.archive");
+    assert.equal(data.targetId, "student-1");
+    assert.equal(mockWarn.mock.callCount(), 0);
+  });
+
+  it("swallows a rejected write, reports failure, and logs no student identifier", async () => {
+    mockCreate.mock.mockImplementation(async () => {
+      throw new Error("new row violates row-level security policy");
+    });
+
+    const written = await audit.tryLogAuditEvent(input);
+
+    assert.equal(written, false, "a failed audit row must not throw into a request whose work already committed");
+    assert.equal(mockWarn.mock.callCount(), 1);
+    const [message, payload] = mockWarn.mock.calls[0].arguments as [string, Record<string, unknown>];
+    assert.equal(typeof message, "string");
+    assert.equal(payload.actorId, "teacher-1");
+    assert.equal(payload.action, "teacher.student.archive");
+    assert.ok(!JSON.stringify(payload).includes("student-1"), "no student id in the log payload");
+  });
+});
