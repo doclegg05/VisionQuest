@@ -30,11 +30,28 @@ function toIso(value) {
 }
 
 /**
+ * @typedef {object} LastRun
+ * @property {string} status pg_cron run status (succeeded, failed, starting, running, ...)
+ * @property {string} startTime ISO timestamp
+ * @property {string | null} returnMessage
+ */
+
+/**
+ * @typedef {object} CronJobReportRow
+ * @property {string} jobname
+ * @property {boolean} present
+ * @property {boolean} active
+ * @property {string | null} schedule
+ * @property {LastRun | null} lastRun
+ * @property {string | null} problem
+ */
+
+/**
  * @param {object} input
  * @param {ReadonlyArray<{ jobname: string, schedule: string, active: boolean }>} input.jobs rows from cron.job
  * @param {ReadonlyArray<{ jobname: string, status: string, start_time: Date | string | null, return_message: string | null }>} input.latestRuns one row per job, the most recent run
  * @param {ReadonlyArray<string>} [input.expected] job names to check (defaults to EXPECTED_CRON_JOBS)
- * @returns {{ ok: boolean, problems: string[], jobs: Array<object> }}
+ * @returns {{ ok: boolean, problems: string[], jobs: CronJobReportRow[] }}
  */
 export function evaluateCronHealth({ jobs, latestRuns, expected = EXPECTED_CRON_JOBS }) {
   const jobByName = new Map(jobs.map((job) => [job.jobname, job]));
