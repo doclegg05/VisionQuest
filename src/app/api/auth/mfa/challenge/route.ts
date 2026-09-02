@@ -11,7 +11,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
-import { claimBackupCode, verifyTotp } from "@/lib/mfa";
+import { claimBackupCode, claimTotpCounter, verifyTotp } from "@/lib/mfa";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -86,17 +86,28 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ACCOUNT_LIMIT_WINDOW_MS,
   );
   if (!accountRl.success) {
-    logger.warn("MFA challenge locked out", { student: studentLogKey(claims.sub) });
+    return NextResponse.json({ error: ACCOUNT_LOCKED_MESSAGE }, { status: 429 });
+  }
+
+  // The last admitted attempt of the window is the one moment the lockout can
+  // be recorded exactly once: every later request is refused above and writes
+  // nothing, so a flood of guesses cannot fill the audit table or the log
+  // (audit S2 on PR #196). A degraded limiter reports remaining 0 too, and
+  // its store is the one that just failed, so it records nothing.
+  if (accountRl.remaining === 0 && !accountRl.degraded) {
+    logger.warn("MFA challenge attempts exhausted for the window", {
+      student: studentLogKey(claims.sub),
+    });
     await logAuditEvent({
       actorId: claims.sub,
       actorRole: claims.role,
       action: "mfa.challenge_locked_out",
       targetType: "student",
       targetId: claims.sub,
-      summary: "MFA challenge locked out after too many code attempts.",
-      metadata: { ip },
+      summary:
+        "MFA challenge used its last code attempt for this window; further attempts are refused until the window resets.",
+      metadata: { ip, resetAt: new Date(accountRl.resetTime).toISOString() },
     });
-    return NextResponse.json({ error: ACCOUNT_LOCKED_MESSAGE }, { status: 429 });
   }
 
   const student = await prisma.student.findUnique({
@@ -131,15 +142,22 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ? verifyTotp(student.mfaSecret, body.token, student.mfaLastUsedCounter)
     : { valid: false, counter: null };
 
-  // A backup code is spent by one conditional write, so the same code posted
-  // twice at once is honoured once (SEC-02). A refused claim is a failed
-  // attempt, whichever request lost the race.
+  // Each factor is spent by one conditional write (SEC-02): the TOTP path
+  // advances the replay counter only while the row still holds the value
+  // that was read, and the backup-code path removes the code only while the
+  // list still holds it. Either way the same code posted twice at once is
+  // honoured once, and a refused claim is a failed attempt whichever request
+  // lost the race.
+  const totpClaimed =
+    totpResult.valid && totpResult.counter != null
+      ? await claimTotpCounter(prisma, student.id, student.mfaLastUsedCounter, totpResult.counter)
+      : false;
   const backupClaim = totpResult.valid
     ? null
     : await claimBackupCode(prisma, student.id, student.mfaBackupCodes, body.token);
   const usedBackupCode = backupClaim?.claimed === true;
 
-  if (!totpResult.valid && !usedBackupCode) {
+  if (!totpClaimed && !usedBackupCode) {
     await logAuditEvent({
       actorId: student.id,
       actorRole: student.role,
@@ -151,17 +169,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     });
 
     return NextResponse.json({ error: "Invalid MFA code." }, { status: 401 });
-  }
-
-  if (totpResult.valid) {
-    // TOTP path: record the accepted counter so the same code cannot be replayed.
-    await prisma.student.update({
-      where: { id: student.id },
-      data: {
-        mfaVerifiedAt: new Date(),
-        ...(totpResult.counter != null ? { mfaLastUsedCounter: totpResult.counter } : {}),
-      },
-    });
   }
 
   const backupCodesRemaining = backupClaim?.claimed

@@ -234,3 +234,40 @@ export async function claimBackupCode(
 
   return count === 1 ? { claimed: true, remaining } : { claimed: false };
 }
+
+/**
+ * The slice of the Prisma client `claimTotpCounter` writes through. As
+ * narrow as `BackupCodeClaimClient`, for the same reason.
+ */
+export interface TotpCounterClaimClient {
+  student: {
+    updateMany(args: {
+      where: { id: string; mfaLastUsedCounter: number | null };
+      data: { mfaLastUsedCounter: number; mfaVerifiedAt: Date };
+    }): Promise<{ count: number }>;
+  };
+}
+
+/**
+ * Advance the TOTP replay counter with a single conditional write.
+ *
+ * `lastUsedCounter` is the value the caller read before `verifyTotp`. The
+ * UPDATE lands only while the row still holds that value (`null` compares as
+ * IS NULL), so two requests that read the same counter and post the same
+ * code produce one affected row; the loser's write is refused and it may not
+ * issue a session. The `verifyTotp` then `update` sequence this replaces let
+ * both through (audit S6 on PR #196). A refused write reads as an invalid
+ * code, the same way a refused backup-code claim does.
+ */
+export async function claimTotpCounter(
+  db: TotpCounterClaimClient,
+  studentId: string,
+  lastUsedCounter: number | null,
+  matchedCounter: number,
+): Promise<boolean> {
+  const { count } = await db.student.updateMany({
+    where: { id: studentId, mfaLastUsedCounter: lastUsedCounter },
+    data: { mfaLastUsedCounter: matchedCounter, mfaVerifiedAt: new Date() },
+  });
+  return count === 1;
+}

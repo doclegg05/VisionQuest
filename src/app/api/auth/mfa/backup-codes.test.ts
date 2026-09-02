@@ -80,6 +80,7 @@ mock.module("@/lib/mfa", {
     generateBackupCodes: mockGenerateBackupCodes,
     hashBackupCodes: mockHashBackupCodes,
     claimBackupCode: mockClaimBackupCode,
+    claimTotpCounter: async () => true,
   },
 });
 
