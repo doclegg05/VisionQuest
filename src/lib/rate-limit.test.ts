@@ -65,10 +65,32 @@ class FakeStore {
     this.rows.set(key, row);
     return [row];
   };
+
+  /**
+   * Models the single-statement refund: decrement, floored at zero, only
+   * on the row whose window matches. Bound values arrive in interpolation
+   * order: values[0] = now, values[1] = key, values[2] = resetTime.
+   */
+  $executeRaw = async (
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<number> => {
+    this.statements.push(strings.join("?"));
+
+    const queued = this.failWith.shift();
+    if (queued) throw queued;
+
+    const [, key, resetTime] = values as [Date, string, Date];
+    const existing = this.rows.get(key);
+    if (!existing || existing.resetTime.getTime() !== resetTime.getTime()) return 0;
+    this.rows.set(key, { ...existing, count: Math.max(existing.count - 1, 0) });
+    return 1;
+  };
 }
 
 const store = new FakeStore();
 const loggedErrors: Array<{ message: string; context?: Record<string, unknown> }> = [];
+const loggedWarnings: Array<{ message: string; context?: Record<string, unknown> }> = [];
 
 mock.module("./db", {
   namedExports: { prismaAdmin: store, prisma: store },
@@ -79,7 +101,9 @@ mock.module("./logger", {
     logger: {
       debug: () => {},
       info: () => {},
-      warn: () => {},
+      warn: (message: string, context?: Record<string, unknown>) => {
+        loggedWarnings.push({ message, context });
+      },
       error: (message: string, context?: Record<string, unknown>) => {
         loggedErrors.push({ message, context });
       },
@@ -90,9 +114,10 @@ mock.module("./logger", {
 
 let rateLimit: typeof import("./rate-limit").rateLimit;
 let rateLimitDaily: typeof import("./rate-limit").rateLimitDaily;
+let refundRateLimit: typeof import("./rate-limit").refundRateLimit;
 
 before(async () => {
-  ({ rateLimit, rateLimitDaily } = await import("./rate-limit"));
+  ({ rateLimit, rateLimitDaily, refundRateLimit } = await import("./rate-limit"));
 });
 
 describe("rateLimit", () => {
@@ -252,5 +277,63 @@ describe("rateLimitDaily", () => {
     assert.equal(reset.getUTCMinutes(), 0);
     assert.equal(reset.getUTCSeconds(), 0);
     assert.ok(result.resetTime > Date.now(), "the daily window ends in the future");
+  });
+});
+
+describe("refundRateLimit", () => {
+  beforeEach(() => {
+    store.rows.clear();
+    store.failWith = [];
+    store.statements = [];
+    loggedErrors.length = 0;
+    loggedWarnings.length = 0;
+  });
+
+  it("gives back one unit in the window it was consumed from", async () => {
+    await rateLimit("chat:stu-1", 40, 60_000);
+    const consumed = await rateLimit("chat:stu-1", 40, 60_000);
+    assert.equal(store.rows.get("chat:stu-1")?.count, 2);
+
+    await refundRateLimit("chat:stu-1", consumed.resetTime);
+
+    assert.equal(store.rows.get("chat:stu-1")?.count, 1);
+  });
+
+  it("leaves a different window alone", async () => {
+    const consumed = await rateLimit("chat:stu-2", 40, 60_000);
+
+    await refundRateLimit("chat:stu-2", consumed.resetTime + 1);
+
+    assert.equal(store.rows.get("chat:stu-2")?.count, 1);
+  });
+
+  it("never drives the counter below zero", async () => {
+    const consumed = await rateLimit("chat:stu-3", 40, 60_000);
+
+    await refundRateLimit("chat:stu-3", consumed.resetTime);
+    await refundRateLimit("chat:stu-3", consumed.resetTime);
+
+    assert.equal(store.rows.get("chat:stu-3")?.count, 0);
+  });
+
+  it("spends exactly one store round trip", async () => {
+    const consumed = await rateLimit("chat:stu-4", 40, 60_000);
+    store.statements = [];
+
+    await refundRateLimit("chat:stu-4", consumed.resetTime);
+
+    assert.equal(store.statements.length, 1);
+  });
+
+  it("never throws when the store fails; the unit simply stays consumed, and it warns without the key", async () => {
+    const consumed = await rateLimit("chat:stu-5", 40, 60_000);
+    store.failWith = [new Error("connection refused")];
+
+    await assert.doesNotReject(() => refundRateLimit("chat:stu-5", consumed.resetTime));
+
+    assert.equal(store.rows.get("chat:stu-5")?.count, 1);
+    assert.equal(loggedWarnings.length, 1);
+    assert.equal(loggedWarnings[0].context?.keyFamily, "chat");
+    assert.doesNotMatch(JSON.stringify(loggedWarnings[0]), /stu-5/);
   });
 });

@@ -25,6 +25,7 @@ let toolCapturedBy_withRegistry: string | null = null;
 
 const mockRateLimit = mock.fn() as any;
 const mockRateLimitDaily = mock.fn() as any;
+const mockRefundRateLimit = mock.fn() as any;
 const mockRateLimitsDisabled = mock.fn() as any;
 const mockResolveAiProvider = mock.fn() as any;
 const mockGetPromptTier = mock.fn() as any;
@@ -130,6 +131,7 @@ mock.module("@/lib/rate-limit", {
   namedExports: {
     rateLimit: mockRateLimit,
     rateLimitDaily: mockRateLimitDaily,
+    refundRateLimit: mockRefundRateLimit,
   },
 });
 
@@ -357,6 +359,7 @@ function resetMocks() {
   for (const m of [
     mockRateLimit,
     mockRateLimitDaily,
+    mockRefundRateLimit,
     mockRateLimitsDisabled,
     mockResolveAiProvider,
     mockGetPromptTier,
@@ -420,6 +423,8 @@ function resetMocks() {
   mockCheckTokenQuota.mock.mockImplementation(async () => ({ allowed: true, warning: null }));
   mockWithUsageLogging.mock.mockImplementation((provider: unknown) => provider);
   mockRateLimit.mock.mockImplementation(async () => ({ success: true, remaining: 100, resetTime: Date.now() + 3600_000 }));
+  mockRefundRateLimit.mock.mockImplementation(async () => undefined);
+  mockRateLimitsDisabled.mock.mockImplementation(() => false);
   mockRateLimitDaily.mock.mockImplementation(async () => ({ success: true, remaining: 200, resetTime: Date.now() + 3600_000 }));
   mockGetOrCreateConversation.mock.mockImplementation(async () => ({
     id: "conv-1",
@@ -1560,5 +1565,135 @@ describe("POST /api/chat/send — 988 resources on error paths (F60)", () => {
       const body = await readSseBody(res);
       assert.doesNotMatch(body, /988/);
     });
+  });
+});
+
+describe("POST /api/chat/send — chat limit charged on a reply, not on a confirm card (F29)", () => {
+  // Agent loop on: a confirm card is only ever proposed through it.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  const HOURLY_RESET = 1_800_000_000_000;
+  const DAILY_RESET = 1_800_000_500_000;
+
+  beforeEach(() => {
+    resetMocks();
+    mockRateLimit.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 39,
+      resetTime: HOURLY_RESET,
+      degraded: false,
+    }));
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 199,
+      resetTime: DAILY_RESET,
+      degraded: false,
+    }));
+  });
+
+  function post(message: string) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  const confirmCardTurn = async function* () {
+    yield { type: "tool_call", callId: "call-1", tool: "add_goal", args: { title: "Finish resume" } };
+    yield {
+      type: "tool_result",
+      callId: "call-1",
+      status: "success",
+      summary: "Add the goal \"Finish resume\"? Confirm below.",
+    };
+    yield {
+      type: "action",
+      action: "confirm_tool",
+      target: "add_goal",
+      label: "Add this goal",
+      meta: { token: "tok", toolName: "add_goal", args: { title: "Finish resume" } },
+    };
+    yield { type: "text", text: "Take a look at the card and confirm if that's right." };
+  };
+
+  const plainReplyTurn = async function* () {
+    yield { type: "text", text: "Start with the smallest step you can do today." };
+  };
+
+  function refundCalls() {
+    return mockRefundRateLimit.mock.calls.map((call) => call.arguments);
+  }
+
+  it("refunds the hourly unit, for the window it was consumed from, when the turn ends in a confirm card", async () => {
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+
+    const res = await post("Add a goal to finish my resume this week");
+    const body = await readSseBody(res);
+    assert.match(body, /"done":true/);
+    assert.match(body, /"confirm_tool"/);
+
+    assert.deepEqual(refundCalls(), [[`chat:${session.id}`, HOURLY_RESET]]);
+  });
+
+  it("charges a turn that produced a reply (no refund)", async () => {
+    mockRunAgentTurn.mock.mockImplementation(plainReplyTurn);
+
+    const res = await post("How do I start on my weekly goal?");
+    const body = await readSseBody(res);
+    assert.match(body, /"done":true/);
+
+    assert.equal(mockRateLimit.mock.calls.filter((c) => String(c.arguments[0]).startsWith("chat:")).length, 1);
+    assert.deepEqual(refundCalls(), []);
+  });
+
+  it("refunds both the hourly and the daily unit on the cloud path", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.deepEqual(refundCalls().sort(), [
+      [`chat-daily:${session.id}`, DAILY_RESET],
+      [`chat:${session.id}`, HOURLY_RESET],
+    ]);
+  });
+
+  it("refunds nothing when rate limits are disabled (nothing was consumed)", async () => {
+    mockRateLimitsDisabled.mock.mockImplementation(() => true);
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.equal(mockRateLimit.mock.calls.filter((c) => String(c.arguments[0]).startsWith("chat:")).length, 0);
+    assert.deepEqual(refundCalls(), []);
+  });
+
+  it("does not refund a turn that proposed a card and then failed", async () => {
+    mockRunAgentTurn.mock.mockImplementation(async function* () {
+      yield {
+        type: "action",
+        action: "confirm_tool",
+        target: "add_goal",
+        label: "Add this goal",
+        meta: { token: "tok" },
+      };
+      throw new Error("upstream connection reset");
+    });
+
+    const res = await post("Add a goal to finish my resume this week");
+    const body = await readSseBody(res);
+    assert.match(body, /"error"/);
+
+    assert.deepEqual(refundCalls(), []);
   });
 });

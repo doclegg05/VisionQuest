@@ -1,6 +1,6 @@
 import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
-import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDaily, refundRateLimit } from "@/lib/rate-limit";
 import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
@@ -434,6 +434,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // See code review finding 2026-05-08 (Sprint 1 Bundle #5 / Task A).
   const isCloudProvider = provider.name === "gemini";
   let dailyRemaining: number | null = null;
+  // Units this request consumed, each with the window it was consumed from,
+  // so a turn whose only outcome is a confirm card can give them back (see
+  // the refund after generation below). Degraded (fail-open) results have no
+  // row to refund and are not recorded.
+  let consumedChatLimits: ReadonlyArray<{ key: string; resetTime: number }> = [];
 
   // The dev-only switch and its production guard live in rate-limit-switch.ts.
   if (!rateLimitsDisabled()) {
@@ -448,7 +453,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     // mirror the previous cloud-only configuration (student 40, teacher 60,
     // admin 120) so behavior is unchanged for the cloud path.
     const hourlyLimit = isStaffChat ? (session.role === "admin" ? 120 : 60) : 40;
-    const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
+    const hourlyKey = `chat:${session.id}`;
+    const hourlyRl = await rateLimit(hourlyKey, hourlyLimit, 60 * 60 * 1000);
     if (!hourlyRl.success) {
       return new Response(
         JSON.stringify({
@@ -457,12 +463,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         { status: 429 },
       );
     }
+    if (!hourlyRl.degraded) {
+      consumedChatLimits = [...consumedChatLimits, { key: hourlyKey, resetTime: hourlyRl.resetTime }];
+    }
 
     // Daily limit by role (calendar-day, resets midnight UTC). Cloud-only
     // because the daily cap exists to bound API spend, not host load.
     if (isCloudProvider && session.role !== "admin") {
       const dailyLimit = isStaffChat ? 400 : 200;
-      const dailyRl = await rateLimitDaily(`chat-daily:${session.id}`, dailyLimit);
+      const dailyKey = `chat-daily:${session.id}`;
+      const dailyRl = await rateLimitDaily(dailyKey, dailyLimit);
       if (!dailyRl.success) {
         return new Response(
           JSON.stringify({
@@ -472,6 +482,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }),
           { status: 429 },
         );
+      }
+      if (!dailyRl.degraded) {
+        consumedChatLimits = [...consumedChatLimits, { key: dailyKey, resetTime: dailyRl.resetTime }];
       }
       dailyRemaining = dailyRl.remaining;
     }
@@ -820,6 +833,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     async start(controller) {
       let streamClosed = false;
       let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+      // A confirm card was proposed this turn. The card's Skip is client-only
+      // (no server round trip), so "declined" is never observable here; the
+      // chat limit is instead given back once the turn completes. Set from
+      // the one place every action event passes through.
+      let confirmCardProposed = false;
 
       const enqueueSse = (payload: string, label: string): boolean => {
         if (streamClosed) return false;
@@ -838,6 +856,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       };
 
       const sendEvent = (event: Parameters<typeof formatChatSseEvent>[0], label: string): void => {
+        if (event.type === "action" && event.action === "confirm_tool") {
+          confirmCardProposed = true;
+        }
         if (!enqueueSse(formatChatSseEvent(event), label)) {
           throw new ChatSseClientClosedError();
         }
@@ -1094,6 +1115,17 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             fullResponse += crisisBlock;
             sendEvent({ type: "text", text: crisisBlock }, "text");
           }
+        }
+
+        // Charge the chat limit for a reply, not for a proposal: a turn whose
+        // outcome is a confirm card gives its units back, since the student
+        // can decline the card with nothing having happened. Bounded: the
+        // executor's per-tool consequential limit counts proposals, so this
+        // cannot be looped to bypass host protection. Never throws.
+        if (confirmCardProposed && consumedChatLimits.length > 0) {
+          await Promise.all(
+            consumedChatLimits.map(({ key, resetTime }) => refundRateLimit(key, resetTime)),
+          );
         }
 
         // Save assistant message (capped — see capForPersist).
