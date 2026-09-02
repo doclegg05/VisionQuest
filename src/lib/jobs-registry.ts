@@ -6,10 +6,29 @@ import { registerJobHandler } from "./jobs";
 import { handlePostResponse } from "./chat/post-response";
 import { isEmailDeliveryConfigured, sendEmail } from "./email";
 import { logger } from "./logger";
+import { withStudentRlsContext } from "./rls-context";
+
+/**
+ * Handlers run from the job processor with no session. A handler that
+ * replays a student's work through app-client modules must run as that
+ * student (review F62, 2026-09-01); a payload with no studentId is refused
+ * rather than run blind, where under vq_app every read is empty and every
+ * write is rejected.
+ */
+function requireStudentId(payload: Record<string, unknown>, jobType: string): string {
+  const studentId = payload.studentId;
+  if (typeof studentId !== "string" || studentId.length === 0) {
+    throw new Error(`Invalid ${jobType} payload: studentId is required.`);
+  }
+  return studentId;
+}
 
 // Chat post-response processing (goal extraction, XP, stage updates, title)
 registerJobHandler("chat_post_response", async (payload) => {
-  await handlePostResponse(payload as unknown as Parameters<typeof handlePostResponse>[0]);
+  const studentId = requireStudentId(payload, "chat_post_response");
+  await withStudentRlsContext(studentId, () =>
+    handlePostResponse(payload as unknown as Parameters<typeof handlePostResponse>[0]),
+  );
 });
 
 registerJobHandler("send_email", async (payload) => {
@@ -45,8 +64,9 @@ registerJobHandler("send_email", async (payload) => {
 });
 
 registerJobHandler("sync_student_alerts", async (payload) => {
+  const studentId = requireStudentId(payload, "sync_student_alerts");
   const { syncStudentAlerts } = await import("./advising");
-  await syncStudentAlerts(payload.studentId as string);
+  await withStudentRlsContext(studentId, () => syncStudentAlerts(studentId));
 });
 
 registerJobHandler("snapshot_grant_kpis", async (payload) => {

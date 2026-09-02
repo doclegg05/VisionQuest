@@ -4,6 +4,7 @@ import {
 } from "./advising-scheduling";
 import { prisma } from "./db";
 import { logger } from "./logger";
+import { withStudentRlsContext } from "./rls-context";
 import { studentLogKey } from "@/lib/log-keys";
 export { buildStudentAlertDescriptors } from "./advising-alerts";
 export {
@@ -192,9 +193,18 @@ export async function syncStudentAlerts(studentId: string) {
   }
 }
 
+/**
+ * Batch entrypoint for the /api/internal/alerts/sync cron, which carries no
+ * session. Each student's sync runs as that student: the StudentAlert rows
+ * and the student's own nudge Notification are the student's own rows, and
+ * the app client behind syncStudentAlerts fails closed with no context
+ * (review F5/F62, 2026-09-01). Staff nudges inside already use prismaAdmin.
+ */
 export async function syncAlertsForStudents(studentIds: string[], batchSize: number = 4) {
   for (let index = 0; index < studentIds.length; index += batchSize) {
     const batch = studentIds.slice(index, index + batchSize);
-    await Promise.all(batch.map((studentId) => syncStudentAlerts(studentId)));
+    await Promise.all(
+      batch.map((studentId) => withStudentRlsContext(studentId, () => syncStudentAlerts(studentId))),
+    );
   }
 }

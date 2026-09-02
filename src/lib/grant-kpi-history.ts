@@ -1,5 +1,13 @@
 import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "./classroom";
-import { prisma } from "./db";
+// GrantKpiSnapshot is admin-only under RLS (grant_kpi_snapshot_admin_only:
+// "admin only for now; coordinators via prismaAdmin"). The writer runs from
+// the job processor with no session, and the reader is the staff-gated
+// /api/teacher/reports/grant-kpi/history route (withTeacherAuth +
+// assertStaffCanManageClass), whose teacher context the policy does not
+// admit. Both go through the admin client; the SpokesRecord roll-up is a
+// cross-student aggregate no student branch could satisfy. Neither model is
+// chat-context watched, so no cache invalidation is needed.
+import { prismaAdmin as prisma } from "./db";
 import { computeGrantKpis, currentProgramYear, type GrantKpiPayload } from "./grant-kpi";
 import { programYearBoundsUtc } from "./timezone";
 import { logger } from "./logger";

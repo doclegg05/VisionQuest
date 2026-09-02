@@ -17,7 +17,8 @@ function isAuthorized(req: Request) {
  * Runs periodically (e.g., every 15 minutes) to keep alerts fresh
  * without blocking page renders.
  *
- * Auth: Bearer CRON_SECRET
+ * Auth: Bearer CRON_SECRET. No session: the roster read uses prismaAdmin,
+ * and syncAlertsForStudents runs each student's sync as that student.
  */
 export async function POST(req: Request) {
   if (!isAuthorized(req)) {
