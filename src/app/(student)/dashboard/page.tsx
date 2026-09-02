@@ -5,6 +5,7 @@ import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { getWelcomeCompletedAt } from "@/lib/progression/welcome-completion";
 import { shouldEnterWelcome } from "@/lib/progression/welcome-routing";
+import { countStudentVisibleAlerts } from "@/lib/student-alerts";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { AmbientPanels } from "@/components/dashboard/AmbientPanels";
 import { SagePanels } from "@/components/dashboard/sage/SagePanels";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
         orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
         take: 3,
       }),
-      prisma.studentAlert.count({ where: { studentId: session.id, status: "open" } }),
+      countStudentVisibleAlerts(session.id),
       fetchStudentReadinessData(session.id),
       prisma.orientationItem.findMany({
         where: {

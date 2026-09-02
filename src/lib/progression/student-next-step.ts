@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { countStudentVisibleAlerts } from "@/lib/student-alerts";
 import type { ProgressionState } from "./engine";
 import {
   fetchStudentReadinessData,
@@ -353,9 +354,7 @@ export async function getStudentNextStep(
     prisma.application.count({
       where: { studentId },
     }),
-    prisma.studentAlert.count({
-      where: { studentId, status: "open" },
-    }),
+    countStudentVisibleAlerts(studentId),
     prisma.studentTask.count({
       where: { studentId, status: { in: ["open", "in_progress"] } },
     }),
