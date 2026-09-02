@@ -49,6 +49,10 @@ export type StudentBookingResult =
   | { outcome: "booked"; appointment: BookedAppointment }
   | { outcome: "slot_taken" };
 
+/** Partial unique index from migration 20260902140000. */
+export const SCHEDULED_SLOT_INDEX = "Appointment_advisorId_startsAt_scheduled_key";
+const SCHEDULED_SLOT_FIELDS = ["advisorId", "startsAt"] as const;
+
 export async function createStudentBooking(input: StudentBookingInput): Promise<StudentBookingResult> {
   try {
     const appointment = await prisma.appointment.create({
@@ -69,7 +73,7 @@ export async function createStudentBooking(input: StudentBookingInput): Promise<
     });
     return { outcome: "booked", appointment };
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (isScheduledSlotViolation(error)) {
       return { outcome: "slot_taken" };
     }
     throw error;
@@ -77,17 +81,23 @@ export async function createStudentBooking(input: StudentBookingInput): Promise<
 }
 
 /**
- * Prisma P2002 = unique-constraint violation. Appointment's only unique
- * index besides the primary key is the partial slot index, so any P2002 on
- * create means the slot. If another unique index is ever added to the
- * model, inspect `meta.target` here before treating P2002 as a slot clash.
- * Duck-typed like sage/agent/confirmation-use.ts and progression/events.ts.
+ * Prisma P2002 = unique-constraint violation, duck-typed like
+ * sage/agent/confirmation-use.ts. Only the scheduled-slot index counts as
+ * "slot taken"; a P2002 on any other constraint propagates. `meta.target`
+ * carries the index name (string, or inside an array) or, when quaint parses
+ * the Postgres DETAIL line, the field names, so all three shapes match.
  */
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "P2002"
-  );
+function isScheduledSlotViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ((error as { code?: unknown }).code !== "P2002") return false;
+
+  const target = (error as { meta?: { target?: unknown } }).meta?.target;
+  const names = Array.isArray(target)
+    ? target.map(String)
+    : typeof target === "string"
+      ? [target]
+      : [];
+
+  if (names.includes(SCHEDULED_SLOT_INDEX)) return true;
+  return SCHEDULED_SLOT_FIELDS.every((field) => names.includes(field));
 }

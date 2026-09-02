@@ -4,6 +4,7 @@ import { createStudentBooking } from "@/lib/appointment-booking";
 import { logAuditEvent } from "@/lib/audit";
 import { withAuth } from "@/lib/api-error";
 import { studentLogKey } from "@/lib/log-keys";
+import { redactContactInfo } from "@/lib/log-redaction";
 import { logger } from "@/lib/logger";
 import { parseBody, bookAppointmentSchema } from "@/lib/schemas";
 
@@ -44,8 +45,15 @@ export const POST = withAuth(async (session, req: Request) => {
     slot,
   });
 
-  if (result.outcome === "slot_taken") {
-    return NextResponse.json({ error: SLOT_JUST_TAKEN_MESSAGE }, { status: 409 });
+  switch (result.outcome) {
+    case "slot_taken":
+      return NextResponse.json({ error: SLOT_JUST_TAKEN_MESSAGE }, { status: 409 });
+    case "booked":
+      break;
+    default: {
+      const unhandled: never = result;
+      throw new Error(`Unhandled booking outcome: ${JSON.stringify(unhandled)}`);
+    }
   }
 
   const { appointment } = result;
@@ -85,6 +93,9 @@ async function afterBooking(
   try {
     await effect();
   } catch (error) {
-    logger.warn(`Appointment saved but ${step} failed`, { ...context, error: String(error) });
+    logger.warn(`Appointment saved but ${step} failed`, {
+      ...context,
+      error: redactContactInfo(String(error)),
+    });
   }
 }

@@ -65,16 +65,25 @@ function bookedAppointment(id: string) {
   };
 }
 
-/** Shape Prisma throws for a unique-constraint violation (code P2002). */
-function uniqueViolation() {
+const SLOT_INDEX = "Appointment_advisorId_startsAt_scheduled_key";
+
+/**
+ * Shape Prisma throws for a unique-constraint violation (code P2002).
+ * `meta.target` is the index name, or the field names quaint parses out of
+ * the Postgres DETAIL line; tests cover both.
+ */
+function uniqueViolation(target: unknown = SLOT_INDEX) {
   return Object.assign(
     new Error("Unique constraint failed on the fields: (`advisorId`,`startsAt`)"),
-    {
-      code: "P2002",
-      clientVersion: "6.19.3",
-      meta: { target: "Appointment_advisorId_startsAt_scheduled_key" },
-    },
+    { code: "P2002", clientVersion: "6.19.3", meta: { target } },
   );
+}
+
+function uniqueViolationWithoutMeta() {
+  return Object.assign(new Error("Unique constraint failed on the constraint"), {
+    code: "P2002",
+    clientVersion: "6.19.3",
+  });
 }
 
 mock.module("@/lib/api-error", {
@@ -225,6 +234,49 @@ describe("POST /api/appointments/book", () => {
       assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
       assert.equal(mockSendAppointmentConfirmation.mock.callCount(), 0);
     });
+
+    const slotTargets: ReadonlyArray<readonly [string, unknown]> = [
+      ["the index name as a string", SLOT_INDEX],
+      ["the index name inside an array", [SLOT_INDEX]],
+      ["the field names quaint parses from the Postgres DETAIL line", ["advisorId", "startsAt"]],
+    ];
+    for (const [label, target] of slotTargets) {
+      it(`maps P2002 to 409 when meta.target is ${label}`, async () => {
+        mockAppointmentCreate.mock.mockImplementationOnce(async () => {
+          throw uniqueViolation(target);
+        });
+
+        const result = await post(STUDENT_A);
+
+        assert.equal(result.status, 409);
+        assert.equal(result.body.error, "That time was just taken. Pick another time.");
+        assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+      });
+    }
+
+    it("propagates a P2002 on another constraint as a 500 with no side effects", async () => {
+      mockAppointmentCreate.mock.mockImplementationOnce(async () => {
+        throw uniqueViolation(["id"]);
+      });
+
+      const result = await post(STUDENT_A);
+
+      assert.equal(result.status, 500);
+      assert.equal(result.body.error, "Internal server error");
+      assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+      assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+    });
+
+    it("propagates a P2002 with no meta.target as a 500", async () => {
+      mockAppointmentCreate.mock.mockImplementationOnce(async () => {
+        throw uniqueViolationWithoutMeta();
+      });
+
+      const result = await post(STUDENT_A);
+
+      assert.equal(result.status, 500);
+      assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+    });
   });
 
   describe("F26: a saved booking is never reported as failed", () => {
@@ -261,6 +313,24 @@ describe("POST /api/appointments/book", () => {
         assert.doesNotMatch(serialized, /stu-test-001|studenta/);
         assert.match(serialized, /appt-1/);
       }
+    });
+
+    it("redacts contact info from a failed side effect before logging it", async () => {
+      mockSendAppointmentConfirmation.mock.mockImplementation(async () => {
+        throw new Error(
+          "550 5.1.1 <student.a@example.org>: recipient rejected; callback +15551234567",
+        );
+      });
+
+      const result = await post(STUDENT_A);
+
+      assert.equal(result.status, 201);
+      assert.equal(mockLoggerWarn.mock.callCount(), 1);
+      const [, context] = mockLoggerWarn.mock.calls[0].arguments;
+      const loggedError = String(context?.error);
+      assert.doesNotMatch(loggedError, /student\.a@example\.org|5551234567/);
+      assert.match(loggedError, /\[email redacted\]/);
+      assert.match(loggedError, /\[phone redacted\]/);
     });
   });
 
