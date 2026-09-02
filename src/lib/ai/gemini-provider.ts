@@ -505,7 +505,7 @@ export class GeminiProvider implements AIProvider {
       // "show me my goals AND my appointments") the wall-clock cost
       // collapses from sum(durations) to max(durations).
       const handlerResults = await Promise.all(
-        enriched.map((c) => onToolCall({ name: c.name, args: c.args })),
+        enriched.map((c) => onToolCall({ callId: c.callId, name: c.name, args: c.args })),
       );
 
       const responseParts: Part[] = [];

@@ -116,9 +116,12 @@ export interface ToolStreamOptions {
 
 /**
  * Caller-supplied callback that actually runs the tool. Should return the
- * structured result that gets fed back to the model.
+ * structured result that gets fed back to the model. `callId` is the same id
+ * the surrounding tool_call / tool_result events carry, so the caller can key
+ * its own records by it — parallel handlers complete in any order.
  */
 export type ToolCallHandler = (call: {
+  callId: string;
   name: string;
   args: Record<string, unknown>;
 }) => Promise<{ response: unknown; summary: string; status: "success" | "error" }>;

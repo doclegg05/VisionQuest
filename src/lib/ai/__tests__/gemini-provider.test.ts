@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { GeminiProvider } from "../gemini-provider";
+import type { ToolCallHandler, ToolStreamEvent } from "../types";
 
 // Mock fetch to intercept Gemini SDK network calls
 const mockFetch = mock.fn<typeof globalThis.fetch>();
@@ -263,6 +264,97 @@ describe("GeminiProvider", () => {
       ]);
 
       assert.equal(result, "no usage callback");
+    });
+  });
+
+  describe("tool call ids", () => {
+    type ToolCallEvent = Extract<ToolStreamEvent, { kind: "tool_call" }>;
+    type ToolResultEvent = Extract<ToolStreamEvent, { kind: "tool_result" }>;
+
+    /**
+     * SSE stream carrying one function-call part per chunk. One chunk per
+     * call, not one chunk with two parts: the SDK's stream aggregator reuses
+     * a single part object per chunk, so two parts in one chunk both surface
+     * as the last one.
+     */
+    function geminiFunctionCallStreamResponse(
+      calls: Array<{ name: string; args: Record<string, unknown> }>,
+    ) {
+      const encoder = new TextEncoder();
+      const chunks = calls.map(
+        (c) =>
+          "data: " +
+          JSON.stringify({
+            candidates: [{ content: { parts: [{ functionCall: c }], role: "model" } }],
+          }) +
+          "\r\n\r\n",
+      );
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+            controller.close();
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "text/event-stream" } },
+      );
+    }
+
+    it("hands each parallel handler the same callId its tool_call event carried", async () => {
+      // Hop 1: the model emits two function calls at once; hop 2: plain text.
+      // Explicit onCall indexes — two bare mockImplementationOnce calls both
+      // target "the next call" and the second would overwrite the first.
+      mockFetch.mock.mockImplementationOnce(
+        async () =>
+          geminiFunctionCallStreamResponse([
+            { name: "lookup_a", args: { id: "1" } },
+            { name: "lookup_b", args: { id: "2" } },
+          ]),
+        0,
+      );
+      mockFetch.mock.mockImplementationOnce(async () => geminiStreamResponse(["done"]), 1);
+
+      const tools = ["lookup_a", "lookup_b"].map((name) => ({
+        name,
+        description: `Look up ${name}.`,
+        parameters: {
+          type: "object" as const,
+          properties: { id: { type: "string" as const } },
+        },
+      }));
+      const handlerCalls: Array<{ callId: string | undefined; name: string }> = [];
+      const onToolCall: ToolCallHandler = async (call) => {
+        handlerCalls.push({ callId: call.callId, name: call.name });
+        return { response: { ok: true }, summary: "ok", status: "success" as const };
+      };
+
+      const events: ToolStreamEvent[] = [];
+      for await (const event of provider.streamWithTools(
+        "sys",
+        [{ role: "user", content: "Hi" }],
+        tools,
+        onToolCall,
+      )) {
+        events.push(event);
+      }
+
+      const toolCalls = events.filter((e): e is ToolCallEvent => e.kind === "tool_call");
+      assert.equal(toolCalls.length, 2, "both function calls surface as tool_call events");
+      for (const ev of toolCalls) {
+        const handled = handlerCalls.find((h) => h.name === ev.name);
+        assert.ok(handled, `handler ran for ${ev.name}`);
+        assert.equal(
+          handled.callId,
+          ev.callId,
+          `${ev.name}: the handler must receive the callId its tool_call event carried`,
+        );
+      }
+      const results = events.filter((e): e is ToolResultEvent => e.kind === "tool_result");
+      assert.deepEqual(
+        results.map((r) => r.callId),
+        toolCalls.map((c) => c.callId),
+        "tool_result callIds mirror the tool_call callIds",
+      );
     });
   });
 });
