@@ -14,13 +14,22 @@ Sage jobs (`sage-daily-briefing`, `sage-memory-consolidate`,
 step 3 of the prerequisites below was never applied. The four baseline jobs
 (`appointment-reminders`, `job-processor`, `daily-coaching`,
 `cron-health-monitor`) were never registered at all. Their block in
-`prisma/migrations/00000000000000_baseline/migration.sql` opens with
-`DELETE FROM cron.job`, which fails on Supabase with `42501 permission denied
-for table job` (`cron.job` is owned by `supabase_admin`), so the block aborts
-before its `cron.schedule()` calls. Prisma marks a migration applied once it
-has run, whatever the block did, so the baseline never retries.
-`20260701140000_fix_memory_consolidate_cron` documents the same failure for
-the memory job.
+`prisma/migrations/00000000000000_baseline/migration.sql` has never executed
+with the extensions present: the original `20260421000000_add_pg_cron_jobs`
+ran before `pg_cron` and `pg_net` were enabled and took its NOTICE/RETURN
+branch, and the 2026-06-01 baseline squash was recorded on prod with
+`migrate resolve --applied`, without running
+(`docs/plans/2026-06-01-migration-baseline-runbook.md`). Prisma runs a
+migration file once, so the block never retries. The block is also unsafe to
+run on Supabase: it opens with `DELETE FROM cron.job`, which raises `42501
+permission denied for table job` (`cron.job` is owned by `supabase_admin`),
+and an unhandled error in a DO block fails the migration and every later
+deploy with P3009, which is what `20260625001000_add_wager_resolve_cron`
+records happening to its own first version. Restore hazard: on a fresh
+database with the extensions enabled before `migrate deploy`, the order
+`docs/runbooks/backup-restore.md` section 4.2 prescribes, the baseline block
+raises that 42501 unhandled and the deploy fails before the repair migration
+runs.
 
 Effects: no appointment reminders, no daily coaching, no memory
 consolidation, no Sage briefing, no wager resolution, no queued email (crisis
@@ -41,14 +50,36 @@ Every job reads `app.base_url` at run time. SQL Editor:
 ALTER DATABASE postgres SET app.base_url = 'https://visionquest.onrender.com';
 ```
 
-The setting loads on new connections. Verify in a **new** SQL Editor tab:
+The setting loads on new connections. Verify from the catalog, which does
+not depend on which backend session the SQL Editor reuses (a new editor tab
+does not guarantee a new session, and `SHOW` on an unset custom GUC raises
+an error instead of returning empty):
 
 ```sql
-SHOW app.base_url;
+SELECT d.datname, s.setconfig
+FROM pg_db_role_setting s
+JOIN pg_database d ON d.oid = s.setdatabase
+WHERE d.datname = 'postgres';
 ```
 
-Expected: `https://visionquest.onrender.com`. Then confirm the Vault secret
-exists:
+Expected: `setconfig = {app.base_url=https://visionquest.onrender.com}`.
+Second-best check, from a machine with the direct connection string:
+`psql "$DIRECT_URL" -c 'SHOW app.base_url'`.
+
+If `ALTER DATABASE` is rejected with `must be owner of database`, use
+`ALTER ROLE postgres SET app.base_url = 'https://visionquest.onrender.com';`
+instead; the jobs run as `postgres`, so it reaches the same sessions. A
+role-level setting overrides the database-level one, so if the values ever
+disagree check both rows:
+
+```sql
+SELECT r.rolname, d.datname, s.setconfig
+FROM pg_db_role_setting s
+LEFT JOIN pg_roles r ON r.oid = s.setrole
+LEFT JOIN pg_database d ON d.oid = s.setdatabase;
+```
+
+Then confirm the Vault secret exists:
 
 ```sql
 SELECT name, created_at FROM vault.secrets WHERE name = 'CRON_SECRET';
@@ -64,7 +95,13 @@ Vault secret.
 
 Once `job-processor` is registered it fires every ten minutes and drains
 `BackgroundJob`. The 153 pending rows include mail queued in March through
-May 2026; draining sends it. Two options:
+May 2026; draining sends it. Note that step 1 alone already brings the three
+existing Sage jobs live: `sage-daily-briefing` (11:00 UTC) enqueues one
+`sage_briefing` BackgroundJob per active student, and `sage-wager-resolve`
+(06:20 UTC) resolves wagers that have been pending since spring. If
+expiring, run the script after the GUC is set and before the next 11:00 UTC
+slot, or rely on `--before` leaving the new rows alone (they are created
+after the cutoff). Two options:
 
 **Expire them.** Dry run first, from a machine with the repo checked out:
 
@@ -86,6 +123,20 @@ runs process everything pending, 20 rows per run, so roughly 80 minutes for
 that already have `attempts >= 3` are never claimed either way.
 
 ### 3. Deploy the migration
+
+Before deploying, confirm the migration ledger has nothing half-applied:
+
+```sql
+SELECT migration_name, started_at, finished_at, rolled_back_at
+FROM visionquest._prisma_migrations
+WHERE finished_at IS NULL;
+```
+
+Expected: zero rows. A row with `finished_at IS NULL AND rolled_back_at IS
+NULL` is the only ledger state that blocks `migrate deploy`; the prod-only
+`20260724140000_add_interest_profiler_provenance` row is inert for this
+deploy. The ledger lives in the `visionquest` schema, not `public`
+(`docs/plans/2026-06-01-migration-baseline-runbook.md`).
 
 Merge and deploy the branch carrying
 `20260902120000_reregister_baseline_cron_jobs`. Render runs
@@ -125,7 +176,29 @@ Expected: `status = 'succeeded'` for every job that has had a scheduled slot
 (`daily-coaching` runs at 13:00 UTC, the Sage jobs daily or weekly, so their
 rows appear when their slot passes). A `return_message` of `unrecognized
 configuration parameter "app.base_url"` means step 1 did not take on the
-connection pg_cron uses; re-check `SHOW app.base_url` in a new tab.
+connection pg_cron uses; re-run the catalog query from step 1.
+
+`succeeded` only means the SQL ran. `net.http_post` and `net.http_get` are
+asynchronous, so a run is recorded `succeeded` whether the app answered
+200, 401, 404, or 500; a Vault `CRON_SECRET` that does not match Render's
+shows every job green while nothing runs. Check the HTTP responses:
+
+```sql
+SELECT id, status_code, error_msg, timed_out, created
+FROM net._http_response
+ORDER BY created DESC
+LIMIT 20;
+```
+
+Expected: `status_code = 200` on every row. pg_net keeps these rows only for
+its `ttl` setting (`pg_net.ttl`, default 6 hours), so look within that
+window of a run.
+
+Then run the health check in step 5, with `CRON_CHECK_DATABASE_URL` set, as
+part of this verification. The migration's `insufficient_privilege` guards
+raise NOTICE, which Prisma does not surface, so a permission failure on one
+job would look like a clean deploy and never retry; the health check is what
+catches it.
 
 ### 5. Run the health check
 
@@ -133,15 +206,36 @@ connection pg_cron uses; re-check `SHOW app.base_url` in a new tab.
 CRON_CHECK_DATABASE_URL='<postgres-role connection string>' npm run cron:health
 ```
 
-Exit 0: all seven present, active, have run, and last succeeded. Exit 1:
-problems, listed one per line. Exit 2: the check did not run (no connection
-string, or the queries failed). Same role requirement as step 2: pg_cron
-shows `cron.job` rows only to the role that scheduled them.
+Exit 0: all seven present, active, have run, and last succeeded, and every
+`net._http_response` row in the last 6 hours is a 200. Exit 1: problems,
+listed one per line. Exit 2: the check did not run (no connection string, or
+the queries failed). If `net._http_response` is absent or not readable the
+report says so and that alone does not fail the check. Same role
+requirement as step 2: pg_cron shows `cron.job` rows only to the role that
+scheduled them.
 
 `.github/workflows/cron-health.yml` runs the same check nightly and on
-demand. It needs the `CRON_CHECK_DATABASE_URL` repository secret; without
-it the workflow emits a warning annotation and a step summary saying the
-check did not run, rather than passing.
+demand. It needs the `CRON_CHECK_DATABASE_URL` repository secret, which is
+a merge condition for the repair PR, not an option; without it the workflow
+emits a warning annotation and a step summary saying the check did not run,
+rather than passing.
+
+### Known gaps after the repair
+
+- The Manual Smoke Test cleanup and both Rollback options below use
+  `DELETE FROM cron.job` / `UPDATE cron.job`, which fail with the same 42501
+  from the SQL Editor. `cron.unschedule('<jobname>')` and
+  `cron.alter_job(<jobid>, active := false)` are the forms that work.
+- Restore hazard: the baseline block raises 42501 unhandled on a fresh
+  database with `pg_cron`/`pg_net` enabled before `migrate deploy` (see
+  "What was found"); `docs/runbooks/backup-restore.md` section 4.2 still
+  prescribes that order.
+- pg_cron does not purge `cron.job_run_details`: seven jobs write about 195
+  rows a day, unbounded. Supabase recommends a scheduled
+  `DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days'`.
+  Whether `postgres` may DELETE from that table on Supabase is unverified;
+  try it once in the SQL Editor before scheduling it.
+- The `insufficient_privilege` guards report through NOTICE only; see step 4.
 
 ## Prerequisites
 
@@ -314,5 +408,5 @@ re-apply later.
 - **Sentry**: the `cron-health-monitor` job posts any failures from the
   prior hour to `/api/internal/cron-health`, which logs them to Sentry with
   tag `jobname` for filtering.
-- **SQL**: for ad-hoc checks, `cron.job_run_details` retains the last ~1000
-  runs per Supabase default retention.
+- **SQL**: for ad-hoc checks, query `cron.job_run_details`. pg_cron does not
+  purge it; see the retention gap under "Repair, 2026-09", Known gaps.
