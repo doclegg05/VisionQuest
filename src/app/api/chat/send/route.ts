@@ -29,6 +29,7 @@ import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { ensureCrisisResources } from "@/lib/chat/crisis-safety-net";
+import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
 import {
   assembleStudentContextBundle,
   selfMetricLineFromBundle,
@@ -185,6 +186,19 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const isStaffChat = isTeacher || session.role === "coordinator";
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
+
+  // Crisis scan — request-time, student-only, never throws. Runs before the
+  // direct-answer branches, provider resolution, and rate limits so every
+  // exit below still raises the staff alert (VQ-R-001). Single call site:
+  // handlePostResponse does not scan again.
+  if (!isStaffChat) {
+    await scanStudentMessageForCrisis({
+      studentId: session.id,
+      conversationId,
+      userMessage,
+    });
+  }
+
   // Deterministic form lookup — bypasses discovery/goal stage prompts so a
   // student who asks for a form gets it even mid-onboarding.
   const agentLoopEnabledEarly = isAgentLoopEnabled();
@@ -1096,7 +1110,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           }).catch((err) => logger.error("Post-response error", { error: String(err) }));
         } else {
           // Staff post-processing is memory extraction and nothing else.
-          // handlePostResponse is student-shaped end to end (crisis scan, goal
+          // handlePostResponse is student-shaped end to end (goal
           // proposals, discovery upsert, mood, review XP, classroom
           // confirmation) and every step keys off a studentId a staff account
           // does not have — so staff call the one step they should get

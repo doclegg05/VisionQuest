@@ -19,8 +19,11 @@
  *
  * NOT part of this budget:
  *   - The crisis keyword scan (detectCrisisSignal → recordWellbeingConcern)
- *     is deterministic (no model call). It always runs first, unconditionally;
- *     no cap, flag, or provider outage can ever suppress it.
+ *     does NOT live here. It runs at request time in the chat route
+ *     (src/lib/chat/crisis-scan.ts), before provider resolution, so a
+ *     provider outage, rate limit, or direct answer cannot suppress it. This
+ *     pipeline must not scan again: the alert row is idempotent per day, but
+ *     the staff-notification cooldowns are read-then-write.
  *   - The readability check and title generation are deterministic too.
  *   - Rolling summary compaction (maybeUpdateSummary) is owned by the route.
  *
@@ -50,7 +53,6 @@ import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
 import { rateLimitDaily } from "@/lib/rate-limit";
-import { detectCrisisSignal, recordWellbeingConcern } from "@/lib/sage/crisis-detection";
 import { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } from "@/lib/sage/readability";
 import { retryWithBackoff } from "@/lib/sage/retry";
 import {
@@ -279,29 +281,9 @@ async function runPostResponse(
   }: PostResponseParams,
   plan: PostResponsePlan,
 ): Promise<void> {
-  // 0. Wellbeing/crisis safety-net — runs FIRST and independently of the AI
-  //    provider, so a provider outage can never suppress a staff alert. The
-  //    detector is a deterministic keyword scan (no AI cost/latency) on the
-  //    student's latest turn, regardless of conversation stage. Deliberately
-  //    outside the model-call plan/cap: this must run on every turn, always.
-  try {
-    const signal = detectCrisisSignal(userMessage);
-    if (signal.matched) {
-      // Category only — never the message text (locked privacy decision).
-      await recordWellbeingConcern({
-        studentId,
-        conversationId,
-        reason: "message_signal",
-        category: signal.category,
-      });
-    }
-  } catch (err) {
-    logger.error("Wellbeing detection failed", {
-      conversationId,
-      alert: "wellbeing_detection_failed",
-      error: String(err),
-    });
-  }
+  // The crisis keyword scan is NOT here: it runs at request time in the chat
+  // route (src/lib/chat/crisis-scan.ts) so no exit can skip it. Do not add a
+  // second scan — see the module header.
 
   // Plain-language guard — deterministic reading-level signal on Sage's reply.
   // Non-blocking and model-free; surfaces when Sage drifts above the ~6th-8th
