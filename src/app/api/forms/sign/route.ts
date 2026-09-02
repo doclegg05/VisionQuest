@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+import { afterWrite } from "@/lib/after-write";
 import { parseBody } from "@/lib/schemas";
 
 // Signature is a base64 PNG data URL — body length capped to keep upstream
@@ -109,7 +110,13 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       },
     });
 
-    await syncStudentAlerts(targetStudentId);
+    // The submission is saved. The alert sync is best-effort from here:
+    // a failure is logged, never reported as a failed signature.
+    await afterWrite(() => syncStudentAlerts(targetStudentId), {
+      surface: "forms/sign",
+      effect: "syncStudentAlerts",
+      studentId: targetStudentId,
+    });
 
     return NextResponse.json({
       submission,
