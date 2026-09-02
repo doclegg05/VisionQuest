@@ -32,10 +32,11 @@ const ADMIN_KEY_ACTOR = "admin-key";
 /** Request fields the promotion path deliberately ignores. */
 const PROMOTION_IGNORED_FIELDS = ["password", "displayName"] as const;
 
+/** Shown verbatim by src/app/teacher-register/page.tsx; kept at a 6th-grade reading level. */
 const PROMOTION_MESSAGE =
-  "The teacher account was promoted to admin. The password and display name in this request were ignored: " +
-  "the account keeps its existing credentials and MFA. Every existing session for the account was signed out. " +
-  "Sign in with the account's current password to continue.";
+  "This teacher account is now an admin. We did not change the password or the name. " +
+  "The account keeps its current password and MFA. All open sessions for this account were signed out. " +
+  "Sign in with the current password to continue.";
 
 function timingSafeCompare(a: string, b: string): boolean {
   const bufA = crypto.createHmac("sha256", "vq-key-compare").update(a).digest();

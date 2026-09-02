@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest } from "@/lib/test-helpers";
+import { fleschKincaidGrade, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/readability";
 
 // ---------------------------------------------------------------------------
 // register-teacher (staff registration) route — request-level tests
@@ -276,6 +277,15 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.deepEqual(body.ignoredFields, ["password", "displayName"]);
       assert.match(body.message, /password/i);
       assert.match(body.message, /sign in/i);
+
+      // The registration page shows this message verbatim, so it is UI copy
+      // and must read at the plain-language ideal (6th grade), not just under
+      // the gate ceiling.
+      const grade = fleschKincaidGrade(body.message);
+      assert.ok(
+        grade <= PLAIN_LANGUAGE_IDEAL_GRADE,
+        `promotion message reads at grade ${grade.toFixed(1)}; must be at or under grade ${PLAIN_LANGUAGE_IDEAL_GRADE}`,
+      );
     });
 
     it("does not promote a non-teacher account with the same email (409, no update)", async () => {

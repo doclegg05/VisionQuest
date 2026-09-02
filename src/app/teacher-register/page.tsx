@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
-
-type StaffRole = "teacher" | "admin";
+import { resolveStaffRegistrationOutcome, type StaffRole } from "./staff-registration-outcome";
 
 export default function StaffRegisterPage() {
   const [role, setRole] = useState<StaffRole>("teacher");
@@ -15,12 +14,14 @@ export default function StaffRegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setNotice("");
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -41,7 +42,14 @@ export default function StaffRegisterPage() {
         return;
       }
 
-      router.push(role === "admin" ? "/admin" : "/teacher");
+      // A promotion issues no session, so a redirect would land on the login
+      // form with no explanation. Show the response message instead.
+      const outcome = resolveStaffRegistrationOutcome(data, role);
+      if (outcome.kind === "promoted") {
+        setNotice(outcome.message);
+        return;
+      }
+      router.push(outcome.href);
       router.refresh();
     } catch {
       setError("Could not connect to server.");
@@ -80,6 +88,7 @@ export default function StaffRegisterPage() {
                       setRole(option);
                       setRegistrationKey("");
                       setError("");
+                      setNotice("");
                     }}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
                       role === option
@@ -177,6 +186,12 @@ export default function StaffRegisterPage() {
             {error && (
               <p role="alert" className="rounded-2xl bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
                 {error}
+              </p>
+            )}
+
+            {notice && (
+              <p role="status" className="rounded-2xl bg-[var(--badge-success-bg)] px-4 py-3 text-sm leading-6 text-[var(--badge-success-text)]">
+                {notice}
               </p>
             )}
 
