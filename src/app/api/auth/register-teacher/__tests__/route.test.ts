@@ -83,6 +83,14 @@ mock.module("@/lib/audit", {
   },
 });
 
+const mockLoggerError = mock.fn() as any;
+const mockLoggerWarn = mock.fn() as any;
+mock.module("@/lib/logger", {
+  namedExports: {
+    logger: { error: mockLoggerError, warn: mockLoggerWarn, info: mock.fn(), debug: mock.fn() },
+  },
+});
+
 let registerRoute: Awaited<typeof import("../route")>;
 const ORIGINAL_TEACHER_KEY = process.env.TEACHER_KEY;
 const ORIGINAL_ADMIN_KEY = process.env.ADMIN_KEY;
@@ -97,6 +105,8 @@ const EXISTING_TEACHER = {
   role: "teacher",
   sessionVersion: 3,
   displayName: "Alice Teacher",
+  isActive: true,
+  offboardedAt: null as Date | null,
 };
 
 const MFA_FIELDS = ["mfaSecret", "mfaEnabled", "mfaBackupCodes", "mfaVerifiedAt", "mfaLastUsedCounter"];
@@ -161,6 +171,8 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
     mockLogAuditEvent.mock.resetCalls();
     mockInvalidateSessionCache.mock.resetCalls();
     mockHashPassword.mock.resetCalls();
+    mockLoggerError.mock.resetCalls();
+    mockLoggerWarn.mock.resetCalls();
 
     mockRateLimit.mock.mockImplementation(async () => ({
       success: true,
@@ -258,6 +270,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
 
       assert.equal(res.status, 200);
       assert.equal(cookieSets.length, 0, "promotion must not sign the caller in as the promoted account");
+      assert.equal(res.headers.get("set-cookie"), null, "no Set-Cookie header on the promotion response");
       assert.equal(body.sessionIssued, false);
 
       const { data } = mockUpdate.mock.calls[0].arguments[0];
@@ -287,6 +300,51 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
         `promotion message reads at grade ${grade.toFixed(1)}; must be at or under grade ${PLAIN_LANGUAGE_IDEAL_GRADE}`,
       );
     });
+
+    it("keeps the 200 when the audit write fails after the role change committed", async () => {
+      stubExistingTeacherPromotion();
+      mockLogAuditEvent.mock.mockImplementation(async () => {
+        throw new Error("audit table unavailable");
+      });
+
+      const res = await registerRoute.POST(promotionRequest() as never);
+      const body = (await res.json()) as { promoted: boolean };
+
+      assert.equal(res.status, 200, "a completed promotion must not turn into a 500 because auditing failed");
+      assert.equal(body.promoted, true);
+      assert.equal(mockUpdate.mock.callCount(), 1);
+      assert.equal(mockInvalidateSessionCache.mock.callCount(), 1);
+
+      assert.equal(mockLoggerError.mock.callCount(), 1, "the audit failure must be logged");
+      const [message, meta] = mockLoggerError.mock.calls[0].arguments;
+      assert.match(String(message), /audit/i);
+      assert.equal(typeof meta.alert, "string", "log line must carry an alert key");
+      const logged = JSON.stringify([message, meta]);
+      assert.doesNotMatch(logged, /tch-1|alice@example\.com|Alice|Mallory/i, "no raw id or identifier in server logs");
+      assert.match(logged, /stu_[0-9a-f]{12}/, "correlate with studentLogKey");
+    });
+
+    for (const [label, overrides] of [
+      ["inactive", { isActive: false }],
+      ["offboarded", { offboardedAt: new Date("2026-01-15T00:00:00Z") }],
+    ] as const) {
+      it(`refuses to promote an ${label} teacher row (409, no update, no audit)`, async () => {
+        mockFindFirst.mock.mockImplementation(async () => ({ ...EXISTING_TEACHER, ...overrides }));
+
+        const res = await registerRoute.POST(promotionRequest() as never);
+        const body = (await res.json()) as { error: string };
+
+        assert.equal(res.status, 409);
+        assert.match(body.error, /already registered/i);
+        assert.equal(mockUpdate.mock.callCount(), 0);
+        assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+        assert.equal(cookieSets.length, 0);
+
+        const { select } = mockFindFirst.mock.calls[0].arguments[0];
+        assert.equal(select.isActive, true, "the lookup must read isActive");
+        assert.equal(select.offboardedAt, true, "the lookup must read offboardedAt");
+      });
+    }
 
     it("does not promote a non-teacher account with the same email (409, no update)", async () => {
       mockFindFirst.mock.mockImplementation(async () => ({ ...EXISTING_TEACHER, role: "student" }));
@@ -351,8 +409,15 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.equal(cookieSets.length, 1, "expected session cookie to be set");
       assert.deepEqual(cookieSets[0], { studentId: "tch-1", role: "teacher", sessionVersion: 1 });
       assert.equal(mockLogAuditEvent.mock.callCount(), 1);
-      assert.equal(mockLogAuditEvent.mock.calls[0].arguments[0].action, "auth.register_teacher");
-      assert.equal(mockLogAuditEvent.mock.calls[0].arguments[0].actorId, "tch-1");
+      const creationEvent = mockLogAuditEvent.mock.calls[0].arguments[0];
+      assert.equal(creationEvent.action, "auth.register_teacher");
+      assert.equal(creationEvent.actorId, "tch-1");
+      assert.equal(creationEvent.targetId, "tch-1");
+      assert.doesNotMatch(
+        String(creationEvent.summary),
+        /alice@example\.com|Alice/i,
+        "identifiers belong in targetId, not the summary",
+      );
     });
 
     it("returns 409 when the email is already registered (duplicate email)", async () => {
@@ -422,6 +487,11 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.equal(mockFindFirst.mock.callCount(), 0);
       assert.equal(mockCreate.mock.callCount(), 0);
       assert.equal(cookieSets.length, 0);
+
+      assert.equal(mockLoggerWarn.mock.callCount(), 1);
+      const warnMeta = mockLoggerWarn.mock.calls[0].arguments[1];
+      assert.equal(typeof warnMeta.providedLength, "number");
+      assert.equal("configuredLength" in warnMeta, false, "the configured key's length must not be logged");
     });
 
     it("rejects the teacher key presented for the admin role with 403 (keys are role-bound)", async () => {

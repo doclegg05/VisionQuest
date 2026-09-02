@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
-import {
-  hashPassword,
-  invalidateSessionCache,
-  normalizeEmail,
-  normalizeStudentId,
-  setSessionCookie,
-} from "@/lib/auth";
+import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import { parseBody, registerStaffSchema } from "@/lib/schemas";
+import { promoteTeacherToAdmin, PROMOTION_IGNORED_FIELDS } from "@/lib/promote-staff-account";
 
 function normalizeKey(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -21,16 +16,6 @@ function normalizeKey(value: unknown): string {
 
 const TEACHER_KEY = normalizeKey(process.env.TEACHER_KEY || "");
 const ADMIN_KEY = normalizeKey(process.env.ADMIN_KEY || "");
-
-/**
- * Audit actor for promotions performed with the shared ADMIN_KEY. The key is a
- * registration secret, not an authenticated identity, so the audit row must
- * not be attributed to the promoted account (review 2026-09-01, F11 / SEC-05).
- */
-const ADMIN_KEY_ACTOR = "admin-key";
-
-/** Request fields the promotion path deliberately ignores. */
-const PROMOTION_IGNORED_FIELDS = ["password", "displayName"] as const;
 
 /** Shown verbatim by src/app/teacher-register/page.tsx; kept at a 6th-grade reading level. */
 const PROMOTION_MESSAGE =
@@ -71,7 +56,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ip,
       role,
       providedLength: registrationKey.length,
-      configuredLength: expectedKey.length,
     });
     return NextResponse.json({ error: `Invalid ${role} registration key.` }, { status: 403 });
   }
@@ -82,42 +66,31 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const existing = await prisma.student.findFirst({
     where: { OR: [{ studentId }, { email }] },
-    select: { id: true, studentId: true, email: true, role: true, sessionVersion: true, displayName: true },
+    select: {
+      id: true,
+      studentId: true,
+      email: true,
+      role: true,
+      sessionVersion: true,
+      displayName: true,
+      isActive: true,
+      offboardedAt: true,
+    },
   });
 
-  // Admin registration can promote an existing teacher account. ADMIN_KEY is a
-  // shared registration secret, not an authenticated identity, so promotion
-  // changes the role and nothing else: the supplied password and display name
-  // are ignored, MFA state is untouched, sessionVersion is bumped so every
-  // pre-promotion session dies, and no session is issued here. The promoted
-  // user signs in with the credentials they already hold (F11 / SEC-05).
-  if (existing && existing.email === email && role === "admin" && existing.role === "teacher") {
-    const promoted = await prisma.student.update({
-      where: { id: existing.id },
-      data: { role: "admin", sessionVersion: { increment: 1 } },
-      select: { id: true, role: true },
-    });
-    invalidateSessionCache(promoted.id);
-
-    // targetId identifies the row; no log key here because the digest is a
-    // logging aid that must not be stored (src/lib/log-keys.ts).
-    await logAuditEvent({
-      actorId: ADMIN_KEY_ACTOR,
-      actorRole: ADMIN_KEY_ACTOR,
-      action: "auth.promote_to_admin",
-      targetType: "student",
-      targetId: promoted.id,
-      summary:
-        "Teacher promoted to admin with ADMIN_KEY; " +
-        "password, display name and MFA unchanged; existing sessions invalidated.",
-      metadata: {
-        ip,
-        actor: ADMIN_KEY_ACTOR,
-        previousRole: existing.role,
-        newRole: promoted.role,
-        ignoredFields: [...PROMOTION_IGNORED_FIELDS],
-      },
-    });
+  // Admin registration can promote an existing, active teacher account.
+  // ADMIN_KEY is a shared registration secret, not an authenticated identity,
+  // so promotion changes the role and nothing else (see promoteTeacherToAdmin;
+  // review F11 / SEC-05). Inactive or offboarded rows fall through to the 409
+  // below rather than becoming dormant admin rows.
+  const promotable =
+    existing !== null &&
+    existing.email === email &&
+    existing.role === "teacher" &&
+    existing.isActive &&
+    existing.offboardedAt === null;
+  if (existing && promotable && role === "admin") {
+    const promoted = await promoteTeacherToAdmin({ accountId: existing.id, ip });
 
     // id and role only: the key holder is not authenticated as anyone, so the
     // response carries nothing about the account beyond what they supplied.
@@ -150,7 +123,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     action: `auth.register_${role}`,
     targetType: "student",
     targetId: account.id,
-    summary: `New ${role} registered: ${account.displayName} (${account.email}).`,
+    // Identifiers belong in targetId, not the summary.
+    summary: `New ${role} registered.`,
     metadata: { ip },
   });
 
