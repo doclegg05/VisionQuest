@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to several real function signatures; test setup only. */
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest } from "@/lib/test-helpers";
 
 // Review F19 / SEC-09 (2026-09-01): /api/csp-report is reachable by anyone
@@ -151,5 +151,70 @@ describe("POST /api/csp-report", () => {
     const res = await post({ hello: "world" });
     assert.equal(res.status, 204);
     assert.equal(mockLoggerWarn.mock.callCount(), 0);
+  });
+});
+
+// The detector must stay on wherever it is not explicitly silenced. It was
+// briefly gated on `NODE_ENV !== "production"`, which turned it off in CI —
+// the run that is supposed to catch a CSP regression on a new public page.
+describe("POST /api/csp-report — CSP_REPORT_SILENCE", () => {
+  const setEnv = (key: string, value: string | undefined) => {
+    if (value === undefined) delete (process.env as Record<string, string | undefined>)[key];
+    else (process.env as Record<string, string | undefined>)[key] = value;
+  };
+
+  let priorSilence: string | undefined;
+  let priorNodeEnv: string | undefined;
+
+  beforeEach(() => {
+    priorSilence = process.env.CSP_REPORT_SILENCE;
+    priorNodeEnv = process.env.NODE_ENV;
+    mockRateLimit.mock.resetCalls();
+    mockLoggerWarn.mock.resetCalls();
+    mockRateLimit.mock.mockImplementation(async () => ADMITTED);
+  });
+
+  afterEach(() => {
+    setEnv("CSP_REPORT_SILENCE", priorSilence);
+    setEnv("NODE_ENV", priorNodeEnv);
+  });
+
+  it("stays on outside production when the variable is unset", async () => {
+    setEnv("CSP_REPORT_SILENCE", undefined);
+    setEnv("NODE_ENV", "test");
+    const res = await post(hostileV1Report);
+    assert.equal(res.status, 204);
+    assert.equal(mockRateLimit.mock.callCount(), 1, "the route must still reach the limiter");
+    assert.equal(loggedMeta().documentPath, "/reset-password");
+  });
+
+  it("drops the report without limiting, parsing, or logging when set to 1 outside production", async () => {
+    setEnv("CSP_REPORT_SILENCE", "1");
+    setEnv("NODE_ENV", "development");
+    const res = await post(hostileV1Report);
+    assert.equal(res.status, 204);
+    assert.equal(mockRateLimit.mock.callCount(), 0);
+    assert.equal(mockLoggerWarn.mock.callCount(), 0);
+  });
+
+  it("only silences on the exact opt-in value, never on any truthy string", async () => {
+    setEnv("CSP_REPORT_SILENCE", "true");
+    setEnv("NODE_ENV", "development");
+    await post(hostileV1Report);
+    assert.equal(mockRateLimit.mock.callCount(), 1);
+    assert.equal(loggedMeta().violatedDirective, "script-src 'self'");
+  });
+
+  it("ignores the variable in production so the live detector cannot be switched off by a stray value", async () => {
+    setEnv("CSP_REPORT_SILENCE", "1");
+    setEnv("NODE_ENV", "production");
+    const res = await post(hostileV1Report);
+    assert.equal(res.status, 204);
+    assert.equal(mockRateLimit.mock.callCount(), 1, "the route must still reach the limiter");
+
+    const messages = mockLoggerWarn.mock.calls.map(
+      (call: { arguments: unknown[] }) => call.arguments[0] as string,
+    );
+    assert.ok(messages.includes("CSP violation"), `expected a violation line, got ${JSON.stringify(messages)}`);
   });
 });

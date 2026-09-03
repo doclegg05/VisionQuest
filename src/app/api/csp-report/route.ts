@@ -107,10 +107,40 @@ function pathOf(uri: string): string {
 
 const ACCEPTED = () => new NextResponse(null, { status: 204 });
 
+/**
+ * CSP_REPORT_SILENCE=1 accepts every report without limiting, parsing, or
+ * logging it. It exists for one case: a local dev session whose console is
+ * being drowned by a known, already-triaged violation.
+ *
+ * It is an explicit opt-in, and deliberately not `NODE_ENV !== "production"`.
+ * Silencing on the absence of production turns the detector off in dev AND in
+ * CI, which is where a CSP regression on a new page is supposed to be caught,
+ * and it leaves nothing to grep for when someone later asks why the reports
+ * stopped.
+ *
+ * Production ignores it, on the same reasoning as
+ * `rateLimitsDisabled()` in src/lib/rate-limit-switch.ts: a convenience value
+ * copied into the Render dashboard must not blind the live detector. The
+ * first ignored read logs one warning so the stray variable is visible.
+ */
+function cspReportingSilenced(): boolean {
+  if (process.env.CSP_REPORT_SILENCE !== "1") return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  warnSilenceIgnoredOnce();
+  return false;
+}
+
+/** Once per process: the variable is static, so repeating the line is noise. */
+let warnedSilenceIgnoredInProduction = false;
+
+function warnSilenceIgnoredOnce(): void {
+  if (warnedSilenceIgnoredInProduction) return;
+  warnedSilenceIgnoredInProduction = true;
+  logger.warn("CSP_REPORT_SILENCE=1 is ignored in production; CSP violation reporting stays on");
+}
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  if (process.env.NODE_ENV !== "production") {
-    return ACCEPTED();
-  }
+  if (cspReportingSilenced()) return ACCEPTED();
 
   const limit = await rateLimit(`csp-report:${clientIp(req)}`, REPORTS_PER_WINDOW, WINDOW_MS);
   if (!limit.success) throw rateLimited();
