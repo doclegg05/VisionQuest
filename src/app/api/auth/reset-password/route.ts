@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashPassword, setSessionCookie } from "@/lib/auth";
+import {
+  hashPassword,
+  setSessionCookie,
+  signMfaSessionToken,
+  setMfaSessionCookie,
+} from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPasswordResetToken } from "@/lib/password-reset";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, resetPasswordSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -64,6 +71,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         id: true,
         role: true,
         sessionVersion: true,
+        mfaEnabled: true,
       },
     });
 
@@ -75,8 +83,34 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       studentId: student.id,
       role: student.role,
       sessionVersion: student.sessionVersion,
+      mfaEnabled: student.mfaEnabled,
     };
   });
+
+  // Mailbox control must not skip the second factor (security finding F66).
+  // Same contract as the login route: an MFA-enabled account gets the
+  // short-lived, path-scoped challenge cookie and no session until the
+  // challenge route verifies a TOTP or backup code. The token carries the
+  // sessionVersion bumped above, or the challenge route would reject it.
+  if (result.mfaEnabled) {
+    const mfaSessionToken = signMfaSessionToken(result.studentId, result.role, result.sessionVersion);
+    await setMfaSessionCookie(mfaSessionToken);
+
+    await logAuditEvent({
+      actorId: result.studentId,
+      actorRole: result.role,
+      action: "auth.password.reset",
+      targetType: "student",
+      targetId: result.studentId,
+      summary: "Student reset their password with an emailed recovery link; MFA challenge required before sign-in.",
+      metadata: { mfaRequired: true },
+    });
+    logger.info("Password reset completed; MFA challenge required before a session is issued", {
+      student: studentLogKey(result.studentId),
+    });
+
+    return NextResponse.json({ requiresMfa: true });
+  }
 
   await setSessionCookie(result.studentId, result.role, result.sessionVersion);
 
@@ -87,6 +121,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     targetType: "student",
     targetId: result.studentId,
     summary: "Student reset their password with an emailed recovery link.",
+    metadata: { mfaRequired: false },
   });
 
   return NextResponse.json({ ok: true });
