@@ -233,4 +233,60 @@ describe("POST /api/auth/login", () => {
     assert.equal(mockFindUnique.mock.callCount(), 0, "DB should not be queried when rate limited");
     assert.equal(cookieSets.length, 0);
   });
+
+  // An account provisioned through SPOKES intake holds a password staff chose,
+  // never one the student picked (Student.mustChangePassword). The session is
+  // still issued — this flag is what the client reads to send them to change
+  // it, so it has to survive the response.
+  it("reports that a staff-issued password has not been rotated", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      id: "stu-1",
+      studentId: "alice",
+      displayName: "Alice",
+      role: "student",
+      passwordHash: "scrypt$abc$def",
+      authProvider: "password",
+      isActive: true,
+      mfaEnabled: false,
+      sessionVersion: 1,
+      mustChangePassword: true,
+    }));
+
+    const req = mockRequest("/api/auth/login", {
+      method: "POST",
+      body: { studentId: "alice", password: "any-password" },
+    });
+
+    const res = await loginRoute.POST(req as never);
+    const body = (await res.json()) as { student: { mustChangePassword: boolean } };
+
+    assert.equal(res.status, 200);
+    assert.equal(body.student.mustChangePassword, true);
+    assert.equal(cookieSets.length, 1, "the flag is a prompt, not a gate on the session");
+  });
+
+  it("reports false for an account whose password the student chose", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      id: "stu-1",
+      studentId: "alice",
+      displayName: "Alice",
+      role: "student",
+      passwordHash: "scrypt$abc$def",
+      authProvider: "password",
+      isActive: true,
+      mfaEnabled: false,
+      sessionVersion: 1,
+      mustChangePassword: false,
+    }));
+
+    const req = mockRequest("/api/auth/login", {
+      method: "POST",
+      body: { studentId: "alice", password: "any-password" },
+    });
+
+    const res = await loginRoute.POST(req as never);
+    const body = (await res.json()) as { student: { mustChangePassword: boolean } };
+
+    assert.equal(body.student.mustChangePassword, false);
+  });
 });

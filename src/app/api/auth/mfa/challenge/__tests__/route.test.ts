@@ -40,6 +40,7 @@ interface StudentRow {
   mfaBackupCodes: string[];
   mfaLastUsedCounter: number | null;
   mfaVerifiedAt: Date | null;
+  mustChangePassword: boolean;
 }
 
 type LimiterResult = { success: boolean; remaining: number; resetTime: number; degraded: boolean };
@@ -156,6 +157,7 @@ function makeRow(overrides: Partial<StudentRow> = {}): StudentRow {
     mfaBackupCodes: hashBackupCodes(BACKUP_CODES),
     mfaLastUsedCounter: null,
     mfaVerifiedAt: null,
+    mustChangePassword: false,
     ...overrides,
   };
 }
@@ -497,5 +499,20 @@ describe("POST /api/auth/mfa/challenge", () => {
 
     assert.equal(res.status, 401);
     assert.equal(cookieSets.length, 0);
+  });
+
+  // This route is the other place a session is minted after a password check,
+  // so an MFA-enabled account provisioned through SPOKES intake would
+  // otherwise never be told to rotate the password staff chose for it.
+  it("reports an unrotated staff-issued password once the second factor passes", async () => {
+    installStudentStore(makeRow({ mustChangePassword: true }));
+    const { code } = totpFor(TOTP_SECRET);
+
+    const res = await challengeRoute.POST(challengeRequest(code) as never);
+    const body = (await res.json()) as { student: { mustChangePassword: boolean } };
+
+    assert.equal(res.status, 200);
+    assert.equal(body.student.mustChangePassword, true);
+    assert.equal(cookieSets.length, 1, "the flag is a prompt, not a gate on the session");
   });
 });
