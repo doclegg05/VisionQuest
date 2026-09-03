@@ -1,5 +1,7 @@
 -- Re-register the four baseline pg_cron jobs: appointment-reminders,
--- job-processor, daily-coaching, cron-health-monitor.
+-- job-processor, daily-coaching, cron-health-monitor. Also re-upserts the
+-- three Sage jobs onto the same URL expression so they stop failing on
+-- `current_setting('app.base_url')` while that GUC remains unsettable.
 --
 -- Why: production has never had these four jobs registered (2026-09-01
 -- review, finding F1). Their block in the baseline migration
@@ -28,11 +30,13 @@
 -- own insufficient_privilege handler so a permission problem on one job
 -- cannot block a deploy or the remaining jobs.
 --
--- Schedules and commands are byte-for-byte the baseline's. The jobs read the
--- `app.base_url` GUC and the CRON_SECRET Vault secret at run time; without
--- them each run fails with `unrecognized configuration parameter
--- "app.base_url"` (the state the review found). Prerequisites and order of
--- operations: docs/plans/pg-cron-setup-runbook.md, "Repair, 2026-09".
+-- Base URL: hosted Supabase rejects `ALTER DATABASE/ROLE SET app.base_url`
+-- (`42501 permission denied to set parameter "app.base_url"`) because the
+-- migrate role is not superuser and the name is not a recognized GUC. Jobs
+-- therefore use missing-ok `current_setting` plus the production origin, so
+-- a future host that can set the GUC still wins. They also read CRON_SECRET
+-- from Vault at run time; without that row each request 401s. Prerequisites
+-- and order: docs/plans/pg-cron-setup-runbook.md, "Repair, 2026-09".
 --
 -- Safe to re-run: no-op without pg_cron or pg_net (local dev, CI); upsert
 -- otherwise.
@@ -56,7 +60,7 @@ BEGIN
       '0 * * * *',
       $cmd$
       SELECT net.http_post(
-        url := current_setting('app.base_url') || '/api/internal/appointments/reminders',
+        url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/appointments/reminders',
         headers := jsonb_build_object(
           'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
           'Content-Type', 'application/json'
@@ -76,7 +80,7 @@ BEGIN
       '*/10 * * * *',
       $cmd$
       SELECT net.http_post(
-        url := current_setting('app.base_url') || '/api/internal/jobs/process',
+        url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/jobs/process',
         headers := jsonb_build_object(
           'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
           'Content-Type', 'application/json'
@@ -96,7 +100,7 @@ BEGIN
       '0 13 * * *',
       $cmd$
       SELECT net.http_get(
-        url := current_setting('app.base_url') || '/api/internal/coaching/daily',
+        url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/coaching/daily',
         headers := jsonb_build_object(
           'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1)
         )
@@ -139,7 +143,7 @@ BEGIN
 
         IF failures IS NOT NULL THEN
           PERFORM net.http_post(
-            url := current_setting('app.base_url') || '/api/internal/cron-health',
+            url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/cron-health',
             headers := jsonb_build_object(
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
               'Content-Type', 'application/json'
@@ -154,6 +158,65 @@ BEGIN
   EXCEPTION
     WHEN insufficient_privilege THEN
       RAISE NOTICE 'insufficient privilege to schedule cron-health-monitor; register the cron job manually';
+  END;
+
+  -- Sage jobs already registered in prod still call current_setting('app.base_url')
+  -- with no missing-ok flag, so they fail every slot until upserted here.
+  BEGIN
+    PERFORM cron.schedule(
+      'sage-daily-briefing',
+      '0 11 * * *',
+      $cmd$
+        SELECT net.http_post(
+          url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/sage/briefing',
+          headers := jsonb_build_object(
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
+            'Content-Type', 'application/json'
+          )
+        );
+      $cmd$
+    );
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE 'insufficient privilege to schedule sage-daily-briefing; register the cron job manually';
+  END;
+
+  BEGIN
+    PERFORM cron.schedule(
+      'sage-memory-consolidate',
+      '10 6 * * 0',
+      $cmd$
+        SELECT net.http_post(
+          url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/memory/consolidate',
+          headers := jsonb_build_object(
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
+            'Content-Type', 'application/json'
+          )
+        );
+      $cmd$
+    );
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE 'insufficient privilege to schedule sage-memory-consolidate; register the cron job manually';
+  END;
+
+  BEGIN
+    PERFORM cron.schedule(
+      'sage-wager-resolve',
+      '20 6 * * *',
+      $cmd$
+        SELECT net.http_post(
+          url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/wagers/resolve',
+          headers := jsonb_build_object(
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
+            'Content-Type', 'application/json'
+          )
+        );
+      $cmd$
+    );
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      RAISE NOTICE 'insufficient privilege to schedule sage-wager-resolve; register the cron job manually';
   END;
 END
 $$;

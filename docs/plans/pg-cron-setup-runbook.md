@@ -11,7 +11,7 @@ Nothing scheduled has ever run in production. `cron.job` held only the three
 Sage jobs (`sage-daily-briefing`, `sage-memory-consolidate`,
 `sage-wager-resolve`), and every run of theirs in the 14 days before
 2026-09-01 failed with `unrecognized configuration parameter "app.base_url"`:
-step 3 of the prerequisites below was never applied. The four baseline jobs
+the custom GUC was never set, and this host cannot set it. The four baseline jobs
 (`appointment-reminders`, `job-processor`, `daily-coaching`,
 `cron-health-monitor`) were never registered at all. Their block in
 `prisma/migrations/00000000000000_baseline/migration.sql` has never executed
@@ -36,72 +36,45 @@ consolidation, no Sage briefing, no wager resolution, no queued email (crisis
 and intervention emails go through the queue), and no monitor to report any
 of it. `BackgroundJob` held 153 pending rows, oldest 2026-03-27, newest
 2026-05-14, last completion 2026-05-14. The code-side fix is migration
-`20260902120000_reregister_baseline_cron_jobs`: the same four jobs, same
-schedules and commands, registered with the guarded pattern from
+`20260902120000_reregister_baseline_cron_jobs`: the four baseline jobs plus
+an upsert of the three Sage jobs, registered with the guarded pattern from
 `20260708121000_add_sage_briefing_cron` (`cron.schedule()` upsert only, no
-DML on `cron.job`, a per-job `insufficient_privilege` handler). Everything
-below is the owner's, in this order.
+DML on `cron.job`, a per-job `insufficient_privilege` handler). Job SQL uses
+`COALESCE(NULLIF(current_setting('app.base_url', true), ''),
+'https://visionquest.onrender.com')` because this hosted project cannot set
+the custom GUC (see step 1). Everything below is the owner's, in this order.
 
-### 1. Set the GUC first
+### 1. Base URL and Vault secret
 
-Every job reads `app.base_url` at run time. SQL Editor:
+Do not wait on `ALTER DATABASE postgres SET app.base_url`. On this project
+that statement (and `ALTER ROLE postgres SET app.base_url`) returns `42501
+permission denied to set parameter "app.base_url"`: the SQL Editor /
+migrate role is not superuser, and Supabase does not allow unrecognized
+custom GUCs. `current_setting('app.base_url')` with no missing-ok flag is
+what made every Sage run fail. The repair migration therefore uses
+missing-ok `current_setting` and falls back to the production origin. If a
+future host can set the GUC, that value still wins.
 
-```sql
-ALTER DATABASE postgres SET app.base_url = 'https://visionquest.onrender.com';
-```
-
-The setting loads on new connections. Verify from the catalog, which does
-not depend on which backend session the SQL Editor reuses (a new editor tab
-does not guarantee a new session, and `SHOW` on an unset custom GUC raises
-an error instead of returning empty):
-
-```sql
-SELECT d.datname, s.setconfig
-FROM pg_db_role_setting s
-JOIN pg_database d ON d.oid = s.setdatabase
-WHERE d.datname = 'postgres';
-```
-
-Expected: `setconfig = {app.base_url=https://visionquest.onrender.com}`.
-Second-best check, from a machine with the direct connection string:
-`psql "$DIRECT_URL" -c 'SHOW app.base_url'`.
-
-If `ALTER DATABASE` is rejected with `must be owner of database`, use
-`ALTER ROLE postgres SET app.base_url = 'https://visionquest.onrender.com';`
-instead; the jobs run as `postgres`, so it reaches the same sessions. A
-role-level setting overrides the database-level one, so if the values ever
-disagree check both rows:
-
-```sql
-SELECT r.rolname, d.datname, s.setconfig
-FROM pg_db_role_setting s
-LEFT JOIN pg_roles r ON r.oid = s.setrole
-LEFT JOIN pg_database d ON d.oid = s.setdatabase;
-```
-
-Then confirm the Vault secret exists:
+Confirm the Vault secret exists:
 
 ```sql
 SELECT name, created_at FROM vault.secrets WHERE name = 'CRON_SECRET';
 ```
 
-Expected: one row. If there is none, do prerequisite step 2 below before
-going on. There is no `app.cron_secret` GUC: the jobs read the secret from
-`vault.decrypted_secrets` by name, and no file in the repo references such a
-GUC (grep confirmed 2026-09-02). The two prerequisites are the GUC and the
-Vault secret.
+Expected: one row. If there is none, do the original "Store CRON_SECRET in
+Vault" step below before going on (production had zero `vault.secrets` rows
+as of 2026-09-03). There is no `app.cron_secret` GUC: the jobs read the
+secret from `vault.decrypted_secrets` by name. The two prerequisites are a
+resolvable base URL (fallback in job SQL) and the Vault secret.
 
 ### 2. Decide what happens to the pending queue (D4)
 
 Once `job-processor` is registered it fires every ten minutes and drains
 `BackgroundJob`. The 153 pending rows include mail queued in March through
-May 2026; draining sends it. Note that step 1 alone already brings the three
-existing Sage jobs live: `sage-daily-briefing` (11:00 UTC) enqueues one
-`sage_briefing` BackgroundJob per active student, and `sage-wager-resolve`
-(06:20 UTC) resolves wagers that have been pending since spring. If
-expiring, run the script after the GUC is set and before the next 11:00 UTC
-slot, or rely on `--before` leaving the new rows alone (they are created
-after the cutoff). Two options:
+May 2026; draining sends it. After this migration deploys, the three Sage
+jobs also start succeeding (they are upserted onto the fallback URL). If
+expiring, run the script before merge, or rely on `--before` leaving new
+rows alone (they are created after the cutoff). Two options:
 
 **Expire them.** Dry run first, from a machine with the repo checked out:
 
@@ -140,10 +113,10 @@ deploy. The ledger lives in the `visionquest` schema, not `public`
 
 Merge and deploy the branch carrying
 `20260902120000_reregister_baseline_cron_jobs`. Render runs
-`prisma migrate deploy` on start and the four jobs register. Do not deploy
-before steps 1 and 2: `job-processor` starts within ten minutes of
-registration, and with the GUC unset every job fails the way the Sage jobs
-have been failing.
+`prisma migrate deploy` on start and all seven jobs upsert. Do not deploy
+before the Vault secret exists: `job-processor` starts within ten minutes of
+registration, and a missing `CRON_SECRET` makes every HTTP call 401 while
+`cron.job_run_details` still shows succeeded.
 
 ### 4. Verify all seven jobs
 
@@ -175,8 +148,9 @@ ORDER BY j.jobname, d.start_time DESC;
 Expected: `status = 'succeeded'` for every job that has had a scheduled slot
 (`daily-coaching` runs at 13:00 UTC, the Sage jobs daily or weekly, so their
 rows appear when their slot passes). A `return_message` of `unrecognized
-configuration parameter "app.base_url"` means step 1 did not take on the
-connection pg_cron uses; re-run the catalog query from step 1.
+configuration parameter "app.base_url"` means the job command is still the
+pre-repair `current_setting('app.base_url')` form; confirm this migration
+finished on the ledger and that `cron.job.command` contains `current_setting('app.base_url', true)`.
 
 `succeeded` only means the SQL ran. `net.http_post` and `net.http_get` are
 asynchronous, so a run is recorded `succeeded` whether the app answered
@@ -272,20 +246,18 @@ Verify:
 SELECT name, created_at FROM vault.secrets WHERE name = 'CRON_SECRET';
 ```
 
-### 3. Set the `app.base_url` database GUC
+### 3. Optional `app.base_url` GUC (usually impossible here)
+
+Prefer the fallback in job SQL. On this hosted project, both of these fail
+with `42501 permission denied to set parameter "app.base_url"`:
 
 ```sql
 ALTER DATABASE postgres SET app.base_url = 'https://visionquest.onrender.com';
+ALTER ROLE postgres SET app.base_url = 'https://visionquest.onrender.com';
 ```
 
-Note: this loads on new connections. pg_cron opens a fresh connection per
-run, so no further action is required.
-
-Verify (open a new SQL Editor tab):
-
-```sql
-SHOW app.base_url;
-```
+If a future host allows the GUC, set it; jobs already prefer
+`current_setting('app.base_url', true)` when it is non-empty.
 
 ## Deploy the Migration
 
@@ -324,7 +296,7 @@ Trigger each job once from SQL Editor and check the response:
 -- Fire job-processor immediately
 SELECT cron.schedule('smoke-job-processor', '* * * * *',
   $cmd$ SELECT net.http_post(
-    url := current_setting('app.base_url') || '/api/internal/jobs/process',
+    url := COALESCE(NULLIF(current_setting('app.base_url', true), ''), 'https://visionquest.onrender.com') || '/api/internal/jobs/process',
     headers := jsonb_build_object(
       'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
       'Content-Type', 'application/json'
