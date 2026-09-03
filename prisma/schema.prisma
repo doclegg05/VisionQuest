@@ -16,6 +16,7 @@ model Student {
   passwordHash         String?
   email                String?   @unique
   authProvider         String?
+  googleId             String?   @unique // Google OIDC `sub`, bound on the first verified Google sign-in; sign-in matches this before email
   geminiApiKey         String?
   credlyUsername       String?
   // Last-good Credly badges (Phase 5): survives restarts and Credly outages.
