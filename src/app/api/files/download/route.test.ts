@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
 
-let currentSession: Session = {
+const currentSession: Session = {
   id: "teacher-1",
   studentId: "",
   role: "teacher",
@@ -41,9 +41,11 @@ mock.module("@/lib/storage", {
   },
 });
 
-const prismaFindFirstMock = mock.fn() as any;
-const prismaFindUniqueMock = mock.fn() as any;
-const formResponseFindUniqueMock = mock.fn() as any;
+type Row = Record<string, unknown> | null;
+
+const prismaFindFirstMock = mock.fn(async (): Promise<Row> => null);
+const prismaFindUniqueMock = mock.fn(async (): Promise<Row> => null);
+const formResponseFindUniqueMock = mock.fn(async (): Promise<Row> => null);
 
 mock.module("@/lib/db", {
   namedExports: {

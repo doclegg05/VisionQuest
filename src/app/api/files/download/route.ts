@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { isStaffRole, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
-import type { IntakePayload } from "@/lib/intake/schema";
+import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
@@ -37,74 +38,31 @@ export const GET = withAuth(async (session, req: Request) => {
   });
   if (presigned) return NextResponse.redirect(presigned, 302);
 
-  let result = await downloadFile(file.storageKey);
+  const result = await downloadFile(file.storageKey);
 
-  // Self-healing fallback: If an official orientation intake packet or profile is missing
-  // from object storage (e.g. local environment mismatch or bucket sync delay),
-  // dynamically regenerate the stamped official state PDF and cache it.
-  if (
-    !result &&
-    (file.category === "orientation" ||
-      file.filename.toLowerCase().includes("intake") ||
-      file.filename.toLowerCase().includes("profile"))
-  ) {
-    try {
-      const student = await prisma.student.findUnique({
-        where: { id: file.studentId },
-        include: { spokesRecord: true },
-      });
-
-      if (student) {
-        const formResponse = await prisma.formResponse.findUnique({
-          where: {
-            templateId_studentId: {
-              templateId: "seed-form-student-profile",
-              studentId: file.studentId,
-            },
-          },
-        });
-        const ans = (formResponse?.answers as Record<string, any>) || {};
-        const sp = student.spokesRecord;
-        const nameParts = student.displayName.trim().split(/\s+/);
-        const firstName = ans.first_name || sp?.firstName || nameParts[0] || "Student";
-        const lastName = ans.last_name || sp?.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(" ") : "Record");
-        const birthDate = ans.birth_date || (sp?.birthDate ? sp.birthDate.toISOString().split("T")[0] : "2000-01-01");
-        const county = ans.county || sp?.county || "Nicholas";
-
-        const { createStampedIntakePdfBuffer } = await import("@/lib/intake/pdf-stamped-packet");
-        const { uploadFile } = await import("@/lib/storage");
-
-        const payload: IntakePayload = {
-          firstName,
-          lastName,
-          birthDate,
-          county: county as any,
-          phone: ans.phone || "(304) 555-0100",
-          email: ans.contact_email || student.email || undefined,
-          programTrack: ans.program_track || "Healthcare / CNA",
-          tanfStatus: Boolean(ans.tanf_status ?? sp?.barriersOnEntry?.includes("tanf")),
-          educationalLevel: ans.educational_level || (sp?.educationalLevel as any) || "High school diploma",
-          householdType: ans.household_type || (sp?.householdType as any) || "Single parent (1P)",
-          ferpaConsentSigned: true,
-          policyAcknowledgmentSigned: true,
-          signatureName: student.displayName,
-          signatureTimestamp: file.uploadedAt ? file.uploadedAt.toISOString() : new Date().toISOString(),
-        };
-
-        const buffer = await createStampedIntakePdfBuffer(payload, student.studentId);
-        await uploadFile(file.storageKey, buffer, "application/pdf");
-
-        result = {
-          buffer,
-          mimeType: "application/pdf",
-        };
-      }
-    } catch (healErr) {
-      console.error("Failed to self-heal intake packet:", healErr);
-    }
+  // A missing object is a 404 and nothing else.
+  //
+  // This branch used to "self-heal": when an orientation packet was absent from
+  // storage it rebuilt one from whatever demographics it could scrape together,
+  // filling the gaps with invented constants, hardcoding ferpaConsentSigned and
+  // policyAcknowledgmentSigned to true, stamping the student's name and a
+  // timestamp into the signature block, and writing the result over the
+  // canonical storage key. The output was a signed FERPA consent for a
+  // state-audited TANF program that no student had ever signed, and after the
+  // write nothing distinguished it from a genuine one. It also made a GET
+  // mutate storage, so any authorized reader — including an auditor opening the
+  // packet — triggered the forgery.
+  //
+  // A record that points at a missing object is a storage incident to
+  // investigate, not a document to reconstruct. Report it and say so.
+  if (!result) {
+    logger.warn("File record has no object in storage", {
+      fileId: file.id,
+      category: file.category,
+      student: studentLogKey(file.studentId),
+    });
+    return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
   }
-
-  if (!result) return NextResponse.json({ error: "File not found in storage" }, { status: 404 });
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {
