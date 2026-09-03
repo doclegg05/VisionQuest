@@ -52,6 +52,14 @@ function ResetPasswordForm() {
         return;
       }
 
+      // MFA-enabled account: the server set the challenge cookie instead of
+      // a session. The sign-in page opens the code prompt on `?mfa=1`.
+      if (data.requiresMfa) {
+        router.push("/?mfa=1");
+        router.refresh();
+        return;
+      }
+
       router.push("/chat");
       router.refresh();
     } catch {
@@ -66,7 +74,7 @@ function ResetPasswordForm() {
       <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
       <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Choose a new password</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
-        Create a new password for your VisionQuest account. You will be signed in right after the reset succeeds.
+        Create a new password for your VisionQuest account. After the reset, we will sign you in. If your account uses two-step verification, we will ask for your code first.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
