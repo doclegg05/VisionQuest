@@ -13,6 +13,11 @@ import OverviewTab from "./student-detail/OverviewTab";
 import GoalsPlanTab from "./student-detail/GoalsPlanTab";
 import ProgressTab from "./student-detail/ProgressTab";
 import OperationsTab from "./student-detail/OperationsTab";
+import {
+  buildFormReviewBody,
+  reviewResultMessage,
+  type FormReviewExtras,
+} from "./student-detail/form-review";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
 
@@ -404,7 +409,11 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   };
 
-  async function handleReviewForm(submissionId: string, status: "approved" | "rejected") {
+  async function handleReviewForm(
+    submissionId: string,
+    status: "approved" | "rejected",
+    extras?: FormReviewExtras,
+  ) {
     const notes = status === "rejected"
       ? window.prompt("Optional note for the student:", "")
       : "";
@@ -419,18 +428,14 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       const response = await fetch(`/api/teacher/students/${studentId}/forms`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          submissionId,
-          status,
-          notes: notes || "",
-        }),
+        body: JSON.stringify(buildFormReviewBody(submissionId, status, notes || "", extras)),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(getErrorMessage(payload, "Could not update the form review."));
       }
 
-      setPanelMessage(status === "approved" ? "Form approved." : "Form returned for revision.");
+      setPanelMessage(reviewResultMessage(status, extras, payload));
       await loadData();
     } catch (err) {
       setPanelMessage(err instanceof Error ? err.message : "Could not update the form review.");

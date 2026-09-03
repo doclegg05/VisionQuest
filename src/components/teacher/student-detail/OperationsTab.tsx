@@ -3,6 +3,7 @@ import { humanizeStatusValue } from "@/lib/status-labels";
 import StructuredFormsSection from "./StructuredFormsSection";
 import PdfPreviewModal from "./PdfPreviewModal";
 import SignaturePadModal from "@/components/intake/SignaturePadModal";
+import { counterSignApproval, type FormReviewHandler, type SignaturePadResult } from "./form-review";
 import type {
   StudentData,
   AppointmentData,
@@ -60,7 +61,7 @@ interface OperationsTabProps {
   dateFormatter: Intl.DateTimeFormat;
   /** Form review */
   reviewingFormId: string | null;
-  onReviewForm: (submissionId: string, status: "approved" | "rejected") => void;
+  onReviewForm: FormReviewHandler;
   /** Appointment form */
   appointmentForm: AppointmentFormValues;
   onAppointmentFormChange: (updater: (current: AppointmentFormValues) => AppointmentFormValues) => void;
@@ -128,30 +129,13 @@ export default function OperationsTab({
   const [counterSignSubmission, setCounterSignSubmission] = useState<FormSubmissionData | null>(null);
   const [counterSigning, setCounterSigning] = useState(false);
 
-  const handleTeacherCounterSign = async (sig: {
-    signatureDataUrl: string;
-    signatureName: string;
-    signatureMethod: "drawn" | "uploaded";
-  }) => {
+  const handleTeacherCounterSign = async (sig: SignaturePadResult) => {
     if (!counterSignSubmission) return;
     setCounterSigning(true);
     try {
-      await fetch(`/api/teacher/students/${student.id}/forms`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          submissionId: counterSignSubmission.id,
-          status: "approved",
-          staffSignatureDataUrl: sig.signatureDataUrl,
-          staffSignatureName: sig.signatureName,
-          staffSignatureTitle: "SPOKES Lead Instructor",
-        }),
-      });
-      await onReviewForm(counterSignSubmission.id, "approved");
+      await counterSignApproval(student.id, counterSignSubmission.id, sig, onReviewForm);
       setCounterSignSubmission(null);
       setPreviewSubmission(null);
-    } catch (err) {
-      console.error("Failed to counter-sign form:", err);
     } finally {
       setCounterSigning(false);
     }
@@ -687,7 +671,6 @@ export default function OperationsTab({
           isOpen={Boolean(counterSignSubmission)}
           onClose={() => setCounterSignSubmission(null)}
           onSave={handleTeacherCounterSign}
-          defaultSignerName="SPOKES Lead Instructor"
         />
       )}
     </div>
