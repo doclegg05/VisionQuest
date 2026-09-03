@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
+import { afterWrite } from "@/lib/after-write";
 import { badRequest, forbidden, isStaffRole, notFound, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
@@ -98,7 +99,13 @@ export const PATCH = withAuth(async (
     data: updates,
   });
 
-  await syncStudentAlerts(link.studentId);
+  // The update is saved. The alert sync is best-effort from here: a failure
+  // is logged, never reported as a failed status change.
+  await afterWrite(() => syncStudentAlerts(link.studentId), {
+    surface: "goal-resource-links/[id]",
+    effect: "syncStudentAlerts",
+    studentId: link.studentId,
+  });
 
   return NextResponse.json({ link: toGoalResourceLinkView(updated) });
 });

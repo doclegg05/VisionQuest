@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { badRequest, conflict, notFound, withTeacherAuth } from "@/lib/api-error";
 import { syncStudentAlerts } from "@/lib/advising";
+import { afterWrite } from "@/lib/after-write";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import {
@@ -103,22 +104,28 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
     },
   });
 
-  await logAuditEvent({
-    actorId: session.id,
-    actorRole: session.role,
-    action: "goal_resource_link.created",
-    targetType: "goal",
-    targetId: goal.id,
-    summary: `Linked resource "${title}" to a student goal.`,
-    metadata: {
-      studentId: goal.studentId,
-      resourceType,
-      resourceId,
-      linkType,
-      status,
-      dueAt: dueAt?.toISOString() ?? null,
-    },
-  });
+  // The link is saved. Everything below is best-effort: a failure is logged,
+  // never reported to the teacher as a failed link.
+  await afterWrite(
+    () =>
+      logAuditEvent({
+        actorId: session.id,
+        actorRole: session.role,
+        action: "goal_resource_link.created",
+        targetType: "goal",
+        targetId: goal.id,
+        summary: `Linked resource "${title}" to a student goal.`,
+        metadata: {
+          studentId: goal.studentId,
+          resourceType,
+          resourceId,
+          linkType,
+          status,
+          dueAt: dueAt?.toISOString() ?? null,
+        },
+      }),
+    { surface: "goal-resource-links", effect: "logAuditEvent", studentId: goal.studentId, level: "error" },
+  );
 
   if (linkType === "assigned") {
     sendNotification(goal.studentId, {
@@ -130,7 +137,11 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
     }).catch((error) => logger.error("Failed to send goal plan notification", { error: String(error) }));
   }
 
-  await syncStudentAlerts(goal.studentId);
+  await afterWrite(() => syncStudentAlerts(goal.studentId), {
+    surface: "goal-resource-links",
+    effect: "syncStudentAlerts",
+    studentId: goal.studentId,
+  });
 
   const link = toGoalResourceLinkView(created);
   return NextResponse.json({ link });
