@@ -23,7 +23,7 @@ mock.module("@/lib/auth", {
   },
 });
 
-const rateLimitMock = mock.fn(async () => ({
+const rateLimitMock = mock.fn(async (_key: string, _limit: number, _windowMs: number) => ({
   success: true,
   remaining: 10,
   resetTime: Date.now() + 60_000,

@@ -241,15 +241,27 @@ describe("provisionIntakeStudent — the temporary password", () => {
     assert.equal(created.students[0].mustChangePassword, true);
   });
 
-  it("generates a collision-suffixed username without Math.random", async () => {
-    const source = await import("node:fs/promises").then((fs) =>
-      fs.readFile(new URL("./provision.ts", import.meta.url), "utf8"),
-    );
+  it("falls back to an unpredictable username suffix when every numbered candidate collides", async () => {
+    const original = fakeClient.student.findUnique;
+    fakeClient.student.findUnique = async () => ({ id: "taken" }) as never;
 
-    assert.ok(
-      !source.includes("Math.random"),
-      "username collision fallback must use a CSPRNG, not Math.random",
-    );
+    try {
+      const first = await provision.provisionIntakeStudent(PAYLOAD, { source: "staff" });
+      const second = await provision.provisionIntakeStudent(PAYLOAD, { source: "staff" });
+
+      assert.equal(first.outcome, "provisioned");
+      assert.equal(second.outcome, "provisioned");
+      if (first.outcome !== "provisioned" || second.outcome !== "provisioned") return;
+
+      assert.match(first.studentId, /^dana\.hall\.[0-9a-f]{8}$/);
+      assert.notEqual(
+        first.studentId,
+        second.studentId,
+        "the collision suffix must not be reproducible",
+      );
+    } finally {
+      fakeClient.student.findUnique = original;
+    }
   });
 });
 

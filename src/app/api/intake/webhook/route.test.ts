@@ -11,7 +11,24 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 mock.module("@/lib/auth", { namedExports: { getSession: async () => null } });
 
 mock.module("@/lib/api-error", {
-  namedExports: { isStaffRole: (role: string) => role === "teacher" || role === "admin" },
+  namedExports: {
+    isStaffRole: (role: string) => role === "teacher" || role === "admin",
+    // Faithful to the real wrapper's contract: ApiError renders as its own
+    // status and message, anything else as a bare 500 with no detail.
+    withErrorHandler:
+      <Args extends unknown[]>(handler: (...args: Args) => Promise<Response>) =>
+      async (...args: Args) => {
+        try {
+          return await handler(...args);
+        } catch (err) {
+          const status = (err as { statusCode?: number })?.statusCode;
+          if (typeof status === "number") {
+            return Response.json({ error: (err as Error).message }, { status });
+          }
+          return Response.json({ error: "Internal server error" }, { status: 500 });
+        }
+      },
+  },
 });
 
 mock.module("@/lib/logger", {
@@ -22,7 +39,7 @@ mock.module("@/lib/logger", {
 
 let provisionResult: unknown = null;
 let provisionError: Error | null = null;
-const provisionMock = mock.fn(async () => {
+const provisionMock = mock.fn(async (_payload: unknown, _options: unknown) => {
   if (provisionError) throw provisionError;
   return provisionResult;
 });
