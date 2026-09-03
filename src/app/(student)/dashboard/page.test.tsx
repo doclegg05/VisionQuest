@@ -8,9 +8,13 @@ import {
   STUDENT_ID,
 } from "@/lib/student-alerts.test-support";
 
-// Module mocks, registered before the page is imported. Only the alert count
-// is under test; every other read returns the quietest value that keeps the
-// page off the welcome redirect (one goal, orientation complete).
+// How many intake FormSubmission rows the student has. Mutable so a test can
+// drive the signature banner's branch; 0 = the banner shows.
+let intakeSubmissionCount = 0;
+
+// Module mocks, registered before the page is imported. Every read not under
+// test returns the quietest value that keeps the page off the welcome redirect
+// (one goal, orientation complete).
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
@@ -19,6 +23,7 @@ mock.module("@/lib/db", {
       studentTask: { findMany: async () => [] },
       studentAlert: createStudentAlertStore(),
       orientationItem: { findMany: async () => [] },
+      formSubmission: { count: async () => intakeSubmissionCount },
     },
   },
 });
@@ -91,5 +96,36 @@ describe("DashboardPage alert count", () => {
     const ambient = ambientRenders.at(-1);
     assert.ok(ambient, "AmbientPanels was not rendered");
     assert.equal(ambient.alertCount, 1);
+  });
+});
+
+describe("DashboardPage intake signature banner", () => {
+  it("prompts the student when no intake submission exists yet", async () => {
+    intakeSubmissionCount = 0;
+    const html = renderToString(await DashboardPage());
+
+    assert.match(html, /Sign your student profile form/);
+    assert.match(html, /Your class hours only count once your signed form is on file\./);
+  });
+
+  it("sends a signed-in student to the authenticated orientation flow, never the anonymous intake form", async () => {
+    intakeSubmissionCount = 0;
+    const html = renderToString(await DashboardPage());
+
+    assert.match(html, /href="\/orientation"/);
+    // /intake is the public QR-code enrollment form. An authenticated student
+    // must never be routed to it: it collects the identity they already have,
+    // and it is the surface that used to hand out sessions.
+    assert.doesNotMatch(html, /href="\/intake"/);
+  });
+
+  it("hides the banner once an intake submission is on file", async () => {
+    intakeSubmissionCount = 1;
+    try {
+      const html = renderToString(await DashboardPage());
+      assert.doesNotMatch(html, /Sign your student profile form/);
+    } finally {
+      intakeSubmissionCount = 0;
+    }
   });
 });

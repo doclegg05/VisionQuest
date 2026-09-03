@@ -108,6 +108,18 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  // KNOWN GAP (owner: the intake bundle, not this page). Neither "orientation-intake"
+  // nor "student-intake" is in the SPOKES catalog (src/lib/spokes/forms.ts), and
+  // /api/forms/sign refuses any formId that is not, so the ONLY writer of these two
+  // rows is the anonymous QR-code flow (src/lib/intake/pdf-stamped-packet.ts).
+  //
+  // A student enrolled by a teacher therefore has zero of them and cannot earn one
+  // from inside the app, so this banner does not clear for them. The CTA points at
+  // /orientation — the authenticated place to sign the SPOKES Student Profile this
+  // banner names — rather than at the anonymous enrollment form, which is the wrong
+  // destination for someone already signed in. Settling the predicate (accept
+  // "student-profile", or record intake under a catalog id) belongs with the intake
+  // flow's owner.
   const needsIntakeSignature = intakeSubmissionCount === 0;
 
   return (
@@ -121,21 +133,21 @@ export default async function DashboardPage() {
               </div>
               <div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300 border border-amber-500/30">
-                  Action Required • Enrollment Clearance
+                  Do this next
                 </span>
                 <h3 className="text-base font-extrabold text-[var(--ink-strong)] mt-0.5">
-                  Complete & Sign Your SPOKES Student Profile & Intake Form
+                  Sign your student profile form
                 </h3>
-                <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                  State TANF/SNAP workforce regulations require your digital signature on file to certify your class attendance and milestone credits.
+                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                  Your class hours only count once your signed form is on file.
                 </p>
               </div>
             </div>
             <Link
-              href="/intake"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+              href="/orientation"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
             >
-              Sign Intake Form →
+              Sign my form →
             </Link>
           </div>
         </div>
