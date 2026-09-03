@@ -22,7 +22,7 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
     // The zip is already in storage. AuditLog is admin-only under RLS, so
     // the row goes through the admin client, and a failed write is logged
     // rather than 500ing a request whose work is done (review F5).
-    await tryLogAuditEvent({
+    const { audited } = await tryLogAuditEvent({
       actorId: session.id,
       actorRole: session.role,
       action: "teacher.student.archive",
@@ -32,7 +32,7 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
       metadata: { storageKey, fileCount },
     });
 
-    return NextResponse.json({ storageKey, fileCount });
+    return NextResponse.json({ storageKey, fileCount, audited });
   } catch (error) {
     logger.error("Archive generation failed", {
       student: studentLogKey(studentId),

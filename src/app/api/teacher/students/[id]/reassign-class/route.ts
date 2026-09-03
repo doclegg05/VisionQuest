@@ -100,7 +100,7 @@ export const POST = withAuth(
     // and lives on the admin client (it cannot join the transaction above),
     // so a failed audit write is logged rather than 500ing a reassignment
     // that already happened (review F5).
-    await tryLogAuditEvent({
+    const { audited } = await tryLogAuditEvent({
       actorId: session.id,
       actorRole: session.role,
       action: "teacher.student.reassign_class",
@@ -123,6 +123,7 @@ export const POST = withAuth(
         oldClassId: currentEnrollment?.classId ?? null,
         newClassId: body.newClassId,
         newProgramType,
+        audited,
       },
     });
   },

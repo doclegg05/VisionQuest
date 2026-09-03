@@ -15,6 +15,7 @@ const appAuditCreateMock = mock.fn() as any;
 const adminAuditCreateMock = mock.fn() as any;
 const generateStudentArchiveMock = mock.fn() as any;
 const warnMock = mock.fn() as any;
+const errorMock = mock.fn() as any;
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -74,7 +75,7 @@ mock.module("@/lib/student-archive", {
 
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { debug: mock.fn(), info: mock.fn(), warn: warnMock, error: mock.fn() },
+    logger: { debug: mock.fn(), info: mock.fn(), warn: warnMock, error: errorMock },
   },
 });
 
@@ -89,6 +90,7 @@ beforeEach(() => {
   adminAuditCreateMock.mock.resetCalls();
   generateStudentArchiveMock.mock.resetCalls();
   warnMock.mock.resetCalls();
+  errorMock.mock.resetCalls();
 
   adminAuditCreateMock.mock.mockImplementation(async () => ({ id: "audit-1" }));
   generateStudentArchiveMock.mock.mockImplementation(async () => ({
@@ -110,6 +112,7 @@ describe("POST /api/teacher/students/:id/archive", () => {
     assert.deepEqual(await res.json(), {
       storageKey: "archives/stu-1/2026-09-02.zip",
       fileCount: 3,
+      audited: true,
     });
 
     assert.equal(appAuditCreateMock.mock.callCount(), 0, "app-client AuditLog write is rejected by RLS for teachers");
@@ -126,19 +129,24 @@ describe("POST /api/teacher/students/:id/archive", () => {
     });
   });
 
-  it("still returns the archive when the audit write is rejected, and logs no student id", async () => {
+  it("still returns the archive when the audit write is rejected, says so, and alerts without a student id", async () => {
     adminAuditCreateMock.mock.mockImplementation(async () => {
       throw new Error("new row violates row-level security policy");
     });
 
     const res = await callRoute();
     assert.equal(res.status, 200, "the zip is already uploaded; the audit failure must not 500");
-    const body = (await res.json()) as { storageKey: string };
+    const body = (await res.json()) as { storageKey: string; audited: boolean };
     assert.equal(body.storageKey, "archives/stu-1/2026-09-02.zip");
+    assert.equal(body.audited, false, "a PII export with no audit row must say so in the response");
 
-    assert.equal(warnMock.mock.callCount(), 1);
-    const payload = JSON.stringify(warnMock.mock.calls[0].arguments[1]);
-    assert.ok(!payload.includes("stu-1"), `warn payload carries a raw student id: ${payload}`);
+    // Silent-gap convention: logger.error with an alert tag, never a bare warn.
+    assert.equal(warnMock.mock.callCount(), 0);
+    assert.equal(errorMock.mock.callCount(), 1);
+    const payload = errorMock.mock.calls[0].arguments[1] as Record<string, unknown>;
+    assert.equal(payload.alert, "audit_write_failed");
+    const serialized = JSON.stringify(payload);
+    assert.ok(!serialized.includes("stu-1"), `error payload carries a raw student id: ${serialized}`);
   });
 
   it("returns 500 and writes no audit row when archive generation fails", async () => {

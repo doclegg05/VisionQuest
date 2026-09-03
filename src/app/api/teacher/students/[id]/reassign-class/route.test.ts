@@ -21,6 +21,7 @@ const mockEnrollmentCreate = mock.fn() as any;
 const mockAuditLogCreate = mock.fn() as any;
 const mockAdminAuditLogCreate = mock.fn() as any;
 const mockWarn = mock.fn() as any;
+const mockError = mock.fn() as any;
 const mockTransaction = mock.fn() as any;
 const mockGetStudentProgramType = mock.fn() as any;
 
@@ -106,7 +107,7 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { debug: mock.fn(), info: mock.fn(), warn: mockWarn, error: mock.fn() },
+    logger: { debug: mock.fn(), info: mock.fn(), warn: mockWarn, error: mockError },
   },
 });
 
@@ -125,6 +126,7 @@ beforeEach(() => {
   mockAuditLogCreate.mock.resetCalls();
   mockAdminAuditLogCreate.mock.resetCalls();
   mockWarn.mock.resetCalls();
+  mockError.mock.resetCalls();
   mockTransaction.mock.resetCalls();
   mockGetStudentProgramType.mock.resetCalls();
 
@@ -233,6 +235,7 @@ describe("POST /api/teacher/students/:id/reassign-class", () => {
     assert.equal(json.data.oldClassId, "class-source");
     assert.equal(json.data.newClassId, "class-target");
     assert.equal(json.data.newProgramType, "adult_ed");
+    assert.equal(json.data.audited, true);
 
     assert.equal(mockEnrollmentUpdate.mock.callCount(), 1);
     const updateArgs = mockEnrollmentUpdate.mock.calls[0].arguments[0];
@@ -273,11 +276,16 @@ describe("POST /api/teacher/students/:id/reassign-class", () => {
     const json = await res.json();
     assert.equal(json.success, true);
     assert.equal(json.data.newClassId, "class-target");
+    assert.equal(json.data.audited, false, "a reassignment with no audit row must say so in the response");
     assert.equal(mockEnrollmentCreate.mock.callCount(), 1);
 
-    assert.equal(mockWarn.mock.callCount(), 1);
-    const payload = JSON.stringify(mockWarn.mock.calls[0].arguments[1]);
-    assert.ok(!payload.includes("stu-1"), `warn payload carries a raw student id: ${payload}`);
+    // Silent-gap convention: logger.error with an alert tag, never a bare warn.
+    assert.equal(mockWarn.mock.callCount(), 0);
+    assert.equal(mockError.mock.callCount(), 1);
+    const payload = mockError.mock.calls[0].arguments[1] as Record<string, unknown>;
+    assert.equal(payload.alert, "audit_write_failed");
+    const serialized = JSON.stringify(payload);
+    assert.ok(!serialized.includes("stu-1"), `error payload carries a raw student id: ${serialized}`);
   });
 
   it("skips archive step when student has no active enrollment", async () => {
