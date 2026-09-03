@@ -5,6 +5,7 @@ import { sendMultiChannelNotification } from "@/lib/notifications";
 import { gatherDailyPromptContext } from "@/lib/sage/daily-prompt-data";
 import { selectDailyPrompt } from "@/lib/sage/daily-prompts";
 import { getOrCreateCoachingArc, advanceArcWeek } from "@/lib/sage/coaching-arcs";
+import { withStudentRlsContext } from "@/lib/rls-context";
 import { studentLogKey } from "@/lib/log-keys";
 
 const COOLDOWN_HOURS = 20;
@@ -17,12 +18,50 @@ function isAuthorized(req: Request): boolean {
 }
 
 /**
+ * One student's daily prompt: arc upkeep, prompt selection, notification.
+ * Runs inside that student's RLS context (see GET below): the coaching arc,
+ * prompt context, and Notification rows are all the student's own, and the
+ * app client used by those helpers fails closed with no context.
+ */
+async function sendDailyPromptForStudent(studentId: string) {
+  // Arc advancement — create arc if first time, advance week if 7 days have passed
+  try {
+    const arc = await getOrCreateCoachingArc(studentId);
+    if (arc.status === "active") {
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      const weekElapsedMs = arc.weekNumber * msPerWeek;
+      const arcAgeMs = Date.now() - arc.startedAt.getTime();
+      if (arcAgeMs >= weekElapsedMs) {
+        await advanceArcWeek(studentId);
+      }
+    }
+  } catch (arcErr) {
+    logger.error("Arc advancement failed", { student: studentLogKey(studentId), error: String(arcErr) });
+  }
+
+  const ctx = await gatherDailyPromptContext(studentId);
+  const prompt = selectDailyPrompt(ctx);
+
+  return sendMultiChannelNotification(
+    studentId,
+    {
+      type: "sage_daily_prompt",
+      title: prompt.title,
+      body: prompt.body,
+    },
+    COOLDOWN_HOURS,
+  );
+}
+
+/**
  * GET /api/internal/coaching/daily
  *
  * Cron endpoint — sends a personalized daily coaching prompt to every active student.
  * Runs once per day at 8 AM ET (13:00 UTC) via Render cron.
  *
- * Auth: Bearer CRON_SECRET
+ * Auth: Bearer CRON_SECRET. The request carries no session, so the
+ * cross-student roster read uses prismaAdmin and each student's body runs
+ * as that student (review F5, 2026-09-01).
  */
 export async function GET(req: Request): Promise<NextResponse> {
   if (!isAuthorized(req)) {
@@ -39,32 +78,8 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   for (const student of students) {
     try {
-      // Arc advancement — create arc if first time, advance week if 7 days have passed
-      try {
-        const arc = await getOrCreateCoachingArc(student.id);
-        if (arc.status === "active") {
-          const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-          const weekElapsedMs = arc.weekNumber * msPerWeek;
-          const arcAgeMs = Date.now() - arc.startedAt.getTime();
-          if (arcAgeMs >= weekElapsedMs) {
-            await advanceArcWeek(student.id);
-          }
-        }
-      } catch (arcErr) {
-        logger.error("Arc advancement failed", { student: studentLogKey(student.id), error: String(arcErr) });
-      }
-
-      const ctx = await gatherDailyPromptContext(student.id);
-      const prompt = selectDailyPrompt(ctx);
-
-      const channels = await sendMultiChannelNotification(
-        student.id,
-        {
-          type: "sage_daily_prompt",
-          title: prompt.title,
-          body: prompt.body,
-        },
-        COOLDOWN_HOURS,
+      const channels = await withStudentRlsContext(student.id, () =>
+        sendDailyPromptForStudent(student.id),
       );
 
       if (channels.inApp) {

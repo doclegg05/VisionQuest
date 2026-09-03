@@ -5,6 +5,7 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 const mockFindFirst = mock.fn() as any;
 const mockCreate = mock.fn(async () => ({ id: "audit-1" })) as any;
 const mockWarn = mock.fn() as any;
+const mockError = mock.fn() as any;
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -29,7 +30,9 @@ mock.module("@/lib/logger", {
       get warn() {
         return mockWarn;
       },
-      error: mock.fn(),
+      get error() {
+        return mockError;
+      },
     },
   },
 });
@@ -167,5 +170,57 @@ describe("logAuditEvent", () => {
     assert.equal(data.targetId, null);
     assert.equal(data.summary, null);
     assert.equal(data.metadata, JSON.stringify({ classId: "class-1" }));
+  });
+});
+
+describe("tryLogAuditEvent", () => {
+  beforeEach(() => {
+    mockCreate.mock.resetCalls();
+    mockWarn.mock.resetCalls();
+    mockError.mock.resetCalls();
+    mockCreate.mock.mockImplementation(async () => ({ id: "audit-1" }));
+  });
+
+  const input = {
+    actorId: "teacher-1",
+    actorRole: "teacher",
+    action: "teacher.student.archive",
+    targetType: "student",
+    targetId: "student-1",
+    summary: "Archived 3 files",
+    metadata: { fileCount: 3 },
+  };
+
+  it("writes the row through the admin client and reports it audited", async () => {
+    const result = await audit.tryLogAuditEvent(input);
+
+    assert.deepEqual(result, { audited: true });
+    assert.equal(mockCreate.mock.callCount(), 1);
+    const data = mockCreate.mock.calls[0].arguments[0].data;
+    assert.equal(data.action, "teacher.student.archive");
+    assert.equal(data.targetId, "student-1");
+    assert.equal(mockWarn.mock.callCount(), 0);
+    assert.equal(mockError.mock.callCount(), 0);
+  });
+
+  it("swallows a rejected write, reports not audited, and raises an alert-tagged error with no student identifier", async () => {
+    mockCreate.mock.mockImplementation(async () => {
+      throw new Error("new row violates row-level security policy");
+    });
+
+    const result = await audit.tryLogAuditEvent(input);
+
+    assert.deepEqual(result, { audited: false }, "a failed audit row must not throw into a request whose work already committed");
+    // A silent audit gap on a PII export is an alert, not a warn line: the
+    // convention for silent-gap failures is logger.error with an `alert` tag
+    // (jobs-registry send_email, crisis-detection).
+    assert.equal(mockWarn.mock.callCount(), 0);
+    assert.equal(mockError.mock.callCount(), 1);
+    const [message, payload] = mockError.mock.calls[0].arguments as [string, Record<string, unknown>];
+    assert.equal(typeof message, "string");
+    assert.equal(payload.alert, "audit_write_failed");
+    assert.equal(payload.actorId, "teacher-1");
+    assert.equal(payload.action, "teacher.student.archive");
+    assert.ok(!JSON.stringify(payload).includes("student-1"), "no student id in the log payload");
   });
 });

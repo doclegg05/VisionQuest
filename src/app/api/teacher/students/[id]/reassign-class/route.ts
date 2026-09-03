@@ -9,6 +9,7 @@ import {
 } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
+import { tryLogAuditEvent } from "@/lib/audit";
 import { canManageAnyClass } from "@/lib/classroom";
 import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
@@ -95,20 +96,22 @@ export const POST = withAuth(
       });
     });
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: session.id,
-        actorRole: session.role,
-        action: "teacher.student.reassign_class",
-        targetType: "student",
-        targetId: studentId,
-        summary: `Reassigned ${student.displayName} to ${targetClass.name}`,
-        metadata: JSON.stringify({
-          oldClassId: currentEnrollment?.classId ?? null,
-          newClassId: body.newClassId,
-          newProgramType: targetClass.programType,
-          reason: body.reason ?? null,
-        }),
+    // The enrollment change is committed. AuditLog is admin-only under RLS
+    // and lives on the admin client (it cannot join the transaction above),
+    // so a failed audit write is logged rather than 500ing a reassignment
+    // that already happened (review F5).
+    const { audited } = await tryLogAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      action: "teacher.student.reassign_class",
+      targetType: "student",
+      targetId: studentId,
+      summary: `Reassigned ${student.displayName} to ${targetClass.name}`,
+      metadata: {
+        oldClassId: currentEnrollment?.classId ?? null,
+        newClassId: body.newClassId,
+        newProgramType: targetClass.programType,
+        reason: body.reason ?? null,
       },
     });
 
@@ -120,6 +123,7 @@ export const POST = withAuth(
         oldClassId: currentEnrollment?.classId ?? null,
         newClassId: body.newClassId,
         newProgramType,
+        audited,
       },
     });
   },

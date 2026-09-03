@@ -25,6 +25,36 @@ export async function logAuditEvent(input: AuditEventInput) {
   });
 }
 
+/**
+ * `logAuditEvent` for a request whose real work has already committed (an
+ * archive uploaded, an enrollment moved). AuditLog is admin-only under RLS
+ * and lives on the admin client, so it cannot join the caller's transaction;
+ * writing it before the work would record actions that then failed. So it is
+ * written after, and a failed write must not turn a finished request into a
+ * 500: the failure is logged and swallowed. Returns `{ audited }` so the
+ * caller can tell the client when a PII-touching action has no audit row.
+ *
+ * No student identifier in the log line: actor + action localize the
+ * failure (.claude/rules/security.md, Data Privacy).
+ */
+export async function tryLogAuditEvent(
+  input: AuditEventInput,
+): Promise<{ audited: boolean }> {
+  try {
+    await logAuditEvent(input);
+    return { audited: true };
+  } catch (error: unknown) {
+    logger.error("audit write failed", {
+      alert: "audit_write_failed",
+      actorId: input.actorId ?? null,
+      actorRole: input.actorRole ?? null,
+      action: input.action,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { audited: false };
+  }
+}
+
 /** Where in the app the staff member viewed the student's data. */
 export type StudentViewSurface = "student_detail" | "conversations" | "export" | "sage_operations";
 

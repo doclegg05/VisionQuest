@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { withStudentRlsContext } from "@/lib/rls-context";
 import { logger } from "@/lib/logger";
 
 function isAuthorized(req: Request) {
@@ -16,7 +17,11 @@ function isAuthorized(req: Request) {
  * Cron endpoint that generates monthly readiness report snapshots for all active classes.
  * Stores results as a JSON notification so teachers see it on their next login.
  *
- * Auth: Bearer CRON_SECRET
+ * Auth: Bearer CRON_SECRET. No session: the class roster and the teacher
+ * notification span every class, which no student branch can satisfy, so
+ * they stay on prismaAdmin; each readiness read runs as that student
+ * because it reads only the student's own rows through the app client
+ * (review F5, 2026-09-01).
  */
 export async function POST(req: Request) {
   if (!isAuthorized(req)) {
@@ -55,7 +60,9 @@ export async function POST(req: Request) {
     const buckets: Record<string, number> = { "0-25": 0, "26-50": 0, "51-75": 0, "76-100": 0 };
 
     const readinessResults = await Promise.all(
-      students.map((student) => fetchStudentReadinessData(student.id)),
+      students.map((student) =>
+        withStudentRlsContext(student.id, () => fetchStudentReadinessData(student.id)),
+      ),
     );
 
     let readinessSum = 0;

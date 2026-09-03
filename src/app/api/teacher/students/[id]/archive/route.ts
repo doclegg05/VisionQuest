@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
-import { prisma } from "@/lib/db";
+import { tryLogAuditEvent } from "@/lib/audit";
 import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logger } from "@/lib/logger";
@@ -19,19 +19,20 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
       session.id,
     );
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: session.id,
-        actorRole: session.role,
-        action: "teacher.student.archive",
-        targetType: "student",
-        targetId: studentId,
-        summary: `Archived ${fileCount} files for ${student.displayName}`,
-        metadata: JSON.stringify({ storageKey, fileCount }),
-      },
+    // The zip is already in storage. AuditLog is admin-only under RLS, so
+    // the row goes through the admin client, and a failed write is logged
+    // rather than 500ing a request whose work is done (review F5).
+    const { audited } = await tryLogAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      action: "teacher.student.archive",
+      targetType: "student",
+      targetId: studentId,
+      summary: `Archived ${fileCount} files for ${student.displayName}`,
+      metadata: { storageKey, fileCount },
     });
 
-    return NextResponse.json({ storageKey, fileCount });
+    return NextResponse.json({ storageKey, fileCount, audited });
   } catch (error) {
     logger.error("Archive generation failed", {
       student: studentLogKey(studentId),
