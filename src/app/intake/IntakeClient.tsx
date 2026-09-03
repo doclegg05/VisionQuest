@@ -1,12 +1,10 @@
 "use client";
 
 import { useId, useState, useTransition } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle,
-  Sparkle,
-  Copy,
   ArrowRight,
   ArrowLeft,
   ShieldCheck,
@@ -28,7 +26,6 @@ const CAREER_TRACK_OPTIONS = [
 
 export default function IntakeClient() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   // Every control on this page needs a label it actually owns: /intake is
   // reached by QR code from a printed flyer, on a phone, by adults with low
@@ -83,24 +80,12 @@ export default function IntakeClient() {
 
   // Status & Success state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [successResult, setSuccessResult] = useState<{
-    displayName: string;
-    studentId: string;
-    temporaryPassword: string;
-    className: string | null;
-    pdfStorageKey: string | null;
-  } | null>(null);
-
-  const handleCopy = async (text: string, key: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 2500);
-    } catch {
-      // Fallback
-    }
-  };
+  // The public endpoint deliberately returns no account: no name, no username,
+  // no password, and no indication of whether a matching record already existed.
+  // Anything more would let an anonymous submitter confirm who is enrolled, and
+  // the old screen printed a shared temporary password to whoever was standing
+  // at the phone. All this screen holds is the acknowledgement text.
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canSubmitEnrollment =
     signatureName.trim().length > 0 && ferpaConsent && policyConsent && signatureConsent;
@@ -181,13 +166,11 @@ export default function IntakeClient() {
           return;
         }
 
-        setSuccessResult({
-          displayName: data.student.displayName,
-          studentId: data.credentials.username,
-          temporaryPassword: data.credentials.temporaryPassword,
-          className: data.enrollment?.className || `${county} County SPOKES`,
-          pdfStorageKey: data.orientation?.packetStorageKey || null,
-        });
+        setSuccessMessage(
+          typeof data.message === "string" && data.message.length > 0
+            ? data.message
+            : "Your form was sent. Your instructor will set up your account.",
+        );
       } catch {
         setErrorMessage("Network error connecting to VisionQuest. Please try again.");
       }
@@ -195,7 +178,12 @@ export default function IntakeClient() {
   };
 
   // --- Success State ---
-  if (successResult) {
+  // An acknowledgement, not an account. Submitting this form no longer signs
+  // anyone in and mints no password, so there is nothing here to copy down and
+  // no portal to enter yet — an instructor sets the account up. The screen also
+  // reads the same whether or not a matching record already existed, so it
+  // cannot be used to check who is enrolled.
+  if (successMessage) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)] px-4 py-12">
         <div className="w-full max-w-xl rounded-3xl border border-[var(--border)] bg-[var(--surface-card)] p-8 shadow-xl">
@@ -204,75 +192,42 @@ export default function IntakeClient() {
               <CheckCircle size={40} weight="fill" />
             </div>
 
-            <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-700">
-              <Sparkle size={14} weight="fill" /> Official Enrollment Confirmed
-            </span>
-
-            <h1 className="mt-2 font-display text-2xl font-bold text-[var(--ink-strong)] sm:text-3xl">
-              Welcome to SPOKES, {successResult.displayName}!
+            <h1 className="mt-4 font-display text-2xl font-bold text-[var(--ink-strong)] sm:text-3xl">
+              Your form was sent
             </h1>
 
-            <p className="mt-2 text-sm text-[var(--ink-muted)]">
-              Your account has been created, your state intake packet has been digitally signed and stamped, and your instructor has been notified.
-            </p>
+            <p className="mt-3 text-base text-[var(--ink-muted)]">{successMessage}</p>
           </div>
 
           <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-              Your Day-One Sign-In Credentials
+            <p className="text-sm font-semibold text-[var(--ink-strong)]">What happens next</p>
+            <ol className="mt-3 space-y-2.5 text-sm text-[var(--ink-muted)]">
+              <li className="flex gap-2.5">
+                <span className="font-semibold text-[var(--ink-strong)]">1.</span>
+                <span>Your instructor checks your form.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="font-semibold text-[var(--ink-strong)]">2.</span>
+                <span>They set up your account and give you your sign-in details.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="font-semibold text-[var(--ink-strong)]">3.</span>
+                <span>You sign in and meet Sage, your coach.</span>
+              </li>
+            </ol>
+            <p className="mt-4 text-sm text-[var(--ink-muted)]">
+              Nothing else to do right now. If you have not heard back in a few days, ask your
+              instructor.
             </p>
-            <p className="mt-1 text-xs text-[var(--ink-muted)]">
-              Save these details for logging into your VisionQuest portal on any device:
-            </p>
-
-            <div className="mt-4 space-y-3 font-mono text-sm">
-              <div className="flex items-center justify-between rounded-xl bg-[var(--surface-card)] px-4 py-2.5 border border-[var(--border)]">
-                <div>
-                  <span className="text-xs font-sans text-[var(--ink-muted)]">Username: </span>
-                  <span className="font-bold text-[var(--ink-strong)]">{successResult.studentId}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(successResult.studentId, "user")}
-                  className="flex items-center gap-1 text-xs font-sans font-semibold text-[var(--accent)] hover:underline"
-                >
-                  <Copy size={14} /> {copiedKey === "user" ? "Copied!" : "Copy"}
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl bg-[var(--surface-card)] px-4 py-2.5 border border-[var(--border)]">
-                <div>
-                  <span className="text-xs font-sans text-[var(--ink-muted)]">Initial Password: </span>
-                  <span className="font-bold text-[var(--ink-strong)]">{successResult.temporaryPassword}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(successResult.temporaryPassword, "pass")}
-                  className="flex items-center gap-1 text-xs font-sans font-semibold text-[var(--accent)] hover:underline"
-                >
-                  <Copy size={14} /> {copiedKey === "pass" ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </div>
           </div>
 
-          <div className="mt-6 space-y-3">
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard")}
-              className="primary-button flex w-full items-center justify-center gap-2 py-3.5 text-base font-semibold"
+          <div className="mt-6 text-center">
+            <Link
+              href="/login"
+              className="inline-flex min-h-[44px] items-center justify-center px-4 text-sm font-semibold text-[var(--accent)] underline hover:text-[var(--ink-strong)]"
             >
-              Enter VisionQuest & Meet Sage <ArrowRight size={18} weight="bold" />
-            </button>
-
-            <div className="text-center">
-              <Link
-                href="/login"
-                className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] underline"
-              >
-                Go to standard sign-in page
-              </Link>
-            </div>
+              Already have an account? Sign in
+            </Link>
           </div>
         </div>
       </main>

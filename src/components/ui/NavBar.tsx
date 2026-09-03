@@ -38,14 +38,17 @@ export const STAFF_ITEMS: NavItem[] = [
 ];
 
 const COORDINATOR_ITEMS: NavItem[] = [
+  { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
   { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
+  { href: "/teacher/library", label: "Library & Forms", icon: Books, phase: 1 },
+  { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
   { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
-  { href: "/admin", label: "Program Admin", icon: Wrench, phase: 1 },
-  { href: "/admin/library", label: "Library", icon: Books, phase: 1 },
-  { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
+  { href: "/admin", label: "Admin & Ops", icon: Wrench, phase: 1 },
+  { href: "/admin/library", label: "Library & Forms", icon: Books, phase: 1 },
+  { href: "/admin/chat", label: "Sage AI", icon: ChatCircle, phase: 1 },
 ];
 
 interface NavBarProps {
@@ -84,30 +87,21 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
   const homeHref = getRoleHomePath(role);
   const settingsHref = getRoleSettingsPath(role);
 
-  // Primary nav items for the sidebar — condensed to 4 purposeful hubs
+  // Primary nav items for the sidebar. Each role's list is the exported
+  // constant for that role — not an inline copy. The 2026-09-03 reshuffle
+  // inlined four items per role and left STAFF_ITEMS rendering nothing, which
+  // silently dropped AI Review (/teacher/failed-extractions) and Classes out of
+  // teacher navigation altogether while NavBar.items.test.tsx went on asserting
+  // against the orphaned constant. Rendering from the constants keeps the tested
+  // list and the displayed list the same list.
   const primaryItems =
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
-        ? [
-            { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 as const },
-            { href: "/admin", label: "Admin & Ops", icon: Wrench, phase: 1 as const },
-            { href: "/admin/library", label: "Library & Forms", icon: Books, phase: 1 as const },
-            { href: "/admin/chat", label: "Sage AI", icon: ChatCircle, phase: 1 as const },
-          ]
+        ? ADMIN_ITEMS
         : role === "coordinator"
-          ? [
-              { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 as const },
-              { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 as const },
-              { href: "/teacher/library", label: "Library & Forms", icon: Books, phase: 1 as const },
-              { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 as const },
-            ]
-          : [
-              { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 as const },
-              { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 as const },
-              { href: "/teacher/library", label: "Library & Forms", icon: Books, phase: 1 as const },
-              { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 as const },
-            ];
+          ? COORDINATOR_ITEMS
+          : STAFF_ITEMS;
 
   // Secondary nav items (student only)
   const secondaryItems =

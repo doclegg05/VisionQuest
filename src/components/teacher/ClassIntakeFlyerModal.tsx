@@ -19,19 +19,24 @@ export default function ClassIntakeFlyerModal({
   className,
   countyName = "",
 }: ClassIntakeFlyerModalProps) {
-  const [intakeUrl, setIntakeUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // The flyer URL is derived from props, not state: computing it during render
+  // removes the setState-in-effect cascade and means the field is never briefly
+  // blank on open. `window` is guarded for the server pass.
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://visionquest.onrender.com";
+  const countyParam = countyName ? `&county=${encodeURIComponent(countyName)}` : "";
+  const intakeUrl = `${origin}/intake?classId=${classId}${countyParam}`;
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://visionquest.onrender.com";
-    const countyParam = countyName ? `&county=${encodeURIComponent(countyName)}` : "";
-    const url = `${origin}/intake?classId=${classId}${countyParam}`;
-    setIntakeUrl(url);
+    // The QR must encode the same URL the modal shows and the flyer prints, so
+    // it is keyed on the URL itself rather than on the props it is built from.
+    let cancelled = false;
 
-    QRCode.toDataURL(url, {
+    QRCode.toDataURL(intakeUrl, {
       width: 320,
       margin: 2,
       color: {
@@ -39,9 +44,15 @@ export default function ClassIntakeFlyerModal({
         light: "#ffffff",
       },
     })
-      .then((data) => setQrDataUrl(data))
+      .then((data) => {
+        if (!cancelled) setQrDataUrl(data);
+      })
       .catch(() => {});
-  }, [isOpen, classId, className, countyName]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, intakeUrl]);
 
   if (!isOpen) return null;
 

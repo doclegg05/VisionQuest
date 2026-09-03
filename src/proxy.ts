@@ -12,6 +12,24 @@ import {
 const isProduction = process.env.NODE_ENV === "production";
 const SESSION_COOKIE_NAME = "vq-session";
 
+let warnedStyleRelaxIgnored = false;
+
+/**
+ * CSP_DEV_RELAX=1 permits inline <style> elements, for a local session fighting
+ * a tool that injects un-nonced styles. Opt-in and greppable, rather than
+ * inferred from `NODE_ENV !== "production"`, so the policy exercised in dev and
+ * CI is the policy that ships. Production ignores it and says so once.
+ */
+function styleSrcElemRelaxed(): boolean {
+  if (process.env.CSP_DEV_RELAX !== "1") return false;
+  if (!isProduction) return true;
+  if (!warnedStyleRelaxIgnored) {
+    warnedStyleRelaxIgnored = true;
+    console.warn("[csp] CSP_DEV_RELAX is set in production and is being ignored.");
+  }
+  return false;
+}
+
 // Next.js 16 proxy (middleware) convention — filename must be `proxy.ts` and the
 // exported function must be named `proxy`. Handles:
 //   1. Auth redirect for gated routes (student/teacher/admin) to prevent "Loading..." flash
@@ -81,7 +99,13 @@ export function proxy(request: NextRequest) {
     // (for example on next/image and the route announcer), so style attrs
     // need to be permitted even though style/script elements remain controlled.
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-    process.env.NODE_ENV !== "production"
+    // Nonce-based in every environment unless CSP_DEV_RELAX=1 is explicitly set,
+    // and never relaxed in production regardless. Relaxing on the mere absence of
+    // production means the CSP you develop and test against is not the CSP you
+    // ship — a missing nonce then surfaces for the first time as broken styling
+    // for real users. This is the same reasoning as CSP_REPORT_SILENCE in
+    // src/app/api/csp-report/route.ts; the two halves are kept in step.
+    styleSrcElemRelaxed()
       ? `style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com`
       : `style-src-elem 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "style-src-attr 'unsafe-inline'",

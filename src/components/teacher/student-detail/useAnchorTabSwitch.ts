@@ -45,8 +45,15 @@ export function useAnchorTabSwitch<TabKey extends string>({
   activeTab: TabKey;
   setTab: (tab: TabKey) => void;
 }): void {
+  // The hash handler needs the CURRENT tab without re-subscribing on every tab
+  // change, so the value is mirrored into a ref. Writing that ref during render
+  // is what `react-hooks/refs` forbids; the write belongs in an effect. Reads are
+  // all inside event handlers, which run after commit, so they still see the
+  // latest value.
   const activeTabRef = useRef(activeTab);
-  activeTabRef.current = activeTab;
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

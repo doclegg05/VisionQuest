@@ -80,11 +80,19 @@ before(async () => {
   route = await import("./route");
 });
 
+// Consent is no longer defaulted anywhere: `intakePayloadSchema` requires both
+// flags as `z.literal(true)`, and the webhook parses that same schema. A staff
+// caller (or the Power Automate form behind it) is asserting that a signed
+// consent exists on paper — an authenticated, audited assertion, unlike the
+// anonymous one the public route used to accept. An integration that omits
+// these now gets a 400 rather than an intake with no recorded consent.
 const PAYLOAD = {
   firstName: "Dana",
   lastName: "Hall",
   birthDate: "1988-02-03",
   county: "Kanawha",
+  ferpaConsentSigned: true as const,
+  policyAcknowledgmentSigned: true as const,
 };
 
 function postWebhook(body: Record<string, unknown> = PAYLOAD): Request {

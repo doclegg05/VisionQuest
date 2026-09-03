@@ -1,4 +1,4 @@
-import crypto, { createHmac } from "node:crypto";
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
@@ -8,8 +8,22 @@ import {
   type ParsedSignatureImage,
 } from "./schema";
 import { uploadFile } from "@/lib/storage";
+// The app client is the CORRECT one here, and prismaAdmin would be wrong. Every
+// write in this module belongs to a single student and runs inside
+// `withStudentRlsContext(studentDbId, ...)`, which is the second remedy the rule
+// itself prescribes; the rule matches on the import and cannot see the wrapper.
+// Reaching for prismaAdmin to silence it would trade a lint error for an unscoped
+// write path through a document generator that public intake can reach. If a write
+// here ever needs to cross students, that is a design change to argue for, not a
+// client swap.
+// eslint-disable-next-line no-restricted-imports -- RLS-scoped, see above
 import { prisma } from "@/lib/db";
 import { withStudentRlsContext } from "@/lib/rls-context";
+import { signDocumentVerificationToken } from "./document-token";
+
+// Re-exported: callers were given this name on this module, and the token is now
+// defined once in ./document-token so signer and verifier cannot drift apart.
+export { signDocumentVerificationToken } from "./document-token";
 import { logger } from "@/lib/logger";
 import QRCode from "qrcode";
 
@@ -88,35 +102,6 @@ export function computePacketDigest(bytes: Uint8Array): string {
  */
 export function createPacketFileUploadId(): string {
   return `c${crypto.randomBytes(12).toString("hex")}`;
-}
-
-/**
- * Sign the verification token the packet's QR code carries.
- *
- * The QR is printed inside the packet, so the token has to exist before the
- * final bytes do — it therefore binds the FileUpload id, and the content digest
- * is recorded alongside the archived file rather than inside the token. `dig` is
- * an interim issuer assertion for callers that already know the digest; the
- * verifier prefers the stored value.
- *
- * The MAC covers `"vqd1." + segment`, so the version is inside the signature and
- * a later v2 token cannot be downgraded to v1.
- *
- * Contract shared with `/api/verify/document`. Integration lifts both copies
- * into `src/lib/intake/document-token.ts`; until then they must stay identical.
- */
-export function signDocumentVerificationToken(fileUploadId: string, pdfDigest?: string): string {
-  const secret = process.env.DOCUMENT_VERIFICATION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("DOCUMENT_VERIFICATION_SECRET is not configured");
-  const payload: Record<string, unknown> = {
-    v: 1,
-    fid: fileUploadId,
-    iat: Math.floor(Date.now() / 1000),
-  };
-  if (pdfDigest) payload.dig = pdfDigest;
-  const segment = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  const signature = createHmac("sha256", secret).update(`vqd1.${segment}`).digest("base64url");
-  return `vqd1.${segment}.${signature}`;
 }
 
 /** Signing forensics the ROUTE derives — never the request body. */
@@ -1012,20 +997,23 @@ export async function createStampedIntakePdfBuffer(
 /**
  * Record the digest of the archived bytes.
  *
- * `FileUpload.contentDigest` arrives with the schema change that accompanies the
- * verifier. Until the generated client carries the column this write no-ops, so
- * a packet never fails on a column that is not there yet — but it is logged,
- * because a missing digest is exactly what makes the verify page's "hash your
- * copy and compare" claim untrue.
+ * This is what makes the verifier's answer trustworthy: it compares against a
+ * digest the program recorded, rather than one the token merely asserts. A
+ * failure here is not fatal to issuing the packet, but it is logged, because a
+ * packet with no recorded digest can only ever be verified on the issuer's own
+ * say-so.
  */
 async function recordContentDigest(fileUploadId: string, digest: string): Promise<void> {
-  const client = prisma.fileUpload as unknown as {
-    update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>;
-  };
   try {
-    await client.update({ where: { id: fileUploadId }, data: { contentDigest: digest } });
+    await prisma.fileUpload.update({
+      where: { id: fileUploadId },
+      data: { contentDigest: digest },
+    });
   } catch (err) {
-    logger.warn("Intake packet content digest not persisted", { error: String(err) });
+    logger.warn("Intake packet content digest not persisted", {
+      alert: "packet_digest_not_recorded",
+      error: String(err),
+    });
   }
 }
 

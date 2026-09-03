@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
 import { prismaAdmin } from "@/lib/db";
+import { MIN_SECRET_LENGTH, verifyDocumentToken } from "@/lib/intake/document-token";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
@@ -78,17 +77,6 @@ import { studentLogKey } from "@/lib/log-keys";
  * record the caller already proved they hold.
  */
 
-/** vqd1.<payload>.<43-char base64url HMAC-SHA256>. Bounds the payload so a
- *  megabyte of base64 never reaches JSON.parse. */
-const TOKEN_PATTERN = /^vqd1\.[A-Za-z0-9_-]{1,512}\.[A-Za-z0-9_-]{43}$/;
-
-const SIGNATURE_BYTES = 32;
-
-/** The signature is the only thing between a forger and a page carrying two
- *  statutes, so a placeholder value ("test", "changeme") is treated as no key
- *  at all rather than quietly signing with it. render.yaml generates one. */
-const MIN_SECRET_LENGTH = 32;
-
 /** Public callers, so the window is per source address and generous enough for
  *  a classroom or agency office sharing one egress IP. */
 const RATE_LIMIT_MAX = 20;
@@ -107,42 +95,6 @@ const ISSUING_AGENCY = "West Virginia SPOKES Program / West Virginia Adult Educa
 
 const LEGAL_STANDARD =
   "West Virginia Uniform Electronic Transactions Act (W. Va. Code § 39A-1-1) & Federal E-SIGN Act (15 U.S.C. § 7001)";
-
-/** External data is untyped until parsed, signature or no signature. */
-const tokenPayloadSchema = z.object({
-  v: z.literal(1),
-  fid: z.string().min(1).max(64),
-  iat: z.number().int().nonnegative(),
-  // Optional, and deliberately so — see "Why the digest is NOT required in the
-  // token" above. Rejected outright unless it is a real SHA-256, so a token can
-  // never put arbitrary text on the page.
-  dig: z.string().regex(/^[0-9a-f]{64}$/).optional(),
-});
-
-type TokenPayload = z.infer<typeof tokenPayloadSchema>;
-
-function verifyDocumentToken(token: string, secret: string): TokenPayload | null {
-  if (!TOKEN_PATTERN.test(token)) return null;
-
-  const [prefix, payloadSegment, signatureSegment] = token.split(".");
-
-  const expected = createHmac("sha256", secret)
-    .update(`${prefix}.${payloadSegment}`)
-    .digest();
-  const provided = Buffer.from(signatureSegment, "base64url");
-  if (provided.length !== SIGNATURE_BYTES || expected.length !== SIGNATURE_BYTES) return null;
-  if (!timingSafeEqual(provided, expected)) return null;
-
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(Buffer.from(payloadSegment, "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-
-  const parsed = tokenPayloadSchema.safeParse(decoded);
-  return parsed.success ? parsed.data : null;
-}
 
 function refuse(reason: string, status: number, message: string): NextResponse {
   return NextResponse.json({ verified: false, reason, error: message }, { status });

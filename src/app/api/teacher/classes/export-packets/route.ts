@@ -5,7 +5,8 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
 import { downloadFile } from "@/lib/storage";
-import { createStampedIntakePdfBuffer } from "@/lib/intake/pdf-stamped-packet";
+import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -65,6 +66,12 @@ export async function GET(req: NextRequest) {
   const archive = archiver("zip", { zlib: { level: 6 } });
   archive.pipe(bufferStream);
 
+  // Students whose packet could not be exported, reported in the archive rather
+  // than silently omitted — a cohort export that is quietly short a packet reads
+  // as "this student has none", which is a different claim from "we could not
+  // retrieve it".
+  const missing: string[] = [];
+
   for (const student of students) {
     const sub = student.formSubmissions[0];
     const file = sub ? fileMap.get(sub.fileId) : null;
@@ -74,45 +81,50 @@ export async function GET(req: NextRequest) {
       const downloaded = await downloadFile(file.storageKey);
       if (downloaded) {
         pdfBuffer = downloaded.buffer;
+      } else {
+        logger.warn("Archived intake packet missing from storage during cohort export", {
+          alert: "packet_missing_from_storage",
+          student: studentLogKey(student.id),
+          surface: "export-packets",
+        });
       }
     }
 
-    // Self-heal or generate if not yet in storage
-    if (!pdfBuffer && student.spokesRecord) {
-      try {
-        const sr = student.spokesRecord;
-        pdfBuffer = await createStampedIntakePdfBuffer(
-          {
-            firstName: sr.firstName || student.displayName.split(" ")[0] || "Student",
-            lastName: sr.lastName || student.displayName.split(" ").slice(1).join(" ") || "Participant",
-            birthDate: sr.birthDate ? sr.birthDate.toISOString().slice(0, 10) : "2000-01-01",
-            county: (sr.county as any) || "Nicholas",
-            email: sr.referralEmail || `${student.studentId}@example.com`,
-            phone: "(304) 555-0100",
-            gender: (sr.gender as any) || null,
-            race: sr.race || null,
-            ethnicity: sr.ethnicity || null,
-            householdType: (sr.householdType as any) || "Single adult",
-            educationalLevel: (sr.educationalLevel as any) || "High school equivalency (GED/HSE)",
-            tanfStatus: true,
-            programTrack: "Customer Service / Clerical",
-            signatureName: student.displayName,
-            signatureMethod: "drawn",
-            staffClearanceStatus: sub?.status === "approved" ? "approved" : "pending",
-          },
-          student.studentId,
-        );
-      } catch (err) {
-        console.error(`Failed to generate stamped packet for student ${student.studentId}:`, err);
-      }
-    }
-
+    // A packet is EXPORTED, never regenerated. The signature evidence — who
+    // signed, when, from where, and the drawn image — exists only inside the
+    // archived bytes, so re-rendering one would replace a participant's signed
+    // state form with a lookalike built from defaults, in bulk, for a whole
+    // cohort. That is the same fabrication the single-student approval path was
+    // just stripped of (review B4b); it does not become acceptable at scale.
+    // A student with no archived packet is reported as missing.
     if (pdfBuffer) {
       const cleanLastName = (student.spokesRecord?.lastName || student.displayName.split(" ").slice(1).join(" ") || "Student").replace(/[^a-zA-Z0-9]/g, "_");
       const cleanFirstName = (student.spokesRecord?.firstName || student.displayName.split(" ")[0] || "Participant").replace(/[^a-zA-Z0-9]/g, "_");
       const filename = `${cleanLastName}_${cleanFirstName}_SPOKES_Intake.pdf`;
       archive.append(pdfBuffer, { name: filename });
+    } else {
+      missing.push(`${student.displayName} (${student.studentId})`);
     }
+  }
+
+  if (missing.length > 0) {
+    archive.append(
+      [
+        "SPOKES cohort intake export — packets not included",
+        "",
+        "These participants have no signed intake packet on file, so nothing was",
+        "exported for them. This export never generates a replacement: a packet",
+        "carries the participant's own signature and consent, and a regenerated",
+        "one would assert both without either having happened.",
+        "",
+        "To obtain a packet, have the participant complete and sign their intake.",
+        "",
+        ...missing.map((entry) => `  - ${entry}`),
+        "",
+        `${missing.length} of ${students.length} participants in this export.`,
+      ].join("\n"),
+      { name: "MISSING_PACKETS.txt" },
+    );
   }
 
   await archive.finalize();
