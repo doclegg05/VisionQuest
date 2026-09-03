@@ -265,6 +265,21 @@ describe("provisionIntakeStudent — the temporary password", () => {
   });
 });
 
+describe("generateTemporaryPassword", () => {
+  it("draws only from a transcription-safe alphabet, so nobody mistakes O for 0", async () => {
+    for (let i = 0; i < 200; i += 1) {
+      assert.match(provision.generateTemporaryPassword(), /^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$/);
+    }
+  });
+
+  it("does not repeat across a thousand draws", async () => {
+    const drawn = new Set<string>();
+    for (let i = 0; i < 1000; i += 1) drawn.add(provision.generateTemporaryPassword());
+
+    assert.equal(drawn.size, 1000);
+  });
+});
+
 describe("provisionIntakeStudent — orientation items", () => {
   beforeEach(reset);
 
