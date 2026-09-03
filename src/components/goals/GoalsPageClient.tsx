@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import {
   GOAL_LEVEL_META,
@@ -12,7 +12,10 @@ import {
   type GoalPlanEntry,
   type GoalResourceLinkStatus,
 } from "@/lib/goal-resource-links";
-import { apiFetch } from "@/lib/api";
+import { isLockedByProposal, PROPOSED_TOGGLE_HINT } from "./goal-locks";
+import { AskSageModal } from "./AskSageModal";
+import { createConfettiEngine, type ConfettiEngine } from "./confetti";
+import { GoalRowActions } from "./GoalRowActions";
 import {
   Square,
   CheckSquare,
@@ -58,84 +61,6 @@ function resourceStatusOptions(currentStatus: GoalResourceLinkStatus): GoalResou
   return [...new Set([...STUDENT_LINK_STATUSES, currentStatus])];
 }
 
-interface ConfettiParticle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  size: number;
-  rotation: number;
-  rotationSpeed: number;
-}
-
-const activeParticles: ConfettiParticle[] = [];
-let animationFrameId: number | null = null;
-
-function triggerConfetti(clientX: number, clientY: number) {
-  const canvas = document.getElementById("confetti-canvas") as HTMLCanvasElement | null;
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  // Sync canvas size to screen
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  const colors = ["#37b550", "#2a8a3c", "#007baf", "#d3b257", "#ad8806"];
-
-  for (let i = 0; i < 40; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 3 + Math.random() * 5;
-    activeParticles.push({
-      x: clientX,
-      y: clientY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 2.5, // upward bias
-      color: colors[Math.floor(Math.random() * colors.length)],
-      size: 5 + Math.random() * 5,
-      rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: -0.1 + Math.random() * 0.2,
-    });
-  }
-
-  function update() {
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (let i = activeParticles.length - 1; i >= 0; i--) {
-      const p = activeParticles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.2; // gravity
-      p.vx *= 0.97; // friction
-      p.rotation += p.rotationSpeed;
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-      ctx.restore();
-
-      if (p.y > canvas.height || p.x < 0 || p.x > canvas.width) {
-        activeParticles.splice(i, 1);
-      }
-    }
-
-    if (activeParticles.length > 0) {
-      animationFrameId = requestAnimationFrame(update);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      animationFrameId = null;
-    }
-  }
-
-  if (animationFrameId === null) {
-    update();
-  }
-}
-
 export default function GoalsPageClient({ initialGoals, initialGoalPlans }: GoalsPageClientProps) {
   const { checkProgression } = useProgression();
   const [goals, setGoals] = useState(initialGoals);
@@ -166,8 +91,23 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   // UX Enhancement state variables
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [sageModalGoal, setSageModalGoal] = useState<GoalRecord | null>(null);
-  const [sageModalLoading, setSageModalLoading] = useState(false);
-  const [sageResponse, setSageResponse] = useState<string>("");
+
+  // Parent lookup for the proposed-goal lock (F23): a weekly or task under a
+  // Sage proposal cannot be checked off until the instructor confirms it.
+  const goalsById = new Map<string, GoalRecord>(goals.map((g) => [g.id, g]));
+
+  // Confetti state lives on this instance, not the module (F36 / FE-01), so
+  // celebrations cannot interfere and unmount cancels the frame loop.
+  const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
+  const confettiRef = useRef<ConfettiEngine | null>(null);
+  useEffect(() => {
+    const engine = createConfettiEngine({ getCanvas: () => confettiCanvasRef.current });
+    confettiRef.current = engine;
+    return () => {
+      engine.dispose();
+      confettiRef.current = null;
+    };
+  }, []);
 
   // Read Aloud Text-to-Speech Handler
   function handleReadAloud(id: string, text: string) {
@@ -185,53 +125,6 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     utterance.onerror = () => setSpeakingId(null);
     setSpeakingId(id);
     window.speechSynthesis.speak(utterance);
-  }
-
-  // Localized Sage Scaffolding Modal Handler
-  async function handleOpenAskSageModal(goal: GoalRecord) {
-    setSageModalGoal(goal);
-    setSageModalLoading(true);
-    setSageResponse("");
-
-    try {
-      const promptText = `I have set a monthly goal: "${goal.content}". Can you suggest 3 to 4 actionable weekly milestones or tasks I can check off to achieve this goal? Please speak in encouraging, plain language suitable for a student.`;
-      const res = await apiFetch("/api/chat/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: promptText }),
-      });
-
-      if (!res.ok) throw new Error("Could not contact Sage");
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          for (const line of chunk.split("\n")) {
-            if (!line.startsWith("data: ")) continue;
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data?.text) {
-                accumulated += data.text;
-                setSageResponse(accumulated);
-              }
-            } catch {
-              // Ignore chunk parse issues
-            }
-          }
-        }
-      }
-    } catch {
-      setSageResponse("Sorry, I had trouble reaching Sage right now. Please try again soon!");
-    } finally {
-      setSageModalLoading(false);
-    }
   }
 
   function upsertGoalPlan(nextPlan: GoalPlanEntry) {
@@ -351,10 +244,16 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   }
 
   async function handleToggleGoalStatus(goalId: string, currentStatus: GoalStatus, event?: React.MouseEvent) {
+    const target = goalsById.get(goalId);
+    if (target && isLockedByProposal(target, goalsById)) {
+      setMessage({ tone: "error", text: PROPOSED_TOGGLE_HINT });
+      return;
+    }
+
     const nextStatus: GoalStatus = currentStatus === "completed" ? "active" : "completed";
-    
+
     if (nextStatus === "completed" && event) {
-      triggerConfetti(event.clientX, event.clientY);
+      confettiRef.current?.burst(event.clientX, event.clientY);
     }
 
     setSavingGoalId(goalId);
@@ -492,10 +391,81 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     (g) => g.level !== "bhag" && g.level !== "monthly" && !hasMonthlyAncestor(g)
   );
 
+  // Orphan weekly goals render with their own tasks nested under them. Every
+  // other orphan (no parent, or a parent that was abandoned) lands under
+  // "Unassigned tasks". Reports count all of these, so none may be hidden (F24).
+  const orphanWeeklies = orphanGoals.filter((g) => g.level === "weekly");
+  const orphanWeeklyIds = new Set(orphanWeeklies.map((g) => g.id));
+  const unassignedTasks = orphanGoals.filter(
+    (g) => g.level !== "weekly" && !(g.parentId && orphanWeeklyIds.has(g.parentId)),
+  );
+  const orphanLocked = orphanGoals.some((g) => isLockedByProposal(g, goalsById));
+
+  function renderOrphanRow(item: GoalRecord, options: { nested?: boolean } = {}) {
+    const isRowEditing = editingGoalId === item.id;
+    const rowLocked = isLockedByProposal(item, goalsById);
+    const label = item.level === "weekly" ? "Weekly" : "Item";
+    return (
+      <div key={item.id} className={`${options.nested ? "" : "pl-1 py-1"} flex items-start gap-2.5 group`}>
+        <button
+          type="button"
+          onClick={(e) => handleToggleGoalStatus(item.id, item.status, e)}
+          disabled={rowLocked}
+          aria-describedby={rowLocked ? "orphan-proposed-hint" : undefined}
+          aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
+          className="mt-1 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {item.status === "completed" ? (
+            <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)]" />
+          ) : (
+            <Square size={16} />
+          )}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          {isRowEditing ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveInlineGoal(item.id, editingGoalContent);
+              }}
+              className="flex gap-2"
+            >
+              <input
+                type="text"
+                value={editingGoalContent}
+                onChange={(e) => setEditingGoalContent(e.target.value)}
+                className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                autoFocus
+              />
+              <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
+              <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
+            </form>
+          ) : (
+            <div className="flex items-start justify-between">
+              <span className={`text-sm leading-relaxed break-words ${item.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
+                {item.content}
+              </span>
+              <GoalRowActions
+                label={label}
+                iconSize={12}
+                onEdit={() => {
+                  setEditingGoalId(item.id);
+                  setEditingGoalContent(item.content);
+                }}
+                onDismiss={() => handleDismissGoal(item.id)}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Confetti canvas overlay */}
-      <canvas id="confetti-canvas" className="pointer-events-none fixed inset-0 z-50 h-screen w-screen" />
+      <canvas ref={confettiCanvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-50 h-screen w-screen" />
 
       <div className="surface-section p-5">
         <p className="text-sm leading-relaxed text-[var(--ink-muted)]">
@@ -640,7 +610,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           const isMEditing = editingGoalId === monthly.id;
           const isMProposed = monthly.status === "proposed";
           const mWeekly = weeklyGoals.filter((w) => w.parentId === monthly.id);
-          const mDirectTasks = orphanGoals.filter((o) => o.parentId === monthly.id);
+          // Tasks and daily goals attached straight to the monthly goal. These are
+          // counted in the progress bar below, so they must render too (F24).
+          const mDirectTasks = activeGoals.filter((o) => o.parentId === monthly.id && o.level !== "weekly");
 
           const goalPlan = goalPlans.find((p) => p.goalId === monthly.id) ?? {
             goalId: monthly.id,
@@ -663,6 +635,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           const totalDescendants = descendants.length;
           const completedDescendants = descendants.filter((g) => g.status === "completed").length;
           const progressPercent = totalDescendants > 0 ? Math.round((completedDescendants / totalDescendants) * 100) : 0;
+          const lockedInCard = totalDescendants > 0 && descendants.some((g) => isLockedByProposal(g, goalsById));
+          const proposedHintId = `${monthly.id}-proposed-hint`;
 
           return (
             <article key={monthly.id} className="organic-paper-card w-full shadow-md relative overflow-hidden transition-transform duration-300 hover:shadow-lg">
@@ -711,25 +685,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         <h3 className={`font-display text-lg text-[var(--ink-strong)] leading-snug break-words ${monthly.status === "completed" ? "line-through opacity-60" : ""}`}>
                           {monthly.content}
                         </h3>
-                        <div className="opacity-0 group-hover:opacity-100 flex gap-2 ml-2 shrink-0">
-                          <button
-                            onClick={() => {
-                              setEditingGoalId(monthly.id);
-                              setEditingGoalContent(monthly.content);
-                            }}
-                            className="text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                            aria-label="Edit Monthly"
-                          >
-                            <PencilSimple size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDismissGoal(monthly.id)}
-                            className="text-[var(--ink-muted)] hover:text-red-500"
-                            aria-label="Dismiss Monthly"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
+                        <GoalRowActions
+                          label="Monthly"
+                          iconSize={16}
+                          onEdit={() => {
+                            setEditingGoalId(monthly.id);
+                            setEditingGoalContent(monthly.content);
+                          }}
+                          onDismiss={() => handleDismissGoal(monthly.id)}
+                        />
                       </div>
                     )}
                   </div>
@@ -748,7 +712,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleOpenAskSageModal(monthly)}
+                        onClick={() => setSageModalGoal(monthly)}
                         className="flex items-center gap-1 px-2.5 py-1 text-3xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors shrink-0"
                         title="Ask Sage to help break down this goal"
                       >
@@ -802,11 +766,17 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
               </div>
 
               {/* Checklist Items: Weekly Goals & Tasks */}
+              {lockedInCard && (
+                <p id={proposedHintId} className="mb-2 text-xs text-[var(--ink-muted)]">
+                  {PROPOSED_TOGGLE_HINT}
+                </p>
+              )}
               <div className="space-y-3 mb-2">
                 {/* Render Weekly Goals inside Monthly Card */}
                 {mWeekly.map((weekly) => {
                   const isWEditing = editingGoalId === weekly.id;
                   const wTasks = dailyGoals.concat(tasks).filter((t) => t.parentId === weekly.id);
+                  const wLocked = isLockedByProposal(weekly, goalsById);
 
                   return (
                     <div key={weekly.id} className="pl-1">
@@ -815,7 +785,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         <button
                           type="button"
                           onClick={(e) => handleToggleGoalStatus(weekly.id, weekly.status, e)}
-                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center"
+                          disabled={wLocked}
+                          aria-describedby={wLocked ? proposedHintId : undefined}
+                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={weekly.status === "completed" ? "Mark incomplete" : "Mark complete"}
                         >
                           {weekly.status === "completed" ? (
@@ -845,29 +817,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
                             </form>
                           ) : (
-                            <div className="flex items-start justify-between group/wline">
+                            <div className="flex items-start justify-between">
                               <span className={`text-sm font-semibold leading-relaxed break-words ${weekly.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                                 {weekly.content}
                               </span>
-                              <div className="opacity-0 group-hover/wline:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                                <button
-                                  onClick={() => {
-                                    setEditingGoalId(weekly.id);
-                                    setEditingGoalContent(weekly.content);
-                                  }}
-                                  className="p-2 -m-2 text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center justify-center"
-                                  aria-label="Edit Weekly"
-                                >
-                                  <PencilSimple size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleDismissGoal(weekly.id)}
-                                  className="p-2 -m-2 text-[var(--ink-muted)] hover:text-red-500 flex items-center justify-center"
-                                  aria-label="Dismiss Weekly"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
+                              <GoalRowActions
+                                label="Weekly"
+                                iconSize={14}
+                                onEdit={() => {
+                                  setEditingGoalId(weekly.id);
+                                  setEditingGoalContent(weekly.content);
+                                }}
+                                onDismiss={() => handleDismissGoal(weekly.id)}
+                              />
                             </div>
                           )}
                         </div>
@@ -877,12 +839,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       <div className="pl-6 border-l border-dashed border-[var(--border)] ml-2.5 mt-1.5 space-y-1.5">
                         {wTasks.map((task) => {
                           const isTEditing = editingGoalId === task.id;
+                          const tLocked = isLockedByProposal(task, goalsById);
                           return (
                             <div key={task.id} className="flex items-start gap-2 group/task">
                               <button
                                 type="button"
                                 onClick={(e) => handleToggleGoalStatus(task.id, task.status, e)}
-                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center"
+                                disabled={tLocked}
+                                aria-describedby={tLocked ? proposedHintId : undefined}
+                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={task.status === "completed" ? "Mark incomplete" : "Mark complete"}
                               >
                                 {task.status === "completed" ? (
@@ -912,29 +877,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                     <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
                                   </form>
                                 ) : (
-                                  <div className="flex items-start justify-between group/tline">
+                                  <div className="flex items-start justify-between">
                                     <span className={`text-sm leading-relaxed break-words ${task.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                                       {task.content}
                                     </span>
-                                    <div className="opacity-0 group-hover/tline:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                                      <button
-                                        onClick={() => {
-                                          setEditingGoalId(task.id);
-                                          setEditingGoalContent(task.content);
-                                        }}
-                                        className="p-2 -m-2 text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center justify-center"
-                                        aria-label="Edit Task"
-                                      >
-                                        <PencilSimple size={12} />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDismissGoal(task.id)}
-                                        className="p-2 -m-2 text-[var(--ink-muted)] hover:text-red-500 flex items-center justify-center"
-                                        aria-label="Dismiss Task"
-                                      >
-                                        <X size={12} />
-                                      </button>
-                                    </div>
+                                    <GoalRowActions
+                                      label="Task"
+                                      iconSize={12}
+                                      onEdit={() => {
+                                        setEditingGoalId(task.id);
+                                        setEditingGoalContent(task.content);
+                                      }}
+                                      onDismiss={() => handleDismissGoal(task.id)}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -986,12 +941,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {/* Direct tasks/milestones on this Monthly Plan (not grouped by Weekly Goal) */}
                 {mDirectTasks.map((item) => {
                   const isItemEditing = editingGoalId === item.id;
+                  const itemLocked = isLockedByProposal(item, goalsById);
                   return (
                     <div key={item.id} className="pl-1 py-1 flex items-start gap-2.5 group">
                       <button
                         type="button"
                         onClick={(e) => handleToggleGoalStatus(item.id, item.status, e)}
-                        className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-center"
+                        disabled={itemLocked}
+                        aria-describedby={itemLocked ? proposedHintId : undefined}
+                        className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
                       >
                         {item.status === "completed" ? (
@@ -1021,29 +979,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                             <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
                           </form>
                         ) : (
-                          <div className="flex items-start justify-between group/item">
+                          <div className="flex items-start justify-between">
                             <span className={`text-sm leading-relaxed break-words ${item.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
                               {item.content}
                             </span>
-                            <div className="opacity-0 group-hover/item:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                              <button
-                                onClick={() => {
-                                  setEditingGoalId(item.id);
-                                  setEditingGoalContent(item.content);
-                                }}
-                                className="p-2 -m-2 text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center justify-center"
-                                aria-label="Edit Item"
-                              >
-                                <PencilSimple size={12} />
-                              </button>
-                              <button
-                                onClick={() => handleDismissGoal(item.id)}
-                                className="p-2 -m-2 text-[var(--ink-muted)] hover:text-red-500 flex items-center justify-center"
-                                aria-label="Dismiss Item"
-                              >
-                                <X size={12} />
-                              </button>
-                            </div>
+                            <GoalRowActions
+                              label="Item"
+                              iconSize={12}
+                              onEdit={() => {
+                                setEditingGoalId(item.id);
+                                setEditingGoalContent(item.content);
+                              }}
+                              onDismiss={() => handleDismissGoal(item.id)}
+                            />
                           </div>
                         )}
                       </div>
@@ -1177,7 +1125,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           );
         })}
 
-        {/* Orphan Goals Card — for tasks/weekly goals without a monthly parent */}
+        {/* Orphan card: weekly goals and tasks with no monthly parent. Nothing the
+            reports count is hidden here (F24 / VQ-R-008). */}
         {orphanGoals.length > 0 && (
           <article className="organic-paper-card w-full shadow-md relative overflow-hidden transition-transform duration-300 hover:shadow-lg">
             <div className="tape-effect bg-purple-400/30 border-purple-400/10" />
@@ -1195,72 +1144,33 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
               </div>
             </div>
 
+            {orphanLocked && (
+              <p id="orphan-proposed-hint" className="mb-2 text-xs text-[var(--ink-muted)]">
+                {PROPOSED_TOGGLE_HINT}
+              </p>
+            )}
             <div className="space-y-3">
-              {orphanGoals.filter((g) => g.level === "weekly" || g.parentId === null).map((weeklyOrOrphan) => {
-                const isItemEditing = editingGoalId === weeklyOrOrphan.id;
+              {orphanWeeklies.map((weekly) => {
+                const weeklyTasks = childMap.get(weekly.id) ?? [];
                 return (
-                  <div key={weeklyOrOrphan.id} className="pl-1 py-1 flex items-start gap-2.5 group">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleGoalStatus(weeklyOrOrphan.id, weeklyOrOrphan.status)}
-                      className="mt-1 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0"
-                    >
-                      {weeklyOrOrphan.status === "completed" ? (
-                        <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)]" />
-                      ) : (
-                        <Square size={16} />
-                      )}
-                    </button>
-
-                    <div className="flex-1 min-w-0">
-                      {isItemEditing ? (
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSaveInlineGoal(weeklyOrOrphan.id, editingGoalContent);
-                          }}
-                          className="flex gap-2"
-                        >
-                          <input
-                            type="text"
-                            value={editingGoalContent}
-                            onChange={(e) => setEditingGoalContent(e.target.value)}
-                            className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
-                            autoFocus
-                          />
-                          <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
-                          <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
-                        </form>
-                      ) : (
-                        <div className="flex items-start justify-between group/item">
-                          <span className={`text-sm leading-relaxed break-words ${weeklyOrOrphan.status === "completed" ? "line-through text-[var(--ink-muted)] opacity-60" : "text-[var(--ink-strong)]"}`}>
-                            {weeklyOrOrphan.content}
-                          </span>
-                          <div className="opacity-0 group-hover/item:opacity-100 flex gap-1.5 ml-2 shrink-0">
-                            <button
-                              onClick={() => {
-                                setEditingGoalId(weeklyOrOrphan.id);
-                                setEditingGoalContent(weeklyOrOrphan.content);
-                              }}
-                              className="text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-                              aria-label="Edit Item"
-                            >
-                              <PencilSimple size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleDismissGoal(weeklyOrOrphan.id)}
-                              className="text-[var(--ink-muted)] hover:text-red-500"
-                              aria-label="Dismiss Item"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                  <div key={weekly.id}>
+                    {renderOrphanRow(weekly)}
+                    {weeklyTasks.length > 0 && (
+                      <div className="pl-6 border-l border-dashed border-[var(--border)] ml-2.5 mt-1.5 space-y-1.5">
+                        {weeklyTasks.map((task) => renderOrphanRow(task, { nested: true }))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
+
+              {unassignedTasks.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">Unassigned tasks</p>
+                  <p className="mb-2 text-xs text-[var(--ink-muted)]">These steps are not under a goal yet.</p>
+                  <div className="space-y-1.5">{unassignedTasks.map((task) => renderOrphanRow(task))}</div>
+                </div>
+              )}
             </div>
           </article>
         )}
@@ -1321,64 +1231,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         </article>
       </div>
 
-      {/* Localized Sage Scaffolding Modal Helper */}
-      {sageModalGoal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border-strong)] rounded-2xl max-w-lg w-full p-6 shadow-xl relative animate-scale-pop">
-            <button
-              onClick={() => {
-                setSageModalGoal(null);
-                setSageResponse("");
-              }}
-              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-              aria-label="Close modal"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="flex items-center gap-2 mb-4">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                <Sparkle size={20} weight="fill" />
-              </span>
-              <div>
-                <h3 className="font-display text-lg text-[var(--ink-strong)]">Scaffolding with Sage</h3>
-                <p className="text-xs text-[var(--ink-muted)]">AI Coach guidance for breaking down your goal</p>
-              </div>
-            </div>
-
-            <div className="bg-indigo-50/30 dark:bg-indigo-950/10 p-3.5 rounded-xl border border-indigo-100/50 dark:border-indigo-950/40 mb-4">
-              <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">Goal Focus</p>
-              <p className="text-sm font-medium text-[var(--ink-strong)] mt-1 italic">
-                &ldquo;{sageModalGoal.content}&rdquo;
-              </p>
-            </div>
-
-            <div className="max-h-[300px] overflow-y-auto border border-[var(--border)] rounded-xl p-4 bg-[var(--surface-muted)] text-sm text-[var(--ink-strong)] leading-relaxed whitespace-pre-line">
-              {sageModalLoading && !sageResponse ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-[var(--ink-muted)]">
-                  <div className="h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-2" />
-                  <p className="text-xs">Sage is thinking of active steps for you...</p>
-                </div>
-              ) : (
-                sageResponse || "No suggestions received yet."
-              )}
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setSageModalGoal(null);
-                  setSageResponse("");
-                }}
-                className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--border)] transition-colors min-h-[48px] flex items-center justify-center"
-              >
-                Got it, thanks!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {sageModalGoal && <AskSageModal goal={sageModalGoal} onClose={() => setSageModalGoal(null)} />}
     </div>
   );
 }

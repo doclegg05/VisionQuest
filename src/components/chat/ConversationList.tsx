@@ -26,6 +26,66 @@ const STAGE_LABELS: Record<string, string> = {
   general: "General",
 };
 
+interface ConversationListItemProps {
+  conv: ConversationSummary;
+  isActive: boolean;
+  isDeleting: boolean;
+  onSelect: () => void;
+  onDelete: (event: React.MouseEvent) => void;
+}
+
+/**
+ * One row of the sidebar. The delete control is always visible in faint ink
+ * with a 44px target so it is reachable on touch; hover only adds emphasis
+ * (F45 / UX-06).
+ */
+export function ConversationListItem({ conv, isActive, isDeleting, onSelect, onDelete }: ConversationListItemProps) {
+  const label = conv.title || STAGE_LABELS[conv.stage] || conv.stage;
+  return (
+    <div
+      className={[
+        "group relative mb-1 rounded-xl transition-colors",
+        isActive ? "bg-[var(--chat-sidebar-active)]" : "hover:bg-[var(--chat-sidebar-hover)]",
+        isDeleting ? "opacity-50" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <button onClick={onSelect} type="button" disabled={isDeleting} className="w-full px-3 py-2.5 text-left">
+        <div className="flex items-start justify-between gap-2">
+          <span
+            className={[
+              "min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.12em]",
+              isActive ? "text-[var(--chat-sage-action)]" : "text-[var(--ink-muted)]",
+            ].join(" ")}
+          >
+            {STAGE_LABELS[conv.stage] || conv.stage}
+          </span>
+          {conv.active && (
+            <span
+              className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--accent-green)]"
+              aria-label="Active conversation"
+            />
+          )}
+        </div>
+        <p className="mt-1 line-clamp-2 break-words pr-11 text-sm font-medium leading-5 text-[var(--ink-strong)]">
+          {conv.title || "New conversation"}
+        </p>
+        <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{new Date(conv.updatedAt).toLocaleDateString()}</p>
+      </button>
+      <button
+        onClick={onDelete}
+        type="button"
+        disabled={isDeleting}
+        aria-label={`Delete conversation "${label}"`}
+        className="absolute right-1 top-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--ink-faint)] transition-colors hover:bg-[var(--badge-error-bg)] hover:text-[var(--badge-error-text)] focus-visible:text-[var(--badge-error-text)] disabled:cursor-not-allowed"
+      >
+        <Trash size={16} weight="regular" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 export default function ConversationList({
   onSelect,
   onNewChat,
@@ -116,63 +176,16 @@ export default function ConversationList({
             No conversations yet. Start one!
           </div>
         ) : (
-          conversations.map((conv) => {
-            const isActive = activeId === conv.id;
-            const isDeleting = deletingId === conv.id;
-            return (
-              <div
-                key={conv.id}
-                className={[
-                  "group relative mb-1 rounded-xl transition-colors",
-                  isActive
-                    ? "bg-[var(--chat-sidebar-active)]"
-                    : "hover:bg-[var(--chat-sidebar-hover)]",
-                  isDeleting ? "opacity-50" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <button
-                  onClick={() => onSelect(conv.id)}
-                  type="button"
-                  disabled={isDeleting}
-                  className="w-full px-3 py-2.5 text-left"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={[
-                        "min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.12em]",
-                        isActive ? "text-[var(--chat-sage-action)]" : "text-[var(--ink-muted)]",
-                      ].join(" ")}
-                    >
-                      {STAGE_LABELS[conv.stage] || conv.stage}
-                    </span>
-                    {conv.active && (
-                      <span
-                        className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--accent-green)]"
-                        aria-label="Active conversation"
-                      />
-                    )}
-                  </div>
-                  <p className="mt-1 line-clamp-2 break-words pr-7 text-sm font-medium leading-5 text-[var(--ink-strong)]">
-                    {conv.title || "New conversation"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                    {new Date(conv.updatedAt).toLocaleDateString()}
-                  </p>
-                </button>
-                <button
-                  onClick={(e) => handleDelete(e, conv)}
-                  type="button"
-                  disabled={isDeleting}
-                  aria-label={`Delete conversation "${conv.title || STAGE_LABELS[conv.stage] || conv.stage}"`}
-                  className="absolute right-1.5 top-1.5 rounded-lg p-1.5 text-[var(--ink-faint)] opacity-0 transition-all hover:bg-[var(--badge-error-bg)] hover:text-[var(--badge-error-text)] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
-                >
-                  <Trash size={15} weight="regular" aria-hidden="true" />
-                </button>
-              </div>
-            );
-          })
+          conversations.map((conv) => (
+            <ConversationListItem
+              key={conv.id}
+              conv={conv}
+              isActive={activeId === conv.id}
+              isDeleting={deletingId === conv.id}
+              onSelect={() => onSelect(conv.id)}
+              onDelete={(e) => handleDelete(e, conv)}
+            />
+          ))
         )}
       </div>
       {confirmDialog}
