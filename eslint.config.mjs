@@ -77,8 +77,29 @@ const studentAlertDirectRead = {
 // (src/lib/rls-context.ts). This catches the direct import only; a lib
 // module that imports the app client is caught when a test exercises the
 // path under RLS_CONTEXT_STRICT=true (CI).
+//
+// The globs cover PUBLIC and PRE-AUTH surfaces too, not just the scheduled
+// ones. The rule was written for cron and job handlers, and the public intake
+// and verification routes then landed OUTSIDE all three globs and repeated the
+// same class silently — the second time a sessionless handler has walked
+// around this guard. A route reachable without a session is exactly the case
+// the rule exists for, so it is listed here when it is added, not after the
+// next review finds it.
+//
+// Deliberately NOT listed: src/app/api/auth/**. Login has no session by
+// definition and must read Student to create one; whether that read works
+// under vq_app is a live question (see F7, "give dev a vq_app login"), and
+// flipping it to an error before that is answered would break the gate
+// without telling anyone anything true. Settle it, then add the glob.
 const appPrismaImportWithoutSession = {
-  files: ["src/app/api/internal/**", "src/app/api/cron/**", "src/lib/jobs-registry.ts"],
+  files: [
+    "src/app/api/internal/**",
+    "src/app/api/cron/**",
+    "src/app/api/intake/**",
+    "src/app/api/verify/**",
+    "src/lib/intake/**",
+    "src/lib/jobs-registry.ts",
+  ],
   rules: {
     "no-restricted-imports": [
       "error",
