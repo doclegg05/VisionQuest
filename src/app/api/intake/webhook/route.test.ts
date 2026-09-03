@@ -1,121 +1,119 @@
+/**
+ * The webhook is the staff-authenticated door into the same provisioning
+ * code. It may do things the public form may not — name a class, refresh an
+ * existing record, and receive the one-time temporary password — but it is
+ * still an API boundary, so a driver error must not travel back through it
+ * (review finding M4).
+ */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
-const provisionIntakeStudentMock = mock.fn() as any;
-mock.module("@/lib/intake/provision", {
-  namedExports: {
-    provisionIntakeStudent: provisionIntakeStudentMock,
-  },
-});
+mock.module("@/lib/auth", { namedExports: { getSession: async () => null } });
 
-mock.module("@/lib/auth", {
-  namedExports: {
-    getSession: mock.fn(async () => null),
-  },
+mock.module("@/lib/api-error", {
+  namedExports: { isStaffRole: (role: string) => role === "teacher" || role === "admin" },
 });
 
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { error: mock.fn(), info: mock.fn() },
+    logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
   },
+});
+
+let provisionResult: unknown = null;
+let provisionError: Error | null = null;
+const provisionMock = mock.fn(async () => {
+  if (provisionError) throw provisionError;
+  return provisionResult;
+});
+
+mock.module("@/lib/intake/provision", {
+  namedExports: { provisionIntakeStudent: provisionMock },
 });
 
 let route: typeof import("./route");
 
 before(async () => {
+  process.env.INTAKE_WEBHOOK_SECRET = "test-webhook-secret";
   route = await import("./route");
 });
 
-describe("POST /api/intake/webhook", () => {
-  // Dummy value for this test only — never a real credential. gitleaks:allow
-  const validSecret = "test-fixture-not-a-real-secret";
+const PAYLOAD = {
+  firstName: "Dana",
+  lastName: "Hall",
+  birthDate: "1988-02-03",
+  county: "Kanawha",
+};
 
-  beforeEach(() => {
-    process.env.INTAKE_WEBHOOK_SECRET = validSecret;
-    provisionIntakeStudentMock.mock.resetCalls();
-  });
-
-  function createRequest(options: { auth?: string; body?: unknown }) {
-    const headers: Record<string, string> = {
+function postWebhook(body: Record<string, unknown> = PAYLOAD): Request {
+  return new Request("http://localhost:3000/api/intake/webhook", {
+    method: "POST",
+    headers: {
       "Content-Type": "application/json",
-    };
-    if (options.auth) {
-      headers.authorization = options.auth;
-    }
-
-    return new Request("http://localhost:3000/api/intake/webhook", {
-      method: "POST",
-      headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : "{}",
-    });
-  }
-
-  it("rejects unauthorized request with 401 when no auth header provided", async () => {
-    const req = createRequest({ body: {} });
-    const res = await route.POST(req);
-    assert.equal(res.status, 401);
+      authorization: "Bearer test-webhook-secret",
+    },
+    body: JSON.stringify(body),
   });
+}
 
-  it("rejects unauthorized request with 401 when invalid secret is provided", async () => {
-    const req = createRequest({ auth: "Bearer wrong-secret", body: {} });
-    const res = await route.POST(req);
-    assert.equal(res.status, 401);
-  });
-
-  it("rejects invalid payload with 400 when required fields are missing", async () => {
-    const req = createRequest({
-      auth: `Bearer ${validSecret}`,
-      body: { firstName: "Jane" }, // Missing lastName, county, birthDate
-    });
-    const res = await route.POST(req);
-    assert.equal(res.status, 400);
-    const json = await res.json();
-    assert.equal(json.error, "Validation failed.");
-    assert.ok(Array.isArray(json.details));
-  });
-
-  it("accepts valid intake payload with valid secret and returns 201 Created", async () => {
-    provisionIntakeStudentMock.mock.mockImplementation(async (data: any) => ({
-      studentDbId: "db-student-123",
-      studentId: "marcus.miller",
-      displayName: `${data.firstName} ${data.lastName}`,
-      isExisting: false,
-      spokesRecordId: "spokes-rec-456",
-      classId: "class-789",
-      className: "Fayette County SPOKES",
+describe("POST /api/intake/webhook", () => {
+  beforeEach(() => {
+    provisionError = null;
+    provisionResult = {
+      outcome: "provisioned",
+      studentDbId: "stu_1",
+      studentId: "dana.hall",
+      displayName: "Dana Hall",
+      spokesRecordId: "spokes_1",
+      classId: "class_1",
+      className: "Kanawha County SPOKES",
       orientationInitialized: true,
-      pdfStorageKey: "orientation/db-student-123/packet.pdf",
-    }));
-
-    const validPayload = {
-      firstName: "Marcus",
-      lastName: "Miller",
-      email: "marcus.miller@example.com",
-      birthDate: "1998-05-20",
-      county: "Fayette",
-      householdType: "Single parent (1P)",
-      programTrack: "Healthcare / CNA",
-      tanfStatus: true,
-      ferpaConsentSigned: true,
-      policyAcknowledgmentSigned: true,
-      signatureName: "Marcus Miller",
+      temporaryPassword: "K7QM-2XPT-9RHF",
+      pdfStorageKey: "packet.pdf",
     };
+    provisionMock.mock.resetCalls();
+  });
 
-    const req = createRequest({
-      auth: `Bearer ${validSecret}`,
-      body: validPayload,
-    });
+  it("rejects an unauthenticated caller", async () => {
+    const res = await route.POST(
+      new Request("http://localhost:3000/api/intake/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(PAYLOAD),
+      }),
+    );
 
-    const res = await route.POST(req);
+    assert.equal(res.status, 401);
+  });
+
+  it("provisions as staff, not as the public form", async () => {
+    await route.POST(postWebhook());
+
+    const options = provisionMock.mock.calls[0]?.arguments[1] as { source?: string } | undefined;
+    assert.equal(options?.source, "staff");
+  });
+
+  it("hands the one-time temporary password to the authenticated caller", async () => {
+    const res = await route.POST(postWebhook());
+    const body = await res.json();
+
     assert.equal(res.status, 201);
-    const json = await res.json();
+    assert.equal(body.credentials.temporaryPassword, "K7QM-2XPT-9RHF");
+    assert.equal(body.credentials.mustChangePassword, true);
+  });
 
-    assert.equal(json.success, true);
-    assert.equal(json.student.studentId, "marcus.miller");
-    assert.equal(json.student.displayName, "Marcus Miller");
-    assert.equal(json.enrollment.className, "Fayette County SPOKES");
-    assert.equal(json.orientation.initialized, true);
-    assert.equal(json.orientation.packetStorageKey, "orientation/db-student-123/packet.pdf");
-    assert.equal(provisionIntakeStudentMock.mock.callCount(), 1);
+  it("returns a generic message when provisioning throws, with no driver detail", async () => {
+    provisionError = new Error(
+      'Invalid `prisma.spokesRecord.create()` invocation: Foreign key constraint failed on the field: `studentId`',
+    );
+
+    const res = await route.POST(postWebhook());
+    const body = await res.json();
+    const raw = JSON.stringify(body);
+
+    assert.equal(res.status, 500);
+    assert.ok(!raw.includes("prisma"), `response leaked Prisma internals: ${raw}`);
+    assert.ok(!raw.includes("Foreign key"), `response leaked the driver error: ${raw}`);
+    assert.ok(!("message" in body), `response carried a raw message field: ${raw}`);
   });
 });
