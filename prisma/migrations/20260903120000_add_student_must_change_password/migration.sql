@@ -14,3 +14,17 @@
 
 ALTER TABLE "visionquest"."Student"
   ADD COLUMN "mustChangePassword" BOOLEAN NOT NULL DEFAULT false;
+
+-- FileUpload.contentDigest: the digest of the stored bytes as the program
+-- recorded them at upload time, for /api/verify/document (bundle 4).
+--
+-- The verifier's job is to confirm the person presenting a document holds the
+-- one that was issued. Comparing against a digest carried by the presented
+-- token only confirms the token agrees with itself, which is most of what was
+-- wrong with the old check. Comparing against this column compares against the
+-- program's own record.
+--
+-- Nullable: every row that exists predates the column and has no recorded
+-- digest. A verifier must read NULL as "cannot verify", never as a match.
+
+ALTER TABLE "visionquest"."FileUpload" ADD COLUMN "contentDigest" TEXT;
