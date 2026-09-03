@@ -69,6 +69,18 @@ services:
         sync: false
       - key: CRON_SECRET
         generateValue: true
+      # Held by the external intake automation (Power Automate). Deliberately
+      # NOT CRON_SECRET: src/lib/csrf.ts has no fallback between them, so a
+      # leak on the vendor side cannot reach /api/internal/*. Generated here so
+      # the route is never unauthenticated-by-absence; read it out of the Render
+      # dashboard to configure the vendor.
+      - key: INTAKE_WEBHOOK_SECRET
+        generateValue: true
+      # Signs the QR verification tokens on issued intake packets
+      # (src/app/api/verify/document). Rotating it invalidates the QR codes on
+      # packets already printed, so treat it as long-lived.
+      - key: DOCUMENT_VERIFICATION_SECRET
+        generateValue: true
       - key: SENTRY_DSN
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN
