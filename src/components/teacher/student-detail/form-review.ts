@@ -26,39 +26,48 @@ export interface SignaturePadResult {
   signatureMethod: "drawn" | "uploaded";
 }
 
-/** Body for PATCH /api/teacher/students/[id]/forms. */
+/**
+ * Body for PATCH /api/teacher/students/[id]/forms.
+ *
+ * The counter-signature rides on the approval itself. It used to travel on a
+ * PATCH of its own, and the approval PATCH that followed carried no signature
+ * fields — so the route saw an approval with nothing attached and wrote a
+ * second, contradicting audit row over the first.
+ *
+ * No signer title is sent: the signature pad does not collect one, and the
+ * route records a title only when a person typed it.
+ */
 export function buildFormReviewBody(
   submissionId: string,
   status: "approved" | "rejected",
   notes: string,
-  _extras?: FormReviewExtras,
+  extras?: FormReviewExtras,
 ): Record<string, unknown> {
   return {
     submissionId,
     status,
     notes: notes || "",
+    ...(extras ?? {}),
   };
 }
 
-/** Approve a submission with the instructor's counter-signature attached. */
+/**
+ * Approve a submission with the instructor's counter-signature attached.
+ *
+ * Exactly one approval request, and it is the caller's — this must never
+ * issue a PATCH of its own again. The route URL belongs to the handler this
+ * delegates to, which is why no student id is needed here.
+ */
 export async function counterSignApproval(
-  studentId: string,
   submissionId: string,
   signature: SignaturePadResult,
   reviewForm: FormReviewHandler,
 ): Promise<void> {
-  await fetch(`/api/teacher/students/${studentId}/forms`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      submissionId,
-      status: "approved",
-      staffSignatureDataUrl: signature.signatureDataUrl,
-      staffSignatureName: signature.signatureName,
-      staffSignatureTitle: "SPOKES Lead Instructor",
-    }),
+  await reviewForm(submissionId, "approved", {
+    staffSignatureDataUrl: signature.signatureDataUrl,
+    staffSignatureName: signature.signatureName,
+    staffSignatureMethod: signature.signatureMethod,
   });
-  await reviewForm(submissionId, "approved");
 }
 
 /**

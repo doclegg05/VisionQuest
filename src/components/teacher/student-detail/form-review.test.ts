@@ -82,7 +82,7 @@ describe("counterSignApproval", () => {
   // overwritten with null seconds after it was drawn.
   it("issues exactly one approval request", async () => {
     const reviewForm = mock.fn(noopHandler);
-    await counterSignApproval("student-1", "sub-1", SIGNATURE, reviewForm);
+    await counterSignApproval("sub-1", SIGNATURE, reviewForm);
 
     assert.equal(reviewForm.mock.callCount(), 1);
     assert.equal(fetchCalls, 0, "counterSignApproval must not issue its own PATCH");
@@ -90,7 +90,7 @@ describe("counterSignApproval", () => {
 
   it("hands the captured signature to the review handler", async () => {
     const reviewForm = mock.fn(noopHandler);
-    await counterSignApproval("student-1", "sub-1", SIGNATURE, reviewForm);
+    await counterSignApproval("sub-1", SIGNATURE, reviewForm);
 
     const [submissionId, status, extras] = reviewForm.mock.calls[0].arguments;
     assert.equal(submissionId, "sub-1");
@@ -103,7 +103,7 @@ describe("counterSignApproval", () => {
       throw new Error("network down");
     };
     await assert.rejects(
-      () => counterSignApproval("student-1", "sub-1", SIGNATURE, reviewForm),
+      () => counterSignApproval("sub-1", SIGNATURE, reviewForm),
       /network down/,
     );
   });

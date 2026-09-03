@@ -133,7 +133,7 @@ export default function OperationsTab({
     if (!counterSignSubmission) return;
     setCounterSigning(true);
     try {
-      await counterSignApproval(student.id, counterSignSubmission.id, sig, onReviewForm);
+      await counterSignApproval(counterSignSubmission.id, sig, onReviewForm);
       setCounterSignSubmission(null);
       setPreviewSubmission(null);
     } finally {

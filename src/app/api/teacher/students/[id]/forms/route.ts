@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { logAuditEvent } from "@/lib/audit";
+import { tryLogAuditEvent } from "@/lib/audit";
 import { syncStudentAlerts } from "@/lib/advising";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { logger } from "@/lib/logger";
 import { awardEvent } from "@/lib/progression/events";
-import { withTeacherAuth } from "@/lib/api-error";
+import { withTeacherAuth, type Session } from "@/lib/api-error";
+import { parseBody } from "@/lib/schemas";
 
 export const GET = withTeacherAuth(async (
   session,
@@ -13,10 +15,10 @@ export const GET = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const managedStudent = await assertStaffCanManageStudent(session, id);
 
   const submissions = await prisma.formSubmission.findMany({
-    where: { studentId: id },
+    where: { studentId: managedStudent.id },
     orderBy: { createdAt: "desc" },
   });
 
@@ -36,21 +38,112 @@ export const GET = withTeacherAuth(async (
   return NextResponse.json({ submissions: enriched });
 });
 
+/**
+ * A drawn or uploaded signature arrives as a data URL. Bound it at the
+ * boundary: only raster image data URLs, and only up to 256 KB, so an
+ * arbitrary string can never be persisted as if it were a signature.
+ */
+const SIGNATURE_DATA_URL_MAX = 256 * 1024;
+
+const reviewFormSchema = z.object({
+  submissionId: z.string().trim().min(1, "submissionId is required.").max(100),
+  status: z.enum(["approved", "rejected"], {
+    message: "status must be approved or rejected.",
+  }),
+  notes: z.string().max(2000).optional().nullable(),
+  staffSignatureDataUrl: z
+    .string()
+    .max(SIGNATURE_DATA_URL_MAX, "Signature image is too large.")
+    .regex(
+      /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/,
+      "Signature must be a PNG or JPEG data URL.",
+    )
+    .optional()
+    .nullable(),
+  staffSignatureName: z.string().trim().max(150).optional().nullable(),
+  staffSignatureTitle: z.string().trim().max(100).optional().nullable(),
+  staffSignatureMethod: z.enum(["drawn", "uploaded"]).optional().nullable(),
+});
+
+type ReviewFormBody = z.infer<typeof reviewFormSchema>;
+
+/**
+ * What the instructor actually did, recorded from the authenticated session
+ * and the request — never defaulted to a plausible-looking name or title.
+ *
+ * The old code filled the gaps: `staffSignatureName || session.displayName ||
+ * "SPOKES Lead Instructor"` and a `staffSignatureTitle` that fell back to
+ * "SPOKES Instructional Coordinator", so a packet could carry a job title
+ * nobody in the building holds. A title is only recorded when the signer
+ * typed one, and an unnamed signature is refused rather than attributed.
+ */
+interface StaffCounterSignature {
+  signatureDataUrl: string;
+  signerName: string;
+  signerTitle: string | null;
+  method: "drawn" | "uploaded";
+  signedAt: string;
+  actorId: string;
+}
+
+function buildCounterSignature(
+  session: Session,
+  body: ReviewFormBody,
+): StaffCounterSignature | null {
+  if (!body.staffSignatureDataUrl) return null;
+
+  const signerName = (body.staffSignatureName || session.displayName || "").trim();
+  if (!signerName) return null;
+
+  return {
+    signatureDataUrl: body.staffSignatureDataUrl,
+    signerName,
+    signerTitle: body.staffSignatureTitle?.trim() || null,
+    method: body.staffSignatureMethod ?? "drawn",
+    signedAt: new Date().toISOString(),
+    actorId: session.id,
+  };
+}
+
+/**
+ * The audit summary says what happened on this request, not what the happy
+ * path would have done. It read "Approved and counter-signed" on every
+ * approval — including approvals with no signature at all, and including the
+ * ones where the packet regeneration threw and was swallowed by a catch.
+ */
+function describeReview(
+  formId: string,
+  status: "approved" | "rejected",
+  counterSignature: StaffCounterSignature | null,
+): string {
+  if (status === "rejected") {
+    return `Returned form submission ${formId} for revision.`;
+  }
+  if (counterSignature) {
+    const who = counterSignature.signerTitle
+      ? `${counterSignature.signerName}, ${counterSignature.signerTitle}`
+      : counterSignature.signerName;
+    return `Approved form submission ${formId} and recorded a counter-signature by ${who}.`;
+  }
+  return `Approved form submission ${formId}. No counter-signature was supplied.`;
+}
+
 export const PATCH = withTeacherAuth(async (
   session,
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
+  // Takes a db id OR a studentId username and resolves it. Everything
+  // downstream uses the resolved `studentDbId`: called with a username, the
+  // raw route param matches no `Student.id`, so the old code's ownership
+  // check, XP award and alert sync all silently addressed nothing while the
+  // audit row still reported success (M5).
   const managedStudent = await assertStaffCanManageStudent(session, id);
   const studentDbId = managedStudent.id;
 
-  const body = await req.json();
-  const { submissionId, status, notes, staffSignatureDataUrl, staffSignatureName, staffSignatureTitle } = body;
-
-  if (!submissionId || !["approved", "rejected"].includes(status)) {
-    return NextResponse.json({ error: "submissionId and valid status required." }, { status: 400 });
-  }
+  const body = await parseBody(req, reviewFormSchema);
+  const { submissionId, status } = body;
 
   // Verify submission belongs to this student
   const submission = await prisma.formSubmission.findFirst({
@@ -66,63 +159,53 @@ export const PATCH = withTeacherAuth(async (
       status,
       reviewedBy: session.id,
       reviewedAt: new Date(),
-      notes: notes || null,
+      notes: body.notes || null,
     },
   });
 
-  // If approved and it is an intake packet, re-generate stamped PDF with instructor counter-signature
-  if (status === "approved" && (submission.formId === "orientation-intake" || submission.formId === "student-intake")) {
-    try {
-      const { saveStampedIntakePacket } = await import("@/lib/intake/pdf-stamped-packet");
-      const studentRecord = await prisma.student.findUnique({
-        where: { id },
-        include: { spokesRecord: true },
-      });
-      if (studentRecord && studentRecord.spokesRecord) {
-        const sr = studentRecord.spokesRecord;
-        const intakePayload = {
-          firstName: sr.firstName || studentRecord.displayName.split(" ")[0] || "Student",
-          lastName: sr.lastName || studentRecord.displayName.split(" ").slice(1).join(" ") || "Participant",
-          birthDate: sr.birthDate ? sr.birthDate.toISOString().slice(0, 10) : "2000-01-01",
-          county: (sr.county as any) || "Nicholas",
-          email: sr.referralEmail || `${studentRecord.studentId}@example.com`,
-          phone: "(304) 555-0100",
-          gender: (sr.gender as any) || null,
-          race: sr.race || null,
-          ethnicity: sr.ethnicity || null,
-          householdType: (sr.householdType as any) || "Single adult",
-          educationalLevel: (sr.educationalLevel as any) || "High school equivalency (GED/HSE)",
-          tanfStatus: true,
-          programTrack: "Customer Service / Clerical",
-          signatureName: studentRecord.displayName,
-          signatureMethod: "drawn" as const,
-          staffSignatureName: staffSignatureName || session.displayName || "SPOKES Lead Instructor",
-          staffSignatureTitle: staffSignatureTitle || "SPOKES Instructional Coordinator",
-          staffSignatureDataUrl: staffSignatureDataUrl || null,
-          staffSignatureTimestamp: new Date().toISOString(),
-          staffClearanceStatus: "approved" as const,
-        };
-        await saveStampedIntakePacket(studentRecord.id, studentRecord.studentId, intakePayload);
-      }
-    } catch (err) {
-      logger.error("Failed to re-generate counter-signed intake packet", { error: String(err) });
-    }
-  }
+  const counterSignature = status === "approved" ? buildCounterSignature(session, body) : null;
 
-  await logAuditEvent({
+  // The packet is NOT regenerated here, deliberately.
+  //
+  // Approving used to re-render the stamped intake PDF and save it over the
+  // student's real packet, with `tanfStatus: true` hardcoded, a synthesized
+  // `${studentId}@example.com` address, a literal "(304) 555-0100" phone, a
+  // "Nicholas" county fallback, a `householdType` of "Single adult" that is
+  // not a member of the enum (an `as any` hid it), and
+  // `signatureMethod: "drawn"` — asserting that the student had drawn a
+  // signature. For a state-audited TANF program that is a forged compliance
+  // record overwriting a genuine one.
+  //
+  // Regenerating cannot be made safe from here, and the reason is structural
+  // rather than a matter of sourcing the fields better: nothing persists the
+  // student's own signature evidence. `saveStampedIntakePacket` writes
+  // demographics to FormResponse.answers and stops, so signatureName,
+  // signatureTimestamp, signatureDataUrl, signatureMethod, signatureIp and
+  // signatureAuditHash exist only inside the already-rendered PDF bytes. Any
+  // re-render therefore destroys the student's signature block and has to
+  // invent a replacement. It is never "strictly better-sourced".
+  //
+  // So the counter-signature is recorded as an attestation on the audit
+  // trail — who signed, under what title, when, by what method, and the
+  // image itself as evidence of the act. Putting the instructor's mark onto
+  // the packet needs an append-a-page helper in src/lib/intake/ that reads
+  // the existing bytes and never re-derives student data; this route already
+  // builds the object such a helper would take.
+  const { audited } = await tryLogAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     action: `teacher.form.${status}`,
     targetType: "form_submission",
     targetId: submissionId,
-    summary: `${status === "approved" ? "Approved and counter-signed" : "Rejected"} form submission for ${submission.formId}.`,
+    summary: describeReview(submission.formId, status, counterSignature),
+    metadata: counterSignature ? { counterSignature } : null,
   });
 
   // Award XP for approved form submissions
   if (status === "approved") {
     try {
       await awardEvent({
-        studentId: id,
+        studentId: studentDbId,
         eventType: "form_approved",
         sourceType: "form",
         sourceId: submission.id,
@@ -134,7 +217,14 @@ export const PATCH = withTeacherAuth(async (
     }
   }
 
-  await syncStudentAlerts(id);
+  await syncStudentAlerts(studentDbId);
 
-  return NextResponse.json({ submission: updated });
+  return NextResponse.json({
+    submission: updated,
+    // The audit row is the only place the counter-signature is kept, so a
+    // failed audit write means the signature was not recorded. Say so rather
+    // than letting the instructor believe they counter-signed.
+    audited,
+    counterSignatureRecorded: Boolean(counterSignature) && audited,
+  });
 });
