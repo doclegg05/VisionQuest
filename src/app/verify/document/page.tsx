@@ -24,7 +24,7 @@ interface VerificationSuccess {
   verified: true;
   documentType: string;
   issuedAt: string;
-  documentDigest: string;
+  documentDigest: string | null;
   issuingAgency: string;
   legalStandard: string;
 }
@@ -158,20 +158,23 @@ function VerifyContent() {
           </p>
         </div>
 
-        {/* Document fingerprint */}
-        <div className="rounded-xl border border-slate-200 bg-slate-900 p-4 text-white">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
-            <Fingerprint size={16} weight="bold" /> Document fingerprint (SHA-256)
-          </p>
-          <p className="mt-1.5 select-all break-all font-mono text-xs text-slate-300">
-            {data.documentDigest}
-          </p>
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-            This is the SHA-256 fingerprint of the PDF file this program issued. It matches the
-            fingerprint printed on the document. If the two differ, the file you have is not the one
-            we issued.
-          </p>
-        </div>
+        {/* Document fingerprint. Rendered only when we actually hold one — an
+            empty seal is the failure mode this page was rewritten to remove. */}
+        {data.documentDigest && (
+          <div className="rounded-xl border border-slate-200 bg-slate-900 p-4 text-white">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+              <Fingerprint size={16} weight="bold" /> Document fingerprint (SHA-256)
+            </p>
+            <p className="mt-1.5 select-all break-all font-mono text-xs text-slate-300">
+              {data.documentDigest}
+            </p>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+              This is the SHA-256 fingerprint of the PDF file this program issued. It matches the
+              fingerprint printed on the document. If the two differ, the file you have is not the
+              one we issued.
+            </p>
+          </div>
+        )}
 
         {/* What this page does not tell you */}
         <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-xs leading-relaxed text-slate-600">

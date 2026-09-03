@@ -31,7 +31,13 @@ function signToken(payload: Record<string, unknown>, secret = TEST_SECRET): stri
 }
 
 function validPayload() {
-  return { v: 1, fid: FILE_UPLOAD_ID, dig: PDF_DIGEST, iat: 1756900000 };
+  return { v: 1, fid: FILE_UPLOAD_ID, iat: 1756900000, dig: PDF_DIGEST };
+}
+
+/** What the issuer can actually stamp into a QR that lives inside the file it
+ *  is describing: the record id, and no digest of bytes that do not exist yet. */
+function payloadWithoutDigest() {
+  return { v: 1, fid: FILE_UPLOAD_ID, iat: 1756900000 };
 }
 
 /** A FileUpload row joined to its student, as the leaky route selected it. */
@@ -218,6 +224,28 @@ describe("document verifier — signed tokens", () => {
       (recordedQueries[0] as { where?: unknown }).where,
       { id: FILE_UPLOAD_ID },
     );
+  });
+
+  it("verifies a token that carries no digest", async () => {
+    const res = await get(`token=${encodeURIComponent(signToken(payloadWithoutDigest()))}`);
+    const { raw, json } = await body(res);
+
+    assert.equal(res.status, 200);
+    assert.equal(json.verified, true);
+    assert.equal(json.documentDigest, null, "absent, not invented");
+    assertNoPii(raw);
+  });
+
+  it("refuses a token whose digest is not a SHA-256", async () => {
+    // A free-text field on the token would put attacker-chosen copy on a page
+    // that carries two statutes.
+    const res = await get(
+      `token=${encodeURIComponent(
+        signToken({ ...payloadWithoutDigest(), dig: "SEE https://evil.example" }),
+      )}`,
+    );
+    const { json } = await body(res);
+    assert.equal(json.verified, false);
   });
 
   it("refuses a token whose payload was edited after signing", async () => {

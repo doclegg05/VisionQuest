@@ -36,21 +36,32 @@ import { studentLogKey } from "@/lib/log-keys";
  *
  *   vqd1.<base64url(payload JSON)>.<base64url(HMAC-SHA256)>
  *
- * payload: { v: 1, fid: <FileUpload id>, dig: <lowercase hex SHA-256 of the
- * finished PDF bytes>, iat: <unix seconds> }
+ * payload: { v: 1, fid: <FileUpload id>, iat: <unix seconds>, dig?: <lowercase
+ * hex SHA-256> }
  *
  * The MAC is taken over the string "vqd1.<payload segment>" — the encoded
  * segment, not the re-serialized object, so no canonicalization question
  * arises — and the version prefix is inside the MAC so a later v2 cannot be
- * downgraded to v1. Key: DOCUMENT_VERIFICATION_SECRET. Absent, the verifier
- * refuses everything and says so at error level; it never falls back to a
- * shared secret, and it never falls back to "looks about right".
+ * downgraded to v1. Key: DOCUMENT_VERIFICATION_SECRET. Absent or shorter than
+ * a real key, the verifier refuses everything and says so at error level; it
+ * never falls back to a shared secret, and it never falls back to "looks about
+ * right".
  *
- * The digest travels inside the signed token rather than being read back from
- * a column, because no column holds it yet. When one exists, compare
- * payload.dig against the stored value here and refuse on mismatch — that
- * turns the digest from "what the issuer asserted" into "what the issuer
- * recorded", and is the last hardening step this design is waiting on.
+ * --- Why the digest is NOT required in the token ---
+ *
+ * The QR is printed inside the packet, so the token has to exist before the
+ * final bytes do. A "SHA-256 of the finished PDF" carried inside that same PDF
+ * is circular and cannot be produced. The issuer therefore stamps a QR binding
+ * only the record id, and the digest of the finished file is computed after
+ * rendering and PERSISTED — which is also the stronger arrangement, because
+ * the verifier then reports what the program recorded rather than what the
+ * token asserted, and a holder can recompute SHA-256 over the file they have
+ * and compare.
+ *
+ * That column does not exist yet, so `dig` is accepted as an interim
+ * issuer-assertion. When FileUpload grows a content-digest column, select it
+ * below and prefer it over payload.dig — one line, and the promise on the page
+ * gets stronger without the page copy changing.
  *
  * There is no expiry. A signed paper packet does not stop having been issued,
  * so liveness comes from the record lookup below: delete the FileUpload (a
@@ -101,8 +112,11 @@ const LEGAL_STANDARD =
 const tokenPayloadSchema = z.object({
   v: z.literal(1),
   fid: z.string().min(1).max(64),
-  dig: z.string().regex(/^[0-9a-f]{64}$/),
   iat: z.number().int().nonnegative(),
+  // Optional, and deliberately so — see "Why the digest is NOT required in the
+  // token" above. Rejected outright unless it is a real SHA-256, so a token can
+  // never put arbitrary text on the page.
+  dig: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });
 
 type TokenPayload = z.infer<typeof tokenPayloadSchema>;
@@ -214,11 +228,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // When FileUpload carries a stored content digest, read it here and prefer it
+  // over the token's — the recorded value outranks the asserted one.
+  const documentDigest = payload.dig ?? null;
+
   return NextResponse.json({
     verified: true,
     documentType: DOCUMENT_TYPE_LABELS[record.category] ?? GENERIC_DOCUMENT_TYPE,
     issuedAt: record.uploadedAt.toISOString(),
-    documentDigest: payload.dig,
+    documentDigest,
     issuingAgency: ISSUING_AGENCY,
     legalStandard: LEGAL_STANDARD,
   });
