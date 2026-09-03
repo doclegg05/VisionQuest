@@ -7,6 +7,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import { parseBody, registerStaffSchema } from "@/lib/schemas";
+import { promoteTeacherToAdmin, PROMOTION_IGNORED_FIELDS } from "@/lib/promote-staff-account";
 
 function normalizeKey(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -15,6 +16,12 @@ function normalizeKey(value: unknown): string {
 
 const TEACHER_KEY = normalizeKey(process.env.TEACHER_KEY || "");
 const ADMIN_KEY = normalizeKey(process.env.ADMIN_KEY || "");
+
+/** Shown verbatim by src/app/teacher-register/page.tsx; kept at a 6th-grade reading level. */
+const PROMOTION_MESSAGE =
+  "This teacher account is now an admin. We did not change the password or the name. " +
+  "The account keeps its current password and MFA. All open sessions for this account were signed out. " +
+  "Sign in with the current password to continue.";
 
 function timingSafeCompare(a: string, b: string): boolean {
   const bufA = crypto.createHmac("sha256", "vq-key-compare").update(a).digest();
@@ -49,7 +56,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ip,
       role,
       providedLength: registrationKey.length,
-      configuredLength: expectedKey.length,
     });
     return NextResponse.json({ error: `Invalid ${role} registration key.` }, { status: 403 });
   }
@@ -60,36 +66,40 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const existing = await prisma.student.findFirst({
     where: { OR: [{ studentId }, { email }] },
-    select: { id: true, studentId: true, email: true, role: true, sessionVersion: true, displayName: true },
+    select: {
+      id: true,
+      studentId: true,
+      email: true,
+      role: true,
+      sessionVersion: true,
+      displayName: true,
+      isActive: true,
+      offboardedAt: true,
+    },
   });
 
-  // Admin registration can promote an existing teacher account
-  if (existing && existing.email === email && role === "admin" && existing.role === "teacher") {
-    const { hash } = hashPassword(password);
-    const promoted = await prisma.student.update({
-      where: { id: existing.id },
-      data: { role: "admin", passwordHash: hash, displayName },
-    });
+  // Admin registration can promote an existing, active teacher account.
+  // ADMIN_KEY is a shared registration secret, not an authenticated identity,
+  // so promotion changes the role and nothing else (see promoteTeacherToAdmin;
+  // review F11 / SEC-05). Inactive or offboarded rows fall through to the 409
+  // below rather than becoming dormant admin rows.
+  const promotable =
+    existing !== null &&
+    existing.email === email &&
+    existing.role === "teacher" &&
+    existing.isActive &&
+    existing.offboardedAt === null;
+  if (existing && promotable && role === "admin") {
+    const promoted = await promoteTeacherToAdmin({ accountId: existing.id, ip });
 
-    await setSessionCookie(promoted.id, promoted.role, existing.sessionVersion);
-
-    await logAuditEvent({
-      actorId: promoted.id,
-      actorRole: promoted.role,
-      action: "auth.promote_to_admin",
-      targetType: "student",
-      targetId: promoted.id,
-      summary: `Teacher promoted to admin: ${promoted.displayName} (${email}).`,
-      metadata: { ip },
-    });
-
+    // id and role only: the key holder is not authenticated as anyone, so the
+    // response carries nothing about the account beyond what they supplied.
     return NextResponse.json({
-      student: {
-        id: promoted.id,
-        studentId: promoted.studentId,
-        displayName: promoted.displayName,
-        role: promoted.role,
-      },
+      student: { id: promoted.id, role: promoted.role },
+      promoted: true,
+      sessionIssued: false,
+      ignoredFields: [...PROMOTION_IGNORED_FIELDS],
+      message: PROMOTION_MESSAGE,
     });
   }
 
@@ -113,7 +123,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     action: `auth.register_${role}`,
     targetType: "student",
     targetId: account.id,
-    summary: `New ${role} registered: ${account.displayName} (${account.email}).`,
+    // Identifiers belong in targetId, not the summary.
+    summary: `New ${role} registered.`,
     metadata: { ip },
   });
 
