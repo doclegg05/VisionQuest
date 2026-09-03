@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  crisisResourceBlockFor,
   ensureCrisisResources,
   CRISIS_RESOURCE_BLOCK,
   CRISIS_RESOURCE_BLOCK_ES,
@@ -110,5 +111,52 @@ describe("ensureCrisisResources — Spanish localization", () => {
       "estoy muy cansado de todo, i want to end it all",
     );
     assert.equal(result, CRISIS_RESOURCE_BLOCK);
+  });
+});
+
+describe("crisisResourceBlockFor — block from an already-computed detection", () => {
+  // The send route detects once per request and reuses the result on every
+  // exit (503, 429, stream error, success), so the block must be derivable
+  // from the detection alone — no second scan of the message.
+  it("returns null for a null detection (staff chat never detects)", () => {
+    assert.equal(crisisResourceBlockFor(null, ""), null);
+  });
+
+  it("returns null when nothing matched", () => {
+    assert.equal(crisisResourceBlockFor({ matched: false, category: null, lang: null }, ""), null);
+  });
+
+  it("returns the English block for an English match against an empty reply", () => {
+    assert.equal(
+      crisisResourceBlockFor({ matched: true, category: "self_harm", lang: "en" }, ""),
+      CRISIS_RESOURCE_BLOCK,
+    );
+  });
+
+  it("returns the Spanish block for a Spanish match", () => {
+    assert.equal(
+      crisisResourceBlockFor({ matched: true, category: "self_harm", lang: "es" }, ""),
+      CRISIS_RESOURCE_BLOCK_ES,
+    );
+  });
+
+  it("returns null when the reply already carries 988 (no duplicate block)", () => {
+    assert.equal(
+      crisisResourceBlockFor(
+        { matched: true, category: "self_harm", lang: "en" },
+        "Please call or text 988 right now.",
+      ),
+      null,
+    );
+  });
+
+  it("agrees with ensureCrisisResources for the same message and reply", () => {
+    const reply = "I hear you, that sounds really hard.";
+    const message = "I just want to end it all";
+    // ensureCrisisResources is the detect-then-derive composition of this helper.
+    assert.equal(
+      ensureCrisisResources(reply, message),
+      crisisResourceBlockFor({ matched: true, category: "self_harm", lang: "en" }, reply),
+    );
   });
 });

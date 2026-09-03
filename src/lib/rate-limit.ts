@@ -173,6 +173,36 @@ export async function rateLimit(
 }
 
 /**
+ * Give back one unit that `rateLimit()` consumed for `key`, but only in the
+ * window it was consumed from: `resetTime` is the value the consuming call
+ * returned, and a row whose window has since rolled over is left alone. The
+ * counter never goes below zero.
+ *
+ * One statement, never throws. A refund that fails leaves the unit consumed,
+ * which is the safe direction for a limiter; the failure is logged at warn
+ * with the key family only (same rule as the fail-open log above).
+ *
+ * Exists for the chat route, which must consume before the model call (host
+ * protection) but should not charge a turn whose only outcome was a confirm
+ * card the student can decline without any server round trip.
+ */
+export async function refundRateLimit(key: string, resetTime: number): Promise<void> {
+  const now = new Date();
+  try {
+    await prisma.$executeRaw`
+      UPDATE "visionquest"."RateLimitEntry"
+      SET "count" = GREATEST("count" - 1, 0), "updatedAt" = ${now}
+      WHERE "key" = ${key} AND "resetTime" = ${new Date(resetTime)}
+    `;
+  } catch (error) {
+    logger.warn("Rate limit refund failed — unit stays consumed", {
+      keyFamily: key.split(":")[0],
+      error: String(error),
+    });
+  }
+}
+
+/**
  * Daily rate limit with calendar-day window (resets at midnight UTC).
  * Returns the same RateLimitResult shape as rateLimit().
  */

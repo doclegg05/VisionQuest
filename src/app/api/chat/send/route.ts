@@ -1,6 +1,6 @@
 import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
-import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDaily, refundRateLimit } from "@/lib/rate-limit";
 import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
@@ -29,12 +29,15 @@ import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
-import { ensureCrisisResources } from "@/lib/chat/crisis-safety-net";
+import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
+import { detectCrisisSignal } from "@/lib/sage/crisis-detection";
 import {
   assembleStudentContextBundle,
   selfMetricLineFromBundle,
+  type AlertSummary,
 } from "@/lib/sage/context-bundle";
+import { STUDENT_VISIBLE_ALERT_TYPES } from "@/lib/student-alerts";
 import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
 import { renderRecentActivity } from "@/lib/sage/recent-activity";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
@@ -56,6 +59,32 @@ import { studentLogKey } from "@/lib/log-keys";
 // ─── Route handler ──────────────────────────────────────────────────────────
 
 const CHAT_SSE_HEARTBEAT_MS = 15_000;
+
+/**
+ * Ceiling on a persisted assistant message so a model that goes off the
+ * rails cannot produce an unbounded DB write (40k chars ≈ 10k tokens).
+ */
+const MAX_ASSISTANT_CHARS = 40_000;
+const TRUNCATED_REPLY_SUFFIX = "\n[…truncated by server — response exceeded length cap]";
+/**
+ * Appended to a partial reply persisted after a mid-stream failure, so the
+ * transcript stays two-sided and the student can see why it stops short.
+ * Student-facing copy: keep it plain (grade-6 reading level).
+ */
+const INTERRUPTED_REPLY_SUFFIX = "\n\n[Sage got cut off here. Send your message again to keep going.]";
+
+/** Prisma's `code` on a known-request error, when present; nothing else is read. */
+function prismaErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+  const code = (error as { code: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function capForPersist(text: string): string {
+  return text.length > MAX_ASSISTANT_CHARS
+    ? text.slice(0, MAX_ASSISTANT_CHARS) + TRUNCATED_REPLY_SUFFIX
+    : text;
+}
 
 const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|yeah|nah|yup|hm|hmm|wow|oh|ah|lol|haha|bye|goodbye|cya)[!.,?]*$/i;
 
@@ -89,6 +118,21 @@ function getDirectSmallTalkAnswer(message: string): string | null {
     return "You're welcome. Send me the next thing you want help with when you're ready.";
   }
   return null;
+}
+
+const STUDENT_VISIBLE_ALERT_TYPE_SET: ReadonlySet<string> = new Set(STUDENT_VISIBLE_ALERT_TYPES);
+
+/**
+ * Alert descriptors a student may read. bundle.alerts is built from the
+ * staff-facing advising descriptors (inactivity stages say "consider
+ * archiving", certification stalls name the instructor's next step), and
+ * without this filter those lines reached the student's own Sage prompt. Only
+ * the types whose copy is written for the student pass (the same set the
+ * Advising page shows). With today's bundle inputs — no tasks or appointments
+ * are passed to the descriptor builder — that is no alerts at all.
+ */
+function studentVisibleAlerts(alerts: readonly AlertSummary[] | undefined): AlertSummary[] {
+  return (alerts ?? []).filter((alert) => STUDENT_VISIBLE_ALERT_TYPE_SET.has(alert.type));
 }
 
 function formatStreamErrorForClient(message: string, cause?: string): string {
@@ -202,6 +246,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       userMessage,
     });
   }
+  // The student-facing 988 block for every exit below. The scan above keeps
+  // its detection to itself (it only raises the staff alert), so this is the
+  // one extra detection per request; no path detects again. Staff: null.
+  const crisisSignal = isStaffChat ? null : detectCrisisSignal(userMessage);
+  /** `text` plus the 988 block when the message carried a crisis signal. */
+  const withCrisisResources = (text: string): string =>
+    text + (crisisResourceBlockFor(crisisSignal, "") ?? "");
 
   // Deterministic form lookup — bypasses discovery/goal stage prompts so a
   // student who asks for a form gets it even mid-onboarding.
@@ -214,12 +265,15 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const directSmallTalkAnswer = getDirectSmallTalkAnswer(userMessage);
 
   if (directFormAnswer) {
+    // A crisis message that also names a form exits here without a model
+    // call; the 988 block rides on the reply the same as every other exit.
+    const reply = withCrisisResources(directFormAnswer);
     const conversation = isStaffChat
       ? await getOrCreateTeacherConversation(session.id, conversationId)
       : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
     await saveMessage(conversation.id, session.id, "user", userMessage);
-    await saveMessage(conversation.id, session.id, "assistant", directFormAnswer);
+    await saveMessage(conversation.id, session.id, "assistant", reply);
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -233,11 +287,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       providerClass: "none",
       allowCloud: true,
       inputChars: userMessage.length,
-      outputChars: directFormAnswer.length,
+      outputChars: reply.length,
       reason: "Matched a public blank-form request in the deterministic SPOKES form registry.",
     });
 
-    return createSseResponse(conversation.id, directFormAnswer);
+    return createSseResponse(conversation.id, reply);
   }
 
   // Agent mode: same high-confidence form match, but emit present_form action
@@ -257,10 +311,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       args: { query: top.form.id },
     });
     const morePending = directFormMatches.length > 1;
-    const reply =
+    // Same no-model exit as above: the 988 block rides on the reply.
+    const reply = withCrisisResources(
       record.result.status === "success"
         ? formCommitmentReply(top.form.title, morePending)
-        : record.result.summary;
+        : record.result.summary,
+    );
 
     await saveMessage(conversation.id, session.id, "assistant", reply);
     await logAiAuditEvent({
@@ -350,9 +406,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
     return new Response(
       JSON.stringify({
-        error: isOffline
-          ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
-          : "Sage is temporarily unavailable. Please try again in a moment.",
+        error: withCrisisResources(
+          isOffline
+            ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
+            : "Sage is temporarily unavailable. Please try again in a moment.",
+        ),
       }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
@@ -388,6 +446,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // See code review finding 2026-05-08 (Sprint 1 Bundle #5 / Task A).
   const isCloudProvider = provider.name === "gemini";
   let dailyRemaining: number | null = null;
+  // Units this request consumed, each with the window it was consumed from,
+  // so a turn whose only outcome is a confirm card can give them back (see
+  // the refund after generation below). Degraded (fail-open) results have no
+  // row to refund and are not recorded.
+  let consumedChatLimits: ReadonlyArray<{ key: string; resetTime: number }> = [];
 
   // The dev-only switch and its production guard live in rate-limit-switch.ts.
   if (!rateLimitsDisabled()) {
@@ -402,24 +465,38 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     // mirror the previous cloud-only configuration (student 40, teacher 60,
     // admin 120) so behavior is unchanged for the cloud path.
     const hourlyLimit = isStaffChat ? (session.role === "admin" ? 120 : 60) : 40;
-    const hourlyRl = await rateLimit(`chat:${session.id}`, hourlyLimit, 60 * 60 * 1000);
+    const hourlyKey = `chat:${session.id}`;
+    const hourlyRl = await rateLimit(hourlyKey, hourlyLimit, 60 * 60 * 1000);
     if (!hourlyRl.success) {
       return new Response(
-        JSON.stringify({ error: "Too many messages this hour. Please wait before sending more." }),
+        JSON.stringify({
+          error: withCrisisResources("Too many messages this hour. Please wait before sending more."),
+        }),
         { status: 429 },
       );
+    }
+    if (!hourlyRl.degraded) {
+      consumedChatLimits = [...consumedChatLimits, { key: hourlyKey, resetTime: hourlyRl.resetTime }];
     }
 
     // Daily limit by role (calendar-day, resets midnight UTC). Cloud-only
     // because the daily cap exists to bound API spend, not host load.
     if (isCloudProvider && session.role !== "admin") {
       const dailyLimit = isStaffChat ? 400 : 200;
-      const dailyRl = await rateLimitDaily(`chat-daily:${session.id}`, dailyLimit);
+      const dailyKey = `chat-daily:${session.id}`;
+      const dailyRl = await rateLimitDaily(dailyKey, dailyLimit);
       if (!dailyRl.success) {
         return new Response(
-          JSON.stringify({ error: "I've reached my daily limit. I'll be fresh and ready tomorrow! For urgent questions, please ask your instructor." }),
+          JSON.stringify({
+            error: withCrisisResources(
+              "I've reached my daily limit. I'll be fresh and ready tomorrow! For urgent questions, please ask your instructor.",
+            ),
+          }),
           { status: 429 },
         );
+      }
+      if (!dailyRl.degraded) {
+        consumedChatLimits = [...consumedChatLimits, { key: dailyKey, resetTime: dailyRl.resetTime }];
       }
       dailyRemaining = dailyRl.remaining;
     }
@@ -431,7 +508,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     : { allowed: true, warning: null };
   if (!quota.allowed) {
     return new Response(
-      JSON.stringify({ error: quota.warning }),
+      JSON.stringify({ error: withCrisisResources(quota.warning ?? "") }),
       { status: 429, headers: { "Content-Type": "application/json" } },
     );
   }
@@ -594,7 +671,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     if (conversationStage !== "discovery") {
       recentActivityBlock = renderRecentActivity({
         events: bundle.recentEvents,
-        alerts: bundle.alerts,
+        alerts: studentVisibleAlerts(bundle.alerts),
       });
     }
   }
@@ -768,6 +845,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     async start(controller) {
       let streamClosed = false;
       let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+      // A confirm card was proposed this turn. The card's Skip is client-only
+      // (no server round trip), so "declined" is never observable here; the
+      // chat limit is instead given back once the turn completes. Set from
+      // the one place every action event passes through.
+      let confirmCardProposed = false;
 
       const enqueueSse = (payload: string, label: string): boolean => {
         if (streamClosed) return false;
@@ -786,6 +868,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       };
 
       const sendEvent = (event: Parameters<typeof formatChatSseEvent>[0], label: string): void => {
+        if (event.type === "action" && event.action === "confirm_tool") {
+          confirmCardProposed = true;
+        }
         if (!enqueueSse(formatChatSseEvent(event), label)) {
           throw new ChatSseClientClosedError();
         }
@@ -1016,9 +1101,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
                 },
                 "action",
               );
+            } else if (event.type === "agent_stop" && event.reason === "error") {
+              // runAgentTurn catches the provider failure itself and reports
+              // it as agent_stop { reason: "error" }, so this loop would
+              // otherwise end normally and a cut-off reply would be persisted,
+              // audited, and rewarded as complete. Throw so the catch below
+              // runs: cut-off marker, 988 block, error event, no XP.
+              throw new Error("The reply stopped before it finished. Please send your message again.");
             }
-            // agent_stop events are internal — chat route drives done/error
-            // via the surrounding try/catch + sendEvent({ done: true }) below.
+            // Other agent_stop reasons (complete, max_hops) are internal —
+            // the route drives done via sendEvent({ done: true }) below.
           }
         } else if (useNonStreaming) {
           fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages);
@@ -1037,19 +1129,28 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         // the reply itself, and folded into fullResponse BEFORE persisting so
         // conversation history matches exactly what the student saw.
         if (!isStaffChat) {
-          const crisisBlock = ensureCrisisResources(fullResponse, userMessage);
+          const crisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse);
           if (crisisBlock) {
             fullResponse += crisisBlock;
             sendEvent({ type: "text", text: crisisBlock }, "text");
           }
         }
 
-        // Save assistant message (truncate to avoid unbounded DB writes if the
-        // model goes off the rails — 40k chars ≈ 10k tokens, generous ceiling).
-        const MAX_ASSISTANT_CHARS = 40_000;
-        const persisted = fullResponse.length > MAX_ASSISTANT_CHARS
-          ? fullResponse.slice(0, MAX_ASSISTANT_CHARS) + "\n[…truncated by server — response exceeded length cap]"
-          : fullResponse;
+        // The chat units were consumed BEFORE the model call (the limiter
+        // above; host protection is unchanged). This gives them back when the
+        // completed turn's outcome is a confirm card, since the student can
+        // decline the card with nothing having happened. Bound: proposals
+        // count against the executor's per-tool consequential limit (10
+        // student tools x 5/day), so at most 50 refunded turns per student
+        // per day on top of the hourly cap. Never throws.
+        if (confirmCardProposed && consumedChatLimits.length > 0) {
+          await Promise.all(
+            consumedChatLimits.map(({ key, resetTime }) => refundRateLimit(key, resetTime)),
+          );
+        }
+
+        // Save assistant message (capped — see capForPersist).
+        const persisted = capForPersist(fullResponse);
         if (persisted.length !== fullResponse.length) {
           logger.warn("Assistant message truncated before persist", {
             conversationId: conversation.id,
@@ -1145,6 +1246,32 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         } else {
           logger.error("Stream error", logPayload);
         }
+        // 988 for the student in the moment, on the error event and in the
+        // persisted partial alike; skipped when the streamed text already
+        // carries it. Decided once here for both uses.
+        const crisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse) ?? "";
+        // Keep the transcript two-sided: persist whatever Sage streamed
+        // before the failure, marked so the student knows it was cut off.
+        // A failed persist is logged and never hides the original error
+        // from the client below.
+        if (fullResponse.length > 0) {
+          try {
+            await saveMessage(
+              conversation.id,
+              session.id,
+              "assistant",
+              capForPersist(fullResponse) + INTERRUPTED_REPLY_SUFFIX + crisisBlock,
+            );
+          } catch (persistError) {
+            // Name and Prisma code only: a Prisma validation error quotes the
+            // invocation, which would put the reply text in the log.
+            logger.error("Failed to persist interrupted reply", {
+              conversationId: conversation.id,
+              errorName: persistError instanceof Error ? persistError.name : typeof persistError,
+              code: prismaErrorCode(persistError),
+            });
+          }
+        }
         await logAiAuditEvent({
           actorId: session.id,
           actorRole: session.role,
@@ -1170,7 +1297,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         });
         if (!clientClosed) {
           try {
-            sendEvent({ error: formatStreamErrorForClient(msg, cause) }, "error");
+            sendEvent({ error: formatStreamErrorForClient(msg, cause) + crisisBlock }, "error");
           } catch {
             // The client went away while we were reporting the original error.
           }

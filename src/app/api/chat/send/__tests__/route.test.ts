@@ -25,6 +25,7 @@ let toolCapturedBy_withRegistry: string | null = null;
 
 const mockRateLimit = mock.fn() as any;
 const mockRateLimitDaily = mock.fn() as any;
+const mockRefundRateLimit = mock.fn() as any;
 const mockRateLimitsDisabled = mock.fn() as any;
 const mockResolveAiProvider = mock.fn() as any;
 const mockGetPromptTier = mock.fn() as any;
@@ -130,6 +131,7 @@ mock.module("@/lib/rate-limit", {
   namedExports: {
     rateLimit: mockRateLimit,
     rateLimitDaily: mockRateLimitDaily,
+    refundRateLimit: mockRefundRateLimit,
   },
 });
 
@@ -163,6 +165,9 @@ mock.module("@/lib/logger", {
 mock.module("@/lib/sage/system-prompts", {
   namedExports: {
     buildSystemPrompt: mockBuildSystemPrompt,
+    // renderRecentActivity sanitizes alert lines through this; identity is
+    // enough here — the sanitizer has its own tests.
+    sanitizeForPrompt: (text: string) => text,
     // ConversationStage is a type-only export — not needed at runtime.
   },
 });
@@ -354,6 +359,7 @@ function resetMocks() {
   for (const m of [
     mockRateLimit,
     mockRateLimitDaily,
+    mockRefundRateLimit,
     mockRateLimitsDisabled,
     mockResolveAiProvider,
     mockGetPromptTier,
@@ -417,6 +423,8 @@ function resetMocks() {
   mockCheckTokenQuota.mock.mockImplementation(async () => ({ allowed: true, warning: null }));
   mockWithUsageLogging.mock.mockImplementation((provider: unknown) => provider);
   mockRateLimit.mock.mockImplementation(async () => ({ success: true, remaining: 100, resetTime: Date.now() + 3600_000 }));
+  mockRefundRateLimit.mock.mockImplementation(async () => undefined);
+  mockRateLimitsDisabled.mock.mockImplementation(() => false);
   mockRateLimitDaily.mock.mockImplementation(async () => ({ success: true, remaining: 200, resetTime: Date.now() + 3600_000 }));
   mockGetOrCreateConversation.mock.mockImplementation(async () => ({
     id: "conv-1",
@@ -1110,5 +1118,762 @@ describe("POST /api/chat/send — request-time crisis scan", () => {
       mockLogger.info.mock.calls.some((call) => call.arguments[0] === "Crisis record burst capped"),
       "expected the capped burst to be logged at info",
     );
+  });
+});
+
+describe("POST /api/chat/send — student-safe alert context (F61)", () => {
+  // Classic streamResponse() path so a capturing provider double can read
+  // the assembled system prompt the route hands to the model.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  function makePromptCapturingProvider() {
+    const captured = { systemPrompt: "" };
+    const provider = {
+      name: "ollama",
+      async generateResponse(systemPrompt: string) {
+        captured.systemPrompt = systemPrompt;
+        return "ok";
+      },
+      async *streamResponse(systemPrompt: string) {
+        captured.systemPrompt = systemPrompt;
+        yield "ok";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+    return { provider, captured };
+  }
+
+  function bundleWithAlerts(alerts: Array<{ type: string; severity: string; title: string; summary: string }>) {
+    return {
+      chatPromptContext: {
+        priorConversationContext: "",
+        goalsByLevel: {},
+        goalsSummary: "",
+      },
+      recentEvents: [],
+      alerts: alerts.map((alert) => ({ ...alert, alertKey: `${alert.type}:stu` })),
+      meta: { selfMetrics: undefined },
+    };
+  }
+
+  it("keeps a staff-only descriptor (inactive_student_90) out of the student prompt", async () => {
+    const { provider, captured } = makePromptCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () =>
+      bundleWithAlerts([
+        {
+          type: "inactive_student_90",
+          severity: "critical",
+          title: "Inactive 90+ days",
+          summary: "No recorded student activity since Jun 1. Consider archiving the student.",
+        },
+      ]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hi Sage, I'm back. What did I miss?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+
+    assert.ok(captured.systemPrompt.length > 0, "provider should have received a system prompt");
+    assert.doesNotMatch(captured.systemPrompt, /ACTIVE ALERTS/);
+    assert.doesNotMatch(captured.systemPrompt, /archiv/i);
+    assert.doesNotMatch(captured.systemPrompt, /Inactive 90/);
+  });
+
+  it("still renders a student-visible descriptor (overdue_task) as an ACTIVE ALERTS line", async () => {
+    const { provider, captured } = makePromptCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () =>
+      bundleWithAlerts([
+        {
+          type: "overdue_task",
+          severity: "warning",
+          title: "Overdue task",
+          summary: "Finish the resume draft was due Aug 30.",
+        },
+      ]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hi Sage, I'm back. What did I miss?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+
+    assert.match(captured.systemPrompt, /ACTIVE ALERTS/);
+    assert.match(captured.systemPrompt, /Overdue task/);
+  });
+
+  it("drops the staff-only descriptor and keeps the student-visible one when both are present", async () => {
+    const { provider, captured } = makePromptCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () =>
+      bundleWithAlerts([
+        {
+          type: "inactive_student_90",
+          severity: "critical",
+          title: "Inactive 90+ days",
+          summary: "Consider archiving the student.",
+        },
+        {
+          type: "missed_appointment",
+          severity: "warning",
+          title: "Missed appointment",
+          summary: "Advising check-in on Aug 28 was missed.",
+        },
+      ]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "Hi Sage, I'm back. What did I miss?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+
+    assert.match(captured.systemPrompt, /Missed appointment/);
+    assert.doesNotMatch(captured.systemPrompt, /archiv/i);
+  });
+});
+
+describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
+  // Classic streamResponse() path so a mid-stream throw is a real stream
+  // error (the agent loop is mocked to yield nothing).
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  // Student-facing marker on the persisted partial (grade-6 copy). Pinned
+  // here so a wording change is a deliberate test change.
+  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+
+  function makeProviderFailingAfter(chunks: string[]) {
+    return {
+      name: "ollama",
+      async generateResponse() {
+        throw new Error("upstream connection reset");
+      },
+      async *streamResponse() {
+        for (const chunk of chunks) yield chunk;
+        throw new Error("upstream connection reset");
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+  }
+
+  function assistantSaves() {
+    return mockSaveMessage.mock.calls.filter((call) => call.arguments[2] === "assistant");
+  }
+
+  it("persists the partial reply marked as cut off, and still sends the SSE error event", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeProviderFailingAfter(["Here is the first step: ", "open your goal list."]),
+    );
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How do I start on my weekly goal?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+
+    // The client still learns the turn failed.
+    assert.match(body, /"error"/);
+    assert.doesNotMatch(body, /"done":true/);
+
+    // The transcript stays two-sided: user message + partial assistant reply.
+    const saves = assistantSaves();
+    assert.equal(saves.length, 1, "expected exactly one assistant saveMessage call");
+    const [conversationId, studentId, , content] = saves[0].arguments;
+    assert.equal(conversationId, "conv-1");
+    assert.equal(studentId, session.id);
+    assert.ok(
+      String(content).startsWith("Here is the first step: open your goal list."),
+      `partial text should be persisted verbatim, got: ${String(content)}`,
+    );
+    assert.ok(String(content).endsWith(CUT_OFF_MARKER), `expected the cut-off marker, got: ${String(content)}`);
+  });
+
+  it("does not persist an empty assistant turn when the stream fails before the first token", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeProviderFailingAfter([]));
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How do I start on my weekly goal?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.match(body, /"error"/);
+    assert.equal(assistantSaves().length, 0, "nothing streamed, nothing to persist");
+  });
+
+  it("still sends the SSE error event when persisting the partial reply fails", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      makeProviderFailingAfter(["Here is the first step: "]),
+    );
+    mockSaveMessage.mock.mockImplementation(async (_c: string, _s: string, role: string) => {
+      if (role === "assistant") {
+        // Shaped like a Prisma known-request error: its message quotes the
+        // invocation, which includes the reply text (student chat content).
+        const err = new Error(
+          "Invalid `prisma.message.create()` invocation: content: 'Here is the first step: ' value too long",
+        ) as Error & { code: string };
+        err.name = "PrismaClientKnownRequestError";
+        err.code = "P2000";
+        throw err;
+      }
+      return { id: "test-msg-id" };
+    });
+
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "How do I start on my weekly goal?" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    assert.match(body, /"error"/);
+    assert.equal(assistantSaves().length, 1, "the persist was attempted");
+    const logCall = mockLogger.error.mock.calls.find(
+      (call) => call.arguments[0] === "Failed to persist interrupted reply",
+    );
+    assert.ok(logCall, "expected the failed persist to be logged");
+    const payload = logCall!.arguments[1] as Record<string, unknown>;
+    // Chat content never reaches logs: name and Prisma code only.
+    assert.doesNotMatch(JSON.stringify(payload), /Here is the first step/);
+    assert.equal(payload.errorName, "PrismaClientKnownRequestError");
+    assert.equal(payload.code, "P2000");
+    // The original stream error is still the one reported to the client.
+    assert.match(body, /upstream connection reset/);
+  });
+});
+
+describe("POST /api/chat/send — 988 resources on error paths (F60)", () => {
+  // Classic streamResponse() path so a mid-stream throw is a real stream error.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const CRISIS_MESSAGE = "I just want to end it all";
+  const CRISIS_MESSAGE_ES = "ya no aguanto, me quiero morir";
+  const NORMAL_MESSAGE = "How do I finish my OSHA 10 certification?";
+  // Distinctive substrings of the two existing blocks (crisis-safety-net.ts).
+  const EN_BLOCK = /call or text 988/;
+  const ES_BLOCK = /oprime 2 para español/;
+
+  function post(message: string) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  function providerDown() {
+    mockResolveAiProvider.mock.mockImplementation(async () => {
+      throw new Error("Local AI server unreachable");
+    });
+  }
+
+  function hourlyLimitExhausted() {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRateLimit.mock.mockImplementation(async (key: string) =>
+      key.startsWith("chat:")
+        ? { success: false, remaining: 0, resetTime: Date.now() + 3600_000, degraded: false }
+        : { success: true, remaining: 2, resetTime: Date.now() + 600_000, degraded: false },
+    );
+  }
+
+  function makeMidStreamFailingProvider(chunks: string[]) {
+    return {
+      name: "ollama",
+      async generateResponse() {
+        throw new Error("upstream connection reset");
+      },
+      async *streamResponse() {
+        for (const chunk of chunks) yield chunk;
+        throw new Error("upstream connection reset");
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+  }
+
+  describe("provider failure (503)", () => {
+    it("includes the 988 block in the error body for a crisis message", async () => {
+      providerDown();
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.match(body.error, /Sage is offline right now/);
+      assert.match(body.error, EN_BLOCK);
+    });
+
+    it("localizes the block to Spanish for a Spanish-pattern match", async () => {
+      providerDown();
+      const res = await post(CRISIS_MESSAGE_ES);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.match(body.error, ES_BLOCK);
+      assert.doesNotMatch(body.error, EN_BLOCK);
+    });
+
+    it("keeps the error body plain for a normal message", async () => {
+      providerDown();
+      const res = await post(NORMAL_MESSAGE);
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.doesNotMatch(body.error, /988/);
+    });
+
+    it("does not add the block for staff (teacher) chat", async () => {
+      session = mockTeacherSession();
+      providerDown();
+      const res = await post("A student told me they want to end it all — what do I do?");
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.doesNotMatch(body.error, /988/);
+    });
+  });
+
+  describe("rate limits (429)", () => {
+    it("hourly cap: includes the 988 block for a crisis message", async () => {
+      hourlyLimitExhausted();
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.match(body.error, /Too many messages this hour/);
+      assert.match(body.error, EN_BLOCK);
+    });
+
+    it("hourly cap: keeps the error body plain for a normal message", async () => {
+      hourlyLimitExhausted();
+      const res = await post(NORMAL_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.doesNotMatch(body.error, /988/);
+    });
+
+    it("daily cap: includes the 988 block for a crisis message", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+      mockRateLimitDaily.mock.mockImplementation(async () => ({
+        success: false,
+        remaining: 0,
+        resetTime: Date.now() + 3600_000,
+        degraded: false,
+      }));
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.match(body.error, /daily limit/);
+      assert.match(body.error, EN_BLOCK);
+    });
+
+    it("token quota: includes the 988 block for a crisis message", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+      mockCheckTokenQuota.mock.mockImplementation(async () => ({
+        allowed: false,
+        warning: "You have used all of today's Sage time. Please try again tomorrow.",
+      }));
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.match(body.error, /Sage time/);
+      assert.match(body.error, EN_BLOCK);
+    });
+  });
+
+  describe("stream error (SSE error event)", () => {
+    function errorEventText(body: string): string {
+      const line = body
+        .split("\n")
+        .find((l) => l.startsWith("data: ") && l.includes('"error"'));
+      assert.ok(line, "expected an SSE error event");
+      return String((JSON.parse(line!.slice("data: ".length)) as { error: string }).error);
+    }
+
+    it("includes the 988 block in the error event for a crisis message, and in the persisted partial", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () =>
+        makeMidStreamFailingProvider(["I hear you, "]),
+      );
+      const res = await post(CRISIS_MESSAGE);
+      assert.equal(res.status, 200);
+      const body = await readSseBody(res);
+      const errorText = errorEventText(body);
+      assert.match(errorText, /AI streaming failed/);
+      assert.match(errorText, EN_BLOCK);
+
+      // Transcript parity: what the student saw in the moment is what the
+      // reload shows.
+      const assistantCall = mockSaveMessage.mock.calls.find((call) => call.arguments[2] === "assistant");
+      assert.ok(assistantCall, "expected the partial to be persisted");
+      assert.match(String(assistantCall!.arguments[3]), EN_BLOCK);
+    });
+
+    it("does not repeat the block when the streamed partial already carries 988", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () =>
+        makeMidStreamFailingProvider(["Please call or text 988 right now. "]),
+      );
+      const res = await post(CRISIS_MESSAGE);
+      const body = await readSseBody(res);
+      const errorText = errorEventText(body);
+      assert.doesNotMatch(errorText, /988/);
+      const occurrences = (body.match(/988/g) ?? []).length;
+      assert.equal(occurrences, 1, "988 appears once — from the streamed text, not a second block");
+    });
+
+    it("keeps the error event plain for a normal message", async () => {
+      mockResolveAiProvider.mock.mockImplementation(async () =>
+        makeMidStreamFailingProvider(["Sure, first "]),
+      );
+      const res = await post(NORMAL_MESSAGE);
+      const body = await readSseBody(res);
+      assert.doesNotMatch(body, /988/);
+    });
+  });
+});
+
+describe("POST /api/chat/send — chat limit charged on a reply, not on a confirm card (F29)", () => {
+  // Agent loop on: a confirm card is only ever proposed through it.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  const HOURLY_RESET = 1_800_000_000_000;
+  const DAILY_RESET = 1_800_000_500_000;
+
+  beforeEach(() => {
+    resetMocks();
+    mockRateLimit.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 39,
+      resetTime: HOURLY_RESET,
+      degraded: false,
+    }));
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 199,
+      resetTime: DAILY_RESET,
+      degraded: false,
+    }));
+  });
+
+  function post(message: string) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  const confirmCardTurn = async function* () {
+    yield { type: "tool_call", callId: "call-1", tool: "add_goal", args: { title: "Finish resume" } };
+    yield {
+      type: "tool_result",
+      callId: "call-1",
+      status: "success",
+      summary: "Add the goal \"Finish resume\"? Confirm below.",
+    };
+    yield {
+      type: "action",
+      action: "confirm_tool",
+      target: "add_goal",
+      label: "Add this goal",
+      meta: { token: "tok", toolName: "add_goal", args: { title: "Finish resume" } },
+    };
+    yield { type: "text", text: "Take a look at the card and confirm if that's right." };
+  };
+
+  const plainReplyTurn = async function* () {
+    yield { type: "text", text: "Start with the smallest step you can do today." };
+  };
+
+  function refundCalls() {
+    return mockRefundRateLimit.mock.calls.map((call) => call.arguments);
+  }
+
+  it("refunds the hourly unit, for the window it was consumed from, when the turn ends in a confirm card", async () => {
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+
+    const res = await post("Add a goal to finish my resume this week");
+    const body = await readSseBody(res);
+    assert.match(body, /"done":true/);
+    assert.match(body, /"confirm_tool"/);
+
+    assert.deepEqual(refundCalls(), [[`chat:${session.id}`, HOURLY_RESET]]);
+  });
+
+  it("charges a turn that produced a reply (no refund)", async () => {
+    mockRunAgentTurn.mock.mockImplementation(plainReplyTurn);
+
+    const res = await post("How do I start on my weekly goal?");
+    const body = await readSseBody(res);
+    assert.match(body, /"done":true/);
+
+    assert.equal(mockRateLimit.mock.calls.filter((c) => String(c.arguments[0]).startsWith("chat:")).length, 1);
+    assert.deepEqual(refundCalls(), []);
+  });
+
+  it("refunds both the hourly and the daily unit on the cloud path", async () => {
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.deepEqual(refundCalls().sort(), [
+      [`chat-daily:${session.id}`, DAILY_RESET],
+      [`chat:${session.id}`, HOURLY_RESET],
+    ]);
+  });
+
+  it("refunds nothing when rate limits are disabled (nothing was consumed)", async () => {
+    mockRateLimitsDisabled.mock.mockImplementation(() => true);
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.equal(mockRateLimit.mock.calls.filter((c) => String(c.arguments[0]).startsWith("chat:")).length, 0);
+    assert.deepEqual(refundCalls(), []);
+  });
+
+  it("does not refund a turn that proposed a card and then failed", async () => {
+    mockRunAgentTurn.mock.mockImplementation(async function* () {
+      yield {
+        type: "action",
+        action: "confirm_tool",
+        target: "add_goal",
+        label: "Add this goal",
+        meta: { token: "tok" },
+      };
+      throw new Error("upstream connection reset");
+    });
+
+    const res = await post("Add a goal to finish my resume this week");
+    const body = await readSseBody(res);
+    assert.match(body, /"error"/);
+
+    assert.deepEqual(refundCalls(), []);
+  });
+});
+
+describe("POST /api/chat/send — interrupted reply on the agent-loop path (F28, R2)", () => {
+  // Default student path: SAGE_AGENT_MODE "full". runAgentTurn catches the
+  // provider failure itself and yields agent_stop { reason: "error" }, so
+  // the route must treat that as a stream error, not a completed reply.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+  const PARTIAL = "Here is the first step: ";
+
+  function post(message: string) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  function agentTurnStoppingWith(reason: "error" | "complete") {
+    return async function* () {
+      yield { type: "text", text: PARTIAL };
+      yield { type: "agent_stop", reason, transcript: [], finalText: PARTIAL };
+    };
+  }
+
+  function assistantSaves() {
+    return mockSaveMessage.mock.calls.filter((call) => call.arguments[2] === "assistant");
+  }
+
+  function auditStatuses(): string[] {
+    return mockLogAiAuditEvent.mock.calls.map((call) => call.arguments[0].status);
+  }
+
+  it("agent_stop error after partial text: marker persisted, error event, failed audit, no XP, no post-response", async () => {
+    mockRunAgentTurn.mock.mockImplementation(agentTurnStoppingWith("error"));
+
+    const res = await post("How do I start on my weekly goal?");
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+
+    assert.match(body, /"error"/);
+    assert.doesNotMatch(body, /"done":true/);
+
+    const saves = assistantSaves();
+    assert.equal(saves.length, 1);
+    const content = String(saves[0].arguments[3]);
+    assert.ok(content.startsWith(PARTIAL), `expected the partial, got: ${content}`);
+    assert.ok(content.endsWith(CUT_OFF_MARKER), `expected the cut-off marker, got: ${content}`);
+
+    assert.ok(auditStatuses().includes("failed"), "expected a failed audit row");
+    assert.ok(!auditStatuses().includes("completed"), "a cut-off turn must not audit as completed");
+    assert.equal(mockAwardEvent.mock.callCount(), 0, "no XP for a cut-off turn");
+    assert.equal(mockHandlePostResponse.mock.callCount(), 0, "no post-response for a cut-off turn");
+  });
+
+  it("agent_stop error on a crisis message: the error event carries the 988 block", async () => {
+    mockRunAgentTurn.mock.mockImplementation(agentTurnStoppingWith("error"));
+
+    const res = await post("I just want to end it all");
+    const body = await readSseBody(res);
+    const line = body.split("\n").find((l) => l.startsWith("data: ") && l.includes('"error"'));
+    assert.ok(line, "expected an SSE error event");
+    const errorText = String((JSON.parse(line!.slice("data: ".length)) as { error: string }).error);
+    assert.match(errorText, /call or text 988/);
+  });
+
+  it("agent_stop complete is still a completed reply (done, completed audit, XP)", async () => {
+    mockRunAgentTurn.mock.mockImplementation(agentTurnStoppingWith("complete"));
+
+    const res = await post("How do I start on my weekly goal?");
+    const body = await readSseBody(res);
+
+    assert.match(body, /"done":true/);
+    assert.doesNotMatch(body, /"error"/);
+    const content = String(assistantSaves()[0].arguments[3]);
+    assert.equal(content, PARTIAL);
+    assert.ok(auditStatuses().includes("completed"));
+    assert.equal(mockAwardEvent.mock.callCount(), 1);
+  });
+});
+
+describe("POST /api/chat/send — 988 resources on the form-lookup exits (F60, R3)", () => {
+  beforeEach(() => {
+    resetMocks();
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      {
+        form: { id: "student-profile", title: "SPOKES Student Profile" },
+        url: "/api/forms/download?formId=student-profile&mode=view",
+        score: 40,
+      },
+    ]);
+    mockGetDirectFormAnswer.mock.mockImplementation(
+      () => "Here is the [SPOKES Student Profile](/api/forms/download?formId=student-profile&mode=view).",
+    );
+  });
+
+  const CRISIS_FORM_ASK = "I just want to end it all. Where is the student profile form?";
+  const NORMAL_FORM_ASK = "Where is the student profile form?";
+  const EN_BLOCK = /call or text 988/;
+
+  async function postWithAgentMode(mode: "off" | "full", message: string) {
+    const previousMode = process.env.SAGE_AGENT_MODE;
+    const previousFlag = process.env.SAGE_AGENT_ENABLED;
+    process.env.SAGE_AGENT_MODE = mode;
+    delete process.env.SAGE_AGENT_ENABLED;
+    try {
+      const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+      const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+      return readSseBody(res);
+    } finally {
+      if (previousMode === undefined) delete process.env.SAGE_AGENT_MODE;
+      else process.env.SAGE_AGENT_MODE = previousMode;
+      if (previousFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+      else process.env.SAGE_AGENT_ENABLED = previousFlag;
+    }
+  }
+
+  function persistedAssistant(): string {
+    const call = mockSaveMessage.mock.calls.find((c) => c.arguments[2] === "assistant");
+    assert.ok(call, "expected an assistant saveMessage call");
+    return String(call!.arguments[3]);
+  }
+
+  it("direct form answer (agent loop off): the reply and the persisted message carry the block", async () => {
+    const body = await postWithAgentMode("off", CRISIS_FORM_ASK);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0, "direct answer must not resolve a provider");
+    assert.match(body, EN_BLOCK);
+    assert.match(persistedAssistant(), EN_BLOCK);
+    assert.match(persistedAssistant(), /SPOKES Student Profile/);
+  });
+
+  it("present_form card (agent loop on): the reply and the persisted message carry the block", async () => {
+    const body = await postWithAgentMode("full", CRISIS_FORM_ASK);
+    assert.equal(mockResolveAiProvider.mock.callCount(), 0, "direct answer must not resolve a provider");
+    assert.match(body, /"open_form"/);
+    assert.match(body, EN_BLOCK);
+    assert.match(persistedAssistant(), EN_BLOCK);
+  });
+
+  it("a plain form ask stays plain on both paths", async () => {
+    const offBody = await postWithAgentMode("off", NORMAL_FORM_ASK);
+    assert.doesNotMatch(offBody, /988/);
+    resetMocks();
+    mockResolveDirectFormMatch.mock.mockImplementation(() => [
+      {
+        form: { id: "student-profile", title: "SPOKES Student Profile" },
+        url: "/api/forms/download?formId=student-profile&mode=view",
+        score: 40,
+      },
+    ]);
+    const onBody = await postWithAgentMode("full", NORMAL_FORM_ASK);
+    assert.doesNotMatch(onBody, /988/);
   });
 });

@@ -1,4 +1,4 @@
-import { detectCrisisSignal } from "@/lib/sage/crisis-detection";
+import { detectCrisisSignal, type CrisisDetection } from "@/lib/sage/crisis-detection";
 
 /**
  * Deterministic, model-independent crisis-resource safety net.
@@ -44,8 +44,21 @@ export const CRISIS_RESOURCE_BLOCK_ES =
  * Pure + synchronous — safe to call on every turn.
  */
 export function ensureCrisisResources(reply: string, message: string): string | null {
-  const { matched, lang } = detectCrisisSignal(message);
-  if (!matched) return null;
+  return crisisResourceBlockFor(detectCrisisSignal(message), reply);
+}
+
+/**
+ * Same decision as ensureCrisisResources, from a detection the caller already
+ * holds. The send route detects once per request and needs the block on
+ * every exit — provider-down 503, the 429s, a stream that fails mid-reply —
+ * not only after a completed reply, and must not rescan per path. `null`
+ * detection (staff chat) yields null.
+ */
+export function crisisResourceBlockFor(
+  detection: CrisisDetection | null,
+  reply: string,
+): string | null {
+  if (!detection?.matched) return null;
   if (CRISIS_MARKER.test(reply)) return null;
-  return lang === "es" ? CRISIS_RESOURCE_BLOCK_ES : CRISIS_RESOURCE_BLOCK;
+  return detection.lang === "es" ? CRISIS_RESOURCE_BLOCK_ES : CRISIS_RESOURCE_BLOCK;
 }
