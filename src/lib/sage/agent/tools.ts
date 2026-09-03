@@ -26,7 +26,7 @@ import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
 import { listBookableAdvisors } from "@/lib/advising";
 import { formatCohortDateTime } from "@/lib/timezone";
-import { ensureStudentCertification } from "@/lib/sage/cert-actions";
+import { lookupCertProgress as lookupStudentCertProgress } from "@/lib/sage/cert-actions";
 import type { AgentTool, AgentToolResult } from "./types";
 
 const PROGRAM_INFO_TOPICS = Object.keys(TOPIC_CONTENT) as ReadonlyArray<string>;
@@ -380,11 +380,34 @@ const lookupCertProgress: AgentTool = {
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
     const studentId = ctx.targetStudentId ?? ctx.session.id;
-    const progress = await ensureStudentCertification(studentId);
+    const progress = await lookupStudentCertProgress(studentId);
     if (!progress) {
       return {
         status: "error",
         summary: "I couldn't load the certification checklist right now.",
+      };
+    }
+
+    // Read tier: no Certification row exists until the student opens the
+    // Certifications page, and this tool never creates one (SAGE-03).
+    if (!progress.started) {
+      return {
+        status: "success",
+        summary: `Ready-to-Work: not started yet (0/${progress.total} required items).`,
+        data: {
+          certificationId: null,
+          status: "not_started",
+          done: 0,
+          total: progress.total,
+          requirements: progress.requirements,
+        },
+        action: { action: "navigate", target: "/certifications", label: "Start certification" },
+        modelHint:
+          `Ready-to-Work progress: not started. The student has no certification checklist yet; it is created the first time they open the Certifications page (the button above). ` +
+          `Do NOT call mark_certification_complete — there are no requirement ids yet. ` +
+          `The checklist will cover: ${progress.requirements
+            .map((r) => `"${r.label}"${r.required ? "" : " (optional)"}`)
+            .join(", ")}.`,
       };
     }
 
