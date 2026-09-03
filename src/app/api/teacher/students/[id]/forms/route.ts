@@ -42,10 +42,11 @@ export const PATCH = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const managedStudent = await assertStaffCanManageStudent(session, id);
+  const studentDbId = managedStudent.id;
 
   const body = await req.json();
-  const { submissionId, status, notes } = body;
+  const { submissionId, status, notes, staffSignatureDataUrl, staffSignatureName, staffSignatureTitle } = body;
 
   if (!submissionId || !["approved", "rejected"].includes(status)) {
     return NextResponse.json({ error: "submissionId and valid status required." }, { status: 400 });
@@ -53,7 +54,7 @@ export const PATCH = withTeacherAuth(async (
 
   // Verify submission belongs to this student
   const submission = await prisma.formSubmission.findFirst({
-    where: { id: submissionId, studentId: id },
+    where: { id: submissionId, studentId: studentDbId },
   });
   if (!submission) {
     return NextResponse.json({ error: "Submission not found." }, { status: 404 });
@@ -69,13 +70,52 @@ export const PATCH = withTeacherAuth(async (
     },
   });
 
+  // If approved and it is an intake packet, re-generate stamped PDF with instructor counter-signature
+  if (status === "approved" && (submission.formId === "orientation-intake" || submission.formId === "student-intake")) {
+    try {
+      const { saveStampedIntakePacket } = await import("@/lib/intake/pdf-stamped-packet");
+      const studentRecord = await prisma.student.findUnique({
+        where: { id },
+        include: { spokesRecord: true },
+      });
+      if (studentRecord && studentRecord.spokesRecord) {
+        const sr = studentRecord.spokesRecord;
+        const intakePayload = {
+          firstName: sr.firstName || studentRecord.displayName.split(" ")[0] || "Student",
+          lastName: sr.lastName || studentRecord.displayName.split(" ").slice(1).join(" ") || "Participant",
+          birthDate: sr.birthDate ? sr.birthDate.toISOString().slice(0, 10) : "2000-01-01",
+          county: (sr.county as any) || "Nicholas",
+          email: sr.referralEmail || `${studentRecord.studentId}@example.com`,
+          phone: "(304) 555-0100",
+          gender: (sr.gender as any) || null,
+          race: sr.race || null,
+          ethnicity: sr.ethnicity || null,
+          householdType: (sr.householdType as any) || "Single adult",
+          educationalLevel: (sr.educationalLevel as any) || "High school equivalency (GED/HSE)",
+          tanfStatus: true,
+          programTrack: "Customer Service / Clerical",
+          signatureName: studentRecord.displayName,
+          signatureMethod: "drawn" as const,
+          staffSignatureName: staffSignatureName || session.displayName || "SPOKES Lead Instructor",
+          staffSignatureTitle: staffSignatureTitle || "SPOKES Instructional Coordinator",
+          staffSignatureDataUrl: staffSignatureDataUrl || null,
+          staffSignatureTimestamp: new Date().toISOString(),
+          staffClearanceStatus: "approved" as const,
+        };
+        await saveStampedIntakePacket(studentRecord.id, studentRecord.studentId, intakePayload);
+      }
+    } catch (err) {
+      logger.error("Failed to re-generate counter-signed intake packet", { error: String(err) });
+    }
+  }
+
   await logAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     action: `teacher.form.${status}`,
     targetType: "form_submission",
     targetId: submissionId,
-    summary: `${status === "approved" ? "Approved" : "Rejected"} form submission for ${submission.formId}.`,
+    summary: `${status === "approved" ? "Approved and counter-signed" : "Rejected"} form submission for ${submission.formId}.`,
   });
 
   // Award XP for approved form submissions

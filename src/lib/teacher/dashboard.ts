@@ -96,6 +96,8 @@ export interface StudentOverview {
   readinessScore: number;
   requirementsMet: number;
   requirementsTotal: number;
+  intakeStatus: "certified" | "needs_review" | "missing";
+  intakeFileId?: string | null;
 }
 
 export interface ManagedClassOption {
@@ -436,9 +438,8 @@ export async function getTeacherDashboardPage(
       },
       _count: { select: { portfolioItems: true, files: true } },
       formSubmissions: {
-        select: { id: true, updatedAt: true },
+        select: { id: true, formId: true, fileId: true, status: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
-        take: 1,
       },
       applications: {
         select: { id: true, updatedAt: true },
@@ -598,6 +599,17 @@ export async function getTeacherDashboardPage(
       readinessScore: readiness.score,
       requirementsMet: complianceMap.get(student.id)?.requiredMet ?? 0,
       requirementsTotal: complianceMap.get(student.id)?.requiredCount ?? 0,
+      intakeStatus: (() => {
+        const intakeSub = student.formSubmissions.find(
+          (s) => s.formId === "orientation-intake" || s.formId === "student-intake"
+        );
+        if (!intakeSub) return "missing" as const;
+        return (intakeSub.status === "approved" ? "certified" : "needs_review") as "certified" | "needs_review";
+      })(),
+      intakeFileId:
+        student.formSubmissions.find(
+          (s) => s.formId === "orientation-intake" || s.formId === "student-intake"
+        )?.fileId ?? null,
     };
   });
 

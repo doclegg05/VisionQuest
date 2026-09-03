@@ -543,27 +543,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               onShowAllConversations={() => setShowAllConversations(true)}
             />
           ),
-          admin: (
-            <div id="account-actions" className="space-y-6">
-              <OverviewTab
-                data={data}
-                moodEntries={moodEntries}
-                dateFormatter={dateFormatter}
-                showResetPw={showResetPw}
-                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
-                newPassword={newPassword}
-                onNewPasswordChange={setNewPassword}
-                resetStatus={resetStatus}
-                onResetPassword={handleResetPassword}
-                confirmDeactivate={confirmDeactivate}
-                onSetConfirmDeactivate={setConfirmDeactivate}
-                deactivating={deactivating}
-                onToggleStudentStatus={toggleStudentStatus}
-                archiving={archiving}
-                onArchive={handleArchive}
-                archiveResult={archiveResult}
-                archiveError={archiveError}
-              />
+          forms: (
+            <div id="forms-documents" className="space-y-6">
               <OperationsTab
                 data={data}
                 dateFormatter={dateFormatter}
@@ -586,6 +567,29 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 savingNote={savingNote}
                 onCreateNote={handleCreateNote}
                 scope="submittedForms"
+              />
+            </div>
+          ),
+          admin: (
+            <div id="account-actions" className="space-y-6">
+              <OverviewTab
+                data={data}
+                moodEntries={moodEntries}
+                dateFormatter={dateFormatter}
+                showResetPw={showResetPw}
+                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
+                newPassword={newPassword}
+                onNewPasswordChange={setNewPassword}
+                resetStatus={resetStatus}
+                onResetPassword={handleResetPassword}
+                confirmDeactivate={confirmDeactivate}
+                onSetConfirmDeactivate={setConfirmDeactivate}
+                deactivating={deactivating}
+                onToggleStudentStatus={toggleStudentStatus}
+                archiving={archiving}
+                onArchive={handleArchive}
+                archiveResult={archiveResult}
+                archiveError={archiveError}
               />
             </div>
           ),

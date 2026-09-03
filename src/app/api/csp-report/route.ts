@@ -108,6 +108,10 @@ function pathOf(uri: string): string {
 const ACCEPTED = () => new NextResponse(null, { status: 204 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
+  if (process.env.NODE_ENV !== "production") {
+    return ACCEPTED();
+  }
+
   const limit = await rateLimit(`csp-report:${clientIp(req)}`, REPORTS_PER_WINDOW, WINDOW_MS);
   if (!limit.success) throw rateLimited();
 

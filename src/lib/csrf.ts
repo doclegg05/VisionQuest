@@ -21,15 +21,23 @@ function constantTimeEqual(a: string, b: string): boolean {
 export function isAuthorizedInternalRequest(
   pathname: string,
   authorizationHeader: string | null,
-  cronSecret: string | undefined
+  cronSecret: string | undefined,
+  intakeSecret?: string | undefined,
 ): boolean {
-  if (!pathname.startsWith("/api/internal/")) {
-    return false;
+  if (pathname.startsWith("/api/internal/")) {
+    if (!cronSecret || !authorizationHeader) {
+      return false;
+    }
+    return constantTimeEqual(authorizationHeader, `Bearer ${cronSecret}`);
   }
 
-  if (!cronSecret || !authorizationHeader) {
-    return false;
+  if (pathname === "/api/intake/webhook") {
+    const validSecret = intakeSecret || cronSecret;
+    if (!validSecret || !authorizationHeader) {
+      return false;
+    }
+    return constantTimeEqual(authorizationHeader, `Bearer ${validSecret}`);
   }
 
-  return constantTimeEqual(authorizationHeader, `Bearer ${cronSecret}`);
+  return false;
 }

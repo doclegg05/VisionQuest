@@ -5,9 +5,9 @@ import ProgramBadge from "@/components/ui/ProgramBadge";
 import type { TodayRosterEntry } from "@/lib/teacher/today";
 
 const PRESENCE_STYLE: Record<TodayRosterEntry["presence"], string> = {
-  present: "bg-[var(--accent-green)]",
-  recent: "bg-[var(--accent-gold)]",
-  away: "bg-[var(--ink-faint)]",
+  present: "bg-emerald-500 ring-2 ring-emerald-300 animate-pulse",
+  recent: "bg-amber-500 ring-2 ring-amber-200",
+  away: "bg-slate-400",
 };
 
 const PRESENCE_LABEL: Record<TodayRosterEntry["presence"], string> = {
@@ -20,8 +20,8 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
   if (roster.length === 0) {
     return (
       <section className="surface-section p-5">
-        <h2 className="font-display text-2xl text-[var(--ink-strong)]">Today</h2>
-        <p className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+        <h2 className="font-display text-2xl font-extrabold text-[var(--ink-strong)]">Today</h2>
+        <p className="mt-3 rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           No managed students in this view. Switch classes via the class switcher above.
         </p>
       </section>
@@ -31,12 +31,12 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
   return (
     <section className="surface-section p-5">
       <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
           In class today
         </p>
-        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Roster</h2>
-        <p className="mt-1 text-xs text-[var(--ink-muted)]">
-          Presence derived from most recent chat activity — no formal attendance.
+        <h2 className="mt-1 font-display text-2xl font-extrabold text-[var(--ink-strong)]">Daily Attendance & Check-In</h2>
+        <p className="mt-1 text-xs font-medium text-[var(--ink-muted)]">
+          Presence derived from live student chat activity and recent milestone check-ins.
         </p>
       </header>
 
@@ -45,16 +45,16 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
           <li key={entry.id}>
             <Link
               href={`/teacher/students/${entry.studentId}`}
-              className="flex items-center gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)]"
+              className="flex items-center gap-3.5 rounded-2xl border-2 border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3.5 transition-all hover:border-sky-500 hover:shadow-md active:scale-[0.99]"
             >
               <span
                 aria-label={PRESENCE_LABEL[entry.presence]}
                 title={PRESENCE_LABEL[entry.presence]}
-                className={`h-2.5 w-2.5 shrink-0 rounded-full ${PRESENCE_STYLE[entry.presence]}`}
+                className={`h-3 w-3 shrink-0 rounded-full ${PRESENCE_STYLE[entry.presence]}`}
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
+                  <p className="truncate text-sm font-bold text-[var(--ink-strong)]">
                     {entry.name}
                   </p>
                   <ProgramBadge programType={entry.programType} size="sm" />

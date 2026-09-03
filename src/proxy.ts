@@ -60,6 +60,7 @@ export function proxy(request: NextRequest) {
       pathname,
       authorization,
       process.env.CRON_SECRET,
+      process.env.INTAKE_WEBHOOK_SECRET,
     );
 
     if (!isInternal && !isUrlHostMatch(origin, host) && !isUrlHostMatch(referer, host)) {
@@ -80,7 +81,9 @@ export function proxy(request: NextRequest) {
     // (for example on next/image and the route announcer), so style attrs
     // need to be permitted even though style/script elements remain controlled.
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-    `style-src-elem 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    process.env.NODE_ENV !== "production"
+      ? `style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com`
+      : `style-src-elem 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",

@@ -1,6 +1,8 @@
-import { type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { humanizeStatusValue } from "@/lib/status-labels";
 import StructuredFormsSection from "./StructuredFormsSection";
+import PdfPreviewModal from "./PdfPreviewModal";
+import SignaturePadModal from "@/components/intake/SignaturePadModal";
 import type {
   StudentData,
   AppointmentData,
@@ -122,9 +124,42 @@ export default function OperationsTab({
   const showSubmittedForms = scope === "all" || scope === "submittedForms";
   const showCoachingSections = scope === "all" || scope === "coaching";
 
+  const [previewSubmission, setPreviewSubmission] = useState<FormSubmissionData | null>(null);
+  const [counterSignSubmission, setCounterSignSubmission] = useState<FormSubmissionData | null>(null);
+  const [counterSigning, setCounterSigning] = useState(false);
+
+  const handleTeacherCounterSign = async (sig: {
+    signatureDataUrl: string;
+    signatureName: string;
+    signatureMethod: "drawn" | "uploaded";
+  }) => {
+    if (!counterSignSubmission) return;
+    setCounterSigning(true);
+    try {
+      await fetch(`/api/teacher/students/${student.id}/forms`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionId: counterSignSubmission.id,
+          status: "approved",
+          staffSignatureDataUrl: sig.signatureDataUrl,
+          staffSignatureName: sig.signatureName,
+          staffSignatureTitle: "SPOKES Lead Instructor",
+        }),
+      });
+      await onReviewForm(counterSignSubmission.id, "approved");
+      setCounterSignSubmission(null);
+      setPreviewSubmission(null);
+    } catch (err) {
+      console.error("Failed to counter-sign form:", err);
+    } finally {
+      setCounterSigning(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {showCoachingSections && (
+      {showSubmittedForms && (
         /* Structured Forms (Phase 4) — data-reportable forms, separate from PDF uploads below */
         <StructuredFormsSection studentId={student.id} />
       )}
@@ -177,41 +212,44 @@ export default function OperationsTab({
 
                   <div className="flex flex-wrap items-center gap-2">
                     {submission.file ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewSubmission(submission)}
+                        className="rounded-xl border border-sky-600 bg-sky-600 hover:bg-sky-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 cursor-pointer"
+                      >
+                        Preview & Print
+                      </button>
+                    ) : null}
+                    {submission.file ? (
                       <a
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                        className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface-base)] px-3.5 py-1.5 text-xs font-bold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] transition-colors shadow-sm"
                       >
-                        Open file
+                        Download PDF
                       </a>
                     ) : null}
-                    {submission.signatureFile ? (
-                      <a
-                        href={`/api/files/download?id=${submission.signatureFile.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                    {submission.status !== "approved" && (
+                      <button
+                        type="button"
+                        onClick={() => setCounterSignSubmission(submission)}
+                        disabled={reviewingFormId === submission.id || counterSigning}
+                        className="rounded-xl border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
                       >
-                        View signature
-                      </a>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => onReviewForm(submission.id, "approved")}
-                      disabled={reviewingFormId === submission.id}
-                      className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
-                    >
-                      {reviewingFormId === submission.id ? "Saving..." : "Approve"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onReviewForm(submission.id, "rejected")}
-                      disabled={reviewingFormId === submission.id}
-                      className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-200 disabled:opacity-60"
-                    >
-                      Return
-                    </button>
+                        Counter-Sign & Approve
+                      </button>
+                    )}
+                    {submission.status !== "approved" && (
+                      <button
+                        type="button"
+                        onClick={() => onReviewForm(submission.id, "rejected")}
+                        disabled={reviewingFormId === submission.id}
+                        className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3.5 py-1.5 text-xs font-bold text-rose-800 transition-colors disabled:opacity-60 cursor-pointer"
+                      >
+                        Return
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -624,6 +662,35 @@ export default function OperationsTab({
         </div>
       </div>
       </>
+      )}
+
+      {/* In-Browser PDF Preview & Print Modal */}
+      {previewSubmission && previewSubmission.file && (
+        <PdfPreviewModal
+          isOpen={Boolean(previewSubmission)}
+          onClose={() => setPreviewSubmission(null)}
+          fileId={previewSubmission.file.id}
+          title={previewSubmission.title}
+          studentName={student.displayName}
+          studentId={student.id}
+          submissionId={previewSubmission.id}
+          status={previewSubmission.status}
+          onCounterSign={() => {
+            const s = previewSubmission;
+            setPreviewSubmission(null);
+            setCounterSignSubmission(s);
+          }}
+        />
+      )}
+
+      {/* Teacher Counter-Signature Pad Modal */}
+      {counterSignSubmission && (
+        <SignaturePadModal
+          isOpen={Boolean(counterSignSubmission)}
+          onClose={() => setCounterSignSubmission(null)}
+          onSave={handleTeacherCounterSign}
+          defaultSignerName="SPOKES Lead Instructor"
+        />
       )}
     </div>
   );

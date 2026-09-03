@@ -8,6 +8,7 @@ import SummaryCards from "./class-overview/SummaryCards";
 import StudentCards from "./class-overview/StudentCards";
 import StudentTable from "./class-overview/StudentTable";
 import { apiFetch } from "@/lib/api";
+import { FileArchive } from "@phosphor-icons/react";
 import { type TeacherDashboardPageData } from "@/lib/teacher/dashboard";
 import {
   teacherDashboardAlertQuickAction,
@@ -24,6 +25,7 @@ import type {
 } from "@/lib/teacher/dashboard";
 
 type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDone" | "readinessScore";
+type IntakeFilter = "all" | "certified" | "needs_review" | "missing";
 
 const EMPTY_INACTIVITY_SUMMARY: InactivitySummary = {
   followUp14: 0,
@@ -59,6 +61,7 @@ export default function ClassOverview({
   const [sortBy, setSortBy] = useState<SortKey>("displayName");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [search, setSearch] = useState("");
+  const [intakeFilter, setIntakeFilter] = useState<IntakeFilter>("all");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(initialData?.totalPages ?? 1);
   const [showInactive, setShowInactive] = useState(false);
@@ -126,11 +129,17 @@ export default function ClassOverview({
   }
 
   const filtered = students
-    .filter(
-      (s) =>
+    .filter((s) => {
+      const matchesSearch =
         s.displayName.toLowerCase().includes(search.toLowerCase()) ||
-        s.studentId.toLowerCase().includes(search.toLowerCase())
-    )
+        s.studentId.toLowerCase().includes(search.toLowerCase());
+      if (!matchesSearch) return false;
+
+      if (intakeFilter === "certified") return s.intakeStatus === "certified";
+      if (intakeFilter === "needs_review") return s.intakeStatus === "needs_review";
+      if (intakeFilter === "missing") return s.intakeStatus === "missing";
+      return true;
+    })
     .sort((a, b) => {
       let cmp = 0;
       if (sortBy === "displayName") cmp = a.displayName.localeCompare(b.displayName);
@@ -142,8 +151,11 @@ export default function ClassOverview({
       return sortDir === "desc" ? -cmp : cmp;
     });
 
-  // Summary stats
+  // Summary stats & compliance counts
   const totalStudents = students.length;
+  const certifiedCount = students.filter((s) => s.intakeStatus === "certified").length;
+  const needsReviewCount = students.filter((s) => s.intakeStatus === "needs_review").length;
+  const missingCount = students.filter((s) => s.intakeStatus === "missing").length;
   const pendingVerifications = students.reduce((sum, s) => sum + s.certPendingVerify, 0);
   const studentsNeedingAttention = students.filter((s) => s.openAlertCount > 0).length;
   const avgXp = totalStudents > 0 ? Math.round(students.reduce((sum, s) => sum + s.xp, 0) / totalStudents) : 0;
@@ -317,16 +329,16 @@ export default function ClassOverview({
       </div>
 
       {/* Search + Export */}
-      <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="surface-section flex flex-col gap-3 p-5 sm:flex-row sm:items-end sm:justify-between rounded-2xl border border-[var(--border)] shadow-sm">
         <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
           <label>
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+            <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)]">
               Class scope
             </span>
             <select
               value={currentClassId}
               onChange={(event) => setCurrentClassId(event.target.value)}
-              className="field w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+              className="field w-full rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-base)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             >
               <option value="">All assigned classes</option>
               {classes.map((item) => (
@@ -337,60 +349,122 @@ export default function ClassOverview({
             </select>
           </label>
           <label className="min-w-0">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+            <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)]">
               Search students
             </span>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or student ID..."
-              className="field w-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+              placeholder="Search by student name or ID..."
+              className="field w-full rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-base)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] placeholder:text-[var(--ink-faint)] focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             />
           </label>
         </div>
-        <a
-          href={`/api/teacher/export${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
-          className="inline-flex items-center justify-center rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
-        >
-          Export CSV
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/api/teacher/classes/export-packets${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
+            className="inline-flex items-center gap-1.5 justify-center rounded-xl border-2 border-emerald-600 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all active:scale-95 cursor-pointer"
+            title="Download all stamped intake packets for this cohort as a ZIP"
+          >
+            <FileArchive size={18} weight="bold" />
+            Download Cohort Packets (.zip)
+          </a>
+          <a
+            href={`/api/teacher/export${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
+            className="inline-flex items-center justify-center rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-2.5 text-sm font-bold text-[var(--ink-strong)] shadow-sm transition-all hover:border-sky-500 hover:bg-[var(--surface-base)] active:scale-95"
+          >
+            Export CSV
+          </a>
+        </div>
       </div>
 
       {/* View & Filter Controls */}
-      <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="surface-section flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-[var(--border)] shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-full border border-[var(--border)] bg-[var(--surface-raised)]/70 p-1">
+          <div className="flex rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-raised)] p-1">
             <button
               onClick={() => setViewMode("table")}
-              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                viewMode === "table" ? "bg-[var(--accent-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
+              className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
+                viewMode === "table"
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               Table
             </button>
             <button
               onClick={() => setViewMode("cards")}
-              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                viewMode === "cards" ? "bg-[var(--accent-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
+              className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all ${
+                viewMode === "cards"
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               Cards
             </button>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--ink-muted)]">
+          {/* Intake Compliance Filter Chips */}
+          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1">
+            <button
+              type="button"
+              onClick={() => setIntakeFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                intakeFilter === "all"
+                  ? "bg-slate-800 text-white shadow-xs"
+                  : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+              }`}
+            >
+              All ({students.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setIntakeFilter("certified")}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                intakeFilter === "certified"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+              }`}
+            >
+              ✓ Certified ({certifiedCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setIntakeFilter("needs_review")}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                intakeFilter === "needs_review"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+              }`}
+            >
+              ✍ Needs Sign-off ({needsReviewCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setIntakeFilter("missing")}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                intakeFilter === "missing"
+                  ? "bg-rose-600 text-white shadow-xs"
+                  : "text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+              }`}
+            >
+              ⚠ Missing ({missingCount})
+            </button>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--ink-strong)]">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="h-4 w-4 rounded border-[var(--border-strong)] text-[var(--accent-secondary)]"
+              className="h-4 w-4 rounded border-2 border-[var(--border-strong)] text-sky-600 focus:ring-sky-500"
             />
             Show inactive students
           </label>
         </div>
 
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)]">
           {filtered.length} visible
         </p>
       </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ChatCircleText,
   ChartLineUp,
+  FileText,
   Gear,
 } from "@phosphor-icons/react";
 
@@ -12,7 +13,7 @@ import {
   useAnchorTabSwitch,
 } from "./useAnchorTabSwitch";
 
-export type StudentDetailTabKey = "coach" | "progress" | "admin";
+export type StudentDetailTabKey = "coach" | "progress" | "forms" | "admin";
 
 interface TabDef {
   key: StudentDetailTabKey;
@@ -21,9 +22,10 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { key: "coach", label: "Coach", icon: ChatCircleText },
-  { key: "progress", label: "Progress", icon: ChartLineUp },
-  { key: "admin", label: "Admin", icon: Gear },
+  { key: "coach", label: "Coaching & Goals", icon: ChatCircleText },
+  { key: "progress", label: "Progress & Outcomes", icon: ChartLineUp },
+  { key: "forms", label: "Forms & Documents", icon: FileText },
+  { key: "admin", label: "Account & Settings", icon: Gear },
 ];
 
 interface StudentDetailTabsProps {
@@ -43,21 +45,43 @@ export default function StudentDetailTabs({ children }: StudentDetailTabsProps) 
 
   return (
     <div>
-      <div className="mb-6 flex gap-1 rounded-xl theme-segmented p-1">
+      <div className="mb-6 flex flex-wrap sm:flex-nowrap gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-muted)] p-1.5 shadow-sm">
         {TABS.map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+
+          // Distinct vibrant active styles for maximum visual clarity
+          const activeStyle =
+            tab.key === "coach"
+              ? "bg-sky-600 text-white shadow-md shadow-sky-600/20"
+              : tab.key === "progress"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                : tab.key === "forms"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+                  : "bg-slate-800 text-white shadow-md shadow-slate-800/20 dark:bg-slate-700";
+
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === tab.key
-                  ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-sm"
-                  : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.key);
+                if (typeof window !== "undefined" && window.location.hash) {
+                  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                }
+              }}
+              className={`group flex min-h-12 flex-1 items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-150 cursor-pointer active:scale-[0.98] ${
+                isActive
+                  ? activeStyle
+                  : "bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] hover:bg-[var(--surface-base)] hover:border-[var(--border-strong)] hover:shadow-sm"
               }`}
             >
-              <Icon size={18} weight={activeTab === tab.key ? "fill" : "regular"} />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <Icon
+                size={20}
+                weight={isActive ? "fill" : "bold"}
+                className={isActive ? "text-white" : "text-[var(--ink-muted)] group-hover:text-[var(--ink-strong)]"}
+              />
+              <span className="tracking-tight">{tab.label}</span>
             </button>
           );
         })}

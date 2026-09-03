@@ -120,3 +120,6 @@ broken-documents-backup-*.json
 /VisionQuest Media/
 *.fcpbundle
 *.fcpxml
+
+# Local scratch — intake PDF samples, may contain student data
+/scratch/

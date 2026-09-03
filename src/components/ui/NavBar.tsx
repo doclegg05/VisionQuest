@@ -24,8 +24,7 @@ import NotificationBell from "./NotificationBell";
 import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 export const STAFF_ITEMS: NavItem[] = [
-  { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
-  { href: "/teacher", label: "Students", icon: Users, phase: 1 },
+  { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
   { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
@@ -35,6 +34,7 @@ export const STAFF_ITEMS: NavItem[] = [
     icon: WarningCircle,
     phase: 1,
   },
+  { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
 ];
 
 const COORDINATOR_ITEMS: NavItem[] = [
@@ -42,9 +42,10 @@ const COORDINATOR_ITEMS: NavItem[] = [
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
-  { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
-  { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
+  { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
+  { href: "/admin", label: "Program Admin", icon: Wrench, phase: 1 },
   { href: "/admin/library", label: "Library", icon: Books, phase: 1 },
+  { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
 ];
 
 interface NavBarProps {
@@ -83,24 +84,30 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
   const homeHref = getRoleHomePath(role);
   const settingsHref = getRoleSettingsPath(role);
 
-  // Primary nav items for the sidebar
+  // Primary nav items for the sidebar — condensed to 4 purposeful hubs
   const primaryItems =
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
-        // Admin has their own Sage (/admin/chat) and Library (/admin/library).
-        // Drop the teacher-facing duplicates from STAFF_ITEMS so the sidebar
-        // doesn't show "Sage" or "Library" twice.
         ? [
-            ...ADMIN_ITEMS,
-            ...COORDINATOR_ITEMS,
-            ...STAFF_ITEMS.filter(
-              (item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library",
-            ),
+            { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 as const },
+            { href: "/admin", label: "Admin & Ops", icon: Wrench, phase: 1 as const },
+            { href: "/admin/library", label: "Library & Forms", icon: Books, phase: 1 as const },
+            { href: "/admin/chat", label: "Sage AI", icon: ChatCircle, phase: 1 as const },
           ]
         : role === "coordinator"
-          ? COORDINATOR_ITEMS
-          : STAFF_ITEMS;
+          ? [
+              { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 as const },
+              { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 as const },
+              { href: "/teacher/library", label: "Library & Forms", icon: Books, phase: 1 as const },
+              { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 as const },
+            ]
+          : [
+              { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 as const },
+              { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 as const },
+              { href: "/teacher/library", label: "Library & Forms", icon: Books, phase: 1 as const },
+              { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 as const },
+            ];
 
   // Secondary nav items (student only)
   const secondaryItems =

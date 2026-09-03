@@ -54,53 +54,53 @@ export default function StudentTable({
       <div className="overflow-x-auto">
         <table className="min-w-[66rem] w-full text-sm lg:min-w-[72rem]">
           <thead>
-            <tr className="bg-[var(--surface-soft)] border-b border-[var(--border)]">
+            <tr className="bg-[var(--surface-muted)] border-b-2 border-[var(--border-strong)]">
               <th
-                className="cursor-pointer px-4 py-3 text-left font-medium text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                className="cursor-pointer px-4 py-3.5 text-left font-bold text-xs uppercase tracking-wider text-[var(--ink-strong)] hover:text-sky-600 transition-colors"
                 onClick={() => handleSort("displayName")}
               >
                 Student {getSortIcon("displayName")}
               </th>
               <th
-                className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                className="cursor-pointer px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)] hover:text-sky-600 transition-colors"
                 onClick={() => handleSort("xp")}
               >
                 Level/XP {getSortIcon("xp")}
               </th>
               <th
-                className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                className="cursor-pointer px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)] hover:text-sky-600 transition-colors"
                 onClick={() => handleSort("orientationDone")}
               >
                 Orientation {getSortIcon("orientationDone")}
               </th>
               <th
-                className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                className="cursor-pointer px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)] hover:text-sky-600 transition-colors"
                 onClick={() => handleSort("certDone")}
               >
                 Certification {getSortIcon("certDone")}
               </th>
               <th
-                className="cursor-pointer px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                className="cursor-pointer px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)] hover:text-sky-600 transition-colors"
                 onClick={() => handleSort("readinessScore")}
               >
                 Readiness {getSortIcon("readinessScore")}
               </th>
-              <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)]">
+              <th className="px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)]">
                 Requirements
               </th>
-              <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)]">
+              <th className="px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)]">
                 Goals
               </th>
-              <th className="px-3 py-3 text-center font-medium whitespace-nowrap text-[var(--ink-muted)]">
+              <th className="px-3 py-3.5 text-center font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)]">
                 Portfolio
               </th>
               <th
-                className="cursor-pointer px-4 py-3 text-right font-medium whitespace-nowrap text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+                className="cursor-pointer px-4 py-3.5 text-right font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)] hover:text-sky-600 transition-colors"
                 onClick={() => handleSort("lastActive")}
               >
                 Last Active {getSortIcon("lastActive")}
               </th>
-              <th className="px-4 py-3 text-right font-medium whitespace-nowrap text-[var(--ink-muted)]">
+              <th className="px-4 py-3.5 text-right font-bold text-xs uppercase tracking-wider whitespace-nowrap text-[var(--ink-strong)]">
                 Actions
               </th>
             </tr>
@@ -145,14 +145,34 @@ export default function StudentTable({
                             }
                             return <span className="h-2 w-2 rounded-full bg-red-400" title={`Inactive ${daysSince}d`} />;
                           })()}
-                          <p className="break-words font-medium text-[var(--ink-strong)]">{student.displayName}</p>
+                          <p className="break-words font-bold text-sm text-[var(--ink-strong)] group-hover:text-sky-600 transition-colors">{student.displayName}</p>
                         </div>
-                        <p className="ml-4 text-xs break-words text-[var(--ink-faint)]">{student.studentId}</p>
-                        {student.openAlertCount > 0 && (
-                          <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                            {student.openAlertCount} alert{student.openAlertCount === 1 ? "" : "s"}
-                          </span>
-                        )}
+                        <p className="ml-4 text-xs font-medium break-words text-[var(--ink-muted)]">{student.studentId}</p>
+                        <div className="ml-4 mt-1 flex flex-wrap items-center gap-1.5">
+                          {student.intakeStatus === "certified" && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 border border-emerald-300/40">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Certified Intake
+                            </span>
+                          )}
+                          {student.intakeStatus === "needs_review" && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/70 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 border border-amber-300/40">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Needs Sign-off
+                            </span>
+                          )}
+                          {student.intakeStatus === "missing" && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/70 px-2 py-0.5 text-[10px] font-bold text-rose-800 dark:text-rose-300 border border-rose-300/40">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                              Missing Intake
+                            </span>
+                          )}
+                          {student.openAlertCount > 0 && (
+                            <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                              {student.openAlertCount} alert{student.openAlertCount === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </div>
                       </Link>
                     </td>
                     <td className="text-center px-3 py-3">
@@ -241,32 +261,32 @@ export default function StudentTable({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-1.5">
                         <Link
                           href={links.record}
                           prefetch={false}
-                          className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)]"
+                          className="inline-flex items-center rounded-lg border border-sky-600 bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-sky-700 hover:shadow active:scale-95"
                         >
                           Record
                         </Link>
                         <Link
-                          href={links.orientation}
-                          prefetch={false}
-                          className="rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
-                        >
-                          Orientation
-                        </Link>
-                        <Link
                           href={links.forms}
                           prefetch={false}
-                          className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-interactive)]"
+                          className="inline-flex items-center rounded-lg border border-amber-600 bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-amber-700 hover:shadow active:scale-95"
                         >
                           Forms
                         </Link>
                         <Link
+                          href={links.orientation}
+                          prefetch={false}
+                          className="inline-flex items-center rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow active:scale-95"
+                        >
+                          Orientation
+                        </Link>
+                        <Link
                           href={links.goals}
                           prefetch={false}
-                          className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-interactive)]"
+                          className="inline-flex items-center rounded-lg border border-indigo-600 bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow active:scale-95"
                         >
                           Goals
                         </Link>

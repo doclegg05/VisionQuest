@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { QrCode as QrIcon } from "@phosphor-icons/react";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
+import ClassIntakeFlyerModal from "./ClassIntakeFlyerModal";
 
 interface InstructorOption {
   id: string;
@@ -113,6 +115,7 @@ export default function ClassRosterManager() {
   const [classStartDate, setClassStartDate] = useState("");
   const [classEndDate, setClassEndDate] = useState("");
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
 
   // Create student form state
   const [newStudentUsername, setNewStudentUsername] = useState("");
@@ -634,7 +637,9 @@ export default function ClassRosterManager() {
 
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Add student</p>
-                <p className="mt-1 text-sm text-[var(--ink-muted)]">Create an account and enroll in this class.</p>
+                <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                  Create an account manually, or receive automatic enrollments via connected Microsoft Forms intake.
+                </p>
                 <div className="mt-3 space-y-3">
                   <input
                     value={newStudentName}
@@ -724,9 +729,18 @@ export default function ClassRosterManager() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Roster</p>
                   <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in this class</h3>
                 </div>
-                <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
-                  {classDetail.enrollments.length} total
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFlyerModal(true)}
+                    className="flex items-center gap-1.5 rounded-full border border-[var(--accent)] bg-[var(--surface-card)] px-3.5 py-1 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--surface-soft)]"
+                  >
+                    <QrIcon size={14} weight="bold" /> Intake QR & Link
+                  </button>
+                  <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                    {classDetail.enrollments.length} total
+                  </span>
+                </div>
               </div>
               <div className="mt-4 space-y-3">
                 {classDetail.enrollments.length === 0 ? (
@@ -746,6 +760,12 @@ export default function ClassRosterManager() {
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          <a
+                            href={`/teacher/students/${enrollment.student.id}`}
+                            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
+                          >
+                            View Student
+                          </a>
                           <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                             {enrollment.status}
                           </span>
@@ -796,6 +816,15 @@ export default function ClassRosterManager() {
           </p>
         )}
       </div>
+
+      {classDetail ? (
+        <ClassIntakeFlyerModal
+          isOpen={showFlyerModal}
+          onClose={() => setShowFlyerModal(false)}
+          classId={classDetail.id}
+          className={classDetail.name}
+        />
+      ) : null}
     </div>
   );
 }

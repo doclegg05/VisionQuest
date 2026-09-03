@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * Anchor→tab map for the StudentDetail tabs. Every key MUST match a rendered
@@ -21,8 +21,9 @@ export const STUDENT_DETAIL_ANCHOR_TO_TAB = {
   "orientation-review": "progress",
   "certification-review": "progress",
   "career-progress": "progress",
+  // Forms tab anchors
+  "submitted-forms": "forms",
   // Admin tab anchors
-  "submitted-forms": "admin",
   "account-actions": "admin",
 } as const;
 
@@ -44,6 +45,9 @@ export function useAnchorTabSwitch<TabKey extends string>({
   activeTab: TabKey;
   setTab: (tab: TabKey) => void;
 }): void {
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -51,12 +55,14 @@ export function useAnchorTabSwitch<TabKey extends string>({
       const hash = window.location.hash.replace(/^#/, "");
       if (!hash) return;
       const targetTab = anchorToTab[hash];
-      if (!targetTab || targetTab === activeTab) {
+      if (!targetTab) {
         const el = document.getElementById(hash);
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
       }
-      setTab(targetTab);
+      if (targetTab !== activeTabRef.current) {
+        setTab(targetTab);
+      }
       // Wait a frame for the tab content to render before scrolling.
       requestAnimationFrame(() => {
         const el = document.getElementById(hash);
@@ -67,7 +73,7 @@ export function useAnchorTabSwitch<TabKey extends string>({
     handleHash();
     window.addEventListener("hashchange", handleHash);
     return () => window.removeEventListener("hashchange", handleHash);
-  }, [anchorToTab, activeTab, setTab]);
+  }, [anchorToTab, setTab]);
 }
 
 /**

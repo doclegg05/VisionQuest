@@ -270,11 +270,11 @@ function StudentAccordion({
   onAction: InterventionQueueProps["onAction"];
 }) {
   const borderColor = group.highCount > 0
-    ? "border-red-200"
-    : "border-amber-200";
+    ? "border-red-300 dark:border-red-900/80"
+    : "border-amber-300 dark:border-amber-900/80";
   const bgColor = group.highCount > 0
-    ? "bg-red-50/40"
-    : "bg-amber-50/40";
+    ? "bg-red-50/70 dark:bg-red-950/20"
+    : "bg-amber-50/70 dark:bg-amber-950/20";
 
   // Build a compact preview of consolidated categories
   const preview = group.consolidated
@@ -283,68 +283,70 @@ function StudentAccordion({
     .join(", ");
 
   return (
-    <div className={`overflow-hidden rounded-[1.15rem] border ${borderColor} ${bgColor} transition-colors`}>
+    <div className={`overflow-hidden rounded-2xl border-2 ${borderColor} ${bgColor} transition-all shadow-sm hover:shadow`}>
       {/* Collapsed header — always visible */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-black/[0.02]"
-        aria-expanded={isOpen}
-      >
-        {/* Chevron */}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={[
-            "shrink-0 text-[var(--ink-muted)] transition-transform",
-            isOpen ? "rotate-90" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+      <div className="flex w-full items-center justify-between gap-3 px-4 py-3.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left transition-colors hover:bg-black/[0.03] rounded-xl p-1.5 -m-1.5 cursor-pointer"
+          aria-expanded={isOpen}
         >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
+          {/* Chevron */}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={[
+              "shrink-0 text-[var(--ink-strong)] transition-transform",
+              isOpen ? "rotate-90" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--ink-strong)]">
-              {group.student.displayName}
-            </span>
-            {group.highCount > 0 && (
-              <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
-                {group.highCount} urgent
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-bold text-[var(--ink-strong)]">
+                {group.student.displayName}
               </span>
-            )}
-            <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
-              {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
-            </span>
+              {group.highCount > 0 && (
+                <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                  {group.highCount} urgent
+                </span>
+              )}
+              <span className="rounded-full border border-[var(--border)] bg-[var(--surface-base)] px-2.5 py-0.5 text-xs font-bold text-[var(--ink-strong)]">
+                {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-xs font-medium text-[var(--ink-muted)]">{preview}</p>
           </div>
-          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{preview}</p>
-        </div>
+        </button>
 
         {/* Quick actions on the collapsed row */}
-        <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageMessage(group))}
-            className="rounded-full border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:brightness-110"
+            className="rounded-lg border border-purple-500 bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all active:scale-95"
           >
             Ask Sage
           </button>
           <Link
             href={`/teacher/students/${group.student.id}`}
-            className="rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="rounded-lg border border-slate-700 bg-slate-900 hover:bg-black text-white px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all active:scale-95 dark:bg-slate-800 dark:border-slate-600"
           >
             View student
           </Link>
         </div>
-      </button>
+      </div>
 
       {/* Expanded — consolidated items grouped by category */}
       {isOpen && (
@@ -388,7 +390,7 @@ function StudentAccordion({
                   {c.primaryAction && (
                     <Link
                       href={c.primaryAction.href}
-                      className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
+                      className="rounded-lg border border-sky-600 bg-sky-600 hover:bg-sky-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95"
                     >
                       {c.primaryAction.label}
                     </Link>
@@ -399,7 +401,7 @@ function StudentAccordion({
                       const first = c.items[0];
                       onAction({ type: first.type, studentId: first.student.id, alertId: first.id, studentName: first.student.displayName });
                     }}
-                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+                    className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface-base)] hover:bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-bold text-[var(--ink-strong)] shadow-sm transition-all active:scale-95 cursor-pointer"
                   >
                     Actions
                   </button>
@@ -456,11 +458,11 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+          <p className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
             Needs attention
           </p>
-          <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
-          <p className="mt-1 text-xs text-[var(--ink-muted)]">
+          <h2 className="mt-1 font-display text-2xl font-extrabold text-[var(--ink-strong)]">Intervention Queue</h2>
+          <p className="mt-1 text-xs font-medium text-[var(--ink-muted)]">
             {totalCount} intervention{totalCount !== 1 ? "s" : ""} across {studentGroups.length} student{studentGroups.length !== 1 ? "s" : ""}
             {highCount > 0 ? ` \u2022 ${highCount} high priority` : ""}
           </p>
@@ -469,14 +471,14 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageAllMessage(studentGroups, totalCount))}
-            className="rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-105 hover:shadow-md hover:brightness-110"
+            className="rounded-xl border border-purple-500 bg-purple-600 hover:bg-purple-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-purple-600/20 transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             Ask Sage to prioritize
           </button>
           <button
             type="button"
             onClick={openStudents.size === studentGroups.length ? collapseAll : expandAll}
-            className="rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-raised)] px-3.5 py-2 text-xs font-bold text-[var(--ink-strong)] transition-all hover:bg-[var(--surface-muted)] active:scale-95 cursor-pointer"
           >
             {openStudents.size === studentGroups.length ? "Collapse all" : "Expand all"}
           </button>

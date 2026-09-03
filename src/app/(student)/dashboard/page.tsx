@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
@@ -97,10 +98,48 @@ export default async function DashboardPage() {
   }
 
   // Reuse the readiness data fetched above — no duplicate readiness queries.
-  const nextStep = await getStudentNextStep(session.id, readinessData);
+  const [nextStep, intakeSubmissionCount] = await Promise.all([
+    getStudentNextStep(session.id, readinessData),
+    prisma.formSubmission.count({
+      where: {
+        studentId: session.id,
+        formId: { in: ["orientation-intake", "student-intake"] },
+      },
+    }),
+  ]);
+
+  const needsIntakeSignature = intakeSubmissionCount === 0;
 
   return (
     <div className="page-shell page-shell-wide space-y-6">
+      {needsIntakeSignature && (
+        <div className="relative overflow-hidden rounded-2xl border-2 border-amber-400 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-orange-500/10 p-5 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm font-bold text-lg">
+                ✍
+              </div>
+              <div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300 border border-amber-500/30">
+                  Action Required • Enrollment Clearance
+                </span>
+                <h3 className="text-base font-extrabold text-[var(--ink-strong)] mt-0.5">
+                  Complete & Sign Your SPOKES Student Profile & Intake Form
+                </h3>
+                <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                  State TANF/SNAP workforce regulations require your digital signature on file to certify your class attendance and milestone credits.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/intake"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+            >
+              Sign Intake Form →
+            </Link>
+          </div>
+        </div>
+      )}
       <PathToEmployment
         currentStepKey={nextStep.currentStepKey}
         title={nextStep.title}
