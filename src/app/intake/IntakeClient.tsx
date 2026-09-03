@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,11 +9,9 @@ import {
   Copy,
   ArrowRight,
   ArrowLeft,
-  FilePdf,
   ShieldCheck,
   GraduationCap,
   IdentificationCard,
-  LockKey,
 } from "@phosphor-icons/react";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { WV_COUNTIES } from "@/lib/spokes/student-profile-form";
@@ -31,6 +29,26 @@ const CAREER_TRACK_OPTIONS = [
 export default function IntakeClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Every control on this page needs a label it actually owns: /intake is
+  // reached by QR code from a printed flyer, on a phone, by adults with low
+  // literacy, and it is the enrollment front door.
+  const firstNameId = useId();
+  const lastNameId = useId();
+  const birthDateId = useId();
+  const countyId = useId();
+  const phoneId = useId();
+  const emailId = useId();
+  const educationId = useId();
+  const householdId = useId();
+  const tanfId = useId();
+  const notesId = useId();
+  const signatureNameId = useId();
+  const signatureHelpId = useId();
+  const ferpaConsentId = useId();
+  const policyConsentId = useId();
+  const signatureConsentId = useId();
+  const trackGroupId = useId();
 
   const prefilledClassId = searchParams.get("classId") || "";
   const prefilledCounty = searchParams.get("county") || "";
@@ -55,7 +73,13 @@ export default function IntakeClient() {
   const [notes, setNotes] = useState("");
 
   const [signatureName, setSignatureName] = useState("");
-  const [consentConfirmed, setConsentConfirmed] = useState(true);
+  // Three separate, unchecked agreements. This packet authorizes disclosure of
+  // a TANF participant's education records to DoHS, WorkForce WV and program
+  // staff, so FERPA 34 CFR § 99.30 wants a signed, dated, affirmative consent —
+  // never a box that arrives already ticked.
+  const [ferpaConsent, setFerpaConsent] = useState(false);
+  const [policyConsent, setPolicyConsent] = useState(false);
+  const [signatureConsent, setSignatureConsent] = useState(false);
 
   // Status & Success state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,6 +101,9 @@ export default function IntakeClient() {
       // Fallback
     }
   };
+
+  const canSubmitEnrollment =
+    signatureName.trim().length > 0 && ferpaConsent && policyConsent && signatureConsent;
 
   const validateStep1 = () => {
     if (!firstName.trim() || !lastName.trim()) {
@@ -105,8 +132,16 @@ export default function IntakeClient() {
       setErrorMessage("Please type your full legal name in the signature box to complete enrollment.");
       return;
     }
-    if (!consentConfirmed) {
-      setErrorMessage("Please check the agreement box to acknowledge program policies.");
+    if (!ferpaConsent) {
+      setErrorMessage("Please check the first box to allow SPOKES to share your records.");
+      return;
+    }
+    if (!policyConsent) {
+      setErrorMessage("Please check the second box to agree to the program rules.");
+      return;
+    }
+    if (!signatureConsent) {
+      setErrorMessage("Please check the last box to confirm this is your signature.");
       return;
     }
 
@@ -130,10 +165,13 @@ export default function IntakeClient() {
             tanfStatus,
             notes: notes.trim() || null,
             classId: prefilledClassId || null,
-            ferpaConsentSigned: true,
-            policyAcknowledgmentSigned: true,
+            ferpaConsentSigned: ferpaConsent,
+            policyAcknowledgmentSigned: policyConsent,
+            legalAffirmationSigned: signatureConsent,
             signatureName: signatureName.trim(),
-            signatureTimestamp: new Date().toISOString(),
+            signatureMethod: "typed_affirmation",
+            // Signing time and source IP are recorded by the server. A form
+            // cannot be trusted to timestamp its own audit trail.
           }),
         });
 
@@ -253,7 +291,14 @@ export default function IntakeClient() {
         </div>
 
         {/* Progress Bar */}
-        <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]">
+        <div
+          role="progressbar"
+          aria-label={`Enrollment progress: step ${step} of 3`}
+          aria-valuemin={1}
+          aria-valuemax={3}
+          aria-valuenow={step}
+          className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]"
+        >
           <div
             className="h-full bg-[var(--accent)] transition-all duration-300"
             style={{ width: `${(step / 3) * 100}%` }}
@@ -279,9 +324,9 @@ export default function IntakeClient() {
                   <IdentificationCard size={24} weight="bold" />
                 </div>
                 <div>
-                  <h2 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                  <h1 className="font-display text-xl font-bold text-[var(--ink-strong)]">
                     About You
-                  </h2>
+                  </h1>
                   <p className="text-xs text-[var(--ink-muted)]">
                     Enter your identification details for state enrollment.
                   </p>
@@ -291,10 +336,11 @@ export default function IntakeClient() {
               <div className="mt-6 space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={firstNameId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Legal First Name *
                     </label>
                     <input
+                      id={firstNameId}
                       type="text"
                       required
                       value={firstName}
@@ -304,10 +350,11 @@ export default function IntakeClient() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={lastNameId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Legal Last Name *
                     </label>
                     <input
+                      id={lastNameId}
                       type="text"
                       required
                       value={lastName}
@@ -320,10 +367,11 @@ export default function IntakeClient() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={birthDateId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Date of Birth *
                     </label>
                     <input
+                      id={birthDateId}
                       type="date"
                       required
                       value={birthDate}
@@ -332,10 +380,11 @@ export default function IntakeClient() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={countyId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       West Virginia County *
                     </label>
                     <select
+                      id={countyId}
                       required
                       value={county}
                       onChange={(e) => setCounty(e.target.value)}
@@ -353,10 +402,11 @@ export default function IntakeClient() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={phoneId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Phone Number *
                     </label>
                     <input
+                      id={phoneId}
                       type="tel"
                       required
                       value={phone}
@@ -366,10 +416,11 @@ export default function IntakeClient() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={emailId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Email Address (Optional)
                     </label>
                     <input
+                      id={emailId}
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -402,9 +453,9 @@ export default function IntakeClient() {
                   <GraduationCap size={24} weight="bold" />
                 </div>
                 <div>
-                  <h2 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                  <h1 className="font-display text-xl font-bold text-[var(--ink-strong)]">
                     Your Goals & Needs
-                  </h2>
+                  </h1>
                   <p className="text-xs text-[var(--ink-muted)]">
                     Tell us what career path interests you and how we can support you.
                   </p>
@@ -412,15 +463,16 @@ export default function IntakeClient() {
               </div>
 
               <div className="mt-6 space-y-5">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                <div role="group" aria-labelledby={trackGroupId}>
+                  <p id={trackGroupId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                     Career Pathway Interest
-                  </label>
+                  </p>
                   <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
                     {CAREER_TRACK_OPTIONS.map((track) => (
                       <button
                         key={track.id}
                         type="button"
+                        aria-pressed={programTrack === track.id}
                         onClick={() => setProgramTrack(track.id)}
                         className={`flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-all ${
                           programTrack === track.id
@@ -444,10 +496,11 @@ export default function IntakeClient() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={educationId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Highest Education Completed
                     </label>
                     <select
+                      id={educationId}
                       value={educationalLevel}
                       onChange={(e) => setEducationalLevel(e.target.value as (typeof INTAKE_EDUCATIONAL_LEVELS)[number])}
                       className="field mt-1.5 w-full px-4 py-2.5 text-sm"
@@ -460,10 +513,11 @@ export default function IntakeClient() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                    <label htmlFor={householdId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                       Household Structure
                     </label>
                     <select
+                      id={householdId}
                       value={householdType}
                       onChange={(e) => setHouseholdType(e.target.value as (typeof INTAKE_HOUSEHOLD_TYPES)[number])}
                       className="field mt-1.5 w-full px-4 py-2.5 text-sm"
@@ -478,29 +532,31 @@ export default function IntakeClient() {
                 </div>
 
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
+                  <div className="flex items-center gap-3">
                     <input
+                      id={tanfId}
                       type="checkbox"
                       checked={tanfStatus}
                       onChange={(e) => setTanfStatus(e.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--border)] text-[var(--accent)]"
+                      className="h-4 w-4 shrink-0 rounded border-[var(--border)] text-[var(--accent)]"
                     />
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--ink-strong)]">
+                    <label htmlFor={tanfId} className="cursor-pointer">
+                      <span className="block text-sm font-semibold text-[var(--ink-strong)]">
                         Receiving TANF / WV Works / DHHR Assistance
-                      </p>
-                      <p className="text-xs text-[var(--ink-muted)]">
+                      </span>
+                      <span className="block text-xs text-[var(--ink-muted)]">
                         Check this box if referred through your local DHHR or WV Works office.
-                      </p>
-                    </div>
-                  </label>
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                  <label htmlFor={notesId} className="block text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
                     Schedule, Transportation, or Childcare Notes (Optional)
                   </label>
                   <textarea
+                    id={notesId}
                     rows={2}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -537,9 +593,9 @@ export default function IntakeClient() {
                   <ShieldCheck size={24} weight="bold" />
                 </div>
                 <div>
-                  <h2 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                  <h1 className="font-display text-xl font-bold text-[var(--ink-strong)]">
                     Agreements & Digital Signature
-                  </h2>
+                  </h1>
                   <p className="text-xs text-[var(--ink-muted)]">
                     Review statutory notices and electronically sign your state intake packet.
                   </p>
@@ -567,13 +623,18 @@ export default function IntakeClient() {
 
                 {/* Electronic Signature Box */}
                 <div className="rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface-card)] p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  <label
+                    htmlFor={signatureNameId}
+                    className="block text-xs font-semibold uppercase tracking-wider text-[var(--accent)]"
+                  >
                     Official Electronic Signature (34 CFR § 99.30)
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                  </label>
+                  <p id={signatureHelpId} className="mt-1 text-xs text-[var(--ink-muted)]">
                     Type your full legal name below to sign your state intake packet:
                   </p>
                   <input
+                    id={signatureNameId}
+                    aria-describedby={signatureHelpId}
                     type="text"
                     required
                     value={signatureName}
@@ -582,17 +643,52 @@ export default function IntakeClient() {
                     className="field mt-3 w-full px-4 py-3 text-base font-semibold text-[var(--ink-strong)]"
                   />
 
-                  <label className="mt-4 flex items-start gap-2.5 cursor-pointer">
+                  <p className="mt-4 text-xs font-semibold text-[var(--ink-strong)]">
+                    Check all three boxes to finish. Nothing is checked for you.
+                  </p>
+
+                  <div className="mt-2 flex items-start gap-2.5">
                     <input
+                      id={ferpaConsentId}
                       type="checkbox"
-                      checked={consentConfirmed}
-                      onChange={(e) => setConsentConfirmed(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-[var(--accent)]"
+                      checked={ferpaConsent}
+                      onChange={(e) => setFerpaConsent(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border)] text-[var(--accent)]"
                     />
-                    <span className="text-xs text-[var(--ink-strong)]">
-                      I verify that the information provided is accurate and that I agree to enroll in the SPOKES workforce development program.
-                    </span>
-                  </label>
+                    <label htmlFor={ferpaConsentId} className="cursor-pointer text-xs text-[var(--ink-strong)]">
+                      I allow SPOKES to share my school records with the WV Department of Human
+                      Services (DoHS / WV Works), WorkForce West Virginia, and my instructors. They
+                      may use them to run the program and help me get support services.
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex items-start gap-2.5">
+                    <input
+                      id={policyConsentId}
+                      type="checkbox"
+                      checked={policyConsent}
+                      onChange={(e) => setPolicyConsent(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border)] text-[var(--accent)]"
+                    />
+                    <label htmlFor={policyConsentId} className="cursor-pointer text-xs text-[var(--ink-strong)]">
+                      I agree to the program rules above: come to class, take part in coaching, and
+                      use the computers only for school and job work.
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex items-start gap-2.5">
+                    <input
+                      id={signatureConsentId}
+                      type="checkbox"
+                      checked={signatureConsent}
+                      onChange={(e) => setSignatureConsent(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border)] text-[var(--accent)]"
+                    />
+                    <label htmlFor={signatureConsentId} className="cursor-pointer text-xs text-[var(--ink-strong)]">
+                      The name I typed above is my legal signature, and everything I entered is
+                      true.
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -606,7 +702,7 @@ export default function IntakeClient() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || !canSubmitEnrollment}
                   className="primary-button flex items-center gap-2 px-8 py-3.5 text-base font-semibold disabled:opacity-60"
                 >
                   {isPending ? "Submitting Enrollment..." : "Complete Official Enrollment"}
