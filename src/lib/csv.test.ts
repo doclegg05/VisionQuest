@@ -11,4 +11,10 @@ describe("escapeCsvValue", () => {
   it("still quotes values that contain commas", () => {
     assert.equal(escapeCsvValue("Doe, Jane"), '"Doe, Jane"');
   });
+
+  it("prefixes tab- and CR-led cells and quotes an embedded carriage return", () => {
+    assert.equal(escapeCsvValue("\t=1+1"), "'\t=1+1");
+    assert.equal(escapeCsvValue("\r=1+1"), "\"'\r=1+1\"");
+    assert.equal(escapeCsvValue("line1\rline2"), '"line1\rline2"');
+  });
 });

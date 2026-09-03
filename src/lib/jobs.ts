@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prismaAdmin as prisma } from "./db";
 import { logger } from "./logger";
+import { studentLogKey } from "./log-keys";
 
 /**
  * Lightweight background job queue backed by the database.
@@ -133,12 +134,32 @@ export async function claimPendingJobById(jobId: string): Promise<ClaimedJob[]> 
   `);
 }
 
+/** Shortest value treated as an id; keeps a short or empty field from mangling the message. */
+const MIN_STUDENT_ID_LENGTH = 8;
+
+/**
+ * Replace any student id the payload carries with its one-way log key.
+ * A handler's message reaches the "Job failed" log line and BackgroundJob.error
+ * verbatim, both outside the logger lint rule (review F59, 2026-09-01), so the
+ * runner scrubs what it can see instead of trusting every handler to.
+ */
+function redactPayloadStudentIds(message: string, payload: Record<string, unknown> | null): string {
+  if (payload === null) return message;
+  const ids = Object.entries(payload).flatMap(([key, value]) =>
+    /studentId$/i.test(key) && typeof value === "string" && value.length >= MIN_STUDENT_ID_LENGTH
+      ? [value]
+      : [],
+  );
+  return ids.reduce((text, id) => text.split(id).join(studentLogKey(id)), message);
+}
+
 async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
   if (claimed.length === 0) return 0;
 
   let processed = 0;
 
   for (const job of claimed) {
+    let payload: Record<string, unknown> | null = null;
     try {
       const handler = JOB_HANDLERS[job.type];
       if (!handler) {
@@ -150,8 +171,9 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
         continue;
       }
 
-      const payload = JSON.parse(job.payload);
-      await handler(payload);
+      const parsed: Record<string, unknown> = JSON.parse(job.payload);
+      payload = parsed;
+      await handler(parsed);
 
       await prisma.backgroundJob.update({
         where: { id: job.id },
@@ -159,7 +181,8 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
       });
       processed++;
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      const errorMsg = redactPayloadStudentIds(rawMessage, payload);
       logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorMsg });
 
       await prisma.backgroundJob.update({

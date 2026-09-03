@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { enqueueJob, processJobById, processJobs, registerJobHandler } from "@/lib/jobs";
+import { studentLogKey } from "@/lib/log-keys";
 
 type FindFirstArgs = Parameters<typeof prisma.backgroundJob.findFirst>[0];
 type CreateArgs = Parameters<typeof prisma.backgroundJob.create>[0];
@@ -212,6 +213,45 @@ test("processJobs returns 0 immediately when nothing is claimed", async () => {
     assert.equal(processed, 0);
     assert.equal(updateStub.calls.length, 0);
   } finally {
+    restoreClaim();
+    updateStub.restore();
+  }
+});
+
+// Review F59 (2026-09-01): BackgroundJob.error and the "Job failed" log line
+// take the handler's message verbatim, which is outside the reach of the
+// logger lint rule. The runner scrubs any student id it can see in the
+// payload before either sink receives the message.
+test("processJobs keeps a payload student id out of the error column and the log line", async () => {
+  const studentId = "cmf9x1y2z0000abcdefghijkl";
+  const restoreClaim = stubQueryRaw([
+    { id: "job-5", type: "test_fail_leaky", payload: JSON.stringify({ studentId }), attempts: 1 },
+  ]);
+  const updateStub = stubBackgroundJobUpdate();
+  const consoleLines: string[] = [];
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    consoleLines.push(args.map(String).join(" "));
+  };
+
+  registerJobHandler("test_fail_leaky", async (payload) => {
+    // This fixture is the leak the runner must scrub, so the F59 rule fires
+    // on it by design; real code fixes the line instead of disabling the rule.
+    // eslint-disable-next-line no-restricted-syntax
+    throw new Error(`briefing: agent turn failed for student ${(payload as { studentId: string }).studentId}`);
+  });
+
+  try {
+    await processJobs(1);
+    const stored = String(updateStub.calls[0].data.error);
+    assert.doesNotMatch(stored, new RegExp(studentId));
+    assert.match(stored, new RegExp(studentLogKey(studentId)));
+    assert.match(stored, /agent turn failed/);
+    const logged = consoleLines.join("\n");
+    assert.match(logged, /Job failed/);
+    assert.doesNotMatch(logged, new RegExp(studentId));
+  } finally {
+    console.error = originalConsoleError;
     restoreClaim();
     updateStub.restore();
   }

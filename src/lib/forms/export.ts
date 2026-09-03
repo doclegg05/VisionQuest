@@ -1,3 +1,4 @@
+import { escapeCsvValue } from "@/lib/csv";
 import type { FieldDef, FormTemplateSchema } from "@/lib/forms/schema";
 
 export interface ExportableResponse {
@@ -33,21 +34,20 @@ const METADATA_COLUMNS = [
 ] as const;
 
 /**
- * RFC 4180 CSV escaping: wrap in double quotes if the field contains comma,
- * quote, CR, or LF; escape embedded quotes by doubling them.
+ * Render one cell: normalize the unknown answer shape to text, then run it
+ * through the shared escaper. Review F13 (2026-09-01): this file used to carry
+ * its own RFC 4180-only escaper, which let a cell opening with `=`, `+`, `-`,
+ * `@`, tab, or CR reach Excel as a live formula.
  */
-export function csvEscape(value: unknown): string {
+function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const str = typeof value === "string" ? value : Array.isArray(value) ? value.join("; ") : String(value);
-  if (/[",\n\r]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
+  const text = typeof value === "string" ? value : Array.isArray(value) ? value.join("; ") : String(value);
+  return escapeCsvValue(text);
 }
 
 export function buildHeaderRow(schema: FormTemplateSchema): string {
   const fieldKeys = schema.map((field) => field.key);
-  return [...METADATA_COLUMNS, ...fieldKeys].map(csvEscape).join(",");
+  return [...METADATA_COLUMNS, ...fieldKeys].map(csvCell).join(",");
 }
 
 export function buildResponseRow(
@@ -67,8 +67,8 @@ export function buildResponseRow(
     createdAt: response.createdAt.toISOString(),
     updatedAt: response.updatedAt.toISOString(),
   };
-  const meta = METADATA_COLUMNS.map((key) => csvEscape(metadata[key]));
-  const values = schema.map((field) => csvEscape(formatAnswer(field, answers[field.key])));
+  const meta = METADATA_COLUMNS.map((key) => csvCell(metadata[key]));
+  const values = schema.map((field) => csvCell(formatAnswer(field, answers[field.key])));
   return [...meta, ...values].join(",");
 }
 

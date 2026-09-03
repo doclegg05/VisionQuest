@@ -1,6 +1,7 @@
 import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { rateLimit, rateLimitDaily } from "@/lib/rate-limit";
+import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
@@ -386,10 +387,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // could still DoS the local Ollama host, which is production for VisionQuest.
   // See code review finding 2026-05-08 (Sprint 1 Bundle #5 / Task A).
   const isCloudProvider = provider.name === "gemini";
-  const rateLimitsDisabled = process.env.VISIONQUEST_DISABLE_RATE_LIMITS === "true";
   let dailyRemaining: number | null = null;
 
-  if (!rateLimitsDisabled) {
+  // The dev-only switch and its production guard live in rate-limit-switch.ts.
+  if (!rateLimitsDisabled()) {
     // Hourly per-user request cap. Fires for every role (student, teacher,
     // admin) because the goal is host protection, not cost control. Admin
     // gets a higher ceiling consistent with prior cloud-only behavior, but

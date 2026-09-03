@@ -32,6 +32,7 @@ import {
   type CrisisCategory,
 } from "@/lib/sage/crisis-detection";
 import { rateLimit } from "@/lib/rate-limit";
+import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -41,11 +42,6 @@ import { studentLogKey } from "@/lib/log-keys";
  */
 const CRISIS_RECORD_CAP = 3;
 const CRISIS_RECORD_WINDOW_MS = 10 * 60_000;
-
-/** Same switch, same spelling, as the chat route's rate limits. */
-function rateLimitsDisabled(): boolean {
-  return process.env.VISIONQUEST_DISABLE_RATE_LIMITS === "true";
-}
 
 /** True when this signal may be recorded. Fails open on any counter failure. */
 async function recordAllowed(studentId: string): Promise<boolean> {

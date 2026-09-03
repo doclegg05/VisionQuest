@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
+import { studentLogKey } from "@/lib/log-keys";
 
 // ── Module mocks (must precede the dynamic import of briefing.ts) ───────────
 
@@ -226,7 +227,15 @@ describe("runDailyBriefing", () => {
       stopReason: "error",
       violation: null,
     }));
-    await assert.rejects(() => briefing.runDailyBriefing("student-a"));
+    await assert.rejects(() => briefing.runDailyBriefing("student-a"), (err: unknown) => {
+      // Review F59 (2026-09-01): this message lands in the job runner's log
+      // line and in BackgroundJob.error, so it carries the one-way log key
+      // and never the raw student id.
+      const message = err instanceof Error ? err.message : String(err);
+      assert.doesNotMatch(message, /student-a/);
+      assert.match(message, new RegExp(studentLogKey("student-a")));
+      return true;
+    });
     const updateArg = panelUpdate.mock.calls.at(-1)!.arguments[0] as {
       data: { status: string };
     };

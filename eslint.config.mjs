@@ -37,6 +37,22 @@ const restrictedSyntaxEverywhere = [
     message:
       "No student identifier in server logs, even under a different key. Use studentLogKey(studentId) from @/lib/log-keys.",
   },
+  // An Error message or an `error:` field interpolating a student id reaches
+  // BackgroundJob.error and the job runner's log line, outside the logger
+  // selectors above (review F59, 2026-09-01). Both the bare identifier and
+  // the `x.studentId` member form are matched.
+  {
+    selector:
+      "NewExpression[callee.name='Error'] > TemplateLiteral > :matches(Identifier[name=/^(studentId|targetStudentId)$/], MemberExpression[property.name=/^(studentId|targetStudentId)$/])",
+    message:
+      "No student identifier in an Error message; it reaches logs and BackgroundJob.error. Use studentLogKey(studentId) from @/lib/log-keys.",
+  },
+  {
+    selector:
+      "Property[key.name='error'] > TemplateLiteral > :matches(Identifier[name=/^(studentId|targetStudentId)$/], MemberExpression[property.name=/^(studentId|targetStudentId)$/])",
+    message:
+      "No student identifier in an error string; it reaches logs and BackgroundJob.error. Use studentLogKey(studentId) from @/lib/log-keys.",
+  },
 ];
 
 // StudentAlert is the staff intervention queue, and the RLS policy admits a
