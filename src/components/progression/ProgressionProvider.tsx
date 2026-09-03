@@ -106,6 +106,11 @@ export default function ProgressionProvider({ children }: { children: ReactNode 
 
     async function loadInitialProgression() {
       try {
+        // The daily check-in is an explicit write, once per app-shell mount.
+        // GET /api/progression below is read-only (F25 / VQ-R-006).
+        await fetch("/api/progression/checkin", { method: "POST" }).catch(() => undefined);
+        if (cancelled) return;
+
         const res = await fetch("/api/progression");
         if (!res.ok || cancelled) return;
 

@@ -1,28 +1,56 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { badRequest, forbidden, notFound } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
-import { invalidatePrefix } from "@/lib/cache";
 import { prisma } from "@/lib/db";
-import { ensureGoalLevelProgression } from "@/lib/goal-progression";
-import { goalCountsTowardPlan, isGoalLevel, isGoalStatus } from "@/lib/goals";
-import { recordBhagCompleted } from "@/lib/progression/engine";
-import { updateProgression } from "@/lib/progression/service";
+import { isGoalStatus } from "@/lib/goals";
+import {
+  applyGoalTransition,
+  goalActorFor,
+  type GoalTransitionFields,
+  type GoalTransitionRequest,
+} from "@/lib/goals/transition-goal-status";
+import { parseBody } from "@/lib/schemas";
 
-async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const body = await req.json();
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      throw new Error("invalid");
+const patchGoalSchema = z.object({
+  content: z.string().optional(),
+  status: z.string().optional(),
+  confirm: z.boolean().optional(),
+  reviewed: z.boolean().optional(),
+});
+
+type PatchGoalBody = z.infer<typeof patchGoalSchema>;
+
+function goalFieldsFrom(body: PatchGoalBody, currentContent: string): GoalTransitionFields {
+  const content = body.content === undefined ? undefined : body.content.trim();
+  if (content !== undefined) {
+    if (!content) {
+      throw badRequest("Goal content cannot be empty.");
     }
-    return body as Record<string, unknown>;
-  } catch {
-    throw badRequest("Invalid JSON body.");
+    if (content.length > 500) {
+      throw badRequest("Goal content must be 500 characters or fewer.");
+    }
   }
+  return {
+    ...(content !== undefined && content !== currentContent ? { content } : {}),
+    // Review flag: stamp lastReviewedAt in the same write.
+    ...(body.reviewed === true ? { lastReviewedAt: new Date() } : {}),
+  };
+}
+
+function transitionRequestFrom(body: PatchGoalBody): GoalTransitionRequest {
+  const confirm = body.confirm === true;
+  if (body.status === undefined) return { confirm };
+  const status = body.status.trim().toLowerCase();
+  if (!isGoalStatus(status)) {
+    throw badRequest("Goal status is invalid.");
+  }
+  return { to: status, confirm };
 }
 
 export const PATCH = withRegistry("goals.update", async (session, req, ctx, _tool) => {
   const { id } = await ctx.params;
-  const body = await readJsonBody(req);
+  const body = await parseBody(req, patchGoalSchema);
   const goal = await prisma.goal.findFirst({
     where: { id, studentId: session.id },
     select: {
@@ -40,83 +68,27 @@ export const PATCH = withRegistry("goals.update", async (session, req, ctx, _too
     throw notFound("Goal not found.");
   }
 
-  const updates: {
-    content?: string;
-    status?: string;
-    confirmedAt?: Date;
-    confirmedBy?: string;
-    lastReviewedAt?: Date;
-  } = {};
-
-  if ("content" in body) {
-    const content = typeof body.content === "string" ? body.content.trim() : "";
-    if (!content) {
-      throw badRequest("Goal content cannot be empty.");
-    }
-    if (content.length > 500) {
-      throw badRequest("Goal content must be 500 characters or fewer.");
-    }
-    if (content !== goal.content) {
-      updates.content = content;
-    }
-  }
-
-  if ("status" in body) {
-    const status = typeof body.status === "string" ? body.status.trim().toLowerCase() : "";
-    if (!isGoalStatus(status)) {
-      throw badRequest("Goal status is invalid.");
-    }
-    if (status !== goal.status) {
-      updates.status = status;
-    }
-  }
-
-  // Handle confirmation: proposed Sage goals and student-entered active goals
-  // both become confirmed only after a human explicitly accepts them.
-  if (updates.status === "confirmed" || ("confirm" in body && body.confirm === true)) {
-    // Product rule (docs/PRODUCT_DECISIONS.md): AI may not finalize a student
-    // goal — Sage-proposed goals (sourceMessageId set) require STAFF
-    // confirmation via the teacher route. Students may still confirm goals
-    // they created themselves (sourceMessageId is null).
-    if (goal.sourceMessageId) {
-      throw forbidden("Sage suggested this goal — ask your instructor to confirm it.");
-    }
-    const CONFIRMABLE_FROM = ["proposed", "active", "in_progress"];
-    const effectiveStatus = updates.status && updates.status !== "confirmed"
-      ? updates.status
-      : goal.status;
-    if (!CONFIRMABLE_FROM.includes(effectiveStatus)) {
-      throw badRequest(`Cannot confirm a goal with status '${effectiveStatus}'.`);
-    }
-    updates.status = "confirmed";
-    updates.confirmedAt = new Date();
-    updates.confirmedBy = session.id;
-  }
-
-  // Handle review: when "reviewed" flag is passed, update lastReviewedAt
-  if ("reviewed" in body && body.reviewed === true) {
-    updates.lastReviewedAt = new Date();
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ goal });
-  }
-
-  const updatedGoal = await prisma.goal.update({
-    where: { id: goal.id },
-    data: updates,
+  // Status changes, confirmation, and their side effects (cache, progression,
+  // XP) all go through the one transition path shared with the Sage
+  // update_goal_status tool.
+  const result = await applyGoalTransition({
+    actor: goalActorFor(session),
+    goal: {
+      id: goal.id,
+      studentId: session.id,
+      level: goal.level,
+      status: goal.status,
+      sourceMessageId: goal.sourceMessageId,
+    },
+    request: transitionRequestFrom(body),
+    fields: goalFieldsFrom(body, goal.content),
   });
 
-  invalidatePrefix(`goals:${session.id}`);
-
-  if (goalCountsTowardPlan(updatedGoal.status) && isGoalLevel(updatedGoal.level)) {
-    await ensureGoalLevelProgression(session.id, [updatedGoal.level]);
+  if (!result.ok) {
+    throw result.kind === "forbidden" ? forbidden(result.message) : badRequest(result.message);
   }
-
-  // When a BHAG is marked completed, award XP and check tier unlocks
-  if (updatedGoal.level === "bhag" && updatedGoal.status === "completed") {
-    await updateProgression(session.id, recordBhagCompleted);
+  if (!result.changed) {
+    return NextResponse.json({ goal });
   }
-
-  return NextResponse.json({ goal: updatedGoal });
+  return NextResponse.json({ goal: result.goal });
 });

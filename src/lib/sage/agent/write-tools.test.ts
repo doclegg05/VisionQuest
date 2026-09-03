@@ -100,6 +100,32 @@ mock.module("./rate-limit", {
   },
 });
 
+// The shared goal transition path (src/lib/goals/transition-goal-status.ts)
+// invalidates the goals cache and records progression/XP. Stub those side
+// effects so update_goal_status tests can assert them without a DB.
+const mockInvalidatePrefix = mock.fn() as any;
+const mockEnsureGoalLevelProgression = mock.fn(async () => 0) as any;
+const mockUpdateProgression = mock.fn(async () => ({})) as any;
+
+mock.module("@/lib/cache", {
+  namedExports: {
+    cached: async (...args: any[]) => {
+      const fn = args.find((a) => typeof a === "function");
+      return fn();
+    },
+    invalidate: () => undefined,
+    invalidatePrefix: mockInvalidatePrefix,
+    invalidateChatContext: () => undefined,
+    invalidateAllChatContext: () => undefined,
+  },
+});
+mock.module("@/lib/goal-progression", {
+  namedExports: { ensureGoalLevelProgression: mockEnsureGoalLevelProgression },
+});
+mock.module("@/lib/progression/service", {
+  namedExports: { updateProgression: mockUpdateProgression },
+});
+
 let executeAgentTool: typeof import("./executor").executeAgentTool;
 let createConfirmationToken: typeof import("./confirmation").createConfirmationToken;
 
@@ -591,5 +617,161 @@ describe("write tools — injection resistance", () => {
     });
     assert.equal(record.result.status, "error");
     assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+});
+
+describe("update_goal_status — shared transition path (F22 / VQ-R-011)", () => {
+  // The tool file has no import of @/lib/cache, @/lib/goal-progression, or
+  // @/lib/progression/service. The only way these effects can fire from a
+  // tool call is through src/lib/goals/transition-goal-status.ts, so observing
+  // them proves the tool goes through the shared helper the HTTP route uses.
+  function goalRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "goal-1",
+      studentId: "stu-1",
+      level: "weekly",
+      content: "Finish CNA prep",
+      status: "active",
+      sourceMessageId: null,
+      ...overrides,
+    };
+  }
+
+  function confirmedCall(args: Record<string, unknown>, session: any, targetStudentId?: string) {
+    const token = createConfirmationToken(
+      { toolName: "update_goal_status", args, sessionId: session.id, conversationId: "conv-1", targetStudentId },
+      new Date(),
+    );
+    return executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "update_goal_status",
+      args,
+      targetStudentId,
+      confirmedToken: token,
+    });
+  }
+
+  beforeEach(() => {
+    mockGoalFindFirst.mock.resetCalls();
+    mockGoalUpdate.mock.resetCalls();
+    mockRecordOperation.mock.resetCalls();
+    mockInvalidatePrefix.mock.resetCalls();
+    mockEnsureGoalLevelProgression.mock.resetCalls();
+    mockUpdateProgression.mock.resetCalls();
+    mockGoalFindFirst.mock.mockImplementation(async () => goalRow());
+    mockGoalUpdate.mock.mockImplementation(async ({ where, data }: any) => ({ ...goalRow(), id: where.id, ...data }));
+  });
+
+  it("a confirmed status change invalidates the goals cache and records level progression", async () => {
+    const record = await confirmedCall({ goalId: "goal-1", status: "completed" }, studentSession());
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockGoalUpdate.mock.callCount(), 1);
+    assert.equal(mockGoalUpdate.mock.calls[0].arguments[0].data.status, "completed");
+    assert.deepEqual(mockInvalidatePrefix.mock.calls.map((c: any) => c.arguments[0]), ["goals:stu-1"]);
+    assert.deepEqual(mockEnsureGoalLevelProgression.mock.calls[0].arguments, ["stu-1", ["weekly"]]);
+    assert.equal(mockUpdateProgression.mock.callCount(), 0, "weekly goal completion awards no BHAG XP");
+    const ledger = mockRecordOperation.mock.calls.at(-1).arguments[0];
+    assert.equal(ledger.status, "executed");
+  });
+
+  it("completing a BHAG through the tool awards BHAG XP like the HTTP route", async () => {
+    const bhag = goalRow({ level: "bhag", status: "confirmed" });
+    mockGoalFindFirst.mock.mockImplementation(async () => bhag);
+    mockGoalUpdate.mock.mockImplementation(async ({ data }: any) => ({ ...bhag, ...data }));
+
+    const record = await confirmedCall({ goalId: "goal-1", status: "completed" }, studentSession());
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockUpdateProgression.mock.callCount(), 1);
+    assert.equal(mockUpdateProgression.mock.calls[0].arguments[0], "stu-1");
+    assert.deepEqual(mockEnsureGoalLevelProgression.mock.calls[0].arguments, ["stu-1", ["bhag"]]);
+  });
+
+  it("'paused' is stored as the lifecycle status 'blocked', never as an unknown status", async () => {
+    const record = await confirmedCall({ goalId: "goal-1", status: "paused" }, studentSession());
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockGoalUpdate.mock.calls[0].arguments[0].data.status, "blocked");
+    assert.deepEqual(mockInvalidatePrefix.mock.calls.map((c: any) => c.arguments[0]), ["goals:stu-1"]);
+  });
+
+  it("staff acting on a target student writes and progresses the TARGET's goal", async () => {
+    mockGoalFindFirst.mock.mockImplementation(async () => goalRow({ studentId: "stu-2", status: "confirmed" }));
+
+    const record = await confirmedCall(
+      { goalId: "goal-1", status: "completed" },
+      { id: "teach-1", role: "teacher" } as any,
+      "stu-2",
+    );
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockGoalFindFirst.mock.calls[0].arguments[0].where.studentId, "stu-2");
+    assert.deepEqual(mockInvalidatePrefix.mock.calls.map((c: any) => c.arguments[0]), ["goals:stu-2"]);
+    assert.equal(mockEnsureGoalLevelProgression.mock.calls[0].arguments[0], "stu-2");
+  });
+});
+
+describe("update_goal_status — proposed-goal guard (F23 / VQ-R-005)", () => {
+  function sageProposed(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "goal-1",
+      studentId: "stu-1",
+      level: "weekly",
+      content: "Earn the OSHA-10 card",
+      status: "proposed",
+      sourceMessageId: "msg-1",
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    mockGoalFindFirst.mock.resetCalls();
+    mockGoalUpdate.mock.resetCalls();
+    mockRecordOperation.mock.resetCalls();
+    mockInvalidatePrefix.mock.resetCalls();
+    mockEnsureGoalLevelProgression.mock.resetCalls();
+    mockGoalFindFirst.mock.mockImplementation(async () => sageProposed());
+    mockGoalUpdate.mock.mockImplementation(async ({ where, data }: any) => ({ ...sageProposed(), id: where.id, ...data }));
+  });
+
+  for (const status of ["completed", "active"]) {
+    it(`a student asking Sage to mark a proposed goal '${status}' gets a plain refusal, no confirm card, no write`, async () => {
+      const record = await executeAgentTool({
+        session: studentSession(),
+        conversationId: "conv-1",
+        toolName: "update_goal_status",
+        args: { goalId: "goal-1", status },
+      });
+
+      assert.equal(record.result.status, "error");
+      assert.match(record.result.summary, /instructor/);
+      assert.equal(record.result.action, undefined, "no confirmation card for a change the server refuses");
+      assert.equal(mockGoalUpdate.mock.callCount(), 0);
+      assert.equal(mockRecordOperation.mock.callCount(), 0, "nothing proposed to the ledger");
+    });
+  }
+
+  it("a teacher acting on the student may complete the proposed goal (staff matrix), with effects", async () => {
+    mockGoalFindFirst.mock.mockImplementation(async () => sageProposed({ studentId: "stu-2" }));
+    const args = { goalId: "goal-1", status: "completed" };
+    const token = createConfirmationToken(
+      { toolName: "update_goal_status", args, sessionId: "teach-1", conversationId: "conv-1", targetStudentId: "stu-2" },
+      new Date(),
+    );
+
+    const record = await executeAgentTool({
+      session: { id: "teach-1", role: "teacher" } as any,
+      conversationId: "conv-1",
+      toolName: "update_goal_status",
+      args,
+      targetStudentId: "stu-2",
+      confirmedToken: token,
+    });
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockGoalUpdate.mock.calls[0].arguments[0].data.status, "completed");
+    assert.deepEqual(mockInvalidatePrefix.mock.calls.map((c: any) => c.arguments[0]), ["goals:stu-2"]);
   });
 });
