@@ -71,9 +71,20 @@ function describePrismaCode(error: unknown): string | null {
 /**
  * A rate-limit bucket for the person the form describes, without putting their
  * name and date of birth in the `RateLimitEntry` table as plain text.
+ *
+ * The birth date is normalized to a calendar day first. The schema accepts any
+ * string `Date.parse` understands, so "1988-02-03" and "February 3, 1988" name
+ * the same person; keying on the raw text would have let a submitter re-spell
+ * the date for a fresh budget of attempts. An unparseable date cannot reach
+ * here — the schema refuses it — but if one ever did, falling back to the raw
+ * text keeps the bucket rather than dropping the limit.
  */
 function applicantKey(firstName: string, lastName: string, birthDate: string): string {
-  const identity = `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${birthDate.trim()}`;
+  const parsed = new Date(birthDate);
+  const day = Number.isNaN(parsed.getTime())
+    ? birthDate.trim()
+    : parsed.toISOString().slice(0, 10);
+  const identity = `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${day}`;
   return createHash("sha256").update(identity).digest("hex").slice(0, 16);
 }
 

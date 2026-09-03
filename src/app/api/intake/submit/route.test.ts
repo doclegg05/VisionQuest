@@ -373,6 +373,21 @@ describe("POST /api/intake/submit — caller-supplied class and error text", () 
     }
   });
 
+  it("keys the applicant bucket on the calendar day, so re-spelling the date buys no new attempts", async () => {
+    await route.POST(postIntake(BASE_PAYLOAD) as never);
+    const isoKey = rateLimitMock.mock.calls
+      .map((c) => String(c.arguments[0]))
+      .find((k) => k.startsWith("intake:submit:person:"));
+
+    resetState();
+    await route.POST(postIntake({ ...BASE_PAYLOAD, birthDate: "April 12, 1991" }) as never);
+    const prosePayload = rateLimitMock.mock.calls
+      .map((c) => String(c.arguments[0]))
+      .find((k) => k.startsWith("intake:submit:person:"));
+
+    assert.equal(prosePayload, isoKey);
+  });
+
   it("bounds submissions per applicant identity, not only per network address", async () => {
     await route.POST(postIntake(BASE_PAYLOAD) as never);
 
