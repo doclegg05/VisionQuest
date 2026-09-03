@@ -29,9 +29,9 @@ mock.module("@/lib/classroom", {
   },
 });
 
-const downloadFileMock = mock.fn(async () => null);
+const downloadFileMock = mock.fn(async () => null as { buffer: Buffer; mimeType: string } | null);
 const uploadFileMock = mock.fn(async () => undefined);
-const getPresignedDownloadUrlMock = mock.fn(async () => null);
+const getPresignedDownloadUrlMock = mock.fn(async () => null as string | null);
 
 mock.module("@/lib/storage", {
   namedExports: {
@@ -61,11 +61,21 @@ mock.module("@/lib/db", {
   },
 });
 
+const createStampedIntakePdfBufferMock = mock.fn(async () => Buffer.from("%PDF-1.4 mock pdf"));
 mock.module("@/lib/intake/pdf-stamped-packet", {
   namedExports: {
-    createStampedIntakePdfBuffer: mock.fn(async () => Buffer.from("%PDF-1.4 mock pdf")),
+    createStampedIntakePdfBuffer: createStampedIntakePdfBufferMock,
   },
 });
+
+const INTAKE_FILE = {
+  id: "file-intake-1",
+  studentId: "student-1",
+  filename: "Official_Intake_Packet_morgan.vance.pdf",
+  storageKey: "orientation/student-1/intake-123.pdf",
+  category: "orientation",
+  uploadedAt: new Date("2026-09-01"),
+};
 
 let route: typeof import("./route");
 
@@ -76,10 +86,40 @@ before(async () => {
 describe("GET /api/files/download", () => {
   beforeEach(() => {
     downloadFileMock.mock.resetCalls();
+    downloadFileMock.mock.mockImplementation(async () => null);
     uploadFileMock.mock.resetCalls();
+    getPresignedDownloadUrlMock.mock.resetCalls();
+    getPresignedDownloadUrlMock.mock.mockImplementation(async () => null);
     prismaFindFirstMock.mock.resetCalls();
     prismaFindUniqueMock.mock.resetCalls();
     formResponseFindUniqueMock.mock.resetCalls();
+    createStampedIntakePdfBufferMock.mock.resetCalls();
+
+    // A real, resolvable student with a SPOKES record and a submitted profile
+    // form: everything the deleted "self-healing" block needed to manufacture a
+    // replacement packet. Without these the fabrication path short-circuits and
+    // the tests below pass for the wrong reason.
+    prismaFindUniqueMock.mock.mockImplementation(async () => ({
+      id: "student-1",
+      studentId: "morgan.vance",
+      displayName: "Morgan Vance",
+      email: "morgan@example.com",
+      spokesRecord: {
+        firstName: "Morgan",
+        lastName: "Vance",
+        county: "Nicholas",
+        birthDate: new Date("1997-08-22"),
+        barriersOnEntry: ["tanf"],
+      },
+    }));
+    formResponseFindUniqueMock.mock.mockImplementation(async () => ({
+      answers: {
+        first_name: "Morgan",
+        last_name: "Vance",
+        phone: "(304) 555-0819",
+        tanf_status: true,
+      },
+    }));
   });
 
   it("returns 400 when id query parameter is missing", async () => {
@@ -95,46 +135,57 @@ describe("GET /api/files/download", () => {
     assert.equal(res.status, 404);
   });
 
-  it("self-heals missing intake packet by generating stamped state PDF and returning 200", async () => {
-    prismaFindFirstMock.mock.mockImplementation(async () => ({
-      id: "file-intake-1",
-      studentId: "student-1",
-      filename: "Official_Intake_Packet_morgan.vance.pdf",
-      storageKey: "orientation/student-1/intake-123.pdf",
-      category: "orientation",
-      uploadedAt: new Date("2026-09-01"),
+  it("returns the stored object when storage has it", async () => {
+    prismaFindFirstMock.mock.mockImplementation(async () => INTAKE_FILE);
+    downloadFileMock.mock.mockImplementation(async () => ({
+      buffer: Buffer.from("%PDF-1.4 the real signed packet"),
+      mimeType: "application/pdf",
     }));
-
-    prismaFindUniqueMock.mock.mockImplementation(async () => ({
-      id: "student-1",
-      studentId: "morgan.vance",
-      displayName: "Morgan Vance",
-      email: "morgan@example.com",
-      spokesRecord: {
-        firstName: "Morgan",
-        lastName: "Vance",
-        county: "Nicholas",
-        birthDate: new Date("1997-08-22"),
-        barriersOnEntry: ["tanf"],
-      },
-    }));
-
-    formResponseFindUniqueMock.mock.mockImplementation(async () => ({
-      answers: {
-        first_name: "Morgan",
-        last_name: "Vance",
-        phone: "(304) 555-0819",
-        tanf_status: true,
-      },
-    }));
-
-    downloadFileMock.mock.mockImplementation(async () => null); // Simulate missing storage file!
 
     const req = new Request("http://localhost:3000/api/files/download?id=file-intake-1");
     const res = await route.GET(req);
 
     assert.equal(res.status, 200);
     assert.equal(res.headers.get("content-type"), "application/pdf");
-    assert.equal(uploadFileMock.mock.callCount(), 1); // Confirms it was self-healed and cached in storage!
+    assert.equal(
+      Buffer.from(await res.arrayBuffer()).toString(),
+      "%PDF-1.4 the real signed packet",
+    );
+  });
+
+  // B4a. A missing orientation packet used to be "self-healed": the route
+  // synthesized a replacement from invented demographics with
+  // ferpaConsentSigned/policyAcknowledgmentSigned hardcoded true and a
+  // signature block naming the student, then wrote it over the canonical
+  // storage key. That manufactures a signed FERPA consent for a state-audited
+  // TANF program and makes it indistinguishable from a real one. A missing
+  // file is a 404.
+  it("returns 404 for a missing intake packet instead of fabricating a signed one", async () => {
+    prismaFindFirstMock.mock.mockImplementation(async () => INTAKE_FILE);
+
+    const req = new Request("http://localhost:3000/api/files/download?id=file-intake-1");
+    const res = await route.GET(req);
+
+    assert.equal(res.status, 404);
+    assert.equal(createStampedIntakePdfBufferMock.mock.callCount(), 0);
+  });
+
+  it("never writes to storage on a read, even when the object is missing", async () => {
+    prismaFindFirstMock.mock.mockImplementation(async () => INTAKE_FILE);
+
+    const req = new Request("http://localhost:3000/api/files/download?id=file-intake-1");
+    await route.GET(req);
+
+    assert.equal(uploadFileMock.mock.callCount(), 0);
+  });
+
+  it("does not re-derive student demographics when the object is missing", async () => {
+    prismaFindFirstMock.mock.mockImplementation(async () => INTAKE_FILE);
+
+    const req = new Request("http://localhost:3000/api/files/download?id=file-intake-1");
+    await route.GET(req);
+
+    assert.equal(prismaFindUniqueMock.mock.callCount(), 0);
+    assert.equal(formResponseFindUniqueMock.mock.callCount(), 0);
   });
 });
