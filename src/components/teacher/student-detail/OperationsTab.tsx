@@ -672,8 +672,6 @@ export default function OperationsTab({
           fileId={previewSubmission.file.id}
           title={previewSubmission.title}
           studentName={student.displayName}
-          studentId={student.id}
-          submissionId={previewSubmission.id}
           status={previewSubmission.status}
           onCounterSign={() => {
             const s = previewSubmission;

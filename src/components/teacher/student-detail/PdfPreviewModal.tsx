@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef, useState } from "react";
-import { X, Printer, DownloadSimple, CheckCircle, PenNib, PaperPlaneTilt } from "@phosphor-icons/react";
+import React, { useRef } from "react";
+import { X, Printer, DownloadSimple, PenNib } from "@phosphor-icons/react";
 
 interface PdfPreviewModalProps {
   isOpen: boolean;
@@ -9,8 +9,6 @@ interface PdfPreviewModalProps {
   fileId: string;
   title: string;
   studentName: string;
-  studentId?: string;
-  submissionId?: string;
   status: string;
   onCounterSign?: () => void;
 }
@@ -21,48 +19,14 @@ export default function PdfPreviewModal({
   fileId,
   title,
   studentName,
-  studentId,
-  submissionId,
   status,
   onCounterSign,
 }: PdfPreviewModalProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [dispatching, setDispatching] = useState(false);
-  const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
 
   if (!isOpen || !fileId) return null;
 
   const downloadUrl = `/api/files/download?id=${fileId}`;
-
-  const handleDispatchCaseworker = async () => {
-    if (!studentId) return;
-    const email = window.prompt("Enter DHHR / WorkForce Caseworker Email to dispatch certified packet:", "caseworker@wv.gov");
-    if (!email || !email.includes("@")) return;
-
-    setDispatching(true);
-    try {
-      const res = await fetch(`/api/teacher/students/${studentId}/forms/dispatch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          submissionId,
-          caseworkerEmail: email,
-          caseworkerName: "DHHR Regional Worker",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDispatchSuccess(`Packet dispatched to ${email}`);
-        setTimeout(() => setDispatchSuccess(null), 4000);
-      } else {
-        alert(data.error || "Failed to dispatch to caseworker");
-      }
-    } catch {
-      alert("Error sending packet to caseworker");
-    } finally {
-      setDispatching(false);
-    }
-  };
 
   const handlePrint = () => {
     const iframe = iframeRef.current;
@@ -112,19 +76,6 @@ export default function PdfPreviewModal({
               </button>
             )}
 
-            {studentId && (
-              <button
-                type="button"
-                onClick={handleDispatchCaseworker}
-                disabled={dispatching}
-                className="flex items-center gap-1.5 rounded-xl border border-indigo-600 bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
-                title="Send certified packet directly to student's DHHR caseworker"
-              >
-                <PaperPlaneTilt size={15} weight="bold" />
-                {dispatching ? "Sending..." : "Send to Caseworker"}
-              </button>
-            )}
-
             <button
               type="button"
               onClick={handlePrint}
@@ -155,12 +106,6 @@ export default function PdfPreviewModal({
             </button>
           </div>
         </div>
-
-        {dispatchSuccess && (
-          <div className="bg-emerald-600 px-6 py-2 text-xs font-bold text-white text-center shadow-inner animate-fade-in">
-            ✓ {dispatchSuccess} and recorded in official Case Notes.
-          </div>
-        )}
 
         {/* PDF Viewer Body */}
         <div className="relative flex-1 bg-slate-900/10 dark:bg-black/30">
