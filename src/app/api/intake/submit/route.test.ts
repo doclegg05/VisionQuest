@@ -350,6 +350,30 @@ describe("POST /api/intake/submit — caller-supplied class and error text", () 
     assert.equal(createdEnrollments.length, 0, "no county match must mean no enrollment");
   });
 
+  // Carried over from the route's original suite, which this file replaced.
+  it("rejects an incomplete payload with 400 and provisions nothing", async () => {
+    const res = await route.POST(postIntake({ firstName: "Jordan" }) as never);
+    const body = await res.json();
+
+    assert.equal(res.status, 400);
+    assert.ok(body.error);
+    assert.equal(createdStudents.length, 0);
+  });
+
+  it("refuses and provisions nothing once the per-network limit is spent", async () => {
+    rateLimitMock.mock.mockImplementationOnce(async () => ({
+      success: false,
+      remaining: 0,
+      resetTime: Date.now() + 60_000,
+      degraded: false,
+    }));
+
+    const res = await route.POST(postIntake(BASE_PAYLOAD) as never);
+
+    assert.equal(res.status, 429);
+    assert.equal(createdStudents.length, 0);
+  });
+
   it("returns a generic message when provisioning throws, with no internal detail", async () => {
     const boom = new Error(
       'Invalid `prisma.student.create()` invocation: Unique constraint failed on the fields: (`email`)',

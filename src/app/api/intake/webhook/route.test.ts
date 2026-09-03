@@ -10,9 +10,22 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 
 mock.module("@/lib/auth", { namedExports: { getSession: async () => null } });
 
+class FakeApiError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 mock.module("@/lib/api-error", {
   namedExports: {
     isStaffRole: (role: string) => role === "teacher" || role === "admin",
+    // parseBody reaches for this on a schema failure; without it the route
+    // would 500 on a bad payload and the 400 case would pass for the wrong
+    // reason.
+    badRequest: (message: string) => new FakeApiError(400, message),
     // Faithful to the real wrapper's contract: ApiError renders as its own
     // status and message, anything else as a bare 500 with no detail.
     withErrorHandler:
@@ -31,9 +44,17 @@ mock.module("@/lib/api-error", {
   },
 });
 
+const loggedErrors: Array<Record<string, unknown>> = [];
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+    logger: {
+      info: () => {},
+      warn: () => {},
+      debug: () => {},
+      error: (_message: string, payload?: Record<string, unknown>) => {
+        loggedErrors.push(payload ?? {});
+      },
+    },
   },
 });
 
@@ -52,6 +73,10 @@ let route: typeof import("./route");
 
 before(async () => {
   process.env.INTAKE_WEBHOOK_SECRET = "test-webhook-secret";
+  // The route must not fall back to this. CRON_SECRET authenticates every
+  // /api/internal/* cron endpoint, so handing it to an external form vendor
+  // would make one vendor-side leak reach the whole internal job surface.
+  process.env.CRON_SECRET = "the-cron-secret-that-must-not-work-here";
   route = await import("./route");
 });
 
@@ -89,18 +114,77 @@ describe("POST /api/intake/webhook", () => {
       pdfStorageKey: "packet.pdf",
     };
     provisionMock.mock.resetCalls();
+    loggedErrors.length = 0;
+    process.env.INTAKE_WEBHOOK_SECRET = "test-webhook-secret";
   });
 
+  function postWithAuth(authorization: string | null): Request {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (authorization) headers.authorization = authorization;
+    return new Request("http://localhost:3000/api/intake/webhook", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(PAYLOAD),
+    });
+  }
+
   it("rejects an unauthenticated caller", async () => {
+    const res = await route.POST(postWithAuth(null));
+
+    assert.equal(res.status, 401);
+    assert.equal(provisionMock.mock.callCount(), 0);
+  });
+
+  it("rejects a wrong secret", async () => {
+    const res = await route.POST(postWithAuth("Bearer not-the-secret"));
+
+    assert.equal(res.status, 401);
+    assert.equal(provisionMock.mock.callCount(), 0);
+  });
+
+  it("does not accept CRON_SECRET, which authenticates the internal job surface", async () => {
+    // With its own secret set, the fallback never fired anyway. The escalation
+    // lived in the case that is production today: INTAKE_WEBHOOK_SECRET was
+    // declared nowhere, so `|| CRON_SECRET` made the token that authenticates
+    // every /api/internal/* cron endpoint the webhook's password, and one
+    // vendor-side leak reached the whole internal job surface.
+    delete process.env.INTAKE_WEBHOOK_SECRET;
+
+    const res = await route.POST(postWithAuth(`Bearer ${process.env.CRON_SECRET}`));
+
+    assert.equal(res.status, 401);
+    assert.equal(provisionMock.mock.callCount(), 0);
+  });
+
+  it("refuses the webhook and raises an alert when its own secret is unset", async () => {
+    delete process.env.INTAKE_WEBHOOK_SECRET;
+
+    const res = await route.POST(postWithAuth("Bearer anything-at-all"));
+
+    assert.equal(res.status, 401);
+    assert.equal(provisionMock.mock.callCount(), 0);
+    assert.ok(
+      loggedErrors.some((entry) => entry.alert === "intake_webhook_secret_missing"),
+      `a missing webhook secret must be loud, logged: ${JSON.stringify(loggedErrors)}`,
+    );
+  });
+
+  it("rejects a payload missing required fields with 400, before provisioning", async () => {
     const res = await route.POST(
       new Request("http://localhost:3000/api/intake/webhook", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(PAYLOAD),
+        headers: {
+          "Content-Type": "application/json",
+          authorization: "Bearer test-webhook-secret",
+        },
+        body: JSON.stringify({ firstName: "Dana" }),
       }),
     );
+    const body = await res.json();
 
-    assert.equal(res.status, 401);
+    assert.equal(res.status, 400);
+    assert.ok(body.error);
+    assert.equal(provisionMock.mock.callCount(), 0);
   });
 
   it("provisions as staff, not as the public form", async () => {

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { intakePayloadSchema } from "@/lib/intake/schema";
 import { provisionIntakeStudent } from "@/lib/intake/provision";
@@ -16,12 +17,46 @@ import { logger } from "@/lib/logger";
  * driver error is logged, not returned (review finding M4).
  */
 
+/**
+ * Compare a presented bearer token against the configured one without letting
+ * the comparison's duration report how much of the prefix matched. The length
+ * check leaks only the length, which a token's format already publishes.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+/**
+ * Bearer authentication for the external-form caller.
+ *
+ * This deliberately does NOT fall back to `CRON_SECRET`. That fallback made
+ * the token authenticating every `/api/internal/*` cron endpoint double as the
+ * webhook's password, so one leak at an external form vendor would have
+ * reached the whole internal job surface — and because `INTAKE_WEBHOOK_SECRET`
+ * was declared in no environment file, the fallback was not a fallback, it was
+ * the live path.
+ *
+ * With the fallback gone, an unset secret must fail loudly rather than turn
+ * into a silently unusable endpoint, so it refuses and alarms. A staff session
+ * is checked separately in the handler and still works: it is an independent,
+ * stronger credential that a missing bearer secret does not weaken.
+ */
 function isWebhookAuthorized(req: Request): boolean {
-  const secret = process.env.INTAKE_WEBHOOK_SECRET || process.env.CRON_SECRET;
-  if (!secret) return false;
+  const secret = process.env.INTAKE_WEBHOOK_SECRET;
+  if (!secret) {
+    logger.error("INTAKE_WEBHOOK_SECRET is not configured; the intake webhook refuses every bearer caller", {
+      alert: "intake_webhook_secret_missing",
+    });
+    return false;
+  }
 
   const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
+  if (!authHeader) return false;
+
+  return constantTimeEqual(authHeader, `Bearer ${secret}`);
 }
 
 /**
