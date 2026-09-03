@@ -73,6 +73,11 @@ const TOKEN_PATTERN = /^vqd1\.[A-Za-z0-9_-]{1,512}\.[A-Za-z0-9_-]{43}$/;
 
 const SIGNATURE_BYTES = 32;
 
+/** The signature is the only thing between a forger and a page carrying two
+ *  statutes, so a placeholder value ("test", "changeme") is treated as no key
+ *  at all rather than quietly signing with it. render.yaml generates one. */
+const MIN_SECRET_LENGTH = 32;
+
 /** Public callers, so the window is per source address and generous enough for
  *  a classroom or agency office sharing one egress IP. */
 const RATE_LIMIT_MAX = 20;
@@ -150,11 +155,12 @@ export async function GET(req: NextRequest) {
   }
 
   const secret = process.env.DOCUMENT_VERIFICATION_SECRET;
-  if (!secret) {
-    // Fail closed and loudly: a verifier with no key must never be the reason
-    // a forged document passes.
-    logger.error("Document verification secret is not configured", {
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    // Fail closed and loudly: a verifier with no usable key must never be the
+    // reason a forged document passes.
+    logger.error("Document verification secret is missing or too short", {
       alert: "document_verify_secret_missing",
+      configured: Boolean(secret),
     });
     return refuse(
       "verifier_unavailable",

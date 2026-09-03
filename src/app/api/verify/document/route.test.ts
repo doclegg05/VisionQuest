@@ -262,6 +262,15 @@ describe("document verifier — signed tokens", () => {
     );
   });
 
+  it("treats a placeholder-length secret as no secret", async () => {
+    process.env.DOCUMENT_VERIFICATION_SECRET = "changeme";
+
+    const res = await get(`token=${encodeURIComponent(signToken(validPayload(), "changeme"))}`);
+    const { json } = await body(res);
+    assert.equal(json.verified, false, "a token must not verify under a placeholder key");
+    assert.ok(loggerCalls.some((c) => c.context?.alert === "document_verify_secret_missing"));
+  });
+
   it("requires a token", async () => {
     const res = await get("");
     const { json } = await body(res);
