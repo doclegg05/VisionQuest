@@ -1,7 +1,12 @@
 /**
  * RLS policy integration tests — verifies that migration
- * `20260423120000_rls_policy_recovery` enforces the intended access matrix
- * when queries run as the `vq_app` role.
+ * `20260423120000_rls_policy_recovery` (now folded into the baseline) plus
+ * `20260701141000_scope_sage_memory_teacher_rls` and
+ * `20260820140000_tighten_sage_operation_read_rls` enforce the intended
+ * access matrix when queries run as the `vq_app` role.
+ *
+ * Every case below is written so that loosening the policy it names turns
+ * it red; the comment on each block says which loosening it guards against.
  *
  * Approach:
  *   Each test runs inside an interactive transaction where we
@@ -31,18 +36,39 @@ import { PrismaClient } from "@prisma/client";
 type Role = "student" | "teacher" | "admin";
 
 interface Fixtures {
+  /** Per-run namespace; every synthetic id/key embeds it so cleanup is scoped to this run. */
+  suffix: string;
   studentA: string;
   studentB: string;
+  /** Enrolled in classBeta; managed by teacherB only. */
+  studentC: string;
   teacher: string;
+  /** Second teacher; instructs classBeta only. Never manages Student A or B. */
+  teacherB: string;
   admin: string;
   classAlpha: string;
+  classBeta: string;
   conversationA: string;
   conversationB: string;
+  conversationC: string;
   goalA: string;
   goalB: string;
   caseNoteA: string;
   memoryA: string;
   memoryB: string;
+  alertA: string;
+  alertC: string;
+  arcA: string;
+  arcB: string;
+  auditRow: string;
+  /** actorType=student, actorId=A, targetStudentId=NULL (legacy self-service shape). */
+  opStudentA: string;
+  /** actorType=student, actorId=B, targetStudentId=NULL (legacy self-service shape). */
+  opStudentB: string;
+  /** actorType=teacher, actorId=teacher, targetStudentId=A (staff on-behalf-of). */
+  opStaffOnA: string;
+  /** actorType=teacher, actorId=teacherB, targetStudentId=C (staff on-behalf-of). */
+  opStaffOnC: string;
 }
 
 const SHOULD_RUN = process.env.RLS_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
@@ -60,18 +86,32 @@ if (!SHOULD_RUN) {
   describe("rls policies (integration)", () => {
     const db = new PrismaClient();
     const fixtures: Fixtures = {
+      suffix: "",
       studentA: "",
       studentB: "",
+      studentC: "",
       teacher: "",
+      teacherB: "",
       admin: "",
       classAlpha: "",
+      classBeta: "",
       conversationA: "",
       conversationB: "",
+      conversationC: "",
       goalA: "",
       goalB: "",
       caseNoteA: "",
       memoryA: "",
       memoryB: "",
+      alertA: "",
+      alertC: "",
+      arcA: "",
+      arcB: "",
+      auditRow: "",
+      opStudentA: "",
+      opStudentB: "",
+      opStaffOnA: "",
+      opStaffOnC: "",
     };
 
     /**
@@ -104,6 +144,7 @@ if (!SHOULD_RUN) {
 
     async function createFixtures(): Promise<void> {
       const suffix = `rlstest-${Date.now()}`;
+      fixtures.suffix = suffix;
 
       const [sa, sb, t, a] = await Promise.all([
         db.student.create({
@@ -230,9 +271,126 @@ if (!SHOULD_RUN) {
       ]);
       fixtures.memoryA = memA.id;
       fixtures.memoryB = memB.id;
+
+      // ---- Second tenant: Teacher B instructs Class Beta; only Student C is
+      // enrolled there. Teacher B therefore manages C and nobody else.
+      const [tb, sc] = await Promise.all([
+        db.student.create({
+          data: {
+            studentId: `tb-${suffix}`,
+            displayName: "Teacher Two",
+            role: "teacher",
+            passwordHash: "x",
+          },
+        }),
+        db.student.create({
+          data: {
+            studentId: `sc-${suffix}`,
+            displayName: "Student C",
+            role: "student",
+            passwordHash: "x",
+          },
+        }),
+      ]);
+      fixtures.teacherB = tb.id;
+      fixtures.studentC = sc.id;
+
+      const clsB = await db.spokesClass.create({
+        data: {
+          name: `RLS Test Class Beta ${suffix}`,
+          code: `RLSB-${suffix}`,
+          status: "active",
+        },
+      });
+      fixtures.classBeta = clsB.id;
+      await db.spokesClassInstructor.create({
+        data: { classId: clsB.id, instructorId: tb.id },
+      });
+      await db.studentClassEnrollment.create({
+        data: { classId: clsB.id, studentId: sc.id, status: "active" },
+      });
+
+      const convC = await db.conversation.create({
+        data: {
+          studentId: sc.id,
+          module: "goal-setting",
+          stage: "start",
+          title: "C's chat",
+        },
+      });
+      fixtures.conversationC = convC.id;
+
+      // ---- StudentAlert: one per tenant (A under Teacher, C under Teacher B).
+      const alertBase = {
+        type: "wellbeing_concern",
+        severity: "critical",
+        title: "Wellbeing check-in needed",
+        summary: "rls fixture",
+      };
+      const [alertA, alertC] = await Promise.all([
+        db.studentAlert.create({
+          data: { studentId: sa.id, alertKey: `rlstest-alert-a-${suffix}`, ...alertBase },
+        }),
+        db.studentAlert.create({
+          data: { studentId: sc.id, alertKey: `rlstest-alert-c-${suffix}`, ...alertBase },
+        }),
+      ]);
+      fixtures.alertA = alertA.id;
+      fixtures.alertC = alertC.id;
+
+      // ---- CoachingArc: A (managed by Teacher) and B (unmanaged).
+      const [arcA, arcB] = await Promise.all([
+        db.coachingArc.create({ data: { studentId: sa.id, arcType: "standard_6week" } }),
+        db.coachingArc.create({ data: { studentId: sb.id, arcType: "standard_6week" } }),
+      ]);
+      fixtures.arcA = arcA.id;
+      fixtures.arcB = arcB.id;
+
+      // ---- AuditLog: written as postgres (the prismaAdmin path audit.ts uses).
+      // No FK to Student, so it is deleted explicitly in destroyFixtures.
+      const audit = await db.auditLog.create({
+        data: {
+          actorId: t.id,
+          actorRole: "teacher",
+          action: "rls_test.fixture",
+          targetType: "RlsTestFixture",
+          targetId: suffix,
+          summary: "rls fixture",
+        },
+      });
+      fixtures.auditRow = audit.id;
+
+      // ---- SageOperation: the four row shapes sage_operation_read
+      // distinguishes. `id` has no default and there is no FK, so ids embed
+      // the suffix and destroyFixtures deletes by it.
+      fixtures.opStudentA = `rlstest-op-student-a-${suffix}`;
+      fixtures.opStudentB = `rlstest-op-student-b-${suffix}`;
+      fixtures.opStaffOnA = `rlstest-op-staff-on-a-${suffix}`;
+      fixtures.opStaffOnC = `rlstest-op-staff-on-c-${suffix}`;
+      const opBase = { toolName: "update_goal_status", status: "executed", payload: {} };
+      await db.sageOperation.createMany({
+        data: [
+          // Legacy shape (pre-20260820120000): student actor, no target. Both
+          // student rows use it so the teacher cases exercise the actor
+          // branch of the CASE in both directions (A managed, B unmanaged).
+          { id: fixtures.opStudentA, actorType: "student", actorId: sa.id, targetStudentId: null, ...opBase },
+          { id: fixtures.opStudentB, actorType: "student", actorId: sb.id, targetStudentId: null, ...opBase },
+          { id: fixtures.opStaffOnA, actorType: "teacher", actorId: t.id, targetStudentId: sa.id, ...opBase },
+          { id: fixtures.opStaffOnC, actorType: "teacher", actorId: tb.id, targetStudentId: sc.id, ...opBase },
+        ],
+      });
     }
 
     async function destroyFixtures(): Promise<void> {
+      // SageOperation and AuditLog have no FK to Student (ledger rows must
+      // survive offboarding), so neither cascades. Delete by the per-run
+      // namespace so a mid-test failure (e.g. the F17 createMany case) leaves
+      // nothing behind either.
+      await db.sageOperation.deleteMany({ where: { id: { contains: fixtures.suffix } } });
+      await db.auditLog.deleteMany({
+        where: { targetType: "RlsTestFixture", targetId: fixtures.suffix },
+      });
+
       // SageMemory.subjectId is a polymorphic reference (no Prisma relation /
       // real FK to Student — see prisma/schema.prisma's SageMemory model), so
       // it does NOT cascade-delete when the fixture Student rows are removed
@@ -243,9 +401,20 @@ if (!SHOULD_RUN) {
       // Cascades on Student delete clean up Conversation, Goal, CaseNote,
       // StudentClassEnrollment, etc. SpokesClassInstructor is covered by the
       // class delete cascade.
-      await db.spokesClass.deleteMany({ where: { id: fixtures.classAlpha } });
+      await db.spokesClass.deleteMany({ where: { id: { in: [fixtures.classAlpha, fixtures.classBeta] } } });
       await db.student.deleteMany({
-        where: { id: { in: [fixtures.studentA, fixtures.studentB, fixtures.teacher, fixtures.admin] } },
+        where: {
+          id: {
+            in: [
+              fixtures.studentA,
+              fixtures.studentB,
+              fixtures.studentC,
+              fixtures.teacher,
+              fixtures.teacherB,
+              fixtures.admin,
+            ],
+          },
+        },
       });
     }
 
@@ -308,7 +477,7 @@ if (!SHOULD_RUN) {
                 data: { studentId: fixtures.studentB, level: "daily", content: "forged" },
               }),
             ),
-          /row.level security|violates|permission/i,
+          /row-level security/i,
         );
       });
     });
@@ -424,6 +593,24 @@ if (!SHOULD_RUN) {
         assert.deepEqual(goals, [], "Goal must be empty with no context");
         assert.deepEqual(notes, [], "CaseNote must be empty with no context");
       });
+
+      it("returns zero rows for AuditLog, CoachingArc, StudentAlert, and SageOperation", async () => {
+        // Guards against any of these policies gaining a branch that is true
+        // with empty GUCs (e.g. `OR "studentId" = ''`, or a CASE ELSE true
+        // reachable without a role). Unfiltered on purpose: one row is a leak.
+        const [audits, arcs, alerts, ops] = await asRole(null, null, (tx) =>
+          Promise.all([
+            tx.auditLog.findMany({ select: { id: true } }),
+            tx.coachingArc.findMany({ select: { id: true } }),
+            tx.studentAlert.findMany({ select: { id: true } }),
+            tx.sageOperation.findMany({ select: { id: true } }),
+          ]),
+        );
+        assert.deepEqual(audits, [], "AuditLog must be empty with no context");
+        assert.deepEqual(arcs, [], "CoachingArc must be empty with no context");
+        assert.deepEqual(alerts, [], "StudentAlert must be empty with no context");
+        assert.deepEqual(ops, [], "SageOperation must be empty with no context");
+      });
     });
 
     describe("prismaAdmin bypass (simulated by skipping SET LOCAL ROLE)", () => {
@@ -536,6 +723,383 @@ if (!SHOULD_RUN) {
           // catch this too; delete here so a mid-test failure leaves nothing.
           await db.notification.deleteMany({ where: { id: created.id } });
         }
+      });
+    });
+
+    describe("AuditLog (audit_log_admin_only)", () => {
+      // Guards against adding a student or teacher branch to
+      // audit_log_admin_only. Staff writes go through prismaAdmin
+      // (src/lib/audit.ts); DB-03 in the 2026-09-01 DB review is two teacher
+      // routes that wrote through the app client and 500'd on exactly this
+      // policy. The postgres case at the end is the path that must keep working.
+      const directWrite = (actorId: string, actorRole: string) => ({
+        actorId,
+        actorRole,
+        action: "rls_test.direct-write",
+        targetType: "RlsTestFixture",
+        targetId: fixtures.suffix,
+        summary: "written through the app role",
+      });
+
+      it("student and teacher read zero audit rows", async () => {
+        const [asStudent, asTeacher] = await Promise.all([
+          asRole("student", fixtures.studentA, (tx) =>
+            tx.auditLog.findMany({ where: { id: fixtures.auditRow }, select: { id: true } }),
+          ),
+          asRole("teacher", fixtures.teacher, (tx) =>
+            tx.auditLog.findMany({ where: { id: fixtures.auditRow }, select: { id: true } }),
+          ),
+        ]);
+        assert.deepEqual(asStudent, [], "student must not read AuditLog");
+        assert.deepEqual(asTeacher, [], "teacher must not read AuditLog (admin only)");
+      });
+
+      it("student cannot insert an audit row", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.auditLog.create({ data: directWrite(fixtures.studentA, "student") }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("teacher cannot insert an audit row through the app role (DB-03 shape)", async () => {
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.auditLog.create({ data: directWrite(fixtures.teacher, "teacher") }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("admin reads the row; the postgres (prismaAdmin) path inserts one", async () => {
+        const seen = await asRole("admin", fixtures.admin, (tx) =>
+          tx.auditLog.findMany({ where: { id: fixtures.auditRow }, select: { id: true } }),
+        );
+        assert.deepEqual(seen.map((r) => r.id), [fixtures.auditRow], "admin branch must still read");
+
+        const created = await db.auditLog.create({
+          data: directWrite(fixtures.teacher, "teacher"),
+          select: { id: true },
+        });
+        try {
+          assert.ok(created.id, "audit.ts writes through prismaAdmin; that path must succeed");
+        } finally {
+          await db.auditLog.deleteMany({ where: { id: created.id } });
+        }
+      });
+    });
+
+    describe("CoachingArc (coaching_arc_access)", () => {
+      // Guards against dropping the ownership term (`"studentId" =
+      // current_user_id`) or the managed_student_ids() gate on the teacher
+      // branch. The daily-coaching cron writes arcs; DB-02 in the 2026-09-01
+      // DB review is that write running under the wrong client, not a policy
+      // defect, so the policy shape is pinned here as-is.
+      it("student sees only own arc", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.coachingArc.findMany({
+            where: { id: { in: [fixtures.arcA, fixtures.arcB] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.id), [fixtures.arcA]);
+      });
+
+      it("student can update own arc and cannot update another student's", async () => {
+        const own = await asRole("student", fixtures.studentA, (tx) =>
+          tx.coachingArc.updateMany({ where: { id: fixtures.arcA }, data: { weekNumber: 2 } }),
+        );
+        assert.equal(own.count, 1, "own-row write is admitted (proves the context is live)");
+        const other = await asRole("student", fixtures.studentA, (tx) =>
+          tx.coachingArc.updateMany({ where: { id: fixtures.arcB }, data: { weekNumber: 2 } }),
+        );
+        assert.equal(other.count, 0, "cross-student write must touch zero rows");
+      });
+
+      it("student cannot insert an arc for another student", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.coachingArc.create({
+                // Distinct arcType so @@unique([studentId, arcType]) cannot be
+                // what rejects this; only the policy may.
+                data: { studentId: fixtures.studentB, arcType: "rlstest_forged" },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("teacher sees managed students' arcs only", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.coachingArc.findMany({
+            where: { id: { in: [fixtures.arcA, fixtures.arcB] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.id), [fixtures.arcA], "Student B is unmanaged");
+      });
+    });
+
+    describe("StudentAlert (student_alert_access)", () => {
+      // Two things are pinned. (1) The policy admits a student's OWN alert
+      // rows. That is what let staff wellbeing alerts reach the student's
+      // Advising page and Home (F3, fixed app-side in #186), and it is also
+      // what lets crisis-detection.ts upsert the CRITICAL alert from inside
+      // the student's context. Tightening the policy would silently kill that
+      // upsert, so the own-row cases going red means: check the crisis path
+      // before changing anything else. (2) Cross-student and unmanaged-teacher
+      // access must stay closed; those cases guard against dropping the
+      // ownership term or the managed_student_ids() gate.
+      it("student sees own alert rows (the DB admits them; hiding staff alerts is app-side, F3)", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentAlert.findMany({
+            where: { id: { in: [fixtures.alertA, fixtures.alertC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.id), [fixtures.alertA]);
+      });
+
+      it("student context can write own alert row (crisis-detection.ts upsert path)", async () => {
+        const result = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentAlert.updateMany({ where: { id: fixtures.alertA }, data: { status: "open" } }),
+        );
+        assert.equal(result.count, 1);
+      });
+
+      it("student cannot read or update another student's alert", async () => {
+        const seen = await asRole("student", fixtures.studentB, (tx) =>
+          tx.studentAlert.findMany({ where: { id: fixtures.alertA }, select: { id: true } }),
+        );
+        assert.deepEqual(seen, []);
+        const touched = await asRole("student", fixtures.studentB, (tx) =>
+          tx.studentAlert.updateMany({ where: { id: fixtures.alertA }, data: { status: "resolved" } }),
+        );
+        assert.equal(touched.count, 0);
+      });
+
+      it("student cannot insert an alert for another student", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentAlert.create({
+                data: {
+                  studentId: fixtures.studentB,
+                  alertKey: `rlstest-alert-forged-${fixtures.suffix}`,
+                  type: "wellbeing_concern",
+                  title: "forged",
+                  summary: "forged",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("teacher sees managed students' alerts only", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentAlert.findMany({
+            where: { id: { in: [fixtures.alertA, fixtures.alertC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.id), [fixtures.alertA], "Student C is Teacher B's");
+      });
+    });
+
+    describe("SageOperation (sage_operation_read / _write / _update)", () => {
+      // sage_operation_read is the one policy that has already been wrong
+      // once (any teacher could read every ledger row until 20260820140000).
+      // The read cases guard against that regression: the CASE must keep
+      // gating both the targetStudentId branch and the legacy
+      // actorType='student' branch through managed_student_ids(). The write
+      // cases document F17 (DB-07 in the 2026-09-01 DB review): the INSERT
+      // and UPDATE policies still admit any teacher, unscoped.
+      const allOps = () => [
+        fixtures.opStudentA,
+        fixtures.opStudentB,
+        fixtures.opStaffOnA,
+        fixtures.opStaffOnC,
+      ];
+      const sortedIds = (rows: { id: string }[]) => rows.map((r) => r.id).sort();
+      const ledgerRow = (id: string, actorId: string, targetStudentId: string) => ({
+        id,
+        actorType: "teacher",
+        actorId,
+        targetStudentId,
+        toolName: "update_goal_status",
+        status: "proposed",
+        payload: {},
+      });
+
+      it("student sees own actor rows only: not another student's, not staff rows about them", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.sageOperation.findMany({ where: { id: { in: allOps() } }, select: { id: true } }),
+        );
+        // opStaffOnA is ABOUT Student A but its actor is staff; the student
+        // branch is actor-keyed on purpose (20260820140000 header: widening
+        // students into on-behalf-of rows is a product decision, tracked in
+        // .claude/MEMORY.md). Change this deliberately, never by accident.
+        assert.deepEqual(sortedIds(rows), [fixtures.opStudentA]);
+      });
+
+      it("teacher sees rows about managed students only, through both CASE branches", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.sageOperation.findMany({ where: { id: { in: allOps() } }, select: { id: true } }),
+        );
+        // opStudentA passes the legacy actor branch, opStaffOnA the
+        // targetStudentId branch. opStudentB (legacy, actor unmanaged) and
+        // opStaffOnC (target managed by Teacher B) must both be filtered.
+        assert.deepEqual(sortedIds(rows), [fixtures.opStaffOnA, fixtures.opStudentA].sort());
+      });
+
+      it("second teacher sees none of the first teacher's students' rows", async () => {
+        const rows = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.sageOperation.findMany({ where: { id: { in: allOps() } }, select: { id: true } }),
+        );
+        assert.deepEqual(sortedIds(rows), [fixtures.opStaffOnC]);
+      });
+
+      it("admin sees every row", async () => {
+        const rows = await asRole("admin", fixtures.admin, (tx) =>
+          tx.sageOperation.findMany({ where: { id: { in: allOps() } }, select: { id: true } }),
+        );
+        assert.equal(rows.length, 4);
+      });
+
+      it("student cannot insert a ledger row as another student", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.sageOperation.create({
+                data: {
+                  ...ledgerRow(`rlstest-op-forged-${fixtures.suffix}`, fixtures.studentB, fixtures.studentB),
+                  actorType: "student",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("teacher create() targeting an unmanaged student is rejected, but only by the read policy", async () => {
+        // sage_operation_write's teacher branch is unscoped (F17). This
+        // rejection comes from Postgres applying sage_operation_read to the
+        // INSERT ... RETURNING row that Prisma's create() emits, not from the
+        // WITH CHECK clause. It therefore guards the read policy; the next
+        // case shows what happens once nothing is RETURNING.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacherB, (tx) =>
+              tx.sageOperation.create({
+                data: ledgerRow(`rlstest-op-f17-create-${fixtures.suffix}`, fixtures.teacherB, fixtures.studentA),
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("F17 KNOWN GAP: teacher createMany() targeting an unmanaged student succeeds", async () => {
+        // Documents current behavior; it is NOT the desired behavior.
+        // sage_operation_write WITH CHECK is `current_role IN ('admin',
+        // 'teacher')` with no managed_student_ids() gate, so an INSERT with no
+        // RETURNING clause lands a ledger row about a student this teacher does
+        // not manage. When the policy is scoped (mirror the CASE in
+        // 20260820140000), this case goes red: replace the body with
+        // assert.rejects(..., /row-level security/i) and delete this note.
+        const id = `rlstest-op-f17-createmany-${fixtures.suffix}`;
+        try {
+          const result = await asRole("teacher", fixtures.teacherB, (tx) =>
+            tx.sageOperation.createMany({
+              data: [ledgerRow(id, fixtures.teacherB, fixtures.studentA)],
+            }),
+          );
+          assert.equal(result.count, 1, "F17 closed? Flip this case to assert.rejects (see comment)");
+        } finally {
+          await db.sageOperation.deleteMany({ where: { id } });
+        }
+      });
+
+      it("teacher keyed update of a row about an unmanaged student touches zero rows", async () => {
+        // sage_operation_update USING also admits any teacher (F17). A keyed
+        // UPDATE has to read the row first, so sage_operation_read filters it
+        // and the count is 0; loosen the read policy and this goes red. An
+        // UPDATE with no WHERE is not filtered, which is why F17 still needs
+        // the policy scoped rather than relying on this.
+        const result = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.sageOperation.updateMany({
+            where: { id: fixtures.opStaffOnA },
+            data: { resultSummary: "touched by the wrong teacher" },
+          }),
+        );
+        assert.equal(result.count, 0);
+      });
+    });
+
+    describe("two-teacher isolation (Teacher B manages Student C only)", () => {
+      // The pre-2026-09-02 suite had one teacher, so a policy whose teacher
+      // branch was `current_role = 'teacher'` with no managed_student_ids()
+      // gate (the exact shape 20260701141000 and 20260820140000 removed)
+      // passed every teacher case. These cases guard against that shape
+      // returning on any of the five tables.
+      it("Teacher B sees own managed student's Conversation (context is live)", async () => {
+        const rows = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.conversation.findMany({ where: { id: fixtures.conversationC }, select: { id: true } }),
+        );
+        assert.deepEqual(rows.map((r) => r.id), [fixtures.conversationC]);
+      });
+
+      it("Teacher B does NOT see Student A's Conversation", async () => {
+        // Red-proven in PR #191's first CI run: with this query run as
+        // postgres instead of Teacher B (the shape of a wide-open teacher
+        // branch) it failed with `[ { id: conversationA } ] !== []`.
+        const rows = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.conversation.findMany({ where: { id: fixtures.conversationA }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, []);
+      });
+
+      it("Teacher A does NOT see Student C's Conversation (isolation is symmetric)", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.conversation.findMany({ where: { id: fixtures.conversationC }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, []);
+      });
+
+      it("Teacher B sees none of Student A's Goal, CaseNote, SageMemory, or StudentAlert rows", async () => {
+        const [goals, notes, memories, alerts] = await asRole("teacher", fixtures.teacherB, (tx) =>
+          Promise.all([
+            tx.goal.findMany({ where: { id: fixtures.goalA }, select: { id: true } }),
+            tx.caseNote.findMany({ where: { id: fixtures.caseNoteA }, select: { id: true } }),
+            tx.sageMemory.findMany({ where: { id: fixtures.memoryA }, select: { id: true } }),
+            tx.studentAlert.findMany({ where: { id: fixtures.alertA }, select: { id: true } }),
+          ]),
+        );
+        assert.deepEqual(goals, [], "Goal");
+        assert.deepEqual(notes, [], "CaseNote");
+        assert.deepEqual(memories, [], "SageMemory");
+        assert.deepEqual(alerts, [], "StudentAlert");
+      });
+
+      it("Teacher B cannot update any of Student A's rows", async () => {
+        const [conv, goal, note, memory, alert] = await asRole("teacher", fixtures.teacherB, (tx) =>
+          Promise.all([
+            tx.conversation.updateMany({ where: { id: fixtures.conversationA }, data: { title: "hijacked" } }),
+            tx.goal.updateMany({ where: { id: fixtures.goalA }, data: { content: "hijacked" } }),
+            tx.caseNote.updateMany({ where: { id: fixtures.caseNoteA }, data: { body: "hijacked" } }),
+            tx.sageMemory.updateMany({ where: { id: fixtures.memoryA }, data: { confidence: 0.01 } }),
+            tx.studentAlert.updateMany({ where: { id: fixtures.alertA }, data: { status: "dismissed" } }),
+          ]),
+        );
+        assert.equal(conv.count, 0, "Conversation");
+        assert.equal(goal.count, 0, "Goal");
+        assert.equal(note.count, 0, "CaseNote");
+        assert.equal(memory.count, 0, "SageMemory");
+        assert.equal(alert.count, 0, "StudentAlert");
       });
     });
   });
