@@ -11,7 +11,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
-import { consumeBackupCode, verifyTotp } from "@/lib/mfa";
+import { claimBackupCode, claimTotpCounter, verifyTotp } from "@/lib/mfa";
+import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 
 const mfaChallengeSchema = z.object({
   token: z.string().min(6, "MFA code is required.").max(32, "MFA code is too long."),
@@ -19,6 +21,16 @@ const mfaChallengeSchema = z.object({
   // clients rely on the httpOnly cookie set at login time.
   mfaSessionToken: z.string().optional(),
 });
+
+/**
+ * Per-account bounds, matching login's per-user limit (login/route.ts). The
+ * window outlives the five-minute challenge cookie on purpose: a re-login
+ * mints a fresh cookie and must not mint a fresh budget of code guesses.
+ */
+const ACCOUNT_LIMIT_ATTEMPTS = 5;
+const ACCOUNT_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const ACCOUNT_LOCKED_MESSAGE =
+  "Too many code tries for this account. Wait 15 minutes, then log in and try again.";
 
 /**
  * POST /api/auth/mfa/challenge
@@ -64,6 +76,40 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     );
   }
 
+  // Per-account limit, keyed on the challenged account rather than the
+  // caller's address: guesses spread across IPs, or repeated through
+  // re-logins that each mint a fresh challenge cookie, share one counter.
+  // Runs before the account row is read so a locked account costs no query.
+  const accountRl = await rateLimit(
+    `mfa-challenge:user:${claims.sub}`,
+    ACCOUNT_LIMIT_ATTEMPTS,
+    ACCOUNT_LIMIT_WINDOW_MS,
+  );
+  if (!accountRl.success) {
+    return NextResponse.json({ error: ACCOUNT_LOCKED_MESSAGE }, { status: 429 });
+  }
+
+  // The last admitted attempt of the window is the one moment the lockout can
+  // be recorded exactly once: every later request is refused above and writes
+  // nothing, so a flood of guesses cannot fill the audit table or the log
+  // (audit S2 on PR #196). A degraded limiter reports remaining 0 too, and
+  // its store is the one that just failed, so it records nothing.
+  if (accountRl.remaining === 0 && !accountRl.degraded) {
+    logger.warn("MFA challenge attempts exhausted for the window", {
+      student: studentLogKey(claims.sub),
+    });
+    await logAuditEvent({
+      actorId: claims.sub,
+      actorRole: claims.role,
+      action: "mfa.challenge_locked_out",
+      targetType: "student",
+      targetId: claims.sub,
+      summary:
+        "MFA challenge used its last code attempt for this window; further attempts are refused until the window resets.",
+      metadata: { ip, resetAt: new Date(accountRl.resetTime).toISOString() },
+    });
+  }
+
   const student = await prisma.student.findUnique({
     where: { id: claims.sub },
     select: {
@@ -95,14 +141,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const totpResult = isTotpToken
     ? verifyTotp(student.mfaSecret, body.token, student.mfaLastUsedCounter)
     : { valid: false, counter: null };
-  const isValidTotp = totpResult.valid;
-  const remainingBackupCodes = isValidTotp
-    ? null
-    : consumeBackupCode(student.mfaBackupCodes, body.token);
-  const usedBackupCode = remainingBackupCodes !== null;
-  const isValid = isValidTotp || usedBackupCode;
 
-  if (!isValid) {
+  // Each factor is spent by one conditional write (SEC-02): the TOTP path
+  // advances the replay counter only while the row still holds the value
+  // that was read, and the backup-code path removes the code only while the
+  // list still holds it. Either way the same code posted twice at once is
+  // honoured once, and a refused claim is a failed attempt whichever request
+  // lost the race.
+  const totpClaimed =
+    totpResult.valid && totpResult.counter != null
+      ? await claimTotpCounter(prisma, student.id, student.mfaLastUsedCounter, totpResult.counter)
+      : false;
+  const backupClaim = totpResult.valid
+    ? null
+    : await claimBackupCode(prisma, student.id, student.mfaBackupCodes, body.token);
+  const usedBackupCode = backupClaim?.claimed === true;
+
+  if (!totpClaimed && !usedBackupCode) {
     await logAuditEvent({
       actorId: student.id,
       actorRole: student.role,
@@ -116,15 +171,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "Invalid MFA code." }, { status: 401 });
   }
 
-  // MFA verified — update timestamp and issue the real session
-  await prisma.student.update({
-    where: { id: student.id },
-    data: {
-      mfaVerifiedAt: new Date(),
-      ...(usedBackupCode ? { mfaBackupCodes: remainingBackupCodes } : {}),
-      ...(isValidTotp && totpResult.counter != null ? { mfaLastUsedCounter: totpResult.counter } : {}),
-    },
-  });
+  const backupCodesRemaining = backupClaim?.claimed
+    ? backupClaim.remaining.length
+    : student.mfaBackupCodes.length;
 
   await setSessionCookie(student.id, student.role, student.sessionVersion);
   // Single-use cookie — clear once the real session is issued.
@@ -145,7 +194,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   return NextResponse.json({
     backupCodeUsed: usedBackupCode,
-    backupCodesRemaining: usedBackupCode ? remainingBackupCodes.length : student.mfaBackupCodes.length,
+    backupCodesRemaining,
     student: {
       id: student.id,
       studentId: student.studentId,

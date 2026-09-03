@@ -185,3 +185,89 @@ export function consumeBackupCode(
 
   return null;
 }
+
+/**
+ * The slice of the Prisma client `claimBackupCode` writes through. Kept
+ * narrow so a test can hand in a fake that models the conditional write;
+ * the real `prismaAdmin` satisfies it structurally.
+ */
+export interface BackupCodeClaimClient {
+  student: {
+    updateMany(args: {
+      where: { id: string; mfaBackupCodes: { equals: string[] } };
+      data: { mfaBackupCodes: string[]; mfaVerifiedAt: Date };
+    }): Promise<{ count: number }>;
+  };
+}
+
+export type BackupCodeClaim = { claimed: true; remaining: string[] } | { claimed: false };
+
+/**
+ * Spend one backup code with a single conditional write.
+ *
+ * `storedHashes` is the list the caller just read. The UPDATE lands only
+ * while the row still holds exactly that list, so two requests that read the
+ * same list and post the same code produce one affected row, not two. The
+ * `findUnique` then `update` sequence this replaces honoured the code twice
+ * (review finding SEC-02, 2026-09-01).
+ *
+ * A refused write means the code is already spent or the list moved under
+ * the caller; neither case may issue a session, so both read as "invalid
+ * code". `mfaVerifiedAt` rides on the same statement so a successful claim
+ * and the verification timestamp cannot disagree.
+ */
+export async function claimBackupCode(
+  db: BackupCodeClaimClient,
+  studentId: string,
+  storedHashes: string[],
+  candidate: string,
+): Promise<BackupCodeClaim> {
+  const remaining = consumeBackupCode(storedHashes, candidate);
+  if (remaining === null) {
+    return { claimed: false };
+  }
+
+  const { count } = await db.student.updateMany({
+    where: { id: studentId, mfaBackupCodes: { equals: storedHashes } },
+    data: { mfaBackupCodes: remaining, mfaVerifiedAt: new Date() },
+  });
+
+  return count === 1 ? { claimed: true, remaining } : { claimed: false };
+}
+
+/**
+ * The slice of the Prisma client `claimTotpCounter` writes through. As
+ * narrow as `BackupCodeClaimClient`, for the same reason.
+ */
+export interface TotpCounterClaimClient {
+  student: {
+    updateMany(args: {
+      where: { id: string; mfaLastUsedCounter: number | null };
+      data: { mfaLastUsedCounter: number; mfaVerifiedAt: Date };
+    }): Promise<{ count: number }>;
+  };
+}
+
+/**
+ * Advance the TOTP replay counter with a single conditional write.
+ *
+ * `lastUsedCounter` is the value the caller read before `verifyTotp`. The
+ * UPDATE lands only while the row still holds that value (`null` compares as
+ * IS NULL), so two requests that read the same counter and post the same
+ * code produce one affected row; the loser's write is refused and it may not
+ * issue a session. The `verifyTotp` then `update` sequence this replaces let
+ * both through (audit S6 on PR #196). A refused write reads as an invalid
+ * code, the same way a refused backup-code claim does.
+ */
+export async function claimTotpCounter(
+  db: TotpCounterClaimClient,
+  studentId: string,
+  lastUsedCounter: number | null,
+  matchedCounter: number,
+): Promise<boolean> {
+  const { count } = await db.student.updateMany({
+    where: { id: studentId, mfaLastUsedCounter: lastUsedCounter },
+    data: { mfaLastUsedCounter: matchedCounter, mfaVerifiedAt: new Date() },
+  });
+  return count === 1;
+}

@@ -9,7 +9,7 @@ const mockUpdate = mock.fn() as any;
 const mockVerifyTotp = mock.fn() as any;
 const mockGenerateBackupCodes = mock.fn() as any;
 const mockHashBackupCodes = mock.fn() as any;
-const mockConsumeBackupCode = mock.fn() as any;
+const mockClaimBackupCode = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
 const mockRateLimit = mock.fn() as any;
 const mockVerifyMfaSessionToken = mock.fn() as any;
@@ -79,7 +79,8 @@ mock.module("@/lib/mfa", {
     verifyTotp: mockVerifyTotp,
     generateBackupCodes: mockGenerateBackupCodes,
     hashBackupCodes: mockHashBackupCodes,
-    consumeBackupCode: mockConsumeBackupCode,
+    claimBackupCode: mockClaimBackupCode,
+    claimTotpCounter: async () => true,
   },
 });
 
@@ -125,7 +126,7 @@ describe("MFA backup code routes", () => {
     mockVerifyTotp.mock.resetCalls();
     mockGenerateBackupCodes.mock.resetCalls();
     mockHashBackupCodes.mock.resetCalls();
-    mockConsumeBackupCode.mock.resetCalls();
+    mockClaimBackupCode.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
     mockRateLimit.mock.resetCalls();
     mockVerifyMfaSessionToken.mock.resetCalls();
@@ -138,7 +139,7 @@ describe("MFA backup code routes", () => {
     mockHashBackupCodes.mock.mockImplementation((codes: string[]) =>
       codes.map((code) => `hash:${code}`),
     );
-    mockConsumeBackupCode.mock.mockImplementation(() => null);
+    mockClaimBackupCode.mock.mockImplementation(async () => ({ claimed: false }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockRateLimit.mock.mockImplementation(async () => ({ success: true }));
     mockVerifyMfaSessionToken.mock.mockImplementation(() => ({
@@ -180,8 +181,10 @@ describe("MFA backup code routes", () => {
 
   it("accepts a valid backup code during login and consumes it", async () => {
     mockVerifyTotp.mock.mockImplementation(() => ({ valid: false, counter: null }));
-    mockConsumeBackupCode.mock.mockImplementation((stored: string[], token: string) =>
-      token === "deadbeef" ? stored.slice(1) : null,
+    // The claim owns the write (one conditional UPDATE); it reports what is left.
+    mockClaimBackupCode.mock.mockImplementation(
+      async (_db: unknown, _studentId: string, stored: string[], token: string) =>
+        token === "deadbeef" ? { claimed: true, remaining: stored.slice(1) } : { claimed: false },
     );
     mockFindUnique.mock.mockImplementation(async () => ({
       id: "teacher-1",
@@ -209,15 +212,20 @@ describe("MFA backup code routes", () => {
     assert.equal(res.status, 200);
     assert.equal(body.backupCodeUsed, true);
     assert.equal(body.backupCodesRemaining, 1);
-    assert.deepEqual(mockUpdate.mock.calls[0]?.arguments[0]?.data?.mfaBackupCodes, [
+    // The claim is handed the account and the list that was read; no
+    // unconditional update carries the backup codes any more.
+    assert.equal(mockClaimBackupCode.mock.calls[0]?.arguments[1], "teacher-1");
+    assert.deepEqual(mockClaimBackupCode.mock.calls[0]?.arguments[2], [
+      "hash:deadbeef",
       "hash:cafebabe",
     ]);
+    assert.equal(mockUpdate.mock.callCount(), 0);
     assert.equal(mockClearMfaSessionCookie.mock.callCount(), 1);
   });
 
   it("rejects invalid backup codes", async () => {
     mockVerifyTotp.mock.mockImplementation(() => ({ valid: false, counter: null }));
-    mockConsumeBackupCode.mock.mockImplementation(() => null);
+    mockClaimBackupCode.mock.mockImplementation(async () => ({ claimed: false }));
     mockFindUnique.mock.mockImplementation(async () => ({
       id: "teacher-1",
       studentId: "teacher",
