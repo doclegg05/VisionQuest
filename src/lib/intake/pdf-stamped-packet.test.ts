@@ -12,11 +12,18 @@ interface UpsertArgs {
   update: Record<string, unknown>;
 }
 
+// The verifier's HMAC needs a >=32 char secret; without it the packet ships
+// with no QR code, which would hide the token wiring from these tests.
+process.env.DOCUMENT_VERIFICATION_SECRET = "test-document-verification-secret-0123456789";
+
 const uploads: Array<{ key: string; bytes: number; mimeType: string }> = [];
 const fileUploadCreate = mock.fn(async (args: { data: Record<string, unknown> }) => ({
-  id: "file_test_1",
   ...args.data,
+  id: String(args.data.id ?? "file_test_1"),
 }));
+const fileUploadUpdate = mock.fn(
+  async (_args: { where: { id: string }; data: Record<string, unknown> }) => ({ id: "file_test_1" }),
+);
 const formSubmissionUpsert = mock.fn(async (_args: UpsertArgs) => ({ id: "submission_test_1" }));
 const formResponseUpsert = mock.fn(async (_args: UpsertArgs) => ({ id: "response_test_1" }));
 
@@ -31,7 +38,7 @@ mock.module("@/lib/storage", {
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
-      fileUpload: { create: fileUploadCreate },
+      fileUpload: { create: fileUploadCreate, update: fileUploadUpdate },
       formSubmission: { upsert: formSubmissionUpsert },
       formResponse: { upsert: formResponseUpsert },
     },
@@ -192,12 +199,12 @@ describe("createStampedIntakePacket", () => {
     const text = await extractPdfText(buffer);
 
     // The pre-hardening "digest" was hex of `name:timestamp:studentId`.
-    const reversible = Buffer.from(attestation.documentId, "hex").toString("latin1");
+    const reversible = Buffer.from(attestation.fileUploadId.slice(1), "hex").toString("latin1");
     assert.ok(!reversible.includes("Morgan"), "verification id decodes back to the signer's name");
     assert.ok(!reversible.includes("Vance"));
     assert.ok(!reversible.includes("morgan.vance"));
     assert.ok(!text.includes("Audit Certificate Digest"), "reversible plaintext digest is still printed");
-    assert.ok(text.includes(`Verification ID: ${attestation.documentId}`));
+    assert.ok(text.includes(`Verification ID: ${attestation.fileUploadId}`));
   });
 
   it("issues an unguessable verification id per packet", async () => {
@@ -208,10 +215,50 @@ describe("createStampedIntakePacket", () => {
         "morgan.vance",
         PROCEDURAL,
       );
-      assert.ok(attestation.documentId.length >= 32, "verification id is too short to resist guessing");
-      ids.add(attestation.documentId);
+      assert.match(attestation.fileUploadId, /^c[0-9a-f]{24}$/, "verification id is not cuid-shaped");
+      ids.add(attestation.fileUploadId);
     }
     assert.equal(ids.size, 3, "verification ids repeat for identical input");
+  });
+
+  it("stamps a signed verification token that binds the archived file id", async () => {
+    const { attestation } = await packet.createStampedIntakePacket(
+      signedPayload(),
+      "morgan.vance",
+      PROCEDURAL,
+    );
+
+    const token = attestation.verificationToken;
+    assert.ok(token, "no verification token was issued");
+    const [version, segment, signature] = token.split(".");
+    assert.equal(version, "vqd1");
+
+    const payload = JSON.parse(Buffer.from(segment, "base64url").toString("utf8"));
+    assert.equal(payload.v, 1);
+    assert.equal(payload.fid, attestation.fileUploadId);
+
+    const expected = crypto
+      .createHmac("sha256", process.env.DOCUMENT_VERIFICATION_SECRET as string)
+      .update(`vqd1.${segment}`)
+      .digest("base64url");
+    assert.equal(signature, expected);
+
+    // The version is inside the MAC, so a v2 token cannot be replayed as v1.
+    const downgraded = crypto
+      .createHmac("sha256", process.env.DOCUMENT_VERIFICATION_SECRET as string)
+      .update(segment)
+      .digest("base64url");
+    assert.notEqual(signature, downgraded);
+  });
+
+  it("refuses to sign a verification token without a configured secret", () => {
+    const original = process.env.DOCUMENT_VERIFICATION_SECRET;
+    process.env.DOCUMENT_VERIFICATION_SECRET = "too-short";
+    try {
+      assert.throws(() => packet.signDocumentVerificationToken("cfileid"), /DOCUMENT_VERIFICATION_SECRET/);
+    } finally {
+      process.env.DOCUMENT_VERIFICATION_SECRET = original;
+    }
   });
 
   it("returns a real SHA-256 digest over the finished PDF bytes", async () => {
@@ -314,6 +361,7 @@ describe("saveStampedIntakePacket", () => {
   beforeEach(() => {
     uploads.length = 0;
     fileUploadCreate.mock.resetCalls();
+    fileUploadUpdate.mock.resetCalls();
     formSubmissionUpsert.mock.resetCalls();
     formResponseUpsert.mock.resetCalls();
   });
@@ -357,8 +405,19 @@ describe("saveStampedIntakePacket", () => {
     );
 
     assert.equal(uploads.length, 1);
-    assert.ok(uploads[0].key.includes(result.attestation.documentId));
+    assert.ok(uploads[0].key.includes(result.attestation.fileUploadId));
     assert.equal(result.storageKey, uploads[0].key);
     assert.equal(result.attestation.digest.length, 64);
+
+    // The row is filed under the id the printed token already binds.
+    const created = fileUploadCreate.mock.calls[0].arguments[0].data;
+    assert.equal(created.id, result.attestation.fileUploadId);
+    assert.equal(result.fileUploadId, result.attestation.fileUploadId);
+
+    // ...and the digest of the archived bytes is recorded against it.
+    assert.equal(fileUploadUpdate.mock.callCount(), 1);
+    const digestWrite = fileUploadUpdate.mock.calls[0].arguments[0];
+    assert.equal(digestWrite.where.id, result.attestation.fileUploadId);
+    assert.equal(digestWrite.data.contentDigest, result.attestation.digest);
   });
 });

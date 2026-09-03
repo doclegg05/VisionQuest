@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import crypto, { createHmac } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
@@ -9,6 +9,8 @@ import {
 } from "./schema";
 import { uploadFile } from "@/lib/storage";
 import { prisma } from "@/lib/db";
+import { withStudentRlsContext } from "@/lib/rls-context";
+import { logger } from "@/lib/logger";
 import QRCode from "qrcode";
 
 // US Letter dimensions in points
@@ -76,12 +78,45 @@ export function computePacketDigest(bytes: Uint8Array): string {
 }
 
 /**
- * Opaque per-packet id. Printed on the packet, encoded in the QR code, and used
- * as the storage-key discriminator so a scan can find the archived original. It
- * carries no student data and is unguessable.
+ * Mint the id the packet is filed under.
+ *
+ * It becomes the FileUpload primary key, the storage-key discriminator, the
+ * printed verification id, and the `fid` the verification token binds — one
+ * identity for the archived original. Cuid-shaped because several routes screen
+ * file ids with `z.string().cuid()`; 96 random bits, so it carries no student
+ * data and cannot be enumerated.
  */
-export function createPacketDocumentId(): string {
-  return crypto.randomBytes(16).toString("hex");
+export function createPacketFileUploadId(): string {
+  return `c${crypto.randomBytes(12).toString("hex")}`;
+}
+
+/**
+ * Sign the verification token the packet's QR code carries.
+ *
+ * The QR is printed inside the packet, so the token has to exist before the
+ * final bytes do — it therefore binds the FileUpload id, and the content digest
+ * is recorded alongside the archived file rather than inside the token. `dig` is
+ * an interim issuer assertion for callers that already know the digest; the
+ * verifier prefers the stored value.
+ *
+ * The MAC covers `"vqd1." + segment`, so the version is inside the signature and
+ * a later v2 token cannot be downgraded to v1.
+ *
+ * Contract shared with `/api/verify/document`. Integration lifts both copies
+ * into `src/lib/intake/document-token.ts`; until then they must stay identical.
+ */
+export function signDocumentVerificationToken(fileUploadId: string, pdfDigest?: string): string {
+  const secret = process.env.DOCUMENT_VERIFICATION_SECRET;
+  if (!secret || secret.length < 32) throw new Error("DOCUMENT_VERIFICATION_SECRET is not configured");
+  const payload: Record<string, unknown> = {
+    v: 1,
+    fid: fileUploadId,
+    iat: Math.floor(Date.now() / 1000),
+  };
+  if (pdfDigest) payload.dig = pdfDigest;
+  const segment = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = createHmac("sha256", secret).update(`vqd1.${segment}`).digest("base64url");
+  return `vqd1.${segment}.${signature}`;
 }
 
 /** Signing forensics the ROUTE derives — never the request body. */
@@ -115,12 +150,25 @@ export interface StampedPacketOptions {
    * Defaults to the FY26 fillable profile under `docs-upload/orientation/`.
    */
   templatePath?: string | null;
+  /**
+   * Bind the packet to an existing FileUpload row. Regeneration of an archived
+   * packet should pass the original id so the printed token keeps resolving;
+   * omitted, a fresh id is minted and `saveStampedIntakePacket` files under it.
+   */
+  fileUploadId?: string;
   /** Clock injection point for tests. */
   now?: Date;
 }
 
 export interface PacketAttestation {
-  documentId: string;
+  /** FileUpload primary key, printed verification id, and the token's `fid`. */
+  fileUploadId: string;
+  /**
+   * HMAC token the printed QR code carries, or null when
+   * `DOCUMENT_VERIFICATION_SECRET` is unconfigured (the packet then ships
+   * without a QR rather than failing to generate).
+   */
+  verificationToken: string | null;
   /** Lowercase hex digest over the bytes returned alongside this record. */
   digest: string;
   algorithm: PacketDigestAlgorithm;
@@ -141,7 +189,8 @@ interface ResolvedStaffSignature {
 }
 
 export interface PacketAttestationPlan {
-  documentId: string;
+  fileUploadId: string;
+  verificationToken: string | null;
   signedAt: Date;
   sourceIp: string | null;
   studentAttested: boolean;
@@ -191,8 +240,11 @@ export function resolvePacketAttestation(
         }
       : null;
 
+  const fileUploadId = options.fileUploadId?.trim() || createPacketFileUploadId();
+
   return {
-    documentId: createPacketDocumentId(),
+    fileUploadId,
+    verificationToken: trySignVerificationToken(fileUploadId),
     signedAt,
     sourceIp: options.signature?.sourceIp?.trim() || null,
     studentAttested,
@@ -210,9 +262,23 @@ const UNSIGNED_EXPLANATION =
 const LEGAL_DECLARATION =
   "Legal Declaration: Verified electronic signature compliant with FERPA 34 CFR § 99.30(d) and Federal E-SIGN Act (15 U.S.C. § 7001).";
 
-function verifyUrlFor(documentId: string): string {
+/**
+ * A missing verification secret must not stop a compliance packet from being
+ * produced, so the token is optional and its absence is logged rather than
+ * thrown. The packet then prints no QR code.
+ */
+function trySignVerificationToken(fileUploadId: string): string | null {
+  try {
+    return signDocumentVerificationToken(fileUploadId);
+  } catch (err) {
+    logger.warn("Intake packet issued without a verification token", { error: String(err) });
+    return null;
+  }
+}
+
+function verifyUrlFor(token: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://visionquest.onrender.com";
-  return `${baseUrl}/verify/document?id=${encodeURIComponent(documentId)}`;
+  return `${baseUrl}/verify/document?token=${encodeURIComponent(token)}`;
 }
 
 async function embedSignatureImage(doc: PDFDocument, image: ParsedSignatureImage) {
@@ -420,7 +486,7 @@ async function tryFillOfficialStudentProfilePdf(
     }
 
     firstPage.drawText(
-      safeText(`Verification ID: ${plan.documentId}  |  Student Identifier: ${studentIdDisplay}`),
+      safeText(`Verification ID: ${plan.fileUploadId}  |  Student Identifier: ${studentIdDisplay}`),
       { x: 46, y: 26, size: 6.5, font: regular, color: rgb(0.4, 0.4, 0.4) },
     );
 
@@ -723,7 +789,7 @@ async function renderProceduralPacket(
     );
   }
 
-  ctx.page.drawText(safeText(`Verification ID: ${plan.documentId}`), {
+  ctx.page.drawText(safeText(`Verification ID: ${plan.fileUploadId}`), {
     x: MARGIN + 14,
     y: ctx.y - 70,
     size: 7.5,
@@ -731,10 +797,11 @@ async function renderProceduralPacket(
     color: rgb(0.1, 0.4, 0.3),
   });
 
-  // Scannable verification code. It carries the opaque document id only — the
+  // Scannable verification code. It carries a signed, opaque token — the
   // pre-hardening QR carried a hex-encoded copy of the student's own name.
   try {
-    const qrPngBuffer = await QRCode.toBuffer(verifyUrlFor(plan.documentId), {
+    if (!plan.verificationToken) throw new Error("no verification token issued");
+    const qrPngBuffer = await QRCode.toBuffer(verifyUrlFor(plan.verificationToken), {
       width: 140,
       margin: 1,
       color: { dark: "#004777", light: "#ffffff" },
@@ -914,7 +981,8 @@ export async function createStampedIntakePacket(
   return {
     buffer,
     attestation: {
-      documentId: plan.documentId,
+      fileUploadId: plan.fileUploadId,
+      verificationToken: plan.verificationToken,
       digest: computePacketDigest(buffer),
       algorithm: PACKET_DIGEST_ALGORITHM,
       signedAt: plan.signedAt,
@@ -942,12 +1010,36 @@ export async function createStampedIntakePdfBuffer(
 }
 
 /**
+ * Record the digest of the archived bytes.
+ *
+ * `FileUpload.contentDigest` arrives with the schema change that accompanies the
+ * verifier. Until the generated client carries the column this write no-ops, so
+ * a packet never fails on a column that is not there yet — but it is logged,
+ * because a missing digest is exactly what makes the verify page's "hash your
+ * copy and compare" claim untrue.
+ */
+async function recordContentDigest(fileUploadId: string, digest: string): Promise<void> {
+  const client = prisma.fileUpload as unknown as {
+    update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>;
+  };
+  try {
+    await client.update({ where: { id: fileUploadId }, data: { contentDigest: digest } });
+  } catch (err) {
+    logger.warn("Intake packet content digest not persisted", { error: String(err) });
+  }
+}
+
+/**
  * Generate the packet, archive it, and synchronize the student's records.
  *
  * The FormSubmission this writes is `pending` unless signed-in staff supplied a
  * counter-signature: generating a document is not reviewing it. Regeneration
  * never rewrites an existing review verdict either — only the archived file
  * pointer moves.
+ *
+ * Every row written here belongs to `studentDbId`, so the writes run as that
+ * student. Public intake provisioning has no session at all, and under `vq_app`
+ * an app-client write with no RLS context is rejected (review F5/F62).
  */
 export async function saveStampedIntakePacket(
   studentDbId: string,
@@ -955,115 +1047,122 @@ export async function saveStampedIntakePacket(
   payload: IntakePayload,
   options: StampedPacketOptions = {},
 ): Promise<{ fileUploadId: string; storageKey: string; attestation: PacketAttestation }> {
-  const { buffer, attestation } = await createStampedIntakePacket(
-    payload,
-    studentIdDisplay,
-    options,
-  );
+  const { buffer, attestation } = await createStampedIntakePacket(payload, studentIdDisplay, {
+    ...options,
+    fileUploadId: options.fileUploadId ?? createPacketFileUploadId(),
+  });
 
-  // The verification id keys the archived original, so a scanned packet can be
-  // matched back to the exact file whose digest was recorded.
-  const storageKey = `orientation/${studentDbId}/intake-packet-${attestation.documentId}.pdf`;
+  // The FileUpload id is minted before rendering because the printed QR token
+  // binds it, so the row has to be filed under the id the packet already shows.
+  const fileUploadId = attestation.fileUploadId;
+  const storageKey = `orientation/${studentDbId}/intake-packet-${fileUploadId}.pdf`;
   const filename = `Official_Intake_Packet_${studentIdDisplay}.pdf`;
 
   await uploadFile(storageKey, buffer, "application/pdf");
 
-  const fileUpload = await prisma.fileUpload.create({
-    data: {
-      studentId: studentDbId,
-      filename,
-      mimeType: "application/pdf",
-      sizeBytes: buffer.length,
-      storageKey,
-      category: "orientation",
-      gist: attestation.staffCounterSigned
-        ? "SPOKES intake and policy packet, counter-signed by program staff."
-        : "SPOKES intake and policy packet, pending staff review.",
-      gistMethod: "none",
-    },
-  });
+  return withStudentRlsContext(studentDbId, async () => {
+    const fileUpload = await prisma.fileUpload.create({
+      data: {
+        id: fileUploadId,
+        studentId: studentDbId,
+        filename,
+        mimeType: "application/pdf",
+        sizeBytes: buffer.length,
+        storageKey,
+        category: "orientation",
+        gist: attestation.staffCounterSigned
+          ? "SPOKES intake and policy packet, counter-signed by program staff."
+          : "SPOKES intake and policy packet, pending staff review.",
+        gistMethod: "none",
+      },
+    });
 
-  try {
-    const reviewFields = attestation.staffCounterSigned
-      ? {
-          status: "approved",
-          reviewedBy: attestation.reviewerId,
-          reviewedAt: new Date(),
-          notes: `Counter-signed SPOKES intake packet (verification ${attestation.documentId}).`,
-        }
-      : null;
+    await recordContentDigest(fileUpload.id, attestation.digest);
 
-    await prisma.formSubmission.upsert({
-      where: {
-        studentId_formId: {
+    try {
+      const reviewFields = attestation.staffCounterSigned
+        ? {
+            status: "approved",
+            reviewedBy: attestation.reviewerId,
+            reviewedAt: new Date(),
+            notes: `Counter-signed SPOKES intake packet (verification ${fileUploadId}).`,
+          }
+        : null;
+
+      await prisma.formSubmission.upsert({
+        where: {
+          studentId_formId: {
+            studentId: studentDbId,
+            formId: "orientation-intake",
+          },
+        },
+        // Without a counter-signature this is a regeneration, not a review: move
+        // the file pointer and leave the existing verdict where staff left it.
+        update: reviewFields
+          ? { fileId: fileUpload.id, ...reviewFields }
+          : { fileId: fileUpload.id },
+        create: {
           studentId: studentDbId,
           formId: "orientation-intake",
+          fileId: fileUpload.id,
+          status: reviewFields?.status ?? "pending",
+          reviewedBy: reviewFields?.reviewedBy ?? null,
+          reviewedAt: reviewFields?.reviewedAt ?? null,
+          notes:
+            reviewFields?.notes ??
+            `Self-submitted SPOKES intake packet, pending staff review (verification ${fileUploadId}).`,
         },
-      },
-      // Without a counter-signature this is a regeneration, not a review: move
-      // the file pointer and leave the existing verdict where staff left it.
-      update: reviewFields ? { fileId: fileUpload.id, ...reviewFields } : { fileId: fileUpload.id },
-      create: {
-        studentId: studentDbId,
-        formId: "orientation-intake",
-        fileId: fileUpload.id,
-        status: reviewFields?.status ?? "pending",
-        reviewedBy: reviewFields?.reviewedBy ?? null,
-        reviewedAt: reviewFields?.reviewedAt ?? null,
-        notes:
-          reviewFields?.notes ??
-          `Self-submitted SPOKES intake packet, pending staff review (verification ${attestation.documentId}).`,
-      },
-    });
-  } catch {
-    // best-effort FormSubmission synchronization
-  }
+      });
+    } catch {
+      // best-effort FormSubmission synchronization
+    }
 
-  const answers = {
-    first_name: payload.firstName,
-    last_name: payload.lastName,
-    birth_date: payload.birthDate,
-    county: payload.county,
-    household_type: payload.householdType,
-    gender: payload.gender,
-    race: payload.race,
-    ethnicity: payload.ethnicity,
-    educational_level: payload.educationalLevel,
-    contact_email: payload.email,
-    phone: payload.phone,
-    tanf_status: payload.tanfStatus,
-    program_track: payload.programTrack,
-    notes: payload.notes,
-  };
+    const answers = {
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      birth_date: payload.birthDate,
+      county: payload.county,
+      household_type: payload.householdType,
+      gender: payload.gender,
+      race: payload.race,
+      ethnicity: payload.ethnicity,
+      educational_level: payload.educationalLevel,
+      contact_email: payload.email,
+      phone: payload.phone,
+      tanf_status: payload.tanfStatus,
+      program_track: payload.programTrack,
+      notes: payload.notes,
+    };
 
-  try {
-    await prisma.formResponse.upsert({
-      where: {
-        templateId_studentId: {
+    try {
+      await prisma.formResponse.upsert({
+        where: {
+          templateId_studentId: {
+            templateId: "seed-form-student-profile",
+            studentId: studentDbId,
+          },
+        },
+        update: {
+          status: "submitted",
+          submittedAt: new Date(),
+          answers,
+        },
+        create: {
           templateId: "seed-form-student-profile",
           studentId: studentDbId,
+          status: "submitted",
+          submittedAt: new Date(),
+          answers,
         },
-      },
-      update: {
-        status: "submitted",
-        submittedAt: new Date(),
-        answers,
-      },
-      create: {
-        templateId: "seed-form-student-profile",
-        studentId: studentDbId,
-        status: "submitted",
-        submittedAt: new Date(),
-        answers,
-      },
-    });
-  } catch {
-    // best-effort FormResponse synchronization
-  }
+      });
+    } catch {
+      // best-effort FormResponse synchronization
+    }
 
-  return {
-    fileUploadId: fileUpload.id,
-    storageKey,
-    attestation,
-  };
+    return {
+      fileUploadId: fileUpload.id,
+      storageKey,
+      attestation,
+    };
+  });
 }
