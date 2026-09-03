@@ -30,6 +30,11 @@ model Student {
   mfaBackupCodes       String[]  @default([]) // SHA-256 hashes of one-time recovery codes
   mfaVerifiedAt        DateTime? // When MFA was last verified this session
   mfaLastUsedCounter   Int? // Last accepted TOTP counter — prevents replay within 90s window
+  // True while the account still holds a credential somebody else chose —
+  // a staff-issued intake password, not one the student picked. Set at
+  // provisioning, surfaced by the login and MFA-challenge responses so the
+  // client can send the student to change it.
+  mustChangePassword   Boolean   @default(false)
   classroomConfirmedAt DateTime? // Set once Sage has confirmed the student is in the right classroom
   offboardedAt         DateTime? // Set by the admin-only manual offboarding flow — see docs/DATA_RETENTION_POLICY.md
   createdAt            DateTime  @default(now())
@@ -605,6 +610,13 @@ model FileUpload {
   classification       Json?
   classificationMethod String? // cloud | local | none
   classifiedAt         DateTime?
+  // Digest of the stored bytes, recorded by the program at upload time.
+  // /api/verify/document compares against THIS rather than a digest the
+  // presented token asserts, so a verifier is checking the holder against
+  // what was issued instead of against the issuer's own claim. Nullable:
+  // rows written before this column have no recorded digest, and a
+  // verifier must treat "no digest" as unverifiable, never as a match.
+  contentDigest        String?
   uploadedAt           DateTime  @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
