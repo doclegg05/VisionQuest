@@ -701,6 +701,12 @@ model Appointment {
   tasks   StudentTask[]
 
   @@index([studentId, startsAt])
+  // Double-booking guard lives only in migration 20260902140000: a partial
+  // unique index Appointment_advisorId_startsAt_scheduled_key on
+  // (advisorId, startsAt) WHERE status = 'scheduled'. Prisma cannot express
+  // a partial index and its describer ignores them, so `migrate dev` reports
+  // no drift. Keep this plain index; do not add a plain @@unique, which
+  // would block re-booking a cancelled slot.
   @@index([advisorId, startsAt])
   @@index([status, startsAt])
   @@schema("visionquest")
