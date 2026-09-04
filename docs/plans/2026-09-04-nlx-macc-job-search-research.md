@@ -90,3 +90,48 @@ Britt chose option 1 and has requested CareerOneStop API access; the credentials
 - WorkForce West Virginia, "Find a Job" and MACC public search (macc.workforcewv.org/jobs); "Work Search Activity & Acceptable Proof Guide", rev. 03/2026
 - WV DHHR Income Maintenance Manual ch. 13.5 (WV Works work requirements, MACC registration)
 - WVDE Adult Education employer recruitment page (WVAdultEd + MACC partnership)
+
+---
+
+# Part 2 — Is there a better way? (research pass, 2026-09-04 evening)
+
+Britt asked whether other tools, workflows, or integrations would give a similar or better experience than the NLx → CareerOneStop path. Four parallel research tracks: job-posting data sources, platforms and workflows used by other TANF/workforce programs plus the placement evidence base, AI-first job-search products, and West Virginia's own state systems. Claims below were verified on the source's own page unless marked otherwise; the per-track reports with URLs are summarised here.
+
+## The finding that reorders everything
+
+**Rigorous evaluations of TANF employment programs find that more self-directed job search does not raise employment.** OPRE's Job Search Assistance study (NYC, Sacramento, Michigan) found no detectable effect at six months from stricter search requirements or goal-coaching. What does move placement, per MDRC's synthesis and trials: a person or program brokering the job (job developers, employer intermediaries), subsidized employment slots (LA paid work experience, +4 points employment), and sector pipelines with employer ties (WorkAdvance +14% earnings at two years, Per Scholas +14% at year seven). One cheap exception has RCT evidence: weekly SMS reminders during job search (Harvard People Lab / LA WorkSource) made participants 20% more likely to report employment.
+
+So a better job *board* is a modest gain. A better *brokering workflow* is the real gain, and West Virginia already has the levers:
+
+- **WV Works pays employers to hire SPOKES graduates.** The Employment Incentive Program (EIP) reimburses 50% of starting wage for 200–600 hours; the subsidized employment program (ESP) reimburses up to 100% for six months. Both are triggered only by the student's WV Works case manager. The SPOKES Work Verification Plan already says each program's Job Coach "works closely with the WDBs and with local Job Service to find employment for the participants as they finish". Nothing in VisionQuest supports that hand-off today.
+- **WorkForce WV business services** will post job orders, pre-screen, and refer candidates for an employer; the statewide number is 1-800-252-JOBS. Jobs & Hope WV (recovery population) shows the model at full strength: named placement staff plus up to $20,000 wage reimbursement, and WV Adult Education is a listed partner.
+- **SPOKES funding is under live review.** DoHS told WVDE in July 2026 to run SPOKES on unexpended FY26 TANF while the FY27 review is pending, amid a projected WV Works deficit. Placement-outcome evidence is the most valuable thing VisionQuest can produce this year.
+
+## Data sources: the verdict holds, with one addition
+
+- **CareerOneStop/NLx stays first.** MACC, jobs.wv.gov (run by Jobcase), and CareerOneStop all draw on the same NLx-vetted pool, so this credential is the WV-local lever, not "one more aggregator".
+- **Add Talroo** as the hourly/frontline backfill: publisher API, free (Talroo pays a per-click fee), zip + radius + commute-time filters, pay data. Clicks must route through Talroo's tracking URL, which fits the link-out model. Talent.com and Careerjet are similar second-tier options.
+- **Dead ends, verified:** Indeed (publisher API retired 2023, XML feeds cut March 2026), ZipRecruiter (publisher API ended March 2025), LinkedIn, Glassdoor, SimplyHired (no third-party search API); Jooble (500 requests per key, lifetime); Craigslist (terms forbid it with per-day penalties); NLx Research Hub (research-only); Snagajob and Facebook Jobs (real hourly jobs, no publisher feed, so link-outs only).
+- **Compliance flag on an existing adapter:** Adzuna's developer terms allow organisational use only under a 14-day trial then a licence, require the "Jobs by Adzuna" logo, and cap free use at 250 calls/day. The current adapter may be outside those terms; one email to Adzuna citing nonprofit use settles it.
+- **AEMIS is a legacy name.** WV adult education's live system is LACES (LiteracyPro), and the WIOA plan says it shares participant activities with the MACC in real time. Whether an instructor can *see* a student's MACC applications through it is unverified; Nick Northup (WVDE data coordinator) is the person to ask. Employment outcomes for federal reporting come from UI wage-record matching, not from the MACC.
+
+## AI-first experiences: what to borrow, what to refuse
+
+The best current products (Indeed Career Scout, ChatGPT's job search, LinkedIn's natural-language search) all stop at the same boundary VisionQuest already enforces: search, explain fit, then hand off to apply on the source site. Auto-apply tools (LazyApply, Sonara) show 1–6% response rates, trigger platform bans and CAPTCHAs, and sit under active litigation (Mobley v. Workday). Trackers like Huntr and Teal add a second pipeline, the exact problem VQ-R-017 already names. Google Cloud Talent Solution offers transit-mode commute search, but WV bus data exists only for Charleston (KRT) and Morgantown, so "on a bus line" must degrade to distance plus a question. No commercial product rewrites postings to grade 6 or handles the benefits cliff; both are within reach here (PolicyEngine CliffWatch is open source; WV SNAP uses 200% FPL under BBCE).
+
+## Recommendation, in order
+
+1. **Finish CareerOneStop; add Talroo.** Data supply is solved with those two. (Owner action, then one adapter.)
+2. **Build the brokering loop, not a better search.** An `Employer`/`JobLead` pipeline inside VisionQuest (keeps one RLS/FERPA story; Salesforce's free nonprofit seats only if instructors refuse an in-app UI), a per-class job-developer view, and an exit confirm-card that packages the graduate's résumé and an EIP/ESP subsidy pitch for the WV Works case manager and the WorkForce WV business services rep.
+3. **SMS nudges through the existing Twilio path.** Opt-in weekly "2 new day-shift jobs near you, reply Y" plus "did you hear back?" prompts that write to the tracker. The one intervention here with RCT evidence, and the cheapest.
+4. **Sage job search, designed for this audience.** A read-only `search_jobs` tool returning at most three jobs filtered by distance, availability grid, and pay floor; an `explain_job` tool that rewrites a posting at grade 6 in a fixed template with a read-aloud button; one next step per screen; a benefits check that always says "check with your worker" and notifies the instructor.
+5. **Placement-outcome reporting matched to what DoHS is reviewing.** Ask WVDE for the exact SPOKES statistical-report fields and emit them from `SpokesRecord` and the placement bridge.
+6. **Do not build:** auto-apply or headless form submission; Indeed/LinkedIn scraping or account automation; a second application tracker; any employer-facing AI ranking score; a benefits number without a human-worker caveat.
+
+## Asks of the state, in priority order
+
+1. Sandra Adkins / Christina Harper (WVDE): the SPOKES statistical-report fields DoHS is using in the FY27 review.
+2. Nick Northup (WVDE data): a spec of the LACES ↔ MACC interface — which MACC fields reach LACES, and whether a per-student export exists.
+3. WorkForce WV: can SPOKES instructors hold "Staff Member" or partner MACC accounts to see and enter referrals?
+4. WorkForce WV business services: a standing referral arrangement for graduate résumés and a recurring hiring event per class.
+5. DoHS via Sandra: an EIP/ESP referral protocol at SPOKES exit, one form the instructor triggers to the case manager.
