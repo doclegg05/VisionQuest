@@ -60,6 +60,15 @@ There is no policy text, no rationale, and no mention of SPOKES, WV Works, or TA
 
 Not recommended: building an NLx adapter against usnlx.com (private API, no licence), or an NLx Research Hub feed (research-only terms, explicitly excludes job matching and platform integration), or driving students to the manual six-step process.
 
+## 6a. Execution status (2026-09-04, same day)
+
+Britt chose option 1 and has requested CareerOneStop API access; the credentials have not arrived yet. Option 2 was built in the same branch so it ships dark and activates the moment `COS_USER_ID`/`COS_API_TOKEN` are set:
+
+- `src/lib/job-board/wv-employer.ts` — the "West Virginia Employer" label, `isWorkForceWvPosting()`, the badge text, and the plain-language MACC apply hint.
+- `careeronestop.ts` — a dedicated WorkForce WV pass (`keyword=0`, `companyName=West Virginia Employer`, 50 rows) runs before the title passes and is additive to the 60-row cap, so MACC postings can never be crowded out.
+- `JobCard.tsx` — badge plus hint on WorkForce WV postings, in both full and compact cards.
+- `npm run cos:smoke` — two new job-board families: counts WorkForce WV postings for Charleston and follows one apply link to report whether it lands on `workforcewv.org`. Running it on day one settles the first two unverified points below.
+
 ## 7. Unverified points
 
 - That the CareerOneStop API returns the company string exactly as "West Virginia Employer" and that its `URL` for those rows resolves into the MACC. Both are what the handout and CareerOneStop docs imply; both can only be confirmed with live credentials.
