@@ -176,15 +176,56 @@ else applies to none, because there is no way to tell whose reply it is.
   (Advisory-lock class ids are namespaced in `ADVISORY_LOCK_CLASS`,
   `src/lib/nudges/sms-policy-shared.ts`: 1 = the per-recipient send lock,
   2 = this run lock.)
+- **`skipped: "deadline"` on the run.** The sweep started, did real work, and
+  stopped early to stay inside its lock transaction. The counts on that
+  response are real and partial; whatever it did not reach is due again at the
+  next hourly run, because every rule is re-derived from the rows each time —
+  nothing is queued and nothing is lost. `nudges_run_deadline` logs how many
+  texts were planned, sent, and left. If it recurs, the sweep is genuinely
+  taking near four minutes: look at `MAX_WEEKLY_STUDENTS` and
+  `WEEKLY_RANK_CONCURRENCY` in `schedule.ts`, in that order.
+
+  Worth knowing why this exists: Prisma's transaction `timeout` releases the
+  lock and rolls back, but it does NOT stop the callback — the handler would
+  carry on texting, now unserialised, beside whatever sweep started next. The
+  deadline is set 15s inside the timeout so the run ends itself while it still
+  holds the lock.
+
+- **`skipped: "run lock unavailable"`.** The lock transaction could not be
+  opened at all — the database refused, or no pooled connection came free
+  within `maxWait` (5s). Nothing ran. Distinct from `already running`, which
+  means the lock was taken by another sweep; the log line
+  (`nudges_run_lock_failed`) is what tells them apart.
+
+- **`nudges_run_lock_commit_failed`, with normal counts on the response.** The
+  sweep finished and the lock transaction then failed to commit. This is NOT a
+  failed run: the transaction holds a lock and nothing else, so the texts went
+  out over Twilio and their rows were written by `sendPolicySms` on other
+  connections, none of which a rollback here touches. The counts are what
+  really happened; treat it as a connection-health signal, not a data problem.
+
+- **`ADMIN_DATABASE_URL` and the admin pool.** `src/lib/db.ts` gives it
+  `connection_limit=10&pool_timeout=10` unless the URL already names one (an
+  explicit value is never overridden; `ADMIN_DB_POOL_SIZE` /
+  `ADMIN_DB_POOL_TIMEOUT` change the default). Ten rather than the app pool's
+  five because ONE of these connections is parked on the run lock for the
+  length of a sweep while the same pool serves the crons fanning out beside
+  it. Before this, the admin URL had no bound at all, which Prisma reads as
+  unlimited — an unbounded pool next to a long-lived checkout is how the
+  instance runs out of connections and the app pool students are waiting on
+  starts failing.
+
 - **`nudges_admin_client_missing` in the logs, and nothing sends.** The admin
   Prisma client is not RLS-bypassing — `ADMIN_DATABASE_URL` is unset or points
   at `vq_app`. Both the runner and the inbound webhook refuse to act rather
   than sweeping over rows they cannot see (review finding F63). Fix the env
   var and redeploy; the probe is cached per process.
-- **`net._http_response` shows a timeout but texts went out.** pg_net's default
-  timeout is 5 seconds; the job sets `timeout_milliseconds := 240000`. If a
-  timeout still appears, the run took over four minutes — check
-  `MAX_WEEKLY_STUDENTS` and the ranking concurrency in `schedule.ts`.
+- **`net._http_response` shows a timeout but texts went out.** Expected, and
+  not a contradiction: pg_net's `timeout_milliseconds` (the job sets 240000
+  against a 5s default) abandons the RESPONSE — the route it called keeps
+  running to completion, unaware anyone stopped listening. So a timeout here
+  says the sweep was slow, never that it failed. The run's own deadline is
+  what bounds the work; see `skipped: "deadline"` above.
 
 ## Known limits
 

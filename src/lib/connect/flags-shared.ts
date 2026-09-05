@@ -45,6 +45,31 @@ export function parseConnectScope(raw: string | null | undefined): ConnectScope 
   return classIds.length > 0 ? { mode: "classes", classIds } : { mode: "off" };
 }
 
+/**
+ * The class ids a student must be enrolled in to satisfy BOTH scopes, or
+ * `null` when neither scope names classes (so no filter is needed).
+ *
+ * This exists because a `take` on the roster query is applied by Postgres
+ * BEFORE the in-memory flag check that decides who is in scope. With
+ * `sms_nudges_enabled_classes = "all"` and one pilot class in
+ * `connect_enabled_classes`, the first N enrollment rows are just the first N
+ * students in the program — quite possibly none of them in the pilot — and the
+ * weekly text then goes to nobody, with no error anywhere. Filtering in the
+ * query means the rows that come back are already the right ones.
+ *
+ * An `off` scope yields an empty list rather than null: nothing satisfies it,
+ * and `classId: { in: [] }` matches no rows, which is the correct answer.
+ */
+export function intersectScopeClassIds(...scopes: ConnectScope[]): string[] | null {
+  if (scopes.some((scope) => scope.mode === "off")) return [];
+  const lists = scopes
+    .filter((scope): scope is { mode: "classes"; classIds: string[] } => scope.mode === "classes")
+    .map((scope) => scope.classIds);
+  if (lists.length === 0) return null; // every scope is "all"
+  const [first, ...rest] = lists;
+  return first.filter((id) => rest.every((other) => other.includes(id)));
+}
+
 export function isConnectEnabledForClasses(
   scope: ConnectScope,
   activeClassIds: readonly string[],

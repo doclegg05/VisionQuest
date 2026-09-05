@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 /**
  * A one-time nudge for students whose SMS opt-in predates verification.
@@ -12,57 +12,71 @@ import { useEffect, useState } from "react";
  * their side nothing changed and nothing announced itself. Settings already
  * explains it, but only to someone who happens to open Settings.
  *
- * Deliberately small: one sentence, one link, one dismiss. It renders only for
- * the exact population it is about (`enabled && !consented`), and the dismissal
- * is per-device in localStorage rather than a column — being reminded again on
- * another device is a smaller cost than a migration for a banner, and the
- * banner disappears for good the moment they finish confirming.
+ * Whether it applies is decided on the SERVER, by the page that renders it
+ * (`show`), for two reasons. It began as a client fetch inside
+ * DashboardClient, and DashboardClient is also mounted by the teacher's
+ * student-detail dashboard — so a teacher looking at a student's page was
+ * shown a notice about the teacher's own phone preferences. It is now the
+ * student `/dashboard` page alone that decides, from that student's own
+ * preference row, and there is no fetch to shift the layout after paint.
+ *
+ * The dismissal stays per-device in localStorage: being reminded again on
+ * another device is a smaller cost than a column and a migration for a
+ * banner, and it disappears for good the moment they finish confirming.
  */
 const DISMISS_KEY = "vq.sms-reconsent-dismissed";
 
-export function SmsReconsentNotice() {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // A private window, cleared site data or a browser that blocks storage all
-    // throw here rather than returning null, so the read cannot be trusted to
-    // be a plain lookup.
+/**
+ * localStorage as an external store, read through `useSyncExternalStore`.
+ *
+ * The obvious shape — `useState(false)` plus an effect that reads storage —
+ * is a cascading render and the lint rule rejects it. It is also the wrong
+ * model: the dismissal is state owned by the browser, not by React, which is
+ * exactly what this hook exists for. The server snapshot is `false` (not
+ * dismissed), so the notice is in the server HTML and nothing shifts for the
+ * students it is aimed at; a viewer who dismissed it on this device sees it
+ * for the one paint before hydration reads their real answer.
+ */
+const dismissStore = {
+  listeners: new Set<() => void>(),
+  subscribe(listener: () => void) {
+    dismissStore.listeners.add(listener);
+    return () => dismissStore.listeners.delete(listener);
+  },
+  read(): boolean {
+    // A private window, cleared site data, or a browser set to block storage
+    // throws here rather than returning null, so this cannot be a plain read.
+    // Unreadable storage means "not dismissed": repeating the notice is the
+    // safe direction, since the alternative is never telling them at all.
     try {
-      if (window.localStorage.getItem(DISMISS_KEY) === "1") return;
+      return window.localStorage.getItem(DISMISS_KEY) === "1";
     } catch {
-      // Storage unavailable: show the notice. Repeating it is the safe
-      // direction — the alternative is never telling them at all.
+      return false;
     }
-
-    void (async () => {
-      try {
-        const res = await fetch("/api/notifications/preferences");
-        if (!res.ok) return;
-        const data: unknown = await res.json();
-        const sms = (data as { sms?: { enabled?: boolean; consented?: boolean } }).sms;
-        if (!cancelled && sms?.enabled === true && sms.consented === false) setShow(true);
-      } catch {
-        // A banner is not worth an error state.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!show) return null;
-
-  function dismiss() {
-    setShow(false);
+  },
+  /** Server (and pre-hydration) answer. Must be a stable reference. */
+  readServer(): boolean {
+    return false;
+  },
+  dismiss() {
     try {
       window.localStorage.setItem(DISMISS_KEY, "1");
     } catch {
-      // Nothing to do; it will come back next visit.
+      // Nothing to persist; it comes back next visit. The listeners below
+      // still fire, so the click still closes it for this page view.
     }
-  }
+    for (const listener of dismissStore.listeners) listener();
+  },
+};
+
+export function SmsReconsentNotice({ show }: { show: boolean }) {
+  const dismissed = useSyncExternalStore(
+    dismissStore.subscribe,
+    dismissStore.read,
+    dismissStore.readServer,
+  );
+
+  if (!show || dismissed) return null;
 
   return (
     <div className="surface-section flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
@@ -77,10 +91,11 @@ export function SmsReconsentNotice() {
         >
           Turn texts back on
         </Link>
+        {/* No aria-label: it would replace the visible words for a voice-control
+            user, who says what they see (WCAG 2.5.3 Label in Name). */}
         <button
           type="button"
-          onClick={dismiss}
-          aria-label="Hide this message"
+          onClick={() => dismissStore.dismiss()}
           className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
         >
           Not now

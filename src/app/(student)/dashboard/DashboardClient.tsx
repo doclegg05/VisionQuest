@@ -16,7 +16,6 @@ import {
 } from "@phosphor-icons/react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import AssignedFormsCard from "@/components/student/AssignedFormsCard";
-import { SmsReconsentNotice } from "@/components/student/SmsReconsentNotice";
 import AskSageLink from "@/components/sage/AskSageLink";
 import SageInsightList from "@/components/sage/SageInsightList";
 
@@ -191,10 +190,6 @@ export default function DashboardClient({
       </AnimatedSection>
 
       {/* ── Section 1: Mountain Progress ── rendered in page.tsx above this component */}
-
-      {/* Renders for nobody except students whose texts stopped when consent
-          became code-verified. See SmsReconsentNotice. */}
-      <SmsReconsentNotice />
 
       <AnimatedSection delay={0.08}>
         <SageInsightList hideWhenEmpty />

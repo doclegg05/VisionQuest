@@ -77,6 +77,25 @@ export const ADVISORY_LOCK_CLASS = {
  * characters — so a 100-character body that "fits" here would arrive as two
  * messages, or truncated, depending on the carrier. Keep new copy to ASCII.
  */
+/**
+ * The comparable form of a phone number: bare national digits.
+ *
+ * "+1 304 555 0123", "(304) 555-0123" and "3045550123" are one number, and a
+ * raw string comparison calls each of them a different one. Anywhere that asks
+ * "is this a NEW number?" has to normalise both sides or it answers yes to a
+ * re-typed identical number -- which, on the settings page, wipes the
+ * student's confirmed consent and makes them verify again for nothing.
+ *
+ * It lives in this module rather than beside the inbound matcher in replies.ts
+ * because it is pure and client-safe, and replies.ts imports Prisma.
+ */
+export function normalizedPhone(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 0) return null;
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
+
 export const SMS_MAX_LENGTH = 160;
 
 /** ASCII, for the reason above. Never "…". */

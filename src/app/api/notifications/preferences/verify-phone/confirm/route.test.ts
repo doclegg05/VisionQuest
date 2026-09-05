@@ -70,7 +70,7 @@ describe("POST /api/notifications/preferences/verify-phone/confirm", () => {
     assert.equal(mockConfirm.mock.callCount(), 5);
 
     const sixth = await POST(confirmRequest("000000"));
-    assert.equal(sixth.status, 400);
+    assert.equal(sixth.status, 429, "a refusal is 'later', not 'your code is wrong'");
     const body = (await sixth.json()) as { error?: string };
     assert.match(body.error ?? "", /Too many tries/);
     assert.equal(
@@ -99,7 +99,7 @@ describe("POST /api/notifications/preferences/verify-phone/confirm", () => {
     }));
 
     const res = await POST(confirmRequest("123456"));
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 429);
     const body = (await res.json()) as { error?: string };
     assert.match(body.error ?? "", /Too many tries/);
     assert.equal(mockConfirm.mock.callCount(), 0);

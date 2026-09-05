@@ -27,6 +27,7 @@ import { VIEW_EVENT_NOTE } from "@/lib/connect/employer-link";
 import {
   getConnectScope,
   getSmsNudgeScope,
+  intersectScopeClassIds,
   isConnectEnabledForClasses,
   type ConnectScope,
 } from "@/lib/connect/flags";
@@ -110,8 +111,18 @@ export interface NudgeRunResult {
   smsScope: ConnectScope["mode"];
   weeklySlot: boolean;
   /**
-   * Set when the run declined to do anything: another sweep holds the lock, or
-   * the admin client is not privileged. `null` on a normal run.
+   * Set when the run did not complete normally. `null` on a normal run.
+   *
+   *   "admin client not privileged" — prismaAdmin cannot bypass RLS, so every
+   *     cross-student read would return nothing (finding F63). Nothing ran.
+   *   "already running" — another sweep holds the run lock. Nothing ran.
+   *   "run lock unavailable" — the lock transaction could not even be opened
+   *     (the database refused or the pool never freed a connection). Nothing
+   *     ran; the distinction from "already running" is in the log line.
+   *   "deadline" — the run STARTED and did real work, then stopped early to
+   *     stay inside the lock transaction's timeout. The counts on this result
+   *     are real and partial; what it did not reach is simply due again next
+   *     hour, because every rule is re-derived from the rows each run.
    */
   skipped: string | null;
   alertsPlanned: number;
@@ -495,8 +506,11 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
   //
   // A dry run takes no lock: it writes nothing, and blocking an operator's
   // "what would this send?" behind a live sweep is exactly backwards.
-  const body = () => runNudgesBody({ now, dryRun, result, connectScope, smsScope, weeklySlot });
-  if (dryRun) return body();
+  const body = (deadlineAt: number) =>
+    runNudgesBody({ now, dryRun, result, connectScope, smsScope, weeklySlot, deadlineAt });
+  // A dry run writes nothing and holds no lock, so nothing bounds it but the
+  // caller; Infinity says that plainly rather than inventing a deadline.
+  if (dryRun) return body(Number.POSITIVE_INFINITY);
 
   return runUnderRunLock(result, body);
 }
@@ -506,14 +520,27 @@ const RUN_LOCK_KEY = "connect-nudges";
 /**
  * How long one transaction may hold the run lock.
  *
- * The sweep itself is bounded by the cron entry's four-minute
- * `timeout_milliseconds`, so this matches it: a transaction that outlives the
- * request that started it is holding a connection nothing is waiting on.
+ * Four minutes, matching the cron entry's `timeout_milliseconds` — but those
+ * two numbers do NOT do the same thing, and an earlier version of this comment
+ * said they did. pg_net's timeout abandons the RESPONSE; the HTTP handler it
+ * called keeps running to completion, unaware. Prisma's transaction timeout is
+ * the same shape from the other side: when it fires, the transaction is rolled
+ * back and the lock released, while the `await` chain inside the callback goes
+ * right on sending texts — now unserialised, so a second sweep can start
+ * beside it.
+ *
+ * `SEND_DEADLINE_MARGIN_MS` is what actually stops the work. The body checks a
+ * wall-clock deadline set that much BEFORE the transaction timeout, and stops
+ * between sends, so the sweep ends itself while it still holds the lock rather
+ * than being cut loose by it. The margin covers one in-flight Twilio call plus
+ * the row update that follows it.
+ *
  * `maxWait` is short on purpose — if no pooled connection is free within five
  * seconds, the honest answer is "not this hour", not a queue.
  */
 const RUN_LOCK_TIMEOUT_MS = 240_000;
 const RUN_LOCK_MAX_WAIT_MS = 5_000;
+const SEND_DEADLINE_MARGIN_MS = 15_000;
 
 /**
  * One sweep at a time, on a TRANSACTION-scoped advisory lock.
@@ -539,12 +566,20 @@ const RUN_LOCK_MAX_WAIT_MS = 5_000;
  */
 async function runUnderRunLock(
   result: NudgeRunResult,
-  body: () => Promise<NudgeRunResult>,
+  body: (deadlineAt: number) => Promise<NudgeRunResult>,
 ): Promise<NudgeRunResult> {
-  // Separates "the lock could not be taken" (skip quietly, as before) from "the
-  // sweep itself threw" (the route's own catch reports it). Without the flag a
-  // failure deep inside the run would be reported as a lock problem.
+  // Three states, not two. `bodyStarted` separates "the lock could not be
+  // taken" (skip quietly) from "the sweep ran"; `outcome` then separates "the
+  // sweep threw" from "the sweep FINISHED and the commit failed afterwards".
+  //
+  // That third case is the one worth spelling out. Texts are sent by a Twilio
+  // call and recorded by `sendPolicySms` on its own connection, neither of
+  // which this transaction owns — it holds a lock and nothing else. So a
+  // rollback here rolls back nothing that was sent. Reporting a 500 and
+  // discarding the counts would tell an operator the run failed on the one
+  // occasion they most need to know what went out.
   let bodyStarted = false;
+  let outcome: NudgeRunResult | null = null;
   try {
     return await prismaAdmin.$transaction(
       async (tx) => {
@@ -557,11 +592,20 @@ async function runUnderRunLock(
           return result;
         }
         bodyStarted = true;
-        return await body();
+        outcome = await body(Date.now() + RUN_LOCK_TIMEOUT_MS - SEND_DEADLINE_MARGIN_MS);
+        return outcome;
       },
       { timeout: RUN_LOCK_TIMEOUT_MS, maxWait: RUN_LOCK_MAX_WAIT_MS },
     );
   } catch (error) {
+    if (outcome !== null) {
+      logger.warn("nudges_run_lock_commit_failed", {
+        lockKey: RUN_LOCK_KEY,
+        error: String(error),
+        hint: "the sweep completed; the lock transaction failed to commit afterwards",
+      });
+      return outcome;
+    }
     if (bodyStarted) throw error;
     // A database that cannot open this transaction cannot run the sweep
     // either; skipping is the same answer as losing the lock race, and the log
@@ -579,10 +623,16 @@ interface RunBodyContext {
   connectScope: ConnectScope;
   smsScope: ConnectScope;
   weeklySlot: boolean;
+  /**
+   * Wall-clock ms (Date.now() scale) after which the run stops between units
+   * of work. Deliberately NOT derived from `now`, which is the logical time the
+   * rules are evaluated at and is a fixed fixture in tests.
+   */
+  deadlineAt: number;
 }
 
 async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
-  const { now, dryRun, result, connectScope, smsScope, weeklySlot } = ctx;
+  const { now, dryRun, result, connectScope, smsScope, weeklySlot, deadlineAt } = ctx;
 
   const [connections, savedJobs] = await Promise.all([
     loadConnectionSnapshots(),
@@ -628,7 +678,7 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
   ];
 
   if (weeklySlot && smsScope.mode !== "off") {
-    candidateSms.push(...(await planWeeklyJobsNudges(smsScope, connectScope, now)));
+    candidateSms.push(...(await planWeeklyJobsNudges(smsScope, connectScope, now, deadlineAt)));
   }
 
   // One open question at a time per student.
@@ -709,6 +759,20 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
   }
 
   for (const plan of smsPlans) {
+    // Checked BEFORE each send, never during one: stopping mid-send would
+    // leave a `queued` row with a text possibly already delivered. Everything
+    // not reached is due again next hour — the rules are re-derived from the
+    // rows every run, so there is no queue to drain and nothing is lost.
+    if (Date.now() >= deadlineAt) {
+      result.skipped = "deadline";
+      logger.warn("nudges_run_deadline", {
+        textsPlanned: result.textsPlanned,
+        textsSent: result.textsSent,
+        alertsWritten: result.alertsWritten,
+        remaining: result.textsPlanned - result.textsSent,
+      });
+      break;
+    }
     // sendPolicySms is already total, but the loop is guarded anyway: one
     // student's send must never end the sweep for everyone behind them in the
     // list, and "total" is a property of today's implementation rather than of
@@ -746,6 +810,7 @@ async function planWeeklyJobsNudges(
   smsScope: ConnectScope,
   connectScope: ConnectScope,
   now: Date,
+  deadlineAt: number,
 ): Promise<NudgeSmsPlan[]> {
   const weekAgo = new Date(now.getTime() - WEEKLY_NUDGE_LOOKBACK_DAYS * DAY_MS);
   const recentLeads = await prismaAdmin.jobLead.findMany({
@@ -755,13 +820,20 @@ async function planWeeklyJobsNudges(
   if (recentLeads.length === 0) return [];
   const recentLeadIds = new Set(recentLeads.map((lead) => lead.id));
 
-  // The roster: actively enrolled students of classes BOTH flags admit. A
-  // scope of "all" has no class list to filter by, so the enrollment query
-  // stands on its own and the flag check below does the rest.
+  // The roster: actively enrolled students of classes BOTH flags admit.
+  //
+  // The intersection is applied HERE, in the query, not only in the flag check
+  // below. It used to filter on `smsScope` alone, and the `take` underneath is
+  // applied by Postgres before anything in this process runs: with SMS scoped
+  // to "all" and Connect scoped to one pilot class, the first 800 rows were
+  // simply the program's first 800 enrollments, which need not contain a
+  // single pilot student. The weekly text then went to nobody and nothing said
+  // so. `null` means both scopes are "all" and there is nothing to filter by.
+  const scopedClassIds = intersectScopeClassIds(smsScope, connectScope);
   const enrollments = await prismaAdmin.studentClassEnrollment.findMany({
     where: {
       status: "active",
-      ...(smsScope.mode === "classes" ? { classId: { in: smsScope.classIds } } : {}),
+      ...(scopedClassIds !== null ? { classId: { in: scopedClassIds } } : {}),
       student: { role: "student", isActive: true },
     },
     // Ordered, because an unordered `take` makes WHICH students get the text a
@@ -826,8 +898,17 @@ async function planWeeklyJobsNudges(
     .slice(0, MAX_WEEKLY_STUDENTS)
     .map(([studentId]) => studentId);
 
-  const counts = await mapWithConcurrency(eligible, WEEKLY_RANK_CONCURRENCY, (studentId) =>
-    countNewLeadsForStudent(studentId, recentLeadIds),
+  // The ranking is the expensive half of the sweep (one scored pass per
+  // student), so it is the half most likely to run into the deadline. Students
+  // past it are simply not planned for; the weekly nudge is idempotent within
+  // its week, so the next hourly run picks them up.
+  const counts = await mapWithConcurrency(
+    eligible,
+    WEEKLY_RANK_CONCURRENCY,
+    (studentId) =>
+      Date.now() >= deadlineAt
+        ? Promise.resolve(0)
+        : countNewLeadsForStudent(studentId, recentLeadIds),
   );
   return selectWeeklyJobsRecipients(
     eligible.map((studentId, index) => ({ studentId, newLeadCount: counts[index] })),

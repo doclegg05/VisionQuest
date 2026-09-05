@@ -34,6 +34,8 @@ const state = {
   txOptions: [] as Array<Record<string, unknown> | undefined>,
   /** Set while the lock transaction is open, so a second run can contend. */
   lockHeld: false,
+  commitFails: false,
+  transactionThrowsImmediately: false,
   /** The `take` the enrollment query asked for, and the roster it was asked about. */
   enrollmentTake: undefined as number | undefined,
   weeklyDedupeIds: [] as string[],
@@ -87,9 +89,16 @@ const prismaAdmin = {
     // Honours `take`, because the ceiling under test IS the take: a mock that
     // returned the whole roster regardless would make the query's bound
     // untestable and the test would pass with the bound removed.
-    findMany: mock.fn(async ({ take }: { take?: number }) => {
+    findMany: mock.fn(async ({ take, where }: { take?: number; where?: any }) => {
       state.enrollmentTake = take;
-      return typeof take === "number" ? state.enrollments.slice(0, take) : state.enrollments;
+      // The class filter is applied BEFORE the take, exactly as Postgres
+      // would. A mock that took first and filtered after would make the
+      // scope-intersection case pass with the intersection removed.
+      const scoped: string[] | undefined = where?.classId?.in;
+      const rows = scoped
+        ? state.enrollments.filter((row: any) => scoped.includes(row.classId))
+        : state.enrollments;
+      return typeof take === "number" ? rows.slice(0, take) : rows;
     }),
   },
   jobLead: { findMany: mock.fn(async () => state.leads) },
@@ -105,6 +114,9 @@ const prismaAdmin = {
   $transaction: mock.fn(
     async (fn: (tx: unknown) => Promise<unknown>, options?: Record<string, unknown>) => {
       state.txOptions.push(options);
+      // The pool never freed a connection, or the database refused: the
+      // callback never runs at all.
+      if (state.transactionThrowsImmediately) throw new Error("could not start a transaction");
       const tx = {
         $queryRaw: async (strings: TemplateStringsArray) => {
           const sql = strings.raw.join("?");
@@ -118,7 +130,12 @@ const prismaAdmin = {
         },
       };
       try {
-        return await fn(tx);
+        const value = await fn(tx);
+        // Simulates the commit failing AFTER the callback finished — a
+        // transaction timeout, or the connection dropping. Prisma surfaces
+        // this by rejecting the $transaction promise, not the callback.
+        if (state.commitFails) throw new Error("could not commit the transaction");
+        return value;
       } finally {
         // COMMIT or ROLLBACK: either way the lock is gone, with no separate
         // unlock statement to route anywhere.
@@ -145,6 +162,18 @@ mock.module("@/lib/connect/flags", {
       if (scope.mode === "off") return false;
       if (scope.mode === "all") return true;
       return classIds.some((id) => scope.classIds.includes(id));
+    },
+    // The real implementation, not a stub: the roster query's correctness IS
+    // this intersection, so a permissive stand-in would make the pilot-class
+    // case below pass against the bug it was written for.
+    intersectScopeClassIds: (...scopes: any[]) => {
+      if (scopes.some((scope) => scope.mode === "off")) return [];
+      const lists = scopes
+        .filter((scope) => scope.mode === "classes")
+        .map((scope) => scope.classIds as string[]);
+      if (lists.length === 0) return null;
+      const [first, ...rest] = lists;
+      return first.filter((id) => rest.every((other) => other.includes(id)));
     },
   },
 });
@@ -238,6 +267,8 @@ beforeEach(() => {
   state.clientRawSql = [];
   state.txOptions = [];
   state.lockHeld = false;
+  state.commitFails = false;
+  state.transactionThrowsImmediately = false;
   state.enrollmentTake = undefined;
   state.weeklyDedupeIds = [];
 });
@@ -391,6 +422,30 @@ describe("the weekly jobs nudge", () => {
     );
     assert.ok(state.weeklyDedupeIds.length > 0, "and it is not empty — the cap must not zero it");
     assert.ok(state.sent.length <= 200, `sent ${state.sent.length} texts in one sweep`);
+  });
+
+  it("finds a pilot class beyond the first 800 enrollment rows", async () => {
+    // `take` is applied by Postgres BEFORE the in-memory flag check. With SMS
+    // scoped to "all" and Connect scoped to one pilot class, filtering on the
+    // SMS scope alone fetched the program's first 800 enrollments — none of
+    // them necessarily in the pilot — and the weekly text went to nobody,
+    // silently. The intersection has to be in the WHERE clause.
+    state.smsScope = "all";
+    state.connectScope = "class_pilot";
+    state.leads = [{ id: "lead_new" }];
+    state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
+    state.enrollments = [
+      ...Array.from({ length: 900 }, (_, i) => ({
+        studentId: `stu_other_${String(i).padStart(4, "0")}`,
+        classId: "class_not_in_pilot",
+      })),
+      { studentId: "stu_pilot", classId: "class_pilot" },
+    ];
+
+    await runNudges({ now: MONDAY });
+
+    assert.equal(state.sent.length, 1, "the pilot student must be reachable past the take");
+    assert.equal(state.sent[0].studentId, "stu_pilot");
   });
 
   it("keeps every class of a student already inside the ceiling", async () => {
@@ -619,6 +674,65 @@ describe("guards that stop the run entirely", () => {
     state.alertUpserts = [];
     const later = await runNudges({ now: NOW });
     assert.equal(later.skipped, null, "a transaction lock cannot survive its transaction");
+  });
+
+  it("a sweep that finished keeps its counts when the commit fails afterwards", async () => {
+    // The lock transaction holds a lock and nothing else: the texts went out
+    // through Twilio on another connection, and their rows were written by
+    // sendPolicySms on another still. A rollback here rolls back nothing that
+    // was sent, so reporting a 500 and discarding the counts would lie to the
+    // operator on exactly the run they most need to read.
+    state.commitFails = true;
+    state.connections = [unviewedConnection()];
+
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, null, "the sweep completed; only the commit failed");
+    assert.equal(result.alertsPlanned, 1);
+    assert.equal(result.alertsWritten, 1, "the work it really did is still reported");
+  });
+
+  it("still reports a lock failure that happened BEFORE the body ran", async () => {
+    // The salvage above must not swallow a genuine "could not even start".
+    state.transactionThrowsImmediately = true;
+    state.connections = [unviewedConnection()];
+
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, "run lock unavailable");
+    assert.equal(state.alertUpserts.length, 0);
+  });
+
+  it("stops sending at the deadline rather than running past the lock", async () => {
+    // Prisma's transaction timeout releases the lock and rolls back; it does
+    // NOT stop the callback, which would carry on texting unserialised beside
+    // whatever sweep starts next. The body has to end itself first.
+    //
+    // The deadline is wall-clock, so the clock is what this test moves: the
+    // first reading (when the lock is taken, computing the deadline) is real,
+    // and every later one is far in the future. `now` -- the logical time the
+    // rules are evaluated at -- is untouched, which is the point of keeping
+    // the two separate.
+    const realNow = Date.now;
+    let readings = 0;
+    Date.now = () => {
+      readings += 1;
+      return readings === 1 ? realNow() : realNow() + 1_000_000;
+    };
+    try {
+      state.connections = [
+        { ...unviewedConnection(), status: "started", sentAt: daysBefore(60) },
+      ];
+      state.events = [
+        { connectionId: "con_1", toStatus: "started", note: null, at: daysBefore(31) },
+      ];
+
+      const result = await runNudges({ now: NOW });
+      assert.equal(result.skipped, "deadline");
+      assert.equal(state.sent.length, 0, "it stopped BEFORE the first send, not during one");
+      assert.ok(result.textsPlanned > 0, "and it reports what it had planned to do");
+      assert.equal(result.textsSent, 0);
+    } finally {
+      Date.now = realNow;
+    }
   });
 
   it("a dry run needs no lock — it writes nothing anyway", async () => {

@@ -43,7 +43,17 @@ import { withStudentRlsContext } from "@/lib/rls-context";
 
 import { upsertNudgeAlert } from "./alerts";
 import { sendPolicySms } from "./sms-policy";
-import { buildInterviewDeclineAckSms, classifyInboundSms } from "./sms-policy-shared";
+import {
+  buildInterviewDeclineAckSms,
+  classifyInboundSms,
+  normalizedPhone,
+} from "./sms-policy-shared";
+
+// Re-exported because this module is where callers look for phone matching,
+// and because moving it was a fix, not a rename: it lives in
+// sms-policy-shared.ts so the settings page can reach it without pulling
+// replies.ts — which imports Prisma — into a client bundle.
+export { normalizedPhone };
 import {
   NUDGE_ALERT_TYPES,
   interviewDeclineAckTemplateKey,
@@ -75,22 +85,6 @@ export type InboundOutcome =
 // ---------------------------------------------------------------------------
 // Phone → student
 // ---------------------------------------------------------------------------
-
-/**
- * The comparable form of a phone number: bare national digits.
- *
- * "+1 304 555 0123", "(304) 555-0123" and "3045550123" are one number, and a
- * raw string comparison calls each of them a different one. Anywhere that
- * asks "is this a NEW number?" has to normalise both sides or it answers yes
- * to a re-typed identical number -- which, on the settings page, wipes the
- * student's confirmed consent and makes them verify again for nothing.
- */
-export function normalizedPhone(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 0) return null;
-  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-}
 
 /**
  * The forms a US number may have been typed in.

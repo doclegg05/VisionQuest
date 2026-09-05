@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { withAuth, badRequest } from "@/lib/api-error";
+import { withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { confirmVerificationCode } from "@/lib/nudges/phone-verification";
 import { rateLimit } from "@/lib/rate-limit";
 import { parseBody } from "@/lib/schemas";
@@ -46,7 +46,10 @@ export const POST = withAuth(async (session, req: Request) => {
     CONFIRM_WINDOW_MS,
   );
   if (!limit.success || limit.degraded) {
-    throw badRequest("Too many tries. Wait a few minutes and try again.");
+    // 429, not 400: the request was well formed and the answer is "later".
+    // A 400 would tell a client the code was wrong, which is the one thing
+    // this refusal must not reveal.
+    throw rateLimited("Too many tries. Wait a few minutes and try again.");
   }
 
   const { code } = await parseBody(req, confirmSchema);

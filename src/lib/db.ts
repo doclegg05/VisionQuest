@@ -44,16 +44,53 @@ import { logger } from "./logger";
  * RLS. Use it ONLY from internal cron endpoints, background job handlers,
  * pre-auth/public routes, and admin operations that must see all rows.
  */
+/**
+ * Give a connection URL a bounded pool, unless it already names one.
+ *
+ * Exported for its test: this is string surgery on a value nothing in the
+ * process re-reads, so getting it wrong is invisible until the pool behaves
+ * oddly under load. An explicit `connection_limit` or `pool_timeout` already
+ * in the URL is left completely alone — an operator who set one meant it, and
+ * silently adding the other half would be a second, different opinion.
+ */
+export function withPoolDefaults(url: string, poolSize: number, poolTimeout: number): string {
+  if (!url) return url;
+  if (url.includes("connection_limit=") || url.includes("pool_timeout=")) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}connection_limit=${poolSize}&pool_timeout=${poolTimeout}`;
+}
+
+/**
+ * ADMIN_DATABASE_URL had no pool bound at all, which Prisma reads as "as many
+ * connections as you like". That was survivable while prismaAdmin only did
+ * short reads; the nudge runner changed it, because its run lock holds ONE
+ * admin connection open for the length of a sweep. An unbounded admin pool
+ * next to a long-lived checkout is how a Supabase instance runs out of
+ * connections and every other request starts failing — including the app pool
+ * students are waiting on.
+ *
+ * Ten rather than five: this pool serves crons and job handlers that fan out
+ * (`mapWithConcurrency`), and one of its connections may be parked on the run
+ * lock, so a five-connection ceiling would have the sweep contending with
+ * itself.
+ */
+const ADMIN_POOL_SIZE = 10;
+const ADMIN_POOL_TIMEOUT = 10;
+
 function applyPoolDefaults(): void {
   const poolSize = parseInt(process.env.DB_POOL_SIZE ?? "5", 10);
   const poolTimeout = parseInt(process.env.DB_POOL_TIMEOUT ?? "10", 10);
 
   const url = process.env.DATABASE_URL ?? "";
-  const hasPoolParams = url.includes("connection_limit=") || url.includes("pool_timeout=");
+  if (url) process.env.DATABASE_URL = withPoolDefaults(url, poolSize, poolTimeout);
 
-  if (!hasPoolParams && url) {
-    const separator = url.includes("?") ? "&" : "?";
-    process.env.DATABASE_URL = `${url}${separator}connection_limit=${poolSize}&pool_timeout=${poolTimeout}`;
+  const adminUrl = process.env.ADMIN_DATABASE_URL ?? "";
+  if (adminUrl) {
+    process.env.ADMIN_DATABASE_URL = withPoolDefaults(
+      adminUrl,
+      parseInt(process.env.ADMIN_DB_POOL_SIZE ?? String(ADMIN_POOL_SIZE), 10),
+      parseInt(process.env.ADMIN_DB_POOL_TIMEOUT ?? String(ADMIN_POOL_TIMEOUT), 10),
+    );
   }
 }
 

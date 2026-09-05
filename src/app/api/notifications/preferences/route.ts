@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth, badRequest } from "@/lib/api-error";
 import { phoneNumberInUseByAnotherStudent } from "@/lib/nudges/phone-verification";
-import { normalizedPhone } from "@/lib/nudges/replies";
+import { normalizedPhone } from "@/lib/nudges/sms-policy-shared";
 
 const preferencesSchema = z.object({
   email: z
