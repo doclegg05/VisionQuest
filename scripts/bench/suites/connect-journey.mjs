@@ -23,37 +23,20 @@
 //   node scripts/bench/suites/connect-journey.mjs --self-test
 // =============================================================================
 
-import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
-
+import { readRunReportOrExplain } from "./lib/raw-report.mjs";
 import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
-  const reportPath = path.join(ctx.repoRoot, ctx.fixture.reportPath);
-
-  let raw;
-  try {
-    raw = readFileSync(reportPath, "utf8");
-  } catch {
-    return {
-      skipped:
-        `no run report at ${ctx.fixture.reportPath} — run the spec first:\n  ` +
-        ctx.fixture.howToRun.join("\n  "),
-    };
-  }
-
-  const report = JSON.parse(raw);
-
-  const ageHours = (Date.now() - statSync(reportPath).mtimeMs) / (60 * 60 * 1000);
-  const maxAge = ctx.fixture.maxReportAgeHours ?? Infinity;
-  if (ageHours > maxAge) {
-    return {
-      skipped:
-        `the run report is ${ageHours.toFixed(1)} h old (limit ${maxAge} h). ` +
-        "Scoring it would report a result from an older commit as this one's. " +
-        `Re-run:\n  ${ctx.fixture.howToRun.join("\n  ")}`,
-    };
-  }
+  // A bare `{ skipped }` is a CONTRACT VIOLATION, not graceful degradation:
+  // the runner requires `{ metrics: [...] }`, so returning it surfaced a
+  // missing collector as "run(ctx) must resolve to { metrics: [...] }" — an
+  // unreadable complaint about this file's return type instead of the plain
+  // fact that the spec never ran. Same bug B6b fixed in the two journey
+  // scorers; the decision now lives in one shared helper so the three cannot
+  // drift, and it carries the staleness check with it.
+  const read = readRunReportOrExplain(ctx, "connect-journey");
+  if (read.metrics) return read;
+  const { report, ageHours } = read;
 
   return {
     metrics: [

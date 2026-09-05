@@ -443,6 +443,14 @@ jobs:
           # so setting it here reaches both sides; naming it explicitly beats
           # relying on both processes defaulting to the same relative path.
           EMAIL_SINK_DIR: "${{ github.workspace }}/.bench-outbox"
+          # The sink refuses itself in production, and `npm run start` IS
+          # production — the standalone server sets NODE_ENV itself, which is
+          # why this step's mail was silently going nowhere and the send route
+          # 503'd. This opt-in is one of two locks; the other is that
+          # DATABASE_URL must be a local or *_ci/*_local database, which this
+          # job's hermetic Postgres is and no real deployment is. See
+          # src/lib/email.ts.
+          EMAIL_SINK_ALLOW_HERMETIC: "1"
 
       - name: Score browser benchmarks
         env:
