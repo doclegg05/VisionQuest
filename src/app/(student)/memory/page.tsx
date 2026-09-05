@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PageIntro from "@/components/ui/PageIntro";
 import { SageMemoryPanel } from "@/components/student/SageMemoryPanel";
+import { SharedWithEmployersPanel } from "@/components/student/SharedWithEmployersPanel";
 
 export default function MemoryPage() {
   return (
@@ -31,6 +32,14 @@ export default function MemoryPage() {
       </div>
 
       <SageMemoryPanel />
+
+      {/*
+        Everything the program has sent about this student to an employer.
+        It lives on this page rather than a new one because "what does this
+        program know and share about me" is one question, and answering half
+        of it in two places is answering neither.
+      */}
+      <SharedWithEmployersPanel />
     </div>
   );
 }

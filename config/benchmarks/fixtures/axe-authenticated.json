@@ -1,0 +1,9 @@
+{
+  "_comment": "Documents the route set e2e/bench-axe-authenticated.spec.ts scans; the spec's own constants are the source of truth. Baseline is set once the first real run establishes a number — see this suite's `notes`.",
+  "axeTags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+  "routes": {
+    "student": ["/dashboard", "/goals", "/learning", "/career", "/portfolio"],
+    "teacher": ["/teacher", "/teacher/students/[seeded student id]"]
+  },
+  "rawDataPath": "reports/benchmarks/raw/axe-authenticated.json"
+}

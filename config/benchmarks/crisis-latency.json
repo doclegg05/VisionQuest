@@ -1,0 +1,26 @@
+{
+  "suite": "crisis-latency",
+  "title": "Crisis path latency under provider failure",
+  "area": "safety",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/crisis-latency.mjs",
+  "fixture": "config/benchmarks/fixtures/crisis-en.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "p95_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": 500,
+      "tolerance": 50
+    },
+    {
+      "id": "concern_recorded_rate",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 1.0,
+      "tolerance": 0.0
+    }
+  ],
+  "notes": "Replays 20 crisis messages through the real POST /api/chat/send handler under three failure modes (provider 503, hourly rate limit 429, mid-stream error) and times request start to recordWellbeingConcern. concern_recorded_rate has a floor of 1.0 because that is the VQ-R-001 invariant itself: every failure exit must still raise the staff alert. Messages are drawn from the crisis-en corpus so the two suites cannot disagree about what a crisis message is."
+}

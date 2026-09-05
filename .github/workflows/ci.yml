@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: nothing in this workflow writes to the repository, opens an
+# issue, or touches a deployment. Declaring it at the workflow level means a
+# job added later starts read-only rather than inheriting whatever the
+# repository default happens to be.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -80,7 +87,39 @@ jobs:
         # draft-PR-before-CI-watch ordering, never-merge language, named agent
         # references). Runs each scripts/validate-*-pipeline-command.mjs via
         # the umbrella script — add new siblings there, not here. DB-free.
+        #
+        # The umbrella also runs bench:validate (the benchmark suite's
+        # five-part check). The explicit bench:validate step below is
+        # deliberate duplication: it costs milliseconds and names the failing
+        # gate in the job log instead of hiding it inside the umbrella.
         run: npm run pipelines:validate
+
+      - name: Platform map validation
+        # Reconciles src/lib/sage/platform-map.ts against the real App Router
+        # routes and the tool registry. It has always exited 1 on drift and
+        # until now ran in NO workflow — which is how 11 unmapped entries
+        # drifted in before PR #173 (2026-09-05 benchmark-suite design, §2:
+        # "three instruments that look like safety nets are inert"). DB-free:
+        # the fake DATABASE_URL above is only needed for the Prisma import.
+        run: npm run platform:validate
+
+      - name: Validate benchmark suites
+        # The five-part check on every config/benchmarks/*.json: config parses,
+        # scorer exists and exports run(ctx), declared fixture exists and stays
+        # inside the checkout, every metric carries a unit and — whenever it
+        # declares a numeric floor — an explicit direction, gate- and
+        # nightly-tier metrics carry a floor, "exact", or a documented
+        # "floor": null plus a reason, tier and requires come from the contract
+        # vocabulary, and a local-model suite records its host. Filesystem-only
+        # — it never imports a scorer. See docs/runbooks/benchmarks.md.
+        run: npm run bench:validate
+
+      - name: Benchmark runner unit tests
+        # The runner decides what a gate means, so its own verdict function,
+        # env mapping, schema check and CLI exit codes are unit-tested. These
+        # live under scripts/bench/__tests__/ (.mjs), outside `npm test`'s
+        # src/**/*.test.ts glob, so they need their own step.
+        run: npm run bench:test
 
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
@@ -134,6 +173,44 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RATE_LIMIT_DB_TEST_ENABLED: "true"
+
+      # --- Gate-tier benchmarks ------------------------------------------
+      # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
+      # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
+      # crosses its floor. Suites whose `requires` are unmet report `skipped`
+      # and never fail the run, so the Gemini-backed and prod-read-only suites
+      # stay quiet here (they belong to benchmarks.yml, nightly).
+      #
+      # Placed after the migrate step so a suite that requires `postgres` or
+      # `cohort` meets a real, migrated schema in the hermetic pgvector
+      # service. DATABASE_URL is overridden for this step only — the verify
+      # job's default is deliberately a fake URL.
+      - name: Seed the synthetic benchmark cohort
+        # Owned by the Connect benchmark phase (A3). Guarded so this workflow
+        # is correct before that script lands and needs no edit after.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
+          fi
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+
+      - name: Gate-tier benchmarks
+        run: npm run bench -- --tier=gate --compare
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-pr
+          path: reports/benchmarks/latest/
+          if-no-files-found: ignore
 
       - name: Build
         run: npm run build
@@ -233,6 +310,47 @@ jobs:
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
+
+      # --- Browser-collected benchmarks -----------------------------------
+      # Two steps, in this order, and the order is load-bearing: the Playwright
+      # specs are COLLECTORS — they walk the running app and write
+      # reports/benchmarks/raw/<suite>.json — and the scorers read those files.
+      # Run the runner first and each scorer errors, by design, because the
+      # environment says browser+server are available and the raw data is not.
+      #
+      # These are the only two suites whose `requires` include `browser` and
+      # `server`, so this job is the one place they can run at all; without it
+      # they would report `skipped` forever, which is the quiet-instrument
+      # failure this whole suite exists to prevent.
+      - name: Collect browser benchmark data (non-blocking)
+        # Non-blocking for the same reason as the soak scan below: both suites
+        # are watch tier today, and a collector that breaks is reported by the
+        # runner as an `error` row in the table and the uploaded artifact
+        # rather than by reddening the gating e2e job. When touch-targets is
+        # promoted to gate (see docs/runbooks/benchmarks.md), drop
+        # continue-on-error here so a missing collection fails honestly.
+        continue-on-error: true
+        run: >-
+          npx playwright test
+          e2e/bench-touch-targets.spec.ts
+          e2e/bench-axe-authenticated.spec.ts
+          --reporter=line --timeout=180000
+
+      - name: Score browser benchmarks
+        env:
+          # The runner's `requires` check reads presence only; the collectors
+          # above already drove the real browser against the job's own server.
+          PLAYWRIGHT: "1"
+          BENCH_BASE_URL: "http://localhost:3000"
+        run: npm run bench -- --suite=touch-targets --suite=axe-authenticated --compare
+
+      - name: Upload browser benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-e2e
+          path: reports/benchmarks/latest/
+          if-no-files-found: ignore
 
       - name: Authenticated a11y scans (soak — red baseline, non-blocking)
         # Zero-violation bar per route; fails today by design (see the job

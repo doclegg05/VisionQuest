@@ -1,0 +1,14 @@
+{
+  "suite": "scheduled-layer-drift",
+  "title": "Scheduled-layer drift (pg_cron registration vs. the health check)",
+  "area": "ops",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/scheduled-layer-drift.mjs",
+  "fixture": "config/benchmarks/fixtures/scheduled-layer-drift.json",
+  "requires": [],
+  "metrics": [
+    { "id": "unregistered_expected_jobs", "unit": "count", "direction": "lower", "floor": 0 },
+    { "id": "unexpected_registered_jobs", "unit": "count", "direction": "lower", "floor": 0 }
+  ],
+  "notes": "Compares EXPECTED_CRON_JOBS in scripts/lib/cron-health.mjs against every job name a `cron.schedule('<name>'` call registers across prisma/migrations/*cron*/migration.sql — no database, no secrets, so this runs on every PR. This is the exact class of drift the 2026-09-01 review found (the 4 baseline jobs were registered nowhere the health check could see, for 5 months, entirely invisible until someone queried prod directly): a new *cron*-named migration that schedules a job the health check does not know about (unexpected_registered_jobs) or that stops re-registering one it does (unregistered_expected_jobs) fails this gate immediately, on the migration diff, instead of five months later in prod."
+}

@@ -17,7 +17,17 @@
  * on its own.
  */
 
-/** The seven jobs the scheduled layer must carry (docs/plans/pg-cron-setup-runbook.md). */
+/**
+ * The eight jobs the scheduled layer must carry
+ * (docs/plans/pg-cron-setup-runbook.md; connect-nudges added 2026-09-05,
+ * migration 20260905140000_add_connect_nudges_cron, schedule "30 * * * *" —
+ * hourly on the half hour, per that migration's own header). Found missing
+ * from this list by scripts/bench/suites/scheduled-layer-drift.mjs
+ * (config/benchmarks/scheduled-layer-drift.json) the same day the migration
+ * landed: exactly the "registered but the health check doesn't know it
+ * exists" drift class the 2026-09-01 review found with the four baseline
+ * jobs.
+ */
 export const EXPECTED_CRON_JOBS = Object.freeze([
   "appointment-reminders",
   "job-processor",
@@ -26,6 +36,7 @@ export const EXPECTED_CRON_JOBS = Object.freeze([
   "sage-daily-briefing",
   "sage-memory-consolidate",
   "sage-wager-resolve",
+  "connect-nudges",
 ]);
 
 const IN_PROGRESS_STATUSES = new Set(["starting", "running", "sending", "connecting"]);

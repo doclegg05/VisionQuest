@@ -1,0 +1,28 @@
+{
+  "suite": "connection-walks",
+  "title": "Connection state machine under replay",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/connection-walks.mjs",
+  "fixture": "config/benchmarks/fixtures/connection-walks.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "illegal_accepted",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "events_per_transition",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 1,
+      "exact": true,
+      "tolerance": 0
+    }
+  ],
+  "notes": "500 seeded random legal walks driven through the real transitionConnection with the same Prisma-shaped fake pipeline.test.ts uses (src/lib/connect/pipeline-fake-client.ts). Complements pipeline-shared.test.ts, which enumerates the 15x15 table statically: this exercises the DATABASE half — the guarded update, the atomic event write, and the student-actor narrowing — over long sequences rather than single steps. Every walk also attempts one illegal move at every step, and every legal-but-not-student-legal move is attempted with a student actor."
+}

@@ -5,6 +5,12 @@ import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } fro
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
+import {
+  MACC_APPLY_HINT,
+  WORKFORCE_WV_BADGE,
+  isWorkForceWvPosting,
+} from "@/lib/job-board/wv-employer";
+import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -118,6 +124,7 @@ export function JobCard({
 }: JobCardProps) {
   const primaryCluster = clusters[0];
   const visibleReasons = matchReasons.slice(0, 3);
+  const workForceWv = isWorkForceWvPosting({ company, source });
   const [draftStatus, setDraftStatus] = useState<SavedJobStatus>(savedStatus ?? "saved");
   const [draftNotes, setDraftNotes] = useState(savedNotes ?? "");
   const [saving, setSaving] = useState(false);
@@ -203,7 +210,28 @@ export function JobCard({
             {formatSourceLabel(source)}
           </span>
         )}
+        {workForceWv && (
+          <span className="rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-xs font-semibold text-[var(--accent)]">
+            {WORKFORCE_WV_BADGE}
+          </span>
+        )}
       </div>
+
+      {workForceWv && (
+        <p className="mt-2 text-xs leading-snug text-[var(--text-secondary)]">
+          {MACC_APPLY_HINT}
+        </p>
+      )}
+
+      {/* Read the posting's own facts out loud — title, employer, place, pay.
+          Hidden where the browser has no speech synthesis. */}
+      {!compact && (
+        <div className="mt-2">
+          <ReadAloudButton
+            text={`${title} at ${company}. ${location}.${salary ? ` Pay: ${salary}.` : ""}`}
+          />
+        </div>
+      )}
 
       {!compact && visibleReasons.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
@@ -257,7 +285,7 @@ export function JobCard({
             <button
               onClick={() => void persistTracking({ status: "saved" })}
               disabled={saving}
-              className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+              className={`flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
                 savedStatus
                   ? "bg-[var(--accent)]/20 text-[var(--accent)]"
                   : "bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
@@ -270,7 +298,7 @@ export function JobCard({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+              className="flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
             >
               <ArrowSquareOut size={14} />
               View

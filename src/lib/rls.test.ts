@@ -31,9 +31,15 @@
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
-type Role = "student" | "teacher" | "admin";
+/**
+ * The roles `app.current_role` can carry. "coordinator" is included so the
+ * fail-closed cases can actually assert it: a policy that names only student /
+ * teacher / admin must return zero rows for it, and a test that could not
+ * spell the role could not prove that.
+ */
+type Role = "student" | "teacher" | "admin" | "coordinator";
 
 interface Fixtures {
   /** Per-run namespace; every synthetic id/key embeds it so cleanup is scoped to this run. */
@@ -911,6 +917,543 @@ if (!SHOULD_RUN) {
       });
     });
 
+    describe("StudentWorkProfile (student_work_profile_access)", () => {
+      // Match & Connect Phase 2. The row holds availability, transport, pay
+      // floor and childcare hours — student-owned answers that must reach the
+      // student's own instructors and nobody else.
+      before(async () => {
+        await db.studentWorkProfile.createMany({
+          data: [
+            { studentId: fixtures.studentA, availability: {}, transport: "bus" },
+            { studentId: fixtures.studentC, availability: {}, transport: "car" },
+          ],
+        });
+      });
+
+      it("student sees only own work profile", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentWorkProfile.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA]);
+      });
+
+      it("student can update own profile and cannot update another student's", async () => {
+        const own = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentA },
+            data: { payFloorHourly: 15 },
+          }),
+        );
+        assert.equal(own.count, 1);
+
+        const other = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentC },
+            data: { payFloorHourly: 99 },
+          }),
+        );
+        assert.equal(other.count, 0);
+      });
+
+      it("student cannot insert a profile for another student", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentWorkProfile.create({
+                data: { studentId: fixtures.studentB, availability: {} },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("teacher sees managed students' profiles only", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentWorkProfile.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA], "Student C is Teacher B's");
+      });
+
+      it("teacher can update a managed student's profile, and only that one", async () => {
+        // Instructors correct a profile with the student in front of them
+        // (updatedVia "teacher"), so the teacher branch must be writable —
+        // and must stop at the classroom boundary.
+        const managed = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentA },
+            data: { maxCommuteMinutes: 30 },
+          }),
+        );
+        assert.equal(managed.count, 1, "Teacher A manages Student A");
+
+        const unmanaged = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentC },
+            data: { maxCommuteMinutes: 999 },
+          }),
+        );
+        assert.equal(unmanaged.count, 0, "Student C is Teacher B's");
+      });
+
+      it("student cannot re-key their own row onto another student", async () => {
+        // The WITH CHECK clause is what catches this: the UPDATE passes USING
+        // (it is their row) and must still fail on the row it would become.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentWorkProfile.update({
+                where: { studentId: fixtures.studentA },
+                data: { studentId: fixtures.studentB },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("returns zero rows with no RLS context", async () => {
+        // The "no RLS context" block above runs before these fixture rows
+        // exist, so this table's empty-GUC case has to be asserted here, with
+        // rows on the table. Unfiltered on purpose: one row is a leak.
+        const rows = await asRole(null, null, (tx) =>
+          tx.studentWorkProfile.findMany({ select: { studentId: true } }),
+        );
+        assert.deepEqual(rows, [], "StudentWorkProfile must be empty with no context");
+      });
+    });
+
+    describe("Employer / EmployerContact / JobLead (Match & Connect Phase 3)", () => {
+      // Employer and EmployerContact are staff-only: no student branch exists
+      // in either policy. JobLead is the one table in the group a student may
+      // read, and only rows that are open AND visible to a class they are
+      // enrolled in. These cases guard four specific loosenings: adding a
+      // student branch to the employer policies; dropping the
+      // `status = 'open'` clause from job_lead_read; letting the student
+      // branch reach the write path; and dropping the class clause from
+      // job_lead_write, which would let a teacher publish into a classroom
+      // they do not instruct.
+      let employerId = "";
+      let contactId = "";
+      /** classId NULL — visible to every student. */
+      let leadProgramWide = "";
+      /** classId NULL, closed — invisible to students, visible to staff. */
+      let leadProgramWideClosed = "";
+      /** classAlpha (Student A's class), open. */
+      let leadAlphaOpen = "";
+      /** classAlpha, closed — the status clause is the only thing hiding it. */
+      let leadAlphaClosed = "";
+      /** classBeta (Student C's class), open. */
+      let leadBetaOpen = "";
+
+      before(async () => {
+        const employer = await db.employer.create({
+          data: {
+            name: `RLS Test Employer ${fixtures.suffix}`,
+            nameKey: `rls test employer ${fixtures.suffix}`,
+            county: "Raleigh",
+            city: "Beckley",
+          },
+        });
+        employerId = employer.id;
+
+        const contact = await db.employerContact.create({
+          data: { employerId, name: "Pat Buyer", email: "pat@example.test" },
+        });
+        contactId = contact.id;
+
+        const leadBase = {
+          employerId,
+          employerName: employer.name,
+          location: "Beckley, WV",
+          source: "manual",
+        };
+        // `source` + `sourceRef` is unique, so every fixture lead needs its own
+        // sourceRef — the constraint is real and the fixtures must respect it.
+        const [programWide, programWideClosed, alphaOpen, alphaClosed, betaOpen] =
+          await Promise.all([
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-pw-${fixtures.suffix}`,
+                title: "Program wide",
+                classId: null,
+                status: "open",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-pwc-${fixtures.suffix}`,
+                title: "Program wide closed",
+                classId: null,
+                status: "closed",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-ao-${fixtures.suffix}`,
+                title: "Alpha open",
+                classId: fixtures.classAlpha,
+                status: "open",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-ac-${fixtures.suffix}`,
+                title: "Alpha closed",
+                classId: fixtures.classAlpha,
+                status: "closed",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-bo-${fixtures.suffix}`,
+                title: "Beta open",
+                classId: fixtures.classBeta,
+                status: "open",
+              },
+            }),
+          ]);
+        leadProgramWide = programWide.id;
+        leadProgramWideClosed = programWideClosed.id;
+        leadAlphaOpen = alphaOpen.id;
+        leadAlphaClosed = alphaClosed.id;
+        leadBetaOpen = betaOpen.id;
+      });
+
+      after(async () => {
+        // JobLead cascades from Employer; EmployerContact does too.
+        await db.employer.deleteMany({ where: { id: employerId } });
+      });
+
+      it("a student sees no Employer rows at all", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.employer.findMany({ where: { id: employerId }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "Employer is staff-only");
+      });
+
+      it("a student sees no EmployerContact rows at all", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "employer contact details never reach a student");
+      });
+
+      it("a coordinator sees none of the three tables", async () => {
+        // The coordinator role has no branch in any of these policies, and
+        // src/lib/classroom.ts's coordinator clause is fail-closed. This pins
+        // that a role added to the app later does not silently inherit access.
+        const [employers, contacts, leads] = await Promise.all([
+          asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+            tx.employer.findMany({ where: { id: employerId }, select: { id: true } }),
+          ),
+          asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+            tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
+          ),
+          asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+            tx.jobLead.findMany({ where: { employerId }, select: { id: true } }),
+          ),
+        ]);
+        assert.deepEqual(employers, [], "Employer must be empty for a coordinator");
+        assert.deepEqual(contacts, [], "EmployerContact must be empty for a coordinator");
+        assert.deepEqual(leads, [], "JobLead must be empty for a coordinator");
+      });
+
+      it("a teacher reads employers and their contacts", async () => {
+        const [employers, contacts] = await Promise.all([
+          asRole("teacher", fixtures.teacher, (tx) =>
+            tx.employer.findMany({ where: { id: employerId }, select: { id: true } }),
+          ),
+          asRole("teacher", fixtures.teacher, (tx) =>
+            tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
+          ),
+        ]);
+        assert.deepEqual(employers.map((row) => row.id), [employerId]);
+        assert.deepEqual(contacts.map((row) => row.id), [contactId]);
+      });
+
+      it("a student cannot create an Employer", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.employer.create({
+                data: {
+                  name: `forged ${fixtures.suffix}`,
+                  nameKey: `forged ${fixtures.suffix}`,
+                  county: "Raleigh",
+                  city: "Beckley",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("runs rankLeadsForStudent's ACTUAL query shape as a student", async () => {
+        // The shape is the point. rankLeadsForStudent selects lead columns
+        // only and filters on lead columns only, because Employer has no
+        // student branch — a query that reached through the relation would
+        // come back empty here and the student would silently see no jobs.
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.findMany({
+            where: {
+              status: "open",
+              OR: [{ classId: null }, { classId: { in: [fixtures.classAlpha] } }],
+            },
+            orderBy: [{ postedAt: "desc" }, { id: "asc" }],
+            select: {
+              id: true,
+              title: true,
+              employerId: true,
+              employerName: true,
+              status: true,
+              location: true,
+              clusters: true,
+              requirements: true,
+              schedule: true,
+              payMin: true,
+              payMax: true,
+              payPeriod: true,
+              transitNotes: true,
+              distanceMiles: true,
+              source: true,
+              classId: true,
+            },
+          }),
+        );
+
+        assert.deepEqual(
+          rows.map((row) => row.id).sort(),
+          [leadProgramWide, leadAlphaOpen].sort(),
+          "open + (program-wide or my class); the closed and other-class leads must not appear",
+        );
+        assert.ok(
+          rows.every((row) => row.employerName.length > 0),
+          "the denormalised employerName is what makes this query possible at all",
+        );
+      });
+
+      it("a student does NOT read a closed lead, for their class or program-wide", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.findMany({
+            where: { id: { in: [leadAlphaClosed, leadProgramWideClosed] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows, [], "job_lead_read must keep the status = 'open' clause");
+      });
+
+      it("a COMPLETED enrollment still reads its class's open lead", async () => {
+        // Graduates are the placement population. Cutting them off at exit
+        // would hide leads from exactly the students this feature exists for.
+        await db.studentClassEnrollment.updateMany({
+          where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+          data: { status: "completed" },
+        });
+        try {
+          const rows = await asRole("student", fixtures.studentA, (tx) =>
+            tx.jobLead.findMany({ where: { id: leadAlphaOpen }, select: { id: true } }),
+          );
+          assert.deepEqual(rows.map((row) => row.id), [leadAlphaOpen]);
+        } finally {
+          await db.studentClassEnrollment.updateMany({
+            where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+            data: { status: "active" },
+          });
+        }
+      });
+
+      it("a WITHDRAWN enrollment loses the class lead but keeps program-wide ones", async () => {
+        await db.studentClassEnrollment.updateMany({
+          where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+          data: { status: "withdrawn" },
+        });
+        try {
+          const rows = await asRole("student", fixtures.studentA, (tx) =>
+            tx.jobLead.findMany({
+              where: { id: { in: [leadAlphaOpen, leadProgramWide] } },
+              select: { id: true },
+            }),
+          );
+          assert.deepEqual(
+            rows.map((row) => row.id),
+            [leadProgramWide],
+            "active_enrolled_class_ids() admits active and completed, not withdrawn",
+          );
+        } finally {
+          await db.studentClassEnrollment.updateMany({
+            where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+            data: { status: "active" },
+          });
+        }
+      });
+
+      it("a student cannot create, update or delete a lead", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.jobLead.create({
+                data: {
+                  employerId,
+                  employerName: "forged",
+                  title: "forged",
+                  location: "Beckley, WV",
+                  source: "manual",
+                  sourceRef: `rls-forged-${fixtures.suffix}`,
+                  classId: null,
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+
+        // Count 0, not a throw: the student fails job_lead_write's USING, so
+        // the row is never matched and no WITH CHECK is reached. The teacher
+        // retarget case below is the opposite shape and rejects instead — see
+        // the note there before making these two agree.
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.updateMany({
+            where: { id: leadProgramWide },
+            data: { title: "forged title" },
+          }),
+        );
+        assert.equal(updated.count, 0, "job_lead_write has no student branch");
+
+        // Deleting a row they CAN see is the sharper case: the read policy
+        // admits it, so only job_lead_write's missing student branch stops it.
+        const deleted = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.deleteMany({ where: { id: leadProgramWide } }),
+        );
+        assert.equal(deleted.count, 0, "a visible lead is still not a deletable one");
+      });
+
+      it("a teacher cannot publish a lead into a class they do not instruct", async () => {
+        // Teacher One instructs classAlpha only. classBeta belongs to
+        // Teacher Two, and publishing there would put a job in front of
+        // somebody else's students.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.jobLead.create({
+                data: {
+                  employerId,
+                  employerName: "RLS Test Employer",
+                  title: "Cross-class forgery",
+                  location: "Beckley, WV",
+                  source: "manual",
+                  sourceRef: `rls-cross-${fixtures.suffix}`,
+                  classId: fixtures.classBeta,
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a teacher cannot RETARGET a lead into a class they do not instruct", async () => {
+        // THROWS, it does not return count 0 — and the difference is the whole
+        // mechanism. On an UPDATE, Postgres evaluates the policy's USING
+        // against the OLD row and its WITH CHECK against the NEW one. Teacher
+        // One instructs classAlpha, so the old row passes USING and the row IS
+        // matched; the new classId is classBeta, which fails WITH CHECK, and a
+        // WITH CHECK violation raises 42501 rather than filtering the row out.
+        //
+        // Contrast the student cases above, which DO return count 0: a student
+        // fails job_lead_write's USING, so no row is ever matched and there is
+        // nothing to check. Expecting a count here (as the first cut did) tests
+        // for the one outcome this policy cannot produce.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.jobLead.updateMany({
+                where: { id: leadAlphaOpen },
+                data: { classId: fixtures.classBeta },
+              }),
+            ),
+          /row-level security/i,
+        );
+
+        // The rejection aborts its transaction, so the lead must still belong
+        // to the class it started in. Without this the test would pass on a
+        // policy that threw AFTER writing.
+        const after = await db.jobLead.findUnique({
+          where: { id: leadAlphaOpen },
+          select: { classId: true },
+        });
+        assert.equal(after?.classId, fixtures.classAlpha, "the lead must not have moved");
+      });
+
+      it("a teacher CAN publish into their own class and program-wide", async () => {
+        const own = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.create({
+            data: {
+              employerId,
+              employerName: "RLS Test Employer",
+              title: "Own class",
+              location: "Beckley, WV",
+              source: "manual",
+              sourceRef: `rls-own-${fixtures.suffix}`,
+              classId: fixtures.classAlpha,
+            },
+            select: { id: true },
+          }),
+        );
+        assert.ok(own.id);
+
+        const wide = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.create({
+            data: {
+              employerId,
+              employerName: "RLS Test Employer",
+              title: "Program wide by teacher",
+              location: "Beckley, WV",
+              source: "manual",
+              sourceRef: `rls-wide-${fixtures.suffix}`,
+              classId: null,
+            },
+            select: { id: true },
+          }),
+        );
+        assert.ok(wide.id);
+
+        await db.jobLead.deleteMany({ where: { id: { in: [own.id, wide.id] } } });
+      });
+
+      it("a teacher reads every lead, open or not, in any class", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.findMany({
+            where: {
+              id: {
+                in: [leadProgramWide, leadAlphaOpen, leadAlphaClosed, leadBetaOpen],
+              },
+            },
+            select: { id: true },
+          }),
+        );
+        assert.equal(rows.length, 4, "leads are a staff work queue, not per-class student data");
+      });
+
+      it("returns zero rows for all three tables with no RLS context", async () => {
+        const [employers, contacts, leads] = await Promise.all([
+          asRole(null, null, (tx) => tx.employer.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.employerContact.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.jobLead.findMany({ select: { id: true } })),
+        ]);
+        assert.deepEqual(employers, [], "Employer must be empty with no context");
+        assert.deepEqual(contacts, [], "EmployerContact must be empty with no context");
+        assert.deepEqual(leads, [], "JobLead must be empty with no context");
+      });
+    });
+
     describe("SageOperation (sage_operation_read / _write / _update)", () => {
       // sage_operation_read is the one policy that has already been wrong
       // once (any teacher could read every ledger row until 20260820140000).
@@ -1100,6 +1643,712 @@ if (!SHOULD_RUN) {
         assert.equal(note.count, 0, "CaseNote");
         assert.equal(memory.count, 0, "SageMemory");
         assert.equal(alert.count, 0, "StudentAlert");
+      });
+    });
+
+    describe("Connection / ConnectionEvent / OutboundMessage (Match & Connect Phase 4)", () => {
+      // A Connection is the object that causes a student's information to
+      // leave the program, so these cases guard the four specific loosenings
+      // that would matter: letting a student read someone else's connection;
+      // letting a student drive a status other than student_approved or
+      // withdrawn; letting the append-only event log be edited; and letting a
+      // student read OutboundMessage, which names the employer contact.
+      let employerId = "";
+      let leadId = "";
+      let connectionA = "";
+      let connectionC = "";
+      let eventA = "";
+      let messageA = "";
+      let messageC = "";
+
+      before(async () => {
+        const employer = await db.employer.create({
+          data: {
+            name: `RLS Connect Employer ${fixtures.suffix}`,
+            nameKey: `rls connect employer ${fixtures.suffix}`,
+            county: "Raleigh",
+            city: "Beckley",
+          },
+        });
+        employerId = employer.id;
+
+        const lead = await db.jobLead.create({
+          data: {
+            employerId,
+            // Denormalised at write time so the student path can read a lead
+            // without touching Employer, whose policy has no student branch.
+            employerName: employer.name,
+            title: "Production Associate",
+            location: "Beckley, WV",
+            source: "manual",
+            status: "open",
+          },
+        });
+        leadId = lead.id;
+
+        const [a, c] = await Promise.all([
+          db.connection.create({
+            data: {
+              studentId: fixtures.studentA,
+              jobLeadId: leadId,
+              employerId,
+              proposedById: fixtures.teacher,
+              proposedVia: "teacher",
+              status: "proposed",
+            },
+          }),
+          // Student C belongs to Teacher B's class, so this row is the
+          // cross-teacher and cross-student control.
+          db.connection.create({
+            data: {
+              studentId: fixtures.studentC,
+              jobLeadId: leadId,
+              employerId,
+              proposedById: fixtures.teacherB,
+              proposedVia: "teacher",
+              status: "sent",
+            },
+          }),
+        ]);
+        connectionA = a.id;
+        connectionC = c.id;
+
+        const event = await db.connectionEvent.create({
+          data: {
+            connectionId: connectionA,
+            fromStatus: null,
+            toStatus: "proposed",
+            actorType: "teacher",
+            actorId: fixtures.teacher,
+          },
+        });
+        eventA = event.id;
+
+        // One message per connection, so the teacher cases can prove the
+        // outbound_message_read scoping in BOTH directions: each teacher sees
+        // their own student's row and not the other's. A single seeded row
+        // could pass a broken policy by accident.
+        const [msgA, msgC] = await Promise.all([
+          db.outboundMessage.create({
+            data: {
+              channel: "email",
+              toKind: "employer_contact",
+              toId: "contact-rls-test-a",
+              templateKey: "connect.employer_packet",
+              body: "packet email body for A",
+              connectionId: connectionA,
+              employerId,
+            },
+          }),
+          db.outboundMessage.create({
+            data: {
+              channel: "email",
+              toKind: "employer_contact",
+              toId: "contact-rls-test-c",
+              templateKey: "connect.employer_packet",
+              body: "packet email body for C",
+              connectionId: connectionC,
+              employerId,
+            },
+          }),
+        ]);
+        messageA = msgA.id;
+        messageC = msgC.id;
+      });
+
+      after(async () => {
+        // Deleted child-first, deliberately. Connection's FKs to JobLead,
+        // Employer and proposedBy are Restrict, not Cascade — a disclosure
+        // record has to outlive every party to it — so deleting the employer
+        // while a Connection points at it now FAILS instead of quietly taking
+        // the connection with it. That is the behaviour under test elsewhere;
+        // here it just means the fixture tears down in order.
+        await db.outboundMessage.deleteMany({ where: { employerId } });
+        await db.connectionEvent.deleteMany({
+          where: { connection: { jobLeadId: leadId } },
+        });
+        await db.connection.deleteMany({ where: { jobLeadId: leadId } });
+        await db.jobLead.deleteMany({ where: { id: leadId } });
+        await db.employer.deleteMany({ where: { id: employerId } });
+      });
+
+      it("a student reads their OWN connection and nobody else's", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.findMany({
+            where: { id: { in: [connectionA, connectionC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((row) => row.id), [connectionA]);
+      });
+
+      it("a teacher reads connections for students they manage, and no others", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.connection.findMany({
+            where: { id: { in: [connectionA, connectionC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(
+          rows.map((row) => row.id),
+          [connectionA],
+          "connection_read must keep its managed_student_ids() gate",
+        );
+      });
+
+      it("a student may move their OWN proposal to student_approved", async () => {
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({
+            where: { id: connectionA },
+            data: { status: "student_approved" },
+          }),
+        );
+        assert.equal(updated.count, 1);
+        // Put it back for the cases below.
+        await db.connection.update({
+          where: { id: connectionA },
+          data: { status: "proposed" },
+        });
+      });
+
+      it("a student may withdraw their own connection", async () => {
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({ where: { id: connectionA }, data: { status: "withdrawn" } }),
+        );
+        assert.equal(updated.count, 1);
+        await db.connection.update({ where: { id: connectionA }, data: { status: "proposed" } });
+      });
+
+      it("a student may NOT drive any other status — sent, hired, viewed, not_now", async () => {
+        // THROWS, it does not return count 0 — the same mechanism as the
+        // teacher RETARGET case above. connection_update's USING admits the
+        // student's OWN row, so the row IS matched; the new status then fails
+        // WITH CHECK, and a WITH CHECK violation raises 42501 rather than
+        // filtering the row out.
+        //
+        // Contrast the cross-student case below, which DOES return count 0: a
+        // student fails USING on somebody else's row, so nothing is matched and
+        // there is nothing left to check. Expecting a count here (as the first
+        // cut did) tests for the one outcome this policy cannot produce.
+        for (const status of ["sent", "hired", "viewed", "not_now", "interested"]) {
+          await assert.rejects(
+            () =>
+              asRole("student", fixtures.studentA, (tx) =>
+                tx.connection.updateMany({ where: { id: connectionA }, data: { status } }),
+              ),
+            /row-level security/i,
+            `connection_update's WITH CHECK must refuse a student writing "${status}"`,
+          );
+
+          // The rejection aborts its transaction, so the row must still be
+          // "proposed". Without this the test would pass on a policy that threw
+          // AFTER writing — and the loop's later iterations would be starting
+          // from a status the student had already managed to set.
+          const after = await db.connection.findUnique({
+            where: { id: connectionA },
+            select: { status: true },
+          });
+          assert.equal(
+            after?.status,
+            "proposed",
+            `the student moved the connection to "${status}" before being refused`,
+          );
+        }
+      });
+
+      it("a student cannot touch another student's connection at all", async () => {
+        // Count 0, not a throw: Student A fails connection_update's USING on
+        // Student C's row, so the row is never matched and no WITH CHECK is
+        // reached. "withdrawn" would even be a legal status for its owner —
+        // which is the point, the refusal here is about whose row it is.
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({ where: { id: connectionC }, data: { status: "withdrawn" } }),
+        );
+        assert.equal(updated.count, 0);
+      });
+
+      it("a student's own UPDATE must LEAVE 'proposed' — standing still is refused", async () => {
+        // connection_update's WITH CHECK is written on the row the student
+        // leaves behind, not on the change they made, so an update that keeps
+        // the status at 'proposed' fails it even though the student owns the
+        // row and 'proposed' is where it already was. That is deliberate: the
+        // only two things a student may do to a connection are approve it and
+        // withdraw it, and "edit it in place" is neither.
+        //
+        // A throw, not count 0: USING passes (it is their row), so the row IS
+        // matched and Postgres evaluates WITH CHECK against the new version.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.connection.updateMany({
+                where: { id: connectionA },
+                data: { responseReason: "let me add a note" },
+              }),
+            ),
+          /row-level security/i,
+          "a student was able to edit their connection without moving it",
+        );
+      });
+
+      it("the DATABASE alone would let a student rewrite the packet — the app is the guard", async () => {
+        // This case pins a LIMIT, not a protection, and it is here so that
+        // nobody reads connection_update and concludes the frozen packet is
+        // safe at this layer. RLS is row-level, never column-level: a student
+        // whose UPDATE lands on their own row and leaves 'student_approved'
+        // behind may change any other column in the same statement, `packet`
+        // included. Postgres offers no role-conditional column privilege that
+        // would help — column GRANTs are per database role, and vq_app is
+        // every application role at once.
+        //
+        // The real guard is the approve route, which builds the packet from
+        // server-side data and never accepts one from the request body. If
+        // that ever changes, this test still passes and the product breaks —
+        // which is exactly why the fact is written down here rather than
+        // assumed.
+        const forged = { includedFields: ["everything"], endorsement: "hire me" };
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({
+            where: { id: connectionA },
+            data: { status: "student_approved", packet: forged },
+          }),
+        );
+        assert.equal(updated.count, 1, "the student's own approval was refused");
+
+        const after = await db.connection.findUnique({
+          where: { id: connectionA },
+          select: { packet: true },
+        });
+        assert.deepEqual(
+          after?.packet,
+          forged,
+          "the database rejected the packet rewrite — if this now fails, the column IS protected here and the migration comment must be corrected",
+        );
+
+        await db.connection.update({
+          where: { id: connectionA },
+          data: { status: "proposed", packet: Prisma.DbNull },
+        });
+      });
+
+      it("a student CANNOT withdraw a connection once it is a hire", async () => {
+        // The security fix, at the layer that has to hold even if the app
+        // forgets. `Connection.applicationId` names an accepted,
+        // instructor-verified Application, and the row feeds the placement
+        // bridge, the grant KPI report and the DoHS export — so "take this
+        // back" on a job the student actually got would leave two records of
+        // one event disagreeing, with the funnel counting them as both placed
+        // and not.
+        //
+        // Expressed in USING rather than WITH CHECK because WITH CHECK cannot
+        // see the OLD row: "withdrawn is fine unless you WERE hired" is only
+        // sayable by refusing to match a hired row at all. That also changes
+        // the failure shape — the row is never matched, so this is a silent
+        // count 0 rather than a 42501, and the read-back is what proves it.
+        for (const status of ["hired", "started", "retained_60"] as const) {
+          await db.connection.update({ where: { id: connectionA }, data: { status } });
+
+          const updated = await asRole("student", fixtures.studentA, (tx) =>
+            tx.connection.updateMany({
+              where: { id: connectionA },
+              data: { status: "withdrawn" },
+            }),
+          );
+          assert.equal(
+            updated.count,
+            0,
+            `a student withdrew a "${status}" connection`,
+          );
+
+          const after = await db.connection.findUnique({
+            where: { id: connectionA },
+            select: { status: true },
+          });
+          assert.equal(
+            after?.status,
+            status,
+            `a verified placement was rewritten from "${status}"`,
+          );
+        }
+
+        // Staff keep their route: a hire recorded in error is fixable by the
+        // person who can also unverify the Application.
+        const closed = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.connection.updateMany({ where: { id: connectionA }, data: { status: "closed" } }),
+        );
+        assert.equal(closed.count, 1, "an instructor could not close a bad hire");
+
+        await db.connection.update({
+          where: { id: connectionA },
+          data: { status: "proposed" },
+        });
+      });
+
+      it("a student may insert their OWN proposal, and only in 'proposed'", async () => {
+        // The bounded student branch that makes propose_connection possible
+        // without an admin bypass. Uses studentB, who has no row on this lead.
+        //
+        // The write shape here is the REAL one `proposeConnection` emits, not
+        // a minimal row: the packet is assembled before the insert and written
+        // in it, so a policy that happened to admit a bare row while rejecting
+        // the one the app actually sends would pass a thinner test and fail in
+        // production. `classId` is included for the same reason.
+        const created = await asRole("student", fixtures.studentB, (tx) =>
+          tx.connection.create({
+            data: {
+              studentId: fixtures.studentB,
+              jobLeadId: leadId,
+              employerId,
+              proposedById: fixtures.studentB,
+              proposedVia: "sage",
+              status: "proposed",
+              packet: { includedFields: ["resume"], endorsement: "" },
+              classId: null,
+            },
+            select: { id: true },
+          }),
+        );
+        assert.ok(created.id);
+        await db.connection.delete({ where: { id: created.id } });
+
+        // Any other starting status is refused, so a student cannot insert a
+        // row that is already approved (or already sent).
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentB, (tx) =>
+              tx.connection.create({
+                data: {
+                  studentId: fixtures.studentB,
+                  jobLeadId: leadId,
+                  employerId,
+                  proposedById: fixtures.studentB,
+                  proposedVia: "sage",
+                  status: "student_approved",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a student cannot insert a connection for someone else", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentB, (tx) =>
+              tx.connection.create({
+                data: {
+                  studentId: fixtures.studentA,
+                  jobLeadId: leadId,
+                  employerId,
+                  proposedById: fixtures.studentB,
+                  proposedVia: "sage",
+                  status: "proposed",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("ConnectionEvent is APPEND-ONLY: no update and no delete, for anyone", async () => {
+        // A THROW, not count 0, and the difference is the whole point of the
+        // guard being doubled. Two mechanisms are stacked here:
+        //
+        //   1. No UPDATE or DELETE policy exists, so with RLS on no row is
+        //      ever matched for those commands, for any role including admin.
+        //      On its own that yields a silent `count: 0` — which reads like
+        //      "there was nothing to update" rather than "you may not".
+        //   2. The privileges are REVOKED from vq_app, so the statement is
+        //      rejected outright with 42501 before any row is considered.
+        //
+        // The regex accepts either message because the mechanisms overlap and
+        // Postgres reports whichever it reaches first; what must never happen
+        // is a call that succeeds, or one that quietly reports zero rows.
+        for (const role of ["student", "teacher", "admin"] as const) {
+          const actor =
+            role === "student"
+              ? fixtures.studentA
+              : role === "teacher"
+                ? fixtures.teacher
+                : fixtures.admin;
+          await assert.rejects(
+            () =>
+              asRole(role, actor, (tx) =>
+                tx.connectionEvent.updateMany({ where: { id: eventA }, data: { note: "rewritten" } }),
+              ),
+            /permission denied|row-level security/i,
+            `${role} was able to edit the audit trail`,
+          );
+
+          await assert.rejects(
+            () =>
+              asRole(role, actor, (tx) =>
+                tx.connectionEvent.deleteMany({ where: { id: eventA } }),
+              ),
+            /permission denied|row-level security/i,
+            `${role} was able to delete an audit row`,
+          );
+        }
+
+        // And the row is still exactly as it was written.
+        const after = await db.connectionEvent.findUnique({
+          where: { id: eventA },
+          select: { note: true },
+        });
+        assert.equal(after?.note ?? null, null, "the audit row was modified");
+      });
+
+      it("OutboundMessage is append-only too, and a Connection cannot be deleted", async () => {
+        // The same shape as ConnectionEvent, for the same reason: these are the
+        // records of what left the program. Connection keeps UPDATE (its whole
+        // life is status transitions) but loses DELETE — a disclosure record is
+        // closed or withdrawn, never removed.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.outboundMessage.updateMany({ where: { id: messageA }, data: { status: "edited" } }),
+            ),
+          /permission denied|row-level security/i,
+          "a teacher was able to rewrite the outbound message log",
+        );
+
+        await assert.rejects(
+          () =>
+            asRole("admin", fixtures.admin, (tx) =>
+              tx.outboundMessage.deleteMany({ where: { id: messageA } }),
+            ),
+          /permission denied|row-level security/i,
+          "an admin was able to delete from the outbound message log",
+        );
+
+        await assert.rejects(
+          () =>
+            asRole("admin", fixtures.admin, (tx) =>
+              tx.connection.deleteMany({ where: { id: connectionA } }),
+            ),
+          /permission denied|row-level security/i,
+          "an admin was able to delete a disclosure record",
+        );
+
+        const stillThere = await db.connection.findUnique({
+          where: { id: connectionA },
+          select: { id: true },
+        });
+        assert.ok(stillThere, "the connection was deleted");
+      });
+
+      it("a student reads the events on their own connection", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connectionEvent.findMany({ where: { id: eventA }, select: { id: true } }),
+        );
+        assert.deepEqual(rows.map((row) => row.id), [eventA]);
+      });
+
+      it("a student reads NO OutboundMessage rows — that log names the employer contact", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.outboundMessage.findMany({ select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "OutboundMessage is staff-read only");
+      });
+
+      it("a teacher reads OutboundMessage only for students they manage", async () => {
+        // The scoping that outbound_message_read exists for. The first cut
+        // admitted any role in ('admin','teacher') to every row, so one
+        // student's message log — which names them, their employer and what
+        // was said about them — was readable by staff with no relationship to
+        // them at all. Asserted in both directions, so a policy that simply
+        // returned everything cannot pass.
+        const mine = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.outboundMessage.findMany({
+            where: { id: { in: [messageA, messageC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(
+          mine.map((row) => row.id),
+          [messageA],
+          "a teacher must not read the message log of a student they do not manage",
+        );
+
+        const theirs = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.outboundMessage.findMany({
+            where: { id: { in: [messageA, messageC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(
+          theirs.map((row) => row.id),
+          [messageC],
+          "the other teacher must still read their own student's row",
+        );
+      });
+
+      it("an unattached OutboundMessage row is admin-only", async () => {
+        // connectionId is nullable (the FK is SET NULL, and Phase 5's nudges
+        // may have no connection at all). There is no student to scope such a
+        // row by, so it falls to admin rather than to every teacher —
+        // "unscoped therefore visible to all staff" is the exact default this
+        // policy replaced.
+        const orphan = await db.outboundMessage.create({
+          data: {
+            channel: "sms",
+            toKind: "student",
+            toId: "unattached-rls-test",
+            templateKey: "connect.nudge",
+            body: "no connection attached",
+          },
+          select: { id: true },
+        });
+
+        try {
+          const teacherRows = await asRole("teacher", fixtures.teacher, (tx) =>
+            tx.outboundMessage.findMany({ where: { id: orphan.id }, select: { id: true } }),
+          );
+          assert.deepEqual(teacherRows, [], "a teacher read an unattached message row");
+
+          const adminRows = await asRole("admin", fixtures.admin, (tx) =>
+            tx.outboundMessage.findMany({ where: { id: orphan.id }, select: { id: true } }),
+          );
+          assert.deepEqual(adminRows.map((row) => row.id), [orphan.id]);
+        } finally {
+          await db.outboundMessage.deleteMany({ where: { id: orphan.id } });
+        }
+      });
+
+      it("a student cannot INSERT an OutboundMessage, even one addressed to themselves", async () => {
+        // This is the invariant that forces the SMS sender onto prismaAdmin
+        // (src/lib/nudges/sms-policy.ts): the nudge runner impersonates the
+        // student for their own rows, and if that context could write this
+        // table the outbound log would stop being a staff-only audit trail.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.outboundMessage.create({
+                data: {
+                  channel: "sms",
+                  toKind: "student",
+                  toId: fixtures.studentA,
+                  templateKey: "weekly_jobs",
+                  body: "SPOKES: forged. Reply STOP to stop.",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a student reads and revokes their OWN SMS consent, and nobody else's", async () => {
+        // Phase 5 adds smsConsentAt / smsRevokedAt to NotificationPreference,
+        // which already has notification_preference_access. Pinned because the
+        // settings page writes these as the student: a column that inherited
+        // the wrong reach would let one student silence another's texts.
+        const own = await asRole("student", fixtures.studentA, async (tx) => {
+          const created = await tx.notificationPreference.create({
+            data: {
+              studentId: fixtures.studentA,
+              channel: "sms",
+              enabled: true,
+              destination: "+13045550123",
+              smsConsentAt: new Date(),
+            },
+          });
+          return created.id;
+        });
+
+        const readBack = await asRole("student", fixtures.studentA, (tx) =>
+          tx.notificationPreference.findMany({
+            where: { id: own },
+            select: { id: true, smsConsentAt: true },
+          }),
+        );
+        assert.equal(readBack.length, 1);
+        assert.ok(readBack[0].smsConsentAt, "the student can see their own consent stamp");
+
+        const otherStudentSees = await asRole("student", fixtures.studentB, (tx) =>
+          tx.notificationPreference.findMany({ where: { id: own }, select: { id: true } }),
+        );
+        assert.deepEqual(otherStudentSees, [], "another student must not see the row at all");
+
+        const revoked = await asRole("student", fixtures.studentA, (tx) =>
+          tx.notificationPreference.updateMany({
+            where: { id: own },
+            data: { enabled: false, smsRevokedAt: new Date() },
+          }),
+        );
+        assert.equal(revoked.count, 1, "a student can always revoke their own consent");
+
+        await db.notificationPreference.deleteMany({ where: { id: own } });
+      });
+
+      it("refuses a ResumeVersion or CoverLetter that names NO opening", async () => {
+        // The CHECK constraints, exercised as the table OWNER — this is not an
+        // RLS property, it is a shape the database must refuse for every
+        // writer, including one that never reads tailor-application.ts.
+        //
+        // A row with neither key is the quiet half of the bug: it is invisible
+        // to every packet and every application view, so the tailoring looks
+        // like it simply did not happen, which is exactly how the original
+        // P2003 failure hid.
+        //
+        // SCOPE NOTE: the BOTH-keys half of the same constraint is not
+        // exercised here, because reaching it needs a real `JobListing`, which
+        // needs a JobClassConfig and a scrape batch this suite does not build
+        // — and with a fabricated id the FK fires first, so the assertion
+        // would pass for the wrong reason. `assertExactlyOneOpening` covers it
+        // at the unit level (tailor-application.columns.test.ts), and the
+        // constraint text below is the same predicate for both halves.
+        await assert.rejects(
+          () =>
+            db.resumeVersion.create({
+              data: {
+                studentId: fixtures.studentA,
+                version: 1,
+                content: {},
+                jobListingId: null,
+                jobLeadId: null,
+              },
+            }),
+          /violates check constraint/i,
+          "a ResumeVersion belonging to no opening was accepted",
+        );
+
+        await assert.rejects(
+          () =>
+            db.coverLetter.create({
+              data: {
+                studentId: fixtures.studentA,
+                version: 1,
+                content: "x",
+                jobListingId: null,
+                jobLeadId: null,
+              },
+            }),
+          /violates check constraint/i,
+          "a CoverLetter belonging to no opening was accepted",
+        );
+
+        // And the valid shape still inserts, so the constraint is not simply
+        // refusing everything.
+        const ok = await db.resumeVersion.create({
+          data: {
+            studentId: fixtures.studentA,
+            version: 99,
+            content: {},
+            jobLeadId: leadId,
+          },
+          select: { id: true },
+        });
+        await db.resumeVersion.delete({ where: { id: ok.id } });
+      });
+
+      it("returns zero rows for all three tables with no RLS context", async () => {
+        const [connections, events, messages] = await Promise.all([
+          asRole(null, null, (tx) => tx.connection.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.connectionEvent.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.outboundMessage.findMany({ select: { id: true } })),
+        ]);
+        assert.deepEqual(connections, [], "Connection must be empty with no context");
+        assert.deepEqual(events, [], "ConnectionEvent must be empty with no context");
+        assert.deepEqual(messages, [], "OutboundMessage must be empty with no context");
       });
     });
   });

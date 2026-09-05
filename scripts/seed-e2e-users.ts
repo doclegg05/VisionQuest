@@ -119,13 +119,44 @@ async function main() {
 
   try {
     if (clean) {
+      // Connections FIRST, and not because of the student's own row.
+      //
+      // `Connection.studentId` cascades, so a student's own connections would
+      // go with them. `Connection.proposedById` does NOT — it is RESTRICT,
+      // because a disclosure record has to outlive every party to it. A
+      // self-proposed connection (the Sage path writes proposedById =
+      // studentId) therefore points at the same Student row through both, and
+      // Postgres enforces the RESTRICT regardless of the CASCADE: the delete
+      // below fails outright rather than cascading.
+      //
+      // Deleting them here is safe in a way it would not be in production —
+      // these are marker fixtures on a hermetic or explicitly local database,
+      // which this script refuses to run against anything else.
+      const fixtureLogins = [
+        E2E_TEACHER.login,
+        E2E_STUDENT.login,
+        E2E_JOURNEY_STUDENT.login,
+      ];
+      const fixtureStudents = await prisma.student.findMany({
+        where: { studentId: { in: fixtureLogins } },
+        select: { id: true },
+      });
+      const fixtureIds = fixtureStudents.map((row) => row.id);
+      if (fixtureIds.length > 0) {
+        await prisma.connection.deleteMany({
+          where: {
+            OR: [
+              { studentId: { in: fixtureIds } },
+              { proposedById: { in: fixtureIds } },
+              { sentById: { in: fixtureIds } },
+            ],
+          },
+        });
+      }
+
       // Student cascades wipe goals/progress/enrollments/alerts.
       const students = await prisma.student.deleteMany({
-        where: {
-          studentId: {
-            in: [E2E_TEACHER.login, E2E_STUDENT.login, E2E_JOURNEY_STUDENT.login],
-          },
-        },
+        where: { studentId: { in: fixtureLogins } },
       });
       const classes = await prisma.spokesClass.deleteMany({
         where: { code: E2E_CLASS.code },

@@ -2,6 +2,8 @@
 
 import { useReducedMotion } from "framer-motion";
 
+import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
+
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
@@ -48,6 +50,16 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
           {content}
           {isStreaming && shouldReduceMotion ? "…" : ""}
         </p>
+        {/* Read-aloud lives on Sage's finished replies: an explain_job
+            explanation reaches the student as Sage's own text, because
+            ChatWindow renders a tool_result as a status chip (its summary) and
+            does not render the tool's `data`. Renders nothing where the
+            browser has no on-device voice. */}
+        {!isUser && !isStreaming && (
+          <div className="mt-2">
+            <ReadAloudButton text={content} />
+          </div>
+        )}
       </div>
     </div>
   );

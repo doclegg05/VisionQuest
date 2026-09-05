@@ -1,0 +1,21 @@
+{
+  "_comment": "Documents the walk e2e/bench-touch-targets.spec.ts performs; the spec's own constants are the source of truth, this fixture exists so the suite config has one per the contract's five-part rule and so a future runner can display what the raw-data file's numbers mean without opening the spec.",
+  "viewport": { "width": 375, "height": 667 },
+  "minTargetPx": 44,
+  "routes": [
+    "/dashboard",
+    "/career",
+    "/goals",
+    "/orientation",
+    "/settings",
+    "/appointments",
+    "/memory"
+  ],
+  "interactiveSelector": "a[href], button, input, select, textarea, [role=button], [role=tab], [role=checkbox], [role=radio], [role=switch], [role=menuitem], [tabindex=\"0\"]",
+  "excludes": [
+    "not visible (page.isVisible() false)",
+    "disabled (disabled attribute or aria-disabled=\"true\")",
+    "screen-reader-only (closest(\".sr-only\") — a 1x1 clipped box is not a tappable target)"
+  ],
+  "rawDataPath": "reports/benchmarks/raw/touch-targets.json"
+}

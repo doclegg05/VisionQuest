@@ -1,8 +1,41 @@
+import { appendFileSync, mkdirSync } from "node:fs";
+import path from "node:path";
+
+import { logger } from "./logger";
+
 interface EmailPayload {
   to: string;
   subject: string;
   text: string;
   html?: string;
+}
+
+/**
+ * A local file to write outgoing mail to instead of sending it.
+ *
+ * Set `EMAIL_SINK_DIR` and every send appends one JSON line to
+ * `<dir>/outbox.jsonl` and returns. It exists because some flows can only be
+ * exercised end to end by reading what was sent: the employer's response link
+ * is a capability token that appears in exactly one place — the email — and is
+ * stored only as a hash, so nothing else in the system can recover it. Without
+ * a sink there is no way for a browser test to open the page an employer opens.
+ *
+ * REFUSED IN PRODUCTION, unconditionally. A file sink there would be a silent
+ * mail black hole: every crisis notification, every password reset and every
+ * employer packet would appear to send and reach nobody. The check is on
+ * NODE_ENV rather than on the path or a flag, because the failure is severe
+ * enough that it should not depend on somebody configuring the guard correctly.
+ */
+function getSinkPath(): string | null {
+  const dir = process.env.EMAIL_SINK_DIR;
+  if (!dir) return null;
+  if (process.env.NODE_ENV === "production") return null;
+  return path.join(dir, "outbox.jsonl");
+}
+
+/** Whether mail is being diverted to a file rather than sent. */
+export function isEmailSinkActive(): boolean {
+  return getSinkPath() !== null;
 }
 
 function getMailerConfig() {
@@ -23,11 +56,47 @@ function getMailerConfig() {
   };
 }
 
+/**
+ * True when a send will go somewhere.
+ *
+ * The sink counts. Callers use this to refuse BEFORE doing work they cannot
+ * undo — `sendConnection` checks it before it spends one of an employer's three
+ * weekly packets — and under a sink the send genuinely will not fail, so
+ * reporting "not configured" would make every such flow untestable.
+ */
 export function isEmailDeliveryConfigured(): boolean {
-  return Boolean(getMailerConfig());
+  return isEmailSinkActive() || Boolean(getMailerConfig());
 }
 
+/**
+ * One line the first time mail is diverted, so a non-production deploy that
+ * happens to carry `EMAIL_SINK_DIR` is not a silent black hole.
+ *
+ * `isEmailDeliveryConfigured()` returns TRUE under a sink, which is right for
+ * the flows that check it and wrong as the only signal an operator ever gets:
+ * staging would report mail working while nobody received any. Warned once
+ * rather than per send, because a benchmark run sends dozens.
+ */
+let sinkAnnounced = false;
+
 export async function sendEmail(payload: EmailPayload) {
+  const sinkPath = getSinkPath();
+  if (sinkPath) {
+    if (!sinkAnnounced) {
+      sinkAnnounced = true;
+      logger.warn("email_sink_active", {
+        sinkPath,
+        note: "EMAIL_SINK_DIR is set: outgoing mail is being written to a file, not sent.",
+      });
+    }
+    mkdirSync(path.dirname(sinkPath), { recursive: true });
+    appendFileSync(
+      sinkPath,
+      `${JSON.stringify({ ...payload, sentAt: new Date().toISOString() })}\n`,
+    );
+    return;
+  }
+
   const config = getMailerConfig();
 
   if (!config) {

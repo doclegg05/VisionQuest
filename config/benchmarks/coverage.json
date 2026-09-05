@@ -1,0 +1,19 @@
+{
+  "suite": "coverage",
+  "title": "Line coverage (include-all)",
+  "area": "quality",
+  "tier": "nightly",
+  "scorer": "scripts/bench/suites/coverage.mjs",
+  "requires": [],
+  "metrics": [
+    { "id": "line_coverage", "unit": "ratio", "direction": "higher", "floor": 0.6, "tolerance": 0.01 },
+    {
+      "id": "untested_modules",
+      "unit": "count",
+      "direction": "lower",
+      "floor": null,
+      "reason": "tracked, not gated; the list is the deliverable"
+    }
+  ],
+  "notes": "Moved to nightly (was gate) 2026-09-05 on owner instruction — line_coverage's full run (unit suite + ~850 forced imports) takes ~513s (~8.5 min), too slow for every PR; the unit suite already runs per PR via the ordinary `npm test` gate step. Floor 0.60, tolerance 0.01, never decreasing, unchanged. line_coverage's include-all technique: Node's --test-coverage-include only restricts which ALREADY-LOADED files are reported — it does NOT force-include a file nothing imports (verified experimentally, see scripts/bench/suites/lib/generate-import-all.mjs's header) — so a synthetic node:test file dynamically imports every eligible src/**/*.ts(x) file (excluding *.test.ts(x) and *.d.ts) exactly once, with a per-file try/catch so one unimportable module cannot blank out the run, in the SAME `tsx --test --experimental-test-coverage --test-reporter=lcov` invocation as the real suite. `untested_modules` is a DIFFERENT, static mechanism (scripts/bench/suites/lib/import-graph.mjs): a plain import-graph BFS from every `*.test.ts(x)` file, following only `@/` (mapped to src/ per tsconfig paths) and relative specifiers — a source file the graph never reaches from any test is untested. This replaces an earlier force-import-derived version of this metric that read 0/842 on this repo: because a bare `import` always executes a module's top-level statements, force-importing a file almost always gives it a nonzero line-hit count even when no real test ever calls into it, so that approach could not distinguish 'loaded' from 'exercised'. The static walk is over-conservative in the opposite direction instead: it cannot see dynamic imports built from a non-literal expression or any other non-import wiring, so a file reached only that way would misreport as untested — stated here rather than left for a reader to discover. floor: null with a reason (not a hard gate) because this is a tracked, never-increasing count whose actual deliverable is the file list in details.untestedModules, not a threshold."
+}

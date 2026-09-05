@@ -16,7 +16,9 @@ import {
   UserCircle,
   SignOut,
   Books,
+  Handshake,
   WarningCircle,
+  ChartBar,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
@@ -27,6 +29,7 @@ export const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/teacher", label: "Students", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
+  { href: "/teacher/connect", label: "Connect", icon: Handshake, phase: 1 },
   { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
   {
@@ -41,10 +44,16 @@ const COORDINATOR_ITEMS: NavItem[] = [
   { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
 ];
 
-const ADMIN_ITEMS: NavItem[] = [
+/**
+ * Admin-only sidebar entries. Exported so a test can pin which surfaces are
+ * admin-only: the benchmark dashboard 404s for a teacher who types its URL,
+ * and this list is the only place it is ever advertised.
+ */
+export const ADMIN_ITEMS: NavItem[] = [
   { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
   { href: "/admin/library", label: "Library", icon: Books, phase: 1 },
+  { href: "/teacher/admin/benchmarks", label: "Benchmarks", icon: ChartBar, phase: 1 },
 ];
 
 interface NavBarProps {

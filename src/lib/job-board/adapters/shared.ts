@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import type { NormalizedJob } from "../types";
 
 export const JOB_SCOUT_USER_AGENT = "VisionQuest Job Scout/0.1";
 
@@ -134,6 +135,40 @@ export function annualSalaryText(min: number | null | undefined, max: number | n
   if (low == null || high == null) return null;
   if (low !== high) return `$${Math.round(low)}-$${Math.round(high)}/year`;
   return `$${Math.round(low)}/year`;
+}
+
+/**
+ * Maps raw source items to NormalizedJob one at a time, isolating one
+ * malformed item's failure from the rest of the batch — this is strictly
+ * better than either extreme: the old bare-try/catch adapters swallowed
+ * EVERY item silently on any single failure (one bad row hid a whole
+ * successful response), and a plain `.map()` lets one thrown error fail the
+ * entire fetchJobs() call (a stalled/500 batch turns into a total outage
+ * instead of a partial one). Here, one bad item is skipped and logged; every
+ * well-formed item still comes back.
+ *
+ * `mapItem` returning `null` means "skip, nothing wrong" (e.g. a genuinely
+ * absent required field) and is never logged — only a THROWN error is
+ * logged, since that's the unexpected case. The log carries only
+ * `{ source, index }`, never the item payload (may hold job-posting free
+ * text) or the thrown error's message (could echo back malformed input,
+ * and in principle a URL with embedded secrets).
+ */
+export function mapEachJob<T>(
+  items: readonly T[],
+  source: string,
+  mapItem: (item: T, index: number) => NormalizedJob | null,
+): NormalizedJob[] {
+  const out: NormalizedJob[] = [];
+  items.forEach((item, index) => {
+    try {
+      const mapped = mapItem(item, index);
+      if (mapped) out.push(mapped);
+    } catch {
+      logger.warn("Job source item failed to normalize", { source, index });
+    }
+  });
+  return out;
 }
 
 export function xmlTag(item: string, tag: string): string {

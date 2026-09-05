@@ -44,16 +44,81 @@ import { logger } from "./logger";
  * RLS. Use it ONLY from internal cron endpoints, background job handlers,
  * pre-auth/public routes, and admin operations that must see all rows.
  */
+/**
+ * Give a connection URL a bounded pool, unless it already names one.
+ *
+ * Exported for its test: this is string surgery on a value nothing in the
+ * process re-reads, so getting it wrong is invisible until the pool behaves
+ * oddly under load. An explicit `connection_limit` or `pool_timeout` already
+ * in the URL is left completely alone — an operator who set one meant it, and
+ * silently adding the other half would be a second, different opinion.
+ */
+export function withPoolDefaults(url: string, poolSize: number, poolTimeout: number): string {
+  if (!url) return url;
+  if (url.includes("connection_limit=") || url.includes("pool_timeout=")) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}connection_limit=${poolSize}&pool_timeout=${poolTimeout}`;
+}
+
+/**
+ * ADMIN_DATABASE_URL had no pool bound at all, which Prisma reads as "as many
+ * connections as you like". That was survivable while prismaAdmin only did
+ * short reads; the nudge runner changed it, because its run lock holds ONE
+ * admin connection open for the length of a sweep. An unbounded admin pool
+ * next to a long-lived checkout is how a Supabase instance runs out of
+ * connections and every other request starts failing — including the app pool
+ * students are waiting on.
+ *
+ * Ten rather than five: this pool serves crons and job handlers that fan out
+ * (`mapWithConcurrency`), and one of its connections may be parked on the run
+ * lock, so a five-connection ceiling would have the sweep contending with
+ * itself.
+ */
+const ADMIN_POOL_SIZE = 10;
+const ADMIN_POOL_TIMEOUT = 10;
+
+/**
+ * A positive integer from the environment, or the default.
+ *
+ * `parseInt` returns NaN for a typo and 0 for "0", and both go straight into
+ * the URL: `connection_limit=NaN` is a connection string Prisma will not
+ * parse, and `connection_limit=0` is a pool that can never serve a query.
+ * A bad value should mean "use the default", not "break the database".
+ */
+function positiveIntFromEnv(raw: string | undefined, fallback: number): number {
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * Whether the two clients point at the same database BEFORE pool params are
+ * appended.
+ *
+ * Captured here because `applyPoolDefaults` rewrites both URLs with DIFFERENT
+ * pool sizes (5 vs 10), so afterwards two identical URLs no longer compare
+ * equal — and `buildAdminClient` decides whether to open a second connection
+ * pool on exactly that comparison. Without this, an environment that sets
+ * ADMIN_DATABASE_URL to the same value as DATABASE_URL (every environment
+ * before Slice C) would quietly start running two pools against one database.
+ */
+const adminUrlMatchesAppUrl =
+  Boolean(process.env.ADMIN_DATABASE_URL) &&
+  process.env.ADMIN_DATABASE_URL === process.env.DATABASE_URL;
+
 function applyPoolDefaults(): void {
-  const poolSize = parseInt(process.env.DB_POOL_SIZE ?? "5", 10);
-  const poolTimeout = parseInt(process.env.DB_POOL_TIMEOUT ?? "10", 10);
+  const poolSize = positiveIntFromEnv(process.env.DB_POOL_SIZE, 5);
+  const poolTimeout = positiveIntFromEnv(process.env.DB_POOL_TIMEOUT, 10);
 
   const url = process.env.DATABASE_URL ?? "";
-  const hasPoolParams = url.includes("connection_limit=") || url.includes("pool_timeout=");
+  if (url) process.env.DATABASE_URL = withPoolDefaults(url, poolSize, poolTimeout);
 
-  if (!hasPoolParams && url) {
-    const separator = url.includes("?") ? "&" : "?";
-    process.env.DATABASE_URL = `${url}${separator}connection_limit=${poolSize}&pool_timeout=${poolTimeout}`;
+  const adminUrl = process.env.ADMIN_DATABASE_URL ?? "";
+  if (adminUrl) {
+    process.env.ADMIN_DATABASE_URL = withPoolDefaults(
+      adminUrl,
+      positiveIntFromEnv(process.env.ADMIN_DB_POOL_SIZE, ADMIN_POOL_SIZE),
+      positiveIntFromEnv(process.env.ADMIN_DB_POOL_TIMEOUT, ADMIN_POOL_TIMEOUT),
+    );
   }
 }
 
@@ -243,7 +308,10 @@ function buildAppClient(): PrismaClient {
  */
 function buildAdminClient(): PrismaClient {
   const adminUrl = process.env.ADMIN_DATABASE_URL;
-  if (adminUrl && adminUrl !== process.env.DATABASE_URL) {
+  // The equality test is `adminUrlMatchesAppUrl`, captured before the pool
+  // params were appended — the two URLs are given different pool sizes, so
+  // comparing them here would report "different" for what is one database.
+  if (adminUrl && !adminUrlMatchesAppUrl) {
     return new PrismaClient({ datasources: { db: { url: adminUrl } } });
   }
   return new PrismaClient();

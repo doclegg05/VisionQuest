@@ -59,7 +59,14 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
   // crisis-paraphrase scenario, which this detector previously missed.
   { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
-  { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
+  // The verb list is spelled out rather than suffixed, so the PROGRESSIVE form
+  // of every member is covered. The old alternation offered only "ting" or "t"
+  // after the stem, which happens to spell "cutting" and nothing else: "hurting
+  // myself" and "harming myself" were both verified misses, and they are the
+  // ordinary way a student describes an act that is still going on ("i keep
+  // hurting myself", "i been harming myself"). "cuting" is accepted as the
+  // predictable single-t typo of the one member whose progressive doubles.
+  { category: "self_harm", pattern: /\b((?:hurt|harm|cut)(?:t?ing|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
 
   // --- Informal register (VQ-R-004). The patterns above all require formal
   // "want to" constructions, but the product targets adults at a ~6th-grade
@@ -88,7 +95,48 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // are unambiguously distance: a digit immediately before (with or without a
   // space), and a following "away"/"from". Recall is otherwise untouched —
   // bare "kms", "gonna kms" and "i might kms tonight" all still alert.
-  { category: "self_harm", pattern: /(?<!\d)(?<!\d\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)/i },
+  //
+  // THE DISTANCE GUARDS MUST HOLD IN BOTH LANGUAGES, and the first attempt at
+  // that failed for a reason worth writing down: it ended its Spanish lookahead
+  // with \b, and JS \b is ASCII-only, so it cannot assert a boundary after "í".
+  // "a unos kms de aquí" only stayed silent because the QUANTITY lookbehind
+  // caught it — the lookahead was dead code, and "queda a kms de aquí" (no
+  // quantity word) still alerted, with lang "en", serving a Spanish speaker the
+  // ENGLISH 988 block. That is a fixture passing for the wrong reason, the exact
+  // hazard the 2026-08-21 review named. The remedy is this file's own,
+  // documented 200 lines down for the Spanish block: end on
+  // (?![\wáéíóúüñ]) instead of \b.
+  //
+  // Three guards now, each on a sense that is unambiguously distance:
+  //
+  //   1. QUANTITY BEFORE. "a unos/unas/pocos/pocas/varios/varias kms" and the
+  //      Spanish number words, plus the English "a few / a couple of / about /
+  //      around / roughly / some / several" — the last of which closes
+  //      "the office is a few kms down the road", an ENGLISH row that the
+  //      away/from lookahead alone did not cover.
+  //   2. SPANISH "de" AFTER. "kms de …" is a distance phrase in Spanish
+  //      whatever follows it — "de aquí", "de distancia", "de mi casa",
+  //      "del centro". Guarding on the preposition rather than an enumerated
+  //      list of destinations means the next destination nobody thought of is
+  //      covered too, and there is no Spanish sentence where "kms de" reads as
+  //      an English self-harm abbreviation.
+  //   3. ENGLISH direction word AFTER, widened from away/from to include
+  //      down/up/apart.
+  //
+  // Recall is untouched: bare "kms", "gonna kms", "i might kms tonight" and
+  // every "kys" form still alert, in either language, because none of them
+  // carries a quantity frame or a distance preposition.
+  {
+    category: "self_harm",
+    pattern: new RegExp(
+      "(?<!\\d)(?<!\\d\\s)" +
+        "(?<!\\b(?:a\\s+(?:few|couple\\s+of|unos|unas|pocos|pocas|varios|varias|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)|about|around|roughly|some|several)\\s)" +
+        "\\b(?:kms|kys)\\b" +
+        "(?!\\s+(?:away|from|down|up|apart)\\b)" +
+        "(?!\\s+del?(?![\\wáéíóúüñ]))",
+      "i",
+    ),
+  },
   // "ending things" — the formal pattern only covered "my life" / "it all".
   // PRECISION EXCEPTION to this module's recall-first policy, written down so
   // the owner can veto it in review: "end things WITH <someone>" is a breakup,
@@ -113,8 +161,40 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "sobredosis" twin below has required a first-person frame all along; this
   // restores the parity.
   { category: "self_harm", pattern: /\boverdos(?:e|ed|ing)\s+myself\b/i },
-  { category: "self_harm", pattern: /\bi(?:'m|'ve|'d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
-  { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
+  // The frame accepts the UNPUNCTUATED contractions too ("im", "ive", "id").
+  // This population writes without apostrophes — the informal-register set
+  // exists because of it — so "im overdosing on these pills right now" was a
+  // miss while "i'm overdosing on these pills" alerted, and a disclosure in
+  // progress is the worst possible place for that gap. Widening the pronoun
+  // costs no precision here: the frame still demands the overdose verb and its
+  // "on" object within two words, so a bare "im" or a stray "id" elsewhere in
+  // a sentence cannot reach it, and the third-person guards below
+  // ("my mom overdosed on pills when i was little") are unaffected because
+  // their "i" sits AFTER the verb.
+  // The bounded two-word gap is what makes this frame first-person, and it was
+  // wide enough to let a third-person SUBJECT stand inside it: "i" + "worried
+  // he" + "overdosed on" matched, so a student expressing concern about
+  // somebody else raised a CRITICAL alert on themselves and named their own
+  // instructors. Measured, not theorised — four such sentences were silent
+  // before the unpunctuated pronouns were added and alerting after, which is
+  // why the earlier claim that widening the pronoun "costs no precision" was
+  // wrong. The gap now refuses third-person pronouns and possessives: this
+  // frame is about the student, so nothing inside it may name anyone else.
+  // "i nearly overdosed on tylenol" and "i think i overdosed on" still match,
+  // because "nearly" and "i" are not on the refusal list.
+  {
+    category: "self_harm",
+    pattern:
+      /\bi(?:'?m|'?ve|'?d)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i,
+  },
+  // Past act. The verb list is "took|taken|swallowed", not a bare "take":
+  // "ive taken too many pills" and "i swallowed all my medication" are the
+  // same disclosure in the same register as the pinned "i took all my pills"
+  // and were both silent, while a bare present "take" is exactly how adherence
+  // talk reads ("i take all my pills every morning", pinned silent) and must
+  // stay out. The quantity + medication bounds are unchanged, so nothing that
+  // used to alert on the NOUN side stops alerting.
+  { category: "self_harm", pattern: /\b(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
   // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
   // all my pills tonight"). The two entries above between them only covered
   // intent toward the bare verb ("gonna od") and the completed act ("took all
@@ -149,6 +229,26 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", lang: "es", pattern: /\bno\s+quiero\s+(vivir|seguir\s+viviendo)\b/i },
   { category: "self_harm", lang: "es", pattern: /\b(no\s+vale\s+la\s+pena\s+vivir|la\s+vida\s+no\s+vale\s+la\s+pena)\b/i },
   { category: "self_harm", lang: "es", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer)\s+da(ñ|n)o|lastimarme|cortarme\s+las\s+venas)\b/i },
+  // CUTTING REGISTER (es) — parity with the English hurt/harm/cutting family.
+  // English covers the act in every tense ("i hurt myself yesterday", "i been
+  // hurting myself"); Spanish covered only the fixed phrase "cortarme las
+  // venas" plus the "hacerme daño" family, so the most ordinary Spanish form of
+  // the same disclosure — "me corté los brazos" — was silent, and so was
+  // "me hice cortes", which has no benign reading at all.
+  //
+  // Discriminated by BODY PART, not by the verb: "me corté" is also exactly how
+  // a kitchen accident is described, and unlike English (where
+  // "i cut myself chopping onions" is a recorded, accepted false positive) the
+  // Spanish side can separate the two cheaply, because the disclosure names
+  // where. So "me corté con el cuchillo cocinando", "me corté afeitándome" and
+  // "me corte el dedo picando cebolla" all stay silent — pinned — while the
+  // arms/wrists/thighs/veins list alerts. "el pelo" is not on the list, which
+  // is what keeps the existing haircut guard working.
+  //
+  // "me hice cortes" needs no body part: making cuts on oneself has no
+  // everyday sense. Both clitic positions are handled ("cortarme los brazos" /
+  // "me corté los brazos"), the same climbing the sobredosis entry handles.
+  { category: "self_harm", lang: "es", pattern: /\b(?:me\s+(?:hice|hago|voy\s+a\s+hacer|quiero\s+hacer)\s+cortes|(?:cortarme|me\s+cort(?:o|é|e|aba|aré|are)|me\s+(?:voy\s+a|quiero)\s+cortar)\s+(?:l[oa]s|el|la|mis?)\s+(?:brazos?|mu(?:ñ|n)ecas?|piernas?|muslos?|venas|cuerpo))/i },
   { category: "self_harm", lang: "es", pattern: /\b(mejor\s+muert[oa]|quisiera\s+estar\s+muert[oa])\b/i },
   // Ambiguous like the English "can't go on" — included per err-toward-alerting.
   { category: "self_harm", lang: "es", pattern: /\b(ya\s+)?no\s+puedo\s+m(á|a)s\b/i },

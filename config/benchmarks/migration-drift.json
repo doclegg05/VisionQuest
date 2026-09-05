@@ -1,0 +1,19 @@
+{
+  "suite": "migration-drift",
+  "title": "Migration drift — every table has RLS",
+  "area": "data-integrity",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/migration-drift.mjs",
+  "fixture": "config/benchmarks/fixtures/rls-exemptions.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "tables_without_rls",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "Measured 2026-09-05: exactly one table created without RLS, JobBrowseListing (docs/audits/2026-09-01-full-review.md F8) — exempted in the fixture because it holds no student data (no studentId, no FK to Student). Any other unexempted table created without RLS fails this gate; do not add an exemption without reading the model first."
+}
