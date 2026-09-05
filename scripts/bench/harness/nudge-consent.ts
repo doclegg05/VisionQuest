@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- mock scaffolding accepts many signatures. */
 /**
  * nudge-consent harness — the real sweep, over fuzzed consent states.
  *

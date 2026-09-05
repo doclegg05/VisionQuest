@@ -468,7 +468,7 @@ export function createNudgeStore(seed: NudgeStoreSeed = {}): NudgeStore {
 
   const makeTransactionClient = (release: { onEnd: Array<() => void> }) => ({
     ...baseClient,
-    $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+    $queryRaw: async (strings: TemplateStringsArray, ..._values: unknown[]) => {
       const sql = strings.raw.join("?");
       if (sql.includes("pg_try_advisory_xact_lock")) {
         if (store.runLockHeld) return [{ locked: false }];
