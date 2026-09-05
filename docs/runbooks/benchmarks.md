@@ -286,19 +286,33 @@ the secret exists (nightly Gemini spend is an owner decision, design §9.4).
 
 ### The browser-collected suites
 
-`touch-targets` and `axe-authenticated` are the only suites whose `requires`
-include `browser` and `server`, so the `e2e` job in `ci.yml` is the one place
-they can run. Two steps, and **the order is load-bearing**: the Playwright
-specs `e2e/bench-touch-targets.spec.ts` and `e2e/bench-axe-authenticated.spec.ts`
-are *collectors* — they walk the running app and write
+`touch-targets`, `axe-authenticated`, `journey-day1` and
+`journey-teacher-loop` are the suites whose `requires` include `browser` and
+`server`, so the `e2e` job in `ci.yml` is the one place they can run. Two
+steps, and **the order is load-bearing**: the Playwright specs
+`e2e/bench-*.spec.ts` are *collectors* — they walk the running app and write
 `reports/benchmarks/raw/<suite>.json` — and the scorers read those files. Run
 the runner first and each scorer errors by design, because the environment says
 browser and server are available while the raw data is not.
 
-The collection step is `continue-on-error: true` today, matching the existing
-authenticated-a11y soak: both suites are `watch` tier, so a broken collector
-surfaces as an `error` row in the table and the uploaded artifact rather than
-reddening the gating e2e job.
+All four collectors run in **one** step against **one** server (the job's own
+`npm run start`, through `playwright.config.ts`). A second web server would
+double the boot cost and hand the two halves different databases. `--workers=1`
+is on that step because `/api/auth/login` rate-limits to 10 attempts per IP per
+15 minutes and these specs share one IP.
+
+The collection step is `continue-on-error: true`, matching the existing
+authenticated-a11y soak, so a broken collector surfaces as an `error` row in
+the table and the uploaded artifact rather than as a red step whose log does
+not say what actually broke. That is still honest for the two **gate**-tier
+journey suites: their scorers return `{ skipped }` when the raw report is
+missing, the runner turns that into a suite-level `error` (the environment says
+browser and server *are* available), and `--compare` exits 1 on an error at
+gate tier — so the **scoring** step fails. Nothing is silently green.
+
+A run report older than 24 hours is treated as **absent**, not scored. A green
+`completed: 1` from last week reported against today's commit is a passing gate
+that measured nothing, which is worse than no number because it reads as proof.
 
 ## Open items
 
@@ -317,6 +331,43 @@ reddening the gating e2e job.
   `lower` with `tolerance: 0`, so once a real run sets today's number as the
   baseline it can never creep upward while the burn-down proceeds (design §4.9:
   "burn down to 0, then gate").
+- **`journey-day1` and `journey-teacher-loop` have no tap or time floors yet.**
+  Both suites gate on what can be judged without a measurement —
+  `completed` (all steps, all the way to a saved goal / back to the queue) and
+  `steps_with_next_signal` (8 of 8) — while `student_taps`, `total_seconds`,
+  `teacher_taps` and `queue_to_action_seconds` ship as owner-documented `info`
+  metrics carrying the design's proposed values in `details.designFloor`. The
+  reason is the same one `touch-targets` shipped at `watch` for: the authoring
+  worktree had no dev server and no `DATABASE_URL`, so neither collector has
+  ever been executed and nobody knows today's real number. **After the first
+  green CI run**: read `student_taps` and `teacher_taps` out of
+  `reports/benchmarks/latest/`, set the baseline with a `--reason`, then
+  replace the `"floor": null` + `"reason"` pair with a real floor.
+  The design's defaults are 8 taps for day 1 and 6 for the teacher loop
+  (§4.6, daggered); counting the controls on the day-1 path by hand suggests
+  about ten, so if the run agrees, **the finding is the product's** — the
+  journey costs more than the design's floor — and the fix is the flow, not the
+  floor (floors extend, never relax). The two `seconds` metrics stay unfloored
+  regardless: they are wall clock on whatever machine ran them, a trend line
+  rather than a latency number, and the same reasoning `connect-journey`'s
+  `elapsed_ms` records.
+- **`orientation-readiness`'s `consumer_disagreements` is a burn-down, not yet
+  a gate.** It is 116 of 300 (student, surface) pairs today, and the two
+  mappings behind it are product decisions rather than defects to fix quietly:
+  the **teacher roster** passes no `orientationProgress` to
+  `computeReadinessScore`, so partial orientation earns 0 of 10 there while
+  every other surface gives proportional credit (all 50 cohort students
+  disagree); and **class-progress** and the **KPI report** read certifications,
+  portfolio, résumé and shared-page facts only out of the stored
+  `Progression.state`, never reconciled against live rows (33 students each).
+  Same student, 6 of 12 orientation items, 2 certifications, 3 portfolio items,
+  a résumé and a shared page: **26** on their own dashboard, **5** on
+  class-progress and the KPI report, **21** on the roster. Closing it changes
+  what teachers see, so it is Britt's call; when the mappings are settled,
+  floor the metric at 0 (design §4.6: "identical score across surfaces"). The
+  three mappings now live in one place —
+  `src/lib/progression/readiness-consumers.ts` — so they cannot drift further
+  apart unremarked. Same measure-then-gate shape as `axe-authenticated`.
 - **Four scorers carry their own copy of the entry-point guard**
   (`scripts/bench/suites/{touch-targets,axe-authenticated,sms-readability,readability-by-surface}.mjs`)
   using a raw `argv[1]` comparison, which fails open through a symlink. The

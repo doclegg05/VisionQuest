@@ -5,8 +5,7 @@
 // KPI page.
 
 import { goalCountsTowardPlan } from "./goals";
-import { parseState } from "./progression/engine";
-import { computeReadinessScore } from "./progression/readiness-score";
+import { progressionStateReadiness } from "./progression/readiness-consumers";
 
 // ---------------------------------------------------------------------------
 // Input shape — matches what the API route fetches from Prisma
@@ -234,17 +233,16 @@ export function computeAcademicKpis(
 
     if (studentHasActivity) studentsWithAnyActivity++;
 
-    // Readiness score
-    const progState = parseState(student.progressionState);
+    // Readiness score. The mapping lives in readiness-consumers.ts, shared with
+    // the class-progress panel — the two read the same projection, and holding
+    // one definition is what keeps them from drifting apart. `orientationTotal`
+    // is prisma.orientationItem.count(): ALL items (2026-07-31 decision).
     const studentBhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-    const completedOrientationItems = student.orientationProgress.length;
-    const readiness = computeReadinessScore({
-      ...progState,
+    const readiness = progressionStateReadiness({
+      progressionState: student.progressionState,
       bhagCompleted: studentBhagCompleted,
-      orientationProgress: {
-        completed: completedOrientationItems,
-        total: orientationTotal,
-      },
+      orientationCompletedCount: student.orientationProgress.length,
+      orientationTotalCount: orientationTotal,
     });
     readinessScores.push(readiness.score);
 

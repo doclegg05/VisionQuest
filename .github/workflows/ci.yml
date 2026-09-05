@@ -325,23 +325,40 @@ jobs:
       # Run the runner first and each scorer errors, by design, because the
       # environment says browser+server are available and the raw data is not.
       #
-      # These are the only two suites whose `requires` include `browser` and
+      # These are the only suites whose `requires` include `browser` and
       # `server`, so this job is the one place they can run at all; without it
       # they would report `skipped` forever, which is the quiet-instrument
       # failure this whole suite exists to prevent.
+      #
+      # ONE server, one collection step. Every collector drives the job's own
+      # `npm run start` through playwright.config.ts; a second web server would
+      # double the boot cost and give the two halves different databases.
       - name: Collect browser benchmark data (non-blocking)
-        # Non-blocking for the same reason as the soak scan below: both suites
-        # are watch tier today, and a collector that breaks is reported by the
-        # runner as an `error` row in the table and the uploaded artifact
-        # rather than by reddening the gating e2e job. When touch-targets is
-        # promoted to gate (see docs/runbooks/benchmarks.md), drop
-        # continue-on-error here so a missing collection fails honestly.
+        # Non-blocking for the same reason as the soak scan below: a collector
+        # that breaks is reported by the runner as an `error` row in the table
+        # and the uploaded artifact rather than by reddening the gating e2e job.
+        #
+        # For the two GATE-tier journey suites that is still honest rather than
+        # quiet: their scorers return `{ skipped }` when the raw report is
+        # missing, the runner turns that into a suite-level `error` because the
+        # environment says browser and server ARE available, and `--compare`
+        # exits 1 on an error at gate tier. So a broken journey collector fails
+        # the scoring step below by design; it just does not mask which step
+        # actually broke. When touch-targets is promoted to gate (see
+        # docs/runbooks/benchmarks.md), drop continue-on-error here entirely.
+        #
+        # --workers=1: /api/auth/login rate-limits to 10 attempts per IP per 15
+        # minutes and these specs share one IP (playwright.config.ts already
+        # sets it under CI; named here because the journey specs would be the
+        # first to exhaust it).
         continue-on-error: true
         run: >-
           npx playwright test
           e2e/bench-touch-targets.spec.ts
           e2e/bench-axe-authenticated.spec.ts
-          --reporter=line --timeout=180000
+          e2e/bench-journey-day1.spec.ts
+          e2e/bench-journey-teacher-loop.spec.ts
+          --workers=1 --reporter=line --timeout=180000
 
       - name: Score browser benchmarks
         env:
@@ -349,7 +366,13 @@ jobs:
           # above already drove the real browser against the job's own server.
           PLAYWRIGHT: "1"
           BENCH_BASE_URL: "http://localhost:3000"
-        run: npm run bench -- --suite=touch-targets --suite=axe-authenticated --compare
+        run: >-
+          npm run bench --
+          --suite=touch-targets
+          --suite=axe-authenticated
+          --suite=journey-day1
+          --suite=journey-teacher-loop
+          --compare
 
       - name: Upload browser benchmark results
         if: always()

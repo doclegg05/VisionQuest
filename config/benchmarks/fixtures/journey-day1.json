@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "note": "No corpus. The input is the run report `e2e/bench-journey-day1.spec.ts` writes, and this file is the contract between the two so neither has to guess at the other's shape.",
+  "reportPath": "reports/benchmarks/raw/journey-day1.json",
+  "expectedStepCount": 8,
+  "stepKeys": [
+    "sign_in",
+    "welcome",
+    "meet_sage",
+    "first_orientation_win",
+    "path_choice",
+    "first_sage_message",
+    "dashboard_next_step",
+    "first_goal"
+  ],
+  "reportShape": {
+    "completed": "1 when the whole first session finished, absent when the spec never ran",
+    "studentTaps": "controls the student pressed, including the two navigations they make themselves; typing is not a tap",
+    "totalSeconds": "wall clock for the run, including the app's own network and the runner's waits",
+    "stepCount": "how many steps the spec walked — checked against expectedStepCount so a shortened journey cannot report a higher signal count",
+    "stepsWithNextSignal": "steps where the page told the student what to do next before they had to work it out",
+    "steps": "per step: key, seconds, nextSignal",
+    "measuredAt": "ISO instant, so a stale report can be recognised"
+  },
+  "maxReportAgeHours": 24,
+  "ageNote": "A report older than this is treated as absent rather than scored. A green `completed: 1` from last week, reported against today's commit, is a passing gate that measured nothing.",
+  "designFloors": {
+    "note": "The design's proposed floors (spec section 4.6, marked with a dagger): 8 taps or fewer, 90 seconds or less of scripted interaction. Neither is set as a floor yet — no CI run has established today's real number, and the authoring worktree had no dev server or DATABASE_URL to establish one (the standing 'a worktree has no .env.local' gotcha). Enumerating the controls on the path suggests roughly ten, so adopting 8 sight-unseen would red the gate on a product fact nobody has agreed to act on. See the runbook's open items: set the baseline from the first CI run, then floor.",
+    "studentTaps": 8,
+    "totalSeconds": 90
+  },
+  "howToRun": [
+    "npx tsx scripts/seed-e2e-users.ts",
+    "npm run dev   # or npm run start against a build",
+    "npx playwright test e2e/bench-journey-day1.spec.ts --workers=1"
+  ],
+  "workersNote": "--workers=1 is not optional. /api/auth/login rate-limits to 10 attempts per IP per 15 minutes, and parallel specs sharing one IP exhaust it and fail with 429 (see the standing note in .claude/MEMORY.md)."
+}
