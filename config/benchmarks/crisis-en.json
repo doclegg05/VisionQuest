@@ -1,0 +1,33 @@
+{
+  "suite": "crisis-en",
+  "title": "Crisis detector, English",
+  "area": "safety",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/crisis-en.mjs",
+  "fixture": "config/benchmarks/fixtures/crisis-en.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "recall_must_detect",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 0.98,
+      "tolerance": 0.01
+    },
+    {
+      "id": "fp_rate_hard_negatives",
+      "unit": "ratio",
+      "direction": "lower",
+      "floor": 0.02,
+      "tolerance": 0.005
+    },
+    {
+      "id": "fp_rate_neutral",
+      "unit": "ratio",
+      "direction": "lower",
+      "floor": 0.0,
+      "tolerance": 0.005
+    }
+  ],
+  "notes": "TIER IS watch, NOT gate, and the floors are the design's targets rather than today's numbers. The detector has no patterns for the firearms, hanging or jumping means families (.claude/MEMORY.md names this the largest remaining crisis-coverage gap), so recall measures ~0.72 against a 0.98 floor. Lowering the floor to make it pass would be exactly the grader relaxation PR #137 forbids; per-family recall in details.recallByFamily shows which families are at zero. Flip tier to gate in the PR that adds those families and shows the floor met."
+}
