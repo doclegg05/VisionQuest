@@ -301,14 +301,28 @@ jobs:
         run: npx tsx scripts/seed-e2e-users.ts
 
       - name: Seed the synthetic benchmark cohort
-        # e2e/bench-page-timing.spec.ts (and e2e/bench-connect-journey.spec.ts)
-        # log in as the cohort's own BENCH_INSTRUCTOR/BENCH_JOURNEY_STUDENT
-        # (e2e/bench-fixtures.ts), a separate fixture set from
-        # scripts/seed-e2e-users.ts above. Same guard as the verify job's
-        # identically-named step, so this workflow is correct before the
-        # script lands and needs no edit after — this job's DATABASE_URL is
-        # already the real hermetic Postgres (set at job level), so no
-        # per-step override is needed here.
+        # e2e/bench-page-timing.spec.ts, e2e/bench-connect-journey.spec.ts,
+        # e2e/bench-journey-day1.spec.ts and e2e/bench-journey-teacher-loop
+        # .spec.ts all log in as cohort people (BENCH_INSTRUCTOR/
+        # BENCH_JOURNEY_STUDENT, e2e/bench-fixtures.ts) — cbenchinstr1 acting
+        # on cbenchstu01 — not the e2e fixture users above, so without this
+        # step they have no instructor to log in as and report `skipped`
+        # forever, the quiet-instrument failure this suite exists to prevent.
+        #
+        # The two seeds are safe to run together because their delete scopes
+        # are disjoint by construction: seed-cohort scopes every deleteMany to
+        # `{ startsWith: "cbench" }`, and seed-e2e-users to its three e2e-*
+        # logins plus the e2e class code. Neither can reach the other's rows.
+        #
+        # Ordering: after `migrate deploy` so it meets a real schema, and
+        # before the first `playwright test` — which is when the webServer
+        # boots — so the app never serves a half-seeded database. This job's
+        # DATABASE_URL is already the real hermetic Postgres (set at job
+        # level), so no per-step override is needed here.
+        #
+        # Guarded the same way as the verify job's identically-named step, so
+        # this workflow is correct before the script lands and needs no edit
+        # after.
         run: |
           if [ -f scripts/bench/seed-cohort.ts ]; then
             npx tsx scripts/bench/seed-cohort.ts
@@ -377,7 +391,15 @@ jobs:
           e2e/bench-page-timing.spec.ts
           e2e/bench-journey-day1.spec.ts
           e2e/bench-journey-teacher-loop.spec.ts
+          e2e/bench-connect-journey.spec.ts
           --workers=1 --reporter=line --timeout=180000
+        env:
+          # connect-journey asserts the employer email actually reached an
+          # outbox, so the SERVER has to divert mail to a directory the spec
+          # can read. Playwright starts the webServer as a child of THIS step,
+          # so setting it here reaches both sides; naming it explicitly beats
+          # relying on both processes defaulting to the same relative path.
+          EMAIL_SINK_DIR: "${{ github.workspace }}/.bench-outbox"
 
       - name: Score browser benchmarks
         env:
@@ -392,6 +414,7 @@ jobs:
           --suite=page-timing
           --suite=journey-day1
           --suite=journey-teacher-loop
+          --suite=connect-journey
           --compare
 
       - name: Upload browser benchmark results

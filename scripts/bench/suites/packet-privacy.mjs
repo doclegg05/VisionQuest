@@ -63,7 +63,7 @@ export async function run(ctx) {
   process.env.ADMIN_DATABASE_URL = databaseUrl;
 
   const { renderToString } = await import("react-dom/server");
-  const { prisma } = await import("../../../src/lib/db.ts");
+  const { prisma, prismaAdmin } = await import("../../../src/lib/db.ts");
   const { assemblePacket, packetResumeContent } = await import(
     "../../../src/lib/connect/packet.ts"
   );
@@ -74,6 +74,7 @@ export async function run(ctx) {
   const { parseStoredResumeData } = await import("../../../src/lib/resume.ts");
   const { setPlainConfigValue } = await import("../../../src/lib/system-config.ts");
   const { assertSafeE2eSeedTarget } = await import("../../../src/lib/e2e-seed-guard.ts");
+  const { withRlsContext } = await import("../../../src/lib/rls-context.ts");
   const EmployerConnectPage = (await import("../../../src/app/connect/[token]/page.tsx")).default;
 
   const cohort = loadCohort();
@@ -89,7 +90,12 @@ export async function run(ctx) {
   // against a production-shaped target for the same reason the e2e helper is,
   // and restored in the `finally` below.
   assertSafeE2eSeedTarget(databaseUrl, { allowRemote: false });
-  const connectFlagBefore = await prisma.systemConfig.findUnique({
+  // Through `prismaAdmin`, like the `setPlainConfigValue` below it and like
+  // the employer page that reads this row in production. `SystemConfig` is a
+  // program-wide table with no student to scope to, so there is no RLS context
+  // that would be the honest one to invent here; the admin client is how every
+  // real caller reads it.
+  const connectFlagBefore = await prismaAdmin.systemConfig.findUnique({
     where: { key: "connect_enabled_classes" },
     select: { value: true },
   });
@@ -134,34 +140,58 @@ export async function run(ctx) {
       const lead = cohort.leadById.get(connection.jobLeadId);
       const student = cohort.studentById.get(connection.studentId);
 
+      // Everything a STAFF MEMBER does runs under that staff member's own RLS
+      // context, the same shape `withTeacherAuth` builds for the real route
+      // (`rlsContextFor`: userId = the instructor, role = "teacher", empty
+      // studentId — teacher policies branch on `current_role` and join through
+      // SpokesClassInstructor rather than owning the row).
+      //
+      // The actor is the instructor who proposed THIS connection, not a
+      // borrowed constant: it is who sends it below (`sentById`), so the
+      // benchmark reads these rows as the person who would really read them.
+      // Under RLS_CONTEXT_STRICT this is also the difference between a suite
+      // that runs and one that throws — an app-client query with no context is
+      // the footgun the flag exists to catch, and a benchmark is not exempt
+      // from it just because it is not a route.
+      const staffContext = {
+        userId: connection.proposedById,
+        role: "teacher",
+        studentId: "",
+      };
+
       // Take assemblePacket's REUSE branch: with a ResumeVersion already there
       // for this (student, lead) pair it never reaches the tailoring call, so
       // no AI is contacted and no module is stubbed.
       const resumeVersionId = `cbenchrv${connection.id}`;
-      const stored = await prisma.resumeData.findUnique({
-        where: { studentId: connection.studentId },
-        select: { data: true },
-      });
-      const resume = parseStoredResumeData(stored?.data ?? null);
-      await prisma.resumeVersion.upsert({
-        where: { id: resumeVersionId },
-        update: {},
-        create: {
-          id: resumeVersionId,
-          studentId: connection.studentId,
-          jobLeadId: connection.jobLeadId,
-          version: 1,
-          content: resume,
-        },
-      });
+      const { packet, resume } = await withRlsContext(staffContext, async () => {
+        const stored = await prisma.resumeData.findUnique({
+          where: { studentId: connection.studentId },
+          select: { data: true },
+        });
+        const parsed = parseStoredResumeData(stored?.data ?? null);
+        await prisma.resumeVersion.upsert({
+          where: { id: resumeVersionId },
+          update: {},
+          create: {
+            id: resumeVersionId,
+            studentId: connection.studentId,
+            jobLeadId: connection.jobLeadId,
+            version: 1,
+            content: parsed,
+          },
+        });
 
-      const packet = await assemblePacket(
-        { studentId: connection.studentId, jobLeadId: connection.jobLeadId },
-        {
-          endorsement:
-            `${student.firstName} came to every class on time and finished the work.`,
-        },
-      );
+        return {
+          resume: parsed,
+          packet: await assemblePacket(
+            { studentId: connection.studentId, jobLeadId: connection.jobLeadId },
+            {
+              endorsement:
+                `${student.firstName} came to every class on time and finished the work.`,
+            },
+          ),
+        };
+      });
 
       // --- surface 2: the employer email ---
       const email = buildEmployerEmail({
@@ -189,17 +219,33 @@ export async function run(ctx) {
       // `resolveEmployerLink`. The page's job is to obey `includedFields`, and
       // a stub would have handed it exactly the view model the test expected.
       const { token, tokenHash, expiresAt } = mintEmployerToken(new Date());
-      await prisma.connection.update({
-        where: { id: connection.id },
-        data: {
-          status: "sent",
-          packet,
-          employerTokenHash: tokenHash,
-          tokenExpiresAt: expiresAt,
-          sentById: connection.proposedById,
-        },
+      // Sending is the instructor's action, so it runs as the instructor.
+      //
+      // Note the `async` + `await` INSIDE the callback rather than returning
+      // the query directly. A Prisma promise is lazy: it does not start until
+      // it is awaited, so `withRlsContext(ctx, () => prisma.x.update(...))`
+      // hands the unstarted promise back and it executes after the context
+      // scope has already closed - no context, and under strict mode a throw
+      // that points at a line which visibly IS wrapped. Await inside the scope.
+      await withRlsContext(staffContext, async () => {
+        await prisma.connection.update({
+          where: { id: connection.id },
+          data: {
+            status: "sent",
+            packet,
+            employerTokenHash: tokenHash,
+            tokenExpiresAt: expiresAt,
+            sentById: connection.proposedById,
+          },
+        });
       });
 
+      // Rendered OUTSIDE every RLS context, deliberately. The employer has no
+      // session and never will - they follow a capability URL from their inbox
+      // - so the page must reach its rows through the admin client and nothing
+      // else. Under RLS_CONTEXT_STRICT that is no longer a claim in a comment:
+      // an app-client query anywhere beneath this render would throw here, so
+      // the render succeeding is the proof the public page stayed admin-only.
       const html = renderToString(
         await EmployerConnectPage({ params: Promise.resolve({ token }) }),
       );
@@ -226,7 +272,7 @@ export async function run(ctx) {
         "packet-privacy benchmark (restore)",
       );
     } else {
-      await prisma.systemConfig.deleteMany({ where: { key: "connect_enabled_classes" } });
+      await prismaAdmin.systemConfig.deleteMany({ where: { key: "connect_enabled_classes" } });
     }
     await prisma.$disconnect();
   }
