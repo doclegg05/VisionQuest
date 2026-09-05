@@ -131,9 +131,10 @@ export interface FunnelSubsidySplit {
   hiredWithout: number;
   /** `Connection.packet` was non-null but failed `packetSchema` validation —
    * a genuinely corrupt/unparseable row, distinct from a connection that
-   * legitimately has no packet yet (still `proposed`, pre-approval). Counted
-   * separately rather than silently folded into `notAttached`, which would
-   * make a data problem indistinguishable from "no incentive offered". */
+   * legitimately has no packet yet (still `proposed`, pre-approval). This is
+   * an EXCLUSIVE third bucket, not also present in `notAttached` (2026-09
+   * second-pass review): a data problem must read as a data problem on the
+   * report page, not inflate the "no incentive offered" count. */
   packetUnparseable: number;
 }
 
@@ -354,10 +355,16 @@ export function computeFunnel(
     // --- subsidy split ---
     const hasRawPacket = connection.packet !== null && connection.packet !== undefined;
     const packet = parsePacket(connection.packet);
-    if (hasRawPacket && packet === null) packetUnparseable += 1;
+    const isPacketUnparseable = hasRawPacket && packet === null;
+    if (isPacketUnparseable) packetUnparseable += 1;
     const hasSubsidy = packet !== null && packet.subsidyLine !== null;
     if (hasSubsidy) subsidyAttached += 1;
-    else subsidyNotAttached += 1;
+    // A schema-invalid packet is its OWN bucket (packetUnparseable), not
+    // folded into notAttached too (2026-09 second-pass review, "Take"): a
+    // data problem must read as a data problem, distinguishable from "no
+    // incentive was offered" on the report page rather than inflating that
+    // count.
+    else if (!isPacketUnparseable) subsidyNotAttached += 1;
     if (hiredAt) {
       if (hasSubsidy) hiredWithSubsidy += 1;
       else hiredWithout += 1;
