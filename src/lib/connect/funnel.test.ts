@@ -28,9 +28,11 @@ mock.module("@/lib/db", {
 });
 
 let fetchConnectFunnel: typeof import("./funnel").fetchConnectFunnel;
+let MAX_CONNECT_REPORT_ROWS: number;
 
 before(async () => {
   ({ fetchConnectFunnel } = await import("./funnel"));
+  ({ MAX_CONNECT_REPORT_ROWS } = await import("./classes"));
 });
 
 const teacherSession = { id: "teacher-1", role: "teacher" } as any;
@@ -218,5 +220,48 @@ describe("fetchConnectFunnel — zero managed students short-circuits", () => {
     assert.equal(mockConnectionFindMany.mock.callCount(), 0);
     assert.equal(mockApplicationFindMany.mock.callCount(), 0);
     assert.ok(result.stages.every((s) => s.count === 0));
+  });
+});
+
+describe("fetchConnectFunnel — bounded report reads (W12 partial, 2026-09 second-pass review)", () => {
+  beforeEach(resetMocks);
+
+  it("caps connectManagedStudentIds's admin/no-classId student read (the program-wide branch)", async () => {
+    await fetchConnectFunnel(adminSession, {});
+    const [args] = mockStudentFindMany.mock.calls[0].arguments;
+    assert.equal(args.take, 50_000);
+    assert.equal(MAX_CONNECT_REPORT_ROWS, 50_000, "test literal and the exported constant must agree");
+  });
+
+  it("caps connectManagedStudentIds's instructor-scoped student read", async () => {
+    await fetchConnectFunnel(teacherSession, {});
+    const [args] = mockStudentFindMany.mock.calls[0].arguments;
+    assert.equal(args.take, 50_000);
+    assert.equal(MAX_CONNECT_REPORT_ROWS, 50_000, "test literal and the exported constant must agree");
+  });
+
+  it("caps the Connection read at MAX_CONNECT_REPORT_ROWS", async () => {
+    mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
+    await fetchConnectFunnel(teacherSession, {});
+    const [args] = mockConnectionFindMany.mock.calls[0].arguments;
+    assert.equal(args.take, 50_000);
+    assert.equal(MAX_CONNECT_REPORT_ROWS, 50_000, "test literal and the exported constant must agree");
+  });
+
+  it("caps the ConnectionEvent read at MAX_CONNECT_REPORT_ROWS", async () => {
+    mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
+    mockConnectionFindMany.mock.mockImplementation(async () => [{ id: "c1", employer: { name: "Acme" }, jobLead: { classId: null, class: null } }]);
+    await fetchConnectFunnel(teacherSession, {});
+    const [args] = mockConnectionEventFindMany.mock.calls[0].arguments;
+    assert.equal(args.take, 50_000);
+    assert.equal(MAX_CONNECT_REPORT_ROWS, 50_000, "test literal and the exported constant must agree");
+  });
+
+  it("caps the self-directed Application read at MAX_CONNECT_REPORT_ROWS", async () => {
+    mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
+    await fetchConnectFunnel(teacherSession, {});
+    const [args] = mockApplicationFindMany.mock.calls[0].arguments;
+    assert.equal(args.take, 50_000);
+    assert.equal(MAX_CONNECT_REPORT_ROWS, 50_000, "test literal and the exported constant must agree");
   });
 });
