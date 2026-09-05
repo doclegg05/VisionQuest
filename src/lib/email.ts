@@ -1,6 +1,8 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
+import { logger } from "./logger";
+
 interface EmailPayload {
   to: string;
   subject: string;
@@ -66,9 +68,27 @@ export function isEmailDeliveryConfigured(): boolean {
   return isEmailSinkActive() || Boolean(getMailerConfig());
 }
 
+/**
+ * One line the first time mail is diverted, so a non-production deploy that
+ * happens to carry `EMAIL_SINK_DIR` is not a silent black hole.
+ *
+ * `isEmailDeliveryConfigured()` returns TRUE under a sink, which is right for
+ * the flows that check it and wrong as the only signal an operator ever gets:
+ * staging would report mail working while nobody received any. Warned once
+ * rather than per send, because a benchmark run sends dozens.
+ */
+let sinkAnnounced = false;
+
 export async function sendEmail(payload: EmailPayload) {
   const sinkPath = getSinkPath();
   if (sinkPath) {
+    if (!sinkAnnounced) {
+      sinkAnnounced = true;
+      logger.warn("email_sink_active", {
+        sinkPath,
+        note: "EMAIL_SINK_DIR is set: outgoing mail is being written to a file, not sent.",
+      });
+    }
     mkdirSync(path.dirname(sinkPath), { recursive: true });
     appendFileSync(
       sinkPath,

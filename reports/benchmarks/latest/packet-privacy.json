@@ -1,0 +1,52 @@
+{
+  "suite": "packet-privacy",
+  "tier": "gate",
+  "startedAt": "2026-09-05T16:34:37.483Z",
+  "durationMs": 1437,
+  "commit": "f6d7c25",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.7,
+    "node": "v22.22.2",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "forbidden_fields_found",
+      "value": 0,
+      "unit": "count",
+      "direction": "lower",
+      "n": 60,
+      "floor": 0,
+      "tolerance": 0,
+      "exact": true,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "findings": [],
+        "surfaces": [
+          "employer_page",
+          "employer_email",
+          "packet_pdf_resume"
+        ],
+        "connections": 20
+      }
+    },
+    {
+      "id": "surfaces_scanned",
+      "value": 60,
+      "unit": "count",
+      "reason": "A denominator, not a quality. Its job is to make `forbidden_fields_found = 0` readable — zero findings over zero surfaces is not a pass — and a page that failed to render is already reported as a finding, so the check that matters is gated there rather than here.",
+      "direction": "higher",
+      "n": 60,
+      "floor": null,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "info"
+    }
+  ],
+  "status": "pass"
+}

@@ -52,6 +52,7 @@ export const COHORT_COLLECTIONS = {
   jobListings: "job-listings.json",
   savedJobs: "saved-jobs.json",
   appointments: "appointments.json",
+  advisorAvailability: "advisor-availability.json",
 };
 
 let cached = null;

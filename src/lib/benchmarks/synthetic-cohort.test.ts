@@ -42,7 +42,7 @@ import { CLUSTERS, PROGRAM_CLUSTERS } from "../../../scripts/bench/lib/cohort-vo
  * test prints on failure. Record in the benchmark baseline's `reason` that the
  * corpus moved, so the metric shifts that follow are not read as regressions.
  */
-const COHORT_CHECKSUM = "1bdc4940ccc5bb86d3a1496d6776e720c8a1a5f3cc0893a349e0cfbb81a2b42b";
+const COHORT_CHECKSUM = "c0998b693f5e88d14496a12cb8e39fcb7de97be5a4dca49ad8988d91164578ec";
 
 describe("the synthetic cohort fixture", () => {
   it("is stable across two loads and returns the identical cached object", () => {
@@ -111,11 +111,73 @@ describe("the synthetic cohort fixture", () => {
       "jobListings",
       "savedJobs",
       "appointments",
+      "advisorAvailability",
     ] as const;
 
     for (const name of collections) {
       for (const row of cohort[name] as Array<{ id: string }>) {
         assert.ok(row.id.startsWith("cbench"), `${name}: ${row.id}`);
+      }
+    }
+  });
+
+  it("never gives one advisor two scheduled appointments at the same instant", () => {
+    // `Appointment_advisorId_startsAt_scheduled_key` (migration 20260902140000)
+    // is a PARTIAL unique index on (advisorId, startsAt) WHERE status =
+    // 'scheduled'. Prisma cannot express a partial index, so it exists only in
+    // the migration SQL and `prisma db push` does not create it -- which is
+    // exactly how a colliding pair reached CI once: it seeded cleanly against a
+    // pushed local database and failed against a migrated one.
+    const cohort = loadCohort();
+    const seen = new Set<string>();
+    for (const appointment of cohort.appointments as Array<{
+      advisorId: string;
+      scheduledAt: string;
+      status: string;
+    }>) {
+      if (appointment.status !== "scheduled") continue;
+      const key = `${appointment.advisorId}@${appointment.scheduledAt}`;
+      assert.ok(!seen.has(key), `two scheduled appointments share ${key}`);
+      seen.add(key);
+    }
+  });
+
+  it("keeps every scheduled appointment outside its advisor's bookable window", () => {
+    // The Connect journey books an interview slot at runtime from
+    // AdvisorAvailability. A seeded appointment sitting inside a bookable
+    // window is a live collision on the same partial unique index -- either the
+    // slot is silently dropped from the employer's list, or the booking hits
+    // the constraint.
+    const cohort = loadCohort();
+    const windows = new Map<string, Array<{ weekday: number; start: number; end: number }>>();
+    for (const block of cohort.advisorAvailability as Array<{
+      advisorId: string;
+      weekday: number;
+      startMinutes: number;
+      endMinutes: number;
+      active: boolean;
+    }>) {
+      if (!block.active) continue;
+      const list = windows.get(block.advisorId) ?? [];
+      list.push({ weekday: block.weekday, start: block.startMinutes, end: block.endMinutes });
+      windows.set(block.advisorId, list);
+    }
+
+    for (const appointment of cohort.appointments as Array<{
+      id: string;
+      advisorId: string;
+      scheduledAt: string;
+      status: string;
+    }>) {
+      if (appointment.status !== "scheduled") continue;
+      const at = new Date(appointment.scheduledAt);
+      // buildBookableAdvisorSlots reads the weekday and the minute of day in
+      // UTC, so the comparison has to be UTC too.
+      const minutes = at.getUTCHours() * 60 + at.getUTCMinutes();
+      for (const window of windows.get(appointment.advisorId) ?? []) {
+        const clashes =
+          window.weekday === at.getUTCDay() && minutes >= window.start && minutes < window.end;
+        assert.ok(!clashes, `${appointment.id} sits inside a bookable window`);
       }
     }
   });

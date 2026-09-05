@@ -44,7 +44,8 @@ suite in the same process.
 | `applications` | `applications.json` | 9 | 6 back the placements; 3 self-directed, none of which qualifies |
 | `jobListings` | `job-listings.json` | 12 | scraped-posting side, for saved jobs |
 | `savedJobs` | `saved-jobs.json` | 35 | across the first 18 students |
-| `appointments` | `appointments.json` | 5 | one is the interview the `interview_scheduled` connection points at |
+| `appointments` | `appointments.json` | 5 | one is the interview the `interview_scheduled` connection points at; all sit at 14:00 UTC, outside every bookable window |
+| `advisorAvailability` | `advisor-availability.json` | 15 | Mon-Fri 09:00-12:00 UTC in 30-minute slots, per instructor — what the employer response page offers |
 
 Convenience indexes hang off the returned object as non-enumerable properties:
 `studentById`, `leadById`, `employerById`, `contactByEmployerId`, `classById`,
@@ -101,6 +102,18 @@ committed checksum it pins. **Every baseline measured against the old cohort
 becomes incomparable** — record that in the baseline's `reason` when you update
 it, because a metric that moved because the corpus moved is not a regression
 and must not be read as one.
+
+**Verify a changed cohort against a database built with `prisma migrate deploy`,
+never `prisma db push`.** Prisma cannot express a partial index, so
+`Appointment_advisorId_startsAt_scheduled_key` — unique on `(advisorId,
+startsAt)` only `WHERE status = 'scheduled'` (migration `20260902140000`) —
+exists in migration SQL alone. A pushed database has no such constraint, so a
+cohort with two colliding appointments seeds cleanly locally and then fails CI,
+which is exactly how it happened once. The generator now asserts both halves of
+that hazard (no duplicate `(advisorId, startsAt)` among scheduled rows, and no
+scheduled row inside a bookable `advisorAvailability` window the Connect journey
+books into at runtime), so it fails at generation time rather than in CI — but a
+migrated database is still the only honest place to prove a seed applies.
 
 ## Putting it in a database
 
