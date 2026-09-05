@@ -3,7 +3,6 @@ import { isStaffRole } from "./api-error";
 import { logger } from "./logger";
 import { redactContactInfo } from "./log-redaction";
 import { sendEmail, isEmailDeliveryConfigured } from "./email";
-import { sendSms } from "./sms";
 import { buildNotificationEmail } from "./email-templates";
 
 /**
@@ -249,21 +248,31 @@ export async function sendMultiChannelNotification(
     }
   }
 
-  // SMS — fire-and-forget
-  if (smsPref) {
-    const phoneNumber = smsPref.destination ?? null;
-    if (phoneNumber) {
-      void (async () => {
-        const maxLen = 160;
-        const raw = `${payload.title}: ${payload.body} — ${actionUrl}`;
-        const smsBody = raw.length > maxLen ? raw.slice(0, maxLen - 1) + "…" : raw;
-        const sent = await sendSms(phoneNumber, smsBody);
-        if (sent) {
-          logger.info("Notification SMS sent", { channel: "sms", type: payload.type });
-        }
-      })();
-      result.sms = true;
-    }
+  // SMS — fire-and-forget, and only through the consent/quiet-hours/cap policy
+  // (Match & Connect Phase 5, Task 5.1). Before that policy existed this branch
+  // texted anyone with a phone number on file and left no record of it; the
+  // design spec's rule is "SMS requires recorded consent, respects quiet hours,
+  // is logged, and every message names SPOKES", and there is no second sender.
+  //
+  // `result.sms` still means "handed to the SMS layer", as it always has —
+  // delivery stays fire-and-forget, so the caller cannot learn the outcome
+  // from the return value. The decision is in the log line and, when a text
+  // actually goes out, in the OutboundMessage row.
+  if (smsPref?.destination) {
+    void (async () => {
+      const { buildNotificationSms, sendPolicySms } = await import("@/lib/nudges/sms-policy");
+      const outcome = await sendPolicySms({
+        studentId,
+        templateKey: `notification:${payload.type}`,
+        body: buildNotificationSms(payload.title, actionUrl),
+      });
+      logger.info("Notification SMS decision", {
+        channel: "sms",
+        type: payload.type,
+        outcome: outcome.status,
+      });
+    })();
+    result.sms = true;
   }
 
   return result;
