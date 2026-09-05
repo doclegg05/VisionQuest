@@ -18,9 +18,13 @@ import { describe, it } from "node:test";
 import {
   checkExplanationFaithfulness,
   ungroundedDollarValues,
+  BARE_RATE,
+  CITY_STATE,
+  MAX_CHECKED_CHARS,
+  type ExplainPosting,
 } from "./explain-faithfulness";
 
-const POSTING = {
+const POSTING: ExplainPosting = {
   title: "Warehouse Selector",
   company: "Blackwater Logistics",
   location: "Charleston, WV",
@@ -31,7 +35,7 @@ const POSTING = {
     "load pallets. A forklift card helps but is not required.",
 };
 
-function kinds(draft: string, posting = POSTING) {
+function kinds(draft: string, posting: ExplainPosting = POSTING) {
   return checkExplanationFaithfulness(draft, posting).map((finding) => finding.kind);
 }
 
@@ -177,5 +181,241 @@ describe("the whole check", () => {
     ].join("\n");
 
     assert.deepEqual(kinds(draft).sort(), ["hours", "place", "wage"]);
+  });
+});
+
+// =============================================================================
+// Code review, 2026-09-05. Each block below reproduces a defect a reviewer
+// executed against the shipped checker, with the reviewer's own inputs.
+// =============================================================================
+
+describe("credentials are matched as words, not as substrings", () => {
+  // CRITICAL. `haystack.indexOf(alias)` matched "ged" inside "changed",
+  // "managed", "encouraged" -- so the check both REFUSED true drafts and
+  // ACCEPTED the fabrication it exists to catch, from the same bug.
+
+  it("does not refuse a true draft over the letters g-e-d inside an ordinary word", () => {
+    const draft =
+      "What it is: You pull orders and load pallets.\n" +
+      "Pay: $16 an hour.\n" +
+      "Hours: 24 hours a week.\n" +
+      "Where: Charleston, WV.\n" +
+      "What you need: Nothing special to start.\n" +
+      "Good to know: Your schedule can be changed by your shift lead.";
+    assert.deepEqual(checkExplanationFaithfulness(draft, POSTING), []);
+  });
+
+  it("still catches a fabricated GED when the posting only contains 'managed'", () => {
+    // The posting grounds nothing; "managed" must not launder "ged" through the
+    // source side of the same substring match.
+    const posting = {
+      ...POSTING,
+      salary: null,
+      employmentType: null,
+      description: "You will be managed by a shift lead. Load trucks.",
+    };
+    assert.deepEqual(kinds("What you need: You must have a GED.", posting), ["requirement"]);
+  });
+
+  const ORDINARY_WORDS = [
+    "changed",
+    "managed",
+    "encouraged",
+    "arranged",
+    "damaged",
+    "engaged",
+    "logged",
+    "tagged",
+    "aged",
+    "packaged",
+  ];
+
+  for (const word of ORDINARY_WORDS) {
+    it(`does not read a credential out of "${word}"`, () => {
+      assert.deepEqual(kinds(`Good to know: Shifts are ${word} by the shift lead.`), []);
+    });
+  }
+});
+
+describe("negation is read across the whole clause, not only before the term", () => {
+  // WARNING. "A CDL is not required." was refused because the negation sits
+  // after the credential. Reassurance about a card a student does not have is
+  // the most useful sentence this tool can write; refusing it trains the model
+  // out of writing it.
+
+  it("accepts a negation that follows the credential", () => {
+    assert.deepEqual(kinds("What you need: A CDL is not required."), []);
+  });
+
+  it("accepts a negation that precedes the credential", () => {
+    assert.deepEqual(kinds("What you need: No CDL needed."), []);
+  });
+
+  it("accepts a contracted negation before the credential", () => {
+    assert.deepEqual(kinds("What you need: You don't need a CDL."), []);
+  });
+
+  it("still refuses a credential invented in the section after a negated one", () => {
+    // The clamp that made this work stays: the "doesn't" belongs to the pay
+    // line, and must not reach across the line break to excuse the CDL.
+    assert.deepEqual(kinds("Pay: The posting doesn't say.\nWhat you need: a CDL."), [
+      "requirement",
+    ]);
+  });
+});
+
+describe("a place is the whole 'City, ST', not the city alone", () => {
+  // WARNING. The check captured the state and then dropped it, so a draft that
+  // moved the job to another state was accepted as long as the town name
+  // matched. A student drives to the wrong Beckley.
+
+  const BECKLEY = {
+    ...POSTING,
+    location: "Beckley, WV",
+    description: "Evening warehouse work in Beckley.",
+  };
+
+  it("refuses the right town in the wrong state", () => {
+    assert.deepEqual(kinds("Where: Beckley, VA.", BECKLEY), ["place"]);
+  });
+
+  it("accepts the town the posting names", () => {
+    assert.deepEqual(kinds("Where: Beckley, WV.", BECKLEY), []);
+  });
+
+  it("still does not attempt a bare town name", () => {
+    // The documented limit, pinned so a later reader sees it is a decision.
+    assert.deepEqual(kinds("Where: the job is in Bluefield.", BECKLEY), []);
+  });
+});
+
+describe("a wage written out in words is still a wage", () => {
+  // SUGGESTION, taken rather than documented: the numeral check was trivially
+  // bypassed by spelling the number out, which is exactly the shape an
+  // injected instruction would use.
+
+  it("catches a spelled-out figure the posting never states", () => {
+    assert.deepEqual(kinds("Pay: twenty-five dollars an hour."), ["wage"]);
+  });
+
+  it("accepts the posted figure spelled out", () => {
+    assert.deepEqual(kinds("Pay: sixteen dollars an hour."), []);
+  });
+
+  it("accepts a spelled-out figure the posting itself spells out", () => {
+    const posting = { ...POSTING, salary: null, description: "Pay is twenty dollars an hour." };
+    assert.deepEqual(kinds("Pay: twenty dollars an hour.", posting), []);
+  });
+
+  it("does not read a wage out of a spelled-out number with no money word", () => {
+    assert.deepEqual(kinds("Good to know: You work with about twenty other people."), []);
+  });
+});
+
+// =============================================================================
+// ReDoS. A super-linear pattern here is reachable by whoever writes a job
+// posting: `explain_job` reads third-party feed text, and the checks run over
+// it before anything reaches a student.
+//
+// Both cases below were measured, not reasoned about. The shape they pin is
+// GROWTH, not a stopwatch reading: a wall-clock threshold on a shared CI runner
+// would flake, but a quadratic pattern grows ~64x across an 8x input increase
+// while a linear one grows ~8x, and no amount of machine noise closes that gap.
+// =============================================================================
+
+const REDOS_SIZES = [1250, 2500, 5000, 10000];
+
+function repeatTo(unit: string, n: number): string {
+  return unit.repeat(Math.ceil(n / unit.length)).slice(0, n);
+}
+
+/** Best of five, so a scheduler hiccup cannot manufacture a failure. */
+function bestMillis(pattern: RegExp, input: string): number {
+  const probe = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+  let best = Infinity;
+  for (let i = 0; i < 5; i += 1) {
+    const started = process.hrtime.bigint();
+    probe.test(input);
+    best = Math.min(best, Number(process.hrtime.bigint() - started) / 1e6);
+  }
+  return best;
+}
+
+/**
+ * How much slower the pattern gets when its input grows eight-fold.
+ *
+ * Linear is 8. The floor on the baseline keeps a sub-microsecond first reading
+ * from turning into a meaningless ratio.
+ */
+function growthRatio(pattern: RegExp, attack: (n: number) => string): number {
+  const times = REDOS_SIZES.map((n) => bestMillis(pattern, attack(n)));
+  return times[times.length - 1] / Math.max(times[0], 0.01);
+}
+
+/** Comfortably above linear (8) and far below the 73-78 the old patterns hit. */
+const LINEAR_ENOUGH = 20;
+
+describe("the patterns stay linear on adversarial input", () => {
+  it("CITY_STATE does not blow up on capitalised prose with no state after it", () => {
+    // The old `(?:[ -][A-Z][a-z]+)*` walked every remaining word from every
+    // start position: 49 ms at 10 KB, 3 s at 80 KB, ratio 78.
+    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa ", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("CITY_STATE does not blow up on hyphenated capitalised prose", () => {
+    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa-", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("BARE_RATE does not blow up on a rate word followed by spaces", () => {
+    // The reachable one -- it reads the POSTING, which is third-party text.
+    // `per\s+` beside `\s*` gave back one space and re-consumed the rest:
+    // 86 ms at 10 KB, 8.5 s at 80 KB, ratio 73.
+    const ratio = growthRatio(BARE_RATE, (n) => `1 per ${" ".repeat(Math.max(0, n - 6))}`);
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("BARE_RATE does not blow up on repeated rate phrases", () => {
+    const ratio = growthRatio(BARE_RATE, (n) => repeatTo("1 per ", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("still reads the wage and place forms it exists to read", () => {
+    // A bound is only safe if it changed nothing real.
+    assert.deepEqual(kinds("Pay: $16 an hour."), []);
+    assert.deepEqual(
+      kinds("Pay: $18 an hour.", { ...POSTING, salary: null, description: "Pays 18/hr." }),
+      [],
+    );
+    assert.deepEqual(
+      kinds("Pay: $18 an hour.", { ...POSTING, salary: null, description: "Pays 18 per hour." }),
+      [],
+    );
+    assert.deepEqual(kinds("Where: Charleston, WV."), []);
+  });
+});
+
+describe("the checked text is bounded", () => {
+  it("stops reading a posting past the cap", () => {
+    // Truncating the SOURCE can only make the check stricter: the wage sits
+    // past the cut, so it no longer grounds the draft and the draft is refused.
+    // Refusing is the safe direction, which is why the cap is not a hole.
+    const posting: ExplainPosting = {
+      ...POSTING,
+      salary: null,
+      description: `${"filler. ".repeat(MAX_CHECKED_CHARS / 4)}Pays $37 an hour.`,
+    };
+    assert.ok(posting.description.length > MAX_CHECKED_CHARS);
+    assert.deepEqual(kinds("Pay: $37 an hour.", posting), ["wage"]);
+  });
+
+  it("reads a posting that fits under the cap normally", () => {
+    const posting: ExplainPosting = {
+      ...POSTING,
+      salary: null,
+      description: "Pays $37 an hour. Evening shifts.",
+    };
+    assert.deepEqual(kinds("Pay: $37 an hour.", posting), []);
   });
 });
