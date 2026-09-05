@@ -1,0 +1,15 @@
+{
+  "_comment": "Which cohort rows the hot queries run against. Defaults inside scripts/bench/suites/query-plans.mjs match these if this fixture is ever unreadable, so they are documentation, not a hidden second source of truth.",
+  "instructorId": "cbenchinstr1",
+  "instructorLogin": "bench-instructor-1",
+  "studentId": "cbenchstu01",
+  "largeTableRowThreshold": 10000,
+  "hotQueries": [
+    "connect_console_lead_list — listLeads(), src/lib/connect/leads.ts",
+    "intervention_queue — getInterventionQueue(), src/lib/teacher/dashboard.ts",
+    "dashboard_bundle_certifications — assembleStudentContextBundle()'s certification read, src/lib/sage/context-bundle.ts",
+    "dashboard_bundle_progression_events — the same bundle's progressionEvent read",
+    "weekly_nudge_roster — planWeeklyJobsNudges(), src/lib/nudges/schedule.ts",
+    "funnel_report — fetchConnectFunnel()'s connection read, src/lib/connect/funnel.ts"
+  ]
+}

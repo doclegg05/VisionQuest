@@ -196,8 +196,13 @@ function latestDate(...values: Array<Date | null | undefined>) {
  * Select for the intervention-queue student query. A builder rather than a
  * constant because `now` is embedded in the overdue-task filter. `as const`
  * keeps the literal types Prisma needs for payload inference.
+ *
+ * Exported (2026-09-05, benchmark suite B5) so scripts/bench/suites/
+ * query-plans.mjs can EXPLAIN the exact select this function builds rather
+ * than hand-writing a stand-in that could silently drift from it. Purely
+ * additive — no other call site or behavior changes.
  */
-function interventionQueueStudentSelect(now: Date) {
+export function interventionQueueStudentSelect(now: Date) {
   return {
     id: true,
     studentId: true,

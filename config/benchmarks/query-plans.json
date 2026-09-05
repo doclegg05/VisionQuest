@@ -1,0 +1,15 @@
+{
+  "suite": "query-plans",
+  "title": "Hot-path query plans",
+  "area": "performance",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/query-plans.mjs",
+  "fixture": "config/benchmarks/fixtures/query-plans.json",
+  "requires": ["postgres", "cohort"],
+  "metrics": [
+    { "id": "seq_scans_on_large_tables", "unit": "count", "direction": "lower", "floor": 0, "tolerance": 0 },
+    { "id": "plans_captured", "unit": "count", "direction": "higher", "floor": null, "reason": "Coverage count (how many query-event/EXPLAIN pairs this run actually captured across the 6 hot-query call sites), not a performance target. A drop to 0 without an error elsewhere would itself be worth noticing, but no fixed number is an owner target." },
+    { "id": "avg_estimated_cost", "unit": "count", "direction": "lower", "floor": null, "reason": "Postgres planner cost units (EXPLAIN's arbitrary 'Total Cost'), not milliseconds or a comparable-across-databases number — informational trend only, per design SS4.7 ('per-query estimated cost as info')." }
+  ],
+  "notes": "Cannot run in this authoring container — no local Postgres (requires: [\"postgres\",\"cohort\"], checked via DATABASE_URL). Meant to run in CI's hermetic pgvector service inside the `bench -- --tier=gate --compare` step, seeded via scripts/bench/seed-cohort.ts (see ci.yml). Captures the REAL SQL Prisma emits for six hot queries (the task's five plus a second dashboard-bundle read) via a purpose-built PrismaClient with query-event logging, using production pure-helpers/constants for the where/select shape wherever exported (LEAD_LIST_SELECT, interventionQueueStudentSelect [exported for this], buildManagedStudentWhere, connectManagedStudentIds, reportDateRangeBoundsUtc, intersectScopeClassIds) rather than hand-writing SQL — see the scorer's header for why db.ts itself was not touched (shared, RLS-security-relevant, out of this suite's ownership) and how identical Prisma call arguments produce identical SQL regardless of which client instance issues them. 'Large table' is gated by ACTUAL row count (pg_stat_user_tables.n_live_tup after an explicit ANALYZE, threshold 10,000) rather than by table name, because the 50-student synthetic cohort has no table anywhere near that size — gating by name alone would flag Postgres's normal, correct choice to Seq Scan a tiny table. This means seq_scans_on_large_tables should read 0 on the standard cohort NOT because indexes are proven correct, but because nothing IS large yet; a meaningful non-trivial signal needs a larger seed, a follow-up left for the coordinator/database-architect rather than invented here by faking scale. Never verified end-to-end against a real database in this task — self-tested via the requires-gate skip path only; the coordinator should confirm a first real CI run before trusting the seq-scan/cost numbers."
+}
