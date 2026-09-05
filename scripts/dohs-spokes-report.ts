@@ -42,14 +42,14 @@
  * cannot see the rows, an unknown --class id, or a missing/malformed argument.
  */
 
-import { writeFileSync } from "node:fs";
+import { chmodSync, writeFileSync } from "node:fs";
 
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
 import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "../src/lib/classroom";
 import { buildDohsExportCsv, buildDohsExportRows } from "../src/lib/connect/dohs-export-shared";
-import { reportDateRangeBoundsUtc } from "../src/lib/timezone";
+import { dateOnlyBoundsUtc } from "../src/lib/timezone";
 
 loadEnvConfig(process.cwd(), true);
 
@@ -132,7 +132,11 @@ async function main(): Promise<number> {
       }
     }
 
-    const { from, to } = reportDateRangeBoundsUtc(fromRaw, toRaw);
+    // SpokesRecord.enrolledAt is a @db.Date column — plain UTC bounds
+    // (dateOnlyBoundsUtc), never the ET-aware reportDateRangeBoundsUtc, which
+    // would shift the whole reporting window back one day (see that
+    // function's header on src/lib/timezone.ts).
+    const { from, to } = dateOnlyBoundsUtc(fromRaw, toRaw);
 
     const records = await prisma.spokesRecord.findMany({
       where: {
@@ -222,8 +226,15 @@ async function main(): Promise<number> {
 
     // Owner-read-only: this file carries a working login identifier per row
     // (SEC-W3) — never leave it world- or group-readable on whatever host
-    // runs this script.
+    // runs this script. `writeFileSync`'s `mode` option only applies when
+    // the call CREATES the file — it is silently ignored when `out` already
+    // exists (re-running the script at the same path, a common case), so a
+    // world-/group-readable file from a prior run or a permissive umask
+    // would otherwise survive untouched. `chmodSync` after the write fixes
+    // the mode unconditionally, whether the file was just created or
+    // already existed (W3 — 2026-09 second-pass review).
     writeFileSync(out, buildDohsExportCsv(rows), { mode: 0o600 });
+    chmodSync(out, 0o600);
     console.log(`Wrote ${rows.length} rows to ${out}.`);
 
     // SEC-W5: an audit row every time this runs, through this script's own
