@@ -46,7 +46,10 @@ Return the paragraph and nothing else.`;
 
 export type EndorsementResult =
   | { status: "ok"; text: string }
-  | { status: "refused"; reason: "empty" | "ungrounded" | "unavailable" };
+  | {
+      status: "refused";
+      reason: "empty" | "ungrounded" | "unavailable" | "cloud_blocked";
+    };
 
 function renderFacts(studentName: string, facts: EndorsementFacts): string {
   const lines = [
@@ -92,6 +95,34 @@ export async function draftEndorsement(
   });
 
   const providerClass = getProviderClass(baseProvider.name);
+
+  // REFUSE rather than send this to the cloud.
+  //
+  // `sensitivity: "student_record"` asks for local-only routing, but
+  // `resolveAiProvider` documents a deliberate fail-open to the configured
+  // cloud provider when the local one is unavailable (VQ-R-002, still an open
+  // owner ruling). Most student_record prompts can live with that; this one
+  // carries a named student's employers, credentials and attendance in one
+  // paragraph written to be sent outside the program, so it is the wrong place
+  // to inherit an open question. An instructor writes it by hand instead.
+  if (providerClass !== "local") {
+    await logAiAuditEvent({
+      actorId: actor.id,
+      actorRole: actor.role,
+      route: "connect.draft_endorsement",
+      task: "draft_endorsement",
+      sensitivity: "student_record",
+      policyDecision: policyDecisionForProvider(baseProvider.name),
+      status: "blocked",
+      targetId: studentId,
+      providerName: baseProvider.name,
+      providerClass,
+      allowCloud: false,
+      reason: "Endorsement drafting is local-only; the resolved provider was not local.",
+    });
+    return { status: "refused", reason: "cloud_blocked" };
+  }
+
   const auditBase = {
     // The instructor is the actor: they asked for this draft. `studentId` is
     // the routing subject and the `targetId`, not the person who acted — the
@@ -107,9 +138,10 @@ export async function draftEndorsement(
     policyDecision: policyDecisionForProvider(baseProvider.name),
     providerName: baseProvider.name,
     providerClass,
-    // Derived, never hardcoded: a hardcoded false would report "local only" on
-    // a cloud-routed call, which is the one thing the report exists to notice.
-    allowCloud: providerClass === "cloud",
+    // Always false past this point, and NOT because it is hardcoded: the guard
+    // above returns unless `providerClass === "local"`, so a cloud-routed call
+    // never reaches here. tsc narrows the type accordingly.
+    allowCloud: false,
   };
   await logAiAuditEvent({ ...auditBase, status: "routed", inputChars: grounding.length });
 

@@ -6,6 +6,10 @@ import {
   EmployerDirectory,
   type EmployerDirectoryItem,
 } from "@/components/teacher/connect/EmployerDirectory";
+import {
+  ConnectionsBoard,
+  type ConnectionRow,
+} from "@/components/teacher/connect/ConnectionsBoard";
 import { LeadsBoard, type LeadsBoardItem } from "@/components/teacher/connect/LeadsBoard";
 import {
   StudentsBoard,
@@ -18,6 +22,9 @@ import { getSession } from "@/lib/auth";
 import { listConnectClasses } from "@/lib/connect/classes";
 import { listEmployers } from "@/lib/connect/employers";
 import { readSubsidyFlags } from "@/lib/connect/employers-shared";
+import { listConnectionsForConsole } from "@/lib/connect/connections";
+import { PACKET_FIELD_LABELS } from "@/lib/connect/packet-shared";
+import { connectionStatusPhrase } from "@/lib/connect/pipeline-shared";
 import { listLeads } from "@/lib/connect/leads";
 import { describeLeadPay, parseLeadSchedule } from "@/lib/connect/leads-shared";
 import { rankRoster, summarizeLeadFits } from "@/lib/connect/matching";
@@ -66,13 +73,20 @@ export default async function ConnectPage() {
     studentId: "",
   };
 
-  const { leads, employers, roster, classes } = await withRlsContext(rlsContext, async () => {
+  const { leads, employers, roster, classes, connections } = await withRlsContext(
+    rlsContext,
+    async () => {
     const [openLeads, employerRows, rosterRows, classRows] = await Promise.all([
       listLeads({ status: "open", limit: MAX_BOARD_LEADS }),
       listEmployers(),
       rankRoster({ leadsPerStudent: 3 }),
       listConnectClasses(session),
     ]);
+
+    // The pipeline board. Read inside the same RLS context as everything else
+    // on this page, so `connection_read`'s managed_student_ids() gate decides
+    // the roster rather than anything this page does.
+    const connectionRows = await listConnectionsForConsole();
 
     const counts = await summarizeLeadFits(openLeads.map((lead) => lead.id));
     const countsByLead = new Map(counts.map((entry) => [entry.jobLeadId, entry]));
@@ -124,8 +138,23 @@ export default async function ConnectPage() {
         }),
       ),
       classes: classRows.map((row) => ({ id: row.id, name: row.name })),
+      connections: connectionRows.map(
+        (row): ConnectionRow => ({
+          id: row.id,
+          studentName: row.studentName,
+          jobTitle: row.jobTitle,
+          employerName: row.employerName,
+          status: row.status,
+          statusPhrase: connectionStatusPhrase(row.status, row.employerName),
+          fields: row.fields.map((key) => PACKET_FIELD_LABELS[key]),
+          contactName: row.contactName,
+          canSend: row.canSend,
+          canClose: row.canClose,
+        }),
+      ),
     };
-  });
+    },
+  );
 
   // Every student named on this page is a staff read of student data, so the
   // audit sample is AWAITED rather than fired and forgotten. `recordStudentView`
@@ -161,6 +190,7 @@ export default async function ConnectPage() {
           above the boards — they are the day's work, not a directory. */}
 
       <LeadsBoard leads={leads} />
+      <ConnectionsBoard connections={connections} />
       <StudentsBoard students={roster} />
       <EmployerDirectory employers={employers} />
 

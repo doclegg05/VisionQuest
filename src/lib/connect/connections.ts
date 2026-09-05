@@ -353,6 +353,96 @@ export async function connectionProvenance(connectionId: string, studentId: stri
   });
 }
 
+/**
+ * The console's pipeline board: live connections for students this actor
+ * manages, with the frozen packet's field list so Send can show what goes.
+ *
+ * Runs in the caller's RLS context, so `connection_read`'s
+ * `managed_student_ids()` gate decides the roster — this helper adds no
+ * scoping of its own and must not need to.
+ */
+export async function listConnectionsForConsole(limit = 50) {
+  const rows = await prisma.connection.findMany({
+    where: { status: { notIn: [...TERMINAL_CONNECTION_STATUSES] } },
+    orderBy: { statusChangedAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      status: true,
+      packet: true,
+      student: { select: { id: true, displayName: true } },
+      jobLead: {
+        select: {
+          title: true,
+          employerName: true,
+          contact: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  return rows.flatMap((row) => {
+    if (!isConnectionStatus(row.status)) return [];
+    const packet = parsePacket(row.packet);
+    return [
+      {
+        id: row.id,
+        studentId: row.student.id,
+        studentName: row.student.displayName,
+        jobTitle: row.jobLead.title,
+        employerName: row.jobLead.employerName,
+        status: row.status,
+        fields: packet ? packet.includedFields : [],
+        contactName: row.jobLead.contact?.name ?? null,
+        // Send is offered ONLY from student_approved. The button mirrors what
+        // sendConnection enforces, so the console never shows an action the
+        // server would refuse.
+        canSend: row.status === "student_approved",
+        canClose: !isTerminalConnectionStatus(row.status),
+      },
+    ];
+  });
+}
+
+/**
+ * The verified facts an endorsement may be built from.
+ *
+ * VERIFIED certifications only, and résumé employers only — the same rule the
+ * packet uses. `skills` is deliberately NOT passed as grounding for employment
+ * claims (see endorsement-shared's note): a skill on a résumé says the student
+ * claims it, not that they did it somewhere.
+ */
+export async function endorsementFactsFor(studentId: string, instructorNotes: string | null) {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: {
+      displayName: true,
+      resumeData: { select: { data: true } },
+      certifications: {
+        where: { status: "completed", verificationStatus: "verified" },
+        select: { certType: true },
+      },
+    },
+  });
+  if (!student) return null;
+
+  const { parseStoredResumeData } = await import("@/lib/resume");
+  const resume = parseStoredResumeData(student.resumeData?.data ?? null);
+
+  return {
+    displayName: student.displayName,
+    facts: {
+      verifiedCertifications: student.certifications.map((cert) => cert.certType),
+      skills: resume.skills,
+      employers: resume.experience.map((item) => item.company),
+      // No attendance helper exists yet; null is honest and the grounding
+      // check treats it as "grounds nothing".
+      attendanceSummary: null,
+      instructorNotes,
+    },
+  };
+}
+
 /** The employer's subsidy flags and status for a lead — a STAFF-only read. */
 export async function leadEmployerContext(jobLeadId: string) {
   const lead = await prisma.jobLead.findUnique({
