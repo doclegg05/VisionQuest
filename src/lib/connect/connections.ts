@@ -824,8 +824,9 @@ export async function sendConnection(
       // OutboundMessage exists to answer "what did we say to this employer",
       // and the answer does not need the live capability URL. Storing it would
       // put a working employer link — one that can book an interview or record
-      // a hire — in a table every staff member can read, which is a quieter
-      // version of the thing the token design exists to prevent.
+      // a hire — in a table read by every staff member who manages this
+      // student, which is a quieter version of the thing the token design
+      // exists to prevent.
       body: email.text.replace(token, "[link]"),
       connectionId,
       // Denormalised so the per-employer limit can count without joining

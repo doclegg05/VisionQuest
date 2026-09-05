@@ -110,6 +110,46 @@ export async function generateStudentArchive(
           updatedVia: true,
         },
       },
+      // Match & Connect Phase 4: the disclosure record. Every Connection is a
+      // moment this program sent this student's information to an employer
+      // outside it, and the archive is the one copy they take with them, so
+      // leaving it out would mean the student can never afterwards answer
+      // "who did SPOKES tell about me, and what did they say".
+      //
+      // The employer's CONTACT is named but never their email or phone: that
+      // is a third party's PII, it is not the student's to be handed, and the
+      // employer-facing page never showed it to them either.
+      connections: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          status: true,
+          statusChangedAt: true,
+          proposedVia: true,
+          packet: true,
+          sentAt: true,
+          employerViewedAt: true,
+          employerRespondedAt: true,
+          employerResponse: true,
+          responseReason: true,
+          hiredAt: true,
+          startDate: true,
+          hourlyWage: true,
+          closedReason: true,
+          createdAt: true,
+          employer: { select: { name: true } },
+          jobLead: { select: { title: true } },
+          events: {
+            orderBy: { at: "asc" },
+            select: {
+              fromStatus: true,
+              toStatus: true,
+              actorType: true,
+              note: true,
+              at: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -251,7 +291,43 @@ export async function generateStudentArchive(
     manifest.fileCount++;
   }
 
-  // 7. Add manifest
+  // 7. Employer introductions as JSON (the disclosure record)
+  if (student.connections.length > 0) {
+    // The frozen packet's `includedFields` is what the student approved and
+    // what the employer page actually rendered, so it is the honest answer to
+    // "what was shared". The rest of the packet is not repeated here — the
+    // resume and cover letter are already in the archive as their own files.
+    const disclosures = student.connections.map((connection) => {
+      const packet = connection.packet as { includedFields?: unknown } | null;
+      const sharedFields = Array.isArray(packet?.includedFields)
+        ? packet.includedFields.filter((field): field is string => typeof field === "string")
+        : [];
+      return {
+        employer: connection.employer.name,
+        job: connection.jobLead.title,
+        status: connection.status,
+        statusChangedAt: connection.statusChangedAt,
+        proposedVia: connection.proposedVia,
+        proposedAt: connection.createdAt,
+        sharedFields,
+        sentAt: connection.sentAt,
+        employerViewedAt: connection.employerViewedAt,
+        employerRespondedAt: connection.employerRespondedAt,
+        employerResponse: connection.employerResponse,
+        responseReason: connection.responseReason,
+        hiredAt: connection.hiredAt,
+        startDate: connection.startDate,
+        hourlyWage: connection.hourlyWage,
+        closedReason: connection.closedReason,
+        events: connection.events,
+      };
+    });
+    archive.append(JSON.stringify(disclosures, null, 2), { name: "connections.json" });
+    manifest.entries.push({ path: "connections.json", type: "employer_introductions" });
+    manifest.fileCount++;
+  }
+
+  // 8. Add manifest
   archive.append(JSON.stringify(manifest, null, 2), { name: "manifest.json" });
 
   await archive.finalize();

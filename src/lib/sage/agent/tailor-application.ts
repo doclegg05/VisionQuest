@@ -314,6 +314,28 @@ function targetColumns(target: TailoringTarget) {
     : { jobListingId: target.id, jobLeadId: null };
 }
 
+/**
+ * The same invariant the CHECK constraints enforce, asserted before the write.
+ *
+ * The database is the real guarantee — `ResumeVersion_one_opening` and
+ * `CoverLetter_one_opening` reject a row with both columns set or neither, for
+ * every writer including a future one that never reads this file. This is here
+ * because a constraint violation arrives as an opaque P2010 several frames
+ * away from the mistake, and because `targetColumns` is one careless edit away
+ * from spreading both keys into the same row.
+ */
+function assertExactlyOneOpening(columns: {
+  jobLeadId: string | null;
+  jobListingId: string | null;
+}): void {
+  const set = [columns.jobLeadId, columns.jobListingId].filter(Boolean).length;
+  if (set !== 1) {
+    throw new GroundingViolationError(
+      "A tailored document must belong to exactly one opening.",
+    );
+  }
+}
+
 export async function createTailoredApplication(
   studentId: string,
   target: TailoringTarget,
@@ -332,6 +354,7 @@ export async function createTailoredApplication(
   const coverLetter = renderCoverLetter(source, plan);
 
   const columns = targetColumns(target);
+  assertExactlyOneOpening(columns);
   // The version scan filters on the SAME column the write uses, or a lead's
   // first résumé would collide with the version numbering of some unrelated
   // listing.
