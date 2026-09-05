@@ -24,9 +24,11 @@ mock.module("@/lib/db", {
 });
 
 let fetchDohsExport: typeof import("./dohs-export").fetchDohsExport;
+let MAX_CONNECT_REPORT_ROWS: number;
 
 before(async () => {
   ({ fetchDohsExport } = await import("./dohs-export"));
+  ({ MAX_CONNECT_REPORT_ROWS } = await import("./classes"));
 });
 
 const teacherSession = { id: "teacher-1", role: "teacher" } as any;
@@ -108,12 +110,45 @@ describe("fetchDohsExport — SpokesRecord query shape (C1, W9, C2)", () => {
     assert.ok(statusFilter.includes("active"));
   });
 
-  it("resolves date-only from/to to ET-aware UTC instants on SpokesRecord.enrolledAt", async () => {
+  it("forwards employerId to the SpokesRecord query via placementApplication.connection (2026-09 second-pass 'Take')", async () => {
+    mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
+    await fetchDohsExport(teacherSession, { employerId: "employer-1" });
+    const [args] = mockSpokesRecordFindMany.mock.calls[0].arguments;
+    assert.deepEqual(args.where.placementApplication, {
+      is: { connection: { is: { employerId: "employer-1" } } },
+    });
+  });
+
+  it("omits the placementApplication filter entirely when no employerId is given", async () => {
+    mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
+    await fetchDohsExport(teacherSession, {});
+    const [args] = mockSpokesRecordFindMany.mock.calls[0].arguments;
+    assert.equal(args.where.placementApplication, undefined);
+  });
+
+  it("resolves date-only from/to to PLAIN UTC instants on SpokesRecord.enrolledAt (@db.Date — no ET conversion)", async () => {
     mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
     await fetchDohsExport(teacherSession, { from: "2026-06-01", to: "2026-06-30" });
     const [args] = mockSpokesRecordFindMany.mock.calls[0].arguments;
-    assert.equal(args.where.enrolledAt.gte.toISOString(), "2026-06-01T04:00:00.000Z");
-    assert.equal(args.where.enrolledAt.lt.toISOString(), "2026-07-01T04:00:00.000Z");
+    // C1 regression guard: enrolledAt is a @db.Date column stored at exactly
+    // UTC midnight for its calendar date. The ET-aware bound
+    // (reportDateRangeBoundsUtc, 04:00Z) would exclude a row literally dated
+    // 2026-06-01T00:00:00Z and admit one dated 2026-07-01T00:00:00Z — this
+    // pins the correct plain-UTC bounds instead.
+    assert.equal(args.where.enrolledAt.gte.toISOString(), "2026-06-01T00:00:00.000Z");
+    assert.equal(args.where.enrolledAt.lt.toISOString(), "2026-07-01T00:00:00.000Z");
+  });
+});
+
+describe("fetchDohsExport — bounded report reads (W12 partial)", () => {
+  beforeEach(resetMocks);
+
+  it("caps the SpokesRecord read at MAX_CONNECT_REPORT_ROWS", async () => {
+    mockStudentFindMany.mock.mockImplementation(async () => [{ id: "student-1" }]);
+    await fetchDohsExport(teacherSession, {});
+    const [args] = mockSpokesRecordFindMany.mock.calls[0].arguments;
+    assert.equal(args.take, 50_000);
+    assert.equal(MAX_CONNECT_REPORT_ROWS, 50_000, "test literal and the exported constant must agree");
   });
 });
 

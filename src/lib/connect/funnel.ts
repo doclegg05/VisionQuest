@@ -24,7 +24,7 @@ import type { Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { reportDateRangeBoundsUtc } from "@/lib/timezone";
 
-import { assertClassIsManaged, connectManagedStudentIds } from "./classes";
+import { assertClassIsManaged, connectManagedStudentIds, MAX_CONNECT_REPORT_ROWS } from "./classes";
 import { computeFunnel, type FunnelResult } from "./funnel-shared";
 
 export interface FetchFunnelOptions {
@@ -83,6 +83,9 @@ export async function fetchConnectFunnel(
       employer: { select: { name: true } },
       jobLead: { select: { classId: true, class: { select: { name: true } } } },
     },
+    // Bounded read-only report query, no pagination UI (W12 partial, 2026-09
+    // second-pass review) — see MAX_CONNECT_REPORT_ROWS's header.
+    take: MAX_CONNECT_REPORT_ROWS,
   });
 
   const connectionIds = connections.map((connection) => connection.id);
@@ -92,6 +95,7 @@ export async function fetchConnectFunnel(
       : await prisma.connectionEvent.findMany({
           where: { connectionId: { in: connectionIds } },
           select: { connectionId: true, toStatus: true, at: true },
+          take: MAX_CONNECT_REPORT_ROWS,
         });
 
   // Same period, same classes, no Connection link — the plan's comparison
@@ -104,6 +108,7 @@ export async function fetchConnectFunnel(
       ...createdAtWhere,
     },
     select: { id: true, studentId: true, createdAt: true, status: true, verificationStatus: true },
+    take: MAX_CONNECT_REPORT_ROWS,
   });
 
   return computeFunnel(

@@ -212,34 +212,49 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * retained_30/60/90 — DERIVED, never read off a literal 30/60/90-day
- * check-in that does not exist in this program (C1, 2026-09 review).
+ * check-in that does not exist as its own column (C1, 2026-09 review).
  *
  * PRIMARY SOURCE: `SpokesEmploymentFollowUp`, the SAME table grant-kpi.ts's
  * `threeMonthRetention`/`sixMonthRetention` read (src/lib/grant-kpi.ts:
- * checkpointMonths 3|6, status "employed"). Its checkpoints are MONTHS
- * (today, only 3 and 6 are ever written — roughly 90 and 180 days), so there
- * is currently no observation that can satisfy "retained 30" without ALSO
- * satisfying 60 and 90 — a 3-month "employed" follow-up trips all three at
- * once. That is a fact about today's check-in cadence, not a bug in these
- * columns: if a finer-grained checkpoint (e.g. a true 30-day check-in) is
- * ever added, it will correctly light up retained30 alone. The rule applied:
- * retainedN = true iff SOME "employed" follow-up's `checkedAt` falls at
- * least N days after the employment start date
- * (`unsubsidizedEmploymentAt`) — i.e. the earliest employed follow-up that
- * already clears that many days out.
+ * checkpointMonths 3|6, status "employed"). Its `checkpointMonths` values
+ * are NOT fixed to 3 and 6: `src/lib/nudges/replies.ts`'s
+ * `handleRetentionAnswer` writes 1/2/3 (the 30/60/90-DAY SMS check-in,
+ * mapped day/30 -> months) for BOTH "employed" and "not_employed" answers,
+ * and the teacher-entry route (`teacher/students/[id]/spokes/follow-up`)
+ * accepts any positive integer a staff member types in. So this function
+ * never assumes a specific checkpoint cadence — it looks at every
+ * follow-up's actual `checkedAt` date relative to the employment start date
+ * (`unsubsidizedEmploymentAt`): retainedN = true iff SOME "employed"
+ * follow-up's `checkedAt` falls at least N days after that start date.
  *
- * FALLBACK, used ONLY when the record has ZERO follow-up rows at all: the
- * linked Connection's own EVENT HISTORY. A "retained_60" event ever recorded
- * (via `furthestFunnelStageIndex` over every `toStatus`, never the
- * connection's CURRENT `status`) implies retained_30 and retained_60. This
- * is what makes a connect-sourced hire that was later marked `closed` still
- * export correctly: its current status is "closed" (no funnel-stage index
- * at all), but the event history still shows it reached retained_60 first —
- * reading current status alone (the pre-fix behavior) reported "not
- * retained" for exactly the connections whose retention actually happened.
+ * A follow-up row of ANY status is authoritative once it exists — it is a
+ * real check-in, not an absence of data:
+ *   - An "employed" row proves retention through however many days out it
+ *     falls (e.g. a 92-day "employed" answer trips retained30/60/90 at
+ *     once; a 45-day one trips only retained30).
+ *   - A "not_employed" (or any other non-"employed") row, with NO
+ *     corroborating "employed" row, means all three read false — a real
+ *     negative observation must not be overridden by (possibly stale)
+ *     Connection event history (W1, 2026-09 review): a connect-sourced hire
+ *     whose event history shows "retained_90" but whose SPOKES follow-up
+ *     says "not_employed" at the 3-month check-in is NOT retained; the
+ *     follow-up is the human-confirmed answer, the event history is a
+ *     system guess about what should have happened.
+ *
+ * FALLBACK, used ONLY when the record has ZERO follow-up rows of ANY status
+ * at all — genuinely no check-in has happened yet: the linked Connection's
+ * own EVENT HISTORY. A "retained_60" event ever recorded (via
+ * `furthestFunnelStageIndex` over every `toStatus`, never the connection's
+ * CURRENT `status`) implies retained_30 and retained_60. This is what makes
+ * a connect-sourced hire that was later marked `closed` still export
+ * correctly when no follow-up exists yet: its current status is "closed"
+ * (no funnel-stage index at all), but the event history still shows it
+ * reached retained_60 first — reading current status alone (the pre-fix
+ * behavior) reported "not retained" for exactly the connections whose
+ * retention actually happened.
  *
  * Self-directed placements have no Connection at all, so they fall through
- * to `false/false/false` only when they ALSO have no follow-up — the bug
+ * to `false/false/false` only when they ALSO have zero follow-ups — the bug
  * this replaces reported `false` unconditionally for every self-directed
  * placement regardless of follow-up data.
  */
@@ -247,24 +262,34 @@ function retainedFlags(
   source: Pick<DohsSourceRow, "unsubsidizedEmploymentAt" | "employmentFollowUps">,
   connection: DohsConnectionDetail | null,
 ): { retained30: boolean; retained60: boolean; retained90: boolean } {
-  const start = parseDate(source.unsubsidizedEmploymentAt);
-  const employedFollowUps = source.employmentFollowUps.filter((f) => f.status === "employed");
+  const followUps = source.employmentFollowUps;
 
-  if (start && employedFollowUps.length > 0) {
-    let maxDaysEmployed: number | null = null;
-    for (const followUp of employedFollowUps) {
-      const checkedAt = parseDate(followUp.checkedAt);
-      if (!checkedAt) continue;
-      const days = (checkedAt.getTime() - start.getTime()) / MS_PER_DAY;
-      if (maxDaysEmployed === null || days > maxDaysEmployed) maxDaysEmployed = days;
+  if (followUps.length > 0) {
+    // A follow-up of ANY status exists — this IS the primary source and it
+    // never falls through to the event-history fallback below, even when
+    // no "employed" row can be used (W1): an unusable or negative
+    // observation is still an observation, not an absence of data.
+    const start = parseDate(source.unsubsidizedEmploymentAt);
+    const employedFollowUps = followUps.filter((f) => f.status === "employed");
+
+    if (start && employedFollowUps.length > 0) {
+      let maxDaysEmployed: number | null = null;
+      for (const followUp of employedFollowUps) {
+        const checkedAt = parseDate(followUp.checkedAt);
+        if (!checkedAt) continue;
+        const days = (checkedAt.getTime() - start.getTime()) / MS_PER_DAY;
+        if (maxDaysEmployed === null || days > maxDaysEmployed) maxDaysEmployed = days;
+      }
+      if (maxDaysEmployed !== null) {
+        return {
+          retained30: maxDaysEmployed >= 30,
+          retained60: maxDaysEmployed >= 60,
+          retained90: maxDaysEmployed >= 90,
+        };
+      }
     }
-    if (maxDaysEmployed !== null) {
-      return {
-        retained30: maxDaysEmployed >= 30,
-        retained60: maxDaysEmployed >= 60,
-        retained90: maxDaysEmployed >= 90,
-      };
-    }
+
+    return { retained30: false, retained60: false, retained90: false };
   }
 
   if (connection) {

@@ -29,6 +29,21 @@ export interface ClassActor {
 }
 
 /**
+ * Bounded `take` for the Connect reporting surfaces (funnel, DoHS export) —
+ * `connectManagedStudentIds` here plus the connection/application reads in
+ * `funnel.ts` and the SpokesRecord read in `dohs-export.ts` (2026-09
+ * second-pass review, W12 partial). These are read-only report queries with
+ * no pagination UI, so an admin's unfiltered, undated program-wide export
+ * previously had no ceiling at all — one very large program could OOM the
+ * request or return a response too large for the route to stream. This is
+ * generous enough that no real SPOKES cohort should ever hit it (the
+ * largest known program is two orders of magnitude smaller), so hitting it
+ * in practice is itself the signal that a report needs pagination, not
+ * silent truncation mistaken for a complete result.
+ */
+export const MAX_CONNECT_REPORT_ROWS = 50_000;
+
+/**
  * Enrollment statuses that still count as "in the program".
  *
  * The app-side mirror of `visionquest.active_enrolled_class_ids()` in
@@ -141,6 +156,7 @@ export async function connectManagedStudentIds(
     const students = await prisma.student.findMany({
       where: { role: "student" },
       select: { id: true },
+      take: MAX_CONNECT_REPORT_ROWS,
     });
     return students.map((student) => student.id);
   }
@@ -157,6 +173,7 @@ export async function connectManagedStudentIds(
       },
     },
     select: { id: true },
+    take: MAX_CONNECT_REPORT_ROWS,
   });
   return students.map((student) => student.id);
 }

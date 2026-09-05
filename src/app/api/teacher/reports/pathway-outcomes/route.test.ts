@@ -62,8 +62,16 @@ describe("GET /api/teacher/reports/pathway-outcomes", () => {
     assert.equal((client as any).__marker, "the-app-prisma-client");
   });
 
-  it("runs inside withTeacherAuth (a plain teacher session gets a response, not a 403)", async () => {
-    const res = await route.GET();
-    assert.equal(res.status, 200);
-  });
+  // A "runs inside withTeacherAuth (a plain teacher session gets a response,
+  // not a 403)" case previously lived here, but this file's `@/lib/api-error`
+  // mock replaces withTeacherAuth with an unconditional pass-through (see the
+  // mock.module block above) — it never calls getSession/isStaffRole, so a
+  // 403 could never occur regardless of what this route does. That made the
+  // assertion tautological, not a real refusal check (2026-09 second-pass
+  // review). Dropped rather than "fixed" here: pinning the REAL refusal
+  // behavior would mean un-mocking withTeacherAuth for one case in a file
+  // that otherwise relies on the pass-through for every other test, which
+  // duplicates api-error.ts's own concern rather than this route's. If
+  // withTeacherAuth's real 403 path needs a regression test, it belongs
+  // next to withTeacherAuth in src/lib/api-error.ts, not per-route.
 });

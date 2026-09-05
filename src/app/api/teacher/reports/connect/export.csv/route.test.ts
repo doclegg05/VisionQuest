@@ -101,6 +101,18 @@ describe("GET /api/teacher/reports/connect/export.csv", () => {
     assert.equal(mockFetchDohsExport.mock.callCount(), 0);
   });
 
+  it("forwards employerId to fetchDohsExport and into the audit metadata (2026-09 second-pass 'Take')", async () => {
+    const req = mockRequest("/api/teacher/reports/connect/export.csv?employerId=employer-1", {
+      method: "GET",
+    });
+    await route.GET(req as never);
+    assert.equal(mockFetchDohsExport.mock.callCount(), 1);
+    const [, options] = mockFetchDohsExport.mock.calls[0].arguments;
+    assert.equal(options.employerId, "employer-1");
+    const [auditCall] = mockLogAuditEvent.mock.calls[0].arguments;
+    assert.equal(auditCall.metadata.employerId, "employer-1");
+  });
+
   it("instructor cannot export a class they do not teach — propagates the 404", async () => {
     // fetchDohsExport's real classId check is assertClassIsManaged, which
     // throws notFound (404), not forbidden (403) — this mock error must

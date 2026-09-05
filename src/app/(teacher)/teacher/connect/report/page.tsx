@@ -118,6 +118,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
   // filtered period got the whole program's dates instead.
   const exportParams = new URLSearchParams();
   if (classId) exportParams.set("classId", classId);
+  if (employerId) exportParams.set("employerId", employerId);
   if (from) exportParams.set("from", from);
   if (to) exportParams.set("to", to);
   const exportQuery = exportParams.toString();
@@ -219,7 +220,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
                 &ldquo;no note&rdquo; below — this is not saying employers were offered nothing.
               </p>
             )}
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
               <div>
                 <dt className="text-[var(--ink-muted)]">Packets that mentioned a hiring incentive</dt>
                 <dd className="font-semibold text-[var(--ink-strong)]">{funnel.subsidy.attached}</dd>
@@ -240,6 +241,12 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
                 <dt className="text-[var(--ink-muted)]">Hired, no hiring-incentive note</dt>
                 <dd className="font-semibold text-[var(--ink-strong)]">
                   {funnel.subsidy.hiredWithout}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[var(--ink-muted)]">Packets that could not be read (a data problem — not &ldquo;no note&rdquo;)</dt>
+                <dd className="font-semibold text-[var(--ink-strong)]">
+                  {funnel.subsidy.packetUnparseable}
                 </dd>
               </div>
             </dl>

@@ -437,7 +437,7 @@ describe("computeFunnel — subsidy split", () => {
     assert.equal(result.subsidy.hiredWithout, 1);
   });
 
-  it("counts a non-null but schema-invalid packet as packetUnparseable, not as notAttached silently", () => {
+  it("counts a non-null but schema-invalid packet as packetUnparseable — an EXCLUSIVE bucket, not also notAttached (2026-09 second-pass review)", () => {
     const connections = [
       connection({ id: "c1", packet: { garbage: true } }),
       connection({ id: "c2", packet: packetWithSubsidy(null) }),
@@ -445,10 +445,10 @@ describe("computeFunnel — subsidy split", () => {
     ];
     const result = computeFunnel(connections, []);
     assert.equal(result.subsidy.packetUnparseable, 1);
-    // All three (c1 unparseable, c2 parseable-but-no-line, c3 null) land in
-    // notAttached too — packetUnparseable is an ADDITIONAL signal, not a
-    // replacement bucket.
-    assert.equal(result.subsidy.notAttached, 3);
+    // Only c2 (parseable-but-no-line) and c3 (legitimately null) land in
+    // notAttached; c1's unparseable packet is a data problem, not a "no
+    // incentive offered" signal, so it must not double-count into both.
+    assert.equal(result.subsidy.notAttached, 2);
   });
 
   it("a legitimately absent packet (null — e.g. still 'proposed') is NOT counted as unparseable", () => {
