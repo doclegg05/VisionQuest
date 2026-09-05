@@ -30,6 +30,12 @@
 -- it on these tables alone would also apply RLS to the table OWNER, which is
 -- the role that runs migrations, seeds, and the employer backfill.
 -- prismaAdmin's bypass is a role attribute and is unaffected either way.
+--
+-- Every CREATE POLICY is prefixed with DROP POLICY IF EXISTS, matching the
+-- baseline's re-runnable pattern and 20260905100000. This file has been
+-- applied to no database anywhere; never edit a migration that HAS been
+-- applied, because the _prisma_migrations ledger keys on the folder name and
+-- would not re-run it.
 
 -- CreateTable
 CREATE TABLE "visionquest"."Employer" (
@@ -164,6 +170,7 @@ GRANT EXECUTE ON FUNCTION visionquest.active_enrolled_class_ids(text) TO vq_app;
 -- ---- Employer (staff only) ----
 ALTER TABLE "visionquest"."Employer" ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "employer_access" ON "visionquest"."Employer";
 CREATE POLICY "employer_access" ON "visionquest"."Employer"
   FOR ALL TO vq_app
   USING (
@@ -178,6 +185,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON "visionquest"."Employer" TO vq_app;
 -- ---- EmployerContact (staff only) ----
 ALTER TABLE "visionquest"."EmployerContact" ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "employer_contact_access" ON "visionquest"."EmployerContact";
 CREATE POLICY "employer_contact_access" ON "visionquest"."EmployerContact"
   FOR ALL TO vq_app
   USING (
@@ -197,6 +205,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON "visionquest"."EmployerContact" TO vq_ap
 -- insert a program-wide open lead — the exact thing this table must not allow.
 ALTER TABLE "visionquest"."JobLead" ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "job_lead_read" ON "visionquest"."JobLead";
 CREATE POLICY "job_lead_read" ON "visionquest"."JobLead"
   FOR SELECT TO vq_app
   USING (
@@ -211,6 +220,7 @@ CREATE POLICY "job_lead_read" ON "visionquest"."JobLead"
     )
   );
 
+DROP POLICY IF EXISTS "job_lead_write" ON "visionquest"."JobLead";
 CREATE POLICY "job_lead_write" ON "visionquest"."JobLead"
   FOR ALL TO vq_app
   USING (
