@@ -79,6 +79,19 @@ mock.module("@/lib/db", {
   },
 });
 
+/**
+ * Phase 3 adds employer-linked leads to search_jobs. They come from
+ * rankLeadsForStudent, which is exercised on its own in
+ * src/lib/connect/matching.test.ts; here it is mocked so these cases stay
+ * about the class board and the merge, and `leadFits` is set per test.
+ */
+let leadFits: unknown[] = [];
+mock.module("@/lib/connect/matching", {
+  namedExports: {
+    rankLeadsForStudent: async () => leadFits,
+  },
+});
+
 /** The text the fake local provider returns; each test sets it. */
 let providerReplies: string[] = [];
 const providerCalls: Array<{ systemPrompt: string; user: string }> = [];
@@ -183,6 +196,7 @@ function workProfileRow(overrides: Record<string, unknown> = {}) {
 }
 
 function resetAll() {
+  leadFits = [];
   for (const m of [
     mockEnrollmentFindFirst,
     mockConfigFindUnique,
@@ -247,6 +261,79 @@ describe("search_jobs", () => {
     const where = mockJobFindMany.mock.calls[0].arguments[0].where;
     assert.equal(where.classConfigId, "cfg-1");
     assert.equal(where.status, "active");
+  });
+
+  // ─── Phase 3: employer-linked leads alongside the scraped board ──────────
+
+  function leadFit(overrides: Record<string, unknown> = {}) {
+    return {
+      lead: {
+        id: "lead-1",
+        title: "Production Associate",
+        employerName: "Mountain Metal",
+        location: "Beckley, WV",
+        payMin: 15,
+        payMax: 15,
+        payPeriod: "hour",
+        ...(overrides.lead as Record<string, unknown> | undefined),
+      },
+      fit: { score: 95, hardBlocks: [], blockReasons: [], reasons: ["Day shift. You can work then."] },
+      ...overrides,
+    };
+  }
+
+  it("marks every result as a lead or a listing", async () => {
+    mockJobFindMany.mock.mockImplementation(async () => [listing()]);
+    leadFits = [leadFit()];
+
+    const result = await tool("search_jobs").execute({}, ctx());
+    const data = result.data as { jobs: Array<{ kind: string }> };
+    assert.deepEqual(data.jobs.map((job) => job.kind).sort(), ["lead", "listing"]);
+  });
+
+  it("ranks leads and listings on one scale rather than putting leads first", async () => {
+    mockJobFindMany.mock.mockImplementation(async () => [listing()]);
+    // A lead the student barely fits must not outrank a strong board posting.
+    leadFits = [{ ...leadFit(), fit: { score: 1, hardBlocks: [], blockReasons: [], reasons: [] } }];
+
+    const result = await tool("search_jobs").execute({}, ctx());
+    const data = result.data as { jobs: Array<{ kind: string }> };
+    assert.equal(data.jobs[0].kind, "listing", "the higher-scoring row wins whatever its kind");
+  });
+
+  it("carries the lead's own id and pay, and never a jobListingId", async () => {
+    mockJobFindMany.mock.mockImplementation(async () => []);
+    leadFits = [leadFit()];
+
+    const result = await tool("search_jobs").execute({}, ctx());
+    const data = result.data as {
+      jobs: Array<{ jobLeadId?: string; jobListingId?: string; salary: string | null }>;
+    };
+    assert.equal(data.jobs[0].jobLeadId, "lead-1");
+    assert.equal(data.jobs[0].jobListingId, undefined);
+    assert.equal(data.jobs[0].salary, "$15 an hour.");
+  });
+
+  it("tells the model a lead cannot be handed to explain_job", async () => {
+    mockJobFindMany.mock.mockImplementation(async () => []);
+    leadFits = [leadFit()];
+
+    const result = await tool("search_jobs").execute({}, ctx());
+    assert.ok(result.modelHint?.includes("jobLeadId=lead-1"), result.modelHint);
+    assert.ok(
+      result.modelHint?.includes("cannot be explained by a tool yet"),
+      result.modelHint,
+    );
+  });
+
+  it("still reports no jobs when neither the board nor the leads have anything", async () => {
+    mockJobFindMany.mock.mockImplementation(async () => []);
+    leadFits = [];
+
+    const result = await tool("search_jobs").execute({}, ctx());
+    const data = result.data as { jobs: unknown[] };
+    assert.equal(data.jobs.length, 0);
+    assert.ok(result.modelHint?.includes("Never invent a job"), result.modelHint);
   });
 
   it("gives every job a one-sentence reason drawn from the scorer's own reasons", async () => {

@@ -16,6 +16,7 @@ import {
   UserCircle,
   SignOut,
   Books,
+  Handshake,
   WarningCircle,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
@@ -27,6 +28,7 @@ export const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
   { href: "/teacher", label: "Students", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
+  { href: "/teacher/connect", label: "Connect", icon: Handshake, phase: 1 },
   { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
   {

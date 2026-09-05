@@ -335,6 +335,18 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "Each row keeps the conversation snapshot. Staff either replay the goal extraction or dismiss a failure they have already handled by hand.",
   },
   {
+    id: "teacher-connect",
+    name: "Connect (Job Developer Console)",
+    roles: ["teacher"],
+    route: "/teacher/connect",
+    summary:
+      "Listed in the teacher nav as Connect: the job developer console — open leads with how many students fit each one, students with their best leads, and the employer directory with relationship owner, hire history and subsidy flags.",
+    compact: "connect (leads, who fits, employer directory)",
+    mechanics:
+      "Leads come from a typed form, from a job posting on the class board (one click), or from a MACC job order. Fit is computed from the student's work profile, verified certifications and career clusters; a blocked student is listed with the reason. \"Batch to WorkForce WV\" exports the ready students as a CSV for the Business Services Rep.",
+    seeAlso: ["teacher-student-record"],
+  },
+  {
     id: "teacher-manage",
     name: "Manage",
     roles: ["teacher"],

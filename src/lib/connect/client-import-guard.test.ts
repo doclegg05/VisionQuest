@@ -41,6 +41,24 @@ const SERVER_ONLY_SPECIFIERS = [
     instead: "@/lib/connect/work-profile-shared",
     why: "it imports prisma from @/lib/db",
   },
+  // Phase 3 repeats the same split for the same reason. The console's
+  // "Add lead" form needs the lead vocabulary and the shift names, and every
+  // one of those lives in a -shared module.
+  {
+    specifier: "@/lib/connect/matching",
+    instead: "@/lib/connect/matching-shared",
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/leads",
+    instead: "@/lib/connect/leads-shared",
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/employers",
+    instead: "@/lib/connect/employers-shared",
+    why: "it imports prisma from @/lib/db",
+  },
 ];
 
 function collectFiles(dir: string, out: string[] = []): string[] {
@@ -113,7 +131,21 @@ describe("client components never import a Prisma-backed module", () => {
     );
   });
 
-  it("the shared module it points at really is free of Prisma", () => {
+  it("every shared module a rule points at really is free of Prisma", () => {
+    // The rules are only worth anything if their escape hatches are clean. If
+    // a -shared module ever imports @/lib/db, the guard would be sending
+    // components at the same break under a different name.
+    for (const rule of SERVER_ONLY_SPECIFIERS) {
+      const relative = rule.instead.replace("@/", "src/");
+      const shared = readFileSync(join(process.cwd(), `${relative}.ts`), "utf8");
+      assert.ok(
+        !importedSpecifiers(shared).some((spec) => spec === "@/lib/db" || spec.endsWith("/db")),
+        `${rule.instead} imports the Prisma client — the split has collapsed`,
+      );
+    }
+  });
+
+  it("the work-profile shared module it points at really is free of Prisma", () => {
     // The rule is only worth anything if its escape hatch is clean. If
     // work-profile-shared ever imports @/lib/db, the guard would be sending
     // components at the same break under a different name.

@@ -57,6 +57,7 @@
     "jobs:expire-stale": "node scripts/expire-stale-background-jobs.mjs",
     "report:pathway-outcomes": "tsx scripts/pathway-outcomes-report.ts",
     "clusters:backfill": "node scripts/backfill-national-clusters.mjs",
+    "employers:backfill": "tsx scripts/backfill-employers.ts",
     "cos:smoke": "tsx scripts/cos-smoke.mjs",
     "talroo:smoke": "tsx scripts/talroo-smoke.mjs",
     "ui-copy:readability": "tsx scripts/ui-copy-readability.mjs",

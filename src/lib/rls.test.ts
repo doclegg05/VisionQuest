@@ -1021,6 +1021,226 @@ if (!SHOULD_RUN) {
       });
     });
 
+    describe("Employer / EmployerContact / JobLead (Match & Connect Phase 3)", () => {
+      // Employer and EmployerContact are staff-only: no student branch exists
+      // in either policy. JobLead is the one table in the group a student may
+      // read, and only rows that are open AND visible to a class they are
+      // ACTIVELY enrolled in. These cases guard three specific loosenings:
+      // adding a student branch to the employer policies; dropping the
+      // `status = 'open'` clause from job_lead_read; and letting the student
+      // branch reach the write path (job_lead_write must stay staff-only).
+      let employerId = "";
+      let contactId = "";
+      /** classId NULL — visible to every student. */
+      let leadProgramWide = "";
+      /** classAlpha (Student A's class), open. */
+      let leadAlphaOpen = "";
+      /** classAlpha, closed — the status clause is the only thing hiding it. */
+      let leadAlphaClosed = "";
+      /** classBeta (Student C's class), open. */
+      let leadBetaOpen = "";
+
+      before(async () => {
+        const employer = await db.employer.create({
+          data: {
+            name: `RLS Test Employer ${fixtures.suffix}`,
+            nameKey: `rls test employer ${fixtures.suffix}`,
+            county: "Raleigh",
+            city: "Beckley",
+          },
+        });
+        employerId = employer.id;
+
+        const contact = await db.employerContact.create({
+          data: { employerId, name: "Pat Buyer", email: "pat@example.test" },
+        });
+        contactId = contact.id;
+
+        const leadBase = {
+          employerId,
+          location: "Beckley, WV",
+          source: "manual",
+        };
+        const [programWide, alphaOpen, alphaClosed, betaOpen] = await Promise.all([
+          db.jobLead.create({
+            data: { ...leadBase, title: "Program wide", classId: null, status: "open" },
+          }),
+          db.jobLead.create({
+            data: {
+              ...leadBase,
+              title: "Alpha open",
+              classId: fixtures.classAlpha,
+              status: "open",
+            },
+          }),
+          db.jobLead.create({
+            data: {
+              ...leadBase,
+              title: "Alpha closed",
+              classId: fixtures.classAlpha,
+              status: "closed",
+            },
+          }),
+          db.jobLead.create({
+            data: {
+              ...leadBase,
+              title: "Beta open",
+              classId: fixtures.classBeta,
+              status: "open",
+            },
+          }),
+        ]);
+        leadProgramWide = programWide.id;
+        leadAlphaOpen = alphaOpen.id;
+        leadAlphaClosed = alphaClosed.id;
+        leadBetaOpen = betaOpen.id;
+      });
+
+      after(async () => {
+        // JobLead cascades from Employer; EmployerContact does too.
+        await db.employer.deleteMany({ where: { id: employerId } });
+      });
+
+      it("a student sees no Employer rows at all", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.employer.findMany({ where: { id: employerId }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "Employer is staff-only");
+      });
+
+      it("a student sees no EmployerContact rows at all", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "employer contact details never reach a student");
+      });
+
+      it("a teacher reads employers and their contacts", async () => {
+        const [employers, contacts] = await Promise.all([
+          asRole("teacher", fixtures.teacher, (tx) =>
+            tx.employer.findMany({ where: { id: employerId }, select: { id: true } }),
+          ),
+          asRole("teacher", fixtures.teacher, (tx) =>
+            tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
+          ),
+        ]);
+        assert.deepEqual(employers.map((row) => row.id), [employerId]);
+        assert.deepEqual(contacts.map((row) => row.id), [contactId]);
+      });
+
+      it("a student cannot create an Employer", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.employer.create({
+                data: {
+                  name: `forged ${fixtures.suffix}`,
+                  nameKey: `forged ${fixtures.suffix}`,
+                  county: "Raleigh",
+                  city: "Beckley",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a student reads open leads for their own class and program-wide leads", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.findMany({
+            where: { id: { in: [leadProgramWide, leadAlphaOpen, leadBetaOpen] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(
+          rows.map((row) => row.id).sort(),
+          [leadProgramWide, leadAlphaOpen].sort(),
+          "Student A is in classAlpha; the classBeta lead is not theirs",
+        );
+      });
+
+      it("a student does NOT read a closed lead, even for their own class", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.findMany({ where: { id: leadAlphaClosed }, select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "job_lead_read must keep the status = 'open' clause");
+      });
+
+      it("a student whose enrollment is not active loses the class lead", async () => {
+        await db.studentClassEnrollment.updateMany({
+          where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+          data: { status: "withdrawn" },
+        });
+        try {
+          const rows = await asRole("student", fixtures.studentA, (tx) =>
+            tx.jobLead.findMany({
+              where: { id: { in: [leadAlphaOpen, leadProgramWide] } },
+              select: { id: true },
+            }),
+          );
+          assert.deepEqual(
+            rows.map((row) => row.id),
+            [leadProgramWide],
+            "active_enrolled_class_ids() must filter on status = 'active'",
+          );
+        } finally {
+          await db.studentClassEnrollment.updateMany({
+            where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+            data: { status: "active" },
+          });
+        }
+      });
+
+      it("a student cannot create or update a lead", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.jobLead.create({
+                data: {
+                  employerId,
+                  title: "forged",
+                  location: "Beckley, WV",
+                  source: "manual",
+                  classId: null,
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.updateMany({
+            where: { id: leadProgramWide },
+            data: { title: "forged title" },
+          }),
+        );
+        assert.equal(updated.count, 0, "job_lead_write has no student branch");
+      });
+
+      it("a teacher reads every lead, open or not, in any class", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.findMany({
+            where: {
+              id: { in: [leadProgramWide, leadAlphaOpen, leadAlphaClosed, leadBetaOpen] },
+            },
+            select: { id: true },
+          }),
+        );
+        assert.equal(rows.length, 4, "leads are a staff work queue, not per-class student data");
+      });
+
+      it("returns zero rows for all three tables with no RLS context", async () => {
+        const [employers, contacts, leads] = await Promise.all([
+          asRole(null, null, (tx) => tx.employer.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.employerContact.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.jobLead.findMany({ select: { id: true } })),
+        ]);
+        assert.deepEqual(employers, [], "Employer must be empty with no context");
+        assert.deepEqual(contacts, [], "EmployerContact must be empty with no context");
+        assert.deepEqual(leads, [], "JobLead must be empty with no context");
+      });
+    });
+
     describe("SageOperation (sage_operation_read / _write / _update)", () => {
       // sage_operation_read is the one policy that has already been wrong
       // once (any teacher could read every ledger row until 20260820140000).

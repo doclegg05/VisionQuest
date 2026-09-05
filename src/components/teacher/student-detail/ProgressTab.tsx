@@ -18,6 +18,14 @@ interface ProgressTabProps {
   /** Certification outcome verification (P1-4) */
   certOutcomeVerifying: boolean;
   onCertOutcomeVerify: (certificationId: string) => void;
+  /**
+   * Application outcome verification (P1-4). The API has existed since P1-4
+   * shipped; this is its first UI. Grant reports split verified placements
+   * from student claims, so an unverified application is a placement nobody
+   * can count.
+   */
+  applicationVerifying: string | null;
+  onApplicationVerify: (applicationId: string) => void;
   /** Orientation honor-system verification (P1-1) */
   orientationVerifying: string | null;
   onOrientationVerify: (itemId: string, decision: "confirm" | "decline") => void;
@@ -33,6 +41,8 @@ export default function ProgressTab({
   onVerify,
   certOutcomeVerifying,
   onCertOutcomeVerify,
+  applicationVerifying,
+  onApplicationVerify,
   orientationVerifying,
   onOrientationVerify,
   showAllConversations,
@@ -253,6 +263,25 @@ export default function ProgressTab({
                     <p className="mt-2 text-xs text-[var(--ink-faint)]">
                       Updated {dateFormatter.format(new Date(application.updatedAt))}
                     </p>
+                    {application.verificationStatus === "verified" ? (
+                      <p className="mt-2 text-xs text-green-700">Outcome verified</p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+                          {application.verificationStatus === "self_reported"
+                            ? "Student-reported \u2014 verify"
+                            : "Not verified"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onApplicationVerify(application.id)}
+                          disabled={applicationVerifying === application.id}
+                          className="min-h-[44px] text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                        >
+                          {applicationVerifying === application.id ? "..." : "Verify"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
