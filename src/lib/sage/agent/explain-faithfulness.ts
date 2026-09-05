@@ -29,9 +29,12 @@
 //
 // EVERY PATTERN HERE READS ATTACKER-INFLUENCED TEXT. The posting arrives from a
 // third-party feed, so a super-linear pattern is a denial of service anybody
-// who can publish a job can trigger. Two were found and fixed that way (see
-// BARE_RATE and CITY_STATE); `explain-faithfulness.test.ts` pins their growth
-// across an 8x input increase, and `MAX_CHECKED_CHARS` bounds the rest.
+// who can publish a job can trigger. Four have been found and fixed that way:
+// the whitespace pair in BARE_RATE, the unbounded word run in CITY_STATE, and
+// the digit/comma quantifier that BARE_RATE and one MONEY_PATTERNS entry both
+// carried (now MONEY_NUMBER, shared). `explain-faithfulness.test.ts` pins their
+// growth across a 4x input, driving `matchAll` as production does, and
+// `MAX_CHECKED_CHARS` bounds what any of them can be handed.
 // =============================================================================
 
 /** What the checker was given to compare against. */
@@ -57,15 +60,41 @@ export interface FaithfulnessFinding {
 // ---------------------------------------------------------------------------
 
 /**
+/**
+ * One number, written the way money is written, defined ONCE and shared by
+ * every pattern below.
+ *
+ * The shape it replaces was `\d[\d,]*(?:\.\d+)?` — "a digit, then any run of
+ * digits and commas". On a posting made of `"1,"` repeated, that run consumes
+ * the whole rest of the text at every one of the ~n digit positions `matchAll`
+ * restarts from, and then gives it all back one character at a time looking
+ * for the suffix that never comes: quadratic, measured at 154 ms for 10 KB and
+ * 9.9 s for 80 KB. A posting is third-party text, so that is CPU an attacker
+ * chooses the length of.
+ *
+ * Two alternatives, not one, and the order matters. Comma-GROUPED first, so
+ * "1,200" matches whole rather than stopping at "1"; a plain digit run second,
+ * because "1200 dollars" is ordinary and a grouped-only pattern would silently
+ * stop reading it. Every quantifier is now bounded by a required literal — a
+ * comma must be followed by exactly three digits — so no alternative can eat
+ * the tail and hand it back.
+ *
+ * It is one constant because it appeared four times, and the whole failure was
+ * one of those four copies being the dangerous one. Sharing it means the next
+ * pattern cannot reintroduce the hazard by copying the wrong line.
+ */
+const MONEY_NUMBER = String.raw`(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
+
+/**
  * Money in a draft or a posting, in the forms either actually uses:
  * "$15", "15 dollars", "USD 15", "15 usd". A check that understood only the
  * "$" form was bypassed by the model simply writing "15 dollars", and refused
  * a correct explanation whenever the POSTING wrote it that way instead.
  */
-const MONEY_PATTERNS = [
-  /\$\s?(\d[\d,]*(?:\.\d+)?)/gi,
-  /\b(\d[\d,]*(?:\.\d+)?)\s*(?:dollars|usd)\b/gi,
-  /\busd\s*(\d[\d,]*(?:\.\d+)?)/gi,
+export const MONEY_PATTERNS = [
+  new RegExp(String.raw`\$\s?(${MONEY_NUMBER})`, "gi"),
+  new RegExp(String.raw`\b(${MONEY_NUMBER})\s*(?:dollars|usd)\b`, "gi"),
+  new RegExp(String.raw`\busd\s*(${MONEY_NUMBER})`, "gi"),
 ];
 
 /**
@@ -151,7 +180,10 @@ function wordMoneyValues(text: string): number[] {
  * for 80 KB. This one reads a POSTING, i.e. third-party job-feed text of
  * unbounded shape, so it was the reachable one. One quantifier, one pass.
  */
-export const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\b|an\b|a\b)\s*(?:hr|hour|h)\b/gi;
+export const BARE_RATE = new RegExp(
+  String.raw`\b(${MONEY_NUMBER})\s*(?:\/|per\b|an\b|a\b)\s*(?:hr|hour|h)\b`,
+  "gi",
+);
 
 /** Rounding a posted rate to whole dollars is not a fabrication. */
 const ROUNDING_TOLERANCE = 1;
