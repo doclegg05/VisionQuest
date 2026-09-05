@@ -93,6 +93,9 @@ model Student {
   workProfile             StudentWorkProfile?
   employerRelationships   Employer[]               @relation("EmployerRelationshipOwner")
   createdJobLeads         JobLead[]                @relation("CreatedJobLeads")
+  connections             Connection[]             @relation("StudentConnections")
+  proposedConnections     Connection[]             @relation("ProposedConnections")
+  sentConnections         Connection[]             @relation("SentConnections")
 
   @@schema("visionquest")
 }
@@ -553,39 +556,57 @@ model ResumeData {
   @@schema("visionquest")
 }
 
+/// A résumé written for ONE opening. Before Match & Connect that opening was
+/// always a scraped `JobListing`; a Phase 4 packet is built for a `JobLead`,
+/// which has no listing behind it when the instructor typed it in by hand.
+///
+/// So both foreign keys are nullable and exactly one is set. `jobListingId`
+/// could not simply stay required: a lead-bound résumé would have had to
+/// invent a listing to point at. The paired unique keys keep the
+/// version-per-opening rule on whichever side is in use; Postgres treats NULLs
+/// as distinct, so the unused key never collides.
 model ResumeVersion {
   id           String   @id @default(cuid())
   studentId    String
-  jobListingId String
+  jobListingId String?
+  jobLeadId    String?
   version      Int
   content      Json
   status       String   @default("draft")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  student    Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobListing JobListing? @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  jobLead    JobLead?    @relation(fields: [jobLeadId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, jobListingId, version])
+  @@unique([studentId, jobLeadId, version])
   @@index([jobListingId])
+  @@index([jobLeadId])
   @@schema("visionquest")
 }
 
+/// Same nullable-pair shape as ResumeVersion, for the same reason.
 model CoverLetter {
   id           String   @id @default(cuid())
   studentId    String
-  jobListingId String
+  jobListingId String?
+  jobLeadId    String?
   version      Int
   content      String   @db.Text
   status       String   @default("draft")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  student    Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobListing JobListing? @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  jobLead    JobLead?    @relation(fields: [jobLeadId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, jobListingId, version])
+  @@unique([studentId, jobLeadId, version])
   @@index([jobListingId])
+  @@index([jobLeadId])
   @@schema("visionquest")
 }
 
@@ -735,12 +756,19 @@ model Appointment {
   bookingSource      String    @default("teacher")
   confirmationSentAt DateTime?
   reminderSentAt     DateTime?
+  /// A third party in the room who has no account here: `{ name, email,
+  /// employerId }` for an interview an employer booked from a Connection link
+  /// (Match & Connect Task 4.4). Null for every ordinary advising appointment.
+  /// Deliberately NOT a Student row — an employer contact is not a person this
+  /// program holds a record on.
+  externalAttendee   Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  student Student       @relation("StudentAppointments", fields: [studentId], references: [id], onDelete: Cascade)
-  advisor Student       @relation("AdvisorAppointments", fields: [advisorId], references: [id], onDelete: Cascade)
-  tasks   StudentTask[]
+  student     Student       @relation("StudentAppointments", fields: [studentId], references: [id], onDelete: Cascade)
+  advisor     Student       @relation("AdvisorAppointments", fields: [advisorId], references: [id], onDelete: Cascade)
+  tasks       StudentTask[]
+  connections Connection[]  @relation("InterviewAppointment")
 
   @@index([studentId, startsAt])
   // Double-booking guard lives only in migration 20260902140000: a partial
@@ -910,6 +938,7 @@ model Employer {
   relationshipOwner Student?          @relation("EmployerRelationshipOwner", fields: [relationshipOwnerId], references: [id], onDelete: SetNull)
   contacts          EmployerContact[]
   jobLeads          JobLead[]
+  connections       Connection[]
 
   @@index([status, county])
   @@schema("visionquest")
@@ -1000,6 +1029,10 @@ model JobLead {
   class     SpokesClass?     @relation(fields: [classId], references: [id], onDelete: SetNull)
   createdBy Student?         @relation("CreatedJobLeads", fields: [createdById], references: [id], onDelete: SetNull)
 
+  connections    Connection[]
+  resumeVersions ResumeVersion[]
+  coverLetters   CoverLetter[]
+
   @@index([status, employerId])
   @@index([source, sourceRef])
   @@schema("visionquest")
@@ -1037,9 +1070,149 @@ model Application {
   student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   spokesPlacement SpokesRecord? @relation("PlacementProvenance")
+  connection      Connection?
 
   @@unique([studentId, opportunityId])
   @@index([studentId, status])
+  @@schema("visionquest")
+}
+
+// ─── Match & Connect Phase 4: the Connection ─────────────────────────────────
+// docs/superpowers/plans/2026-09-05-match-and-connect.md Task 4.1
+// (shape from the design spec §4). A Connection is the only object in this
+// program that causes a student's information to leave it, so its status
+// pipeline lives in a table (src/lib/connect/pipeline-shared.ts), every
+// transition writes an append-only ConnectionEvent, and the packet the student
+// approved is FROZEN in `packet` rather than re-derived at send time.
+
+/// One student introduced to one employer for one opening.
+model Connection {
+  id         String @id @default(cuid())
+  studentId  String
+  jobLeadId  String
+  /// Denormalized from the lead so the per-employer send limit, the
+  /// do-not-contact check and the funnel do not have to join through JobLead
+  /// on every read. A lead never changes employer.
+  employerId String
+
+  /// The staff member or the student who proposed it.
+  proposedById String
+  /// teacher | sage | student — how the proposal was raised.
+  proposedVia String @default("teacher")
+
+  /// See CONNECTION_STATUSES in src/lib/connect/pipeline-shared.ts.
+  status          String   @default("proposed")
+  statusChangedAt DateTime @default(now())
+
+  /// The `employer_referral` consent that was active when the student approved.
+  consentRecordId String?
+
+  /// The frozen packet (src/lib/connect/packet-shared.ts `packetSchema`):
+  /// resumeVersionId, coverLetterId, endorsement, includedCertIds,
+  /// includedFields and the rendered values. Written at approval, never after.
+  packet Json?
+
+  sentById String?
+  sentAt   DateTime?
+
+  /// sha256 of the employer's link token. The token itself is shown once, in
+  /// the email, and is never stored or logged.
+  employerTokenHash String?   @unique
+  tokenExpiresAt    DateTime?
+  /// The contact the token was minted for. A link is good for one person.
+  tokenContactId String?
+
+  employerViewedAt    DateTime?
+  employerRespondedAt DateTime?
+  /// interested | not_now | hired
+  employerResponse String?
+  responseReason   String?
+
+  interviewAppointmentId String?
+
+  hiredAt    DateTime?
+  startDate  DateTime?
+  hourlyWage Float?
+
+  /// The verified Application this hire produced, so the placement bridge and
+  /// the grant KPI report see it exactly as they see a self-directed one.
+  applicationId String? @unique
+
+  closedReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student             Student           @relation("StudentConnections", fields: [studentId], references: [id], onDelete: Cascade)
+  jobLead             JobLead           @relation(fields: [jobLeadId], references: [id], onDelete: Cascade)
+  employer            Employer          @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  proposedBy          Student           @relation("ProposedConnections", fields: [proposedById], references: [id], onDelete: Cascade)
+  sentBy              Student?          @relation("SentConnections", fields: [sentById], references: [id], onDelete: SetNull)
+  consentRecord       ConsentRecord?    @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)
+  interviewAppointment Appointment?     @relation("InterviewAppointment", fields: [interviewAppointmentId], references: [id], onDelete: SetNull)
+  application         Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  events              ConnectionEvent[]
+  messages            OutboundMessage[]
+
+  @@unique([studentId, jobLeadId])
+  @@index([studentId, status])
+  @@index([employerId, status])
+  @@index([status, statusChangedAt])
+  @@schema("visionquest")
+}
+
+/// Append-only: every status change, plus the employer's views. There is no
+/// UPDATE or DELETE policy on this table — an audit trail that can be edited
+/// is not one.
+model ConnectionEvent {
+  id           String @id @default(cuid())
+  connectionId String
+
+  fromStatus String?
+  toStatus   String
+
+  /// student | teacher | admin | employer | system
+  actorType String
+  /// Student.id for a staff or student actor; NULL for the employer, who has
+  /// no account here, and for system transitions.
+  actorId String?
+  note    String? @db.Text
+
+  at DateTime @default(now())
+
+  connection Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, at])
+  @@schema("visionquest")
+}
+
+/// Every message this program sent out about a connection — the audit trail
+/// the SMS/email layer lacks today (design spec §4). Staff-read only.
+model OutboundMessage {
+  id      String @id @default(cuid())
+  /// sms | email
+  channel String
+  /// student | employer_contact | staff
+  toKind String
+  /// Student.id or EmployerContact.id. Never a raw address: the address lives
+  /// on the row it belongs to, and this table is read by staff, not by a
+  /// mailer.
+  toId        String
+  templateKey String
+  /// The rendered body as sent. It contains only what the student approved.
+  body       String  @db.Text
+  providerId String?
+  /// queued | sent | failed
+  status String @default("sent")
+
+  connectionId String?
+
+  sentAt DateTime @default(now())
+
+  connection Connection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([connectionId, sentAt])
+  @@index([toKind, toId, sentAt])
   @@schema("visionquest")
 }
 
@@ -1460,7 +1633,8 @@ model ConsentRecord {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  connections Connection[]
 
   @@index([studentId, scope, revokedAt])
   @@schema("visionquest")
