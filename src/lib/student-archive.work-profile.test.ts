@@ -64,7 +64,7 @@ before(async () => {
   ({ generateStudentArchive } = await import("./student-archive"));
 });
 
-function studentRow(workProfile: unknown) {
+function studentRow(workProfile: unknown, connections: unknown[] = []) {
   return {
     id: "stu-1",
     studentId: "VQ-0001",
@@ -75,10 +75,42 @@ function studentRow(workProfile: unknown) {
     portfolioItems: [],
     resumeData: null,
     workProfile,
+    connections,
   };
 }
 
-describe("generateStudentArchive — work profile", () => {
+/** One disclosure record, in the shape the archive's own select returns. */
+function connectionRow() {
+  return {
+    status: "sent",
+    statusChangedAt: new Date("2026-09-04T00:00:00.000Z"),
+    proposedVia: "teacher",
+    packet: { includedFields: ["candidate_name", "resume"], candidateName: "Test S." },
+    sentAt: new Date("2026-09-04T00:00:00.000Z"),
+    employerViewedAt: null,
+    employerRespondedAt: null,
+    employerResponse: null,
+    responseReason: null,
+    hiredAt: null,
+    startDate: null,
+    hourlyWage: null,
+    closedReason: null,
+    createdAt: new Date("2026-09-03T00:00:00.000Z"),
+    employer: { name: "Mountain Metal" },
+    jobLead: { title: "Production Associate" },
+    events: [
+      {
+        fromStatus: null,
+        toStatus: "proposed",
+        actorType: "teacher",
+        note: null,
+        at: new Date("2026-09-03T00:00:00.000Z"),
+      },
+    ],
+  };
+}
+
+describe("generateStudentArchive — work profile and disclosures", () => {
   beforeEach(() => {
     appended.length = 0;
     mockStudentFindUnique.mock.resetCalls();
@@ -125,6 +157,60 @@ describe("generateStudentArchive — work profile", () => {
       appended.some((a) => a.name === "work-profile.json"),
       false,
       "an empty file would imply the student answered and said nothing",
+    );
+  });
+
+  it("writes connections.json — the record of who this program told about them", async () => {
+    // Offboarding deletes the Connection rows along with the Student. Without
+    // this file the student can never afterwards answer "who did SPOKES tell
+    // about me, and what did they say", which is the point of exporting first.
+    mockStudentFindUnique.mock.mockImplementation(async () =>
+      studentRow(null, [connectionRow()]),
+    );
+
+    await generateStudentArchive("stu-1", "tch-1");
+
+    const entry = appended.find((a) => a.name === "connections.json");
+    assert.ok(entry, "the bundle must contain connections.json");
+    const parsed = JSON.parse(String(entry!.content));
+    assert.equal(parsed.length, 1);
+    assert.equal(parsed[0].employer, "Mountain Metal");
+    assert.equal(parsed[0].job, "Production Associate");
+    assert.equal(parsed[0].status, "sent");
+    // The FIELDS they approved, read off the frozen packet — the honest answer
+    // to "what was shared", rather than a second copy of the values.
+    assert.deepEqual(parsed[0].sharedFields, ["candidate_name", "resume"]);
+    assert.equal(parsed[0].events.length, 1);
+
+    const manifest = appended.find((a) => a.name === "manifest.json");
+    const entries = JSON.parse(String(manifest!.content)).entries as Array<{ path: string }>;
+    assert.ok(entries.some((e) => e.path === "connections.json"));
+  });
+
+  it("carries no employer CONTACT details, only the employer's name", async () => {
+    // A contact's email and phone are a third party's PII. They are not the
+    // student's to be handed, and the employer-facing page never showed them
+    // to the student either.
+    mockStudentFindUnique.mock.mockImplementation(async () =>
+      studentRow(null, [connectionRow()]),
+    );
+
+    await generateStudentArchive("stu-1", "tch-1");
+
+    const entry = appended.find((a) => a.name === "connections.json");
+    const serialized = String(entry!.content).toLowerCase();
+    for (const never of ["contactemail", "contactphone", "employertokenhash", "tokencontactid"]) {
+      assert.ok(!serialized.includes(never), `connections.json leaked "${never}"`);
+    }
+  });
+
+  it("writes no connections.json when the student was never introduced to anyone", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => studentRow(null, []));
+    await generateStudentArchive("stu-1", "tch-1");
+    assert.equal(
+      appended.some((a) => a.name === "connections.json"),
+      false,
+      "an empty array would imply a record that does not exist",
     );
   });
 });
