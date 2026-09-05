@@ -18,9 +18,9 @@
  * context those writes are refused, and the failure looks like a bug in this
  * script rather than what it is.
  *
- * IDEMPOTENT. Every row is upserted on its `bench_`-prefixed primary key, so a
+ * IDEMPOTENT. Every row is upserted on its `cbench`-prefixed primary key, so a
  * re-run is a no-op and a partially-seeded database repairs itself. `--reset`
- * deletes every `bench_` row in FK-safe order, which is the only supported way
+ * deletes every `cbench` row in FK-safe order, which is the only supported way
  * to remove them.
  *
  * SAFETY. Two gates, and the second one has no override:
@@ -42,6 +42,7 @@ import { PrismaClient } from "@prisma/client";
 
 import { BENCH_INSTRUCTOR_PASSWORD, BENCH_STUDENT_PASSWORD } from "../../e2e/bench-fixtures";
 import { assertSafeE2eSeedTarget } from "../../src/lib/e2e-seed-guard";
+import { BENCH_ID_PREFIX } from "./generate-cohort.mjs";
 import { loadCohort } from "./lib/cohort.mjs";
 
 // Already-set process env always wins — @next/env never overrides an existing
@@ -88,103 +89,108 @@ function assertNotProduction(databaseUrl: string): void {
  * disclosure record has to outlive every party to it), so deleting a student
  * who proposed a connection FAILS rather than cascading. Same trap
  * `scripts/seed-e2e-users.ts` documents; the order below is the fix.
+ *
+ * Rows are matched BY ID PREFIX, not by the id list the current cohort holds.
+ * The difference bites the moment the cohort changes: a student the generator
+ * dropped, or an id scheme that moved, leaves rows the new list does not name —
+ * so a `--reset` reported "0 rows removed" against a database still full of
+ * them, and the next seed died on a unique constraint. Matching the prefix
+ * means reset cleans up after generations of the fixture, not just this one.
  */
 type Deleter = { label: string; run: (prisma: PrismaClient) => Promise<{ count: number }> };
 
-function deleteOrder(ids: {
-  studentIds: string[];
-  classIds: string[];
-  employerIds: string[];
-  leadIds: string[];
-  connectionIds: string[];
-  spokesRecordIds: string[];
-  applicationIds: string[];
-  opportunityIds: string[];
-  listingIds: string[];
-}): Deleter[] {
-  const { studentIds, classIds, employerIds, leadIds, connectionIds } = ids;
+function deleteOrder(prefix: string): Deleter[] {
+  const mine = { startsWith: prefix };
 
   return [
     {
       label: "appointments",
-      run: (p) => p.appointment.deleteMany({ where: { studentId: { in: studentIds } } }),
+      run: (p) => p.appointment.deleteMany({ where: { studentId: mine } }),
     },
     {
       label: "employment follow-ups",
       run: (p) =>
-        p.spokesEmploymentFollowUp.deleteMany({ where: { recordId: { in: ids.spokesRecordIds } } }),
+        p.spokesEmploymentFollowUp.deleteMany({ where: { recordId: mine } }),
     },
     {
       label: "SPOKES records",
-      run: (p) => p.spokesRecord.deleteMany({ where: { id: { in: ids.spokesRecordIds } } }),
+      run: (p) => p.spokesRecord.deleteMany({ where: { id: mine } }),
     },
     {
       label: "connection events",
-      run: (p) => p.connectionEvent.deleteMany({ where: { connectionId: { in: connectionIds } } }),
+      run: (p) => p.connectionEvent.deleteMany({ where: { connectionId: mine } }),
     },
     {
       label: "outbound messages",
-      run: (p) => p.outboundMessage.deleteMany({ where: { connectionId: { in: connectionIds } } }),
+      run: (p) => p.outboundMessage.deleteMany({ where: { connectionId: mine } }),
     },
     {
       label: "connections",
-      run: (p) => p.connection.deleteMany({ where: { id: { in: connectionIds } } }),
+      run: (p) => p.connection.deleteMany({ where: { id: mine } }),
     },
     {
       label: "applications",
-      run: (p) => p.application.deleteMany({ where: { id: { in: ids.applicationIds } } }),
+      run: (p) => p.application.deleteMany({ where: { id: mine } }),
     },
     {
       label: "opportunities",
-      run: (p) => p.opportunity.deleteMany({ where: { id: { in: ids.opportunityIds } } }),
+      run: (p) => p.opportunity.deleteMany({ where: { id: mine } }),
     },
     {
       label: "saved jobs",
-      run: (p) => p.studentSavedJob.deleteMany({ where: { studentId: { in: studentIds } } }),
+      run: (p) => p.studentSavedJob.deleteMany({ where: { studentId: mine } }),
     },
     {
       label: "job listings",
-      run: (p) => p.jobListing.deleteMany({ where: { id: { in: ids.listingIds } } }),
+      run: (p) => p.jobListing.deleteMany({ where: { id: mine } }),
     },
-    { label: "job leads", run: (p) => p.jobLead.deleteMany({ where: { id: { in: leadIds } } }) },
+    { label: "job leads", run: (p) => p.jobLead.deleteMany({ where: { id: mine } }) },
     {
       label: "employer contacts",
-      run: (p) => p.employerContact.deleteMany({ where: { employerId: { in: employerIds } } }),
+      run: (p) => p.employerContact.deleteMany({ where: { employerId: mine } }),
     },
     {
       label: "employers",
-      run: (p) => p.employer.deleteMany({ where: { id: { in: employerIds } } }),
+      run: (p) => p.employer.deleteMany({ where: { id: mine } }),
     },
     {
       label: "work profiles",
-      run: (p) => p.studentWorkProfile.deleteMany({ where: { studentId: { in: studentIds } } }),
+      run: (p) => p.studentWorkProfile.deleteMany({ where: { studentId: mine } }),
     },
     {
       label: "certifications",
-      run: (p) => p.certification.deleteMany({ where: { studentId: { in: studentIds } } }),
+      run: (p) => p.certification.deleteMany({ where: { studentId: mine } }),
     },
     {
       label: "résumé data",
-      run: (p) => p.resumeData.deleteMany({ where: { studentId: { in: studentIds } } }),
+      run: (p) => p.resumeData.deleteMany({ where: { studentId: mine } }),
     },
     {
       label: "career discovery",
-      run: (p) => p.careerDiscovery.deleteMany({ where: { studentId: { in: studentIds } } }),
+      run: (p) => p.careerDiscovery.deleteMany({ where: { studentId: mine } }),
+    },
+    {
+      label: "recovery answers",
+      run: (p) => p.securityQuestionAnswer.deleteMany({ where: { studentId: mine } }),
+    },
+    {
+      label: "advisor availability",
+      run: (p) => p.advisorAvailability.deleteMany({ where: { advisorId: mine } }),
     },
     {
       label: "enrollments",
-      run: (p) => p.studentClassEnrollment.deleteMany({ where: { classId: { in: classIds } } }),
+      run: (p) => p.studentClassEnrollment.deleteMany({ where: { classId: mine } }),
     },
     {
       label: "class instructors",
-      run: (p) => p.spokesClassInstructor.deleteMany({ where: { classId: { in: classIds } } }),
+      run: (p) => p.spokesClassInstructor.deleteMany({ where: { classId: mine } }),
     },
     {
       label: "class job configs",
-      run: (p) => p.jobClassConfig.deleteMany({ where: { classId: { in: classIds } } }),
+      run: (p) => p.jobClassConfig.deleteMany({ where: { classId: mine } }),
     },
-    { label: "classes", run: (p) => p.spokesClass.deleteMany({ where: { id: { in: classIds } } }) },
-    { label: "students", run: (p) => p.student.deleteMany({ where: { id: { in: studentIds } } }) },
+    { label: "classes", run: (p) => p.spokesClass.deleteMany({ where: { id: mine } }) },
+    { label: "students", run: (p) => p.student.deleteMany({ where: { id: mine } }) },
   ];
 }
 
@@ -209,6 +215,7 @@ async function main(): Promise<void> {
   // Imported lazily so env is loaded before src/lib/db.ts initializes through
   // auth.ts, exactly as scripts/seed-e2e-users.ts does.
   const { hashPassword } = await import("../../src/lib/auth");
+  const { hashSecurityAnswers } = await import("../../src/lib/security-question-auth");
 
   const cohort = loadCohort() as unknown as Record<string, CohortRow[]> & {
     meta: { epoch: string };
@@ -216,25 +223,10 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
   const reset = process.argv.includes("--reset");
 
-  const ids = {
-    studentIds: [
-      ...cohort.instructors.map((row) => row.id as string),
-      ...cohort.students.map((row) => row.id as string),
-    ],
-    classIds: cohort.classes.map((row) => row.id as string),
-    employerIds: cohort.employers.map((row) => row.id as string),
-    leadIds: cohort.leads.map((row) => row.id as string),
-    connectionIds: cohort.connections.map((row) => row.id as string),
-    spokesRecordIds: cohort.spokesRecords.map((row) => row.id as string),
-    applicationIds: cohort.applications.map((row) => row.id as string),
-    opportunityIds: cohort.applications.map((row) => row.opportunityId as string),
-    listingIds: cohort.jobListings.map((row) => row.id as string),
-  };
-
   try {
     if (reset) {
       let total = 0;
-      for (const step of deleteOrder(ids)) {
+      for (const step of deleteOrder(BENCH_ID_PREFIX)) {
         const { count } = await step.run(prisma);
         total += count;
         if (count > 0) console.log(`  removed ${count} ${step.label}`);
@@ -306,12 +298,72 @@ async function main(): Promise<void> {
         where: { classId: cls.id as string },
         update: { region: cls.region as string, localJobPriority: cls.localJobPriority as string },
         create: {
-          id: `bench_jobconfig_${(cls.id as string).replace("bench_class_", "")}`,
+          id: `cbenchjobconfig${(cls.id as string).replace("cbenchclass", "")}`,
           classId: cls.id as string,
           region: cls.region as string,
           localJobPriority: cls.localJobPriority as string,
         },
       });
+    }
+
+    // ── Recovery questions ───────────────────────────────────────────────
+    //
+    // Not optional, and not obvious: the `(student)` layout redirects to
+    // /recovery-setup before ANY student page when the three-question set is
+    // missing. The Connect journey's first browser step therefore landed on
+    // "Keep your account safe" instead of Career, and read as a missing
+    // approval card. Every browser-driven benchmark over this cohort needs
+    // these, so they are seeded for staff and students alike.
+    const recoveryAnswers = hashSecurityAnswers({
+      birth_city: "Benchville",
+      elementary_school: "Bench Elementary",
+      favorite_teacher: "Benchy",
+    });
+    for (const person of [...cohort.instructors, ...cohort.students]) {
+      for (const answer of recoveryAnswers) {
+        await prisma.securityQuestionAnswer.upsert({
+          where: {
+            studentId_questionKey: {
+              studentId: person.id as string,
+              questionKey: answer.questionKey,
+            },
+          },
+          update: { answerHash: answer.answerHash },
+          create: {
+            studentId: person.id as string,
+            questionKey: answer.questionKey,
+            answerHash: answer.answerHash,
+          },
+        });
+      }
+    }
+
+    // Weekly advising availability for each instructor.
+    //
+    // Not decoration: `listInstructorSlots` builds the employer response page's
+    // "pick a time to meet" list from AdvisorAvailability, so without these the
+    // page tells every employer "There are no open times right now" and the
+    // interview-booking half of the Connect journey cannot be exercised at all.
+    // Monday to Friday, 9 to 12, in 30-minute slots.
+    for (const instructor of cohort.instructors) {
+      for (const weekday of [1, 2, 3, 4, 5]) {
+        const id = `cbenchavail${(instructor.id as string).slice(-1)}${weekday}`;
+        const data = {
+          advisorId: instructor.id as string,
+          weekday,
+          startMinutes: 9 * 60,
+          endMinutes: 12 * 60,
+          slotMinutes: 30,
+          locationType: "in_person",
+          locationLabel: "Room 2",
+          active: true,
+        };
+        await prisma.advisorAvailability.upsert({
+          where: { id },
+          update: data,
+          create: { id, ...data },
+        });
+      }
     }
 
     for (const student of cohort.students) {
@@ -508,7 +560,7 @@ async function main(): Promise<void> {
         clusters: listing.clusters as string[],
         status: "active",
         scrapeBatchId: "bench-cohort",
-        classConfigId: `bench_jobconfig_${(listing.classId as string).replace("bench_class_", "")}`,
+        classConfigId: `cbenchjobconfig${(listing.classId as string).replace("cbenchclass", "")}`,
       };
       await prisma.jobListing.upsert({
         where: { id: listing.id as string },

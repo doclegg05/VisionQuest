@@ -127,7 +127,7 @@ export async function run(ctx) {
       // Take assemblePacket's REUSE branch: with a ResumeVersion already there
       // for this (student, lead) pair it never reaches the tailoring call, so
       // no AI is contacted and no module is stubbed.
-      const resumeVersionId = `bench_rv_${connection.id}`;
+      const resumeVersionId = `cbenchrv${connection.id}`;
       const stored = await prisma.resumeData.findUnique({
         where: { studentId: connection.studentId },
         select: { data: true },

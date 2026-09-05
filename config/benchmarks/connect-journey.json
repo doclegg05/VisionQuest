@@ -1,0 +1,15 @@
+{
+  "suite": "connect-journey",
+  "title": "End-to-end introduction, in a browser",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/connect-journey.mjs",
+  "fixture": "config/benchmarks/fixtures/connect-journey.json",
+  "requires": ["browser", "postgres", "cohort"],
+  "metrics": [
+    { "id": "completed", "unit": "count", "direction": "higher", "floor": 1, "exact": true, "tolerance": 0 },
+    { "id": "student_taps", "unit": "count", "direction": "lower", "floor": 12, "tolerance": 0 },
+    { "id": "elapsed_ms", "unit": "ms", "direction": "lower", "tolerance": 0 }
+  ],
+  "notes": "Scores the run `e2e/bench-connect-journey.spec.ts` performed: propose → student approves at 375 px → instructor sends → employer opens the emailed link, books a time, and hires → a verified Application and a placement queue item exist. The spec writes reports/benchmarks/raw/connect-journey.json and this scorer reads it, so the browser run and the measurement are separable — the runner does not have to own Playwright. `student_taps` counts only what the STUDENT does; the instructor's and the employer's steps are real work by other people and are not what the design's 12-tap floor is about. `elapsed_ms` is informational and includes database polling, so it is a trend line, not a latency number. Reports `skipped` when the spec has not run."
+}

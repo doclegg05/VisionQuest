@@ -1,11 +1,11 @@
 [
   {
-    "id": "bench_lead_01",
-    "employerId": "bench_emp_01",
+    "id": "cbenchlead01",
+    "employerId": "cbenchemp01",
     "employerName": "Ridgeline Metal Works",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_01",
+    "contactId": "cbenchcontact01",
     "classId": null,
     "title": "Production Associate",
     "description": "Ridgeline Metal Works is hiring a production associate in Beckley. The team trains on the job. Steady hours.",
@@ -39,16 +39,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-07-08T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_02",
-    "employerId": "bench_emp_02",
+    "id": "cbenchlead02",
+    "employerId": "cbenchemp02",
     "employerName": "New River Care Home",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_02",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
     "title": "Warehouse Selector",
     "description": "New River Care Home is hiring a warehouse selector in Charleston. The team trains on the job. Steady hours.",
     "requirements": {
@@ -81,16 +81,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-06-20T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_03",
-    "employerId": "bench_emp_03",
+    "id": "cbenchlead03",
+    "employerId": "cbenchemp03",
     "employerName": "Blackwater Logistics",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_03",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
     "title": "Certified Nursing Assistant",
     "description": "Blackwater Logistics is hiring a certified nursing assistant in Huntington. The team trains on the job. Steady hours.",
     "requirements": {
@@ -121,16 +121,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-06-12T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_04",
-    "employerId": "bench_emp_04",
+    "id": "cbenchlead04",
+    "employerId": "cbenchemp04",
     "employerName": "Kanawha Valley Grocers",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_04",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
     "title": "Front Desk Associate",
     "description": "Kanawha Valley Grocers is hiring a front desk associate in Morgantown. The team trains on the job. Steady hours.",
     "requirements": {
@@ -159,19 +159,19 @@
       "Supply Chain & Transportation"
     ],
     "source": "joborder",
-    "sourceRef": "bench_src_04",
+    "sourceRef": "cbenchsrc04",
     "status": "open",
     "openings": 1,
     "postedAt": "2026-06-16T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_05",
-    "employerId": "bench_emp_05",
+    "id": "cbenchlead05",
+    "employerId": "cbenchemp05",
     "employerName": "Coalfield Machine & Tool",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_05",
+    "contactId": "cbenchcontact05",
     "classId": null,
     "title": "Machine Operator",
     "description": "Coalfield Machine & Tool is hiring a machine operator in Parkersburg. The team trains on the job. Steady hours.",
@@ -203,16 +203,16 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-07-03T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_06",
-    "employerId": "bench_emp_06",
+    "id": "cbenchlead06",
+    "employerId": "cbenchemp06",
     "employerName": "Greenbrier Family Dental",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_06",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact06",
+    "classId": "cbenchclass3",
     "title": "Delivery Driver Helper",
     "description": "Greenbrier Family Dental is hiring a delivery driver helper in Wheeling. The team trains on the job. Steady hours.",
     "requirements": {
@@ -244,16 +244,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-06-07T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_07",
-    "employerId": "bench_emp_07",
+    "id": "cbenchlead07",
+    "employerId": "cbenchemp07",
     "employerName": "Tygart Freight Lines",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_07",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact07",
+    "classId": "cbenchclass1",
     "title": "Grocery Stocker",
     "description": "Tygart Freight Lines is hiring a grocery stocker in Martinsburg. The team trains on the job. Steady hours.",
     "requirements": {
@@ -289,16 +289,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-07-03T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_08",
-    "employerId": "bench_emp_08",
+    "id": "cbenchlead08",
+    "employerId": "cbenchemp08",
     "employerName": "Appalachian Print & Sign",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_08",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact08",
+    "classId": "cbenchclass2",
     "title": "Dental Office Assistant",
     "description": "Appalachian Print & Sign is hiring a dental office assistant in Fairmont. The team trains on the job. Steady hours.",
     "requirements": {
@@ -321,19 +321,19 @@
       "Healthcare & Human Services"
     ],
     "source": "opportunity",
-    "sourceRef": "bench_src_08",
+    "sourceRef": "cbenchsrc08",
     "status": "open",
     "openings": 3,
     "postedAt": "2026-06-16T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_09",
-    "employerId": "bench_emp_09",
+    "id": "cbenchlead09",
+    "employerId": "cbenchemp09",
     "employerName": "Cheat River Hospitality",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_09",
+    "contactId": "cbenchcontact09",
     "classId": null,
     "title": "Print Finisher",
     "description": "Cheat River Hospitality is hiring a print finisher in Clarksburg. The team trains on the job. Steady hours.",
@@ -368,16 +368,16 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-16T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_10",
-    "employerId": "bench_emp_10",
+    "id": "cbenchlead10",
+    "employerId": "cbenchemp10",
     "employerName": "Mountain State Data Services",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_10",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact10",
+    "classId": "cbenchclass1",
     "title": "Housekeeping Attendant",
     "description": "Mountain State Data Services is hiring a housekeeping attendant in Lewisburg. The team trains on the job. Steady hours.",
     "requirements": {
@@ -407,20 +407,20 @@
       "Marketing & Sales"
     ],
     "source": "joblisting",
-    "sourceRef": "bench_src_10",
+    "sourceRef": "cbenchsrc10",
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-19T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_11",
-    "employerId": "bench_emp_11",
+    "id": "cbenchlead11",
+    "employerId": "cbenchemp11",
     "employerName": "Elk Fork Building Supply",
     "employerStatus": "do_not_contact",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_11",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact11",
+    "classId": "cbenchclass2",
     "title": "Data Entry Clerk",
     "description": "Elk Fork Building Supply is hiring a data entry clerk in Oak Hill. The team trains on the job. Steady hours.",
     "requirements": {
@@ -451,16 +451,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-07-20T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_12",
-    "employerId": "bench_emp_12",
+    "id": "cbenchlead12",
+    "employerId": "cbenchemp12",
     "employerName": "Seneca Home Health",
     "employerStatus": "paused",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_12",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact12",
+    "classId": "cbenchclass3",
     "title": "Building Supply Cashier",
     "description": "Seneca Home Health is hiring a building supply cashier in Princeton. The team trains on the job. Steady hours.",
     "requirements": {
@@ -493,15 +493,15 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-09T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_13",
-    "employerId": "bench_emp_01",
+    "id": "cbenchlead13",
+    "employerId": "cbenchemp01",
     "employerName": "Ridgeline Metal Works",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_01",
+    "contactId": "cbenchcontact01",
     "classId": null,
     "title": "Home Health Aide",
     "description": "Ridgeline Metal Works is hiring a home health aide in Beckley. The team trains on the job. Steady hours.",
@@ -535,16 +535,16 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-07-07T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_14",
-    "employerId": "bench_emp_02",
+    "id": "cbenchlead14",
+    "employerId": "cbenchemp02",
     "employerName": "New River Care Home",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_02",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
     "title": "Shipping Clerk",
     "description": "New River Care Home is hiring a shipping clerk in Charleston. The team trains on the job. Steady hours.",
     "requirements": {
@@ -571,20 +571,20 @@
       "Digital Technology"
     ],
     "source": "joborder",
-    "sourceRef": "bench_src_14",
+    "sourceRef": "cbenchsrc14",
     "status": "open",
     "openings": 1,
     "postedAt": "2026-06-06T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_15",
-    "employerId": "bench_emp_03",
+    "id": "cbenchlead15",
+    "employerId": "cbenchemp03",
     "employerName": "Blackwater Logistics",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_03",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
     "title": "Line Cook",
     "description": "Blackwater Logistics is hiring a line cook in Huntington. The team trains on the job. Steady hours.",
     "requirements": {
@@ -615,16 +615,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-06-25T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_16",
-    "employerId": "bench_emp_04",
+    "id": "cbenchlead16",
+    "employerId": "cbenchemp04",
     "employerName": "Kanawha Valley Grocers",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_04",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
     "title": "Maintenance Helper",
     "description": "Kanawha Valley Grocers is hiring a maintenance helper in Morgantown. The team trains on the job. Steady hours.",
     "requirements": {
@@ -658,15 +658,15 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-07-24T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_17",
-    "employerId": "bench_emp_05",
+    "id": "cbenchlead17",
+    "employerId": "cbenchemp05",
     "employerName": "Coalfield Machine & Tool",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_05",
+    "contactId": "cbenchcontact05",
     "classId": null,
     "title": "Quality Inspector",
     "description": "Coalfield Machine & Tool is hiring a quality inspector in Parkersburg. The team trains on the job. Steady hours.",
@@ -701,16 +701,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-08-21T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_18",
-    "employerId": "bench_emp_06",
+    "id": "cbenchlead18",
+    "employerId": "cbenchemp06",
     "employerName": "Greenbrier Family Dental",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_06",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact06",
+    "classId": "cbenchclass3",
     "title": "Customer Care Representative",
     "description": "Greenbrier Family Dental is hiring a customer care representative in Wheeling. The team trains on the job. Steady hours.",
     "requirements": {
@@ -733,20 +733,20 @@
       "Supply Chain & Transportation"
     ],
     "source": "opportunity",
-    "sourceRef": "bench_src_18",
+    "sourceRef": "cbenchsrc18",
     "status": "open",
     "openings": 3,
     "postedAt": "2026-07-24T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_19",
-    "employerId": "bench_emp_07",
+    "id": "cbenchlead19",
+    "employerId": "cbenchemp07",
     "employerName": "Tygart Freight Lines",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_07",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact07",
+    "classId": "cbenchclass1",
     "title": "Forklift Operator",
     "description": "Tygart Freight Lines is hiring a forklift operator in Martinsburg. The team trains on the job. Steady hours.",
     "requirements": {
@@ -782,16 +782,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-07-02T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_20",
-    "employerId": "bench_emp_08",
+    "id": "cbenchlead20",
+    "employerId": "cbenchemp08",
     "employerName": "Appalachian Print & Sign",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_08",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact08",
+    "classId": "cbenchclass2",
     "title": "Receiving Associate",
     "description": "Appalachian Print & Sign is hiring a receiving associate in Fairmont. The team trains on the job. Steady hours.",
     "requirements": {
@@ -819,19 +819,19 @@
       "Construction"
     ],
     "source": "joblisting",
-    "sourceRef": "bench_src_20",
+    "sourceRef": "cbenchsrc20",
     "status": "open",
     "openings": 2,
     "postedAt": "2026-08-06T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_21",
-    "employerId": "bench_emp_09",
+    "id": "cbenchlead21",
+    "employerId": "cbenchemp09",
     "employerName": "Cheat River Hospitality",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_09",
+    "contactId": "cbenchcontact09",
     "classId": null,
     "title": "Production Associate",
     "description": "Cheat River Hospitality is hiring a production associate in Clarksburg. The team trains on the job. Steady hours.",
@@ -863,16 +863,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-07-12T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_22",
-    "employerId": "bench_emp_10",
+    "id": "cbenchlead22",
+    "employerId": "cbenchemp10",
     "employerName": "Mountain State Data Services",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_10",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact10",
+    "classId": "cbenchclass1",
     "title": "Warehouse Selector",
     "description": "Mountain State Data Services is hiring a warehouse selector in Lewisburg. The team trains on the job. Steady hours.",
     "requirements": {
@@ -907,16 +907,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-08-22T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_23",
-    "employerId": "bench_emp_11",
+    "id": "cbenchlead23",
+    "employerId": "cbenchemp11",
     "employerName": "Elk Fork Building Supply",
     "employerStatus": "do_not_contact",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_11",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact11",
+    "classId": "cbenchclass2",
     "title": "Certified Nursing Assistant",
     "description": "Elk Fork Building Supply is hiring a certified nursing assistant in Oak Hill. The team trains on the job. Steady hours.",
     "requirements": {
@@ -947,16 +947,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-08-30T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_24",
-    "employerId": "bench_emp_12",
+    "id": "cbenchlead24",
+    "employerId": "cbenchemp12",
     "employerName": "Seneca Home Health",
     "employerStatus": "paused",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_12",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact12",
+    "classId": "cbenchclass3",
     "title": "Front Desk Associate",
     "description": "Seneca Home Health is hiring a front desk associate in Princeton. The team trains on the job. Steady hours.",
     "requirements": {
@@ -983,19 +983,19 @@
       "Marketing & Sales"
     ],
     "source": "joborder",
-    "sourceRef": "bench_src_24",
+    "sourceRef": "cbenchsrc24",
     "status": "open",
     "openings": 1,
     "postedAt": "2026-08-06T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_25",
-    "employerId": "bench_emp_01",
+    "id": "cbenchlead25",
+    "employerId": "cbenchemp01",
     "employerName": "Ridgeline Metal Works",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_01",
+    "contactId": "cbenchcontact01",
     "classId": null,
     "title": "Machine Operator",
     "description": "Ridgeline Metal Works is hiring a machine operator in Beckley. The team trains on the job. Steady hours.",
@@ -1029,16 +1029,16 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-07-19T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_26",
-    "employerId": "bench_emp_02",
+    "id": "cbenchlead26",
+    "employerId": "cbenchemp02",
     "employerName": "New River Care Home",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_02",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
     "title": "Delivery Driver Helper",
     "description": "New River Care Home is hiring a delivery driver helper in Charleston. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1070,16 +1070,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-08-13T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_27",
-    "employerId": "bench_emp_03",
+    "id": "cbenchlead27",
+    "employerId": "cbenchemp03",
     "employerName": "Blackwater Logistics",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_03",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
     "title": "Grocery Stocker",
     "description": "Blackwater Logistics is hiring a grocery stocker in Huntington. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1113,16 +1113,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-07-24T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_28",
-    "employerId": "bench_emp_04",
+    "id": "cbenchlead28",
+    "employerId": "cbenchemp04",
     "employerName": "Kanawha Valley Grocers",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_04",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
     "title": "Dental Office Assistant",
     "description": "Kanawha Valley Grocers is hiring a dental office assistant in Morgantown. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1147,19 +1147,19 @@
       "Digital Technology"
     ],
     "source": "opportunity",
-    "sourceRef": "bench_src_28",
+    "sourceRef": "cbenchsrc28",
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-20T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_29",
-    "employerId": "bench_emp_05",
+    "id": "cbenchlead29",
+    "employerId": "cbenchemp05",
     "employerName": "Coalfield Machine & Tool",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_05",
+    "contactId": "cbenchcontact05",
     "classId": null,
     "title": "Print Finisher",
     "description": "Coalfield Machine & Tool is hiring a print finisher in Parkersburg. The team trains on the job. Steady hours.",
@@ -1194,16 +1194,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-06-03T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_30",
-    "employerId": "bench_emp_06",
+    "id": "cbenchlead30",
+    "employerId": "cbenchemp06",
     "employerName": "Greenbrier Family Dental",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_06",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact06",
+    "classId": "cbenchclass3",
     "title": "Housekeeping Attendant",
     "description": "Greenbrier Family Dental is hiring a housekeeping attendant in Wheeling. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1231,20 +1231,20 @@
       "Hospitality, Events, & Tourism"
     ],
     "source": "joblisting",
-    "sourceRef": "bench_src_30",
+    "sourceRef": "cbenchsrc30",
     "status": "open",
     "openings": 2,
     "postedAt": "2026-07-21T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_31",
-    "employerId": "bench_emp_07",
+    "id": "cbenchlead31",
+    "employerId": "cbenchemp07",
     "employerName": "Tygart Freight Lines",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_07",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact07",
+    "classId": "cbenchclass1",
     "title": "Data Entry Clerk",
     "description": "Tygart Freight Lines is hiring a data entry clerk in Martinsburg. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1277,16 +1277,16 @@
     "status": "open",
     "openings": 1,
     "postedAt": "2026-06-22T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_32",
-    "employerId": "bench_emp_08",
+    "id": "cbenchlead32",
+    "employerId": "cbenchemp08",
     "employerName": "Appalachian Print & Sign",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_08",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact08",
+    "classId": "cbenchclass2",
     "title": "Building Supply Cashier",
     "description": "Appalachian Print & Sign is hiring a building supply cashier in Fairmont. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1319,15 +1319,15 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-22T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_33",
-    "employerId": "bench_emp_09",
+    "id": "cbenchlead33",
+    "employerId": "cbenchemp09",
     "employerName": "Cheat River Hospitality",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_09",
+    "contactId": "cbenchcontact09",
     "classId": null,
     "title": "Home Health Aide",
     "description": "Cheat River Hospitality is hiring a home health aide in Clarksburg. The team trains on the job. Steady hours.",
@@ -1359,16 +1359,16 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-27T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_34",
-    "employerId": "bench_emp_10",
+    "id": "cbenchlead34",
+    "employerId": "cbenchemp10",
     "employerName": "Mountain State Data Services",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_10",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact10",
+    "classId": "cbenchclass1",
     "title": "Shipping Clerk",
     "description": "Mountain State Data Services is hiring a shipping clerk in Lewisburg. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1397,20 +1397,20 @@
       "Construction"
     ],
     "source": "joborder",
-    "sourceRef": "bench_src_34",
+    "sourceRef": "cbenchsrc34",
     "status": "open",
     "openings": 3,
     "postedAt": "2026-06-30T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_35",
-    "employerId": "bench_emp_11",
+    "id": "cbenchlead35",
+    "employerId": "cbenchemp11",
     "employerName": "Elk Fork Building Supply",
     "employerStatus": "do_not_contact",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_11",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact11",
+    "classId": "cbenchclass2",
     "title": "Line Cook",
     "description": "Elk Fork Building Supply is hiring a line cook in Oak Hill. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1441,16 +1441,16 @@
     "status": "open",
     "openings": 2,
     "postedAt": "2026-06-08T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_36",
-    "employerId": "bench_emp_12",
+    "id": "cbenchlead36",
+    "employerId": "cbenchemp12",
     "employerName": "Seneca Home Health",
     "employerStatus": "paused",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_12",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact12",
+    "classId": "cbenchclass3",
     "title": "Maintenance Helper",
     "description": "Seneca Home Health is hiring a maintenance helper in Princeton. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1482,15 +1482,15 @@
     "status": "open",
     "openings": 3,
     "postedAt": "2026-08-14T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_37",
-    "employerId": "bench_emp_01",
+    "id": "cbenchlead37",
+    "employerId": "cbenchemp01",
     "employerName": "Ridgeline Metal Works",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_01",
+    "contactId": "cbenchcontact01",
     "classId": null,
     "title": "Quality Inspector",
     "description": "Ridgeline Metal Works is hiring a quality inspector in Beckley. The team trains on the job. Steady hours.",
@@ -1527,16 +1527,16 @@
     "status": "filled",
     "openings": 3,
     "postedAt": "2026-08-28T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   },
   {
-    "id": "bench_lead_38",
-    "employerId": "bench_emp_02",
+    "id": "cbenchlead38",
+    "employerId": "cbenchemp02",
     "employerName": "New River Care Home",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_02",
-    "classId": "bench_class_2",
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
     "title": "Customer Care Representative",
     "description": "New River Care Home is hiring a customer care representative in Charleston. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1559,20 +1559,20 @@
       "Marketing & Sales"
     ],
     "source": "opportunity",
-    "sourceRef": "bench_src_38",
+    "sourceRef": "cbenchsrc38",
     "status": "paused",
     "openings": 2,
     "postedAt": "2026-08-17T12:00:00.000Z",
-    "createdById": "bench_instr_2"
+    "createdById": "cbenchinstr2"
   },
   {
-    "id": "bench_lead_39",
-    "employerId": "bench_emp_03",
+    "id": "cbenchlead39",
+    "employerId": "cbenchemp03",
     "employerName": "Blackwater Logistics",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": false,
-    "contactId": "bench_contact_03",
-    "classId": "bench_class_3",
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
     "title": "Forklift Operator",
     "description": "Blackwater Logistics is hiring a forklift operator in Huntington. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1606,16 +1606,16 @@
     "status": "closed",
     "openings": 1,
     "postedAt": "2026-07-26T12:00:00.000Z",
-    "createdById": "bench_instr_3"
+    "createdById": "cbenchinstr3"
   },
   {
-    "id": "bench_lead_40",
-    "employerId": "bench_emp_04",
+    "id": "cbenchlead40",
+    "employerId": "cbenchemp04",
     "employerName": "Kanawha Valley Grocers",
     "employerStatus": "active",
     "employerHiredSpokesGradBefore": true,
-    "contactId": "bench_contact_04",
-    "classId": "bench_class_1",
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
     "title": "Receiving Associate",
     "description": "Kanawha Valley Grocers is hiring a receiving associate in Morgantown. The team trains on the job. Steady hours.",
     "requirements": {
@@ -1645,10 +1645,10 @@
       "Advanced Manufacturing"
     ],
     "source": "joblisting",
-    "sourceRef": "bench_src_40",
+    "sourceRef": "cbenchsrc40",
     "status": "filled",
     "openings": 2,
     "postedAt": "2026-07-24T12:00:00.000Z",
-    "createdById": "bench_instr_1"
+    "createdById": "cbenchinstr1"
   }
 ]

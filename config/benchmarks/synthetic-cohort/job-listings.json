@@ -1,7 +1,7 @@
 [
   {
-    "id": "bench_listing_01",
-    "classId": "bench_class_1",
+    "id": "cbenchlisting01",
+    "classId": "cbenchclass1",
     "sourceId": "bench-listing-source-01",
     "title": "Delivery Driver Helper",
     "company": "Blackwater Logistics",
@@ -16,8 +16,8 @@
     "postedAt": "2026-08-26T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_02",
-    "classId": "bench_class_2",
+    "id": "cbenchlisting02",
+    "classId": "cbenchclass2",
     "sourceId": "bench-listing-source-02",
     "title": "Grocery Stocker",
     "company": "Kanawha Valley Grocers",
@@ -32,8 +32,8 @@
     "postedAt": "2026-07-27T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_03",
-    "classId": "bench_class_3",
+    "id": "cbenchlisting03",
+    "classId": "cbenchclass3",
     "sourceId": "bench-listing-source-03",
     "title": "Dental Office Assistant",
     "company": "Coalfield Machine & Tool",
@@ -48,8 +48,8 @@
     "postedAt": "2026-08-09T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_04",
-    "classId": "bench_class_1",
+    "id": "cbenchlisting04",
+    "classId": "cbenchclass1",
     "sourceId": "bench-listing-source-04",
     "title": "Print Finisher",
     "company": "Greenbrier Family Dental",
@@ -64,8 +64,8 @@
     "postedAt": "2026-08-11T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_05",
-    "classId": "bench_class_2",
+    "id": "cbenchlisting05",
+    "classId": "cbenchclass2",
     "sourceId": "bench-listing-source-05",
     "title": "Housekeeping Attendant",
     "company": "Tygart Freight Lines",
@@ -80,8 +80,8 @@
     "postedAt": "2026-08-25T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_06",
-    "classId": "bench_class_3",
+    "id": "cbenchlisting06",
+    "classId": "cbenchclass3",
     "sourceId": "bench-listing-source-06",
     "title": "Data Entry Clerk",
     "company": "Appalachian Print & Sign",
@@ -96,8 +96,8 @@
     "postedAt": "2026-08-29T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_07",
-    "classId": "bench_class_1",
+    "id": "cbenchlisting07",
+    "classId": "cbenchclass1",
     "sourceId": "bench-listing-source-07",
     "title": "Building Supply Cashier",
     "company": "Cheat River Hospitality",
@@ -112,8 +112,8 @@
     "postedAt": "2026-08-21T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_08",
-    "classId": "bench_class_2",
+    "id": "cbenchlisting08",
+    "classId": "cbenchclass2",
     "sourceId": "bench-listing-source-08",
     "title": "Home Health Aide",
     "company": "Mountain State Data Services",
@@ -128,8 +128,8 @@
     "postedAt": "2026-08-23T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_09",
-    "classId": "bench_class_3",
+    "id": "cbenchlisting09",
+    "classId": "cbenchclass3",
     "sourceId": "bench-listing-source-09",
     "title": "Shipping Clerk",
     "company": "Elk Fork Building Supply",
@@ -144,8 +144,8 @@
     "postedAt": "2026-08-01T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_10",
-    "classId": "bench_class_1",
+    "id": "cbenchlisting10",
+    "classId": "cbenchclass1",
     "sourceId": "bench-listing-source-10",
     "title": "Line Cook",
     "company": "Seneca Home Health",
@@ -160,8 +160,8 @@
     "postedAt": "2026-08-24T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_11",
-    "classId": "bench_class_2",
+    "id": "cbenchlisting11",
+    "classId": "cbenchclass2",
     "sourceId": "bench-listing-source-11",
     "title": "Maintenance Helper",
     "company": "Ridgeline Metal Works",
@@ -176,8 +176,8 @@
     "postedAt": "2026-08-27T12:00:00.000Z"
   },
   {
-    "id": "bench_listing_12",
-    "classId": "bench_class_3",
+    "id": "cbenchlisting12",
+    "classId": "cbenchclass3",
     "sourceId": "bench-listing-source-12",
     "title": "Quality Inspector",
     "company": "New River Care Home",

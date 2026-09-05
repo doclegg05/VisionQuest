@@ -42,7 +42,7 @@ import { CLUSTERS, PROGRAM_CLUSTERS } from "../../../scripts/bench/lib/cohort-vo
  * test prints on failure. Record in the benchmark baseline's `reason` that the
  * corpus moved, so the metric shifts that follow are not read as regressions.
  */
-const COHORT_CHECKSUM = "05442b36f7abc4ca0fad154a44c1d657141f7f42951a514c87a568e47e7b9349";
+const COHORT_CHECKSUM = "1bdc4940ccc5bb86d3a1496d6776e720c8a1a5f3cc0893a349e0cfbb81a2b42b";
 
 describe("the synthetic cohort fixture", () => {
   it("is stable across two loads and returns the identical cached object", () => {
@@ -96,7 +96,7 @@ describe("the synthetic cohort fixture", () => {
     assert.ok(!text.includes("@gmail."));
   });
 
-  it("prefixes every id with bench_, which is how the seed finds its own rows", () => {
+  it("prefixes every id with cbench, which is how the seed finds its own rows", () => {
     const cohort = loadCohort();
     const collections = [
       "instructors",
@@ -115,7 +115,7 @@ describe("the synthetic cohort fixture", () => {
 
     for (const name of collections) {
       for (const row of cohort[name] as Array<{ id: string }>) {
-        assert.ok(row.id.startsWith("bench_"), `${name}: ${row.id}`);
+        assert.ok(row.id.startsWith("cbench"), `${name}: ${row.id}`);
       }
     }
   });

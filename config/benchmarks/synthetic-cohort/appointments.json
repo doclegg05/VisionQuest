@@ -1,9 +1,9 @@
 [
   {
-    "id": "bench_appt_01",
-    "studentId": "bench_stu_11",
-    "advisorId": "bench_instr_1",
-    "connectionId": "bench_conn_11",
+    "id": "cbenchappt01",
+    "studentId": "cbenchstu11",
+    "advisorId": "cbenchinstr1",
+    "connectionId": "cbenchconn11",
     "kind": "interview",
     "scheduledAt": "2026-09-05T12:00:00.000Z",
     "durationMinutes": 45,
@@ -11,9 +11,9 @@
     "location": "Tygart Freight Lines"
   },
   {
-    "id": "bench_appt_02",
-    "studentId": "bench_stu_21",
-    "advisorId": "bench_instr_1",
+    "id": "cbenchappt02",
+    "studentId": "cbenchstu21",
+    "advisorId": "cbenchinstr1",
     "connectionId": null,
     "kind": "advising",
     "scheduledAt": "2026-09-06T12:00:00.000Z",
@@ -22,9 +22,9 @@
     "location": "Room 2"
   },
   {
-    "id": "bench_appt_03",
-    "studentId": "bench_stu_22",
-    "advisorId": "bench_instr_2",
+    "id": "cbenchappt03",
+    "studentId": "cbenchstu22",
+    "advisorId": "cbenchinstr2",
     "connectionId": null,
     "kind": "advising",
     "scheduledAt": "2026-09-05T12:00:00.000Z",
@@ -33,9 +33,9 @@
     "location": "Room 2"
   },
   {
-    "id": "bench_appt_04",
-    "studentId": "bench_stu_23",
-    "advisorId": "bench_instr_3",
+    "id": "cbenchappt04",
+    "studentId": "cbenchstu23",
+    "advisorId": "cbenchinstr3",
     "connectionId": null,
     "kind": "advising",
     "scheduledAt": "2026-09-06T12:00:00.000Z",
@@ -44,9 +44,9 @@
     "location": "Room 2"
   },
   {
-    "id": "bench_appt_05",
-    "studentId": "bench_stu_24",
-    "advisorId": "bench_instr_1",
+    "id": "cbenchappt05",
+    "studentId": "cbenchstu24",
+    "advisorId": "cbenchinstr1",
     "connectionId": null,
     "kind": "advising",
     "scheduledAt": "2026-09-06T12:00:00.000Z",

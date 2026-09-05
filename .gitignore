@@ -100,6 +100,16 @@ playwright-report/
 test-results/
 .playwright-mcp/
 
+# Benchmark run artifacts.
+#
+# `reports/benchmarks/raw/` holds what a run PRODUCED — the Playwright journey
+# writes its tap count and timings there, and a scorer reads them. Committing
+# them would put one machine's numbers in the repository as though they were the
+# repository's, which is what `reports/benchmarks/baseline.json` (committed, and
+# updated only through the runner with a stated reason) exists to be instead.
+reports/benchmarks/raw/
+.bench-outbox/
+
 # Local runtime workspaces (audit logs, uploads, scratch dirs)
 local_*/
 

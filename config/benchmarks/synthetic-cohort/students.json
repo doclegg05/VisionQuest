@@ -1,12 +1,12 @@
 [
   {
-    "id": "bench_stu_01",
+    "id": "cbenchstu01",
     "login": "bench-student-01",
     "displayName": "Alma Ashgrove",
     "firstName": "Alma",
     "lastName": "Ashgrove",
     "email": "bench-student-01@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-01",
     "topClusters": [
@@ -29,13 +29,13 @@
     "enrolledDaysAgo": 147
   },
   {
-    "id": "bench_stu_02",
+    "id": "cbenchstu02",
     "login": "bench-student-02",
     "displayName": "Bryce Bellweather",
     "firstName": "Bryce",
     "lastName": "Bellweather",
     "email": "bench-student-02@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-02",
     "topClusters": [
@@ -56,13 +56,13 @@
     "enrolledDaysAgo": 173
   },
   {
-    "id": "bench_stu_03",
+    "id": "cbenchstu03",
     "login": "bench-student-03",
     "displayName": "Corah Cardwell",
     "firstName": "Corah",
     "lastName": "Cardwell",
     "email": "bench-student-03@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-03",
     "topClusters": [
@@ -84,13 +84,13 @@
     "enrolledDaysAgo": 150
   },
   {
-    "id": "bench_stu_04",
+    "id": "cbenchstu04",
     "login": "bench-student-04",
     "displayName": "Dalen Denbrook",
     "firstName": "Dalen",
     "lastName": "Denbrook",
     "email": "bench-student-04@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-04",
     "topClusters": [
@@ -107,13 +107,13 @@
     "enrolledDaysAgo": 273
   },
   {
-    "id": "bench_stu_05",
+    "id": "cbenchstu05",
     "login": "bench-student-05",
     "displayName": "Efren Everly",
     "firstName": "Efren",
     "lastName": "Everly",
     "email": "bench-student-05@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-05",
     "topClusters": [
@@ -136,13 +136,13 @@
     "enrolledDaysAgo": 216
   },
   {
-    "id": "bench_stu_06",
+    "id": "cbenchstu06",
     "login": "bench-student-06",
     "displayName": "Fallon Fenmore",
     "firstName": "Fallon",
     "lastName": "Fenmore",
     "email": "bench-student-06@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-06",
     "topClusters": [
@@ -163,13 +163,13 @@
     "enrolledDaysAgo": 221
   },
   {
-    "id": "bench_stu_07",
+    "id": "cbenchstu07",
     "login": "bench-student-07",
     "displayName": "Garnet Galewood",
     "firstName": "Garnet",
     "lastName": "Galewood",
     "email": "bench-student-07@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-07",
     "topClusters": [
@@ -191,13 +191,13 @@
     "enrolledDaysAgo": 284
   },
   {
-    "id": "bench_stu_08",
+    "id": "cbenchstu08",
     "login": "bench-student-08",
     "displayName": "Halle Hartsell",
     "firstName": "Halle",
     "lastName": "Hartsell",
     "email": "bench-student-08@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-08",
     "topClusters": [
@@ -218,13 +218,13 @@
     "enrolledDaysAgo": 157
   },
   {
-    "id": "bench_stu_09",
+    "id": "cbenchstu09",
     "login": "bench-student-09",
     "displayName": "Ilene Inglewright",
     "firstName": "Ilene",
     "lastName": "Inglewright",
     "email": "bench-student-09@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-09",
     "topClusters": [
@@ -243,13 +243,13 @@
     "enrolledDaysAgo": 192
   },
   {
-    "id": "bench_stu_10",
+    "id": "cbenchstu10",
     "login": "bench-student-10",
     "displayName": "Jarrah Jarrowby",
     "firstName": "Jarrah",
     "lastName": "Jarrowby",
     "email": "bench-student-10@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-10",
     "topClusters": [
@@ -270,13 +270,13 @@
     "enrolledDaysAgo": 297
   },
   {
-    "id": "bench_stu_11",
+    "id": "cbenchstu11",
     "login": "bench-student-11",
     "displayName": "Kessa Kindler",
     "firstName": "Kessa",
     "lastName": "Kindler",
     "email": "bench-student-11@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-11",
     "topClusters": [
@@ -296,13 +296,13 @@
     "enrolledDaysAgo": 235
   },
   {
-    "id": "bench_stu_12",
+    "id": "cbenchstu12",
     "login": "bench-student-12",
     "displayName": "Loman Lindsell",
     "firstName": "Loman",
     "lastName": "Lindsell",
     "email": "bench-student-12@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-12",
     "topClusters": [
@@ -322,13 +322,13 @@
     "enrolledDaysAgo": 236
   },
   {
-    "id": "bench_stu_13",
+    "id": "cbenchstu13",
     "login": "bench-student-13",
     "displayName": "Maribel Marchbank",
     "firstName": "Maribel",
     "lastName": "Marchbank",
     "email": "bench-student-13@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-13",
     "topClusters": [
@@ -348,13 +348,13 @@
     "enrolledDaysAgo": 167
   },
   {
-    "id": "bench_stu_14",
+    "id": "cbenchstu14",
     "login": "bench-student-14",
     "displayName": "Norwood Northway",
     "firstName": "Norwood",
     "lastName": "Northway",
     "email": "bench-student-14@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-14",
     "topClusters": [
@@ -373,13 +373,13 @@
     "enrolledDaysAgo": 247
   },
   {
-    "id": "bench_stu_15",
+    "id": "cbenchstu15",
     "login": "bench-student-15",
     "displayName": "Ottilie Oakhaven",
     "firstName": "Ottilie",
     "lastName": "Oakhaven",
     "email": "bench-student-15@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-15",
     "topClusters": [
@@ -397,13 +397,13 @@
     "enrolledDaysAgo": 245
   },
   {
-    "id": "bench_stu_16",
+    "id": "cbenchstu16",
     "login": "bench-student-16",
     "displayName": "Prewitt Pinderly",
     "firstName": "Prewitt",
     "lastName": "Pinderly",
     "email": "bench-student-16@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-16",
     "topClusters": [
@@ -421,13 +421,13 @@
     "enrolledDaysAgo": 245
   },
   {
-    "id": "bench_stu_17",
+    "id": "cbenchstu17",
     "login": "bench-student-17",
     "displayName": "Quilla Quarry",
     "firstName": "Quilla",
     "lastName": "Quarry",
     "email": "bench-student-17@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-17",
     "topClusters": [
@@ -445,13 +445,13 @@
     "enrolledDaysAgo": 238
   },
   {
-    "id": "bench_stu_18",
+    "id": "cbenchstu18",
     "login": "bench-student-18",
     "displayName": "Rennick Ridgelow",
     "firstName": "Rennick",
     "lastName": "Ridgelow",
     "email": "bench-student-18@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-18",
     "topClusters": [
@@ -473,13 +473,13 @@
     "enrolledDaysAgo": 298
   },
   {
-    "id": "bench_stu_19",
+    "id": "cbenchstu19",
     "login": "bench-student-19",
     "displayName": "Sable Stonebrook",
     "firstName": "Sable",
     "lastName": "Stonebrook",
     "email": "bench-student-19@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-19",
     "topClusters": [
@@ -502,13 +502,13 @@
     "enrolledDaysAgo": 146
   },
   {
-    "id": "bench_stu_20",
+    "id": "cbenchstu20",
     "login": "bench-student-20",
     "displayName": "Tavish Thackery",
     "firstName": "Tavish",
     "lastName": "Thackery",
     "email": "bench-student-20@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-20",
     "topClusters": [
@@ -528,13 +528,13 @@
     "enrolledDaysAgo": 288
   },
   {
-    "id": "bench_stu_21",
+    "id": "cbenchstu21",
     "login": "bench-student-21",
     "displayName": "Ulmer Underhill",
     "firstName": "Ulmer",
     "lastName": "Underhill",
     "email": "bench-student-21@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-21",
     "topClusters": [
@@ -557,13 +557,13 @@
     "enrolledDaysAgo": 173
   },
   {
-    "id": "bench_stu_22",
+    "id": "cbenchstu22",
     "login": "bench-student-22",
     "displayName": "Verity Vellacourt",
     "firstName": "Verity",
     "lastName": "Vellacourt",
     "email": "bench-student-22@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-22",
     "topClusters": [
@@ -583,13 +583,13 @@
     "enrolledDaysAgo": 293
   },
   {
-    "id": "bench_stu_23",
+    "id": "cbenchstu23",
     "login": "bench-student-23",
     "displayName": "Wrenna Westmoor",
     "firstName": "Wrenna",
     "lastName": "Westmoor",
     "email": "bench-student-23@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-23",
     "topClusters": [
@@ -611,13 +611,13 @@
     "enrolledDaysAgo": 242
   },
   {
-    "id": "bench_stu_24",
+    "id": "cbenchstu24",
     "login": "bench-student-24",
     "displayName": "Xavia Yardley",
     "firstName": "Xavia",
     "lastName": "Yardley",
     "email": "bench-student-24@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-24",
     "topClusters": [
@@ -639,13 +639,13 @@
     "enrolledDaysAgo": 214
   },
   {
-    "id": "bench_stu_25",
+    "id": "cbenchstu25",
     "login": "bench-student-25",
     "displayName": "Yolen Ambry",
     "firstName": "Yolen",
     "lastName": "Ambry",
     "email": "bench-student-25@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-25",
     "topClusters": [
@@ -665,13 +665,13 @@
     "enrolledDaysAgo": 199
   },
   {
-    "id": "bench_stu_26",
+    "id": "cbenchstu26",
     "login": "bench-student-26",
     "displayName": "Zephra Brightwell",
     "firstName": "Zephra",
     "lastName": "Brightwell",
     "email": "bench-student-26@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-26",
     "topClusters": [
@@ -693,13 +693,13 @@
     "enrolledDaysAgo": 264
   },
   {
-    "id": "bench_stu_27",
+    "id": "cbenchstu27",
     "login": "bench-student-27",
     "displayName": "Arlo Coalfield",
     "firstName": "Arlo",
     "lastName": "Coalfield",
     "email": "bench-student-27@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-27",
     "topClusters": [
@@ -721,13 +721,13 @@
     "enrolledDaysAgo": 285
   },
   {
-    "id": "bench_stu_28",
+    "id": "cbenchstu28",
     "login": "bench-student-28",
     "displayName": "Brannon Dunmore",
     "firstName": "Brannon",
     "lastName": "Dunmore",
     "email": "bench-student-28@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-28",
     "topClusters": [
@@ -749,13 +749,13 @@
     "enrolledDaysAgo": 260
   },
   {
-    "id": "bench_stu_29",
+    "id": "cbenchstu29",
     "login": "bench-student-29",
     "displayName": "Cressa Elderbush",
     "firstName": "Cressa",
     "lastName": "Elderbush",
     "email": "bench-student-29@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-29",
     "topClusters": [
@@ -776,13 +776,13 @@
     "enrolledDaysAgo": 140
   },
   {
-    "id": "bench_stu_30",
+    "id": "cbenchstu30",
     "login": "bench-student-30",
     "displayName": "Dovie Foxglove",
     "firstName": "Dovie",
     "lastName": "Foxglove",
     "email": "bench-student-30@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-30",
     "topClusters": [
@@ -805,13 +805,13 @@
     "enrolledDaysAgo": 220
   },
   {
-    "id": "bench_stu_31",
+    "id": "cbenchstu31",
     "login": "bench-student-31",
     "displayName": "Emrys Grimsby",
     "firstName": "Emrys",
     "lastName": "Grimsby",
     "email": "bench-student-31@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-31",
     "topClusters": [
@@ -832,13 +832,13 @@
     "enrolledDaysAgo": 215
   },
   {
-    "id": "bench_stu_32",
+    "id": "cbenchstu32",
     "login": "bench-student-32",
     "displayName": "Farrow Havenhurst",
     "firstName": "Farrow",
     "lastName": "Havenhurst",
     "email": "bench-student-32@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-32",
     "topClusters": [
@@ -860,13 +860,13 @@
     "enrolledDaysAgo": 290
   },
   {
-    "id": "bench_stu_33",
+    "id": "cbenchstu33",
     "login": "bench-student-33",
     "displayName": "Gwenda Ironwood",
     "firstName": "Gwenda",
     "lastName": "Ironwood",
     "email": "bench-student-33@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-33",
     "topClusters": [
@@ -886,13 +886,13 @@
     "enrolledDaysAgo": 239
   },
   {
-    "id": "bench_stu_34",
+    "id": "cbenchstu34",
     "login": "bench-student-34",
     "displayName": "Hollis Junewell",
     "firstName": "Hollis",
     "lastName": "Junewell",
     "email": "bench-student-34@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-34",
     "topClusters": [
@@ -914,13 +914,13 @@
     "enrolledDaysAgo": 149
   },
   {
-    "id": "bench_stu_35",
+    "id": "cbenchstu35",
     "login": "bench-student-35",
     "displayName": "Isla Kellerman",
     "firstName": "Isla",
     "lastName": "Kellerman",
     "email": "bench-student-35@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-35",
     "topClusters": [
@@ -941,13 +941,13 @@
     "enrolledDaysAgo": 289
   },
   {
-    "id": "bench_stu_36",
+    "id": "cbenchstu36",
     "login": "bench-student-36",
     "displayName": "Jessup Lowecroft",
     "firstName": "Jessup",
     "lastName": "Lowecroft",
     "email": "bench-student-36@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-36",
     "topClusters": [
@@ -970,13 +970,13 @@
     "enrolledDaysAgo": 262
   },
   {
-    "id": "bench_stu_37",
+    "id": "cbenchstu37",
     "login": "bench-student-37",
     "displayName": "Kettle Merrowfield",
     "firstName": "Kettle",
     "lastName": "Merrowfield",
     "email": "bench-student-37@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-37",
     "topClusters": [
@@ -995,13 +995,13 @@
     "enrolledDaysAgo": 252
   },
   {
-    "id": "bench_stu_38",
+    "id": "cbenchstu38",
     "login": "bench-student-38",
     "displayName": "Lissette Nettleship",
     "firstName": "Lissette",
     "lastName": "Nettleship",
     "email": "bench-student-38@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-38",
     "topClusters": [
@@ -1021,13 +1021,13 @@
     "enrolledDaysAgo": 258
   },
   {
-    "id": "bench_stu_39",
+    "id": "cbenchstu39",
     "login": "bench-student-39",
     "displayName": "Marrow Ottersby",
     "firstName": "Marrow",
     "lastName": "Ottersby",
     "email": "bench-student-39@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-39",
     "topClusters": [
@@ -1048,13 +1048,13 @@
     "enrolledDaysAgo": 260
   },
   {
-    "id": "bench_stu_40",
+    "id": "cbenchstu40",
     "login": "bench-student-40",
     "displayName": "Nyla Pemberlow",
     "firstName": "Nyla",
     "lastName": "Pemberlow",
     "email": "bench-student-40@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-40",
     "topClusters": [
@@ -1075,13 +1075,13 @@
     "enrolledDaysAgo": 153
   },
   {
-    "id": "bench_stu_41",
+    "id": "cbenchstu41",
     "login": "bench-student-41",
     "displayName": "Ozias Quillon",
     "firstName": "Ozias",
     "lastName": "Quillon",
     "email": "bench-student-41@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-41",
     "topClusters": [
@@ -1101,13 +1101,13 @@
     "enrolledDaysAgo": 191
   },
   {
-    "id": "bench_stu_42",
+    "id": "cbenchstu42",
     "login": "bench-student-42",
     "displayName": "Petra Rushmoor",
     "firstName": "Petra",
     "lastName": "Rushmoor",
     "email": "bench-student-42@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-42",
     "topClusters": [
@@ -1127,13 +1127,13 @@
     "enrolledDaysAgo": 281
   },
   {
-    "id": "bench_stu_43",
+    "id": "cbenchstu43",
     "login": "bench-student-43",
     "displayName": "Quenby Saltmarsh",
     "firstName": "Quenby",
     "lastName": "Saltmarsh",
     "email": "bench-student-43@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-43",
     "topClusters": [
@@ -1155,13 +1155,13 @@
     "enrolledDaysAgo": 227
   },
   {
-    "id": "bench_stu_44",
+    "id": "cbenchstu44",
     "login": "bench-student-44",
     "displayName": "Rowan Trueblood",
     "firstName": "Rowan",
     "lastName": "Trueblood",
     "email": "bench-student-44@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-44",
     "topClusters": [
@@ -1180,13 +1180,13 @@
     "enrolledDaysAgo": 266
   },
   {
-    "id": "bench_stu_45",
+    "id": "cbenchstu45",
     "login": "bench-student-45",
     "displayName": "Selby Ulverton",
     "firstName": "Selby",
     "lastName": "Ulverton",
     "email": "bench-student-45@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-45",
     "topClusters": [
@@ -1210,13 +1210,13 @@
     "enrolledDaysAgo": 182
   },
   {
-    "id": "bench_stu_46",
+    "id": "cbenchstu46",
     "login": "bench-student-46",
     "displayName": "Truett Verrell",
     "firstName": "Truett",
     "lastName": "Verrell",
     "email": "bench-student-46@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-46",
     "topClusters": [
@@ -1238,13 +1238,13 @@
     "enrolledDaysAgo": 298
   },
   {
-    "id": "bench_stu_47",
+    "id": "cbenchstu47",
     "login": "bench-student-47",
     "displayName": "Ursa Winnowby",
     "firstName": "Ursa",
     "lastName": "Winnowby",
     "email": "bench-student-47@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-47",
     "topClusters": [
@@ -1265,13 +1265,13 @@
     "enrolledDaysAgo": 169
   },
   {
-    "id": "bench_stu_48",
+    "id": "cbenchstu48",
     "login": "bench-student-48",
     "displayName": "Vantry Yarborough",
     "firstName": "Vantry",
     "lastName": "Yarborough",
     "email": "bench-student-48@test.local",
-    "classId": "bench_class_3",
+    "classId": "cbenchclass3",
     "classRegion": "Cabell County, WV",
     "spokesId": "bench-student-48",
     "topClusters": [
@@ -1289,13 +1289,13 @@
     "enrolledDaysAgo": 240
   },
   {
-    "id": "bench_stu_49",
+    "id": "cbenchstu49",
     "login": "bench-student-49",
     "displayName": "Whitlock Applewhite",
     "firstName": "Whitlock",
     "lastName": "Applewhite",
     "email": "bench-student-49@test.local",
-    "classId": "bench_class_1",
+    "classId": "cbenchclass1",
     "classRegion": "Raleigh County, WV",
     "spokesId": "bench-student-49",
     "topClusters": [
@@ -1312,13 +1312,13 @@
     "enrolledDaysAgo": 129
   },
   {
-    "id": "bench_stu_50",
+    "id": "cbenchstu50",
     "login": "bench-student-50",
     "displayName": "Yarrow Bracknell",
     "firstName": "Yarrow",
     "lastName": "Bracknell",
     "email": "bench-student-50@test.local",
-    "classId": "bench_class_2",
+    "classId": "cbenchclass2",
     "classRegion": "Kanawha County, WV",
     "spokesId": "bench-student-50",
     "topClusters": [

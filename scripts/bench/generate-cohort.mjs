@@ -61,8 +61,21 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
 const OUT_DIR = path.join(REPO, "config", "benchmarks", "synthetic-cohort");
 
-/** Every generated id starts with this, so a seeded row is identifiable in any database. */
-export const BENCH_ID_PREFIX = "bench_";
+/**
+ * Every generated id starts with this, so a seeded row is identifiable in any
+ * database and `--reset` can find its own work.
+ *
+ * The SHAPE is not decoration, and it cost two rounds to get right. Several API
+ * routes validate their path and body ids with `z.string().cuid()`, so the ids
+ * have to satisfy it or the Connect journey spec cannot drive a single real
+ * request. A plain `bench_stu_01` is a 400 (no leading `c`), and — the part
+ * that is easy to get wrong — so is `cbench_stu_01`, because zod 4's cuid
+ * pattern admits no underscores. Hence `cbenchstu01`: readable, and accepted.
+ *
+ * Recorded because "the ids are readable" and "the ids are accepted" are both
+ * requirements, and only the first one is obvious from looking at a fixture.
+ */
+export const BENCH_ID_PREFIX = "cbench";
 
 /**
  * The cohort's "now".
@@ -153,9 +166,9 @@ const AVAILABILITY_SHAPES = {
 
 function buildStaff() {
   const instructors = [
-    { id: "bench_instr_1", login: "bench-instructor-1", displayName: "Marlow Denbrook" },
-    { id: "bench_instr_2", login: "bench-instructor-2", displayName: "Sela Hartsell" },
-    { id: "bench_instr_3", login: "bench-instructor-3", displayName: "Odell Ridgelow" },
+    { id: "cbenchinstr1", login: "bench-instructor-1", displayName: "Marlow Denbrook" },
+    { id: "cbenchinstr2", login: "bench-instructor-2", displayName: "Sela Hartsell" },
+    { id: "cbenchinstr3", login: "bench-instructor-3", displayName: "Odell Ridgelow" },
   ].map((instructor) => ({
     ...instructor,
     email: `${instructor.login}@test.local`,
@@ -163,9 +176,9 @@ function buildStaff() {
   }));
 
   const classes = [
-    { id: "bench_class_1", code: "bench-spokes-beckley", name: "Bench SPOKES Beckley", region: "Raleigh County, WV" },
-    { id: "bench_class_2", code: "bench-spokes-charleston", name: "Bench SPOKES Charleston", region: "Kanawha County, WV" },
-    { id: "bench_class_3", code: "bench-spokes-huntington", name: "Bench SPOKES Huntington", region: "Cabell County, WV" },
+    { id: "cbenchclass1", code: "bench-spokes-beckley", name: "Bench SPOKES Beckley", region: "Raleigh County, WV" },
+    { id: "cbenchclass2", code: "bench-spokes-charleston", name: "Bench SPOKES Charleston", region: "Kanawha County, WV" },
+    { id: "cbenchclass3", code: "bench-spokes-huntington", name: "Bench SPOKES Huntington", region: "Cabell County, WV" },
   ].map((entry, index) => ({
     ...entry,
     instructorId: instructors[index].id,
@@ -194,7 +207,7 @@ function buildStudents(classes) {
     const seq = String(index + 1).padStart(2, "0");
 
     students.push({
-      id: `bench_stu_${seq}`,
+      id: `cbenchstu${seq}`,
       login: `bench-student-${seq}`,
       displayName: `${first} ${last}`,
       firstName: first,
@@ -278,7 +291,7 @@ function buildEmployers() {
     const status = index === 10 ? "do_not_contact" : index === 11 ? "paused" : "active";
 
     return {
-      id: `bench_emp_${seq}`,
+      id: `cbenchemp${seq}`,
       name,
       nameKey: name.toLowerCase().replace(/\s+/gu, " ").trim(),
       legalName: `${name} LLC`,
@@ -306,7 +319,7 @@ function buildContacts(employers) {
     const seq = String(index + 1).padStart(2, "0");
 
     return {
-      id: `bench_contact_${seq}`,
+      id: `cbenchcontact${seq}`,
       employerId: employer.id,
       name: `${first} ${last}`,
       role: rng.pick(CONTACT_ROLES),
@@ -389,7 +402,7 @@ function buildLeads(employers, contacts, classes) {
     const distanceMiles = index % 3 === 2 ? rng.int(1, 30) : null;
 
     leads.push({
-      id: `bench_lead_${seq}`,
+      id: `cbenchlead${seq}`,
       employerId: employer.id,
       employerName: employer.name,
       employerStatus: employer.status,
@@ -419,7 +432,7 @@ function buildLeads(employers, contacts, classes) {
         PROGRAM_CLUSTERS[(index + 3) % PROGRAM_CLUSTERS.length],
       ],
       source,
-      sourceRef: source === "manual" ? null : `bench_src_${seq}`,
+      sourceRef: source === "manual" ? null : `cbenchsrc${seq}`,
       status,
       openings: rng.int(1, 3),
       postedAt: daysBefore(rng.int(2, 90)),
@@ -575,8 +588,8 @@ function buildConnections(students, leads, classes) {
     const stepDays = 4;
     const startDaysAgo = 10 + walk.path.length * stepDays;
     const events = walk.path.map((toStatus, step) => ({
-      id: `bench_conn_${seq}_ev_${String(step + 1).padStart(2, "0")}`,
-      connectionId: `bench_conn_${seq}`,
+      id: `cbenchconn${seq}ev${String(step + 1).padStart(2, "0")}`,
+      connectionId: `cbenchconn${seq}`,
       fromStatus: step === 0 ? null : walk.path[step - 1],
       toStatus,
       actorType: ACTOR_FOR_STATUS[toStatus],
@@ -605,7 +618,7 @@ function buildConnections(students, leads, classes) {
     const approved = walk.path.includes("student_approved");
 
     connections.push({
-      id: `bench_conn_${seq}`,
+      id: `cbenchconn${seq}`,
       key: walk.key,
       studentId: student.id,
       jobLeadId: lead.id,
@@ -641,13 +654,13 @@ function buildConnections(students, leads, classes) {
       events,
       packet: approved
         ? {
-            resumeVersionId: `bench_resume_${seq}`,
+            resumeVersionId: `cbenchresume${seq}`,
             coverLetterId: null,
             resumeFileUploadId: null,
             endorsement:
               `${student.firstName} came to every class on time and finished the work. ` +
               "They ask good questions.",
-            includedCertIds: student.verifiedCertIds.map((certId) => `bench_cert_${seq}_${certId}`),
+            includedCertIds: student.verifiedCertIds.map((certId) => `cbenchcert${seq}${certId.replace(/-/gu, "")}`),
             includedFields: packetFields,
             candidateName: `${student.firstName} ${student.lastName.charAt(0)}.`,
             certifications: [...student.verifiedCertIds],
@@ -714,7 +727,7 @@ function buildSpokesRecords(students, connections, classes) {
     }
 
     return {
-      id: `bench_spokes_${seq}`,
+      id: `cbenchspokes${seq}`,
       studentId: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
@@ -728,7 +741,7 @@ function buildSpokesRecords(students, connections, classes) {
       employerName: placement ? placement.employerName : null,
       hourlyWage: placement ? placement.hourlyWage : null,
       postSecondaryEnteredAt: !placement && rng.chance(0.08) ? dateBefore(rng.int(20, 120)) : null,
-      placementApplicationId: placement ? `bench_app_${placement.id.slice(-2)}` : null,
+      placementApplicationId: placement ? `cbenchapp${placement.id.slice(-2)}` : null,
       employmentFollowUps: followUps,
     };
   });
@@ -751,9 +764,9 @@ function buildApplications(students, connections) {
   for (const connection of connections.filter((entry) => entry.isPlacement)) {
     const suffix = connection.id.slice(-2);
     applications.push({
-      id: `bench_app_${suffix}`,
+      id: `cbenchapp${suffix}`,
       studentId: connection.studentId,
-      opportunityId: `bench_opp_${suffix}`,
+      opportunityId: `cbenchopp${suffix}`,
       connectionId: connection.id,
       jobLeadId: connection.jobLeadId,
       status: "accepted",
@@ -775,9 +788,9 @@ function buildApplications(students, connections) {
   selfDirected.forEach((entry, index) => {
     const seq = String(index + 1).padStart(2, "0");
     applications.push({
-      id: `bench_selfapp_${seq}`,
+      id: `cbenchselfapp${seq}`,
       studentId: entry.studentId,
-      opportunityId: `bench_selfopp_${seq}`,
+      opportunityId: `cbenchselfopp${seq}`,
       connectionId: null,
       jobLeadId: null,
       status: entry.status,
@@ -802,7 +815,7 @@ function buildJobListings(classes) {
     const place = WV_PLACES[index % WV_PLACES.length];
     const seq = String(index + 1).padStart(2, "0");
     return {
-      id: `bench_listing_${seq}`,
+      id: `cbenchlisting${seq}`,
       classId: classes[index % classes.length].id,
       sourceId: `bench-listing-source-${seq}`,
       title: JOB_TITLES[(index + 5) % JOB_TITLES.length],
@@ -832,7 +845,7 @@ function buildSavedJobs(students, listings) {
       seq += 1;
       const applied = rng.chance(0.35);
       saved.push({
-        id: `bench_saved_${String(seq).padStart(2, "0")}`,
+        id: `cbenchsaved${String(seq).padStart(2, "0")}`,
         studentId: student.id,
         jobListingId: listing.id,
         status: applied ? "applied" : "saved",
@@ -857,7 +870,7 @@ function buildAppointments(students, connections, classes) {
   const interview = connections.find((connection) => connection.key === "interview");
   if (interview) {
     appointments.push({
-      id: "bench_appt_01",
+      id: "cbenchappt01",
       studentId: interview.studentId,
       advisorId: classes[0].instructorId,
       connectionId: interview.id,
@@ -871,7 +884,7 @@ function buildAppointments(students, connections, classes) {
 
   students.slice(20, 24).forEach((student, index) => {
     appointments.push({
-      id: `bench_appt_${String(index + 2).padStart(2, "0")}`,
+      id: `cbenchappt${String(index + 2).padStart(2, "0")}`,
       studentId: student.id,
       advisorId: classes[index % classes.length].instructorId,
       connectionId: null,

@@ -53,8 +53,13 @@ Convenience indexes hang off the returned object as non-enumerable properties:
 
 ## Properties suites may rely on
 
-1. **Every id starts with `bench_`.** That prefix is how `seed-cohort.ts` finds
-   its own rows to delete, and how a stray row is identifiable in any database.
+1. **Every id starts with `cbench`** (`cbenchstu01`, `cbenchlead02`). That
+   prefix is how `seed-cohort.ts --reset` finds its own rows, and how a stray
+   row is identifiable in any database. The shape is load-bearing, not
+   cosmetic: several API routes validate ids with `z.string().cuid()`, and zod 4
+   accepts neither a missing leading `c` (`bench_stu_01`) nor an underscore
+   (`cbench_stu_01`). Either would be a 400 before any handler ran, and the
+   Connect journey spec could not drive a single real request.
 2. **Time is fixed.** `meta.epoch` is `2026-09-01T12:00:00Z` and every instant
    in the fixture is an offset from it. Nothing is relative to "today", so
    retention checkpoints, funnel medians and follow-up dates do not drift.
