@@ -73,6 +73,7 @@ export async function run(ctx) {
   );
   const { parseStoredResumeData } = await import("../../../src/lib/resume.ts");
   const { setPlainConfigValue } = await import("../../../src/lib/system-config.ts");
+  const { assertSafeE2eSeedTarget } = await import("../../../src/lib/e2e-seed-guard.ts");
   const EmployerConnectPage = (await import("../../../src/app/connect/[token]/page.tsx")).default;
 
   const cohort = loadCohort();
@@ -81,6 +82,17 @@ export async function run(ctx) {
   // The page refuses every token when Connect is off for the lead's class, and
   // would then render the neutral "no longer active" card for all twenty —
   // scanning nothing while reporting a clean sweep.
+  //
+  // `connect_enabled_classes` is a PROGRAM-WIDE row, so this write is not a
+  // fixture: opening Connect to "all" and leaving it that way would enable the
+  // feature for every real class as a side effect of measuring privacy. Guarded
+  // against a production-shaped target for the same reason the e2e helper is,
+  // and restored in the `finally` below.
+  assertSafeE2eSeedTarget(databaseUrl, { allowRemote: false });
+  const connectFlagBefore = await prisma.systemConfig.findUnique({
+    where: { key: "connect_enabled_classes" },
+    select: { value: true },
+  });
   await setPlainConfigValue(
     "connect_enabled_classes",
     "all",
@@ -206,6 +218,16 @@ export async function run(ctx) {
       scan("employer_page", connection.id, html);
     }
   } finally {
+    // Put the flag back exactly as it was, "did not exist" included.
+    if (connectFlagBefore) {
+      await setPlainConfigValue(
+        "connect_enabled_classes",
+        connectFlagBefore.value,
+        "packet-privacy benchmark (restore)",
+      );
+    } else {
+      await prisma.systemConfig.deleteMany({ where: { key: "connect_enabled_classes" } });
+    }
     await prisma.$disconnect();
   }
 

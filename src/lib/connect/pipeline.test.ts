@@ -1,7 +1,7 @@
 // =============================================================================
 // The Prisma half of the state machine.
 //
-// The fakes live in ./pipeline-fake-client.ts rather than here, because the
+// The fakes live in ./__fixtures__/pipeline-fake-client.ts rather than here, because the
 // `connection-walks` benchmark replays 500 random legal walks through the same
 // contract. A benchmark with its own private stub would keep reporting "zero
 // illegal transitions accepted" after the machine changed shape underneath it.
@@ -26,7 +26,7 @@ import { describe, it } from "node:test";
 import {
   createFakeConnectionClient,
   createTransactionalClient,
-} from "./pipeline-fake-client";
+} from "./__fixtures__/pipeline-fake-client";
 import {
   ConnectionConflictError,
   ConnectionNotFoundError,

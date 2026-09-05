@@ -15,8 +15,8 @@
 // posting doesn't say." for a missing fact, and a check that punished silence
 // would push it the other way.
 //
-//   wage         a dollar figure the posting never states (the original check,
-//                behaviour unchanged);
+//   wage         a dollar figure the posting never states, in numerals or
+//                spelled out;
 //   hours        an hours-per-week or per-day figure the posting never states;
 //   place        a "City, ST" the posting never names;
 //   requirement  a credential from a closed vocabulary that the posting never
@@ -26,6 +26,12 @@
 // grade-6 rewrite produces false refusals, and a false refusal costs a student
 // their explanation and tells them to go ask their instructor — the check has
 // to be one nobody has to argue with.
+//
+// EVERY PATTERN HERE READS ATTACKER-INFLUENCED TEXT. The posting arrives from a
+// third-party feed, so a super-linear pattern is a denial of service anybody
+// who can publish a job can trigger. Two were found and fixed that way (see
+// BARE_RATE and CITY_STATE); `explain-faithfulness.test.ts` pins their growth
+// across an 8x input increase, and `MAX_CHECKED_CHARS` bounds the rest.
 // =============================================================================
 
 /** What the checker was given to compare against. */
@@ -53,8 +59,8 @@ export interface FaithfulnessFinding {
 /**
  * Money in a draft or a posting, in the forms either actually uses:
  * "$15", "15 dollars", "USD 15", "15 usd". A check that understood only the
- * "$" form was bypassed by the model simply writing the number out, and
- * refused a correct explanation whenever the POSTING wrote it out instead.
+ * "$" form was bypassed by the model simply writing "15 dollars", and refused
+ * a correct explanation whenever the POSTING wrote it that way instead.
  */
 const MONEY_PATTERNS = [
   /\$\s?(\d[\d,]*(?:\.\d+)?)/gi,
@@ -63,11 +69,89 @@ const MONEY_PATTERNS = [
 ];
 
 /**
+ * The same figure written out in words: "twenty-five dollars an hour".
+ *
+ * Numerals alone left the check bypassable by spelling the number out, which is
+ * the shape an injected instruction would use precisely BECAUSE it reads as
+ * prose. Deliberately narrow in two ways: only cardinals up to "ninety-nine
+ * hundred", and only when a money word follows immediately. Without that second
+ * condition "you work with about twenty other people" becomes a wage, and a
+ * student loses a correct explanation over a sentence about their coworkers.
+ *
+ * Applied to BOTH sides, so a posting that spells its rate out grounds a draft
+ * that repeats it.
+ */
+const SMALL_WORD_NUMBERS: Readonly<Record<string, number>> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+};
+
+const TENS_WORD_NUMBERS: Readonly<Record<string, number>> = {
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+const SMALL_WORDS = Object.keys(SMALL_WORD_NUMBERS).join("|");
+const TENS_WORDS = Object.keys(TENS_WORD_NUMBERS).join("|");
+
+/** "twenty-five dollars", "sixteen bucks", "one hundred dollars". */
+const WORD_MONEY = new RegExp(
+  `\\b(?:(${TENS_WORDS})(?:[\\s-](${SMALL_WORDS}))?|(${SMALL_WORDS}))` +
+    `(\\s+hundred)?\\s+(?:dollars?|bucks?)\\b`,
+  "gi",
+);
+
+function wordMoneyValues(text: string): number[] {
+  const values: number[] = [];
+  for (const match of text.matchAll(WORD_MONEY)) {
+    const [, tens, tensUnit, small, hundred] = match;
+    let value = tens
+      ? TENS_WORD_NUMBERS[tens.toLowerCase()] + (tensUnit ? SMALL_WORD_NUMBERS[tensUnit.toLowerCase()] : 0)
+      : SMALL_WORD_NUMBERS[small.toLowerCase()];
+    if (hundred) value *= 100;
+    if (Number.isFinite(value)) values.push(value);
+  }
+  return values;
+}
+
+/**
  * Bare "15/hr" and "15 an hour" count as the posting stating a wage. Only
  * applied to the POSTING side: a draft has to name its unit, and treating any
  * bare number in a draft as money would flag "40 pounds".
+ *
+ * The unit words are `\b`-terminated rather than followed by `\s+`. The
+ * original had `per\s+` immediately followed by `\s*` -- two whitespace
+ * quantifiers competing for the same run of spaces -- which is quadratic: on
+ * "1 per " plus 10,000 spaces the `\s+` gives back one space at a time and the
+ * `\s*` re-consumes the rest each time. Measured at 86 ms for 10 KB and 8.5 s
+ * for 80 KB. This one reads a POSTING, i.e. third-party job-feed text of
+ * unbounded shape, so it was the reachable one. One quantifier, one pass.
  */
-const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\s+|an\s+|a\s+)\s*(?:hr|hour|h)\b/gi;
+export const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\b|an\b|a\b)\s*(?:hr|hour|h)\b/gi;
 
 /** Rounding a posted rate to whole dollars is not a fabrication. */
 const ROUNDING_TOLERANCE = 1;
@@ -95,12 +179,14 @@ export function ungroundedDollarValues(
   draft: string,
   job: { salary: string | null; description: string },
 ): number[] {
-  const source = `${job.salary ?? ""} ${job.description}`;
+  const source = clamp(`${job.salary ?? ""} ${job.description}`);
   const grounded = [
     ...numbersMatching(source, MONEY_PATTERNS),
     ...numbersMatching(source, [BARE_RATE]),
+    ...wordMoneyValues(source),
   ];
-  return numbersMatching(draft, MONEY_PATTERNS).filter(
+  const stated = [...numbersMatching(draft, MONEY_PATTERNS), ...wordMoneyValues(draft)];
+  return stated.filter(
     (value) => !grounded.some((posted) => Math.abs(posted - value) < ROUNDING_TOLERANCE),
   );
 }
@@ -163,14 +249,30 @@ function ungroundedHourValues(draft: string, source: string): number[] {
  * honest place for it is a fixture case somebody can point at, not a looser
  * pattern that produces refusals nobody can explain.
  */
-const CITY_STATE = /\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+)*),\s*([A-Z]{2})\b/gu;
+/**
+ * Bounded on purpose. The unbounded `(?:[ -][A-Z][a-z]+)*` was quadratic on
+ * capitalised prose with no comma after it -- "Aa " repeated measured 49 ms at
+ * 10 KB and 3 s at 80 KB -- because every start position walked the whole run
+ * of words before failing. No place name in this corpus is five words long,
+ * so `{0,4}` costs nothing real and makes the walk bounded.
+ */
+export const CITY_STATE = /\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,4}),[ \t]{0,3}([A-Z]{2})\b/gu;
+
+/** "Beckley,WV" and "Beckley,  WV" both compare as "beckley, wv". */
+function normalizePlace(text: string): string {
+  return text.toLowerCase().replace(/,\s*/gu, ", ");
+}
 
 function ungroundedPlaces(draft: string, source: string): string[] {
-  const normalized = source.toLowerCase();
+  // The CITY AND THE STATE, together. Comparing the city alone accepted
+  // "Beckley, VA" against a "Beckley, WV" posting -- the state was captured and
+  // then thrown away, so the one part of the address that decides whether a
+  // student can get there was unchecked.
+  const normalized = normalizePlace(source);
   const found: string[] = [];
   for (const match of draft.matchAll(CITY_STATE)) {
-    const [whole, city] = match;
-    if (!normalized.includes(city.toLowerCase())) found.push(whole);
+    const [whole, city, state] = match;
+    if (!normalized.includes(normalizePlace(`${city}, ${state}`))) found.push(whole);
   }
   return found;
 }
@@ -216,44 +318,81 @@ const NEGATION = /\b(?:no|not|don'?t|doesn'?t|without|never|isn'?t|aren'?t)\b/i;
 const NEGATION_WINDOW = 40;
 
 /**
- * The text between the start of the current sentence and `index`.
+ * The clause containing `index` -- from the start of its sentence to the end of
+ * it, minus the term itself.
  *
- * A fixed-width window was the first cut and it silently broke the check: the
- * five sections sit one per line and one of them is "Pay: The posting doesn't
- * say.", so a `CDL` invented in the NEXT section had "doesn't" forty characters
- * behind it and was read as a negation. A fabricated credential went
- * undetected because of a sentence about the pay.
+ * TWO fixes live here, and they pull in opposite directions, which is why both
+ * are pinned by tests.
  *
- * Clamping to the sentence — the last `.`, newline or `:` — makes the negation
- * belong to the clause it actually negates.
+ * A fixed-width window backwards was the first cut and it silently broke the
+ * check: the sections sit one per line and one of them is "Pay: The posting
+ * doesn't say.", so a CDL invented in the NEXT section had "doesn't" forty
+ * characters behind it and was read as a negation. Clamping to the last `.`,
+ * newline or `:` makes the negation belong to the clause it actually negates.
+ *
+ * Looking only BACKWARDS was the second bug: "A CDL is not required." puts the
+ * negation after the term, and refusing that sentence trains the model out of
+ * the most reassuring thing this tool can say to a student worried about a card
+ * they do not have. So the clause after the term is read too, clamped the same
+ * way.
  */
-function clauseBefore(haystack: string, index: number): string {
-  const boundary = Math.max(
+function clauseAround(haystack: string, index: number, length: number): string {
+  const startBoundary = Math.max(
     haystack.lastIndexOf(".", index - 1),
     haystack.lastIndexOf("\n", index - 1),
     haystack.lastIndexOf(":", index - 1),
   );
-  return haystack.slice(Math.max(boundary + 1, index - NEGATION_WINDOW), index);
+  const before = haystack.slice(Math.max(startBoundary + 1, index - NEGATION_WINDOW), index);
+
+  const after = index + length;
+  const endCandidates = [
+    haystack.indexOf(".", after),
+    haystack.indexOf("\n", after),
+    haystack.indexOf(":", after),
+  ].filter((at) => at !== -1);
+  const endBoundary = endCandidates.length ? Math.min(...endCandidates) : haystack.length;
+
+  return `${before} ${haystack.slice(after, Math.min(endBoundary, after + NEGATION_WINDOW))}`;
 }
 
+/** `\b`-anchored so the alias is a word, with an optional plural. */
+function aliasPattern(alias: string): RegExp {
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`\\b${escaped}s?\\b`, "gi");
+}
+
+const CREDENTIAL_PATTERNS: ReadonlyArray<ReadonlyArray<{ alias: string; pattern: RegExp }>> =
+  CREDENTIAL_VOCABULARY.map((aliases) =>
+    aliases.map((alias) => ({ alias, pattern: aliasPattern(alias) })),
+  );
+
 function ungroundedRequirements(draft: string, source: string): string[] {
-  const haystack = draft.toLowerCase();
-  const grounded = source.toLowerCase();
   const found: string[] = [];
 
-  for (const aliases of CREDENTIAL_VOCABULARY) {
-    if (aliases.some((alias) => grounded.includes(alias))) continue;
+  for (const aliases of CREDENTIAL_PATTERNS) {
+    // WORD BOUNDARIES, on both sides. A plain substring search read "ged" out
+    // of "changed", "managed", "encouraged" -- which broke the check in BOTH
+    // directions at once from one bug: a true draft saying "your schedule can
+    // be changed" was refused, and a posting saying "you will be managed by a
+    // shift lead" GROUNDED a fabricated GED, so the exact thing this check
+    // exists to catch went through.
+    if (aliases.some(({ pattern }) => new RegExp(pattern.source, "iu").test(source))) continue;
 
-    for (const alias of aliases) {
-      let index = haystack.indexOf(alias);
-      while (index !== -1) {
-        if (!NEGATION.test(clauseBefore(haystack, index))) {
-          found.push(alias);
+    for (const { alias, pattern } of aliases) {
+      pattern.lastIndex = 0;
+      let match = pattern.exec(draft);
+      let stated = false;
+      while (match) {
+        if (!NEGATION.test(clauseAround(draft, match.index, match[0].length))) {
+          stated = true;
           break;
         }
-        index = haystack.indexOf(alias, index + alias.length);
+        match = pattern.exec(draft);
       }
-      if (found.includes(alias)) break;
+      if (stated) {
+        found.push(alias);
+        break;
+      }
     }
   }
 
@@ -264,15 +403,38 @@ function ungroundedRequirements(draft: string, source: string): string[] {
 // The check
 // ---------------------------------------------------------------------------
 
+/**
+ * How much of either side these checks will read.
+ *
+ * Defense in depth, not the fix. The two super-linear patterns are fixed where
+ * they live; this is the bound that keeps the NEXT one from mattering. A job
+ * description arrives from a third-party feed and nothing upstream limits its
+ * length, so an unbounded scan is an unbounded amount of work triggerable by
+ * whoever writes the posting.
+ *
+ * 20,000 characters is roughly ten times the longest description in the
+ * benchmark corpus. Truncating the SOURCE can only make the check STRICTER --
+ * a wage stated past the cut stops grounding a draft that repeats it, so the
+ * draft is refused rather than passed. That is the safe direction, and it is
+ * why the cap is not a hole.
+ */
+export const MAX_CHECKED_CHARS = 20_000;
+
+function clamp(text: string): string {
+  return text.length > MAX_CHECKED_CHARS ? text.slice(0, MAX_CHECKED_CHARS) : text;
+}
+
 function postingText(job: ExplainPosting): string {
-  return [
-    job.title ?? "",
-    job.company ?? "",
-    job.location ?? "",
-    job.salary ?? "",
-    job.employmentType ?? "",
-    job.description,
-  ].join("\n");
+  return clamp(
+    [
+      job.title ?? "",
+      job.company ?? "",
+      job.location ?? "",
+      job.salary ?? "",
+      job.employmentType ?? "",
+      job.description,
+    ].join("\n"),
+  );
 }
 
 /**
@@ -288,18 +450,19 @@ export function checkExplanationFaithfulness(
   job: ExplainPosting,
 ): FaithfulnessFinding[] {
   const source = postingText(job);
+  const checked = clamp(draft);
   const findings: FaithfulnessFinding[] = [];
 
-  for (const value of ungroundedDollarValues(draft, job)) {
+  for (const value of ungroundedDollarValues(checked, job)) {
     findings.push({ kind: "wage", detail: `$${value}` });
   }
-  for (const value of ungroundedHourValues(draft, source)) {
+  for (const value of ungroundedHourValues(checked, source)) {
     findings.push({ kind: "hours", detail: `${value} hours` });
   }
-  for (const place of ungroundedPlaces(draft, source)) {
+  for (const place of ungroundedPlaces(checked, source)) {
     findings.push({ kind: "place", detail: place });
   }
-  for (const credential of ungroundedRequirements(draft, source)) {
+  for (const credential of ungroundedRequirements(checked, source)) {
     findings.push({ kind: "requirement", detail: credential });
   }
 

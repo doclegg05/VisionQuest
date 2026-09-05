@@ -1,0 +1,163 @@
+{
+  "suite": "matching-quality",
+  "tier": "gate",
+  "startedAt": "2026-09-05T16:19:00.990Z",
+  "durationMs": 245,
+  "commit": "b700d71",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.7,
+    "node": "v22.22.2",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "precision_at_3",
+      "value": 0.9167,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 50,
+      "floor": 0.8,
+      "tolerance": 0.03,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "studentsSkipped": 0,
+        "skipped": [],
+        "worstStudents": [
+          {
+            "studentId": "cbenchstu17",
+            "precision": 0.5,
+            "misses": [
+              {
+                "leadId": "cbenchlead05",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              },
+              {
+                "leadId": "cbenchlead29",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu06",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead12",
+                "label": "stretch",
+                "why": "cannot cover any one of the shifts it offers"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu12",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead01",
+                "label": "stretch",
+                "why": "cannot cover any one of the shifts it offers"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu16",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead25",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu18",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead06",
+                "label": "stretch",
+                "why": "cannot cover any one of the shifts it offers"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu22",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead25",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu27",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead13",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu30",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead01",
+                "label": "stretch",
+                "why": "cannot cover any one of the shifts it offers"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu32",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead01",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              }
+            ]
+          },
+          {
+            "studentId": "cbenchstu34",
+            "precision": 0.667,
+            "misses": [
+              {
+                "leadId": "cbenchlead25",
+                "label": "stretch",
+                "why": "not the kind of work they picked"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ndcg_at_5",
+      "value": 0.9682,
+      "unit": "ratio",
+      "reason": "Informational beside precision@3. NDCG rewards a `stretch` placed above a `block` and is sensitive to the whole top-5 ordering, which makes it a good trend line and a poor gate: a floor on it would fail runs where the top three were exactly right and the fourth and fifth swapped.",
+      "direction": "higher",
+      "n": 50,
+      "floor": null,
+      "tolerance": 0.03,
+      "baseline": null,
+      "status": "info"
+    }
+  ],
+  "status": "pass"
+}

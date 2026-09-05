@@ -344,26 +344,19 @@ async function main(): Promise<void> {
     // "pick a time to meet" list from AdvisorAvailability, so without these the
     // page tells every employer "There are no open times right now" and the
     // interview-booking half of the Connect journey cannot be exercised at all.
-    // Monday to Friday, 9 to 12, in 30-minute slots.
-    for (const instructor of cohort.instructors) {
-      for (const weekday of [1, 2, 3, 4, 5]) {
-        const id = `cbenchavail${(instructor.id as string).slice(-1)}${weekday}`;
-        const data = {
-          advisorId: instructor.id as string,
-          weekday,
-          startMinutes: 9 * 60,
-          endMinutes: 12 * 60,
-          slotMinutes: 30,
-          locationType: "in_person",
-          locationLabel: "Room 2",
-          active: true,
-        };
-        await prisma.advisorAvailability.upsert({
-          where: { id },
-          update: data,
-          create: { id, ...data },
-        });
-      }
+    //
+    // The windows come from the committed fixture rather than a loop here, so
+    // the generator can assert that no seeded appointment falls inside one --
+    // a scheduled appointment inside a bookable window would let the journey
+    // book a slot that collides with a seeded row on the partial unique index
+    // `Appointment_advisorId_startsAt_scheduled_key`.
+    for (const block of cohort.advisorAvailability) {
+      const { id, ...data } = block;
+      await prisma.advisorAvailability.upsert({
+        where: { id: id as string },
+        update: data as never,
+        create: block as never,
+      });
     }
 
     for (const student of cohort.students) {

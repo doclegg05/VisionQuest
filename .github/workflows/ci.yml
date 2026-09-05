@@ -105,11 +105,13 @@ jobs:
 
       - name: Validate benchmark suites
         # The five-part check on every config/benchmarks/*.json: config parses,
-        # scorer exists and exports run(ctx), declared fixture exists, metrics
-        # carry unit/direction, gate- and nightly-tier metrics carry a floor or
-        # "exact", tier and requires come from the contract vocabulary, and a
-        # local-model suite records its host. Filesystem-only — it never
-        # imports a scorer. See docs/runbooks/benchmarks.md.
+        # scorer exists and exports run(ctx), declared fixture exists and stays
+        # inside the checkout, every metric carries a unit and — whenever it
+        # declares a numeric floor — an explicit direction, gate- and
+        # nightly-tier metrics carry a floor, "exact", or a documented
+        # "floor": null plus a reason, tier and requires come from the contract
+        # vocabulary, and a local-model suite records its host. Filesystem-only
+        # — it never imports a scorer. See docs/runbooks/benchmarks.md.
         run: npm run bench:validate
 
       - name: Benchmark runner unit tests

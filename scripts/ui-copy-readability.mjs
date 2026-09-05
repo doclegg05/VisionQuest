@@ -125,6 +125,14 @@ const SCAN_ROOTS = [
   // interpolated by the settings component, so scanning the component alone
   // would find none of the words a student actually reads.
   { label: "SMS + consent copy data (src/lib carve-out)", relPath: "src/lib/nudges/sms-policy-shared.ts" },
+  // Added with the benchmark dashboard (2026-09-05). The audience is the
+  // program owner, who does not write code: the whole point of the page is
+  // that a number's standing can be read without a glossary, so its copy
+  // belongs under the same gate as the student surfaces. Both halves are
+  // listed because the words live in the label module and the page renders
+  // them.
+  { label: "benchmark dashboard copy", relPath: "src/components/teacher/benchmarks" },
+  { label: "benchmark dashboard page", relPath: "src/app/(teacher)/teacher/admin/benchmarks" },
 ];
 
 // ---------------------------------------------------------------------------
