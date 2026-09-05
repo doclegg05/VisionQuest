@@ -35,6 +35,10 @@ This plan exists so that every phase can be built in parallel against one contra
 - `tier`: `gate` (runs on every PR, fails on floor breach) · `watch` (runs on every PR, reports only) · `nightly` (scheduled) · `manual`.
 - `requires`: any of `postgres`, `cohort`, `gemini`, `ollama`, `browser`, `prod-readonly`, `server`. The runner checks env (`DATABASE_URL`, `GEMINI_API_KEY`, `OLLAMA_HOST`, `PLAYWRIGHT`, `BENCH_PROD_READONLY_URL`, `BENCH_BASE_URL`) and marks a suite `skipped` when unmet.
 - `unit`: `ratio` (0–1) · `percent` (0–100) · `count` · `ms` · `grade` · `seconds`. `direction` says which way is better. `floor` is the gate value in the metric's own direction (for `lower`, the metric must be ≤ floor). `tolerance` is the absolute drop from baseline that opens a watch. `"exact": true` means value must equal baseline.
+- **`direction` is REQUIRED on any metric that declares a numeric `floor`**, `exact` or not — `bench:validate` rejects the config otherwise. A floor of `0` is a minimum under `higher` and a ceiling under `lower`, and the runner defaults to `higher` when direction is absent, so a ceiling metric without one would pass at any value. Direction may be omitted only on an `"exact": true` metric with no floor (there is nothing to read a direction against), and on the documented floorless case below.
+- A `gate`- or `nightly`-tier metric may go without a floor **only** as an explicit `"floor": null` plus a non-empty `"reason"` string; `bench:validate` accepts that as an owner-documented `info` metric. A missing `floor` key with no reason stays an error.
+- `displayUnit` (optional, free string such as `"usd"`) is carried through to the result and the dashboard untouched; `unit` keeps the contract enum, because that is what every reader formats a value by.
+- Status is decided floor-first for every metric — floor, then the `exact`-vs-baseline rule, then tolerance — so a floored metric can fail before any baseline exists. An `exact` metric whose floor is met with no baseline recorded yet is `pass`, not `info`.
 
 ### Scorer module — `scripts/bench/suites/<suite>.mjs`
 ```js
@@ -67,7 +71,7 @@ Updated only via `npm run bench -- --suite=<s> --update-baseline --reason="…"`
 ### CLI
 - `npm run bench -- --suite=<name> [--compare] [--update-baseline --reason=…]`
 - `npm run bench -- --tier=gate --compare` (all gate suites whose `requires` are met)
-- `npm run bench:validate` — every suite has all five parts (config, scorer file exists and exports `run`, fixture exists, every metric has `unit`/`direction`, gate/nightly metrics have a `floor` or `exact`, `tier` valid); local-model suites require a recorded host. Wired into `pipelines:validate` (extend-only).
+- `npm run bench:validate` — every suite has all five parts (config, scorer file exists and exports `run`, declared fixture exists and resolves inside the checkout, every metric has `unit` and — whenever it declares a numeric `floor` — an explicit `direction`, gate/nightly metrics have a `floor`, `exact`, or a documented `"floor": null` + `reason`, `tier` and `requires` from the contract vocabulary); local-model suites require a recorded host. Wired into `pipelines:validate` (extend-only).
 - Exit codes: 0 pass/watch/skipped · 1 any `fail` (with `--compare`) · 2 config error.
 
 ### Workflows

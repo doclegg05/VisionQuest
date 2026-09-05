@@ -250,7 +250,7 @@ test("a metric without a unit, or with an unknown one, is a config error", () =>
   }
 });
 
-test("direction is required unless the metric is exact", () => {
+test("direction is required unless the metric is exact AND floorless", () => {
   const root = makeRepo();
   try {
     const missing = validateSuiteConfig(
@@ -258,11 +258,69 @@ test("direction is required unless the metric is exact", () => {
       { path: "config/benchmarks/demo.json", repoRoot: root }
     );
     assert.ok(missing.errors.some((e) => /direction/i.test(e)), missing.errors.join("; "));
+    // An exact metric with no floor has nothing to read a direction against.
     const exact = validateSuiteConfig(
-      { ...validConfig, metrics: [{ id: "a", unit: "count", exact: true }] },
+      { ...validConfig, tier: "watch", metrics: [{ id: "a", unit: "count", exact: true }] },
       { path: "config/benchmarks/demo.json", repoRoot: root }
     );
     assert.deepEqual(exact.errors, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a numeric floor always requires an explicit direction, exact or not", () => {
+  // A floor of 0 is unreadable on its own: is 40 comfortably above a minimum,
+  // or far past a ceiling? The runner defaults to `higher` when direction is
+  // absent, so a missing direction on a ceiling metric passes silently at any
+  // value — the same class of bug as the exact-branch floor skip, one layer up.
+  const root = makeRepo();
+  try {
+    for (const metric of [
+      { id: "illegal_accepted", unit: "count", floor: 0, exact: true, tolerance: 0 },
+      { id: "blocks_fired", unit: "ratio", floor: 1, exact: true },
+      { id: "p95_ms", unit: "ms", floor: 500 },
+    ]) {
+      const { errors } = validateSuiteConfig(
+        { ...validConfig, metrics: [metric] },
+        { path: "config/benchmarks/demo.json", repoRoot: root }
+      );
+      assert.ok(
+        errors.some((e) => /direction/i.test(e) && /floor/i.test(e)),
+        `${metric.id}: ${errors.join("; ")}`
+      );
+    }
+
+    // Declared explicitly: accepted, both ways.
+    for (const direction of ["higher", "lower"]) {
+      const { errors } = validateSuiteConfig(
+        {
+          ...validConfig,
+          metrics: [{ id: "a", unit: "count", floor: 0, direction, exact: true }],
+        },
+        { path: "config/benchmarks/demo.json", repoRoot: root }
+      );
+      assert.deepEqual(errors, [], direction);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an explicit floorless \"floor\": null does not itself demand a direction", () => {
+  // The owner-documented info case: nothing is being judged, so there is no
+  // direction to read it in.
+  const root = makeRepo();
+  try {
+    const { errors } = validateSuiteConfig(
+      {
+        ...validConfig,
+        tier: "watch",
+        metrics: [{ id: "a", unit: "count", floor: null, exact: true }],
+      },
+      { path: "config/benchmarks/demo.json", repoRoot: root }
+    );
+    assert.deepEqual(errors, []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
