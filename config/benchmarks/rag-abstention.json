@@ -8,7 +8,13 @@
   "requires": ["prod-readonly"],
   "metrics": [
     { "id": "false_abstain_rate", "unit": "ratio", "direction": "lower", "floor": 0.05, "tolerance": 0.02 },
-    { "id": "offtopic_abstain_rate", "unit": "ratio", "direction": "higher" }
+    {
+      "id": "offtopic_abstain_rate",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": null,
+      "reason": "reported per the design table (§4.3: 'abstain rate on off-topic reported') deliberately without a floor — a distance-based gate cannot separate every off-topic lure from a legitimate near-miss without costing false-abstain recall (see scripts/sage-rag-calibrate-abstention.mjs's own overlap-uncatchable accounting), so this is a trend signal, not a pass/fail one"
+    }
   ],
   "notes": "Reuses scripts/sage-rag-harness.mjs UNMODIFIED (same subprocess pattern as rag-retrieval) over config/sage-rag-eval.json (20 in-corpus cases with expectedStorageKeys, 9 expectNoContext off-topic cases) instead of scripts/sage-rag-calibrate-abstention.mjs, because that script deliberately DISABLES the abstention gate (SAGE_RAG_ABSTAIN_DISTANCE forced to 2) to observe raw distances for tuning the floor — it cannot report the gate's actual false-abstain behavior. getDocumentContext() (what the harness calls, and what production calls) already applies the REAL configured SAGE_RAG_ABSTAIN_DISTANCE, so `hasContext=false` on an in-corpus case is a true false-abstain, and `expectNoContext` cases with `matchedDocuments.length===0` (the harness's own `noAnswerOk` field) are correct abstentions. requires=prod-readonly for the same reason as rag-retrieval (see its notes) — no committed command seeds an embedded corpus in the hermetic CI Postgres."
 }

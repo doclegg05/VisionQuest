@@ -8,7 +8,13 @@
   "requires": ["gemini"],
   "metrics": [
     { "id": "p95_ms", "unit": "ms", "direction": "lower", "floor": 6000, "tolerance": 500 },
-    { "id": "p50_ms", "unit": "ms", "direction": "lower" }
+    {
+      "id": "p50_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": null,
+      "reason": "informational alongside the gated p95_ms — config/sage-slo.json only publishes a p95 bar for sage_chat.gemini, and p50 exists purely for trend/debugging context"
+    }
   ],
   "notes": "Replays the first 20 cases' `message` field from config/sage-chat-eval.json through the SAME production chat-path call the chat harness uses for its readability/memory families — `provider.generateResponse(systemPrompt, [{role:'user',content:message}], undefined, {temperature})` on a real GeminiProvider from scripts/lib/sage-eval-provider.mjs (resolveEvalProvider), with the system prompt built by the REAL buildSystemPrompt() from src/lib/sage/system-prompts.ts (production code, not copied). Runs in-process (resolveEvalProvider has no import-time side effects, unlike sage-chat-harness.mjs itself, which runs its CLI main() unconditionally on import and so cannot be imported as a library). The p95_ms floor of 6000ms is read at run time from config/sage-slo.json's perProviderP95Ms.sage_chat.gemini bar, never hard-coded, per the task instruction — if that file's bar changes, this suite's effective floor moves with it (the config's own `floor` value here is a snapshot for bench:validate's static checks and should be kept in sync manually until the runner supports reading external floors)."
 }

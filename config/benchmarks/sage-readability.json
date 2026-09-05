@@ -8,7 +8,13 @@
   "requires": ["gemini"],
   "metrics": [
     { "id": "pass_rate", "unit": "ratio", "direction": "higher", "floor": 1.0, "tolerance": 0 },
-    { "id": "median_grade", "unit": "grade", "direction": "lower" }
+    {
+      "id": "median_grade",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": null,
+      "reason": "informational alongside the gated pass_rate — each case already asserts its own maxGrade via assessReadability(), so median_grade is a distribution stat over only 3 cases today, not an independent gate"
+    }
   ],
   "notes": "Promotes the existing `readability` family of scripts/sage-chat-harness.mjs (3 cases today, each asserting a per-case maxGrade via assessReadability()) to a gated numeric metric. Spawned unmodified via `--families=readability --provider=gemini`. pass_rate floor 1.0 mirrors the existing UI-copy readability gate's zero-tolerance posture; median_grade is informational (no floor) since it is a distribution stat over only 3 cases today."
 }
