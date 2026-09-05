@@ -84,8 +84,10 @@ export default async function EmployerConnectPage({
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <section className="page-hero">
           <p className="page-eyebrow">SPOKES</p>
+          {/* The employer is named so a contact who handles hiring for more
+              than one site knows immediately which opening this is about. */}
           <h1 className="page-title">
-            {view.packet.candidateName} for your {view.jobTitle} job
+            {view.packet.candidateName} for your {view.jobTitle} job at {view.employerName}
           </h1>
           <p className="page-subtitle">
             {view.instructorName} sent you this. {view.packet.candidateName} said it was OK to

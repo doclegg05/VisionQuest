@@ -1432,5 +1432,276 @@ if (!SHOULD_RUN) {
         assert.equal(alert.count, 0, "StudentAlert");
       });
     });
+
+    describe("Connection / ConnectionEvent / OutboundMessage (Match & Connect Phase 4)", () => {
+      // A Connection is the object that causes a student's information to
+      // leave the program, so these cases guard the four specific loosenings
+      // that would matter: letting a student read someone else's connection;
+      // letting a student drive a status other than student_approved or
+      // withdrawn; letting the append-only event log be edited; and letting a
+      // student read OutboundMessage, which names the employer contact.
+      let employerId = "";
+      let leadId = "";
+      let connectionA = "";
+      let connectionC = "";
+      let eventA = "";
+
+      before(async () => {
+        const employer = await db.employer.create({
+          data: {
+            name: `RLS Connect Employer ${fixtures.suffix}`,
+            nameKey: `rls connect employer ${fixtures.suffix}`,
+            county: "Raleigh",
+            city: "Beckley",
+          },
+        });
+        employerId = employer.id;
+
+        const lead = await db.jobLead.create({
+          data: {
+            employerId,
+            title: "Production Associate",
+            location: "Beckley, WV",
+            source: "manual",
+            status: "open",
+          },
+        });
+        leadId = lead.id;
+
+        const [a, c] = await Promise.all([
+          db.connection.create({
+            data: {
+              studentId: fixtures.studentA,
+              jobLeadId: leadId,
+              employerId,
+              proposedById: fixtures.teacher,
+              proposedVia: "teacher",
+              status: "proposed",
+            },
+          }),
+          // Student C belongs to Teacher B's class, so this row is the
+          // cross-teacher and cross-student control.
+          db.connection.create({
+            data: {
+              studentId: fixtures.studentC,
+              jobLeadId: leadId,
+              employerId,
+              proposedById: fixtures.teacherB,
+              proposedVia: "teacher",
+              status: "sent",
+            },
+          }),
+        ]);
+        connectionA = a.id;
+        connectionC = c.id;
+
+        const event = await db.connectionEvent.create({
+          data: {
+            connectionId: connectionA,
+            fromStatus: null,
+            toStatus: "proposed",
+            actorType: "teacher",
+            actorId: fixtures.teacher,
+          },
+        });
+        eventA = event.id;
+
+        await db.outboundMessage.create({
+          data: {
+            channel: "email",
+            toKind: "employer_contact",
+            toId: "contact-rls-test",
+            templateKey: "connect.employer_packet",
+            body: "packet email body",
+            connectionId: connectionC,
+          },
+        });
+      });
+
+      after(async () => {
+        // Connection and ConnectionEvent cascade from Employer through JobLead.
+        await db.outboundMessage.deleteMany({ where: { connectionId: { in: [connectionA, connectionC] } } });
+        await db.employer.deleteMany({ where: { id: employerId } });
+      });
+
+      it("a student reads their OWN connection and nobody else's", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.findMany({
+            where: { id: { in: [connectionA, connectionC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(rows.map((row) => row.id), [connectionA]);
+      });
+
+      it("a teacher reads connections for students they manage, and no others", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.connection.findMany({
+            where: { id: { in: [connectionA, connectionC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(
+          rows.map((row) => row.id),
+          [connectionA],
+          "connection_read must keep its managed_student_ids() gate",
+        );
+      });
+
+      it("a student may move their OWN proposal to student_approved", async () => {
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({
+            where: { id: connectionA },
+            data: { status: "student_approved" },
+          }),
+        );
+        assert.equal(updated.count, 1);
+        // Put it back for the cases below.
+        await db.connection.update({
+          where: { id: connectionA },
+          data: { status: "proposed" },
+        });
+      });
+
+      it("a student may withdraw their own connection", async () => {
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({ where: { id: connectionA }, data: { status: "withdrawn" } }),
+        );
+        assert.equal(updated.count, 1);
+        await db.connection.update({ where: { id: connectionA }, data: { status: "proposed" } });
+      });
+
+      it("a student may NOT drive any other status — sent, hired, viewed, not_now", async () => {
+        for (const status of ["sent", "hired", "viewed", "not_now", "interested"]) {
+          const updated = await asRole("student", fixtures.studentA, (tx) =>
+            tx.connection.updateMany({ where: { id: connectionA }, data: { status } }),
+          );
+          assert.equal(
+            updated.count,
+            0,
+            `connection_update's WITH CHECK must refuse a student writing "${status}"`,
+          );
+        }
+      });
+
+      it("a student cannot touch another student's connection at all", async () => {
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({ where: { id: connectionC }, data: { status: "withdrawn" } }),
+        );
+        assert.equal(updated.count, 0);
+      });
+
+      it("a student may insert their OWN proposal, and only in 'proposed'", async () => {
+        // The bounded student branch that makes propose_connection possible
+        // without an admin bypass. Uses studentB, who has no row on this lead.
+        const created = await asRole("student", fixtures.studentB, (tx) =>
+          tx.connection.create({
+            data: {
+              studentId: fixtures.studentB,
+              jobLeadId: leadId,
+              employerId,
+              proposedById: fixtures.studentB,
+              proposedVia: "sage",
+              status: "proposed",
+            },
+            select: { id: true },
+          }),
+        );
+        assert.ok(created.id);
+        await db.connection.delete({ where: { id: created.id } });
+
+        // Any other starting status is refused, so a student cannot insert a
+        // row that is already approved (or already sent).
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentB, (tx) =>
+              tx.connection.create({
+                data: {
+                  studentId: fixtures.studentB,
+                  jobLeadId: leadId,
+                  employerId,
+                  proposedById: fixtures.studentB,
+                  proposedVia: "sage",
+                  status: "student_approved",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a student cannot insert a connection for someone else", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentB, (tx) =>
+              tx.connection.create({
+                data: {
+                  studentId: fixtures.studentA,
+                  jobLeadId: leadId,
+                  employerId,
+                  proposedById: fixtures.studentB,
+                  proposedVia: "sage",
+                  status: "proposed",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("ConnectionEvent is APPEND-ONLY: no update and no delete, for anyone", async () => {
+        // No UPDATE or DELETE policy exists, so with RLS enabled every such
+        // statement matches zero rows — including for an admin session.
+        for (const role of ["student", "teacher", "admin"] as const) {
+          const actor =
+            role === "student"
+              ? fixtures.studentA
+              : role === "teacher"
+                ? fixtures.teacher
+                : fixtures.admin;
+          const updated = await asRole(role, actor, (tx) =>
+            tx.connectionEvent.updateMany({ where: { id: eventA }, data: { note: "rewritten" } }),
+          );
+          assert.equal(updated.count, 0, `${role} was able to edit the audit trail`);
+
+          const deleted = await asRole(role, actor, (tx) =>
+            tx.connectionEvent.deleteMany({ where: { id: eventA } }),
+          );
+          assert.equal(deleted.count, 0, `${role} was able to delete an audit row`);
+        }
+      });
+
+      it("a student reads the events on their own connection", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connectionEvent.findMany({ where: { id: eventA }, select: { id: true } }),
+        );
+        assert.deepEqual(rows.map((row) => row.id), [eventA]);
+      });
+
+      it("a student reads NO OutboundMessage rows — that log names the employer contact", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.outboundMessage.findMany({ select: { id: true } }),
+        );
+        assert.deepEqual(rows, [], "OutboundMessage is staff-read only");
+      });
+
+      it("a teacher reads OutboundMessage rows", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.outboundMessage.findMany({ select: { id: true } }),
+        );
+        assert.ok(rows.length > 0);
+      });
+
+      it("returns zero rows for all three tables with no RLS context", async () => {
+        const [connections, events, messages] = await Promise.all([
+          asRole(null, null, (tx) => tx.connection.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.connectionEvent.findMany({ select: { id: true } })),
+          asRole(null, null, (tx) => tx.outboundMessage.findMany({ select: { id: true } })),
+        ]);
+        assert.deepEqual(connections, [], "Connection must be empty with no context");
+        assert.deepEqual(events, [], "ConnectionEvent must be empty with no context");
+        assert.deepEqual(messages, [], "OutboundMessage must be empty with no context");
+      });
+    });
   });
 }

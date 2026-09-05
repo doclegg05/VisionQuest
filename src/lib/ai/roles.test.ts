@@ -44,6 +44,7 @@ const ALL_TASKS: AiTask[] = [
   "resume_extract",
   "tailor_application",
   "explain_job",
+  "draft_endorsement",
   "public_form_lookup",
   "public_program_help",
   "chat_file_gist",
