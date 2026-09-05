@@ -56,6 +56,10 @@ mock.module("@/lib/db", {
       programDocument: { findMany: mockProgramDocumentFindMany },
       opportunity: { findMany: mockOpportunityFindMany },
       careerEvent: { findMany: mockCareerEventFindMany },
+      // Match & Connect Phase 2: the route reads the student's work profile
+      // through getWorkProfile(). Null here — the panel's own tests cover the
+      // populated case.
+      studentWorkProfile: { findUnique: async () => null },
     },
   },
 });

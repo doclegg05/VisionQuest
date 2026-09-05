@@ -90,6 +90,7 @@ model Student {
   wagers                  Wager[]
   careerCampaigns         CareerCampaign[]
   failedExtractions       FailedExtraction[]
+  workProfile             StudentWorkProfile?
 
   @@schema("visionquest")
 }
@@ -583,6 +584,35 @@ model CoverLetter {
 
   @@unique([studentId, jobListingId, version])
   @@index([jobListingId])
+  @@schema("visionquest")
+}
+
+/// The student's own answers about when and where they can actually work.
+/// One row per student, student-owned (RLS: the student plus their
+/// instructors). Collected by Sage's five-question intake or the "Work
+/// availability" form in Settings; see src/lib/connect/work-profile.ts.
+///
+/// `transport` is nullable on purpose: null means "has not answered", which
+/// transportFeasible() reads as "unknown" rather than the hard block "none"
+/// would be. `availability` is the 7-day x 4-slot grid; an all-false grid is
+/// the create default and means "not answered yet" too.
+model StudentWorkProfile {
+  studentId         String    @id
+  availability      Json
+  transport         String?
+  homeZip           String?
+  county            String?
+  maxCommuteMinutes Int?
+  payFloorHourly    Float?
+  childcareHours    Json?
+  earliestStart     DateTime?
+  shiftLimits       Json?
+  updatedAt         DateTime  @updatedAt
+  /// "student" | "sage" | "teacher" — who last wrote the row.
+  updatedVia        String    @default("student")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
   @@schema("visionquest")
 }
 

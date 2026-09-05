@@ -44,6 +44,17 @@ describe("SettingsView role split", () => {
     assert.ok(student.includes("files you hand to Sage in chat"));
   });
 
+  it("shows the Work availability form to students only", () => {
+    // Staff have no work profile of their own — /api/work-profile refuses
+    // them — so rendering the form for staff would promise a save that 403s.
+    const student = renderToString(<SettingsView initialRole="student" />);
+    assert.ok(student.includes("Work availability"));
+    assert.ok(student.includes("How do you get to work?"));
+
+    const staff = renderToString(<SettingsView initialRole="teacher" />);
+    assert.ok(!staff.includes("Work availability"));
+  });
+
   it("defaults to the student-safe render when no role is supplied", () => {
     // The (student) route renders <SettingsView /> with no prop — the session
     // fetch resolves the role after mount, exactly as before the extraction.

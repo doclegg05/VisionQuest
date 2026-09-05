@@ -6,6 +6,7 @@ import StaffMfaPanel from "@/components/auth/StaffMfaPanel";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 import { ConsentSection } from "@/components/settings/ConsentSection";
+import { WorkAvailabilitySection } from "@/components/settings/WorkAvailabilitySection";
 
 const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
 
@@ -311,6 +312,11 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           </div>
         </div>
       )}
+
+      {/* Match & Connect Phase 2: the form fallback for Sage's five-question
+          work intake. Student-only — staff have no work profile of their own,
+          and /api/work-profile refuses them. */}
+      {sessionRole !== "teacher" && sessionRole !== "admin" && <WorkAvailabilitySection />}
 
       {sessionRole !== "teacher" && sessionRole !== "admin" && (
       <div className="surface-section mb-6 p-6">

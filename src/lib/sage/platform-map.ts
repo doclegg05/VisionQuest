@@ -204,9 +204,12 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "generate_cover_letter",
       "update_application_status",
       "tailor_application",
+      "update_work_profile",
+      "search_jobs",
+      "explain_job",
     ],
     mechanics:
-      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved.",
+      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved. update_work_profile saves the student's own answers about working — the days and times they can work, how they get there, the pay they need, the soonest they can start, and their kids' hours. Ask one question at a time, in plain words, and save only what they actually said. The same answers can be typed on the Work availability form in Settings, and their instructor can see them. search_jobs returns at most three real postings from this student's own class board, ranked, each with a short reason; it leaves out jobs that pay under the floor they set or that they have no way to get to, and it says how many it left out and why. explain_job puts one posting into plain words in a fixed layout — what you'd do, hours, pay, must-haves, how you'd get there — and says \"The posting doesn't say.\" for anything the posting leaves out. Never name a job either tool did not return.",
   },
   {
     id: "chat",

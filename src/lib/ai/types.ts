@@ -166,6 +166,7 @@ export type AiTask =
   | "resume_assist"
   | "resume_extract"
   | "tailor_application"
+  | "explain_job"
   | "public_form_lookup"
   | "public_program_help"
   | "chat_file_gist";

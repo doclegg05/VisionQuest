@@ -10,6 +10,7 @@ import {
   WORKFORCE_WV_BADGE,
   isWorkForceWvPosting,
 } from "@/lib/job-board/wv-employer";
+import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -220,6 +221,16 @@ export function JobCard({
         <p className="mt-2 text-xs leading-snug text-[var(--text-secondary)]">
           {MACC_APPLY_HINT}
         </p>
+      )}
+
+      {/* Read the posting's own facts out loud — title, employer, place, pay.
+          Hidden where the browser has no speech synthesis. */}
+      {!compact && (
+        <div className="mt-2">
+          <ReadAloudButton
+            text={`${title} at ${company}. ${location}.${salary ? ` Pay: ${salary}.` : ""}`}
+          />
+        </div>
       )}
 
       {!compact && visibleReasons.length > 0 && (
