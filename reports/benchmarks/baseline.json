@@ -51,30 +51,39 @@
   "form-ranking": {
     "top1": {
       "value": 0.9166666666666666,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:56:16.039Z",
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.693Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     },
     "top3": {
       "value": 1,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:56:16.039Z",
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.693Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     },
     "forbidden_hits": {
       "value": 0,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:56:16.039Z",
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.693Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "off_mode_cases": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.693Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     }
   },
   "hard-blocks": {
@@ -126,6 +135,138 @@
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
       "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+    }
+  },
+  "nudge-attribution": {
+    "misattributed_replies": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:57.920Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "second_question_opened": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:57.920Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "direct_followup_writes": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:57.920Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "stop_revocations_incomplete": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:57.920Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "cases_checked": {
+      "value": 52,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:57.920Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    }
+  },
+  "nudge-consent": {
+    "ineligible_selected": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:51.986Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "eligible_missed": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:51.986Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "shared_phone_questions_sent": {
+      "value": 50,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:51.986Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "decisions_evaluated": {
+      "value": 550,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:51.986Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    }
+  },
+  "nudge-quiet-hours": {
+    "outside_window_sends": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:52.747Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "cap_violations": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:52.747Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "deferral_outside_window": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:52.747Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "deferral_not_in_future": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:52.747Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "ticks_evaluated": {
+      "value": 35040,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:52.747Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     }
   },
   "orientation-readiness": {
@@ -224,6 +365,44 @@
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
       "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+    }
+  },
+  "report-parity": {
+    "parity_violations": {
+      "value": 0,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.528Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "grant_kpi_placements": {
+      "value": 6,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.528Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "dohs_export_placed_rows": {
+      "value": 6,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.528Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
+    },
+    "funnel_hired_or_beyond": {
+      "value": 6,
+      "commit": "220e541",
+      "measuredAt": "2026-09-05T19:12:58.528Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     }
   },
   "rls-coverage": {
