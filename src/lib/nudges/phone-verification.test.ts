@@ -22,6 +22,7 @@ const state = {
   smsCalls: [] as Array<{ to: string; body: string }>,
   smsResult: true,
   rateLimitOk: true,
+  rateLimitDegraded: false,
   otherStudentMatch: null as { id: string } | null,
 };
 
@@ -55,7 +56,7 @@ mock.module("@/lib/rate-limit", {
       success: state.rateLimitOk,
       remaining: 2,
       resetTime: 0,
-      degraded: false,
+      degraded: state.rateLimitDegraded,
     }),
   },
 });
@@ -87,6 +88,7 @@ beforeEach(() => {
   state.smsCalls = [];
   state.smsResult = true;
   state.rateLimitOk = true;
+  state.rateLimitDegraded = false;
   state.otherStudentMatch = null;
 });
 
@@ -100,7 +102,7 @@ describe("sending the code", () => {
     const code = state.smsCalls[0].body.match(/code is (\d{6})/)?.[1];
     assert.ok(code, `no code in: ${state.smsCalls[0].body}`);
     const stored = state.updates[0];
-    assert.equal(stored.smsVerifyCodeHash, verification.hashVerifyCode(code));
+    assert.equal(stored.smsVerifyCodeHash, verification.hashVerifyCode(code, STUDENT));
     assert.notEqual(stored.smsVerifyCodeHash, code, "the code itself is never stored");
     assert.equal(
       (stored.smsVerifyExpiresAt as Date).getTime() - NOW.getTime(),
@@ -125,11 +127,34 @@ describe("sending the code", () => {
     assert.equal(state.smsCalls.length, 0);
   });
 
+  it("refuses when the limiter is DEGRADED, even though it said success", async () => {
+    // A paid send to a third party's handset, with an obvious alternative
+    // (try again in a minute). The login path admits a degraded limiter
+    // because locking a shared classroom out is worse; here an unbounded send
+    // is the failure that gets the program's number reported.
+    state.rateLimitDegraded = true;
+    assert.deepEqual(await verification.sendVerificationCode({ studentId: STUDENT, now: NOW }), {
+      ok: false,
+      reason: "rate_limited",
+    });
+    assert.equal(state.smsCalls.length, 0);
+  });
+
   it("stores nothing when the text did not go out", async () => {
     state.smsResult = false;
     const result = await verification.sendVerificationCode({ studentId: STUDENT, now: NOW });
     assert.deepEqual(result, { ok: false, reason: "not_delivered" });
     assert.equal(state.updates.length, 0);
+  });
+
+  it("salts the stored hash with the student id", () => {
+    // Unsalted, a million sha256s cover the whole code space, so any leaked
+    // hash — a backup, a query log — is the live code. Binding it to the
+    // account also stops a hash lifted from one row being replayed at another.
+    const mine = verification.hashVerifyCode("123456", STUDENT);
+    const theirs = verification.hashVerifyCode("123456", "stu_2");
+    assert.notEqual(mine, theirs, "the same code must not hash alike for two students");
+    assert.equal(mine, verification.hashVerifyCode("123456", STUDENT), "and it is deterministic");
   });
 
   it("keeps the message inside one segment and names SPOKES", () => {
@@ -146,7 +171,7 @@ describe("confirming the code", () => {
       id: "pref_1",
       destination: PHONE,
       smsConsentAt: null,
-      smsVerifyCodeHash: verification.hashVerifyCode(code),
+      smsVerifyCodeHash: verification.hashVerifyCode(code, STUDENT),
       smsVerifyExpiresAt: new Date(NOW.getTime() + expiresInMs),
     };
   }
@@ -186,6 +211,26 @@ describe("confirming the code", () => {
       now: NOW,
     });
     assert.deepEqual(result, { ok: false, reason: "expired" });
+    assert.equal(state.updates.length, 0);
+  });
+
+  it("refuses a code that was issued for a different student", async () => {
+    // The pending hash is the other student's. Salting is what makes this a
+    // mismatch rather than a match: unsalted, one live code would confirm on
+    // any account it was replayed into.
+    state.pref = {
+      id: "pref_1",
+      destination: PHONE,
+      smsConsentAt: null,
+      smsVerifyCodeHash: verification.hashVerifyCode("123456", "stu_other"),
+      smsVerifyExpiresAt: new Date(NOW.getTime() + verification.VERIFY_CODE_TTL_MS),
+    };
+    const result = await verification.confirmVerificationCode({
+      studentId: STUDENT,
+      code: "123456",
+      now: NOW,
+    });
+    assert.deepEqual(result, { ok: false, reason: "wrong_code" });
     assert.equal(state.updates.length, 0);
   });
 

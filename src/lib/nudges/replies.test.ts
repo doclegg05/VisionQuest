@@ -164,11 +164,13 @@ import { NUDGE_ALERT_TYPES, replyToken } from "./schedule-shared";
 
 let handleInboundSms: typeof import("./replies").handleInboundSms;
 let REPLY_WINDOW_MS: typeof import("./replies").REPLY_WINDOW_MS;
+let normalizedPhone: typeof import("./replies").normalizedPhone;
 
 before(async () => {
   const mod = await import("./replies");
   handleInboundSms = mod.handleInboundSms;
   REPLY_WINDOW_MS = mod.REPLY_WINDOW_MS;
+  normalizedPhone = mod.normalizedPhone;
 });
 
 const PHONE = "+13045550123";
@@ -543,5 +545,30 @@ describe("phone number matching", () => {
   it("never logs the number it was called with", async () => {
     const seen = prismaAdmin.notificationPreference.findMany.mock.calls.at(-1);
     assert.ok(seen, "the lookup ran");
+  });
+
+  describe("normalizedPhone", () => {
+    // The settings page asks "is this a NEW number?" before clearing a
+    // confirmed consent. A raw string comparison answers yes to a re-typed
+    // identical number, and the student is sent round the code flow again for
+    // nothing.
+    it("collapses the forms one handset can be typed in", () => {
+      const canonical = normalizedPhone("3045550123");
+      assert.equal(canonical, "3045550123");
+      for (const written of ["+13045550123", "13045550123", "+1 304 555 0123", "(304) 555-0123"]) {
+        assert.equal(normalizedPhone(written), canonical, `${written} is the same number`);
+      }
+    });
+
+    it("still tells two different numbers apart", () => {
+      assert.notEqual(normalizedPhone("+13045550123"), normalizedPhone("+13045550124"));
+    });
+
+    it("returns null for absent or digitless input, so it never equals a real number", () => {
+      assert.equal(normalizedPhone(null), null);
+      assert.equal(normalizedPhone(undefined), null);
+      assert.equal(normalizedPhone(""), null);
+      assert.equal(normalizedPhone("not a phone"), null);
+    });
   });
 });

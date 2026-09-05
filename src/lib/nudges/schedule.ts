@@ -41,6 +41,7 @@ import { adminClientIsPrivileged } from "./admin-guard";
 import { resolveNudgeAlerts, upsertNudgeAlert } from "./alerts";
 import { studentsWithOpenQuestions } from "./replies";
 import { sendPolicySms } from "./sms-policy";
+import { ADVISORY_LOCK_CLASS } from "./sms-policy-shared";
 import {
   EMPLOYER_NO_RESPONSE_DAYS,
   NUDGE_ALERT_TYPES,
@@ -88,6 +89,8 @@ const LIVE_STATUSES: ConnectionStatus[] = [
 const MAX_CONNECTIONS = 500;
 const MAX_SAVED_JOBS = 500;
 const MAX_WEEKLY_STUDENTS = 200;
+/** Enrollment rows fetched per student before the roster is capped. */
+const MAX_ENROLLMENTS_PER_STUDENT = 4;
 
 /** Concurrent per-student lead rankings. See mapWithConcurrency below. */
 const WEEKLY_RANK_CONCURRENCY = 4;
@@ -495,58 +498,77 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
   const body = () => runNudgesBody({ now, dryRun, result, connectScope, smsScope, weeklySlot });
   if (dryRun) return body();
 
-  if (!(await tryRunLock(RUN_LOCK_KEY))) {
-    result.skipped = "already running";
-    logger.warn("nudges_run_lock_contended", { lockKey: RUN_LOCK_KEY });
-    return result;
-  }
-  try {
-    return await body();
-  } finally {
-    await releaseRunLock(RUN_LOCK_KEY);
-  }
+  return runUnderRunLock(result, body);
 }
 
 const RUN_LOCK_KEY = "connect-nudges";
 
 /**
- * The advisory lock that keeps one sweep at a time.
+ * How long one transaction may hold the run lock.
  *
- * SESSION-level, so it survives the many queries a run makes — which also
- * means it is bound to whichever pooled backend answered, and the release has
- * to reach that same backend. `releaseRunLock` therefore checks the result and
- * shouts when it did not land: a leaked lock would make every later run report
- * `already running` and silently stop the feature, which is a worse failure
- * than the race it prevents. The runbook carries the query to inspect and
- * clear one.
+ * The sweep itself is bounded by the cron entry's four-minute
+ * `timeout_milliseconds`, so this matches it: a transaction that outlives the
+ * request that started it is holding a connection nothing is waiting on.
+ * `maxWait` is short on purpose — if no pooled connection is free within five
+ * seconds, the honest answer is "not this hour", not a queue.
  */
-async function tryRunLock(key: string): Promise<boolean> {
-  try {
-    const rows = await prismaAdmin.$queryRaw<Array<{ locked: boolean }>>`
-      SELECT pg_try_advisory_lock(hashtext(${key})) AS locked
-    `;
-    return rows[0]?.locked === true;
-  } catch (error) {
-    // A database that cannot answer this cannot run the sweep either; let the
-    // route's own catch report it rather than sweeping unserialized.
-    logger.error("nudges_run_lock_failed", { lockKey: key, error: String(error) });
-    return false;
-  }
-}
+const RUN_LOCK_TIMEOUT_MS = 240_000;
+const RUN_LOCK_MAX_WAIT_MS = 5_000;
 
-async function releaseRunLock(key: string): Promise<void> {
+/**
+ * One sweep at a time, on a TRANSACTION-scoped advisory lock.
+ *
+ * This was `pg_try_advisory_lock` + a later `pg_advisory_unlock`, and that is
+ * unusable through a pooler. A session-scoped lock belongs to the backend that
+ * took it, while the unlock is a separate query the pool is free to route
+ * somewhere else — and the sweep's very first statement is a `Promise.all`, so
+ * something concurrent has always run in between. Measured against a real
+ * Postgres: run 1 leaked the lock and runs 2-10 all reported "already
+ * running". The feature stopped, quietly, and a dry run still looked healthy
+ * because it takes no lock at all.
+ *
+ * `pg_try_advisory_xact_lock` cannot leak: the lock is released by COMMIT or
+ * ROLLBACK on the connection that holds it, so there is no unlock statement to
+ * lose. The cost is that this pins one pooled connection for the length of the
+ * run, which is the trade we want — the sweep is once an hour and bounded.
+ *
+ * `body()` deliberately does NOT take `tx`: its queries run on `prismaAdmin`
+ * as before, on their own connections. The lock only has to be HELD for the
+ * duration, not used, and routing the sweep's dozens of queries through one
+ * interactive transaction would serialise reads that have no reason to be.
+ */
+async function runUnderRunLock(
+  result: NudgeRunResult,
+  body: () => Promise<NudgeRunResult>,
+): Promise<NudgeRunResult> {
+  // Separates "the lock could not be taken" (skip quietly, as before) from "the
+  // sweep itself threw" (the route's own catch reports it). Without the flag a
+  // failure deep inside the run would be reported as a lock problem.
+  let bodyStarted = false;
   try {
-    const rows = await prismaAdmin.$queryRaw<Array<{ released: boolean }>>`
-      SELECT pg_advisory_unlock(hashtext(${key})) AS released
-    `;
-    if (rows[0]?.released !== true) {
-      logger.error("nudges_run_lock_not_released", {
-        lockKey: key,
-        hint: "the unlock reached a different pooled backend; see docs/runbooks/connect-nudges.md",
-      });
-    }
+    return await prismaAdmin.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<Array<{ locked: boolean }>>`
+          SELECT pg_try_advisory_xact_lock(${ADVISORY_LOCK_CLASS.nudgeRun}, hashtext(${RUN_LOCK_KEY})) AS locked
+        `;
+        if (rows[0]?.locked !== true) {
+          result.skipped = "already running";
+          logger.warn("nudges_run_lock_contended", { lockKey: RUN_LOCK_KEY });
+          return result;
+        }
+        bodyStarted = true;
+        return await body();
+      },
+      { timeout: RUN_LOCK_TIMEOUT_MS, maxWait: RUN_LOCK_MAX_WAIT_MS },
+    );
   } catch (error) {
-    logger.error("nudges_run_lock_release_failed", { lockKey: key, error: String(error) });
+    if (bodyStarted) throw error;
+    // A database that cannot open this transaction cannot run the sweep
+    // either; skipping is the same answer as losing the lock race, and the log
+    // line is what tells them apart.
+    logger.error("nudges_run_lock_failed", { lockKey: RUN_LOCK_KEY, error: String(error) });
+    result.skipped = "run lock unavailable";
+    return result;
   }
 }
 
@@ -749,14 +771,31 @@ async function planWeeklyJobsNudges(
     // of the roster and nobody notices which end.
     orderBy: [{ studentId: "asc" }, { classId: "asc" }],
     select: { studentId: true, classId: true },
+    // The in-memory ceiling below bounds how many STUDENTS the run plans for;
+    // this bounds how many ROWS come back to build it from. Without it a
+    // program-wide roster is fetched in full every hour to be thrown away
+    // after the first 200 students. Four rows per student is generous — a
+    // student is enrolled in one class, occasionally two.
+    take: MAX_WEEKLY_STUDENTS * MAX_ENROLLMENTS_PER_STUDENT,
   });
 
   const classesByStudent = new Map<string, string[]>();
   for (const row of enrollments) {
-    const list = classesByStudent.get(row.studentId) ?? [];
-    list.push(row.classId);
-    classesByStudent.set(row.studentId, list);
-    if (classesByStudent.size >= MAX_WEEKLY_STUDENTS && !classesByStudent.has(row.studentId)) break;
+    const existing = classesByStudent.get(row.studentId);
+    if (existing) {
+      // Another class for a student already inside the ceiling; never widens
+      // the roster, so it is always allowed.
+      existing.push(row.classId);
+      continue;
+    }
+    // The ceiling only bites on a student the map has not seen. It used to be
+    // checked AFTER the insert, so `.has()` was true by construction and the
+    // break was unreachable — the ceiling existed only in the `.slice()`
+    // below, after every student had already been ranked. Ordered by
+    // studentId, so which students make the cut is deterministic rather than a
+    // property of the query plan.
+    if (classesByStudent.size >= MAX_WEEKLY_STUDENTS) break;
+    classesByStudent.set(row.studentId, [row.classId]);
   }
 
   // One weekly text per week, whatever else happens. The Monday-10:00 gate

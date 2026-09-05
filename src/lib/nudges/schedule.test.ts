@@ -26,6 +26,17 @@ const state = {
   rankedFits: [] as any[],
   adminPrivileged: true,
   lockAvailable: true,
+  /** Every SQL statement the run lock issued, in order. */
+  lockSql: [] as string[],
+  /** Every statement issued on the CLIENT (outside a transaction). */
+  clientRawSql: [] as string[],
+  /** The options each $transaction call was given. */
+  txOptions: [] as Array<Record<string, unknown> | undefined>,
+  /** Set while the lock transaction is open, so a second run can contend. */
+  lockHeld: false,
+  /** The `take` the enrollment query asked for, and the roster it was asked about. */
+  enrollmentTake: undefined as number | undefined,
+  weeklyDedupeIds: [] as string[],
 };
 
 const prismaAdmin = {
@@ -45,6 +56,9 @@ const prismaAdmin = {
      * mean something against a where clause that is honoured.
      */
     findMany: mock.fn(async ({ where }: any) => {
+      if (where.templateKey === "weekly_jobs" && where.toId?.in) {
+        state.weeklyDedupeIds = where.toId.in as string[];
+      }
       return state.outbound.filter((row) => {
         if (where.status && row.status !== where.status) return false;
         if (where.templateKey?.in && !where.templateKey.in.includes(row.templateKey)) return false;
@@ -69,11 +83,49 @@ const prismaAdmin = {
     }),
   },
   studentSavedJob: { findMany: mock.fn(async () => state.savedJobs) },
-  studentClassEnrollment: { findMany: mock.fn(async () => state.enrollments) },
+  studentClassEnrollment: {
+    // Honours `take`, because the ceiling under test IS the take: a mock that
+    // returned the whole roster regardless would make the query's bound
+    // untestable and the test would pass with the bound removed.
+    findMany: mock.fn(async ({ take }: { take?: number }) => {
+      state.enrollmentTake = take;
+      return typeof take === "number" ? state.enrollments.slice(0, take) : state.enrollments;
+    }),
+  },
   jobLead: { findMany: mock.fn(async () => state.leads) },
-  // Only the advisory-lock statements reach here; the F63 probe is mocked at
-  // its own module below so the two cannot be confused for each other.
-  $queryRaw: mock.fn(async () => [{ locked: state.lockAvailable, released: true }]),
+  // Nothing should reach the CLIENT-level raw query any more: the run lock is
+  // transaction-scoped, so its acquire happens on `tx` and its release is the
+  // COMMIT. A statement here is what a leaked session lock would look like.
+  // The F63 probe is mocked at its own module below, so the two cannot be
+  // confused for each other.
+  $queryRaw: mock.fn(async (strings: TemplateStringsArray) => {
+    state.clientRawSql.push(strings.raw.join("?"));
+    return [{ locked: state.lockAvailable, released: true }];
+  }),
+  $transaction: mock.fn(
+    async (fn: (tx: unknown) => Promise<unknown>, options?: Record<string, unknown>) => {
+      state.txOptions.push(options);
+      const tx = {
+        $queryRaw: async (strings: TemplateStringsArray) => {
+          const sql = strings.raw.join("?");
+          state.lockSql.push(sql);
+          // A transaction lock is held for the life of the transaction, so a
+          // concurrent caller sees it as taken. `lockAvailable: false` is the
+          // simulated second run.
+          const locked = state.lockAvailable && !state.lockHeld;
+          if (locked) state.lockHeld = true;
+          return [{ locked }];
+        },
+      };
+      try {
+        return await fn(tx);
+      } finally {
+        // COMMIT or ROLLBACK: either way the lock is gone, with no separate
+        // unlock statement to route anywhere.
+        state.lockHeld = false;
+      }
+    },
+  ),
 };
 
 mock.module("@/lib/db", { namedExports: { prismaAdmin, prisma: prismaAdmin } });
@@ -182,6 +234,12 @@ beforeEach(() => {
   state.rankedFits = [];
   state.adminPrivileged = true;
   state.lockAvailable = true;
+  state.lockSql = [];
+  state.clientRawSql = [];
+  state.txOptions = [];
+  state.lockHeld = false;
+  state.enrollmentTake = undefined;
+  state.weeklyDedupeIds = [];
 });
 
 describe("flags gate everything", () => {
@@ -306,6 +364,48 @@ describe("the weekly jobs nudge", () => {
       assert.match(call.body, /^SPOKES: 1 new jobs? near you this week\./);
       assert.equal(call.expectsReply, "weekly_jobs");
     }
+  });
+
+  it("caps a 1,000-student roster at the ceiling, in the query and in the loop", async () => {
+    // Two bounds, and the in-loop one was DEAD: it read `.has(studentId)`
+    // after `.set()`, so the condition was false by construction and the
+    // `break` never fired. Every student on the roster was therefore ranked
+    // (one `rankLeadsForStudent` each) before a `.slice()` threw the tail
+    // away, and the whole roster was fetched to build it.
+    state.leads = [{ id: "lead_new" }];
+    state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
+    state.enrollments = Array.from({ length: 1000 }, (_, i) => ({
+      studentId: `stu_${String(i).padStart(4, "0")}`,
+      classId: "class_1",
+    }));
+
+    await runNudges({ now: MONDAY });
+
+    assert.ok(
+      (state.enrollmentTake ?? Infinity) <= 800,
+      `the enrollment query must be bounded; asked for ${String(state.enrollmentTake)}`,
+    );
+    assert.ok(
+      state.weeklyDedupeIds.length <= 200,
+      `the dedupe lookup got ${state.weeklyDedupeIds.length} ids; the ceiling is 200`,
+    );
+    assert.ok(state.weeklyDedupeIds.length > 0, "and it is not empty — the cap must not zero it");
+    assert.ok(state.sent.length <= 200, `sent ${state.sent.length} texts in one sweep`);
+  });
+
+  it("keeps every class of a student already inside the ceiling", async () => {
+    // The break must bound STUDENTS, not rows: dropping a second class for a
+    // student already counted would silently narrow the flag check that
+    // decides whether they are in scope at all.
+    state.leads = [{ id: "lead_new" }];
+    state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
+    state.enrollments = [
+      { studentId: "stu_a", classId: "class_other" },
+      { studentId: "stu_a", classId: "class_1" },
+    ];
+
+    await runNudges({ now: MONDAY });
+    assert.equal(state.sent.length, 1, "stu_a is in scope through their second class");
   });
 
   it("sends nothing when no lead was created this week", async () => {
@@ -470,6 +570,55 @@ describe("guards that stop the run entirely", () => {
     const result = await runNudges({ now: NOW });
     assert.equal(result.skipped, "already running");
     assert.equal(state.alertUpserts.length, 0);
+  });
+
+  it("takes the run lock inside a transaction, and never unlocks it separately", async () => {
+    state.connections = [unviewedConnection()];
+    await runNudges({ now: NOW });
+
+    assert.equal(state.lockSql.length, 1, "exactly one lock statement per run");
+    const sql = state.lockSql[0];
+    assert.match(
+      sql,
+      /pg_try_advisory_xact_lock/,
+      "the lock must be TRANSACTION-scoped: a session lock's release is a separate " +
+        "query the pooler can route to another backend, which leaks it forever",
+    );
+    assert.doesNotMatch(sql, /pg_try_advisory_lock\(/, "no session-scoped acquire");
+    assert.match(sql, /hashtext/);
+
+    // The whole point: there is nothing to unlock.
+    const everySql = [...state.lockSql, ...state.clientRawSql].join(" ");
+    assert.doesNotMatch(everySql, /pg_advisory_unlock/, "an unlock statement is the leak");
+    assert.equal(state.clientRawSql.length, 0, "the lock never runs off the transaction");
+
+    // Bounded, so one wedged sweep cannot hold a pooled connection forever.
+    const options = state.txOptions[0] as { timeout?: number; maxWait?: number };
+    assert.ok((options?.timeout ?? 0) > 0, "the transaction must carry a timeout");
+    assert.ok((options?.maxWait ?? 0) > 0, "and a maxWait, so it queues rather than hangs");
+  });
+
+  it("two overlapping runs: exactly one proceeds, and the next run after them is clean", async () => {
+    // The regression this replaces had the opposite shape: run 1 leaked a
+    // session lock, so run 1 succeeded and runs 2-10 ALL reported "already
+    // running" forever. Two properties pin it. First, of two overlapping runs
+    // exactly one proceeds -- asserted without pinning WHICH, because that is
+    // a scheduling detail and pinning it would make the test lie about what
+    // the lock guarantees. Second, a later run finds the lock free again,
+    // which is what the leak broke.
+    state.connections = [unviewedConnection()];
+
+    const [a, b] = await Promise.all([runNudges({ now: NOW }), runNudges({ now: NOW })]);
+    const skipped = [a, b].filter((r) => r.skipped === "already running");
+    const ran = [a, b].filter((r) => r.skipped === null);
+    assert.equal(skipped.length, 1, "one of the two overlapping runs must be turned away");
+    assert.equal(ran.length, 1, "and exactly one must proceed");
+    assert.equal(ran[0].alertsPlanned, 1, "the run that proceeded did the work");
+
+    // The leak test: after both have finished, the lock is free.
+    state.alertUpserts = [];
+    const later = await runNudges({ now: NOW });
+    assert.equal(later.skipped, null, "a transaction lock cannot survive its transaction");
   });
 
   it("a dry run needs no lock — it writes nothing anyway", async () => {

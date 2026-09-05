@@ -35,6 +35,27 @@ interface SettingsViewProps {
  * section mounted there — StaffMfaPanel — is unreachable for the very roles
  * it exists for.
  */
+/**
+ * Is the "Text Messages" switch unavailable?
+ *
+ * Extracted so the rule is testable rather than buried in JSX, because getting
+ * it wrong is invisible: the earlier version also admitted `consentChecked`,
+ * so ticking the consent box made the switch look available while the API
+ * still refused it — the student flipped it and got a server error. Ticking
+ * the box is not the gate. Only a code that came back from the handset is
+ * (`smsConsented`), and "Text me a code" is the one forward path.
+ *
+ * Turning the channel OFF is always allowed, whatever the state of consent.
+ */
+export function smsToggleDisabled(input: {
+  smsEnabled: boolean;
+  isStudentSurface: boolean;
+  smsConsented: boolean;
+}): boolean {
+  if (input.smsEnabled) return false;
+  return input.isStudentSurface && !input.smsConsented;
+}
+
 export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
   const [sessionRole, setSessionRole] = useState<string | null>(initialRole);
   const [apiKey, setApiKey] = useState("");
@@ -711,10 +732,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                 type="button"
                 role="switch"
                 aria-checked={smsEnabled}
-                // Turning it ON is refused by the API without consent, so the
-                // switch is disabled until the box below is ticked. The student
-                // can always turn it OFF, whatever the box says.
-                disabled={!smsEnabled && isStudentSurface && !smsConsented && !consentChecked}
+                disabled={smsToggleDisabled({ smsEnabled, isStudentSurface, smsConsented })}
                 onClick={() => {
                   const next = !smsEnabled;
                   setSmsEnabled(next);

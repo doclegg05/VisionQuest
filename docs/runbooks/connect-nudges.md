@@ -105,7 +105,17 @@ else applies to none, because there is no way to tell whose reply it is.
    consent — so anyone who had SMS enabled before this shipped sees a
    "Confirm to keep getting texts" panel and gets nothing until they complete
    it. That includes the daily coaching prompt, which also runs through this
-   policy now.
+   policy now. Because nothing announced itself from the student's side, Home
+   also carries a one-line dismissible notice for exactly that population
+   (`smsEnabled && !smsConsented`); it disappears the moment they finish.
+
+   Budgets on the flow, both bounded per ACCOUNT rather than per code:
+   sending a code is 3 per hour (per student and per number), and CONFIRMING
+   one is 5 attempts per 5 minutes. Both refuse when the rate-limit store is
+   degraded — the exception to this app's usual fail-open, because one bounds
+   a paid send to a third party's handset and the other bounds guessing a
+   six-digit secret. A student who hits either waits a few minutes; there is
+   no administrative override, by design.
 
 ## Verify
 
@@ -137,17 +147,35 @@ else applies to none, because there is no way to tell whose reply it is.
 
 ## When something looks stuck
 
-- **Every run reports `already running`.** One sweep at a time is enforced by
-  a SESSION-level advisory lock (`pg_try_advisory_lock(hashtext('connect-nudges'))`).
-  A session lock is bound to the pooled backend that took it, so an unlock that
-  lands on a different backend leaves it held — the runner logs
-  `nudges_run_lock_not_released` when that happens. To inspect and clear:
+- **Every run reports `already running`.** One sweep at a time is enforced by a
+  TRANSACTION-scoped advisory lock,
+  `pg_try_advisory_xact_lock(2, hashtext('connect-nudges'))`, taken inside a
+  `$transaction` that wraps the whole run. It is released by COMMIT or
+  ROLLBACK on the connection holding it, so **there is nothing to leak and no
+  manual clear to perform** — if this is showing up, a sweep really is running,
+  or one is wedged.
+
+  This used to be a session lock plus a separate `pg_advisory_unlock`, which is
+  unusable through a pooler: the unlock is its own query and lands on whichever
+  backend the pool hands out, so the lock stayed held forever and every run
+  after the first reported `already running` while a dry run still looked
+  healthy. If you are reading an older incident, that is what it was.
+
+  To see whether one is genuinely in flight:
   ```sql
-  SELECT pid, objid, granted FROM pg_locks
-   WHERE locktype = 'advisory' AND objid = hashtext('connect-nudges');
-  -- then, having identified the holder:
+  SELECT pid, classid, objid, granted, state, query_start
+    FROM pg_locks JOIN pg_stat_activity USING (pid)
+   WHERE locktype = 'advisory' AND classid = 2 AND objid = hashtext('connect-nudges');
+  ```
+  A run is bounded by the transaction's four-minute timeout and by the job's
+  `timeout_milliseconds`, so a holder older than that is wedged; terminating
+  its backend rolls the transaction back and releases the lock with it:
+  ```sql
   SELECT pg_terminate_backend(<pid>);
   ```
+  (Advisory-lock class ids are namespaced in `ADVISORY_LOCK_CLASS`,
+  `src/lib/nudges/sms-policy-shared.ts`: 1 = the per-recipient send lock,
+  2 = this run lock.)
 - **`nudges_admin_client_missing` in the logs, and nothing sends.** The admin
   Prisma client is not RLS-bypassing — `ADMIN_DATABASE_URL` is unset or points
   at `vq_app`. Both the runner and the inbound webhook refuse to act rather

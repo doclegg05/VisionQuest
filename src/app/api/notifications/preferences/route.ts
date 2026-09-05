@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth, badRequest } from "@/lib/api-error";
 import { phoneNumberInUseByAnotherStudent } from "@/lib/nudges/phone-verification";
+import { normalizedPhone } from "@/lib/nudges/replies";
 
 const preferencesSchema = z.object({
   email: z
@@ -83,7 +84,14 @@ export const PUT = withAuth(async (session, req: Request) => {
     });
     const alreadyConsented = Boolean(existing?.smsConsentAt) && !existing?.smsRevokedAt;
 
-    if (sms.phoneNumber && sms.phoneNumber !== existing?.destination) {
+    // Both sides normalised: "+1 304 555 0123" and "3045550123" are the same
+    // handset, and a raw comparison would read a re-typed number as a change
+    // and clear a confirmed consent for nothing.
+    const incomingPhone = normalizedPhone(sms.phoneNumber);
+    const storedPhone = normalizedPhone(existing?.destination);
+    const phoneChanged = incomingPhone !== null && incomingPhone !== storedPhone;
+
+    if (phoneChanged && sms.phoneNumber) {
       // A number that is already another student's active SMS destination is
       // refused. The nudge texts name an employer and a job title, and the
       // inbound handler cannot tell whose "Y" a shared handset just sent — so
@@ -125,7 +133,7 @@ export const PUT = withAuth(async (session, req: Request) => {
           ...(sms.enabled ? { smsRevokedAt: null } : { smsRevokedAt: now }),
           // A NEW number is a new handset: the old consent proved nothing
           // about it, so verification starts again.
-          ...(sms.phoneNumber && sms.phoneNumber !== existing?.destination
+          ...(phoneChanged
             ? { smsConsentAt: null, smsVerifyCodeHash: null, smsVerifyExpiresAt: null }
             : {}),
         },

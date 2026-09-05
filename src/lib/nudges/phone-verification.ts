@@ -15,7 +15,7 @@
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { rateLimit } from "@/lib/rate-limit";
@@ -38,8 +38,17 @@ export type VerifyConfirmResult =
   | { ok: true }
   | { ok: false; reason: "no_pending_code" | "expired" | "wrong_code" };
 
-export function hashVerifyCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
+/**
+ * Salted with the student id, so the digest is per-account.
+ *
+ * Unsalted, the 10^6 code space is small enough to precompute in full: one
+ * table of a million sha256s turns any leaked `smsVerifyCodeHash` -- a backup,
+ * a support query, a query log -- straight back into the live code. Binding
+ * the digest to the account also means a hash lifted from one row cannot be
+ * replayed against another, and there is no reason to want that portability.
+ */
+export function hashVerifyCode(code: string, studentId: string): string {
+  return createHash("sha256").update(`${studentId}:${code}`).digest("hex");
 }
 
 /**
@@ -56,7 +65,6 @@ export async function phoneNumberInUseByAnotherStudent(
   phoneNumber: string,
   askingStudentId: string,
 ): Promise<boolean> {
-  const { prismaAdmin } = await import("@/lib/db");
   const { phoneCandidates } = await import("./replies");
   const candidates = phoneCandidates(phoneNumber);
   if (candidates.length === 0) return false;
@@ -106,7 +114,9 @@ export function buildVerifyCodeSms(code: string): string {
  * completed is a consent flow people work around.
  *
  * It is bounded instead by its own limiter — three per hour per student and
- * per number — so it cannot become a way to text someone repeatedly.
+ * per number, refusing when the limiter is degraded — so it cannot become a
+ * way to text someone repeatedly. That limiter bounds SENDS; the budget for
+ * GUESSING a code lives on the confirm route.
  */
 export async function sendVerificationCode(input: {
   studentId: string;
@@ -127,7 +137,14 @@ export async function sendVerificationCode(input: {
       VERIFY_SEND_WINDOW_MS,
     ),
   ]);
-  if (!byStudent.success || !byPhone.success) return { ok: false, reason: "rate_limited" };
+  // A degraded limiter refuses here, unlike the login path that lets a shared
+  // classroom IP through during an outage. This send costs money, reaches a
+  // third party's handset, and has an obvious alternative: try again in a
+  // minute. An unbounded send is the failure that gets the program's number
+  // reported, so the safe direction is to stop.
+  if (!byStudent.success || byStudent.degraded || !byPhone.success || byPhone.degraded) {
+    return { ok: false, reason: "rate_limited" };
+  }
 
   const code = generateVerifyCode();
   const delivered = await sendSms(pref.destination, buildVerifyCodeSms(code));
@@ -142,7 +159,7 @@ export async function sendVerificationCode(input: {
   await prisma.notificationPreference.update({
     where: { id: pref.id },
     data: {
-      smsVerifyCodeHash: hashVerifyCode(code),
+      smsVerifyCodeHash: hashVerifyCode(code, input.studentId),
       smsVerifyExpiresAt: new Date(now.getTime() + VERIFY_CODE_TTL_MS),
     },
   });
@@ -153,9 +170,18 @@ export async function sendVerificationCode(input: {
  * Check a code and, on success, stamp consent.
  *
  * The code is cleared whatever the outcome of a SUCCESSFUL match, so it is
- * single-use; a wrong code leaves the pending code alone so a fat-fingered
- * digit does not force a resend, and the send limiter is what bounds guessing.
- * Comparison is length-checked then constant-time.
+ * single-use; a wrong code leaves the pending code alone so one mistyped
+ * character does not force a resend. Comparison is length-checked then
+ * constant-time.
+ *
+ * GUESSING IS BOUNDED BY THE ROUTE, NOT BY THIS FUNCTION. The send limiter
+ * above counts codes SENT, so it says nothing about how many times one code
+ * may be tried -- an earlier revision of this comment claimed otherwise, which
+ * left 10^6 codes open to unlimited guesses inside a 10-minute TTL. The budget
+ * lives in the confirm route
+ * (src/app/api/notifications/preferences/verify-phone/confirm/route.ts): five
+ * attempts per five minutes per account, fail-closed on a degraded limiter.
+ * Any other caller of this function must bring its own.
  */
 export async function confirmVerificationCode(input: {
   studentId: string;
@@ -175,7 +201,7 @@ export async function confirmVerificationCode(input: {
   }
 
   const expected = Buffer.from(pref.smsVerifyCodeHash, "hex");
-  const received = Buffer.from(hashVerifyCode(input.code.trim()), "hex");
+  const received = Buffer.from(hashVerifyCode(input.code.trim(), input.studentId), "hex");
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
     return { ok: false, reason: "wrong_code" };
   }

@@ -25,6 +25,7 @@ import { redactContactInfo } from "@/lib/log-redaction";
 import { sendSms } from "@/lib/sms";
 
 import {
+  ADVISORY_LOCK_CLASS,
   SMS_MAX_LENGTH,
   SMS_PREFIX,
   SMS_STOP_SUFFIX,
@@ -196,7 +197,7 @@ export async function sendPolicySms(input: SendPolicySmsInput): Promise<SmsSendR
  * cron and someone curling the route, or two Render instances) could both read
  * "1 sent today" and both send, putting three texts on one phone in a day the
  * policy caps at two. Now the count and the INSERT happen in one transaction
- * holding `pg_advisory_xact_lock(hashtext(studentId))`, so concurrent callers
+ * holding `pg_advisory_xact_lock(1, hashtext(studentId))`, so concurrent callers
  * for the same recipient serialise on that key, and the row they insert is a
  * `queued` reservation that counts against the cap immediately.
  *
@@ -238,7 +239,9 @@ async function sendPolicySmsUnsafe(input: SendPolicySmsInput): Promise<SmsSendRe
     // commit or rollback — no session-level lock to leak across a pooled
     // connection. hashtext() is stable within a database version, which is all
     // this needs: a collision between two students costs one serialised write.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.studentId}))`;
+    // The class id keeps this key in its own namespace, so it can never
+    // collide with the run lock in ./schedule.ts (see ADVISORY_LOCK_CLASS).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ADVISORY_LOCK_CLASS.smsSend}, hashtext(${input.studentId}))`;
 
     // Consent is re-read inside the lock so a STOP that landed a millisecond
     // ago is honoured rather than raced.

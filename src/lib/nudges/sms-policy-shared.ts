@@ -44,6 +44,31 @@ export const QUIET_HOURS_END_HOUR = 8;
 export const SMS_DAILY_CAP = 2;
 
 /**
+ * Advisory-lock class ids, one namespace per lock.
+ *
+ * Postgres advisory locks are one flat keyspace, so a bare
+ * `hashtext(<string>)` from two unrelated locks can collide and one feature
+ * would silently block the other. The two-argument form takes a class id
+ * first, which separates the namespaces by construction:
+ *
+ *   smsSend  (1) — per-recipient, held while the daily-cap slot is reserved
+ *                  (src/lib/nudges/sms-policy.ts)
+ *   nudgeRun (2) — deployment-wide, held for one sweep of the hourly runner
+ *                  (src/lib/nudges/schedule.ts)
+ *
+ * Both are TRANSACTION-scoped (`pg_advisory_xact_lock` /
+ * `pg_try_advisory_xact_lock`). A session-scoped lock is bound to whichever
+ * pooled backend answered and its release is a separate query that may land on
+ * a different one, which leaks the lock permanently; the transaction form is
+ * released by commit or rollback on the connection that holds it, so there is
+ * nothing to leak and no unlock statement to get lost.
+ */
+export const ADVISORY_LOCK_CLASS = {
+  smsSend: 1,
+  nudgeRun: 2,
+} as const;
+
+/**
  * One GSM-7 segment. A longer body silently becomes two paid messages.
  *
  * GSM-7 is also why every template below is plain ASCII, including the
