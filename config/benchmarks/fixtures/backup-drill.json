@@ -1,0 +1,4 @@
+{
+  "$comment": "backup-drill reads live prod-readonly row counts and probes the configured object-storage backend directly — no fixture corpus. Kept here only so bench:validate's fixture-exists check has something to point at, and to name the evidence tables this suite watches (kept in sync with scripts/backup-verify.mjs's EVIDENCE_TABLES by hand — a schema change there should update this list too).",
+  "evidenceTables": ["Student", "FormSubmission", "FileUpload", "Certification", "SpokesRecord"]
+}

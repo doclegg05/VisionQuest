@@ -51,21 +51,21 @@ const args = parseArgs();
 const prisma = new PrismaClient();
 
 const SINCE_PATTERN = /^(\d+)(h|d)$/i;
-const DEFAULT_BUDGET_CONFIG_PATH = fileURLToPath(new URL("../config/sage-budget.json", import.meta.url));
+export const DEFAULT_BUDGET_CONFIG_PATH = fileURLToPath(new URL("../config/sage-budget.json", import.meta.url));
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Mirrors DataSensitivity in src/lib/ai/types.ts. Kept as a literal here
 // (same pattern as SAFE_STUDENT_CATEGORIES in ./lib/sage-rag-utils.mjs)
 // rather than importing the TS module, so every known sensitivity class
 // prints a row even when it had zero events in the window.
-const ALL_SENSITIVITIES = ["configured", "student_record", "staff_entered", "public_program", "system"];
+export const ALL_SENSITIVITIES = ["configured", "student_record", "staff_entered", "public_program", "system"];
 
 // Mirrors isLocalOnlySensitivity() in src/lib/ai/provider.ts.
-const LOCAL_ONLY_SENSITIVITIES = ["student_record", "staff_entered"];
+export const LOCAL_ONLY_SENSITIVITIES = ["student_record", "staff_entered"];
 
 const PROVIDER_CLASSES = ["local", "cloud", "unknown", "none"];
 
-function parseSince(value) {
+export function parseSince(value) {
   if (!value) return 30 * DAY_MS;
   const match = SINCE_PATTERN.exec(String(value).trim());
   if (!match) {
@@ -81,7 +81,7 @@ function pct(part, total) {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
-function loadBudgetConfig(path) {
+export function loadBudgetConfig(path) {
   const raw = readFileSync(path, "utf8");
   return JSON.parse(raw);
 }
@@ -99,7 +99,7 @@ function parseAuditMetadata(raw) {
 
 // ─── (a) Provider mix by sensitivity ────────────────────────────────────────
 
-function buildProviderMix(auditRows, liveAiProvider) {
+export function buildProviderMix(auditRows, liveAiProvider) {
   // Keyed by sensitivity -> { completed: {local,cloud,unknown,none}, other: {routed,blocked,failed,direct} }
   const bySensitivity = new Map(
     ALL_SENSITIVITIES.map((s) => [
@@ -160,7 +160,7 @@ function buildProviderMix(auditRows, liveAiProvider) {
  * - Returns null (unpriced) when neither source covers this model — the
  *   caller must not guess.
  */
-function resolveModelPrice(model, priceFlag, configPriceMap) {
+export function resolveModelPrice(model, priceFlag, configPriceMap) {
   if (priceFlag !== null) {
     return { input: priceFlag, output: priceFlag, source: "flag" };
   }
@@ -175,12 +175,12 @@ function resolveModelPrice(model, priceFlag, configPriceMap) {
   return null;
 }
 
-function costUsd(inputTokens, outputTokens, price) {
+export function costUsd(inputTokens, outputTokens, price) {
   if (!price) return null;
   return (inputTokens / 1_000_000) * price.input + (outputTokens / 1_000_000) * price.output;
 }
 
-function buildCostReport(llmRows, windowDays, priceFlag, budgetConfig, budgetFlag) {
+export function buildCostReport(llmRows, windowDays, priceFlag, budgetConfig, budgetFlag) {
   const monthlyMultiplier = 30 / Math.max(windowDays, 1 / 24);
 
   const byModel = new Map();
@@ -492,9 +492,17 @@ async function main() {
   }
 }
 
-main()
-  .catch((error) => {
-    console.error("AI accountability report failed:", error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Only auto-run when executed directly — importing this module for its pure
+// report-building functions (the benchmark suite's cost-per-student and
+// ferpa-routing scorers) must never start a live report run against the
+// default DATABASE_URL, since those scorers connect to their own
+// prod-readonly URL instead.
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main()
+    .catch((error) => {
+      console.error("AI accountability report failed:", error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}
