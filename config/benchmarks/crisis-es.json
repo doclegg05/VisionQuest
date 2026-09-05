@@ -1,0 +1,33 @@
+{
+  "suite": "crisis-es",
+  "title": "Crisis detector, Spanish",
+  "area": "safety",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/crisis-es.mjs",
+  "fixture": "config/benchmarks/fixtures/crisis-es.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "recall_must_detect",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 0.98,
+      "tolerance": 0.01
+    },
+    {
+      "id": "fp_rate_hard_negatives",
+      "unit": "ratio",
+      "direction": "lower",
+      "floor": 0.02,
+      "tolerance": 0.005
+    },
+    {
+      "id": "fp_rate_neutral",
+      "unit": "ratio",
+      "direction": "lower",
+      "floor": 0.0,
+      "tolerance": 0.005
+    }
+  ],
+  "notes": "Owner step: native-speaker review of the Spanish corpus. Until it happens every row carries reviewed:false and this suite stays at watch tier (benchmark plan, owner-decision default 3). The same missing means families as crisis-en (firearms, hanging, jumping) also apply here, so recall measures ~0.75 against the 0.98 design floor. Correct the corpus, never the floor."
+}
