@@ -24,8 +24,8 @@ import { studentLogKey } from "@/lib/log-keys";
 import { redactContactInfo } from "@/lib/log-redaction";
 import { sendSms } from "@/lib/sms";
 
+import { takeSendLock } from "./advisory-locks";
 import {
-  ADVISORY_LOCK_CLASS,
   SMS_MAX_LENGTH,
   SMS_PREFIX,
   SMS_STOP_SUFFIX,
@@ -242,15 +242,10 @@ async function sendPolicySmsUnsafe(input: SendPolicySmsInput): Promise<SmsSendRe
     // The class id keeps this key in its own namespace, so it can never
     // collide with the run lock in ./schedule.ts (see ADVISORY_LOCK_CLASS).
     //
-    // `::int` on the class id is load-bearing. Postgres has two overloads,
-    // (bigint) and (int, int); Prisma binds a JavaScript number as bigint, so
-    // the untyped two-argument form resolves to (bigint, integer), matches
-    // neither, and raises 42883. `sendPolicySms` is total, so that became
-    // `{ status: "refused", reason: "send_error" }` for every text the program
-    // tried to send — a complete, silent outage of the SMS channel. Found by
-    // the nudge-sweep benchmark against a real Postgres; this module's unit
-    // tests mock $executeRaw, so they cannot see it.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ADVISORY_LOCK_CLASS.smsSend}::int, hashtext(${input.studentId}))`;
+    // The SQL lives in ./advisory-locks, which owns both locks and the `::int`
+    // casts they need; its header records the 42883 outage that came of
+    // writing the statement out here and in schedule.ts separately.
+    await takeSendLock(tx, input.studentId);
 
     // Consent is re-read inside the lock so a STOP that landed a millisecond
     // ago is honoured rather than raced.

@@ -39,10 +39,10 @@ import { studentLogKey } from "@/lib/log-keys";
 import { withStudentRlsContext } from "@/lib/rls-context";
 
 import { adminClientIsPrivileged } from "./admin-guard";
+import { tryTakeRunLock } from "./advisory-locks";
 import { resolveNudgeAlerts, upsertNudgeAlert } from "./alerts";
 import { studentsWithOpenQuestions } from "./replies";
 import { sendPolicySms } from "./sms-policy";
-import { ADVISORY_LOCK_CLASS } from "./sms-policy-shared";
 import {
   EMPLOYER_NO_RESPONSE_DAYS,
   NUDGE_ALERT_TYPES,
@@ -592,19 +592,11 @@ async function runUnderRunLock(
   try {
     return await prismaAdmin.$transaction(
       async (tx) => {
-        // `::int` on the class id is load-bearing, not decoration. Postgres
-        // offers exactly two overloads — (bigint) and (int, int) — and Prisma
-        // binds a JavaScript number as bigint, so the untyped two-argument form
-        // resolves to (bigint, integer), which matches NEITHER and raises
-        // 42883. The catch below then turns that into `skipped: "run lock
-        // unavailable"`, so the whole sweep goes quiet on every run with a 200
-        // response and one log line — the same silent-outage shape finding F63
-        // is about. Found by the nudge-sweep benchmark against a real Postgres;
-        // every unit test here mocks $queryRaw, so no amount of them can see it.
-        const rows = await tx.$queryRaw<Array<{ locked: boolean }>>`
-          SELECT pg_try_advisory_xact_lock(${ADVISORY_LOCK_CLASS.nudgeRun}::int, hashtext(${RUN_LOCK_KEY})) AS locked
-        `;
-        if (rows[0]?.locked !== true) {
+        // The SQL lives in ./advisory-locks so both locks share one definition
+        // and one `::int` decision; that module's header records the 42883
+        // outage that came of writing it out at each call site instead, and
+        // src/lib/rls.test.ts executes that module against a real Postgres.
+        if (!(await tryTakeRunLock(tx, RUN_LOCK_KEY))) {
           result.skipped = "already running";
           logger.warn("nudges_run_lock_contended", { lockKey: RUN_LOCK_KEY });
           return result;
