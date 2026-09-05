@@ -28,9 +28,7 @@
 // =============================================================================
 
 import { loadCohort, toMatchLead, toMatchStudent } from "../lib/cohort.mjs";
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "hard-blocks";
+import { selfTest } from "../lib/self-test.mjs";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const WEEKDAYS = DAYS.slice(0, 5);
@@ -198,4 +196,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

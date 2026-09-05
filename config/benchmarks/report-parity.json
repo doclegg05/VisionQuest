@@ -15,9 +15,30 @@
       "exact": true,
       "tolerance": 0
     },
-    { "id": "grant_kpi_placements", "unit": "count", "direction": "higher", "tolerance": 0 },
-    { "id": "dohs_export_placed_rows", "unit": "count", "direction": "higher", "tolerance": 0 },
-    { "id": "funnel_hired_or_beyond", "unit": "count", "direction": "higher", "tolerance": 0 }
+    {
+      "id": "grant_kpi_placements",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "One of the three counts being compared. The GATE is `parity_violations`: what matters is that the three agree, not what number they agree on. A floor here would fail every run where the cohort legitimately changed size."
+    },
+    {
+      "id": "dohs_export_placed_rows",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Same \u2014 reported separately only so a parity failure names WHICH report moved."
+    },
+    {
+      "id": "funnel_hired_or_beyond",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Same. The fixture's `expectPlacements` already pins the cohort's own count, and a drift there is reported as a parity violation."
+    }
   ],
-  "notes": "In-process over the synthetic cohort — no database. Runs the three real computations (computeGrantKpis, buildDohsExportRows, computeFunnel) over one population and asserts they agree on how many people got a job. Each count is also reported on its own so a failure says WHICH report moved. The three self-directed applications in the cohort are deliberately non-qualifying, so the funnel's comparison line is non-zero while the three placement counts still agree — a fixture where they qualified would make the reports legitimately disagree and turn this into a test of the fixture."
+  "notes": "In-process over the synthetic cohort \u2014 no database. Runs the three real computations (computeGrantKpis, buildDohsExportRows, computeFunnel) over one population and asserts they agree on how many people got a job. Each count is also reported on its own so a failure says WHICH report moved. The three self-directed applications in the cohort are deliberately non-qualifying, so the funnel's comparison line is non-zero while the three placement counts still agree \u2014 a fixture where they qualified would make the reports legitimately disagree and turn this into a test of the fixture."
 }

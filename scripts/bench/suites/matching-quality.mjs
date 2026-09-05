@@ -28,9 +28,7 @@
 // =============================================================================
 
 import { loadCohort, toMatchLead, toMatchStudent, visibleLeadsFor } from "../lib/cohort.mjs";
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "matching-quality";
+import { selfTest } from "../lib/self-test.mjs";
 
 /** Graded relevance for NDCG. A block scores nothing — it should not be there at all. */
 const GAIN = { fit: 2, stretch: 1, block: 0 };
@@ -133,4 +131,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

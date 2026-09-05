@@ -34,9 +34,7 @@
 // =============================================================================
 
 import { createRng } from "../lib/prng.mjs";
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "connection-walks";
+import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
   const {
@@ -236,4 +234,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

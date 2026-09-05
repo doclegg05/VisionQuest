@@ -25,9 +25,7 @@
 //     node --import tsx scripts/bench/suites/explain-faithfulness.mjs --self-test
 // =============================================================================
 
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "explain-faithfulness";
+import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
   if (!ctx.env.geminiApiKey) {
@@ -115,4 +113,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

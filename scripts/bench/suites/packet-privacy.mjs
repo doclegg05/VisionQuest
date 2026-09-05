@@ -33,9 +33,7 @@
 // =============================================================================
 
 import { loadCohort } from "../lib/cohort.mjs";
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "packet-privacy";
+import { selfTest } from "../lib/self-test.mjs";
 
 /** The scanned surfaces, so a hit says WHICH one leaked. */
 const SURFACES = ["employer_page", "employer_email", "packet_pdf_resume"];
@@ -232,4 +230,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

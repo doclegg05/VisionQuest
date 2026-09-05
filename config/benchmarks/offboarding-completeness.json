@@ -1,0 +1,19 @@
+{
+  "suite": "offboarding-completeness",
+  "title": "Offboarding export completeness",
+  "area": "data-integrity",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/offboarding-completeness.mjs",
+  "fixture": "config/benchmarks/fixtures/archive-exemptions.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "student_linked_models_not_exported",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "Measured 2026-09-05: 42 models have a direct studentId FK to Student; generateStudentArchive() (src/lib/student-archive.ts) reads 7 of them (FormSubmission, FileUpload, Certification, PortfolioItem, ResumeData, StudentWorkProfile, Connection). 5 more are exempted in the fixture as non-personal/derivable (Progression, ProgressionEvent, LlmCallLog, PasswordResetToken, SecurityQuestionAnswer). The remaining 30 — Message (the actual chat transcripts) and SageInsight foremost among them — are real gaps and stay reported at watch tier pending an owner decision on scope/priority; this is not yet a gate because today's baseline is 30, not 0."
+}

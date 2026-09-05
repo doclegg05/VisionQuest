@@ -27,9 +27,7 @@
 // =============================================================================
 
 import { loadCohort } from "../lib/cohort.mjs";
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "report-parity";
+import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
   const { computeGrantKpis } = await import("../../../src/lib/grant-kpi.ts");
@@ -208,4 +206,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

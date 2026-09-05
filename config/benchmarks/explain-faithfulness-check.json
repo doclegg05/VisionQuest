@@ -23,7 +23,14 @@
       "exact": true,
       "tolerance": 0
     },
-    { "id": "kind_attributed", "unit": "ratio", "direction": "higher", "tolerance": 0.02 }
+    {
+      "id": "kind_attributed",
+      "unit": "ratio",
+      "direction": "higher",
+      "tolerance": 0.02,
+      "floor": null,
+      "reason": "Informational. The gate is that a fabrication is CAUGHT; naming the right fact decides whether the student is told something useful, which is a quality of the message rather than a safety property. Flooring it would block a change that caught more fabrications while attributing one of them loosely."
+    }
   ],
-  "notes": "The deterministic half of `explain-faithfulness`. That suite needs a model and runs nightly; this one runs on every PR against 50 committed explanations (20 faithful, 30 with exactly one clause mutated) and asserts the post-generation checker catches every wrong one and refuses none of the faithful ones. Both floors are absolute: a missed fabrication reaches a student as fact, and a false refusal costs a student their explanation, so neither has an acceptable non-zero rate. `kind_attributed` is informational — it says whether the checker named the RIGHT fact, which decides whether the student is told something useful."
+  "notes": "The deterministic half of `explain-faithfulness`. That suite needs a model and runs nightly; this one runs on every PR against 50 committed explanations (20 faithful, 30 with exactly one clause mutated) and asserts the post-generation checker catches every wrong one and refuses none of the faithful ones. Both floors are absolute: a missed fabrication reaches a student as fact, and a false refusal costs a student their explanation, so neither has an acceptable non-zero rate. `kind_attributed` is informational \u2014 it says whether the checker named the RIGHT fact, which decides whether the student is told something useful."
 }

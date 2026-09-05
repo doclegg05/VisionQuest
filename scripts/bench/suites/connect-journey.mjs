@@ -26,12 +26,10 @@
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { benchRepoRoot, isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "connect-journey";
+import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
-  const reportPath = path.join(benchRepoRoot(), ctx.fixture.reportPath);
+  const reportPath = path.join(ctx.repoRoot, ctx.fixture.reportPath);
 
   let raw;
   try {
@@ -80,4 +78,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);

@@ -1,0 +1,21 @@
+{
+  "suite": "form-ranking",
+  "title": "Form search ranking",
+  "area": "retrieval",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/form-ranking.mjs",
+  "fixture": "config/sage-form-eval.json",
+  "requires": [],
+  "metrics": [
+    { "id": "top1", "unit": "ratio", "direction": "higher", "floor": 0.9, "tolerance": 0.05 },
+    {
+      "id": "top3",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": null,
+      "reason": "informational alongside the gated top1/forbidden_hits — top3 has never regressed independently of top1 in this 12-case fixture, so it is reported rather than floored to avoid a second near-duplicate gate"
+    },
+    { "id": "forbidden_hits", "unit": "count", "direction": "lower", "floor": 0, "tolerance": 0 }
+  ],
+  "notes": "Promotes scripts/sage-form-harness.mjs (config/sage-form-eval.json, 12 cases) to a gated benchmark. Runs IN-PROCESS — searchForms() is imported directly from src/lib/spokes/form-search.ts (production code), never re-implemented. No DB or model required: the form-search embedding path falls back to keyword-only ranking when the embedding API is unreachable, same as production. See docs/superpowers/plans/2026-09-05-benchmark-suite.md §4.3."
+}

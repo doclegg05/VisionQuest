@@ -25,9 +25,7 @@
 //   node scripts/bench/suites/explain-faithfulness-check.mjs --self-test
 // =============================================================================
 
-import { isSelfTest, selfTest } from "../lib/self-test.mjs";
-
-const SUITE = "explain-faithfulness-check";
+import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
   const { checkExplanationFaithfulness } = await import(
@@ -89,4 +87,4 @@ export async function run(ctx) {
   };
 }
 
-if (isSelfTest(import.meta.url)) await selfTest(SUITE, run);
+await selfTest(import.meta.url, run);
