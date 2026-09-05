@@ -202,14 +202,28 @@ export function validateSuiteConfig(config, options) {
       }
 
       const isExact = metric.exact === true;
-      if (!isExact && !DIRECTIONS.includes(metric.direction)) {
+      const hasFloor = typeof metric.floor === "number" && Number.isFinite(metric.floor);
+      const hasDirection = DIRECTIONS.includes(metric.direction);
+
+      // A floor is meaningless without a direction to read it in: `"floor": 0`
+      // is a minimum under `higher` and a ceiling under `lower`, and the runner
+      // defaults to `higher` when direction is absent — so a ceiling metric
+      // with no direction would pass at ANY value. That is the same class of
+      // hazard as the exact-branch floor skip fixed in 4594205, one layer up,
+      // and it is closed here structurally rather than left to convention.
+      if (hasFloor && !hasDirection) {
+        errors.push(
+          `metric ${label}: a metric with a "floor" must declare ` +
+            `"direction": ${DIRECTIONS.join(" or ")} — a floor of ${metric.floor} is a minimum ` +
+            'under "higher" and a ceiling under "lower", and the runner cannot guess which'
+        );
+      } else if (!isExact && !hasDirection) {
         errors.push(
           `metric ${label}: "direction" must be ${DIRECTIONS.join(" or ")} ` +
-            "(omit it only when the metric is \"exact\": true)"
+            '(omit it only on an "exact": true metric that has no floor)'
         );
       }
 
-      const hasFloor = typeof metric.floor === "number" && Number.isFinite(metric.floor);
       // `"floor": null` is the deliberate act that opts a metric out of having
       // a floor; a missing key is an omission. The two are treated
       // differently on the gate and nightly tiers (below).

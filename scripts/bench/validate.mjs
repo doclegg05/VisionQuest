@@ -13,8 +13,12 @@
  *   2. the scorer file exists and exports run(ctx)
  *   3. a declared fixture exists (declaring none warns — several suites
  *      measure the repo or a seeded database rather than a committed corpus)
- *   4. every metric has a unit, a direction (unless "exact"), and — on the
- *      gate and nightly tiers — a floor or "exact": true; ids are unique
+ *   4. every metric has a unit; a direction whenever it declares a numeric
+ *      floor (exact or not — a floor of 0 is a minimum under "higher" and a
+ *      ceiling under "lower", and the runner cannot guess) and otherwise
+ *      unless it is "exact"; and — on the gate and nightly tiers — a floor,
+ *      "exact": true, or a documented "floor": null plus a "reason"; ids are
+ *      unique
  *   5. "tier" and every "requires" value are from the contract's vocabulary,
  *      and a local-model suite (requires includes "ollama") records its host
  *

@@ -128,10 +128,17 @@ One row per metric, written only by `--update-baseline` (below).
   the enum, because that is what every reader formats a value by; a display
   label never changes how a number is judged.
 - `direction`: which way is better. `floor` is read in the metric's own
-  direction — a `lower` metric must stay **≤** its floor.
+  direction — a `lower` metric must stay **≤** its floor. **Any metric with a
+  numeric `floor` must declare `direction` explicitly**, `exact` or not, and
+  `bench:validate` rejects it otherwise: `"floor": 0` is a minimum under
+  `higher` and a ceiling under `lower`, and the runner defaults to `higher`
+  when direction is absent — so a ceiling metric that forgot one would pass at
+  any value at all. Omit `direction` only on an `"exact": true` metric with no
+  floor, where there is nothing to read a direction against.
 - `tolerance`: the absolute drop from baseline that opens a `watch`.
-- `"exact": true`: the value must equal the baseline. `direction` may be
-  omitted for an exact metric; `floor` and `tolerance` are ignored for it.
+- `"exact": true`: the value must equal the baseline. Its `floor` is still
+  evaluated first (and so still needs a `direction`); `tolerance` is ignored,
+  because equality is the whole contract.
 
 #### A gate metric with no floor yet
 
