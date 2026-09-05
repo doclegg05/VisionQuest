@@ -278,6 +278,16 @@ describe("the weekly jobs nudge", () => {
     assert.equal(result.weeklySlot, true);
     assert.equal(state.sent.length, 0);
   });
+
+  it("texts a student at most once a week, even if the route is re-run by hand", async () => {
+    state.leads = [{ id: "lead_new" }];
+    state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
+    // The outbound query for the weekly dedupe returns this student's row.
+    state.outbound = [{ toId: STUDENT, templateKey: "weekly_jobs", connectionId: null }];
+    const result = await runNudges({ now: MONDAY });
+    assert.equal(result.weeklySlot, true);
+    assert.equal(state.sent.length, 0, "a second weekly text in the same week is the one that gets blocked");
+  });
 });
 
 describe("the result is safe to log and to hand to a cron", () => {

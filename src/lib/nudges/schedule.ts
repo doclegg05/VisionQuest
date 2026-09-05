@@ -512,10 +512,29 @@ async function planWeeklyJobsNudges(
     classesByStudent.set(row.studentId, list);
   }
 
+  // One weekly text per week, whatever else happens. The Monday-10:00 gate
+  // already makes the cron fire this once, but a manual re-run of the route
+  // inside that hour would otherwise text everyone twice; a "weekly" nudge
+  // that arrives twice is the one most likely to get the number blocked.
+  const sinceLastWeekly = new Date(now.getTime() - (WEEKLY_NUDGE_LOOKBACK_DAYS - 1) * DAY_MS);
+  const alreadyTexted = await prismaAdmin.outboundMessage.findMany({
+    where: {
+      channel: "sms",
+      toKind: "student",
+      templateKey: "weekly_jobs",
+      status: "sent",
+      sentAt: { gte: sinceLastWeekly },
+      toId: { in: Array.from(classesByStudent.keys()) },
+    },
+    select: { toId: true },
+  });
+  const recentlyTexted = new Set(alreadyTexted.map((row) => row.toId));
+
   const candidates: Array<{ studentId: string; newLeadCount: number }> = [];
   for (const [studentId, classIds] of classesByStudent) {
     if (!isConnectEnabledForClasses(connectScope, classIds)) continue;
     if (!isConnectEnabledForClasses(smsScope, classIds)) continue;
+    if (recentlyTexted.has(studentId)) continue;
     candidates.push({
       studentId,
       newLeadCount: await countNewLeadsForStudent(studentId, recentLeadIds),
