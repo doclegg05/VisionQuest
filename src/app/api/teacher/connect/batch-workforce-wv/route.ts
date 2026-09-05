@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { notFound, rateLimited, withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent, recordStudentView } from "@/lib/audit";
-import { listManagedClasses } from "@/lib/classroom";
+import { listConnectClasses } from "@/lib/connect/classes";
 import { batchFilename, buildWorkforceBatchCsv } from "@/lib/connect/workforce-batch";
 import { selectBatchStudents } from "@/lib/connect/workforce-batch-query";
 import { rateLimit } from "@/lib/rate-limit";
@@ -37,7 +37,7 @@ const bodySchema = z.object({ classId: z.string().cuid("Pick a class.") }).stric
 export const POST = withTeacherAuth(async (session, req: Request) => {
   const { classId } = await parseBody(req, bodySchema);
 
-  const managed = await listManagedClasses(session, { includeArchived: true });
+  const managed = await listConnectClasses(session, { includeArchived: true });
   const spokesClass = managed.find((row) => row.id === classId);
   if (!spokesClass) throw notFound("That class wasn't found.");
 

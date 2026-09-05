@@ -27,7 +27,7 @@ let roster = [
   { id: "stu-noconsent", displayName: "Adams Kim", score: 95, consented: false },
 ];
 
-const mockListManagedClasses = mock.fn(async () => [
+const mockListConnectClasses = mock.fn(async () => [
   { id: CLASS_ID, name: "SPOKES Fall 2026" },
 ]) as any;
 const mockEnrollmentFindMany = mock.fn(async () =>
@@ -107,10 +107,13 @@ mock.module("@/lib/db", {
   },
 });
 
-mock.module("@/lib/classroom", {
+mock.module("@/lib/connect/classes", {
   namedExports: {
-    get listManagedClasses() {
-      return mockListManagedClasses;
+    // Kept real: selectBatchStudents reads it as a value, and a mocked module
+    // replaces the WHOLE module, so omitting it makes the query throw.
+    ENROLLED_STATUSES: ["active", "completed"],
+    get listConnectClasses() {
+      return mockListConnectClasses;
     },
   },
 });
@@ -169,7 +172,7 @@ beforeEach(() => {
     },
     { id: "stu-noconsent", displayName: "Adams Kim", score: 95, consented: false },
   ];
-  mockListManagedClasses.mock.resetCalls();
+  mockListConnectClasses.mock.resetCalls();
   mockEnrollmentFindMany.mock.resetCalls();
   mockRecordStudentView.mock.resetCalls();
   mockLogAuditEvent.mock.resetCalls();
@@ -187,7 +190,7 @@ describe("POST /api/teacher/connect/batch-workforce-wv", () => {
     currentRole = "student";
     const response = await post();
     assert.equal(response.status, 403);
-    assert.equal(mockListManagedClasses.mock.callCount(), 0);
+    assert.equal(mockListConnectClasses.mock.callCount(), 0);
   });
 
   it("requires a class — there is no program-wide export", async () => {
@@ -231,6 +234,19 @@ describe("POST /api/teacher/connect/batch-workforce-wv", () => {
     const lines = (await (await post()).text()).trim().split("\r\n");
     assert.ok(lines[1].includes("Sam Anders"), lines[1]);
     assert.ok(lines[2].includes("Dana Zephyr"), lines[2]);
+  });
+
+  it("reads the roster in a deterministic order", async () => {
+    // Without an ORDER BY, Postgres may return the enrollments in a different
+    // sequence run to run. Two students whose last-name sort key ties would
+    // then swap places between the preview a teacher confirms and the file
+    // they download, and the dedupe could keep a different row for the same
+    // person. Cheap to pin, invisible when it goes wrong.
+    await post();
+    assert.deepEqual(mockEnrollmentFindMany.mock.calls[0].arguments[0].orderBy, [
+      { studentId: "asc" },
+      { classId: "asc" },
+    ]);
   });
 
   it("audits a staff read for the EXPORTED students only", async () => {

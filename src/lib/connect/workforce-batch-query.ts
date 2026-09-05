@@ -24,6 +24,7 @@ import { hasActiveConsent } from "@/lib/consent";
 import { prisma } from "@/lib/db";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 
+import { ENROLLED_STATUSES } from "./classes";
 import { getWorkProfiles } from "./work-profile";
 import {
   AVAILABILITY_DAYS,
@@ -102,16 +103,23 @@ function sortKey(displayName: string): string {
  * of who was left out and why.
  *
  * The caller must already have checked that the session may see `classId`
- * (`listManagedClasses`); the queries additionally run in the caller's RLS
- * context, so a class that is not theirs yields nobody.
+ * (`listConnectClasses`, which asks the instructor question the RLS policies
+ * ask); the queries additionally run in the caller's RLS context, so a class
+ * that is not theirs yields nobody.
  */
 export async function selectBatchStudents(classId: string): Promise<BatchSelection> {
   const enrollments = await prisma.studentClassEnrollment.findMany({
     where: {
       classId,
-      status: { in: ["active", "completed"] },
+      status: { in: [...ENROLLED_STATUSES] },
       student: { isActive: true, role: "student" },
     },
+    // A stable read order. Without it Postgres may hand back a different
+    // sequence run to run, so the preview a teacher confirms and the file they
+    // download could dedupe to a different row for the same person — and the
+    // export's own last-name sort would still be non-deterministic between
+    // students whose sort key ties.
+    orderBy: [{ studentId: "asc" }, { classId: "asc" }],
     select: {
       class: { select: { name: true } },
       student: {

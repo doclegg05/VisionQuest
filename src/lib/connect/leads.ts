@@ -7,7 +7,8 @@
 //
 // Three ownership checks run before every write, because `job_lead_write`'s
 // class clause is the floor and a clear 404 beats a policy rejection:
-//   assertClassIsManaged   — you may only publish into a class you instruct
+//   assertClassIsManaged   — you may only publish into a class you INSTRUCT
+//                            (./classes.ts, the app mirror of the RLS policy)
 //   assertContactBelongsTo — a lead's contact must work at its own employer
 //   the RLS policy itself  — the same rule, enforced under the caller's role
 //
@@ -22,6 +23,7 @@ import { z } from "zod";
 import { notFound } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 
+import { type ClassActor, assertClassIsManaged } from "./classes";
 import { findOrCreateEmployerByName } from "./employers";
 import { LOCATION_NOT_LISTED } from "./employers-shared";
 import {
@@ -119,28 +121,6 @@ export type LeadFromListingInput = z.infer<typeof leadFromListingSchema>;
 // ---------------------------------------------------------------------------
 // Ownership checks
 // ---------------------------------------------------------------------------
-
-/**
- * The caller may only attach a lead to a class they can see.
- *
- * The read runs in the CALLER'S RLS context, where `spokes_class_access`
- * already scopes a teacher to their own classes — so "not visible" and "not
- * mine" collapse into the same 404, which is what a caller should be told
- * either way. `job_lead_write`'s class clause enforces the same rule at the
- * database; this exists so the failure is a clear message rather than a policy
- * rejection surfacing as a 500.
- *
- * A null classId (program-wide) is always allowed: it is the default, and it
- * is what every backfilled Opportunity became.
- */
-export async function assertClassIsManaged(classId: string | null | undefined): Promise<void> {
-  if (!classId) return;
-  const spokesClass = await prisma.spokesClass.findUnique({
-    where: { id: classId },
-    select: { id: true },
-  });
-  if (!spokesClass) throw notFound("That class wasn't found.");
-}
 
 /**
  * A lead's contact must be a person at the lead's OWN employer. Without this,
@@ -254,8 +234,8 @@ export async function listConvertibleListings(classId: string, limit = 100) {
 // Writes
 // ---------------------------------------------------------------------------
 
-export async function createLead(input: CreateLeadInput, createdById: string) {
-  await assertClassIsManaged(input.classId);
+export async function createLead(input: CreateLeadInput, actor: ClassActor) {
+  await assertClassIsManaged(input.classId, actor);
   await assertContactBelongsTo(input.employerId, input.contactId);
 
   const employer = await prisma.employer.findUnique({
@@ -288,13 +268,13 @@ export async function createLead(input: CreateLeadInput, createdById: string) {
       source: input.source === "joborder" ? "joborder" : "manual",
       openings: input.openings ?? 1,
       closesAt: input.closesAt ? new Date(input.closesAt) : null,
-      createdById,
+      createdById: actor.id,
     },
     select: LEAD_LIST_SELECT,
   });
 }
 
-export async function updateLead(input: UpdateLeadInput) {
+export async function updateLead(input: UpdateLeadInput, actor: ClassActor) {
   const { id, ...rest } = input;
 
   const existing = await prisma.jobLead.findUnique({
@@ -303,7 +283,7 @@ export async function updateLead(input: UpdateLeadInput) {
   });
   if (!existing) throw notFound("That lead wasn't found.");
 
-  await assertClassIsManaged(rest.classId);
+  await assertClassIsManaged(rest.classId, actor);
   await assertContactBelongsTo(existing.employerId, rest.contactId);
 
   const data: Prisma.JobLeadUncheckedUpdateInput = {};
@@ -356,9 +336,9 @@ export class JobListingNotFoundError extends Error {
  */
 export async function createLeadFromListing(
   input: LeadFromListingInput,
-  createdById: string,
+  actor: ClassActor,
 ) {
-  await assertClassIsManaged(input.classId);
+  await assertClassIsManaged(input.classId, actor);
 
   const listing = await prisma.jobListing.findUnique({
     where: { id: input.jobListingId },
@@ -405,7 +385,7 @@ export async function createLeadFromListing(
         payPeriod: "hour",
         source: "joblisting",
         sourceRef: listing.id,
-        createdById,
+        createdById: actor.id,
       },
       select: LEAD_LIST_SELECT,
     });

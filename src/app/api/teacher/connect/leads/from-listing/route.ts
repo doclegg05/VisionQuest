@@ -29,7 +29,7 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
 
   let result;
   try {
-    result = await createLeadFromListing(input, session.id);
+    result = await createLeadFromListing(input, session);
   } catch (error: unknown) {
     if (error instanceof JobListingNotFoundError) {
       throw notFound(error.message);

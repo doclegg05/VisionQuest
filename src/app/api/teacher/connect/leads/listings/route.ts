@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { badRequest, notFound, withTeacherAuth } from "@/lib/api-error";
-import { listManagedClasses } from "@/lib/classroom";
+import { listConnectClasses } from "@/lib/connect/classes";
 import { listConvertibleListings } from "@/lib/connect/leads";
 
 /**
@@ -30,7 +30,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     throw badRequest(parsed.error.issues[0]?.message ?? "Pick a class.");
   }
 
-  const managed = await listManagedClasses(session, { includeArchived: true });
+  const managed = await listConnectClasses(session);
   const spokesClass = managed.find((row) => row.id === parsed.data.classId);
   if (!spokesClass) throw notFound("That class wasn't found.");
 
