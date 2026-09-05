@@ -1316,6 +1316,10 @@ if (!SHOULD_RUN) {
           /row-level security/i,
         );
 
+        // Count 0, not a throw: the student fails job_lead_write's USING, so
+        // the row is never matched and no WITH CHECK is reached. The teacher
+        // retarget case below is the opposite shape and rejects instead — see
+        // the note there before making these two agree.
         const updated = await asRole("student", fixtures.studentA, (tx) =>
           tx.jobLead.updateMany({
             where: { id: leadProgramWide },
@@ -1356,13 +1360,36 @@ if (!SHOULD_RUN) {
       });
 
       it("a teacher cannot RETARGET a lead into a class they do not instruct", async () => {
-        const moved = await asRole("teacher", fixtures.teacher, (tx) =>
-          tx.jobLead.updateMany({
-            where: { id: leadAlphaOpen },
-            data: { classId: fixtures.classBeta },
-          }),
+        // THROWS, it does not return count 0 — and the difference is the whole
+        // mechanism. On an UPDATE, Postgres evaluates the policy's USING
+        // against the OLD row and its WITH CHECK against the NEW one. Teacher
+        // One instructs classAlpha, so the old row passes USING and the row IS
+        // matched; the new classId is classBeta, which fails WITH CHECK, and a
+        // WITH CHECK violation raises 42501 rather than filtering the row out.
+        //
+        // Contrast the student cases above, which DO return count 0: a student
+        // fails job_lead_write's USING, so no row is ever matched and there is
+        // nothing to check. Expecting a count here (as the first cut did) tests
+        // for the one outcome this policy cannot produce.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.jobLead.updateMany({
+                where: { id: leadAlphaOpen },
+                data: { classId: fixtures.classBeta },
+              }),
+            ),
+          /row-level security/i,
         );
-        assert.equal(moved.count, 0, "the WITH CHECK must reject the new classId too");
+
+        // The rejection aborts its transaction, so the lead must still belong
+        // to the class it started in. Without this the test would pass on a
+        // policy that threw AFTER writing.
+        const after = await db.jobLead.findUnique({
+          where: { id: leadAlphaOpen },
+          select: { classId: true },
+        });
+        assert.equal(after?.classId, fixtures.classAlpha, "the lead must not have moved");
       });
 
       it("a teacher CAN publish into their own class and program-wide", async () => {
