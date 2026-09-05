@@ -59,7 +59,14 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
   // crisis-paraphrase scenario, which this detector previously missed.
   { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
-  { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
+  // The verb list is spelled out rather than suffixed, so the PROGRESSIVE form
+  // of every member is covered. The old alternation offered only "ting" or "t"
+  // after the stem, which happens to spell "cutting" and nothing else: "hurting
+  // myself" and "harming myself" were both verified misses, and they are the
+  // ordinary way a student describes an act that is still going on ("i keep
+  // hurting myself", "i been harming myself"). "cuting" is accepted as the
+  // predictable single-t typo of the one member whose progressive doubles.
+  { category: "self_harm", pattern: /\b((?:hurt|harm|cut)(?:t?ing|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
 
   // --- Informal register (VQ-R-004). The patterns above all require formal
   // "want to" constructions, but the product targets adults at a ~6th-grade
@@ -113,7 +120,17 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "sobredosis" twin below has required a first-person frame all along; this
   // restores the parity.
   { category: "self_harm", pattern: /\boverdos(?:e|ed|ing)\s+myself\b/i },
-  { category: "self_harm", pattern: /\bi(?:'m|'ve|'d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
+  // The frame accepts the UNPUNCTUATED contractions too ("im", "ive", "id").
+  // This population writes without apostrophes — the informal-register set
+  // exists because of it — so "im overdosing on these pills right now" was a
+  // miss while "i'm overdosing on these pills" alerted, and a disclosure in
+  // progress is the worst possible place for that gap. Widening the pronoun
+  // costs no precision here: the frame still demands the overdose verb and its
+  // "on" object within two words, so a bare "im" or a stray "id" elsewhere in
+  // a sentence cannot reach it, and the third-person guards below
+  // ("my mom overdosed on pills when i was little") are unaffected because
+  // their "i" sits AFTER the verb.
+  { category: "self_harm", pattern: /\bi(?:'?m|'?ve|'?d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
   { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
   // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
   // all my pills tonight"). The two entries above between them only covered

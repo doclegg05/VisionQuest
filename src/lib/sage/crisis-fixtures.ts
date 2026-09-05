@@ -251,6 +251,23 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i'm overdosing on these pills", "i'm contraction"],
   ["i nearly overdosed on tylenol last night", "one adverb between i and the verb"],
 
+  // The hurt/harm/cut family in its PROGRESSIVE form. The alternation spelled
+  // "cut" + an optional "ting", so "cutting myself" matched while "hurting
+  // myself" and "harming myself" did not — the two most ordinary ways a
+  // student describes an ongoing act rather than a single one. Found by the
+  // crisis-en corpus, where all three of these rows were misses.
+  ["i keep hurting myself when i get like this", "hurting — progressive"],
+  ["i think about hurting myself when class is over", "hurting after a think-about frame"],
+  ["i been hurting myself so i can feel something", "hurting — past progressive"],
+  ["i been harming myself for a while now", "harming — progressive"],
+
+  // First-person overdose frame WITHOUT the apostrophe. This population texts
+  // "im"/"ive"/"id", and the frame accepted only the punctuated forms, so
+  // "im overdosing on these pills right now" — a disclosure in progress —
+  // passed silently while "i'm overdosing on these pills" alerted.
+  ["im overdosing on these pills right now", "im, no apostrophe"],
+  ["ive overdosed on my meds before", "ive, no apostrophe"],
+
   // "die my hair" is exempted as the dye homophone, but the exemption must end
   // at a word boundary — "my hairbrush" is a different word, so the disclosure
   // in front of it must still alert.
