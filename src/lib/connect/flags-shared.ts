@@ -17,6 +17,17 @@
 export const CONNECT_CONFIG_KEY = "connect_enabled_classes" as const;
 export const CONNECT_SUBSIDY_LINES_CONFIG_KEY = "connect_subsidy_lines_enabled" as const;
 
+/**
+ * Phase 5's second gate, in the same shape and read with the same parser.
+ *
+ * Separate from `connect_enabled_classes` because texting a student is a
+ * bigger step than showing them a lead: a class can pilot Match & Connect on
+ * screen for weeks before anyone's phone is involved. Both must be on — the
+ * nudge runner takes the intersection — so turning Connect off for a class
+ * also stops its texts, with no second switch to remember.
+ */
+export const SMS_NUDGES_CONFIG_KEY = "sms_nudges_enabled_classes" as const;
+
 export type ConnectScope =
   | { mode: "off" }
   | { mode: "all" }
