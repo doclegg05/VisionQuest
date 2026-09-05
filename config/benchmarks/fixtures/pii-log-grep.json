@@ -1,15 +1,4 @@
 {
-  "_read_me": "pii-log-grep suite (config/benchmarks/pii-log-grep.json). `sampleLogClean` and `sampleLogViolation` are small synthetic log captures used ONLY by --self-test, so the suite can prove its detection logic works without spawning the full `npm test` run every time. `sampleLogViolation` embeds a deliberately fake cuid, phone number, and email — none of them real — to prove the scorer actually flags a violation rather than always reporting zero. A real run ignores both fields and either reads $BENCH_TEST_LOG or spawns `npm test` itself.",
-  "sampleLogClean": [
-    "2026-09-05T12:00:00.000Z [INFO] Connect sweep completed {\"sent\":3,\"skipped\":\"none\"}",
-    "2026-09-05T12:00:01.000Z [ERROR] SMS send failed unexpectedly {\"channel\":\"sms\",\"templateKey\":\"weekly_jobs\",\"student\":\"a1b2c3d4\"}",
-    "not a logger line at all, just test runner chatter: 24 passing (312ms)"
-  ],
-  "sampleLogViolation": [
-    "2026-09-05T12:00:00.000Z [INFO] Connect sweep completed {\"sent\":3}",
-    "2026-09-05T12:00:02.000Z [ERROR] Archive: failed to download file {\"fileId\":\"f1\",\"studentId\":\"clfake0000000000000000001\",\"error\":\"ENOENT\"}",
-    "2026-09-05T12:00:03.000Z [ERROR] SMS send failed unexpectedly {\"phone\":\"555-867-5309\",\"error\":\"invalid number\"}",
-    "2026-09-05T12:00:04.000Z [WARN] Notification bounced {\"email\":\"not.a.real.student@example-test-domain.invalid\"}"
-  ],
-  "sampleFixtureCuids": ["clfake0000000000000000001"]
+  "_read_me": "pii-log-grep suite (config/benchmarks/pii-log-grep.json). This suite has no static corpus to score — its real input is whatever the unit-test run's log output looks like on a given commit, captured live via $BENCH_TEST_LOG or a fresh `npm test`. This file exists only because the suite-config contract requires a `fixture` field; it carries no data the scorer reads. The synthetic proof that the detection logic itself works (a planted fake cuid/phone/email) lives entirely inside scripts/bench/suites/pii-log-grep.mjs's own `--self-test` block as hardcoded sample data — NOT here — because an earlier version put that sample data in this file and the real runner, which always loads a suite's declared fixture for every invocation including production runs, silently scored the sample instead of the real log on every single CI run. Do not add sample-log keys back to this file.",
+  "_measured_at": "2026-09-05"
 }

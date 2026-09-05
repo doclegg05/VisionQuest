@@ -20,6 +20,19 @@
 //     `no-restricted-syntax` entries (the dark-mode rgba() guards) by
 //     filtering on the shared "No student identifier ..." message prefix
 //     every PII selector's message starts with.
+//
+// IMPORTANT: `run(ctx)` never branches on `ctx.fixture` — the real runner
+// always passes the suite's DECLARED fixture file's parsed content as
+// `ctx.fixture`, for every invocation (self-test and real runs alike). An
+// earlier version of this file used the presence of sample-log keys in the
+// fixture to switch into a "self-test mode" inside `run()` itself, which
+// meant a REAL CI run — which also loads that same fixture file — silently
+// scored the synthetic planted-violation sample instead of the actual
+// captured test log, and would have reported the same fixed "3 hits" on
+// every run forever, never checking anything real. The proof-of-detection
+// self-check now lives entirely in the `--self-test` CLI block below, using
+// hardcoded sample data that never touches `ctx.fixture` or any file this
+// suite's config declares as its fixture.
 
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
@@ -147,23 +160,15 @@ function tallyPiiMessages(jsonText) {
   return violations;
 }
 
-export async function run(ctx) {
-  const usingSelfTestFixture = Boolean(ctx?.fixture?.sampleLogClean || ctx?.fixture?.sampleLogViolation);
-
-  let loggerLines;
-  let fixtureCuids;
-  if (usingSelfTestFixture) {
-    const lines = [
-      ...(ctx.fixture.sampleLogClean ?? []),
-      ...(ctx.fixture.sampleLogViolation ?? []),
-    ];
-    loggerLines = lines.filter((line) => LOGGER_LINE_RE.test(line));
-    fixtureCuids = new Set(ctx.fixture.sampleFixtureCuids ?? []);
-  } else {
-    const rawText = await captureTestLog();
-    loggerLines = findLoggerLines(rawText);
-    fixtureCuids = collectFixtureCuids();
-  }
+/**
+ * The real behavior, unconditionally: capture (or read) the test log, grep
+ * only its logger-formatted lines, and count PII-selector eslint violations.
+ * Never branches on `ctx.fixture` — see the file-header note on why.
+ */
+export async function run(_ctx) {
+  const rawText = await captureTestLog();
+  const loggerLines = findLoggerLines(rawText);
+  const fixtureCuids = collectFixtureCuids();
 
   const hits = grepLoggerLines(loggerLines, fixtureCuids);
   const eslintResult = await countPiiEslintViolations();
@@ -194,32 +199,47 @@ export async function run(ctx) {
 }
 
 if (process.argv.includes("--self-test")) {
-  const fixturePath = path.join(REPO_ROOT, "config/benchmarks/fixtures/pii-log-grep.json");
-  const cleanFixture = { sampleLogClean: JSON.parse(readFileSync(fixturePath, "utf8")).sampleLogClean };
-  const violationFixture = JSON.parse(readFileSync(fixturePath, "utf8"));
+  // Hardcoded synthetic samples, deliberately NOT read from
+  // config/benchmarks/fixtures/pii-log-grep.json — that file is the real
+  // suite's fixture and must never be a source of self-test-only branching
+  // (see the file-header note). This proves grepLoggerLines/findLoggerLines
+  // detect a planted violation without ever calling the exported `run()`,
+  // which always does the slow real thing (spawns `npm test`, runs eslint).
+  const FAKE_STUDENT_CUID = "clfake0000000000000000001";
+  const cleanSample = [
+    '2026-09-05T12:00:00.000Z [INFO] Connect sweep completed {"sent":3,"skipped":"none"}',
+    `2026-09-05T12:00:01.000Z [ERROR] SMS send failed unexpectedly {"channel":"sms","templateKey":"weekly_jobs","student":"a1b2c3d4"}`,
+    "not a logger line at all, just test runner chatter: 24 passing (312ms)",
+  ];
+  const violationSample = [
+    ...cleanSample,
+    `2026-09-05T12:00:02.000Z [ERROR] Archive: failed to download file {"fileId":"f1","studentId":"${FAKE_STUDENT_CUID}","error":"ENOENT"}`,
+    '2026-09-05T12:00:03.000Z [ERROR] SMS send failed unexpectedly {"phone":"555-867-5309","error":"invalid number"}',
+    '2026-09-05T12:00:04.000Z [WARN] Notification bounced {"email":"not.a.real.student@example-test-domain.invalid"}',
+  ];
 
   (async () => {
-    const cleanResult = await run({ fixture: cleanFixture, fixturePath, env: {}, log: console.log, now: () => new Date() });
-    console.log("clean fixture:", JSON.stringify(cleanResult, null, 2));
-    const cleanHits = cleanResult.metrics.find((m) => m.id === "pii_hits_in_logs");
-    if (cleanHits.value !== 0) {
-      console.error(`FAIL: clean fixture reported ${cleanHits.value} hits, expected 0`);
+    const cleanHits = grepLoggerLines(findLoggerLines(cleanSample.join("\n")), new Set([FAKE_STUDENT_CUID]));
+    console.log("clean sample hits:", JSON.stringify(cleanHits, null, 2));
+    if (cleanHits.length !== 0) {
+      console.error(`FAIL: clean sample reported ${cleanHits.length} hits, expected 0`);
       process.exit(1);
     }
 
-    const violationResult = await run({ fixture: violationFixture, fixturePath, env: {}, log: console.log, now: () => new Date() });
-    console.log("violation fixture:", JSON.stringify(violationResult, null, 2));
-    const violationHits = violationResult.metrics.find((m) => m.id === "pii_hits_in_logs");
-    if (violationHits.value < 3) {
+    const violationHits = grepLoggerLines(
+      findLoggerLines(violationSample.join("\n")),
+      new Set([FAKE_STUDENT_CUID]),
+    );
+    console.log("violation sample hits:", JSON.stringify(violationHits, null, 2));
+    if (violationHits.length < 3) {
       console.error(
-        `FAIL: violation fixture (cuid + phone + email planted) reported only ${violationHits.value} hits — detection logic is not working`,
+        `FAIL: violation sample (cuid + phone + email planted) reported only ${violationHits.length} hits — detection logic is not working`,
       );
       process.exit(1);
     }
 
-    // The real (non-fixture) eslint check is worth proving works too, since
-    // self-test never exercises captureTestLog() — run it against the repo.
-    // A tooling timeout here (plausible under heavy CPU contention from
+    // The real (non-fixture) eslint check is worth proving works too. A
+    // tooling timeout here (plausible under heavy CPU contention from
     // sibling processes) is reported, not treated as a self-test failure —
     // it says nothing about whether the detection logic is correct.
     const eslintOnly = await countPiiEslintViolations();
