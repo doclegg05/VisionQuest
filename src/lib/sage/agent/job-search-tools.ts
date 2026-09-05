@@ -721,6 +721,14 @@ const explainJob: AgentTool = {
     // modelHint all reach the model on the next hop (loop.ts).
     const safe = sanitizePostingFields(job);
 
+    // The explanation is MODEL output written FROM third-party posting text,
+    // so it is a posting field too and gets the same treatment. `modelHint`
+    // already sanitized its copy; `data.explanation` did not, and loop.ts
+    // sends `data` back to the model verbatim — so a posting that talked the
+    // rewrite into emitting a delimiter re-entered the next turn as structure.
+    // One sanitized string now feeds both.
+    const safeExplanation = sanitizeForPrompt(explanation);
+
     return {
       status: "success",
       summary: `Here's "${safe.title}" at ${safe.company} in plain words.`,
@@ -728,7 +736,7 @@ const explainJob: AgentTool = {
         jobListingId: job.id,
         title: safe.title,
         company: safe.company,
-        explanation,
+        explanation: safeExplanation,
         readability: {
           grade: readability.grade,
           withinTarget: readability.withinTarget,
@@ -741,7 +749,7 @@ const explainJob: AgentTool = {
         // grounding block uses. A posting that smuggled an instruction through
         // the rewrite would otherwise re-enter the next turn as trusted prose.
         `Plain-language explanation of "${safe.title}" at ${safe.company}:\n` +
-        `${sanitizeForPrompt(explanation)}\n\n` +
+        `${safeExplanation}\n\n` +
         "Give this to the student as written, or shorter. Do not add facts to it — anything the " +
         `posting did not say must stay "${MISSING_FIELD_LINE}"`,
     };

@@ -16,7 +16,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import { isStaffRole } from "@/lib/api-error";
 import { recordStudentView } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { listManagedClasses } from "@/lib/classroom";
+import { listConnectClasses } from "@/lib/connect/classes";
 import { listEmployers } from "@/lib/connect/employers";
 import { readSubsidyFlags } from "@/lib/connect/employers-shared";
 import { listLeads } from "@/lib/connect/leads";
@@ -35,8 +35,9 @@ import { CERTIFICATIONS } from "@/lib/spokes/certifications";
  * the page costs a fixed handful of queries rather than one per row.
  *
  * Every student named on this page is a staff read of student data, so each
- * one is passed through `recordStudentView` — fired without awaiting, because
- * an audit sample must never make a page slower or fail to render.
+ * one is passed through `recordStudentView`, awaited via `allSettled` so the
+ * record survives the response being sent without a failed sample ever being
+ * able to break the page.
  *
  * Layout order is deliberate and has a gap in it: Phase 4's pipeline and
  * "follow-ups due today" belong ABOVE the boards, between the intro and
@@ -71,7 +72,7 @@ export default async function ConnectPage() {
       listLeads({ status: "open", limit: MAX_BOARD_LEADS }),
       listEmployers(),
       rankRoster({ leadsPerStudent: 3 }),
-      listManagedClasses(session),
+      listConnectClasses(session),
     ]);
 
     const counts = await summarizeLeadFits(openLeads.map((lead) => lead.id));
@@ -127,21 +128,27 @@ export default async function ConnectPage() {
     };
   });
 
-  // Fire-and-forget. `recordStudentView` swallows its own errors and is
-  // sampled once per actor/student/day, so awaiting up to a hundred of them
-  // would add latency to every page load and buy nothing.
+  // Every student named on this page is a staff read of student data, so the
+  // audit sample is AWAITED rather than fired and forgotten. `recordStudentView`
+  // swallows its own errors and `allSettled` never rejects, so a failed sample
+  // still cannot stop the page rendering — but a request that is abandoned when
+  // the response is sent would leave the read unrecorded, which is the one
+  // outcome an audit trail may not have. It is sampled once per
+  // actor/student/surface/day, so the steady-state cost is near zero.
   const namedStudents = new Set<string>([
     ...roster.map((entry) => entry.studentId),
     ...leads.flatMap((lead) => lead.blocked.map((student) => student.studentId)),
   ]);
-  for (const studentId of namedStudents) {
-    void recordStudentView({
-      actorId: session.id,
-      actorRole: session.role,
-      targetStudentId: studentId,
-      surface: "student_detail",
-    });
-  }
+  await Promise.allSettled(
+    [...namedStudents].map((studentId) =>
+      recordStudentView({
+        actorId: session.id,
+        actorRole: session.role,
+        targetStudentId: studentId,
+        surface: "student_detail",
+      }),
+    ),
+  );
 
   return (
     <div className="page-shell space-y-6">

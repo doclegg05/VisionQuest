@@ -82,7 +82,7 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
 
   let lead;
   try {
-    lead = await createLead(input, session.id);
+    lead = await createLead(input, session);
   } catch (error: unknown) {
     // createLead raises its own 404s for a class the caller does not manage
     // and for a contact at another employer; those messages are the useful
@@ -110,7 +110,7 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
 
   let lead;
   try {
-    lead = await updateLead(input);
+    lead = await updateLead(input, session);
   } catch (error: unknown) {
     if (error instanceof ApiError) throw error;
     throw notFound("That lead wasn't found.");
