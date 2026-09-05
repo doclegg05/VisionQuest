@@ -31,6 +31,7 @@
     "sage:rag:notes": "node scripts/sage-rag-notes.mjs",
     "sage:rag:activate": "node scripts/sage-rag-activate.mjs",
     "sage:rag:harness": "tsx scripts/sage-rag-harness.mjs",
+    "bench:suites:test": "tsx --test scripts/bench/suites/**/*.test.mjs",
     "sage:form:harness": "tsx scripts/sage-form-harness.mjs",
     "sage:form:selection:harness": "tsx scripts/sage-form-selection-harness.mjs",
     "catalog:generate": "tsx scripts/catalog/generate.mjs",

@@ -1,0 +1,14 @@
+{
+  "suite": "coverage",
+  "title": "Line coverage (include-all)",
+  "area": "quality",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/coverage.mjs",
+  "fixture": null,
+  "requires": [],
+  "metrics": [
+    { "id": "line_coverage", "unit": "ratio", "direction": "higher", "floor": 0.6, "tolerance": 0.01 },
+    { "id": "untested_modules", "unit": "count", "direction": "lower" }
+  ],
+  "notes": "Include-all technique (Node's --test-coverage-include only restricts which ALREADY-LOADED files are reported — it does NOT force-include a file nothing imports; verified experimentally, see scripts/bench/suites/lib/generate-import-all.mjs's header): a synthetic node:test file dynamically imports every eligible src/**/*.ts(x) file (excluding *.test.ts(x) and *.d.ts) exactly once, with a per-file try/catch so one unimportable module (e.g. one touching `window` at module scope) cannot blank out the run. That file runs IN THE SAME `tsx --test --experimental-test-coverage --test-reporter=lcov` invocation as the real `src/**/*.test.ts(x)` suite, so genuinely-tested files keep their real execution coverage and every other file gets at least its top-level-statement coverage instead of being silently absent. `untested_modules` = eligible files either absent from the lcov report (import failed — see details.importFailures) or present with zero lines hit. Floor 0.60, tolerance 0.01, per the design's owner-decision default #5 (never decreasing). CAVEAT on untested_modules: because a bare `import` always executes a module's top-level statements, force-importing a file usually gives it a nonzero line-hit count even when NO real test ever calls into it — measured on this repo, untested_modules read 0/842 even though npm test alone (no forced imports) leaves hundreds of files completely unloaded. This metric therefore only catches import failures and truly dead files (pure type re-exports, etc.), not 'nothing calls this'; the design's fuller definition ('source files with zero IMPORTING tests') needs a static/transitive import-graph walk from the real test files, which is future work, not part of this promotion. Measured on 2026-09-05 (commit at promotion time): line_coverage 0.6872 over 144064 candidate lines, full run took ~513s (~8.5 min) — this is a GATE-tier suite that reruns the whole unit suite plus 842 forced imports on every PR; flagged for Britt/A0 to weigh against moving it to nightly given the cost."
+}
