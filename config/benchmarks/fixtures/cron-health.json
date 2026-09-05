@@ -1,0 +1,4 @@
+{
+  "$comment": "cron-health reads live prod-readonly data (cron.job, cron.job_run_details, net._http_response, BackgroundJob) rather than a fixture corpus. This file exists only so bench:validate's 'every suite has a fixture' check has something to point at, and to pin the expected job count the metric's denominator is checked against — a change to scripts/lib/cron-health.mjs's EXPECTED_CRON_JOBS list should be a deliberate, reviewed change, not a silent shift in what '7/7' means.",
+  "expectedJobCount": 7
+}
