@@ -57,6 +57,37 @@ const LOCAL_JOB_PRIORITY_OPTIONS: Array<{
   },
 ];
 
+/**
+ * True when "WV Local Jobs" (careeronestop) is on for this class but the
+ * CareerOneStop keys have not been set — the class's default local-jobs
+ * source would otherwise fail silently. `sourceHealth` empty means the
+ * status call hasn't returned yet, so this deliberately reports false rather
+ * than flashing the nudge before real data loads.
+ */
+export function shouldShowCareerOneStopNudge(
+  sources: string[],
+  sourceHealth: JobSourceHealthResult[],
+): boolean {
+  if (!sources.includes("careeronestop")) return false;
+  const status = sourceHealth.find((source) => source.source === "careeronestop");
+  return status ? !status.configured : false;
+}
+
+export function CareerOneStopUnconfiguredNotice({
+  sources,
+  sourceHealth,
+}: {
+  sources: string[];
+  sourceHealth: JobSourceHealthResult[];
+}) {
+  if (!shouldShowCareerOneStopNudge(sources, sourceHealth)) return null;
+  return (
+    <p className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-[var(--error)]">
+      WV Local Jobs is not on yet. Ask your admin to add the CareerOneStop keys.
+    </p>
+  );
+}
+
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
     const data = await res.json();
@@ -510,7 +541,8 @@ export function JobConfigSection() {
               <label className="text-sm font-medium text-[var(--text-primary)] block mb-2">
                 Job Sources
               </label>
-              <div className="grid gap-3 lg:grid-cols-3">
+              <CareerOneStopUnconfiguredNotice sources={sources} sourceHealth={sourceHealth} />
+              <div className="mt-2 grid gap-3 lg:grid-cols-3">
                 {SOURCE_GROUPS.map((group) => (
                   <div key={group.mode} className="rounded-lg border border-[var(--border)] p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
