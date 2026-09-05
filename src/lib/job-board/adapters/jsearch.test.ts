@@ -1,6 +1,7 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { jsearchAdapter } from "./jsearch";
+import { logger } from "@/lib/logger";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_ABORT_TIMEOUT = AbortSignal.timeout;
@@ -87,6 +88,53 @@ describe("jsearch adapter", () => {
 
     assert.ok(capturedSignal instanceof AbortSignal, "expected fetch to receive an AbortSignal");
   });
+
+  it(
+    "skips one malformed item and still returns the rest, logging exactly one {source, index} warning",
+    async (t: TestContext) => {
+      const warnMock = t.mock.method(logger, "warn", () => {});
+      // A getter that throws on access simulates a genuinely corrupt row
+      // (the same class of failure as the reviewer's example: a USAJobs
+      // MatchedObjectDescriptor being undefined and property access
+      // throwing during normalization). JSON.stringify would itself throw
+      // on a getter like this, so this bypasses real serialization by
+      // returning a Response-shaped object whose `.json()` resolves
+      // directly to the raw values fetchJson reads — `fetchJson` only ever
+      // calls `.ok` and `.json()` on what fetch() returns.
+      const malformed = {
+        get job_title() {
+          throw new Error("corrupt row");
+        },
+        job_id: "bad",
+      };
+      const good = {
+        job_id: "good",
+        job_title: "Retail Associate",
+        employer_name: "Corner Store",
+        job_city: "Beckley",
+        job_state: "WV",
+        job_min_salary: null,
+        job_max_salary: null,
+        job_salary_currency: null,
+        job_salary_period: null,
+        job_description: "Stock shelves.",
+        job_apply_link: "https://example.com/apply/good",
+      };
+      globalThis.fetch = (async () => ({
+        ok: true,
+        json: async () => ({ data: [malformed, good] }),
+      })) as unknown as typeof fetch;
+
+      const jobs = await jsearchAdapter.fetchJobs("Beckley, WV", 25);
+
+      assert.equal(jobs.length, 1);
+      assert.equal(jobs[0].sourceId, "jsearch:good");
+      assert.equal(warnMock.mock.calls.length, 1);
+      const [message, context] = warnMock.mock.calls[0].arguments;
+      assert.equal(message, "Job source item failed to normalize");
+      assert.deepEqual(context, { source: "jsearch", index: 0 });
+    },
+  );
 
   it(
     "VQ-R-019: returns [] rather than hanging forever when the request's own timeout fires",

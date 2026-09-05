@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
-import { fetchJson } from "./shared";
+import { fetchJson, mapEachJob } from "./shared";
 
 /**
  * Adzuna adapter — aggregated job listings API.
@@ -59,7 +59,9 @@ export const adzunaAdapter: JobSourceAdapter = {
     const json = await fetchJson<AdzunaApiResponse>(url, {}, { logUrl: `${ADZUNA_BASE}?${logParams}` });
     const results: AdzunaResult[] = json?.results ?? [];
 
-    return results.map((r) => {
+    // mapEachJob isolates one malformed row from the rest of the batch —
+    // see its doc comment in ./shared.
+    return mapEachJob(results, "adzuna", (r) => {
       const salaryText =
         r.salary_min != null
           ? r.salary_max && r.salary_max !== r.salary_min

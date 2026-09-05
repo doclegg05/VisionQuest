@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
-import { fetchJson } from "./shared";
+import { fetchJson, mapEachJob } from "./shared";
 
 /**
  * JSearch adapter — uses RapidAPI's JSearch endpoint.
@@ -56,7 +56,11 @@ export const jsearchAdapter: JobSourceAdapter = {
     });
     const results: JSearchResult[] = json?.data ?? [];
 
-    return results.map((r) => {
+    // mapEachJob isolates one malformed row (e.g. an unexpectedly-shaped
+    // item that throws while reading a field) from the rest of the batch —
+    // see its doc comment in ./shared for why that beats both the old
+    // swallow-everything try/catch and a plain .map().
+    return mapEachJob(results, "jsearch", (r) => {
       const salaryText = formatJSearchSalary(r);
       return {
         title: r.job_title,
