@@ -254,6 +254,7 @@ function HiredForm({
 
   const wageNumber = Number(wage);
   const ready = /^\d{4}-\d{2}-\d{2}$/.test(startDate) && wageNumber > 0;
+  const [touched, setTouched] = useState(false);
 
   return (
     <div className="mt-4">
@@ -283,10 +284,22 @@ function HiredForm({
         className="mt-2 min-h-[44px] w-full rounded-lg border border-[var(--border)] px-3 py-2 text-base"
       />
 
+      {/* Never a silently dead button: say WHY it cannot be pressed. The
+          first cut just disabled it, which leaves an employer tapping a
+          control that does nothing and no way to find out what is missing. */}
+      {touched && !ready && (
+        <p className="mt-3 text-base text-[var(--ink-strong)]" role="alert">
+          Enter a start date and an hourly wage above $0.
+        </p>
+      )}
+
       <button
         type="button"
-        disabled={saving || !ready}
-        onClick={() => onSubmit(startDate, wageNumber)}
+        disabled={saving}
+        onClick={() => {
+          setTouched(true);
+          if (ready) onSubmit(startDate, wageNumber);
+        }}
         className={`${BUTTON} mt-4 w-full bg-[var(--accent-primary)] text-white disabled:opacity-50`}
       >
         Send
