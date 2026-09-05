@@ -120,3 +120,6 @@ broken-documents-backup-*.json
 /VisionQuest Media/
 *.fcpbundle
 *.fcpxml
+
+# Agent worktrees (isolated builder checkouts; never commit)
+.claude/worktrees/
