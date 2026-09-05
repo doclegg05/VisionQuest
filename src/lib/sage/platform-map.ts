@@ -345,7 +345,19 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     compact: "connect (leads, who fits, employer directory)",
     mechanics:
       "Leads come from a typed form, from a job posting on the class board (one click), or from a MACC job order. Fit is computed from the student's work profile, verified certifications and career clusters; a blocked student is listed with the reason. \"Batch to WorkForce WV\" exports the ready students as a CSV for the Business Services Rep.",
-    seeAlso: ["teacher-student-record"],
+    seeAlso: ["teacher-student-record", "teacher-connect-report"],
+  },
+  {
+    id: "teacher-connect-report",
+    name: "Connect Report",
+    roles: ["teacher"],
+    route: "/teacher/connect/report",
+    summary:
+      "The Connect funnel: where introductions stall (proposed through hired and retained), a self-directed comparison line, and the DoHS-facing export for the state statistical report.",
+    compact: "connect report (funnel, subsidy split, DoHS export)",
+    mechanics:
+      "Filterable by class, employer and date range. A connection counts at the furthest stage its history ever reached, so a closed or withdrawn connection that got an employer's interest still shows up there. The DoHS CSV export is instructor-scoped and audited.",
+    seeAlso: ["teacher-connect"],
   },
   {
     id: "teacher-manage",

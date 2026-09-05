@@ -113,9 +113,30 @@ const SERVER_ONLY_SPECIFIERS = [
     instead: "@/lib/connect/endorsement-shared",
     why: "it resolves an AI provider, which imports prisma from @/lib/db",
   },
+  // No -shared twin, and none is wanted: these two exist ONLY to read student
+  // data, so a client component reaching for either is a mistake in itself
+  // rather than an import of the wrong half.
+  {
+    specifier: "@/lib/connect/workforce-batch-query",
+    instead: "@/lib/connect/workforce-batch",
+    why: "it imports prisma from @/lib/db and reads consent",
+  },
+  {
+    specifier: "@/lib/connect/classes",
+    // No module to send them to: the classes belong to the server component
+    // that already loads them, and should arrive as props.
+    instead: null,
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/consent",
+    instead: null,
+    why: "it imports prisma from @/lib/db",
+  },
   // Phase 5. The settings page renders the SMS consent copy, which lives in
   // sms-policy-shared beside the quiet-hours and cap rules; the sending half
-  // imports prismaAdmin. schedule/replies/alerts have no client half at all.
+  // imports prismaAdmin. schedule/replies/alerts have no client half at all,
+  // so their escape hatch is the vocabulary a component would have been after.
   {
     specifier: "@/lib/nudges/sms-policy",
     instead: "@/lib/nudges/sms-policy-shared",
@@ -236,7 +257,7 @@ describe("client files never import or re-export a Prisma-backed module", () => 
         if (specifiers.includes(rule.specifier)) {
           violations.push(
             `${file.replace(process.cwd() + "/", "")} references "${rule.specifier}" ` +
-              `(${rule.why}) — use "${rule.instead}" instead`,
+              `(${rule.why}) — ${rule.instead ? `use "${rule.instead}" instead` : "pass the data down as props from a server component"}`,
           );
         }
       }
@@ -254,6 +275,9 @@ describe("client files never import or re-export a Prisma-backed module", () => 
     // a -shared module ever imports @/lib/db, the guard would be sending
     // components at the same break under a different name.
     for (const rule of SERVER_ONLY_SPECIFIERS) {
+      // Some rules have nowhere to send a component — the data belongs in
+      // props — and those carry `instead: null`.
+      if (!rule.instead) continue;
       const relative = rule.instead.replace("@/", "src/");
       const shared = readFileSync(join(process.cwd(), `${relative}.ts`), "utf8");
       assert.ok(

@@ -1788,19 +1788,47 @@ if (!SHOULD_RUN) {
       });
 
       it("a student may NOT drive any other status — sent, hired, viewed, not_now", async () => {
+        // THROWS, it does not return count 0 — the same mechanism as the
+        // teacher RETARGET case above. connection_update's USING admits the
+        // student's OWN row, so the row IS matched; the new status then fails
+        // WITH CHECK, and a WITH CHECK violation raises 42501 rather than
+        // filtering the row out.
+        //
+        // Contrast the cross-student case below, which DOES return count 0: a
+        // student fails USING on somebody else's row, so nothing is matched and
+        // there is nothing left to check. Expecting a count here (as the first
+        // cut did) tests for the one outcome this policy cannot produce.
         for (const status of ["sent", "hired", "viewed", "not_now", "interested"]) {
-          const updated = await asRole("student", fixtures.studentA, (tx) =>
-            tx.connection.updateMany({ where: { id: connectionA }, data: { status } }),
-          );
-          assert.equal(
-            updated.count,
-            0,
+          await assert.rejects(
+            () =>
+              asRole("student", fixtures.studentA, (tx) =>
+                tx.connection.updateMany({ where: { id: connectionA }, data: { status } }),
+              ),
+            /row-level security/i,
             `connection_update's WITH CHECK must refuse a student writing "${status}"`,
+          );
+
+          // The rejection aborts its transaction, so the row must still be
+          // "proposed". Without this the test would pass on a policy that threw
+          // AFTER writing — and the loop's later iterations would be starting
+          // from a status the student had already managed to set.
+          const after = await db.connection.findUnique({
+            where: { id: connectionA },
+            select: { status: true },
+          });
+          assert.equal(
+            after?.status,
+            "proposed",
+            `the student moved the connection to "${status}" before being refused`,
           );
         }
       });
 
       it("a student cannot touch another student's connection at all", async () => {
+        // Count 0, not a throw: Student A fails connection_update's USING on
+        // Student C's row, so the row is never matched and no WITH CHECK is
+        // reached. "withdrawn" would even be a legal status for its owner —
+        // which is the point, the refusal here is about whose row it is.
         const updated = await asRole("student", fixtures.studentA, (tx) =>
           tx.connection.updateMany({ where: { id: connectionC }, data: { status: "withdrawn" } }),
         );
@@ -1866,8 +1894,14 @@ if (!SHOULD_RUN) {
       });
 
       it("ConnectionEvent is APPEND-ONLY: no update and no delete, for anyone", async () => {
-        // No UPDATE or DELETE policy exists, so with RLS enabled every such
-        // statement matches zero rows — including for an admin session.
+        // Count 0, not a throw, and the reason is worth being exact about: the
+        // append-only property comes from the ABSENCE OF A POLICY for UPDATE
+        // and DELETE, not from withholding the privilege. The baseline's
+        // ALTER DEFAULT PRIVILEGES grants vq_app all four verbs on every table
+        // created in this schema, so the migration's narrower explicit GRANT
+        // takes nothing away. With RLS on and no policy for a command, no row
+        // is ever matched — so there is no USING to pass and no WITH CHECK to
+        // violate, for any role including admin.
         for (const role of ["student", "teacher", "admin"] as const) {
           const actor =
             role === "student"

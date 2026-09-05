@@ -25,6 +25,7 @@
 
 import { prisma } from "@/lib/db";
 
+import { ENROLLED_STATUSES } from "./classes";
 import { employerNameKey, readSubsidyFlags, type SubsidyFlags } from "./employers-shared";
 import { parseLeadRequirements, parseLeadSchedule } from "./leads-shared";
 import { fit, type FitResult, type MatchLead, type MatchStudent } from "./matching-shared";
@@ -237,16 +238,6 @@ interface Candidate {
     certifications: Array<{ certType: string }>;
   };
 }
-
-/**
- * Enrollment statuses that still count as "in the program".
- *
- * Mirrors visionquest.active_enrolled_class_ids() in the migration, and must
- * stay in step with it: a graduate IS the placement population, so cutting
- * `completed` would hide every class-scoped lead from exactly the students
- * this feature exists for. `withdrawn` is the status that ends access.
- */
-const ENROLLED_STATUSES = ["active", "completed"] as const;
 
 /**
  * One query for the whole candidate pool, with every per-student scoring input

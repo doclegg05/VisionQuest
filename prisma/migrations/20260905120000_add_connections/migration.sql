@@ -289,9 +289,17 @@ CREATE POLICY "connection_event_insert" ON "visionquest"."ConnectionEvent"
     )
   );
 
--- Deliberately NO update or delete policy, and no UPDATE/DELETE grant: with
--- RLS enabled and no policy for a command, every such statement matches zero
--- rows. That is what makes this table append-only.
+-- Deliberately NO update or delete policy. With RLS enabled and no policy for
+-- a command, no row is ever matched, so every UPDATE and DELETE affects zero
+-- rows — for every role, admin included. THAT is what makes this table
+-- append-only.
+--
+-- The narrower GRANT below is documentation, not the mechanism: the baseline's
+-- ALTER DEFAULT PRIVILEGES already grants vq_app SELECT/INSERT/UPDATE/DELETE
+-- on every table created in this schema, so it takes nothing away. Do not
+-- "harden" this table by revoking the privilege instead of keeping the policies
+-- absent — a REVOKE turns a silent zero-row result into a 42501 that callers
+-- would then have to handle.
 GRANT SELECT, INSERT ON "visionquest"."ConnectionEvent" TO vq_app;
 
 -- ---- OutboundMessage (staff read only) ----
