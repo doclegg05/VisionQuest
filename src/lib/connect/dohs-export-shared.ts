@@ -217,11 +217,19 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * PRIMARY SOURCE: `SpokesEmploymentFollowUp`, the SAME table grant-kpi.ts's
  * `threeMonthRetention`/`sixMonthRetention` read (src/lib/grant-kpi.ts:
  * checkpointMonths 3|6, status "employed"). Its `checkpointMonths` values
- * are NOT fixed to 3 and 6: `src/lib/nudges/replies.ts`'s
- * `handleRetentionAnswer` writes 1/2/3 (the 30/60/90-DAY SMS check-in,
- * mapped day/30 -> months) for BOTH "employed" and "not_employed" answers,
- * and the teacher-entry route (`teacher/students/[id]/spokes/follow-up`)
- * accepts any positive integer a staff member types in. So this function
+ * are NOT fixed to 3 and 6: the teacher-entry route
+ * (`teacher/students/[id]/spokes/follow-up`) accepts any positive integer a
+ * staff member types in, and it is now the ONLY writer of this table. The
+ * 30/60/90-DAY SMS check-in (`src/lib/nudges/replies.ts`'s
+ * `handleRetentionAnswer`) used to write here too under a day/30 ->
+ * checkpointMonths mapping (1/2/3) for both "employed" and "not_employed"
+ * answers; the Phase 5 fix pass (2026-09) removed that write entirely
+ * (row 618cd29). A student's "yes"/"no" text reply now moves the Connect
+ * pipeline directly — `tryTransition` to `retained_30`/`retained_60`/
+ * `retained_90` on "still working", or to `closed` with
+ * `closedReason: "retention_lost"` on "no" — and raises a
+ * `connect_retention_confirm` (or `connect_retention_lost`) alert asking
+ * staff to reconcile it into the official SPOKES record. So this function
  * never assumes a specific checkpoint cadence — it looks at every
  * follow-up's actual `checkedAt` date relative to the employment start date
  * (`unsubsidizedEmploymentAt`): retainedN = true iff SOME "employed"
@@ -252,6 +260,15 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * reached retained_60 first — reading current status alone (the pre-fix
  * behavior) reported "not retained" for exactly the connections whose
  * retention actually happened.
+ *
+ * Since the Phase 5 fix pass, this fallback is not an edge case — it is the
+ * ONLY place SMS-confirmed retention lives until a staff member acts on the
+ * `connect_retention_confirm`/`connect_retention_lost` alert and enters the
+ * official checkpoint into `SpokesEmploymentFollowUp` themselves. A student
+ * who texts back "still working" at day 60 shows up here via the
+ * `retained_60` event the reply wrote, NOT via a follow-up row — there
+ * isn't one yet, and may never be if staff record it under a different
+ * `checkpointMonths` value than the SMS day implies.
  *
  * Self-directed placements have no Connection at all, so they fall through
  * to `false/false/false` only when they ALSO have zero follow-ups — the bug
