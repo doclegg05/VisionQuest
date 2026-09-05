@@ -28,12 +28,22 @@ export async function loginContext(
   });
 
   if (!response.ok()) {
+    const status = response.status();
     const body = await response.text().catch(() => "<unreadable>");
     await context.close();
-    throw new Error(
-      `Login failed for ${user.login}: HTTP ${response.status()} ${body} — ` +
-        "did the fixture seed run? (npx tsx scripts/seed-e2e-users.ts)",
-    );
+    // A 429 here is almost always /api/auth/login's own 10-attempts-per-IP
+    // limiter (see this file's header) rather than a seeding problem — a
+    // gate step that runs several login-heavy collectors under one shared
+    // IP in the same `--workers=1` invocation can exhaust it before every
+    // spec gets to run (PR review round 2). The seed hint stays for every
+    // OTHER status, since a real seed gap (401/404) looks nothing like this.
+    const hint =
+      status === 429
+        ? "the per-IP login rate limit (10/15min) is exhausted, not a seed problem — " +
+          "either this spec ran too many logins on its own, or another collector in the " +
+          "same CI step already used up the budget"
+        : "did the fixture seed run? (npx tsx scripts/seed-e2e-users.ts)";
+    throw new Error(`Login failed for ${user.login}: HTTP ${status} ${body} — ${hint}`);
   }
 
   return context;
