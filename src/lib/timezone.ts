@@ -128,3 +128,62 @@ export function programYearBoundsUtc(
     end: zonedTimeToUtc(pyNum, 7, 1, 0, 0, 0, timeZone),
   };
 }
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A `"YYYY-MM-DD"` calendar day, one day later, expressed as {year, month}.
+ * Plain UTC calendar arithmetic (no timezone math) — `zonedTimeToUtc` is what
+ * turns the result into a real instant.
+ */
+function dayAfter(year: number, month: number, day: number): { year: number; month: number; day: number } {
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return { year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate() };
+}
+
+/**
+ * Report date-range bounds for a `"YYYY-MM-DD"`-only `from`/`to` pair, e.g. a
+ * teacher report's query params.
+ *
+ * `from` becomes the ET-cohort START of that calendar day (inclusive);
+ * `to` becomes the ET-cohort START of the day AFTER (exclusive) — so a
+ * `createdAt >= from && createdAt < to` filter covers every instant of the
+ * `to` calendar day in Eastern Time.
+ *
+ * This exists because `new Date("2026-06-30")` parses as UTC midnight, which
+ * is 7-8pm ET on 2026-06-29 — a naive `to` bound silently drops the last
+ * day's evening for this cohort (the same class of bug `monthBoundsInZone`
+ * and `programYearBoundsUtc` already guard against at coarser granularity).
+ *
+ * Anything that is not exactly `YYYY-MM-DD` is passed to `new Date()`
+ * unchanged — callers that already validated the query param with a
+ * `YYYY-MM-DD` regex (every report route in this codebase does) never hit
+ * that branch; it exists so a malformed value fails as "invalid date"
+ * rather than silently vanishing here.
+ */
+export function reportDateRangeBoundsUtc(
+  from?: string,
+  to?: string,
+  timeZone: string = COHORT_TIME_ZONE,
+): { from?: Date; to?: Date } {
+  let fromBound: Date | undefined;
+  if (from) {
+    const match = DATE_ONLY.exec(from);
+    fromBound = match
+      ? zonedTimeToUtc(Number(match[1]), Number(match[2]), Number(match[3]), 0, 0, 0, timeZone)
+      : new Date(from);
+  }
+
+  let toBound: Date | undefined;
+  if (to) {
+    const match = DATE_ONLY.exec(to);
+    if (match) {
+      const next = dayAfter(Number(match[1]), Number(match[2]), Number(match[3]));
+      toBound = zonedTimeToUtc(next.year, next.month, next.day, 0, 0, 0, timeZone);
+    } else {
+      toBound = new Date(to);
+    }
+  }
+
+  return { from: fromBound, to: toBound };
+}
