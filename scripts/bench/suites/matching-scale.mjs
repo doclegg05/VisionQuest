@@ -38,7 +38,24 @@ import { percentile } from "../../lib/percentile.mjs";
 import { selfTest } from "../lib/self-test.mjs";
 
 export const SCALES = Object.freeze([1, 10, 50]);
-const WARMUP_STUDENTS = 20;
+
+// One GLOBAL warm-up, before any scale is timed, replaces a per-scale
+// slice(0, 20) that left the JIT cold enough for a few of each scale's
+// OWN first timed calls to still be mid-warm-up. That mattered because of
+// how nearest-rank percentiles dilute with n: at 1x (n=50) the top 5% is
+// only 2-3 students, so a couple of residual-cold calls landed IN the p95
+// sample and inflated it; at 50x (n=2500) the same couple of cold calls
+// are 125-deep in the tail and invisible. p95/p50 measured 6.8x at 1x vs
+// 1.8x at 50x with p50 itself flat — a warm-up-dilution artifact, not a
+// real scaling signal (PR review round 2). The tiling design keeps each
+// student's visible-lead COUNT flat across every scale (header comment
+// above), so the (matchStudent, matchLeads) object shapes rankLeadFits
+// sees are the same at 1x/10x/50x — a warm-up on 1x-shaped inputs is
+// representative of all three, and one pass through the whole 1x cohort
+// is not itself "substantial": WARMUP_PASSES repeats it until the
+// per-call time has visibly flattened (checked empirically, see the
+// scorer's --self-test log and the config notes for the five-run numbers).
+const WARMUP_PASSES = 25;
 
 /** Fisher-Yates over indices [0, n), seeded — never Math.random(). */
 export function shuffledIndices(n, rng) {
@@ -125,6 +142,25 @@ export function logLogSlope(points) {
   return denominator === 0 ? null : numerator / denominator;
 }
 
+/**
+ * The one global warm-up (see WARMUP_PASSES's comment): builds the 1x-tiled
+ * cohort, then calls rankLeadFits WARMUP_PASSES times over every student in
+ * it, entirely discarded. Runs once, before any scale is timed.
+ */
+function warmUp(baseCohort, priority) {
+  const rng = createRng("matching-scale-warmup");
+  const warmupCohort = buildScaledCohort(baseCohort, 1, rng);
+  const prepared = warmupCohort.students.map((student) => ({
+    matchStudent: toMatchStudent(warmupCohort, student),
+    matchLeads: visibleLeadsFor(warmupCohort, student).map(toMatchLead),
+  }));
+  for (let pass = 0; pass < WARMUP_PASSES; pass += 1) {
+    for (const { matchStudent, matchLeads } of prepared) {
+      rankLeadFitsRef(matchStudent, matchLeads, priority);
+    }
+  }
+}
+
 /** One scale's measurement: builds the tiled cohort, times rankLeadFits per student, returns per-student ms plus totals. */
 function measureScale(baseCohort, multiplier, seed, priority) {
   const rng = createRng(seed);
@@ -137,13 +173,9 @@ function measureScale(baseCohort, multiplier, seed, priority) {
     matchLeads: visibleLeadsFor(scaled, student).map(toMatchLead),
   }));
 
-  // Warm up the JIT on a slice before the timed pass, per the task's
-  // instruction — an untimed cold-start call is otherwise folded into
-  // whichever scale runs first and makes 1x look artificially slow.
-  for (const { matchStudent, matchLeads } of prepared.slice(0, WARMUP_STUDENTS)) {
-    rankLeadFitsRef(matchStudent, matchLeads, priority);
-  }
-
+  // No per-scale warm-up here anymore — see WARMUP_PASSES's comment. The
+  // one global warm-up in run() covers all three scales because the
+  // object shapes it sees are the same ones every scale sees.
   const perStudentMs = prepared.map(({ matchStudent, matchLeads }) => {
     const startedAt = performance.now();
     rankLeadFitsRef(matchStudent, matchLeads, priority);
@@ -166,6 +198,8 @@ export async function run(ctx) {
   const priority = "prefer_local";
   const byScale = {};
 
+  warmUp(cohort, priority);
+
   for (const multiplier of SCALES) {
     const { studentCount, leadCount, perStudentMs } = measureScale(
       cohort,
@@ -180,7 +214,14 @@ export async function run(ctx) {
     );
   }
 
-  const exponent = logLogSlope(SCALES.map((m) => ({ x: m, y: byScale[m].p95Ms })));
+  // p50, not p95: p95 is a nearest-rank percentile over n samples, and the
+  // top 5% is 2-3 students at n=50 (1x) vs 125 at n=2500 (50x) — one or two
+  // outlier calls (GC pause, host jitter) land IN the 1x sample and are
+  // invisible in the 50x one, so p95 is not comparable ACROSS scales the
+  // way it is fine to floor WITHIN one scale (still done above). p50 is far
+  // more robust to that dilution and is what the warm-up fix (WARMUP_PASSES)
+  // was verified against — see the config notes for five consecutive runs.
+  const exponent = logLogSlope(SCALES.map((m) => ({ x: m, y: byScale[m].p50Ms })));
 
   const round = (value) => Number(value.toFixed(4));
 
