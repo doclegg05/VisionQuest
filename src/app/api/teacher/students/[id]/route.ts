@@ -317,7 +317,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     ...student.formSubmissions.map((s) => s.fileId),
     ...student.formSubmissions.map((s) => s.signatureFileId).filter(Boolean),
   ].filter(Boolean) as string[];
-  const [orientationItems, certTemplates, formFiles] = await Promise.all([
+  const [orientationItems, certTemplates, formFiles, workProfile] = await Promise.all([
     prisma.orientationItem.findMany({
       orderBy: { sortOrder: "asc" },
     }),
@@ -336,6 +336,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           },
         })
       : Promise.resolve([]),
+    // Match & Connect Phase 2. Folded into the existing batch rather than
+    // awaited on its own: this route already exhausts the Supavisor session
+    // pool on /teacher/students/[id] (see the readiness comment below), and a
+    // serial round trip for one PK lookup is exactly the shape that does it.
+    getWorkProfile(studentId),
   ]);
   const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
@@ -431,8 +436,6 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     links: goalPlans.flatMap((plan) => plan.links),
     evidenceEntries: goalEvidence,
   }));
-
-  const workProfile = await getWorkProfile(studentId);
 
   const activeEnrollment =
     student.classEnrollments.find((enrollment) => enrollment.status === "active") ??

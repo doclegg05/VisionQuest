@@ -90,6 +90,26 @@ export async function generateStudentArchive(
       resumeData: {
         select: { data: true },
       },
+      // Match & Connect Phase 2: the work profile is student-owned PII (home
+      // ZIP, transport, pay floor, childcare hours) with its own retention
+      // row, so export-before-deactivate has to carry it. Leaving it out
+      // would delete a class of data the student never got a copy of.
+      workProfile: {
+        select: {
+          availability: true,
+          transport: true,
+          homeZip: true,
+          county: true,
+          maxCommuteMinutes: true,
+          payFloorHourly: true,
+          childcareHours: true,
+          earliestStart: true,
+          shiftLimits: true,
+          createdAt: true,
+          updatedAt: true,
+          updatedVia: true,
+        },
+      },
     },
   });
 
@@ -222,7 +242,16 @@ export async function generateStudentArchive(
     manifest.fileCount++;
   }
 
-  // 6. Add manifest
+  // 6. Work profile as JSON (student-owned availability/transport/pay answers)
+  if (student.workProfile) {
+    archive.append(JSON.stringify(student.workProfile, null, 2), {
+      name: "work-profile.json",
+    });
+    manifest.entries.push({ path: "work-profile.json", type: "work_profile" });
+    manifest.fileCount++;
+  }
+
+  // 7. Add manifest
   archive.append(JSON.stringify(manifest, null, 2), { name: "manifest.json" });
 
   await archive.finalize();

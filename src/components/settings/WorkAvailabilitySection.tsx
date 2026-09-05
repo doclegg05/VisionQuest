@@ -75,8 +75,8 @@ export function WorkAvailabilitySection() {
       try {
         const res = await fetch("/api/work-profile");
         if (!res.ok) return;
-        const data = (await res.json()) as { workProfile: WorkProfile | null };
-        const profile = data.workProfile;
+        const body = (await res.json()) as { data?: { workProfile: WorkProfile | null } };
+        const profile = body.data?.workProfile ?? null;
         if (!profile) return;
         setAvailability(profile.availability);
         setTransport(profile.transport ?? "");
