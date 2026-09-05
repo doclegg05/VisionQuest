@@ -92,6 +92,16 @@ const SCAN_ROOTS = [
   { label: "components/chat", relPath: "src/components/chat" },
   { label: "components/student", relPath: "src/components/student" },
   { label: "next-step copy data (src/lib carve-out)", relPath: "src/lib/progression/student-next-step.ts" },
+  // Match & Connect Phase 4. Three surfaces that were outside every root:
+  // the Settings consent toggles a student reads before turning employer
+  // introductions on or off; the job-developer console, whose copy an
+  // instructor reads but whose student-facing strings (status phrases, packet
+  // field labels) come straight from the same helpers the student sees; and
+  // the public employer response page, which is read by someone with no
+  // account and no context at all.
+  { label: "components/settings", relPath: "src/components/settings" },
+  { label: "components/teacher/connect", relPath: "src/components/teacher/connect" },
+  { label: "public employer response page", relPath: "src/app/connect" },
 ];
 
 // ---------------------------------------------------------------------------

@@ -30,9 +30,16 @@ const restrictedSyntaxEverywhere = [
   // StudentWorkProfile (Match & Connect Phase 2): a home ZIP beside a class
   // roster is close to an address, and a childcare note is the student's own
   // words about their household.
+  //
+  // Phase 4 adds the Connection identifiers. `connectionId` resolves to one
+  // student's disclosure record; `token` and `employerTokenHash` are a live
+  // capability URL for a stranger and its lookup key; `contactEmail` is a
+  // third party's address (which SMTP errors quote back — see
+  // redactContactInfo); `candidateName` is the student's own name, abbreviated
+  // but still theirs.
   {
     selector:
-      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile)$/]",
+      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile|connectionId|token|employerTokenHash|contactEmail|candidateName)$/]",
     message:
       "No student identifier in server logs. Use studentLogKey(studentId) from @/lib/log-keys for a correlation key, or drop the field.",
   },
