@@ -138,6 +138,16 @@ export function clientIpFrom(req: Request): string | null {
   //
   // 45 is the longest possible textual IPv6 address
   // (an IPv4-mapped form: 45 characters), so no real client is truncated.
+  //
+  // THE TRADE, stated so nobody has to rediscover it: everything that lands in
+  // `"unknown"` shares ONE bucket, so a single spoofer sending malformed
+  // headers can exhaust it and make the unknown-token limit refuse legitimate
+  // traffic that also landed there. That is the direction to fail — an
+  // employer with a real token never reaches this bucket, and refusing
+  // guesses is what it is for. It also catches IPv6 zone ids ("fe80::1%eth0",
+  // whose "%" is not in the shape test), which collapse to the shared bucket
+  // rather than getting one each; a link-local address is not a public client
+  // in this deployment, so that costs nothing real.
   if (first.length > MAX_FORWARDED_IP_CHARS || !IP_SHAPED.test(first)) return "unknown";
   return first;
 }

@@ -28,8 +28,13 @@ export * from "./pipeline-shared";
  * transaction client. Kept structural rather than importing a concrete type so
  * a caller inside `$transaction` can pass its `tx`.
  *
- * Passing one means "I have already opened a transaction; run inside it".
- * Omitting it means "open one for me".
+ * Passing one says WHICH client to write through, and nothing about
+ * transactions: `withTransaction` asks the client itself whether it can open
+ * one. So `prismaAdmin` (the employer path, no session) gets wrapped, a `tx`
+ * inside a caller's own `$transaction` runs directly, and omitting the field
+ * uses the app client. The earlier contract here read "passing one means I
+ * have already opened a transaction", which was true of one call site out of
+ * seven and left the other six writing unwrapped.
  *
  * Typed STRUCTURALLY, by the three calls this module makes, rather than as
  * `Pick<PrismaClient, …>`. Three different clients have to satisfy it — the
