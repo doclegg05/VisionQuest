@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withRegistry } from "@/lib/registry/middleware";
 import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { getWorkProfile } from "@/lib/connect/work-profile";
 import { prisma } from "@/lib/db";
 import {
   buildGoalEvidenceEntries,
@@ -157,6 +158,8 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           status: true,
           updatedAt: true,
           appliedAt: true,
+          // Feeds the per-application Verify action on the Progress tab.
+          verificationStatus: true,
           opportunity: {
             select: {
               id: true,
@@ -316,7 +319,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     ...student.formSubmissions.map((s) => s.fileId),
     ...student.formSubmissions.map((s) => s.signatureFileId).filter(Boolean),
   ].filter(Boolean) as string[];
-  const [orientationItems, certTemplates, formFiles] = await Promise.all([
+  const [orientationItems, certTemplates, formFiles, workProfile] = await Promise.all([
     prisma.orientationItem.findMany({
       orderBy: { sortOrder: "asc" },
     }),
@@ -335,6 +338,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           },
         })
       : Promise.resolve([]),
+    // Match & Connect Phase 2. Folded into the existing batch rather than
+    // awaited on its own: this route already exhausts the Supavisor session
+    // pool on /teacher/students/[id] (see the readiness comment below), and a
+    // serial round trip for one PK lookup is exactly the shape that does it.
+    getWorkProfile(studentId),
   ]);
   const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
@@ -532,6 +540,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           completedAt: student.careerDiscovery.completedAt,
         }
       : null,
+    // Match & Connect Phase 2: the student's own answers about when and how
+    // they can work. Read through the same helper the student surfaces use so
+    // stored JSON is parsed, not trusted. recordStudentView above covers this
+    // read — it is the same surface.
+    workProfile,
   });
 });
 

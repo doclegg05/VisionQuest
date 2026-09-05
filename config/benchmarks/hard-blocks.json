@@ -1,0 +1,28 @@
+{
+  "suite": "hard-blocks",
+  "title": "Hard-block correctness",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/hard-blocks.mjs",
+  "fixture": "config/benchmarks/fixtures/hard-blocks.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "blocks_expected_fired",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 1,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "false_blocks",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    }
+  ],
+  "notes": "All 2,000 cohort pairs plus the fixture's extra withdrawal cases (the cohort has no withdrawn-from-employer history, so that one code needs supplying). Expected blocks are derived MECHANICALLY from the seven rules in the design spec §5, re-implemented independently of src/lib/connect/matching-shared.ts — an agreement between the code and a copy of itself proves nothing. A false block is the failure that matters most: it hides a real job from a student with no error anywhere."
+}

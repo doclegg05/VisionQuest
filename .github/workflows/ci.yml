@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: nothing in this workflow writes to the repository, opens an
+# issue, or touches a deployment. Declaring it at the workflow level means a
+# job added later starts read-only rather than inheriting whatever the
+# repository default happens to be.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -80,7 +87,46 @@ jobs:
         # draft-PR-before-CI-watch ordering, never-merge language, named agent
         # references). Runs each scripts/validate-*-pipeline-command.mjs via
         # the umbrella script — add new siblings there, not here. DB-free.
+        #
+        # The umbrella also runs bench:validate (the benchmark suite's
+        # five-part check). The explicit bench:validate step below is
+        # deliberate duplication: it costs milliseconds and names the failing
+        # gate in the job log instead of hiding it inside the umbrella.
         run: npm run pipelines:validate
+
+      - name: Platform map validation
+        # Reconciles src/lib/sage/platform-map.ts against the real App Router
+        # routes and the tool registry. It has always exited 1 on drift and
+        # until now ran in NO workflow — which is how 11 unmapped entries
+        # drifted in before PR #173 (2026-09-05 benchmark-suite design, §2:
+        # "three instruments that look like safety nets are inert"). DB-free:
+        # the fake DATABASE_URL above is only needed for the Prisma import.
+        run: npm run platform:validate
+
+      - name: Validate benchmark suites
+        # The five-part check on every config/benchmarks/*.json: config parses,
+        # scorer exists and exports run(ctx), declared fixture exists and stays
+        # inside the checkout, every metric carries a unit and — whenever it
+        # declares a numeric floor — an explicit direction, gate- and
+        # nightly-tier metrics carry a floor, "exact", or a documented
+        # "floor": null plus a reason, tier and requires come from the contract
+        # vocabulary, and a local-model suite records its host. Filesystem-only
+        # — it never imports a scorer. See docs/runbooks/benchmarks.md.
+        run: npm run bench:validate
+
+      - name: Benchmark runner unit tests
+        # The runner decides what a gate means, so its own verdict function,
+        # env mapping, schema check and CLI exit codes are unit-tested. These
+        # live under scripts/bench/__tests__/ (.mjs), outside `npm test`'s
+        # src/**/*.test.ts glob, so they need their own step.
+        run: npm run bench:test
+
+      - name: Benchmark scorer unit tests
+        # The scorers' own tests, same reason: scripts/bench/suites/**/*.test
+        # .mjs sits outside every other glob and so ran in no workflow at all.
+        # Keep the glob QUOTED in package.json — unquoted, the shell expands
+        # `**` one level and silently runs 47 of the 153 cases.
+        run: npm run bench:suites:test
 
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
@@ -134,6 +180,44 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RATE_LIMIT_DB_TEST_ENABLED: "true"
+
+      # --- Gate-tier benchmarks ------------------------------------------
+      # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
+      # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
+      # crosses its floor. Suites whose `requires` are unmet report `skipped`
+      # and never fail the run, so the Gemini-backed and prod-read-only suites
+      # stay quiet here (they belong to benchmarks.yml, nightly).
+      #
+      # Placed after the migrate step so a suite that requires `postgres` or
+      # `cohort` meets a real, migrated schema in the hermetic pgvector
+      # service. DATABASE_URL is overridden for this step only — the verify
+      # job's default is deliberately a fake URL.
+      - name: Seed the synthetic benchmark cohort
+        # Owned by the Connect benchmark phase (A3). Guarded so this workflow
+        # is correct before that script lands and needs no edit after.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
+          fi
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+
+      - name: Gate-tier benchmarks
+        run: npm run bench -- --tier=gate --compare
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-pr
+          path: reports/benchmarks/latest/
+          if-no-files-found: ignore
 
       - name: Build
         run: npm run build
@@ -216,6 +300,42 @@ jobs:
         # student. Removable with --clean.
         run: npx tsx scripts/seed-e2e-users.ts
 
+      - name: Seed the synthetic benchmark cohort
+        # e2e/bench-connect-journey.spec.ts, e2e/bench-journey-day1.spec.ts
+        # and e2e/bench-journey-teacher-loop.spec.ts log in as cohort people
+        # (BENCH_INSTRUCTOR/BENCH_JOURNEY_STUDENT, e2e/bench-fixtures.ts) —
+        # cbenchinstr1 acting on cbenchstu01 — not the e2e fixture users
+        # above, so without this step they have no instructor to log in as
+        # and report `skipped` forever, the quiet-instrument failure this
+        # suite exists to prevent. bench-page-timing.spec.ts deliberately
+        # does NOT need this seed (PR review round 2): it only needs a
+        # logged-in student and teacher to render four pages, no Connect-
+        # specific cohort state, so it logs in as the plain E2E_STUDENT/
+        # E2E_TEACHER above instead — sharing this step's cbench accounts
+        # across a fourth collector was adding load to the same 5-per-account
+        # login budget the three Connect specs above already share.
+        #
+        # The two seeds are safe to run together because their delete scopes
+        # are disjoint by construction: seed-cohort scopes every deleteMany to
+        # `{ startsWith: "cbench" }`, and seed-e2e-users to its three e2e-*
+        # logins plus the e2e class code. Neither can reach the other's rows.
+        #
+        # Ordering: after `migrate deploy` so it meets a real schema, and
+        # before the first `playwright test` — which is when the webServer
+        # boots — so the app never serves a half-seeded database. This job's
+        # DATABASE_URL is already the real hermetic Postgres (set at job
+        # level), so no per-step override is needed here.
+        #
+        # Guarded the same way as the verify job's identically-named step, so
+        # this workflow is correct before the script lands and needs no edit
+        # after.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort-backed e2e benchmarks will fail their login."
+          fi
+
       - name: Build
         run: npm run build
 
@@ -233,6 +353,128 @@ jobs:
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
+
+      # --- Browser-collected benchmarks -----------------------------------
+      - name: Collect browser benchmark data (non-blocking)
+        # Non-blocking for the same reason as the soak scan below: a collector
+        # that breaks is reported by the runner as an `error` row in the table
+        # and the uploaded artifact rather than by reddening the gating e2e job.
+        # touch-targets, axe-authenticated and page-timing are watch tier
+        # today, so a broken one of those three is silently informative only.
+        #
+        # For the two GATE-tier journey suites that is still honest rather than
+        # quiet: their scorers return `{ skipped }` when the raw report is
+        # missing, the runner turns that into a suite-level `error` because the
+        # environment says browser and server ARE available, and `--compare`
+        # exits 1 on an error at gate tier. So a broken journey collector fails
+        # the scoring step below by design; it just does not mask which step
+        # actually broke. When a watch-tier suite here is promoted to gate (see
+        # docs/runbooks/benchmarks.md), drop continue-on-error here entirely.
+        #
+        # --workers=1: the login limiter counts every attempt, and parallel
+        # specs sharing one IP and one fixture account exhaust it (10 per IP
+        # and 5 per USER per 15 minutes — see the re-seed step above for which
+        # one actually binds). playwright.config.ts already sets it under CI;
+        # named here because these specs would be the first to notice.
+        continue-on-error: true
+        # ONE COLLECTOR PER INVOCATION, login rate limits cleared between.
+        #
+        # THE PROBLEM. `/api/auth/login` applies two limiters: `login:<ip>` at
+        # 10 attempts per 15 minutes, and `login:user:<studentId>` at **5**.
+        # Their buckets are `RateLimitEntry` ROWS, so they outlive the webServer
+        # that each `playwright test` invocation boots and are shared by every
+        # step running against this job's one database. Every spec here signs in
+        # as the same handful of fixture accounts, so the per-user cap binds
+        # first — measured, the refusal lands on the 6th attempt, not the 11th.
+        #
+        # A single invocation of all six does not fit that budget, measurably:
+        # run locally against a real server, `login:<ip>` reached 15 during the
+        # collection step ALONE, against a cap of 10. Clearing the buckets once
+        # before the step is necessary but not sufficient.
+        #
+        # RETRIES ARE WHY. playwright.config.ts sets `retries: 2` under CI, so a
+        # failing spec makes three attempts and spends its logins three times.
+        # These collectors are `continue-on-error` — they are EXPECTED to fail
+        # sometimes — so a design where one failing collector starves the rest
+        # of the step is exactly backwards: it converts one broken instrument
+        # into six missing measurements. (Live example: bench-page-timing
+        # currently 401s on `bench-student-01`, a fixture nothing here seeds,
+        # and its retries were consuming the budget the journey collectors
+        # needed.)
+        #
+        # Looping keeps each collector's failures its own. The cost is one
+        # webServer boot per spec, because playwright.config.ts sets
+        # `reuseExistingServer: !process.env.CI` — deliberate, so CI never
+        # scores against a stale server. `|| true` per spec preserves the
+        # step's continue-on-error semantics at the individual level, and the
+        # scoring step below is what actually reports each suite's verdict.
+        #
+        # The reset is the fixture seed itself: idempotent, it already clears
+        # these buckets for exactly this reason (see its "Login rate limits"
+        # block), it returns the journey student to the day-1 state
+        # bench-journey-day1 measures, and it refuses any non-local, non-CI
+        # database by construction (src/lib/e2e-seed-guard.ts).
+        #
+        # NOT done by disabling the limiter. VISIONQUEST_DISABLE_RATE_LIMITS is
+        # read at exactly two call sites (chat send, crisis-scan) — never the
+        # auth path — and `rateLimitsDisabled()` returns false whenever
+        # NODE_ENV=production, which `npm run start` always is, since
+        # .next/standalone/server.js sets it. Reaching the login limiter with
+        # that switch would mean widening a brute-force control's bypass to
+        # satisfy a benchmark.
+        run: |
+          for spec in \
+            e2e/bench-touch-targets.spec.ts \
+            e2e/bench-axe-authenticated.spec.ts \
+            e2e/bench-page-timing.spec.ts \
+            e2e/bench-journey-day1.spec.ts \
+            e2e/bench-journey-teacher-loop.spec.ts \
+            e2e/bench-connect-journey.spec.ts
+          do
+            echo "::group::collect $spec"
+            npx tsx scripts/seed-e2e-users.ts >/dev/null
+            npx playwright test "$spec" --workers=1 --reporter=line --timeout=180000 || true
+            echo "::endgroup::"
+          done
+        env:
+          # connect-journey asserts the employer email actually reached an
+          # outbox, so the SERVER has to divert mail to a directory the spec
+          # can read. Playwright starts the webServer as a child of THIS step,
+          # so setting it here reaches both sides; naming it explicitly beats
+          # relying on both processes defaulting to the same relative path.
+          EMAIL_SINK_DIR: "${{ github.workspace }}/.bench-outbox"
+          # The sink refuses itself in production, and `npm run start` IS
+          # production — the standalone server sets NODE_ENV itself, which is
+          # why this step's mail was silently going nowhere and the send route
+          # 503'd. This opt-in is one of two locks; the other is that
+          # DATABASE_URL must be a local or *_ci/*_local database, which this
+          # job's hermetic Postgres is and no real deployment is. See
+          # src/lib/email.ts.
+          EMAIL_SINK_ALLOW_HERMETIC: "1"
+
+      - name: Score browser benchmarks
+        env:
+          # The runner's `requires` check reads presence only; the collectors
+          # above already drove the real browser against the job's own server.
+          PLAYWRIGHT: "1"
+          BENCH_BASE_URL: "http://localhost:3000"
+        run: >-
+          npm run bench --
+          --suite=touch-targets
+          --suite=axe-authenticated
+          --suite=page-timing
+          --suite=journey-day1
+          --suite=journey-teacher-loop
+          --suite=connect-journey
+          --compare
+
+      - name: Upload browser benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-e2e
+          path: reports/benchmarks/latest/
+          if-no-files-found: ignore
 
       - name: Authenticated a11y scans (soak — red baseline, non-blocking)
         # Zero-violation bar per route; fails today by design (see the job

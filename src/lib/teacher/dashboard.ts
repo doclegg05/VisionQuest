@@ -18,13 +18,17 @@ import {
   normalizeInactivityAlertType,
 } from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
+import { rosterReadiness } from "@/lib/progression/readiness-consumers";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
   buildInterventionQueueEntry,
   type InterventionQueueStudentRecord,
 } from "@/lib/teacher/intervention-queue";
+import { interventionQueueStudentSelect } from "@/lib/teacher/intervention-queue-select";
 import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
+
+export { interventionQueueStudentSelect };
 
 export interface QueueStudent {
   studentId: string;
@@ -191,85 +195,11 @@ function latestDate(...values: Array<Date | null | undefined>) {
   }, null);
 }
 
-/**
- * Select for the intervention-queue student query. A builder rather than a
- * constant because `now` is embedded in the overdue-task filter. `as const`
- * keeps the literal types Prisma needs for payload inference.
- */
-function interventionQueueStudentSelect(now: Date) {
-  return {
-    id: true,
-    studentId: true,
-    displayName: true,
-    email: true,
-    createdAt: true,
-    updatedAt: true,
-    progression: { select: { state: true } },
-    goals: {
-      select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
-    },
-    orientationProgress: {
-      select: { completed: true, completedAt: true },
-    },
-    alerts: {
-      where: { status: "open" },
-      select: {
-        id: true,
-        type: true,
-        severity: true,
-        title: true,
-        summary: true,
-        sourceType: true,
-        sourceId: true,
-        detectedAt: true,
-      },
-    },
-    assignedTasks: {
-      where: {
-        status: { not: "completed" },
-        dueAt: { lt: now },
-      },
-      select: { id: true },
-    },
-    conversations: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    portfolioItems: { select: { updatedAt: true } },
-    files: { select: { uploadedAt: true } },
-    formSubmissions: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    applications: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    eventRegistrations: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    certifications: {
-      select: {
-        status: true,
-      },
-    },
-    resumeData: { select: { id: true } },
-    publicCredentialPage: { select: { isPublic: true } },
-    classEnrollments: {
-      select: {
-        enrolledAt: true,
-        status: true,
-        class: { select: { programType: true } },
-      },
-      orderBy: { enrolledAt: "desc" },
-    },
-  } as const;
-}
+// interventionQueueStudentSelect moved to ./intervention-queue-select.ts
+// (2026-09-05, benchmark suite B5, imported above) — this file's
+// `import "server-only"` at the top throws for any importer outside a
+// Next.js server-component context, which made the select unreachable from
+// a plain script (scripts/bench/suites/query-plans.mjs).
 
 /**
  * Shared tail of both queue variants: score each student, drop
@@ -539,20 +469,24 @@ export async function getTeacherDashboardPage(
     const bhagCompleted = student.goals.some(
       (goal) => goal.level === "bhag" && goal.status === "completed",
     );
-    const readiness = computeReadinessScore(
-      {
-        orientationComplete:
-          student.orientationProgress.length >= orientationTotal && orientationTotal > 0,
-        completedGoalLevels,
-        bhagCompleted,
-        certificationsEarned: certDone,
-        portfolioItemCount: student._count.portfolioItems,
-        resumeCreated: !!student.resumeData,
-        portfolioShared,
-        longestStreak,
-      },
-      certTemplates.filter((template) => template.required).length,
-    );
+    // The roster's mapping lives in readiness-consumers.ts alongside the six
+    // other surfaces that show a readiness number, so the three definitions
+    // cannot drift apart unremarked. `orientationTotal` is
+    // prisma.orientationItem.count() — ALL items (2026-07-31 decision).
+    const readiness = rosterReadiness({
+      orientationCompletedCount: student.orientationProgress.length,
+      orientationTotalCount: orientationTotal,
+      completedGoalLevels,
+      bhagCompleted,
+      certificationRequirementsDone: certDone,
+      portfolioItemCount: student._count.portfolioItems,
+      hasResume: !!student.resumeData,
+      portfolioShared,
+      longestStreak,
+      requiredCertificationTemplateCount: certTemplates.filter(
+        (template) => template.required,
+      ).length,
+    });
     const lastActiveAt =
       latestDate(
         student.createdAt,
@@ -607,7 +541,15 @@ export async function getTeacherDashboardPage(
         where: {
           status: "open",
           studentId: { in: managedStudentIds },
-          type: { notIn: [...ALL_INACTIVITY_ALERT_TYPES] },
+          // Inactivity alerts have their own panel below. `connect_weekly_jobs_ready`
+          // is excluded for a different reason: it is the one alert type
+          // written FOR the student ("your jobs are ready"), it resolves the
+          // moment they open /career, and there is nothing an instructor can
+          // do about it. A queue row nobody can action is a queue row people
+          // learn to scroll past.
+          type: {
+            notIn: [...ALL_INACTIVITY_ALERT_TYPES, NUDGE_ALERT_TYPES.weeklyJobsReady],
+          },
         },
         select: {
           id: true,

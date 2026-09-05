@@ -25,6 +25,7 @@ function makeSignals(
     savedJobCount: 0,
     applicationCount: 0,
     openAlertCount: 0,
+    jobsReadyAlertCount: 0,
     openTaskCount: 0,
     sageProposedUnconfirmedGoalCount: 0,
     discoveryAssistantTurnCount: 0,
@@ -255,5 +256,55 @@ test("open advising work blocks the follow-up step after applications start", ()
   assert.equal(result.currentStepKey, "followUp");
   assert.equal(stepStatus(result, "apply"), "complete");
   assert.equal(stepStatus(result, "followUp"), "blocked");
+  assert.equal(result.actionLink, "/appointments");
+});
+
+test("a jobs-ready nudge answered by text sends the student to Career, not Advising", () => {
+  // Match & Connect Phase 5: replying Y to the Monday jobs text writes a
+  // student-visible `connect_weekly_jobs_ready` alert. Routing it to
+  // /appointments alongside instructor follow-ups would answer "show me the
+  // jobs" with an appointments page.
+  const state = createInitialState();
+  state.certificationsEarned = 1;
+  state.portfolioItemCount = 1;
+  state.resumeCreated = true;
+
+  const result = resolveStudentNextStep(
+    makeSignals({
+      state,
+      hasCompletedDiscovery: true,
+      goalCount: 2,
+      completedMilestoneCount: 1,
+      savedJobCount: 1,
+      openAlertCount: 1,
+      jobsReadyAlertCount: 1,
+    }),
+  );
+
+  assert.equal(result.currentStepKey, "followUp");
+  assert.equal(stepStatus(result, "followUp"), "blocked");
+  assert.equal(result.actionLink, "/career");
+  assert.match(result.title, /jobs/i);
+});
+
+test("an instructor follow-up still wins the link when there is no jobs nudge", () => {
+  const state = createInitialState();
+  state.certificationsEarned = 1;
+  state.portfolioItemCount = 1;
+  state.resumeCreated = true;
+
+  const result = resolveStudentNextStep(
+    makeSignals({
+      state,
+      hasCompletedDiscovery: true,
+      goalCount: 2,
+      completedMilestoneCount: 1,
+      savedJobCount: 1,
+      openAlertCount: 1,
+      openTaskCount: 1,
+      jobsReadyAlertCount: 0,
+    }),
+  );
+
   assert.equal(result.actionLink, "/appointments");
 });
