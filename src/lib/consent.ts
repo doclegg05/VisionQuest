@@ -14,15 +14,20 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
-/**
- * `employer_referral` (Match & Connect Phase 4) is blanket permission to be
- * INTRODUCED to employers — revocable, and never on its own enough to send
- * anything: each Connection still needs the student's per-disclosure tap on a
- * card showing that packet's exact field list (design spec §4).
- *
- * Revoking it withdraws every non-terminal connection; see revokeConsent.
- */
-export const CONSENT_SCOPES = ["cloud_file_processing", "employer_referral"] as const;
+export const CONSENT_SCOPES = [
+  "cloud_file_processing",
+  // Match & Connect: blanket, revocable permission to be introduced to an
+  // employer. Added in Phase 3 because the WorkForce WV batch is the first
+  // thing that sends a student's name outside the program and must not do so
+  // without it. Phase 4 adds the student-facing toggle, the per-disclosure
+  // approval card, and the /memory page section.
+  //
+  // Blanket is never enough on its own: each Connection still needs the
+  // student's tap on a card showing that packet's exact field list (design
+  // spec §4), and revoking this scope withdraws every non-terminal connection
+  // (see revokeConsent below).
+  "employer_referral",
+] as const;
 export type ConsentScope = (typeof CONSENT_SCOPES)[number];
 
 export const consentScopeSchema = z.enum(CONSENT_SCOPES);

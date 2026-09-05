@@ -25,6 +25,8 @@ interface ProgressTabProps {
    * can count.
    */
   applicationVerifying: string | null;
+  /** Set when the last verify failed; shown next to the applications list. */
+  applicationVerifyError: string | null;
   onApplicationVerify: (applicationId: string) => void;
   /** Orientation honor-system verification (P1-1) */
   orientationVerifying: string | null;
@@ -42,6 +44,7 @@ export default function ProgressTab({
   certOutcomeVerifying,
   onCertOutcomeVerify,
   applicationVerifying,
+  applicationVerifyError,
   onApplicationVerify,
   orientationVerifying,
   onOrientationVerify,
@@ -109,6 +112,7 @@ export default function ProgressTab({
                       <button
                         onClick={() => onOrientationVerify(item.id, "confirm")}
                         disabled={busy}
+                        aria-label={`Confirm orientation step: ${item.label}`}
                         className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
                       >
                         {busy ? "..." : "Confirm"}
@@ -116,6 +120,7 @@ export default function ProgressTab({
                       <button
                         onClick={() => onOrientationVerify(item.id, "decline")}
                         disabled={busy}
+                        aria-label={`Decline orientation step: ${item.label}`}
                         className="text-xs px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
                       >
                         {busy ? "..." : "Decline"}
@@ -158,6 +163,7 @@ export default function ProgressTab({
             <button
               onClick={() => certification.cert && onCertOutcomeVerify(certification.cert.id)}
               disabled={certOutcomeVerifying}
+              aria-label="Verify Ready to Work certification progress"
               className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
             >
               {certOutcomeVerifying ? "..." : "Verify"}
@@ -243,6 +249,11 @@ export default function ProgressTab({
         <div className="grid gap-6 xl:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-faint)]">Applications</p>
+            {applicationVerifyError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {applicationVerifyError}
+              </p>
+            )}
             {applications.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--ink-faint)]">No tracked applications yet.</p>
             ) : (
@@ -276,6 +287,7 @@ export default function ProgressTab({
                           type="button"
                           onClick={() => onApplicationVerify(application.id)}
                           disabled={applicationVerifying === application.id}
+                          aria-label={`Verify application for ${application.opportunity.title} at ${application.opportunity.company}`}
                           className="min-h-[44px] text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
                         >
                           {applicationVerifying === application.id ? "..." : "Verify"}

@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
+
+import { BoardFilter, ShowMore, useBoardPaging } from "./BoardControls";
 
 /**
  * The roster, each student with their best leads.
@@ -16,6 +21,16 @@ export interface StudentsBoardItem {
 }
 
 export function StudentsBoard({ students }: { students: StudentsBoardItem[] }) {
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return students;
+    return students.filter((student) => student.displayName.toLowerCase().includes(needle));
+  }, [students, query]);
+
+  const { visible, hiddenCount, expanded, expand } = useBoardPaging(filtered);
+
   if (students.length === 0) {
     return (
       <div className="theme-card rounded-xl p-5">
@@ -32,39 +47,54 @@ export function StudentsBoard({ students }: { students: StudentsBoardItem[] }) {
       <h2 id="students-board-heading" className="text-base font-semibold text-[var(--ink-strong)]">
         Students ({students.length})
       </h2>
-      <ul className="mt-4 grid gap-3 md:grid-cols-2">
-        {students.map((student) => (
-          <li key={student.studentId} className="theme-card-subtle rounded-lg p-4">
-            <Link
-              href={`/teacher/students/${student.studentId}`}
-              className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[var(--ink-strong)] underline"
-            >
-              {student.displayName}
-            </Link>
 
-            {student.leads.length === 0 ? (
-              <p className="mt-2 text-sm text-[var(--ink-muted)]">
-                No lead fits them yet. Add a lead, or check their work answers.
-              </p>
-            ) : (
-              <ol className="mt-2 space-y-2">
-                {student.leads.map((lead) => (
-                  <li key={lead.jobLeadId}>
-                    <p className="text-sm text-[var(--ink-strong)]">
-                      {lead.title} at {lead.employerName}
-                    </p>
-                    {lead.reasons.length > 0 && (
-                      <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
-                        {lead.reasons.slice(0, 2).join(" ")}
+      <BoardFilter
+        id="students-filter"
+        label="Find a student"
+        hint="Type a name."
+        value={query}
+        onChange={setQuery}
+      />
+
+      {filtered.length === 0 ? (
+        <p className="mt-4 text-sm text-[var(--ink-muted)]">No student matches that.</p>
+      ) : (
+        <ul className="mt-4 grid gap-3 md:grid-cols-2">
+          {visible.map((student) => (
+            <li key={student.studentId} className="theme-card-subtle rounded-lg p-4">
+              <Link
+                href={`/teacher/students/${student.studentId}`}
+                className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[var(--ink-strong)] underline"
+              >
+                {student.displayName}
+              </Link>
+
+              {student.leads.length === 0 ? (
+                <p className="mt-2 text-sm text-[var(--ink-muted)]">
+                  No lead fits them yet. Add a lead, or check their Work availability answers.
+                </p>
+              ) : (
+                <ol className="mt-2 space-y-2">
+                  {student.leads.map((lead) => (
+                    <li key={lead.jobLeadId}>
+                      <p className="text-sm text-[var(--ink-strong)]">
+                        {lead.title} at {lead.employerName}
                       </p>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
-          </li>
-        ))}
-      </ul>
+                      {lead.reasons.length > 0 && (
+                        <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+                          {lead.reasons.slice(0, 2).join(" ")}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ShowMore hiddenCount={hiddenCount} expanded={expanded} onExpand={expand} noun="students" />
     </section>
   );
 }

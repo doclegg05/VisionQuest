@@ -5,13 +5,21 @@
 // JSON columns, and the pay normalization live in ./leads-shared.ts; this
 // module is where Prisma is allowed.
 //
-// Reads here run in the caller's RLS context, so `job_lead_read` decides what
-// comes back. Writes are staff-only at the policy level as well as at the
-// route level.
+// Three ownership checks run before every write, because `job_lead_write`'s
+// class clause is the floor and a clear 404 beats a policy rejection:
+//   assertClassIsManaged   — you may only publish into a class you instruct
+//   assertContactBelongsTo — a lead's contact must work at its own employer
+//   the RLS policy itself  — the same rule, enforced under the caller's role
+//
+// Every lead also carries `employerName`, copied at write time. That is what
+// lets the student path read leads without touching the Employer table, whose
+// policy has no student branch. `updateEmployer` re-syncs it on rename.
 // =============================================================================
 
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { notFound } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 
 import { findOrCreateEmployerByName } from "./employers";
@@ -23,6 +31,15 @@ import {
   leadRequirementsSchema,
   leadScheduleSchema,
 } from "./leads-shared";
+
+/** Prisma's unique-constraint code. */
+const UNIQUE_VIOLATION = "P2002";
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === UNIQUE_VIOLATION
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -100,6 +117,49 @@ export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 export type LeadFromListingInput = z.infer<typeof leadFromListingSchema>;
 
 // ---------------------------------------------------------------------------
+// Ownership checks
+// ---------------------------------------------------------------------------
+
+/**
+ * The caller may only attach a lead to a class they can see.
+ *
+ * The read runs in the CALLER'S RLS context, where `spokes_class_access`
+ * already scopes a teacher to their own classes — so "not visible" and "not
+ * mine" collapse into the same 404, which is what a caller should be told
+ * either way. `job_lead_write`'s class clause enforces the same rule at the
+ * database; this exists so the failure is a clear message rather than a policy
+ * rejection surfacing as a 500.
+ *
+ * A null classId (program-wide) is always allowed: it is the default, and it
+ * is what every backfilled Opportunity became.
+ */
+export async function assertClassIsManaged(classId: string | null | undefined): Promise<void> {
+  if (!classId) return;
+  const spokesClass = await prisma.spokesClass.findUnique({
+    where: { id: classId },
+    select: { id: true },
+  });
+  if (!spokesClass) throw notFound("That class wasn't found.");
+}
+
+/**
+ * A lead's contact must be a person at the lead's OWN employer. Without this,
+ * a request could attach Mountain Metal's hiring manager to a Valley Foods
+ * lead, and Phase 4 would email them a packet about a job they never posted.
+ */
+export async function assertContactBelongsTo(
+  employerId: string,
+  contactId: string | null | undefined,
+): Promise<void> {
+  if (!contactId) return;
+  const contact = await prisma.employerContact.findFirst({
+    where: { id: contactId, employerId },
+    select: { id: true },
+  });
+  if (!contact) throw notFound("That contact isn't at this employer.");
+}
+
+// ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 
@@ -108,6 +168,7 @@ export const LEAD_LIST_SELECT = {
   title: true,
   description: true,
   employerId: true,
+  employerName: true,
   contactId: true,
   classId: true,
   requirements: true,
@@ -122,6 +183,7 @@ export const LEAD_LIST_SELECT = {
   source: true,
   sourceRef: true,
   status: true,
+  pausedReason: true,
   openings: true,
   postedAt: true,
   closesAt: true,
@@ -153,14 +215,39 @@ export async function listLeads(
       ...(options.status ? { status: options.status } : {}),
       ...(options.employerId ? { employerId: options.employerId } : {}),
     },
-    orderBy: [{ status: "asc" }, { postedAt: "desc" }],
+    orderBy: [{ status: "asc" }, { postedAt: "desc" }, { id: "asc" }],
     take: Math.min(options.limit ?? MAX_LEAD_PAGE, MAX_LEAD_PAGE),
     select: LEAD_LIST_SELECT,
   });
 }
 
-export async function getLead(id: string) {
-  return prisma.jobLead.findUnique({ where: { id }, select: LEAD_LIST_SELECT });
+/**
+ * Open `JobListing` rows on one class's board, for the console's
+ * "from a job on a class board" picker. Titles and companies only — enough to
+ * choose, and the id stays server-side of the form.
+ */
+export async function listConvertibleListings(classId: string, limit = 100) {
+  const [config, existing] = await Promise.all([
+    prisma.jobClassConfig.findUnique({ where: { classId }, select: { id: true } }),
+    prisma.jobLead.findMany({
+      where: { source: "joblisting" },
+      select: { sourceRef: true },
+    }),
+  ]);
+  if (!config) return [];
+
+  const alreadyLeads = new Set(existing.map((row) => row.sourceRef));
+
+  const listings = await prisma.jobListing.findMany({
+    where: { classConfigId: config.id, status: "active" },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    take: limit,
+    select: { id: true, title: true, company: true, location: true },
+  });
+
+  // A posting that is already a lead is dropped rather than shown and then
+  // refused: the picker should only offer choices that do something.
+  return listings.filter((listing) => !alreadyLeads.has(listing.id));
 }
 
 // ---------------------------------------------------------------------------
@@ -168,9 +255,20 @@ export async function getLead(id: string) {
 // ---------------------------------------------------------------------------
 
 export async function createLead(input: CreateLeadInput, createdById: string) {
+  await assertClassIsManaged(input.classId);
+  await assertContactBelongsTo(input.employerId, input.contactId);
+
+  const employer = await prisma.employer.findUnique({
+    where: { id: input.employerId },
+    select: { id: true, name: true },
+  });
+  if (!employer) throw notFound("That employer wasn't found.");
+
   return prisma.jobLead.create({
     data: {
-      employerId: input.employerId,
+      employerId: employer.id,
+      // Copied, not joined — see the module header.
+      employerName: employer.name,
       contactId: input.contactId ?? null,
       classId: input.classId ?? null,
       title: input.title,
@@ -198,7 +296,17 @@ export async function createLead(input: CreateLeadInput, createdById: string) {
 
 export async function updateLead(input: UpdateLeadInput) {
   const { id, ...rest } = input;
-  const data: Record<string, unknown> = {};
+
+  const existing = await prisma.jobLead.findUnique({
+    where: { id },
+    select: { id: true, employerId: true },
+  });
+  if (!existing) throw notFound("That lead wasn't found.");
+
+  await assertClassIsManaged(rest.classId);
+  await assertContactBelongsTo(existing.employerId, rest.contactId);
+
+  const data: Prisma.JobLeadUncheckedUpdateInput = {};
 
   if (rest.contactId !== undefined) data.contactId = rest.contactId;
   if (rest.classId !== undefined) data.classId = rest.classId;
@@ -213,7 +321,12 @@ export async function updateLead(input: UpdateLeadInput) {
   if (rest.transitNotes !== undefined) data.transitNotes = rest.transitNotes;
   if (rest.distanceMiles !== undefined) data.distanceMiles = rest.distanceMiles;
   if (rest.clusters !== undefined) data.clusters = rest.clusters;
-  if (rest.status !== undefined) data.status = rest.status;
+  if (rest.status !== undefined) {
+    data.status = rest.status;
+    // Reopening clears the machine-written explanation; leaving it would keep
+    // telling the instructor the lead is paused for a reason it no longer is.
+    if (rest.status === "open") data.pausedReason = null;
+  }
   if (rest.openings !== undefined) data.openings = rest.openings;
   if (rest.closesAt !== undefined) {
     data.closesAt = rest.closesAt === null ? null : new Date(rest.closesAt);
@@ -233,16 +346,20 @@ export class JobListingNotFoundError extends Error {
  * Turn one scraped `JobListing` into a lead — the board's "Make this a lead"
  * action.
  *
- * The listing's company string becomes (or finds) an Employer, and the
- * listing's id is recorded as `sourceRef`, so the same posting converted twice
- * returns the first lead instead of creating a second. The posting's URL is
- * appended to the description rather than dropped: it is the only way back to
- * the original terms, and JobLead has no url column of its own.
+ * Idempotent at the DATABASE, not by a read-then-write: `@@unique([source,
+ * sourceRef])` means two instructors clicking at the same moment produce one
+ * lead and one P2002, which is caught and re-read. The check before the insert
+ * is only there to skip the employer upsert in the common case.
+ *
+ * The posting's URL is appended to the description rather than dropped: it is
+ * the only way back to the original terms, and JobLead has no url column.
  */
 export async function createLeadFromListing(
   input: LeadFromListingInput,
   createdById: string,
 ) {
+  await assertClassIsManaged(input.classId);
+
   const listing = await prisma.jobListing.findUnique({
     where: { id: input.jobListingId },
     select: {
@@ -258,35 +375,46 @@ export async function createLeadFromListing(
   });
   if (!listing) throw new JobListingNotFoundError();
 
-  const existing = await prisma.jobLead.findFirst({
-    where: { source: "joblisting", sourceRef: listing.id },
-    select: LEAD_LIST_SELECT,
-  });
+  const readExisting = () =>
+    prisma.jobLead.findFirst({
+      where: { source: "joblisting", sourceRef: listing.id },
+      select: LEAD_LIST_SELECT,
+    });
+
+  const existing = await readExisting();
   if (existing) return { lead: existing, created: false as const };
 
   const employer = await findOrCreateEmployerByName(listing.company);
 
-  const lead = await prisma.jobLead.create({
-    data: {
-      employerId: employer.id,
-      classId: input.classId ?? null,
-      title: listing.title,
-      description: [listing.description, `Original posting: ${listing.url}`]
-        .filter(Boolean)
-        .join("\n\n")
-        .slice(0, 5000),
-      location: listing.location || LOCATION_NOT_LISTED,
-      clusters: listing.clusters,
-      // salaryMin is already normalized to an hourly rate by the salary
-      // parser, so the lead's period is "hour" and no conversion happens here.
-      payMin: listing.salaryMin,
-      payPeriod: "hour",
-      source: "joblisting",
-      sourceRef: listing.id,
-      createdById,
-    },
-    select: LEAD_LIST_SELECT,
-  });
-
-  return { lead, created: true as const };
+  try {
+    const lead = await prisma.jobLead.create({
+      data: {
+        employerId: employer.id,
+        employerName: employer.name,
+        classId: input.classId ?? null,
+        title: listing.title,
+        description: [listing.description, `Original posting: ${listing.url}`]
+          .filter(Boolean)
+          .join("\n\n")
+          .slice(0, 5000),
+        location: listing.location || LOCATION_NOT_LISTED,
+        clusters: listing.clusters,
+        // salaryMin is already normalized to an hourly rate by the salary
+        // parser, so the lead's period is "hour" and no conversion happens.
+        payMin: listing.salaryMin,
+        payPeriod: "hour",
+        source: "joblisting",
+        sourceRef: listing.id,
+        createdById,
+      },
+      select: LEAD_LIST_SELECT,
+    });
+    return { lead, created: true as const };
+  } catch (error: unknown) {
+    if (!isUniqueViolation(error)) throw error;
+    // Somebody else won the race. Their row is the lead.
+    const raced = await readExisting();
+    if (!raced) throw error;
+    return { lead: raced, created: false as const };
+  }
 }

@@ -62,6 +62,14 @@ export interface ProposeInput {
   proposedVia: "teacher" | "sage" | "student";
   /** Instructor endorsement, when one is ready at propose time. */
   endorsement?: string;
+  /**
+   * `Employer.subsidyFlags`, read by a STAFF caller and passed through.
+   *
+   * The student path leaves it undefined: Employer is staff-only under RLS,
+   * and a student-initiated proposal must not need an admin bypass just to
+   * decide whether to print a hiring-incentive sentence. See AssembleOptions.
+   */
+  subsidyFlags?: unknown;
 }
 
 /**
@@ -77,15 +85,22 @@ export interface ProposeInput {
  * policy's bounded student branch.
  */
 export async function proposeConnection(input: ProposeInput) {
+  // `employerName` rather than the Employer relation, deliberately: this runs
+  // in the CALLER's RLS context, and for `propose_connection` that caller is
+  // the student — whose role has no branch at all in `employer_access`. The
+  // denormalised column is what Phase 3 added so the student path never has to
+  // touch that table.
+  //
+  // The do-not-contact check comes for free through `status`: `updateEmployer`
+  // pauses an employer's open leads when they go `do_not_contact`, and only an
+  // OPEN lead is proposable — so a paused, filled or closed lead is refused
+  // here without a second query.
   const lead = await prisma.jobLead.findUnique({
     where: { id: input.jobLeadId },
-    select: { id: true, employerId: true, status: true, title: true, employer: { select: { name: true, status: true } } },
+    select: { id: true, employerId: true, status: true, title: true, employerName: true },
   });
   if (!lead) throw new ConnectionError("That job wasn't found.", 404);
   if (lead.status !== "open") throw new ConnectionError("That job is not open right now.");
-  if (lead.employer.status === "do_not_contact") {
-    throw new ConnectionError("We are not contacting that employer.");
-  }
 
   const existing = await prisma.connection.findUnique({
     where: { studentId_jobLeadId: { studentId: input.studentId, jobLeadId: input.jobLeadId } },
@@ -111,7 +126,10 @@ export async function proposeConnection(input: ProposeInput) {
   });
 
   // Assembled after the row exists because assemblePacket reads through it.
-  const packet = await assemblePacket(connection.id, { endorsement: input.endorsement });
+  const packet = await assemblePacket(connection.id, {
+    endorsement: input.endorsement,
+    subsidyFlags: input.subsidyFlags,
+  });
   await prisma.connection.update({
     where: { id: connection.id },
     data: { packet: packetAsJson(packet) },
@@ -124,7 +142,7 @@ export async function proposeConnection(input: ProposeInput) {
       toStatus: "proposed",
       actorType: input.proposedVia === "sage" ? "student" : input.proposedVia,
       actorId: input.proposedById,
-      note: `Proposed for "${lead.title}" at ${lead.employer.name}.`,
+      note: `Proposed for "${lead.title}" at ${lead.employerName}.`,
     },
   });
 
@@ -134,7 +152,7 @@ export async function proposeConnection(input: ProposeInput) {
     action: "connect.connection.proposed",
     targetType: "connection",
     targetId: connection.id,
-    summary: `Proposed an introduction for "${lead.title}" at ${lead.employer.name}.`,
+    summary: `Proposed an introduction for "${lead.title}" at ${lead.employerName}.`,
     metadata: { jobLeadId: lead.id, employerId: lead.employerId, via: input.proposedVia },
   });
 
@@ -145,6 +163,14 @@ export async function proposeConnection(input: ProposeInput) {
 // Read
 // ---------------------------------------------------------------------------
 
+/**
+ * The student's own view of a connection.
+ *
+ * The employer's name comes from `JobLead.employerName`, NOT from the Employer
+ * relation: these reads run in the student's RLS context and `employer_access`
+ * has no student branch at all, so joining Employer here would return nothing
+ * and the pending card would render without a company name.
+ */
 const STUDENT_CONNECTION_SELECT = {
   id: true,
   status: true,
@@ -152,8 +178,7 @@ const STUDENT_CONNECTION_SELECT = {
   packet: true,
   sentAt: true,
   proposedVia: true,
-  jobLead: { select: { id: true, title: true, location: true } },
-  employer: { select: { name: true } },
+  jobLead: { select: { id: true, title: true, location: true, employerName: true } },
 } as const;
 
 export interface StudentConnectionView {
@@ -173,8 +198,7 @@ function toStudentView(row: {
   statusChangedAt: Date;
   packet: unknown;
   sentAt: Date | null;
-  jobLead: { title: string; location: string };
-  employer: { name: string };
+  jobLead: { title: string; location: string; employerName: string };
 }): StudentConnectionView | null {
   if (!isConnectionStatus(row.status)) return null;
   return {
@@ -182,7 +206,7 @@ function toStudentView(row: {
     status: row.status,
     jobTitle: row.jobLead.title,
     location: row.jobLead.location,
-    employerName: row.employer.name,
+    employerName: row.jobLead.employerName,
     packet: parsePacket(row.packet),
     statusChangedAt: row.statusChangedAt.toISOString(),
     sentAt: row.sentAt ? row.sentAt.toISOString() : null,
@@ -358,8 +382,19 @@ export async function sendConnection(
       jobLead: {
         select: {
           title: true,
+          status: true,
           contactId: true,
-          contact: { select: { id: true, name: true, email: true, doNotContactAt: true } },
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              doNotContactAt: true,
+              // Read back so the contact can be checked against the lead's own
+              // employer rather than trusted because it is on the row.
+              employerId: true,
+            },
+          },
         },
       },
     },
@@ -381,9 +416,24 @@ export async function sendConnection(
     throw new ConnectionError("We are not contacting that employer.");
   }
 
+  // 3. The lead must still be live. `updateEmployer` PAUSES an employer's open
+  //    leads when they go do-not-contact, so this catches that transition even
+  //    if the employer row itself were somehow read as active — and it also
+  //    stops a packet going out for a job that has since been filled or closed.
+  if (connection.jobLead.status !== "open") {
+    throw new ConnectionError("That job is not open right now.");
+  }
+
   const contact = connection.jobLead.contact;
   if (!contact || !contact.email) {
     throw new ConnectionError("That job has no contact with an email address.");
+  }
+  // 4. The contact must work at the lead's OWN employer. `assertContactBelongsTo`
+  //    enforces this when a lead is written; re-checking at send means an
+  //    employer merge or a hand-edited row cannot end with Mountain Metal's
+  //    hiring manager receiving a packet about a Valley Foods job.
+  if (contact.employerId !== connection.employerId) {
+    throw new ConnectionError("That contact isn't at this employer.");
   }
   if (contact.doNotContactAt) {
     throw new ConnectionError("That contact asked not to be emailed.");

@@ -55,6 +55,30 @@ describe("leadScheduleSchema", () => {
 });
 
 describe("parseLeadRequirements / parseLeadSchedule", () => {
+  it("KEEP a known list when a stored row carries an unknown extra key", () => {
+    // The write schema is strict so a typo is a 400. The read path must not
+    // be: .strict() fails the whole object on one unknown key, and the failure
+    // path returns the empty default — so a lead written by a later version
+    // would come back with mustHaveCerts: [] and the matcher would silently
+    // stop enforcing a certification.
+    const stored = {
+      mustHaveCerts: ["forklift-operator"],
+      niceToHave: [],
+      physical: [],
+      licenses: [],
+      preferredShifts: ["day"],
+    };
+    assert.deepEqual(parseLeadRequirements(stored).mustHaveCerts, ["forklift-operator"]);
+
+    const schedule = { shifts: ["day"], overtimeLikely: true };
+    assert.deepEqual(parseLeadSchedule(schedule).shifts, ["day"]);
+  });
+
+  it("does not hand the unknown key on to the matcher", () => {
+    const parsed = parseLeadRequirements({ mustHaveCerts: [], niceToHave: [], physical: [], licenses: [], preferredShifts: ["day"] });
+    assert.deepEqual(Object.keys(parsed).sort(), ["licenses", "mustHaveCerts", "niceToHave", "physical"]);
+  });
+
   it("degrade a malformed stored value to the safe default instead of throwing", () => {
     assert.deepEqual(parseLeadRequirements("not json at all").mustHaveCerts, []);
     assert.deepEqual(parseLeadSchedule(42).shifts, []);

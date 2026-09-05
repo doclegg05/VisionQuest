@@ -20,12 +20,20 @@ const state = {
   recentSends: 0,
   rateLimit: { success: true, remaining: 2, resetTime: 0, degraded: false },
   employerStatus: "active" as string,
+  leadStatus: "open" as string,
   contact: {
     id: "contact-1",
     name: "Pat Buyer",
     email: "pat@example.test",
     doNotContactAt: null as Date | null,
-  } as { id: string; name: string; email: string | null; doNotContactAt: Date | null } | null,
+    employerId: "emp-1",
+  } as {
+    id: string;
+    name: string;
+    email: string | null;
+    doNotContactAt: Date | null;
+    employerId: string;
+  } | null,
 };
 
 const STUDENT_ID = "clstudent00000000000000x";
@@ -59,6 +67,7 @@ const mockConnectionFindUnique = mock.fn(async () => ({
   employer: { name: "Mountain Metal", status: state.employerStatus },
   jobLead: {
     title: "Production Associate",
+    status: state.leadStatus,
     contactId: state.contact?.id ?? null,
     contact: state.contact,
   },
@@ -182,11 +191,13 @@ beforeEach(() => {
   state.recentSends = 0;
   state.rateLimit = { success: true, remaining: 2, resetTime: 0, degraded: false };
   state.employerStatus = "active";
+  state.leadStatus = "open";
   state.contact = {
     id: "contact-1",
     name: "Pat Buyer",
     email: "pat@example.test",
     doNotContactAt: null,
+    employerId: "emp-1",
   };
   sentEmails.length = 0;
   auditRows.length = 0;
@@ -244,6 +255,26 @@ describe("sendConnection — what may never leave the program", () => {
   it("REFUSES to send when the lead has no contact with an email", async () => {
     state.contact = { ...state.contact!, email: null };
     await expectRefusal();
+  });
+
+  for (const leadStatus of ["paused", "filled", "closed"]) {
+    it(`REFUSES to send for a "${leadStatus}" lead`, async () => {
+      // `updateEmployer` pauses an employer's open leads when they go
+      // do-not-contact, so the paused case is the second line of that defence;
+      // filled and closed simply are not jobs to introduce anyone to.
+      state.leadStatus = leadStatus;
+      const error = await expectRefusal();
+      assert.match(error.message, /not open/i);
+    });
+  }
+
+  it("REFUSES to send to a contact who works at a DIFFERENT employer", async () => {
+    // The lead's contact must be a person at the lead's own employer, or a
+    // merge or a hand-edited row ends with one company's hiring manager
+    // receiving a packet about another company's job.
+    state.contact = { ...state.contact!, employerId: "emp-other" };
+    const error = await expectRefusal();
+    assert.match(error.message, /isn't at this employer/i);
   });
 
   it("enforces the three-per-employer-per-week limit from the rolling count", async () => {

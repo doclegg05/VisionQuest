@@ -33,7 +33,13 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { PrismaClient } from "@prisma/client";
 
-type Role = "student" | "teacher" | "admin";
+/**
+ * The roles `app.current_role` can carry. "coordinator" is included so the
+ * fail-closed cases can actually assert it: a policy that names only student /
+ * teacher / admin must return zero rows for it, and a test that could not
+ * spell the role could not prove that.
+ */
+type Role = "student" | "teacher" | "admin" | "coordinator";
 
 interface Fixtures {
   /** Per-run namespace; every synthetic id/key embeds it so cleanup is scoped to this run. */
@@ -1025,14 +1031,18 @@ if (!SHOULD_RUN) {
       // Employer and EmployerContact are staff-only: no student branch exists
       // in either policy. JobLead is the one table in the group a student may
       // read, and only rows that are open AND visible to a class they are
-      // ACTIVELY enrolled in. These cases guard three specific loosenings:
-      // adding a student branch to the employer policies; dropping the
-      // `status = 'open'` clause from job_lead_read; and letting the student
-      // branch reach the write path (job_lead_write must stay staff-only).
+      // enrolled in. These cases guard four specific loosenings: adding a
+      // student branch to the employer policies; dropping the
+      // `status = 'open'` clause from job_lead_read; letting the student
+      // branch reach the write path; and dropping the class clause from
+      // job_lead_write, which would let a teacher publish into a classroom
+      // they do not instruct.
       let employerId = "";
       let contactId = "";
       /** classId NULL — visible to every student. */
       let leadProgramWide = "";
+      /** classId NULL, closed — invisible to students, visible to staff. */
+      let leadProgramWideClosed = "";
       /** classAlpha (Student A's class), open. */
       let leadAlphaOpen = "";
       /** classAlpha, closed — the status clause is the only thing hiding it. */
@@ -1058,39 +1068,62 @@ if (!SHOULD_RUN) {
 
         const leadBase = {
           employerId,
+          employerName: employer.name,
           location: "Beckley, WV",
           source: "manual",
         };
-        const [programWide, alphaOpen, alphaClosed, betaOpen] = await Promise.all([
-          db.jobLead.create({
-            data: { ...leadBase, title: "Program wide", classId: null, status: "open" },
-          }),
-          db.jobLead.create({
-            data: {
-              ...leadBase,
-              title: "Alpha open",
-              classId: fixtures.classAlpha,
-              status: "open",
-            },
-          }),
-          db.jobLead.create({
-            data: {
-              ...leadBase,
-              title: "Alpha closed",
-              classId: fixtures.classAlpha,
-              status: "closed",
-            },
-          }),
-          db.jobLead.create({
-            data: {
-              ...leadBase,
-              title: "Beta open",
-              classId: fixtures.classBeta,
-              status: "open",
-            },
-          }),
-        ]);
+        // `source` + `sourceRef` is unique, so every fixture lead needs its own
+        // sourceRef — the constraint is real and the fixtures must respect it.
+        const [programWide, programWideClosed, alphaOpen, alphaClosed, betaOpen] =
+          await Promise.all([
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-pw-${fixtures.suffix}`,
+                title: "Program wide",
+                classId: null,
+                status: "open",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-pwc-${fixtures.suffix}`,
+                title: "Program wide closed",
+                classId: null,
+                status: "closed",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-ao-${fixtures.suffix}`,
+                title: "Alpha open",
+                classId: fixtures.classAlpha,
+                status: "open",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-ac-${fixtures.suffix}`,
+                title: "Alpha closed",
+                classId: fixtures.classAlpha,
+                status: "closed",
+              },
+            }),
+            db.jobLead.create({
+              data: {
+                ...leadBase,
+                sourceRef: `rls-bo-${fixtures.suffix}`,
+                title: "Beta open",
+                classId: fixtures.classBeta,
+                status: "open",
+              },
+            }),
+          ]);
         leadProgramWide = programWide.id;
+        leadProgramWideClosed = programWideClosed.id;
         leadAlphaOpen = alphaOpen.id;
         leadAlphaClosed = alphaClosed.id;
         leadBetaOpen = betaOpen.id;
@@ -1113,6 +1146,26 @@ if (!SHOULD_RUN) {
           tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
         );
         assert.deepEqual(rows, [], "employer contact details never reach a student");
+      });
+
+      it("a coordinator sees none of the three tables", async () => {
+        // The coordinator role has no branch in any of these policies, and
+        // src/lib/classroom.ts's coordinator clause is fail-closed. This pins
+        // that a role added to the app later does not silently inherit access.
+        const [employers, contacts, leads] = await Promise.all([
+          asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+            tx.employer.findMany({ where: { id: employerId }, select: { id: true } }),
+          ),
+          asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+            tx.employerContact.findMany({ where: { id: contactId }, select: { id: true } }),
+          ),
+          asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+            tx.jobLead.findMany({ where: { employerId }, select: { id: true } }),
+          ),
+        ]);
+        assert.deepEqual(employers, [], "Employer must be empty for a coordinator");
+        assert.deepEqual(contacts, [], "EmployerContact must be empty for a coordinator");
+        assert.deepEqual(leads, [], "JobLead must be empty for a coordinator");
       });
 
       it("a teacher reads employers and their contacts", async () => {
@@ -1145,28 +1198,81 @@ if (!SHOULD_RUN) {
         );
       });
 
-      it("a student reads open leads for their own class and program-wide leads", async () => {
+      it("runs rankLeadsForStudent's ACTUAL query shape as a student", async () => {
+        // The shape is the point. rankLeadsForStudent selects lead columns
+        // only and filters on lead columns only, because Employer has no
+        // student branch — a query that reached through the relation would
+        // come back empty here and the student would silently see no jobs.
         const rows = await asRole("student", fixtures.studentA, (tx) =>
           tx.jobLead.findMany({
-            where: { id: { in: [leadProgramWide, leadAlphaOpen, leadBetaOpen] } },
-            select: { id: true },
+            where: {
+              status: "open",
+              OR: [{ classId: null }, { classId: { in: [fixtures.classAlpha] } }],
+            },
+            orderBy: [{ postedAt: "desc" }, { id: "asc" }],
+            select: {
+              id: true,
+              title: true,
+              employerId: true,
+              employerName: true,
+              status: true,
+              location: true,
+              clusters: true,
+              requirements: true,
+              schedule: true,
+              payMin: true,
+              payMax: true,
+              payPeriod: true,
+              transitNotes: true,
+              distanceMiles: true,
+              source: true,
+              classId: true,
+            },
           }),
         );
+
         assert.deepEqual(
           rows.map((row) => row.id).sort(),
           [leadProgramWide, leadAlphaOpen].sort(),
-          "Student A is in classAlpha; the classBeta lead is not theirs",
+          "open + (program-wide or my class); the closed and other-class leads must not appear",
+        );
+        assert.ok(
+          rows.every((row) => row.employerName.length > 0),
+          "the denormalised employerName is what makes this query possible at all",
         );
       });
 
-      it("a student does NOT read a closed lead, even for their own class", async () => {
+      it("a student does NOT read a closed lead, for their class or program-wide", async () => {
         const rows = await asRole("student", fixtures.studentA, (tx) =>
-          tx.jobLead.findMany({ where: { id: leadAlphaClosed }, select: { id: true } }),
+          tx.jobLead.findMany({
+            where: { id: { in: [leadAlphaClosed, leadProgramWideClosed] } },
+            select: { id: true },
+          }),
         );
         assert.deepEqual(rows, [], "job_lead_read must keep the status = 'open' clause");
       });
 
-      it("a student whose enrollment is not active loses the class lead", async () => {
+      it("a COMPLETED enrollment still reads its class's open lead", async () => {
+        // Graduates are the placement population. Cutting them off at exit
+        // would hide leads from exactly the students this feature exists for.
+        await db.studentClassEnrollment.updateMany({
+          where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+          data: { status: "completed" },
+        });
+        try {
+          const rows = await asRole("student", fixtures.studentA, (tx) =>
+            tx.jobLead.findMany({ where: { id: leadAlphaOpen }, select: { id: true } }),
+          );
+          assert.deepEqual(rows.map((row) => row.id), [leadAlphaOpen]);
+        } finally {
+          await db.studentClassEnrollment.updateMany({
+            where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
+            data: { status: "active" },
+          });
+        }
+      });
+
+      it("a WITHDRAWN enrollment loses the class lead but keeps program-wide ones", async () => {
         await db.studentClassEnrollment.updateMany({
           where: { classId: fixtures.classAlpha, studentId: fixtures.studentA },
           data: { status: "withdrawn" },
@@ -1181,7 +1287,7 @@ if (!SHOULD_RUN) {
           assert.deepEqual(
             rows.map((row) => row.id),
             [leadProgramWide],
-            "active_enrolled_class_ids() must filter on status = 'active'",
+            "active_enrolled_class_ids() admits active and completed, not withdrawn",
           );
         } finally {
           await db.studentClassEnrollment.updateMany({
@@ -1191,16 +1297,18 @@ if (!SHOULD_RUN) {
         }
       });
 
-      it("a student cannot create or update a lead", async () => {
+      it("a student cannot create, update or delete a lead", async () => {
         await assert.rejects(
           () =>
             asRole("student", fixtures.studentA, (tx) =>
               tx.jobLead.create({
                 data: {
                   employerId,
+                  employerName: "forged",
                   title: "forged",
                   location: "Beckley, WV",
                   source: "manual",
+                  sourceRef: `rls-forged-${fixtures.suffix}`,
                   classId: null,
                 },
               }),
@@ -1215,13 +1323,91 @@ if (!SHOULD_RUN) {
           }),
         );
         assert.equal(updated.count, 0, "job_lead_write has no student branch");
+
+        // Deleting a row they CAN see is the sharper case: the read policy
+        // admits it, so only job_lead_write's missing student branch stops it.
+        const deleted = await asRole("student", fixtures.studentA, (tx) =>
+          tx.jobLead.deleteMany({ where: { id: leadProgramWide } }),
+        );
+        assert.equal(deleted.count, 0, "a visible lead is still not a deletable one");
+      });
+
+      it("a teacher cannot publish a lead into a class they do not instruct", async () => {
+        // Teacher One instructs classAlpha only. classBeta belongs to
+        // Teacher Two, and publishing there would put a job in front of
+        // somebody else's students.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.jobLead.create({
+                data: {
+                  employerId,
+                  employerName: "RLS Test Employer",
+                  title: "Cross-class forgery",
+                  location: "Beckley, WV",
+                  source: "manual",
+                  sourceRef: `rls-cross-${fixtures.suffix}`,
+                  classId: fixtures.classBeta,
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a teacher cannot RETARGET a lead into a class they do not instruct", async () => {
+        const moved = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.updateMany({
+            where: { id: leadAlphaOpen },
+            data: { classId: fixtures.classBeta },
+          }),
+        );
+        assert.equal(moved.count, 0, "the WITH CHECK must reject the new classId too");
+      });
+
+      it("a teacher CAN publish into their own class and program-wide", async () => {
+        const own = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.create({
+            data: {
+              employerId,
+              employerName: "RLS Test Employer",
+              title: "Own class",
+              location: "Beckley, WV",
+              source: "manual",
+              sourceRef: `rls-own-${fixtures.suffix}`,
+              classId: fixtures.classAlpha,
+            },
+            select: { id: true },
+          }),
+        );
+        assert.ok(own.id);
+
+        const wide = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.jobLead.create({
+            data: {
+              employerId,
+              employerName: "RLS Test Employer",
+              title: "Program wide by teacher",
+              location: "Beckley, WV",
+              source: "manual",
+              sourceRef: `rls-wide-${fixtures.suffix}`,
+              classId: null,
+            },
+            select: { id: true },
+          }),
+        );
+        assert.ok(wide.id);
+
+        await db.jobLead.deleteMany({ where: { id: { in: [own.id, wide.id] } } });
       });
 
       it("a teacher reads every lead, open or not, in any class", async () => {
         const rows = await asRole("teacher", fixtures.teacher, (tx) =>
           tx.jobLead.findMany({
             where: {
-              id: { in: [leadProgramWide, leadAlphaOpen, leadAlphaClosed, leadBetaOpen] },
+              id: {
+                in: [leadProgramWide, leadAlphaOpen, leadAlphaClosed, leadBetaOpen],
+              },
             },
             select: { id: true },
           }),
@@ -1460,6 +1646,9 @@ if (!SHOULD_RUN) {
         const lead = await db.jobLead.create({
           data: {
             employerId,
+            // Denormalised at write time so the student path can read a lead
+            // without touching Employer, whose policy has no student branch.
+            employerName: employer.name,
             title: "Production Associate",
             location: "Beckley, WV",
             source: "manual",

@@ -11,8 +11,10 @@
 // the session role first; the policy is the floor, not the gate.
 // =============================================================================
 
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { badRequest, conflict, notFound } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 
 import {
@@ -21,6 +23,35 @@ import {
   employerNameKey,
   subsidyFlagsSchema,
 } from "./employers-shared";
+
+/** Prisma's unique-constraint code. */
+const UNIQUE_VIOLATION = "P2002";
+
+export function isEmployerNameConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === UNIQUE_VIOLATION
+  );
+}
+
+/**
+ * The relationship owner is a staff member, not any Student row.
+ *
+ * `Employer.relationshipOwnerId` is a foreign key to Student, which is also
+ * where students live — so without this check a request could name a STUDENT
+ * as the owner of an employer relationship, and the console would print their
+ * name in the directory next to a business's contact details.
+ */
+async function assertOwnerIsStaff(ownerId: string | null | undefined): Promise<void> {
+  if (!ownerId) return;
+  const owner = await prisma.student.findUnique({
+    where: { id: ownerId },
+    select: { role: true },
+  });
+  if (!owner) throw notFound("That staff member wasn't found.");
+  if (owner.role !== "teacher" && owner.role !== "admin") {
+    throw badRequest("The relationship owner must be a staff account.");
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -136,12 +167,28 @@ export async function getEmployer(id: string) {
 // ---------------------------------------------------------------------------
 
 export async function createEmployer(input: CreateEmployerInput) {
+  await assertOwnerIsStaff(input.relationshipOwnerId);
+
+  const nameKey = employerNameKey(input.name);
+  if (!nameKey) throw badRequest("Employer name is required.");
+
+  try {
+    return await createEmployerRow(input, nameKey);
+  } catch (error: unknown) {
+    if (isEmployerNameConflict(error)) {
+      throw conflict("There is already an employer with that name.");
+    }
+    throw error;
+  }
+}
+
+function createEmployerRow(input: CreateEmployerInput, nameKey: string) {
   return prisma.employer.create({
     data: {
       name: input.name,
       // Derived, never client-supplied: the unique key must always agree with
       // the name it was computed from.
-      nameKey: employerNameKey(input.name),
+      nameKey,
       legalName: input.legalName ?? null,
       sector: input.sector ?? null,
       clusters: input.clusters ?? [],
@@ -170,28 +217,57 @@ export async function findOrCreateEmployerByName(
   defaults: { county?: string; city?: string } = {},
 ) {
   const nameKey = employerNameKey(companyName);
-  return prisma.employer.upsert({
-    where: { nameKey },
-    // Nothing to change: an existing employer's details belong to whoever
-    // curated them, not to the posting that happened to name it again.
-    update: {},
-    create: {
-      name: companyName.replace(/\s+/gu, " ").trim(),
-      nameKey,
-      county: defaults.county ?? "Unknown",
-      city: defaults.city ?? "Unknown",
-    },
-    select: EMPLOYER_SELECT,
-  });
+  // A blank key would collide every nameless employer onto one row — an
+  // adapter that returned "" for company would quietly merge unrelated jobs
+  // under a single blank employer. Loud failure is the only safe answer.
+  if (!nameKey) {
+    throw badRequest("That job posting has no company name, so it cannot become a lead.");
+  }
+
+  try {
+    return await prisma.employer.upsert({
+      where: { nameKey },
+      // Nothing to change: an existing employer's details belong to whoever
+      // curated them, not to the posting that happened to name it again.
+      update: {},
+      create: {
+        name: companyName.normalize("NFKC").replace(/\s+/gu, " ").trim(),
+        nameKey,
+        county: defaults.county ?? "Unknown",
+        city: defaults.city ?? "Unknown",
+      },
+      select: EMPLOYER_SELECT,
+    });
+  } catch (error: unknown) {
+    // Prisma's upsert is not atomic: two concurrent first-writes both miss the
+    // row and both INSERT, and the loser gets P2002. The winner's row is the
+    // answer either of them wanted.
+    if (!isEmployerNameConflict(error)) throw error;
+    const raced = await prisma.employer.findUnique({
+      where: { nameKey },
+      select: EMPLOYER_SELECT,
+    });
+    if (!raced) throw error;
+    return raced;
+  }
 }
+
+/** Why an employer's open leads were paused, in the instructor's own words. */
+export const DO_NOT_CONTACT_PAUSE_REASON =
+  "Paused because this employer is marked do not contact.";
 
 export async function updateEmployer(input: UpdateEmployerInput) {
   const { id, ...rest } = input;
-  const data: Record<string, unknown> = {};
+
+  await assertOwnerIsStaff(rest.relationshipOwnerId);
+
+  const data: Prisma.EmployerUncheckedUpdateInput = {};
 
   if (rest.name !== undefined) {
+    const nameKey = employerNameKey(rest.name);
+    if (!nameKey) throw badRequest("Employer name is required.");
     data.name = rest.name;
-    data.nameKey = employerNameKey(rest.name);
+    data.nameKey = nameKey;
   }
   if (rest.legalName !== undefined) data.legalName = rest.legalName;
   if (rest.sector !== undefined) data.sector = rest.sector;
@@ -205,7 +281,46 @@ export async function updateEmployer(input: UpdateEmployerInput) {
   if (rest.subsidyFlags !== undefined) data.subsidyFlags = rest.subsidyFlags;
   if (rest.status !== undefined) data.status = rest.status;
 
-  return prisma.employer.update({ where: { id }, data, select: EMPLOYER_SELECT });
+  try {
+    // One transaction, because two of these three writes are corrections that
+    // must not be able to land without the change that caused them.
+    const [employer] = await prisma.$transaction([
+      prisma.employer.update({ where: { id }, data, select: EMPLOYER_SELECT }),
+
+      // A rename has to reach the leads. JobLead.employerName is denormalised
+      // so the student path never touches this table; a stale copy would show
+      // a student the employer's old name and nothing would ever correct it.
+      ...(rest.name !== undefined
+        ? [
+            prisma.jobLead.updateMany({
+              where: { employerId: id },
+              data: { employerName: rest.name },
+            }),
+          ]
+        : []),
+
+      // do_not_contact has to reach the leads too, and for a stronger reason:
+      // it is the promise the program made to a business. The student query
+      // filters on the LEAD's status (it cannot read Employer at all), so
+      // without this the employer would be marked do-not-contact while their
+      // openings kept being offered to students.
+      ...(rest.status === "do_not_contact"
+        ? [
+            prisma.jobLead.updateMany({
+              where: { employerId: id, status: "open" },
+              data: { status: "paused", pausedReason: DO_NOT_CONTACT_PAUSE_REASON },
+            }),
+          ]
+        : []),
+    ]);
+
+    return employer;
+  } catch (error: unknown) {
+    if (isEmployerNameConflict(error)) {
+      throw conflict("An employer with that name already exists.");
+    }
+    throw error;
+  }
 }
 
 export async function createEmployerContact(employerId: string, input: CreateContactInput) {

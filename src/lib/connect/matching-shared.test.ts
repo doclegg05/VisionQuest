@@ -368,6 +368,71 @@ describe("fit — soft score", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Location — an instructor-entered lead is local by construction
+// ---------------------------------------------------------------------------
+
+describe("fit — lead proximity", () => {
+  // The class region is recorded as a county; an instructor types the town.
+  // The shared scorer's text match fails on that pair, which used to cost a
+  // real local employer the whole 40-point location axis.
+  const CLASS_REGION = "Kanawha County, WV";
+  const TOWN = "Charleston, WV";
+
+  it("scores a hand-typed lead in the county's town as local", () => {
+    const typed = fit(
+      student({ classRegion: CLASS_REGION, discovery: null, workProfile: null }),
+      lead({ location: TOWN, source: "manual", clusters: [] }),
+    );
+    const control = fit(
+      student({ classRegion: CLASS_REGION, discovery: null, workProfile: null }),
+      lead({ location: CLASS_REGION, source: "manual", clusters: [] }),
+    );
+    assert.equal(
+      typed.score,
+      control.score,
+      "an instructor typing the town instead of the county must not lose the location axis",
+    );
+    assert.ok(typed.score > 0, `expected a local score, got ${typed.score}`);
+  });
+
+  it("treats a MACC job order and a converted Opportunity the same way", () => {
+    for (const source of ["joborder", "opportunity"]) {
+      const result = fit(
+        student({ classRegion: CLASS_REGION, discovery: null, workProfile: null }),
+        lead({ location: TOWN, source, clusters: [] }),
+      );
+      assert.ok(result.score > 0, `${source} lead scored ${result.score}`);
+    }
+  });
+
+  it("keeps the scraped heuristic for a lead made from a job posting", () => {
+    // joblisting-sourced leads carry the adapters' own unverified location
+    // text, so they must not be promoted to "local" on the strength of an
+    // instructor having clicked a button.
+    const scraped = fit(
+      student({ classRegion: CLASS_REGION, discovery: null, workProfile: null }),
+      lead({ location: TOWN, source: "joblisting", clusters: [] }),
+    );
+    const typed = fit(
+      student({ classRegion: CLASS_REGION, discovery: null, workProfile: null }),
+      lead({ location: TOWN, source: "manual", clusters: [] }),
+    );
+    assert.ok(
+      typed.score > scraped.score,
+      `typed ${typed.score} must beat scraped ${scraped.score} on the same location text`,
+    );
+  });
+
+  it("does not invent a location score when the class has no region recorded", () => {
+    const result = fit(
+      student({ classRegion: "", discovery: null, workProfile: null }),
+      lead({ location: TOWN, source: "manual", clusters: [] }),
+    );
+    assert.equal(result.score, 0, "no region means we do not know, not that it is close");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Reasons
 // ---------------------------------------------------------------------------
 
@@ -420,6 +485,33 @@ describe("fit — reasons", () => {
       readability.withinTarget,
       `reasons scored grade ${readability.grade}: ${text}`,
     );
+  });
+
+  it("describes a past withdrawal as a situation, not as something the student did", () => {
+    const blocked = fit(student({ withdrawnEmployerIds: ["emp-1"] }), lead());
+    assert.deepEqual(blocked.blockReasons, [
+      "This employer came up for them before and it didn't work out.",
+    ]);
+    assert.ok(
+      !blocked.blockReasons.join(" ").toLowerCase().includes("backed out"),
+      "the record shows an application that ended, not who ended it",
+    );
+  });
+
+  it("names a required certification without ever rendering 'undefined'", () => {
+    const blocked = fit(
+      student({ verifiedCertIds: [] }),
+      lead({
+        requirements: {
+          mustHaveCerts: ["forklift-operator"],
+          niceToHave: [],
+          physical: [],
+          licenses: [],
+        },
+      }),
+    );
+    assert.equal(blocked.blockReasons[0], "Needs the forklift operator card. Not earned yet.");
+    assert.ok(!blocked.blockReasons.join(" ").includes("undefined"));
   });
 
   it("explains a block in the same plain words", () => {

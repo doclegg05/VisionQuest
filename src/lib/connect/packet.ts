@@ -109,8 +109,20 @@ export function contentBearingFields(packet: {
 interface AssembleOptions {
   /** The endorsement an instructor has approved. Empty when there is none. */
   endorsement?: string;
-  /** Override the field list. Defaults to the full allowlist. */
+  /** Override the field list. Defaults to the content-bearing ones. */
   includedFields?: PacketFieldKey[];
+  /**
+   * `Employer.subsidyFlags`, supplied by the caller rather than read here.
+   *
+   * Employer is staff-only under RLS, and a student-initiated proposal
+   * assembles its own packet — so this module cannot read the column without
+   * an admin bypass, and a bypass to decide whether to print a benefits
+   * sentence is not a trade worth making. A staff caller passes the flags; the
+   * student path passes nothing and the packet says "Ask about hiring
+   * incentives.", which is also what every path says until P0.8 verifies a
+   * figure.
+   */
+  subsidyFlags?: unknown;
 }
 
 /**
@@ -153,7 +165,11 @@ export async function assemblePacket(
           payMin: true,
           payMax: true,
           payPeriod: true,
-          employer: { select: { name: true, subsidyFlags: true } },
+          // The denormalised name, NOT the Employer relation: assemblePacket
+          // runs in the caller's RLS context and that caller is the student
+          // when Sage raised the proposal. `employer_access` has no student
+          // branch, so a join here would come back empty.
+          employerName: true,
         },
       },
     },
@@ -172,7 +188,7 @@ export async function assemblePacket(
     lead: jobLead,
   });
 
-  const line = await subsidyLine({ subsidyFlags: jobLead.employer.subsidyFlags });
+  const line = await subsidyLine({ subsidyFlags: options.subsidyFlags ?? null });
 
   const draft = {
     resumeVersionId,
@@ -209,7 +225,7 @@ interface TailoringInput {
     payMin: number | null;
     payMax: number | null;
     payPeriod: string;
-    employer: { name: string };
+    employerName: string;
   };
 }
 
@@ -248,7 +264,7 @@ async function buildTailoredDocuments(input: TailoringInput): Promise<{
     job: {
       id: input.lead.id,
       title: sanitizeForPrompt(input.lead.title),
-      company: sanitizeForPrompt(input.lead.employer.name),
+      company: sanitizeForPrompt(input.lead.employerName),
       location: sanitizeForPrompt(input.lead.location),
       description: sanitizeForPrompt(description),
       salary: describeLeadPay(input.lead),
@@ -292,7 +308,7 @@ function renderGrounding(input: TailoringInput, description: string): string {
   return [
     "JOB POSTING",
     `Title: ${input.lead.title}`,
-    `Company: ${input.lead.employer.name}`,
+    `Company: ${input.lead.employerName}`,
     `Location: ${input.lead.location}`,
     `Description: ${description}`,
     "",

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AddLeadForm } from "@/components/teacher/connect/AddLeadForm";
+import { BatchWorkforceButton } from "@/components/teacher/connect/BatchWorkforceButton";
 import {
   EmployerDirectory,
   type EmployerDirectoryItem,
@@ -11,35 +12,41 @@ import {
   type StudentsBoardItem,
 } from "@/components/teacher/connect/StudentsBoard";
 import PageIntro from "@/components/ui/PageIntro";
-import { getSession } from "@/lib/auth";
-import { recordStudentView } from "@/lib/audit";
 import { isStaffRole } from "@/lib/api-error";
+import { recordStudentView } from "@/lib/audit";
+import { getSession } from "@/lib/auth";
 import { listManagedClasses } from "@/lib/classroom";
 import { listEmployers } from "@/lib/connect/employers";
 import { readSubsidyFlags } from "@/lib/connect/employers-shared";
-import { describeLeadPay, parseLeadSchedule } from "@/lib/connect/leads-shared";
 import { listLeads } from "@/lib/connect/leads";
+import { describeLeadPay, parseLeadSchedule } from "@/lib/connect/leads-shared";
 import { rankRoster, summarizeLeadFits } from "@/lib/connect/matching";
 import { withRlsContext } from "@/lib/rls-context";
+import { CERTIFICATIONS } from "@/lib/spokes/certifications";
 
 /**
  * /teacher/connect — the job developer console (Match & Connect Task 3.4).
  *
- * Three boards on one page: open leads with how many students fit each,
- * students with their best leads, and the employer directory. All three are
- * computed on the server from shared loads — `summarizeLeadFits` and
- * `rankRoster` each read the roster once, so the page costs a fixed handful of
- * queries rather than one per row.
+ * Three boards on one page: open leads with how many students fit each (and
+ * who is blocked, behind a disclosure), students with their best leads, and
+ * the employer directory. All three are computed on the server from shared
+ * loads — `summarizeLeadFits` and `rankRoster` each read the roster once, so
+ * the page costs a fixed handful of queries rather than one per row.
  *
  * Every student named on this page is a staff read of student data, so each
- * one is passed through `recordStudentView`. That is the rule in
- * .claude/rules/security.md, and this page is exactly the surface it was
- * written for.
+ * one is passed through `recordStudentView` — fired without awaiting, because
+ * an audit sample must never make a page slower or fail to render.
  *
- * The layout is mobile-first: single column at 375px, two from `md:`, 44px
- * touch targets, and nothing that scrolls sideways. Copy is at a 6th-grade
- * reading level — teacher surfaces are outside the readability gate's globs,
- * so ConnectCopy.test.tsx asserts the key strings with the same helper.
+ * Layout order is deliberate and has a gap in it: Phase 4's pipeline and
+ * "follow-ups due today" belong ABOVE the boards, between the intro and
+ * LeadsBoard, because they are the day's work rather than a directory. The
+ * slot is marked below.
+ *
+ * Mobile-first: single column at 375px, two from `md:`, 44px touch targets,
+ * nothing that scrolls sideways. Copy is at a 6th-grade reading level —
+ * teacher surfaces are outside the readability gate's globs, so
+ * ConnectBoards.test.tsx and AddLeadForm.test.tsx assert the key strings with
+ * the same helper.
  */
 
 export const dynamic = "force-dynamic";
@@ -72,17 +79,19 @@ export default async function ConnectPage() {
     return {
       leads: openLeads.map((lead): LeadsBoardItem => {
         const schedule = parseLeadSchedule(lead.schedule);
+        const counted = countsByLead.get(lead.id);
         return {
           id: lead.id,
           title: lead.title,
-          employerName: lead.employer.name,
+          employerName: lead.employerName,
           location: lead.location,
           pay: describeLeadPay(lead),
           shifts: schedule.shifts,
           className: lead.class?.name ?? null,
           openings: lead.openings,
-          fitCount: countsByLead.get(lead.id)?.fitCount ?? null,
-          blockedCount: countsByLead.get(lead.id)?.blockedCount ?? null,
+          fitCount: counted?.fitCount ?? null,
+          blockedCount: counted?.blockedCount ?? null,
+          blocked: counted?.blocked ?? [],
         };
       }),
       employers: employerRows.map(
@@ -117,46 +126,44 @@ export default async function ConnectPage() {
     };
   });
 
-  // Fire-and-forget: an audit failure must never stop the page from rendering,
-  // and recordStudentView already swallows its own errors.
-  await Promise.allSettled(
-    roster.map((entry) =>
-      recordStudentView({
-        actorId: session.id,
-        actorRole: session.role,
-        targetStudentId: entry.studentId,
-        surface: "student_detail",
-      }),
-    ),
-  );
+  // Fire-and-forget. `recordStudentView` swallows its own errors and is
+  // sampled once per actor/student/day, so awaiting up to a hundred of them
+  // would add latency to every page load and buy nothing.
+  const namedStudents = new Set<string>([
+    ...roster.map((entry) => entry.studentId),
+    ...leads.flatMap((lead) => lead.blocked.map((student) => student.studentId)),
+  ]);
+  for (const studentId of namedStudents) {
+    void recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: studentId,
+      surface: "student_detail",
+    });
+  }
 
   return (
     <div className="page-shell space-y-6">
       <PageIntro
         eyebrow="Teacher tools"
         title="Connect"
-        description="Open jobs, who fits each one, and the employers behind them. Add a lead by hand, from a job order, or from a job on a class board."
+        description="Open jobs, who fits each one, and the employers behind them. Add a lead by hand, from a job order (a job posted on WorkForce WV's job bank), or from a job on a class board."
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[var(--ink-muted)]">
-          Send this week&rsquo;s ready students to WorkForce WV as one file.
-        </p>
-        <a
-          href="/api/teacher/connect/batch-workforce-wv"
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
-        >
-          Batch to WorkForce WV
-        </a>
-      </div>
+      {/* Phase 4 slot: the connection pipeline and today's follow-ups go here,
+          above the boards — they are the day's work, not a directory. */}
 
       <LeadsBoard leads={leads} />
       <StudentsBoard students={roster} />
       <EmployerDirectory employers={employers} />
+
       <AddLeadForm
         employers={employers.map((employer) => ({ id: employer.id, name: employer.name }))}
         classes={classes}
+        certifications={CERTIFICATIONS.map((cert) => ({ id: cert.id, label: cert.shortName }))}
       />
+
+      <BatchWorkforceButton classes={classes} />
     </div>
   );
 }

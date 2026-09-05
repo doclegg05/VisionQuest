@@ -940,7 +940,9 @@ model Employer {
   jobLeads          JobLead[]
   connections       Connection[]
 
-  @@index([status, county])
+  /// Matches listEmployers' ORDER BY: who has hired for us, most recently
+  /// first. The old ([status, county]) index served no query in the code.
+  @@index([status, hiredSpokesGradBefore(sort: Desc), lastHiredAt(sort: Desc)])
   @@schema("visionquest")
 }
 
@@ -979,7 +981,16 @@ model EmployerContact {
 model JobLead {
   id         String  @id @default(cuid())
   employerId String
-  contactId  String?
+  /// The employer's display name, COPIED here on write.
+  ///
+  /// Denormalised on purpose. A student session must be able to read its own
+  /// leads, and `employer_access` has no student branch — so a student-path
+  /// query that filtered or selected through the Employer relation would come
+  /// back empty (or throw Prisma's inconsistency error) under RLS. Keeping the
+  /// name on the lead means the student query touches lead columns only.
+  /// `updateEmployer` re-syncs every lead when an employer is renamed.
+  employerName String
+  contactId    String?
 
   /// Which class may see this lead. NULL = program-wide. Students read a lead
   /// only when it is open AND (classId IS NULL OR they are actively enrolled
@@ -1012,8 +1023,12 @@ model JobLead {
   sourceRef String?
 
   /// open | filled | paused | closed
-  status   String @default("open")
-  openings Int    @default(1)
+  status String @default("open")
+  /// Why a lead is paused or closed, when something other than a person did
+  /// it — an employer moving to `do_not_contact` pauses its open leads, and
+  /// this is what tells the instructor why they went quiet.
+  pausedReason String?
+  openings     Int     @default(1)
 
   postedAt DateTime  @default(now())
   closesAt DateTime?
@@ -1024,17 +1039,36 @@ model JobLead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Cascade rather than Restrict, deliberately: deleting an employer is a
+  /// staff act of last resort (a duplicate row, a business that never existed)
+  /// and leaving orphan leads pointing at nothing would be worse. Phase 4's
+  /// Connection rows will make this a Restrict question again — revisit then.
   employer  Employer         @relation(fields: [employerId], references: [id], onDelete: Cascade)
   contact   EmployerContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  class     SpokesClass?     @relation(fields: [classId], references: [id], onDelete: SetNull)
+  /// Cascade, NOT SetNull. Under job_lead_read a NULL classId means
+  /// "program-wide", i.e. every student can see it — so nulling this column on
+  /// class deletion would silently PROMOTE a class-scoped lead to the whole
+  /// program. Deleting the lead with its class is the fail-closed direction.
+  class     SpokesClass?     @relation(fields: [classId], references: [id], onDelete: Cascade)
   createdBy Student?         @relation("CreatedJobLeads", fields: [createdById], references: [id], onDelete: SetNull)
 
   connections    Connection[]
   resumeVersions ResumeVersion[]
   coverLetters   CoverLetter[]
 
+  /// Provenance is unique, so "make this a lead" is idempotent at the DATABASE
+  /// rather than by a read-then-write that two concurrent clicks both pass.
+  /// `sourceRef` is nullable and Postgres treats NULLs as distinct, so any
+  /// number of hand-typed leads (no sourceRef) coexist happily.
+  @@unique([source, sourceRef])
+  /// listLeads orders by (status, postedAt desc); the console's board and the
+  /// student's own view both start from status.
+  @@index([status, postedAt(sort: Desc)])
   @@index([status, employerId])
-  @@index([source, sourceRef])
+  /// The employer directory's "N open" count and the per-employer lead list.
+  @@index([employerId])
+  /// rankLeadsForStudent's OR-branch and the RLS policy both filter on classId.
+  @@index([classId])
   @@schema("visionquest")
 }
 

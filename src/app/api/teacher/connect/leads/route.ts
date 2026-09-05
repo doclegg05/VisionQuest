@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { notFound, withTeacherAuth } from "@/lib/api-error";
+import { ApiError, badRequest, notFound, withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import {
   createLead,
@@ -45,7 +45,12 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
     employerId: url.searchParams.get("employerId") ?? undefined,
     fitCounts: url.searchParams.get("fitCounts") ?? undefined,
   });
-  const query = parsed.success ? parsed.data : {};
+  // Same reasoning as the employer list: a malformed filter used to fall back
+  // to {} and return every lead, including the closed ones.
+  if (!parsed.success) {
+    throw badRequest(parsed.error.issues[0]?.message ?? "Invalid filter.");
+  }
+  const query = parsed.data;
 
   const leads = await listLeads({ status: query.status, employerId: query.employerId });
 
@@ -59,6 +64,10 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
   const counts = await summarizeLeadFits(openLeadIds);
   const byLead = new Map(counts.map((entry) => [entry.jobLeadId, entry]));
 
+  // Counts only. summarizeLeadFits also carries the blocked students' NAMES
+  // for the console's drill-in, and that is deliberately dropped here: this
+  // route is a filterable list endpoint, and a roster of who does not qualify
+  // for a job is not something it should hand out.
   return NextResponse.json({
     leads: leads.map((lead) => ({
       ...lead,
@@ -74,10 +83,12 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
   let lead;
   try {
     lead = await createLead(input, session.id);
-  } catch {
-    // The realistic failure is a bad employerId, contactId or classId. A
-    // Prisma foreign-key error names the constraint, the table and the schema,
-    // so it is translated rather than forwarded.
+  } catch (error: unknown) {
+    // createLead raises its own 404s for a class the caller does not manage
+    // and for a contact at another employer; those messages are the useful
+    // ones. Anything else is a Prisma error naming the constraint, the table
+    // and the schema, so it is translated rather than forwarded.
+    if (error instanceof ApiError) throw error;
     throw notFound("That employer, contact or class wasn't found.");
   }
 
@@ -100,7 +111,8 @@ export const PUT = withTeacherAuth(async (session, req: Request) => {
   let lead;
   try {
     lead = await updateLead(input);
-  } catch {
+  } catch (error: unknown) {
+    if (error instanceof ApiError) throw error;
     throw notFound("That lead wasn't found.");
   }
 

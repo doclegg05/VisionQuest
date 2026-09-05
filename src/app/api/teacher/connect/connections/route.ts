@@ -8,6 +8,7 @@ import { ConnectionError, proposeConnection } from "@/lib/connect/connections";
 import { isConnectEnabledForStudent } from "@/lib/connect/flags";
 import { MAX_ENDORSEMENT_CHARS } from "@/lib/connect/endorsement-shared";
 import { packetFieldList } from "@/lib/connect/packet-shared";
+import { prisma } from "@/lib/db";
 import { parseBody } from "@/lib/schemas";
 
 /**
@@ -43,6 +44,18 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
     throw badRequest("Connect isn't turned on for that student's class yet.");
   }
 
+  // Staff can see Employer, so the subsidy flags are read HERE and passed in:
+  // assemblePacket runs in the caller's context and a student-initiated
+  // proposal has no way to read them (see AssembleOptions.subsidyFlags).
+  // A missing lead or employer is left to proposeConnection's own 404.
+  const lead = await prisma.jobLead.findUnique({
+    where: { id: input.jobLeadId },
+    select: { employer: { select: { subsidyFlags: true, status: true } } },
+  });
+  if (lead?.employer.status === "do_not_contact") {
+    throw badRequest("We are not contacting that employer.");
+  }
+
   let result;
   try {
     result = await proposeConnection({
@@ -51,6 +64,7 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
       proposedById: session.id,
       proposedVia: "teacher",
       endorsement: input.endorsement,
+      subsidyFlags: lead?.employer.subsidyFlags ?? null,
     });
   } catch (error) {
     if (error instanceof ConnectionError) {

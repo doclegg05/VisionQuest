@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers config reads with different signatures. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
