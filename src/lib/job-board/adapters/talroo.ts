@@ -1,6 +1,6 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { inferJobWorkMode } from "../work-mode";
-import { fetchJson, stripHtml, truncateDescription } from "./shared";
+import { fetchJson, mapEachJob, stripHtml, truncateDescription } from "./shared";
 import { getSpokesJobQueryTitles } from "../spokes-job-queries";
 import { parseSalaryToHourly } from "../salary-parser";
 
@@ -149,9 +149,12 @@ export const talrooAdapter: JobSourceAdapter = {
         { logUrl: url.split(apiKey).join("[talroo-key]") },
       );
 
-      for (const job of data?.jobs ?? []) {
-        const normalized = mapTalrooJob(job, region);
-        if (!normalized) continue;
+      // mapEachJob isolates one malformed row from the rest of this
+      // keyword's response — see its doc comment in ./shared. Kept for
+      // consistency with jsearch/usajobs/adzuna even though mapTalrooJob's
+      // own required-field checks already null out most malformed shapes.
+      const mapped = mapEachJob(data?.jobs ?? [], "talroo", (job) => mapTalrooJob(job, region));
+      for (const normalized of mapped) {
         if (seen.has(normalized.sourceId)) continue;
         seen.add(normalized.sourceId);
         out.push(normalized);

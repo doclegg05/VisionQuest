@@ -4,7 +4,7 @@ import {
   type AvailabilitySlot,
   type TransportMode,
   type WorkProfile,
-} from "@/lib/connect/work-profile";
+} from "@/lib/connect/work-profile-shared";
 
 /**
  * Read-only instructor view of a student's work profile (Match & Connect Task

@@ -314,9 +314,10 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
       )}
 
       {/* Match & Connect Phase 2: the form fallback for Sage's five-question
-          work intake. Student-only — staff have no work profile of their own,
-          and /api/work-profile refuses them. */}
-      {sessionRole !== "teacher" && sessionRole !== "admin" && <WorkAvailabilitySection />}
+          work intake. Gated on the student role specifically, not on
+          "not staff": /api/work-profile refuses every non-student, so a
+          coordinator would have been shown a form whose Save button 403s. */}
+      {sessionRole === "student" && <WorkAvailabilitySection />}
 
       {sessionRole !== "teacher" && sessionRole !== "admin" && (
       <div className="surface-section mb-6 p-6">

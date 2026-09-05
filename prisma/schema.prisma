@@ -598,6 +598,14 @@ model CoverLetter {
 /// transportFeasible() reads as "unknown" rather than the hard block "none"
 /// would be. `availability` is the 7-day x 4-slot grid; an all-false grid is
 /// the create default and means "not answered yet" too.
+///
+/// JSONB rather than a normalized table for the grid: the 28 cells are always
+/// read and written as one whole answer, never queried a cell at a time, and a
+/// StudentAvailabilitySlot table would be 28 rows per student for a value that
+/// has exactly one owner and one writer. If a SQL-side availability prefilter
+/// is ever needed (Phase 3 ranking a whole roster), the shape to add is a
+/// generated bitmask column over the same JSONB — one indexable integer — not
+/// a normalized child table.
 model StudentWorkProfile {
   studentId         String    @id
   availability      Json
@@ -609,6 +617,7 @@ model StudentWorkProfile {
   childcareHours    Json?
   earliestStart     DateTime?
   shiftLimits       Json?
+  createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   /// "student" | "sage" | "teacher" — who last wrote the row.
   updatedVia        String    @default("student")

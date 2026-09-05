@@ -82,7 +82,10 @@ export function CareerOneStopUnconfiguredNotice({
 }) {
   if (!shouldShowCareerOneStopNudge(sources, sourceHealth)) return null;
   return (
-    <p className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-[var(--error)]">
+    <p
+      className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-[var(--error)]"
+      role="alert"
+    >
       WV Local Jobs is not on yet. Ask your admin to add the CareerOneStop keys.
     </p>
   );

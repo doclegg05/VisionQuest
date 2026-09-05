@@ -4,7 +4,7 @@ import {
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
 import { type ProgramType } from "@/lib/program-type";
-import { type WorkProfile } from "@/lib/connect/work-profile";
+import { type WorkProfile } from "@/lib/connect/work-profile-shared";
 
 export interface StudentTabProps {
   studentId: string;
