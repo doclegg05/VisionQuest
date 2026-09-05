@@ -43,6 +43,15 @@ function distinctConfiguredAreas(): string[] {
 }
 
 describe("AREA_LABEL", () => {
+  // B6b's four suites (student day-one / teacher-loop journeys, orientation
+  // readiness, cohort simulation) use "area": "journeys". They land on
+  // origin's feature branch separately from this one, so the config-driven
+  // check above will not see them here yet — this pins the label directly so
+  // it does not silently depend on that merge order.
+  it("has a label for the journeys area (B6b's suites)", () => {
+    assert.equal(AREA_LABEL.journeys, "Student and teacher journeys");
+  });
+
   it("covers every area used by a real config/benchmarks/*.json suite", () => {
     const areas = distinctConfiguredAreas();
     // A change to the discovery logic above that stops finding anything would
