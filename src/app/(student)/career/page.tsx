@@ -1,5 +1,6 @@
 import CareerDnaCallout from "@/components/career/CareerDnaCallout";
 import CareerHub from "@/components/career/CareerHub";
+import { PendingConnectionsPanel } from "@/components/student/PendingConnectionsPanel";
 import { PathToEmployment } from "@/components/progression/PathToEmployment";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
@@ -62,6 +63,13 @@ export default async function CareerPage() {
         title="Career"
         description="See your Career DNA, jobs, applications, and events in one place. Always know your next step."
       />
+      {/*
+        Above the job board on purpose: an introduction waiting on this
+        student's OK is the most time-sensitive thing on the page, and it is
+        the one thing here that discloses something about them if they say yes.
+        Renders nothing when there is nothing waiting or the pilot is off.
+      */}
+      <PendingConnectionsPanel />
       <CareerDnaCallout studentId={session.id} />
       <CareerHub
         opportunities={opportunities.map((opportunity) => ({
