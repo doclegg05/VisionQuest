@@ -128,10 +128,17 @@ One row per metric, written only by `--update-baseline` (below).
   the enum, because that is what every reader formats a value by; a display
   label never changes how a number is judged.
 - `direction`: which way is better. `floor` is read in the metric's own
-  direction — a `lower` metric must stay **≤** its floor.
+  direction — a `lower` metric must stay **≤** its floor. **Any metric with a
+  numeric `floor` must declare `direction` explicitly**, `exact` or not, and
+  `bench:validate` rejects it otherwise: `"floor": 0` is a minimum under
+  `higher` and a ceiling under `lower`, and the runner defaults to `higher`
+  when direction is absent — so a ceiling metric that forgot one would pass at
+  any value at all. Omit `direction` only on an `"exact": true` metric with no
+  floor, where there is nothing to read a direction against.
 - `tolerance`: the absolute drop from baseline that opens a `watch`.
-- `"exact": true`: the value must equal the baseline. `direction` may be
-  omitted for an exact metric; `floor` and `tolerance` are ignored for it.
+- `"exact": true`: the value must equal the baseline. Its `floor` is still
+  evaluated first (and so still needs a `direction`); `tolerance` is ignored,
+  because equality is the whole contract.
 
 #### A gate metric with no floor yet
 
@@ -191,12 +198,17 @@ key was never set teaches everyone to ignore the gate.
 
 Statuses:
 
+Statuses are decided in one fixed order — **floor first, for every metric**,
+then the `exact` rule, then the tolerance. A floor is the one promise a gate
+rests on, so it is checkable on its own: before any baseline exists, and
+whether or not the metric is `exact`.
+
 | Status | Meaning |
 |---|---|
-| `pass` | inside the floor and inside the tolerance |
+| `pass` | inside the floor and inside the tolerance; for an `exact` metric, equal to its baseline — or floor-met with no baseline recorded yet |
 | `watch` | below `baseline − tolerance` (above `baseline + tolerance` for a `lower` metric) but still inside the floor |
-| `fail` | the floor was crossed, or an `exact` metric moved |
-| `info` | nothing to judge against — no floor and no baseline |
+| `fail` | the floor was crossed, or an `exact` metric moved off its baseline |
+| `info` | nothing to judge against — no floor **and** no baseline |
 | `skipped` | no value: the suite's `requires` were unmet |
 | `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met |
 
