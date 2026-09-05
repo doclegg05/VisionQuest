@@ -1,0 +1,12 @@
+{
+  "timeZone": "America/New_York",
+  "startUtc": "2026-01-01T00:00:00.000Z",
+  "hours": 8760,
+  "dstTransitionDaysLocal": ["2026-03-08", "2026-11-01"],
+  "sentTodayCounts": [0, 1, 2, 3],
+  "notes": [
+    "A full year of hourly ticks, so both DST transitions are inside the corpus: 2026-03-08 (spring forward, 02:00 local does not exist) and 2026-11-01 (fall back, 01:00 local happens twice).",
+    "One timezone because the code supports exactly one: SMS_TIME_ZONE is a fixed constant in src/lib/nudges/sms-policy-shared.ts ('SPOKES is in West Virginia. One program, one clock.'). The scorer asserts the constant still equals this fixture's timeZone and throws if it does not, so the day a per-student zone lands, this suite fails loudly rather than measuring the wrong clock.",
+    "sentTodayCounts spans the cap boundary (SMS_DAILY_CAP is 2) plus one over, so the cap and the quiet-hours deferral are exercised together — the two constraints can both bind on the same tick and the policy has to report the later of the two."
+  ]
+}
