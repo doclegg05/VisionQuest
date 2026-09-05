@@ -25,6 +25,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { discoverSuites } from "./discover.mjs";
+import { isMainModule } from "./entry.mjs";
 import { checkRequires, describeUnmet, resolveEnv } from "./env.mjs";
 import { describeHost } from "./host.mjs";
 
@@ -32,9 +33,14 @@ function repoRootFromEnv(env = process.env) {
   return env.BENCH_REPO_ROOT ? resolve(env.BENCH_REPO_ROOT) : resolve(import.meta.dirname, "..", "..", "..");
 }
 
-/** True when this module's caller is the entry point and asked for a self-test. */
+/**
+ * True when this module's caller is the entry point and asked for a
+ * self-test. Entry detection goes through isMainModule, which resolves
+ * argv[1] symlinks — comparing raw paths fails open through a link and exits
+ * 0 having done nothing.
+ */
 export function isSelfTestRun(scorerUrl, argv = process.argv) {
-  if (fileURLToPath(scorerUrl) !== argv[1]) return false;
+  if (!isMainModule(scorerUrl, argv)) return false;
   return argv.includes("--self-test");
 }
 
@@ -44,7 +50,7 @@ export function isSelfTestRun(scorerUrl, argv = process.argv) {
  */
 export async function selfTest(scorerUrl, run) {
   const scorerPath = fileURLToPath(scorerUrl);
-  if (scorerPath !== process.argv[1]) return;
+  if (!isMainModule(scorerUrl)) return;
   if (!process.argv.includes("--self-test")) {
     console.error(`Nothing to do. Run it with --self-test:\n  node ${process.argv[1]} --self-test`);
     return;

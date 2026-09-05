@@ -1,0 +1,13 @@
+{
+  "suite": "consent-scopes",
+  "title": "Consent scopes enforced on every disclosure write path",
+  "area": "data-integrity",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/consent-scopes.mjs",
+  "fixture": "src/lib/connect/consent-scopes.bench.test.ts",
+  "requires": ["postgres"],
+  "metrics": [
+    { "id": "writes_without_scope", "unit": "count", "direction": "lower", "floor": 0, "tolerance": 0 }
+  ],
+  "notes": "The scorer is a thin child-process wrapper (documented in-file, per the plan's own fallback) around a node:test file gated the same way src/lib/rls.test.ts is (RLS_TEST_ENABLED=true + DATABASE_URL), because the guarded functions under test (sendConnection, selectBatchStudents) run through the app's own `prisma` singleton and only become RLS-aware inside withRlsContext + RLS_CONTEXT_INJECTION=true — a real production code path a raw-SQL bootstrap outside node:test cannot exercise. Covers sendConnection (ConsentRecord scope employer_referral), sendPolicySms (NotificationPreference.smsConsentAt — a different consent mechanism for the SMS channel, not literally a ConsentRecord row, but the same kind of scope check), and selectBatchStudents (the WorkForce WV batch export, which must never include a ready-but-unconsented student). All three were already gated in the codebase at measurement time (2026-09-05); this suite makes that gate a durable, falsifiable regression test rather than something only a spec's prose promises."
+}

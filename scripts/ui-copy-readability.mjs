@@ -48,9 +48,9 @@
  * after this addition, byte-identical.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -618,10 +618,20 @@ async function main() {
 // re-running the whole CLI report as an import side effect. Compares against
 // `process.argv[1]` rather than running unconditionally, which is what a
 // bare `main().catch(...)` at module scope would do on every import.
+//
+// argv[1] is resolved through `realpathSync` first. Node resolves a module's
+// real path when it loads it, so `import.meta.url` points at the target of any
+// symlink while argv[1] keeps the link — invoked through one, a raw comparison
+// is false, main() never runs, and this gate EXITS 0 having checked nothing.
+// A gate that reports success without running is worse than no gate.
+//
+// The benchmark runner shares an implementation at scripts/bench/lib/entry.mjs;
+// this copy stays local deliberately, so the readability gate never depends on
+// the benchmark runner to check its own copy.
 const isMainModule = (() => {
   if (!process.argv[1]) return false;
   try {
-    return import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href;
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
   } catch {
     return false;
   }
