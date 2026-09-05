@@ -142,8 +142,11 @@ function dayAfter(year: number, month: number, day: number): { year: number; mon
 }
 
 /**
- * Report date-range bounds for a `"YYYY-MM-DD"`-only `from`/`to` pair, e.g. a
- * teacher report's query params.
+ * Report date-range bounds for a `"YYYY-MM-DD"`-only `from`/`to` pair
+ * against a REAL TIMESTAMP column (plain Prisma `DateTime`, e.g.
+ * `Connection.createdAt`, `Application.createdAt`) — an instant that
+ * genuinely happened at some wall-clock moment, which is why it needs a
+ * timezone at all.
  *
  * `from` becomes the ET-cohort START of that calendar day (inclusive);
  * `to` becomes the ET-cohort START of the day AFTER (exclusive) — so a
@@ -160,6 +163,10 @@ function dayAfter(year: number, month: number, day: number): { year: number; mon
  * `YYYY-MM-DD` regex (every report route in this codebase does) never hit
  * that branch; it exists so a malformed value fails as "invalid date"
  * rather than silently vanishing here.
+ *
+ * NOT for a Prisma `@db.Date` column — see `dateOnlyBoundsUtc` below for
+ * those; running one through THIS function shifts every row back one
+ * calendar day, unconditionally, because ET is always behind UTC.
  */
 export function reportDateRangeBoundsUtc(
   from?: string,
@@ -180,6 +187,52 @@ export function reportDateRangeBoundsUtc(
     if (match) {
       const next = dayAfter(Number(match[1]), Number(match[2]), Number(match[3]));
       toBound = zonedTimeToUtc(next.year, next.month, next.day, 0, 0, 0, timeZone);
+    } else {
+      toBound = new Date(to);
+    }
+  }
+
+  return { from: fromBound, to: toBound };
+}
+
+/**
+ * Date-range bounds for a `"YYYY-MM-DD"`-only `from`/`to` pair against a
+ * Prisma `@db.Date` column (e.g. `SpokesRecord.enrolledAt`) — a plain
+ * calendar date with NO time-of-day, which Postgres/Prisma always returns
+ * as an instant at exactly UTC midnight for that date. It is not "a moment
+ * that could fall on either side of a timezone boundary" — it already IS
+ * the date, with no timezone attached — so this function does PLAIN
+ * `Date.UTC` arithmetic and never touches a timezone at all.
+ *
+ * `from` becomes UTC midnight of that calendar day (inclusive); `to`
+ * becomes UTC midnight of the day AFTER (exclusive) — so
+ * `enrolledAt >= from && enrolledAt < to` covers every `@db.Date` row dated
+ * on or between `from` and `to` inclusive.
+ *
+ * A 2026-09 review first pointed dohs-export.ts's `@db.Date` filters at
+ * `reportDateRangeBoundsUtc` (the ET-aware function above), which shifted
+ * the WHOLE reporting window back one day: `enrolledAt >= "2026-06-01"`
+ * became `>= 2026-06-01T04:00:00Z` (ET midnight), which excludes every row
+ * literally dated `2026-06-01T00:00:00Z` (UTC midnight, what a `@db.Date`
+ * row for that date actually stores) — the review's own earlier finding
+ * about row-DISPLAY dates (`dohs-export-shared.ts`'s `toDateOnlyUtc`)
+ * applies equally to row FILTERING and was missed here the first time.
+ */
+export function dateOnlyBoundsUtc(from?: string, to?: string): { from?: Date; to?: Date } {
+  let fromBound: Date | undefined;
+  if (from) {
+    const match = DATE_ONLY.exec(from);
+    fromBound = match
+      ? new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+      : new Date(from);
+  }
+
+  let toBound: Date | undefined;
+  if (to) {
+    const match = DATE_ONLY.exec(to);
+    if (match) {
+      const next = dayAfter(Number(match[1]), Number(match[2]), Number(match[3]));
+      toBound = new Date(Date.UTC(next.year, next.month - 1, next.day));
     } else {
       toBound = new Date(to);
     }

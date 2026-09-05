@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  dateOnlyBoundsUtc,
   formatCohortDateTime,
   monthBoundsInZone,
   programYearBoundsUtc,
@@ -113,6 +114,52 @@ describe("reportDateRangeBoundsUtc", () => {
 
   it("passes a non-date-only string straight to `new Date()` rather than mangling it", () => {
     const { from } = reportDateRangeBoundsUtc("2026-06-01T14:00:00.000Z", undefined);
+    assert.equal(from?.toISOString(), "2026-06-01T14:00:00.000Z");
+  });
+});
+
+describe("dateOnlyBoundsUtc (for @db.Date columns — no timezone at all)", () => {
+  it("`from` is plain UTC midnight of that calendar day — NOT the ET-shifted instant", () => {
+    const { from } = dateOnlyBoundsUtc("2026-06-01", undefined);
+    assert.equal(from?.toISOString(), "2026-06-01T00:00:00.000Z");
+  });
+
+  it("`to` is plain UTC midnight of the day AFTER — exclusive, still no timezone conversion", () => {
+    const { to } = dateOnlyBoundsUtc(undefined, "2026-06-30");
+    assert.equal(to?.toISOString(), "2026-07-01T00:00:00.000Z");
+  });
+
+  it("a @db.Date row dated exactly on `from` (UTC midnight) is included, not excluded", () => {
+    // This is the C1 regression: reportDateRangeBoundsUtc's ET-shifted
+    // `from` (2026-06-01T04:00:00Z) would exclude a row literally stored at
+    // 2026-06-01T00:00:00Z, which is what a @db.Date column for that date
+    // actually holds.
+    const { from } = dateOnlyBoundsUtc("2026-06-01", undefined);
+    const rowValue = new Date("2026-06-01T00:00:00.000Z");
+    assert.ok(from && rowValue.getTime() >= from.getTime(), "the row's own UTC-midnight value must satisfy >= from");
+  });
+
+  it("a @db.Date row dated exactly on `to` (UTC midnight) is included, not the day after", () => {
+    const { to } = dateOnlyBoundsUtc(undefined, "2026-06-30");
+    const rowOnTo = new Date("2026-06-30T00:00:00.000Z");
+    const rowDayAfter = new Date("2026-07-01T00:00:00.000Z");
+    assert.ok(to && rowOnTo.getTime() < to.getTime(), "the row dated ON `to` must satisfy < the exclusive bound");
+    assert.ok(to && rowDayAfter.getTime() >= to.getTime(), "a row dated the day AFTER `to` must be excluded");
+  });
+
+  it("rolls over a month and a year correctly (Dec 31 -> Jan 1), with no ET offset", () => {
+    const { to } = dateOnlyBoundsUtc(undefined, "2025-12-31");
+    assert.equal(to?.toISOString(), "2026-01-01T00:00:00.000Z");
+  });
+
+  it("returns undefined for an omitted bound", () => {
+    const bounds = dateOnlyBoundsUtc(undefined, undefined);
+    assert.equal(bounds.from, undefined);
+    assert.equal(bounds.to, undefined);
+  });
+
+  it("passes a non-date-only string straight to `new Date()` rather than mangling it", () => {
+    const { from } = dateOnlyBoundsUtc("2026-06-01T14:00:00.000Z", undefined);
     assert.equal(from?.toISOString(), "2026-06-01T14:00:00.000Z");
   });
 });
