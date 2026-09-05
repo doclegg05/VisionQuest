@@ -60,6 +60,7 @@ export const AREA_LABEL: Record<string, string> = {
   meta: "The tests themselves",
   nudges: "Text-message check-ins",
   connect: "Matching students with employers",
+  journeys: "Student and teacher journeys",
   other: "Everything else",
 };
 
