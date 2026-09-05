@@ -20,6 +20,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { BENCH_LATEST_DIR, loadBaseline, baselineValue } from "./lib/discover.mjs";
+import { isMainModule } from "./lib/entry.mjs";
 import { metricStatus } from "./lib/status.mjs";
 
 /** Tiers whose failures stop a run. */
@@ -183,6 +184,6 @@ async function main() {
   process.exit(0);
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMainModule(import.meta.url)) {
   await main();
 }
