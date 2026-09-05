@@ -329,9 +329,28 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i have taken all my pills tonight", "have taken"],
   ["i swallowed all my medication", "swallowed"],
   // A subjectless past act is a real student message and must keep alerting —
-  // it is why this entry is guarded by refusing third-person subjects rather
-  // than by requiring a first-person one.
+  // it is why this entry accepts a bare verb at the start of a sentence as well
+  // as a first-person frame.
   ["took all my pills last night", "no subject at all"],
+  ["just took all my pills", "adverb before a subjectless verb"],
+
+  // A THIRD-PERSON WORD NEAR THE VERB IS NOT A THIRD-PERSON SUBJECT. The first
+  // attempt at bounding this entry refused any of he/she/they/the/my within two
+  // words of the verb, which silenced every one of these — a student naming who
+  // knows about their own overdose. All eleven alerted before that guard and
+  // were silent after it; a generated sweep of <3p word> <verb> i took all my
+  // pills silenced 91 of 91. Pinned so the frame can never be narrowed back
+  // into a preceding-word refusal.
+  ["they know i took all my pills", "3p subject of the OUTER clause"],
+  ["she said i took all my pills", "reported speech"],
+  ["he knows i swallowed all my meds", "3p + swallowed"],
+  ["her fault i took too many pills", "possessive before the real subject"],
+  ["his fault i took too many pills", "possessive, masculine"],
+  ["my fault i took all my pills", "first-person possessive before the verb"],
+  ["they saw i took all my pills", "3p witness"],
+  ["the reason i took all my pills", "determiner before the real subject"],
+  ["their fault i swallowed all my meds", "plural possessive"],
+  ["your fault i took too many pills", "second-person possessive"],
 
   // S1: the od abbreviation as a PAST ACT. The only od entry required an intent
   // verb ("gonna od"), so a completed one was silent.
@@ -401,6 +420,10 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["my brother swallowed all the pills", "possessive subject before the verb"],
   ["the patient had taken all the medication", "determiner subject before the verb"],
   ["they swallowed a bunch of pills", "plural third-person subject"],
+  // The mirror of the must-detect group above: here the third person IS the
+  // subject of the verb, with a first-person word elsewhere in the sentence.
+  ["i heard she took all my pills", "3p subject, 'i' belongs to the outer clause"],
+  ["i think my brother swallowed all the pills", "3p subject after a first-person frame"],
   ["he od'd on pills", "third person + od'd"],
   ["my brother od'd last year", "possessive subject + od'd"],
 

@@ -22,6 +22,7 @@ const HEALTHY = {
   capStress: { attempts: 10, accepted: 2, capConsumingRows: 2, dailyCap: 2 },
   perStudentDailyMax: 2,
   duplicateOpenQuestions: 0,
+  failureProbe: { attempted: 1, sendFailures: 1 },
 };
 
 describe("readDeadlineBudgetMs", () => {
@@ -54,6 +55,7 @@ describe("scoreReport", () => {
     assert.deepEqual(values, {
       sweep_blocked: 0,
       send_errors: 0,
+      send_error_detector_blind: 0,
       daily_cap_exceeded: 0,
       duplicate_open_questions: 0,
       concurrent_run_not_skipped: 0,
@@ -82,6 +84,25 @@ describe("scoreReport", () => {
 
   it("counts sends the policy refused with send_error", () => {
     assert.equal(scoreReport({ ...HEALTHY, sendErrors: 7 }, 225_000).send_errors, 7);
+  });
+
+  it("reports the send_errors detector blind when a deliberate failure went unseen", () => {
+    // The one gate the broken state could not falsify: the outage blocks the
+    // sweep before any send, so `send_errors` stayed 0 through it. The harness
+    // drives a real 503 through sendPolicySms on every run; if that does not
+    // register, `send_errors: 0` is not evidence of anything.
+    assert.equal(
+      scoreReport({ ...HEALTHY, failureProbe: { attempted: 1, sendFailures: 0 } }, 225_000)
+        .send_error_detector_blind,
+      1,
+    );
+    assert.equal(scoreReport(HEALTHY, 225_000).send_error_detector_blind, 0);
+    // No probe attempted at all is not "blind" — it is a skipped run, which
+    // the suite reports separately rather than failing on.
+    assert.equal(
+      scoreReport({ ...HEALTHY, failureProbe: undefined }, 225_000).send_error_detector_blind,
+      0,
+    );
   });
 
   it("counts cap overshoot from the stressed recipient and from the cohort", () => {

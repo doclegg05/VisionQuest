@@ -213,21 +213,34 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // talk reads ("i take all my pills every morning", pinned silent) and must
   // stay out. The quantity + medication bounds are unchanged, so nothing that
   // used to alert on the NOUN side stops alerting.
-  // The verb list refuses a THIRD-PERSON SUBJECT rather than requiring a
-  // first-person one, and the difference matters: "took all my pills last
-  // night" with no subject at all is a real student message and must keep
-  // alerting, so anchoring on "i" would have cost recall to buy precision.
-  // Measured before and after — "she has taken too many pills", "my brother
-  // swallowed all the pills", "the patient had taken all the medication" and
-  // "they swallowed a bunch of pills" were silent before the widening and
-  // alerting after it, so a student describing someone else's overdose was
-  // raising a CRITICAL alert on themselves. The lookbehind spans up to two
-  // words so an auxiliary ("has", "had") between the subject and the verb does
-  // not carry it out of range.
+  // The verb needs a subject that is the STUDENT, and there are exactly two
+  // ways a student writes one: a first-person frame ("i took", "ive taken",
+  // "i have taken"), or no subject at all at the start of a sentence ("took all
+  // my pills last night", "just took all my pills") — the second is a real
+  // message and anchoring only on "i" would lose it.
+  //
+  // The first attempt at this bounded the entry with a lookbehind refusing any
+  // third-person word within two words BEFORE the verb, and that was wrong in a
+  // way only a sweep shows: a third-person word near the verb is not the same
+  // thing as a third-person SUBJECT. "they know i took all my pills", "she said
+  // i took all my pills", "the reason i took all my pills" — eleven such
+  // sentences alerted before that guard and were silent after it, and a
+  // generated sweep of <third-person word> <verb> i took all my pills silenced
+  // 91 of 91. A student naming who knows about their own overdose is exactly
+  // the message this entry exists for.
+  //
+  // The shape below is the one the od'd entry below already uses and got right:
+  // anchor on the first-person pronoun and refuse third-person words INSIDE the
+  // bounded gap that follows it, so a pronoun in an outer clause is irrelevant
+  // and only the verb's own subject is examined. The subjectless alternative
+  // applies the same refusal to the sentence's leading words, which is what
+  // keeps "she has taken too many pills", "my brother swallowed all the pills",
+  // "the patient had taken all the medication" and "they swallowed a bunch of
+  // pills" silent. Both directions are pinned.
   {
     category: "self_harm",
     pattern:
-      /(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|your|the|my)\s(?:\w+\s){0,2})\b(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
+      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+|(?:^|[.!?]\s+)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,2})(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
   },
   // S1: "od'd" as a completed act. The only od entry required an intent verb
   // ("gonna od"), so the past tense — the higher-risk disclosure of the two —
@@ -346,7 +359,7 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // Third person keeps it silent ("se tragó todas las pastillas"), and the
   // quantity + medication bounds keep an accidental swallow silent too
   // ("me tragué un hueso de pollo sin querer"), both pinned.
-  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tom(?:é|é)|(?:me\s+)?tragué|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?(?:tome|trague))\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tomé|(?:me\s+)?tragué|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?(?:tome|trague))\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
   // 2. Stated intent: an intent verb ("quiero/quisiera", "voy a"/"me voy a",
   //    "pienso en", "pensé en") governing the take-verb, the synthetic future
   //    ("me tomaré"), or a time-of-intent marker framing the bare present

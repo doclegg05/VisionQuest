@@ -114,8 +114,11 @@ const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/i;
  * ordinary prose is never joined into an accidental match — makes a
  * post-normalization survivor visible again.
  */
+const HIDEABLE_INSIDE_A_MARKER =
+  /[\s\p{Default_Ignorable_Code_Point}\p{Cf}\p{Cc}]/gu;
+
 function collapseBracketedTokens(text) {
-  return text.replace(/\[[^[\]]*\]/g, (token) => token.replace(/\s+/g, ""));
+  return text.replace(/\[[^[\]]*\]/g, (token) => token.replace(HIDEABLE_INSIDE_A_MARKER, ""));
 }
 
 /**
