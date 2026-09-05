@@ -7,6 +7,8 @@
 
 import { getPlainConfigValue } from "@/lib/system-config";
 
+import { ENROLLED_STATUSES } from "./classes";
+
 import {
   CONNECT_CONFIG_KEY,
   CONNECT_SUBSIDY_LINES_CONFIG_KEY,
@@ -49,8 +51,13 @@ export async function isConnectEnabledForStudent(studentId: string): Promise<boo
     if (scope.mode === "off") return false;
     if (scope.mode === "all") return true;
 
+    // `ENROLLED_STATUSES`, not just "active": the RLS helper
+    // `active_enrolled_class_ids()` deliberately includes `completed`, so a
+    // student who finished the course could still read their class's leads
+    // while this flag said Connect was off for them — the app and the database
+    // disagreeing about who is enrolled.
     const enrollments = await prisma.studentClassEnrollment.findMany({
-      where: { studentId, status: "active" },
+      where: { studentId, status: { in: [...ENROLLED_STATUSES] } },
       select: { classId: true },
     });
     return isConnectEnabledForClasses(

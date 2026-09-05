@@ -60,10 +60,37 @@ function inactive(status = 404): NextResponse {
 export async function resolveEmployerRequest(
   pathToken: string,
   bodyToken: string,
+  clientIp: string | null,
 ): Promise<EmployerRequestResult> {
   const fromPath = normalizeEmployerToken(pathToken);
   const fromBody = normalizeEmployerToken(bodyToken);
   if (!fromPath || !fromBody || fromPath !== fromBody) {
+    return { ok: false, response: inactive() };
+  }
+
+  // RESOLVE FIRST, then rate-limit.
+  //
+  // The first cut limited on the candidate token's hash before resolving, so
+  // every guess wrote a new `RateLimitEntry` row keyed on an attacker-chosen
+  // value — an unbounded insert primitive on a shared table, reachable with no
+  // account. Unknown tokens now cost only a coarse per-IP bucket, and only a
+  // token that resolves gets a per-token counter.
+  const view = await resolveEmployerLink(
+    fromPath,
+    await getPlainConfigValue(CONNECT_CONFIG_KEY),
+  );
+
+  if (!view) {
+    const guesses = await rateLimit(
+      `connect-employer-unknown:${clientIp ?? "unknown"}`,
+      UNKNOWN_TOKEN_LIMIT,
+      EMPLOYER_ACTION_WINDOW_MS,
+    );
+    // Fail closed, consistently with the send limiter: a limiter that cannot
+    // count must not become an open door.
+    if (!guesses.success || guesses.degraded) {
+      return { ok: false, response: tooMany() };
+    }
     return { ok: false, response: inactive() };
   }
 
@@ -73,31 +100,31 @@ export async function resolveEmployerRequest(
     EMPLOYER_ACTION_LIMIT,
     EMPLOYER_ACTION_WINDOW_MS,
   );
-  if (!limit.success) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Too many tries. Please wait a little and try again." },
-        { status: 429 },
-      ),
-    };
+  if (!limit.success || limit.degraded) {
+    return { ok: false, response: tooMany() };
   }
-
-  const view = await resolveEmployerLink(
-    fromPath,
-    await getPlainConfigValue(CONNECT_CONFIG_KEY),
-  );
-  if (!view) return { ok: false, response: inactive() };
 
   return { ok: true, view };
 }
 
-/** The employer's own contact details, for the appointment's external attendee. */
-export async function contactForConnection(connectionId: string) {
-  const { prismaAdmin } = await import("@/lib/db");
-  const connection = await prismaAdmin.connection.findUnique({
-    where: { id: connectionId },
-    select: { jobLead: { select: { contact: { select: { name: true, email: true } } } } },
-  });
-  return connection?.jobLead.contact ?? null;
+function tooMany(): NextResponse {
+  return NextResponse.json(
+    { error: "Too many tries. Please wait a little and try again." },
+    { status: 429 },
+  );
+}
+
+/** Coarse bucket for tokens that resolve to nothing. Per IP, not per guess. */
+export const UNKNOWN_TOKEN_LIMIT = 20;
+
+/**
+ * The client's IP, for the unknown-token bucket only.
+ *
+ * Behind Render's proxy the socket address is the proxy's, so the forwarded
+ * header is the only signal available. It is spoofable, which is why it gates
+ * nothing but this coarse bucket — never authorization.
+ */
+export function clientIpFrom(req: Request): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || null;
 }

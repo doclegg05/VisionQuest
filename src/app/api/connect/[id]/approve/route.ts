@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { forbidden, withAuth } from "@/lib/api-error";
-import { ConnectionError, approveConnection } from "@/lib/connect/connections";
+import {
+  ConnectionError,
+  approveConnection,
+  connectionProvenance,
+} from "@/lib/connect/connections";
 import { isConnectEnabledForStudent } from "@/lib/connect/flags";
 import { packetFieldList } from "@/lib/connect/packet-shared";
 import { operationIdFor, recordOperation } from "@/lib/sage/operations";
-import { prisma } from "@/lib/db";
 
 /**
  * POST /api/connect/[id]/approve — the student's tap (Match & Connect Task
@@ -38,10 +41,7 @@ export const POST = withAuth(
 
     // Read before the write so the SageOperation below can be attributed only
     // when Sage actually raised the proposal.
-    const before = await prisma.connection.findFirst({
-      where: { id, studentId: session.id },
-      select: { proposedVia: true, jobLeadId: true },
-    });
+    const before = await connectionProvenance(id, session.id);
 
     try {
       const packet = await approveConnection(id, session.id);

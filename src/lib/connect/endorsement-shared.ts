@@ -13,6 +13,24 @@
 // would leave a fluent paragraph that had quietly dropped its worst sentence,
 // which is much harder for an instructor to notice than an empty box.
 //
+// WHAT THIS CHECK DOES NOT CATCH. Written down because a named guard invites
+// the assumption that the output is verified, and it is not:
+//
+//   - Quantities and durations. "two years at Kroger" passes whenever Kroger
+//     is on the résumé; nothing here knows how long they were there.
+//   - Tense and status. "works at Kroger" and "worked at Kroger" are the same
+//     to this code, and only one of them may still be true.
+//   - Predictions and opinions. "will be reliable", "is the best student I
+//     have taught" name nothing, so nothing is flagged.
+//   - Anything asserted in lower case that is not credential-shaped. The
+//     collectors look for capitalised runs and credential nouns; "he has a
+//     clean record" gets through.
+//
+// So this is a BACKSTOP against the specific failure that would be worst —
+// a fabricated employer or credential — and not a verifier. The control is
+// that an instructor reads and edits every draft before it can be sent, and
+// that the endorsement is shown to the student before they approve.
+//
 // This module must never import @/lib/db.
 // =============================================================================
 
@@ -42,7 +60,7 @@ function normalize(value: string): string {
 }
 
 /**
- * Everything the draft is allowed to assert, as one lower-cased haystack.
+ * Everything the draft is allowed to NAME, as one lower-cased haystack.
  *
  * The instructor's own notes and the attendance line are included: a person
  * writing about their own student is the source of truth this check exists to
@@ -54,6 +72,31 @@ export function groundedHaystack(facts: EndorsementFacts): string {
       ...facts.verifiedCertifications,
       ...facts.skills,
       ...facts.employers,
+      facts.attendanceSummary ?? "",
+      facts.instructorNotes ?? "",
+    ].join(" \n "),
+  );
+}
+
+/**
+ * The NARROWER haystack, for claims that a person was credentialed.
+ *
+ * `skills` and `employers` come off the student's own résumé — they are what
+ * the student said about themselves, never checked by anyone. That is a fine
+ * source for naming a past employer, and a bad one for "Dana is forklift
+ * certified": a résumé skill line reading "forklift" would otherwise ground a
+ * certification claim in a letter an employer may hire on. Certifications on
+ * `verifiedCertifications` have been confirmed by an instructor, which is the
+ * standard a credential claim leaving the program has to meet.
+ *
+ * The instructor's notes and the attendance line stay in, for the same reason
+ * as above: a teacher asserting something about their own student is the
+ * authority here, not the thing being guarded against.
+ */
+export function credentialHaystack(facts: EndorsementFacts): string {
+  return normalize(
+    [
+      ...facts.verifiedCertifications,
       facts.attendanceSummary ?? "",
       facts.instructorNotes ?? "",
     ].join(" \n "),
@@ -98,8 +141,18 @@ const CREDENTIAL_NOUNS = [
  * `isPhraseGrounded` then decides. Over-collecting costs an instructor one
  * rewrite; under-collecting puts a fabricated employer in an employer's inbox.
  */
-export function assertedEntities(sentence: string): string[] {
-  const found: string[] = [];
+export interface AssertedClaim {
+  phrase: string;
+  /**
+   * Which haystack has to support it. A `credential` claim is checked against
+   * verified certifications only; a `name` claim may be grounded by anything
+   * in the facts.
+   */
+  kind: "name" | "credential";
+}
+
+export function assertedClaims(sentence: string): AssertedClaim[] {
+  const found: AssertedClaim[] = [];
 
   // Capitalised runs, minus a leading sentence-initial word (which is
   // capitalised for grammar, not because it is a name).
@@ -107,7 +160,7 @@ export function assertedEntities(sentence: string): string[] {
   for (const match of body.matchAll(/\b\p{Lu}[\p{L}'&.-]*(?:\s+\p{Lu}[\p{L}'&.-]*)*/gu)) {
     const phrase = match[0].trim();
     if (phrase.length < 3) continue;
-    found.push(phrase);
+    found.push({ phrase, kind: "name" });
   }
 
   // Credential shapes, regardless of capitalisation: "forklift card",
@@ -116,10 +169,15 @@ export function assertedEntities(sentence: string): string[] {
   for (const match of sentence.matchAll(
     /((?:[\p{L}\d][\p{L}\d'&.-]*\s+){0,3}[\p{L}\d][\p{L}\d'&.-]*)\s+(card|certificate|certification|license|licence|credential)s?\b/giu,
   )) {
-    found.push(`${match[1].trim()} ${match[2]}`.trim());
+    found.push({ phrase: `${match[1].trim()} ${match[2]}`.trim(), kind: "credential" });
   }
 
   return found;
+}
+
+/** The phrases only, for callers that do not care which haystack applies. */
+export function assertedEntities(sentence: string): string[] {
+  return assertedClaims(sentence).map((claim) => claim.phrase);
 }
 
 /**
@@ -170,14 +228,16 @@ export function findUngroundedSentences(
   draft: string,
   facts: EndorsementFacts,
 ): GroundingViolation[] {
-  const haystack = groundedHaystack(facts);
+  const names = groundedHaystack(facts);
+  const credentials = credentialHaystack(facts);
   const violations: GroundingViolation[] = [];
 
   for (const sentence of splitSentences(draft)) {
-    for (const term of assertedEntities(sentence)) {
-      if (!normalize(term)) continue;
-      if (isPhraseGrounded(term, haystack)) continue;
-      violations.push({ sentence, term });
+    for (const claim of assertedClaims(sentence)) {
+      if (!normalize(claim.phrase)) continue;
+      const haystack = claim.kind === "credential" ? credentials : names;
+      if (isPhraseGrounded(claim.phrase, haystack)) continue;
+      violations.push({ sentence, term: claim.phrase });
     }
   }
 

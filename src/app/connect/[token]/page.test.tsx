@@ -126,7 +126,7 @@ describe("/connect/[token] — the public employer page", () => {
 
   it("says to ask about incentives when no subsidy figure is verified", async () => {
     const html = await render();
-    assert.ok(html.includes("Ask about hiring incentives."));
+    assert.ok(html.includes("Ask us about money for hiring."));
     // No dollar figure may appear from an unverified rule.
     assert.ok(!/\$\d/.test(html), "an unverified dollar figure reached the page");
   });

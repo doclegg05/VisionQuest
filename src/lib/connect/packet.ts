@@ -1,10 +1,11 @@
 // =============================================================================
 // Packet assembly — Match & Connect Phase 4, Task 4.2.
 //
-// The packet is built ONCE, at approval, and frozen on Connection.packet. It
-// is never re-derived at send time: the student approved a specific list of
-// specific facts, and a résumé edited the next morning must not silently
-// change what an employer receives.
+// The packet is built ONCE, at PROPOSE time, and frozen at approval: the
+// approval card has to show the student the exact contents before they tap, so
+// it cannot be assembled afterwards. Nothing re-derives it at send time — the
+// student approved a specific list of specific facts, and a résumé edited the
+// next morning must not silently change what an employer receives.
 //
 // The résumé and cover letter come from `tailor_application`'s own planner —
 // this module calls `createTailoredApplication` with the LEAD rendered as the
@@ -17,6 +18,8 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
+import { studentLogKey } from "@/lib/log-keys";
 import { generateStorageKey, uploadFile } from "@/lib/storage";
 import { generateResumePdfArrayBuffer } from "@/lib/resume-pdf";
 import { parseStoredResumeData, type ResumeContent } from "@/lib/resume";
@@ -42,6 +45,31 @@ export class PacketAssemblyError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PacketAssemblyError";
+  }
+}
+
+/**
+ * How long the tailoring model call may hold up a propose request.
+ *
+ * This runs on the REQUEST PATH: an instructor tapping "Introduce", or a
+ * student's Sage turn. The local provider's own ceiling is 300s, which is
+ * three minutes of a spinner on a page somebody is waiting at. Past this the
+ * packet degrades to no résumé, the failure is logged, and the approval card
+ * says so — all of which is better than a request that never answers.
+ */
+export const TAILORING_DEADLINE_MS = 20_000;
+
+async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -133,56 +161,57 @@ interface AssembleOptions {
  * must be the ones that actor is allowed to make.
  */
 export async function assemblePacket(
-  connectionId: string,
+  target: { studentId: string; jobLeadId: string },
   options: AssembleOptions = {},
 ): Promise<Packet> {
-  const connection = await prisma.connection.findUnique({
-    where: { id: connectionId },
-    select: {
-      id: true,
-      studentId: true,
-      jobLeadId: true,
-      student: {
-        select: {
-          displayName: true,
-          resumeData: { select: { data: true } },
-          workProfile: true,
-          certifications: {
-            // Verified only. An in-progress or self-reported card is not a
-            // fact this program will assert to an employer.
-            where: { status: "completed", verificationStatus: "verified" },
-            select: { id: true, certType: true, completedAt: true },
-          },
+  // Keyed on (studentId, jobLeadId), NOT on a connection id: the packet is
+  // assembled BEFORE the Connection row exists, so a failure here leaves no
+  // half-built proposal squatting on the permanent unique key, and the
+  // student-context write that stores it is the INSERT rather than an UPDATE
+  // the RLS policy would reject.
+  const [student, jobLead] = await Promise.all([
+    prisma.student.findUnique({
+      where: { id: target.studentId },
+      select: {
+        displayName: true,
+        resumeData: { select: { data: true } },
+        workProfile: true,
+        certifications: {
+          // Verified only. An in-progress or self-reported card is not a fact
+          // this program will assert to an employer.
+          where: { status: "completed", verificationStatus: "verified" },
+          select: { id: true, certType: true, completedAt: true },
         },
       },
-      jobLead: {
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          location: true,
-          clusters: true,
-          payMin: true,
-          payMax: true,
-          payPeriod: true,
-          // The denormalised name, NOT the Employer relation: assemblePacket
-          // runs in the caller's RLS context and that caller is the student
-          // when Sage raised the proposal. `employer_access` has no student
-          // branch, so a join here would come back empty.
-          employerName: true,
-        },
+    }),
+    prisma.jobLead.findUnique({
+      where: { id: target.jobLeadId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        location: true,
+        clusters: true,
+        payMin: true,
+        payMax: true,
+        payPeriod: true,
+        // The denormalised name, NOT the Employer relation: assemblePacket
+        // runs in the caller's RLS context and that caller is the student when
+        // Sage raised the proposal. `employer_access` has no student branch, so
+        // a join here would come back empty.
+        employerName: true,
       },
-    },
-  });
-  if (!connection) throw new PacketAssemblyError("That connection wasn't found.");
+    }),
+  ]);
+  if (!student) throw new PacketAssemblyError("That student wasn't found.");
+  if (!jobLead) throw new PacketAssemblyError("That job wasn't found.");
 
-  const { student, jobLead } = connection;
   const resume: ResumeContent = parseStoredResumeData(student.resumeData?.data ?? null);
   const certifications = student.certifications.map((cert) => cert.certType);
 
   const { resumeVersionId, coverLetterId } = await buildTailoredDocuments({
-    studentId: connection.studentId,
-    jobLeadId: connection.jobLeadId,
+    studentId: target.studentId,
+    jobLeadId: target.jobLeadId,
     resume,
     certifications,
     lead: jobLead,
@@ -280,26 +309,26 @@ async function buildTailoredDocuments(input: TailoringInput): Promise<{
   };
 
   try {
-    const created = await createTailoredApplication(input.studentId, input.lead.id, source);
-    // createTailoredApplication writes rows keyed to a JobListing id, which
-    // this lead is not. Re-key them onto the lead so the packet's documents
-    // hang off the opening they were written for.
-    await prisma.$transaction([
-      prisma.resumeVersion.update({
-        where: { id: created.resumeVersionId },
-        data: { jobLeadId: input.jobLeadId, jobListingId: null },
-      }),
-      prisma.coverLetter.update({
-        where: { id: created.coverLetterId },
-        data: { jobLeadId: input.jobLeadId, jobListingId: null },
-      }),
-    ]);
+    // The lead is named as a LEAD, so the rows are written with `jobLeadId`
+    // from the start. The first cut passed the lead id into `jobListingId` and
+    // re-keyed afterwards; the FK rejected that insert every time, and the
+    // bare catch below turned it into "every packet has no résumé", silently.
+    const created = await withDeadline(
+      createTailoredApplication(input.studentId, { kind: "lead", id: input.lead.id }, source),
+      TAILORING_DEADLINE_MS,
+    );
     return { resumeVersionId: created.resumeVersionId, coverLetterId: created.coverLetterId };
-  } catch {
+  } catch (error) {
     // A tailoring failure must not block the introduction: the packet still
     // carries verified certs, availability and the endorsement, and the
-    // instructor can attach a résumé by hand. The nulls are visible in the
-    // console, so this degrades loudly rather than silently.
+    // instructor can attach a résumé by hand. But it must not be SILENT
+    // either — that is exactly how the FK failure above hid. The student is
+    // told too: the approval card says the résumé is still being prepared
+    // rather than letting them consent to a blank.
+    logger.warn("Packet tailoring failed", {
+      student: studentLogKey(input.studentId),
+      error: String(error),
+    });
     return { resumeVersionId: null, coverLetterId: null };
   }
 }
@@ -344,7 +373,22 @@ export async function renderPacketPdf(
     });
     if (!version) return null;
 
-    const content = parseStoredResumeData(JSON.stringify(version.content));
+    const stored = parseStoredResumeData(JSON.stringify(version.content));
+    // STRIP the contact block.
+    //
+    // packet-shared promises the employer learns the candidate's name at the
+    // interview the instructor arranges — but the résumé PDF carried their
+    // phone, email and home location, behind a capability URL that can be
+    // forwarded anywhere. The card's label ("Your résumé, written for this
+    // job") does not disclose that either. So the document goes out headed by
+    // the same first-name-and-initial the rest of the packet uses.
+    //
+    // OWNER VETO ITEM: Britt may prefer to keep the contact details and change
+    // the label instead. Recorded in the PR notes.
+    const content = {
+      ...stored,
+      contact: { email: "", phone: "", location: "", website: "", linkedin: "" },
+    };
     const buffer = Buffer.from(
       await generateResumePdfArrayBuffer(packet.candidateName, content),
     );

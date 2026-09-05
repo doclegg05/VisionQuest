@@ -215,7 +215,7 @@ export function BatchWorkforceButton({ classes }: BatchWorkforceButtonProps) {
           )}
 
           <p className="mt-3 text-sm text-[var(--ink-muted)]">
-            After it downloads, email it to your WorkForce WV Business Services contact.
+            The file downloads. Then email it to your contact at WorkForce WV.
           </p>
         </div>
       )}

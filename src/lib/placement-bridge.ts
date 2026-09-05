@@ -33,6 +33,7 @@ import "server-only";
 import type { AlertDescriptor } from "./advising-alerts";
 import { OUTCOME_VERIFICATION } from "./outcome-verification";
 import { CONNECT_CONFIG_KEY } from "./connect/flags-shared";
+import { logger } from "./logger";
 import { getPlainConfigValue } from "./system-config";
 
 export const PLACEMENT_ALERT_TYPE = "placement_outcome_pending";
@@ -87,6 +88,18 @@ export function mergePlacementBridgeScopes(
 }
 
 /**
+ * Which widenings have already been announced, so the notice is one line per
+ * process per distinct scope rather than one per hire.
+ */
+const announcedBridgeWidenings = new Set<string>();
+
+function scopeSignature(scope: PlacementBridgeScope): string {
+  return scope.mode === "classes"
+    ? `classes:${[...scope.classIds].sort().join(",")}`
+    : scope.mode;
+}
+
+/**
  * Reads the pilot scope from SystemConfig (cached upstream for 60s), unioned
  * with the Match & Connect pilot scope — see mergePlacementBridgeScopes.
  */
@@ -95,12 +108,41 @@ export async function getPlacementBridgeScope(): Promise<PlacementBridgeScope> {
     getPlainConfigValue(PLACEMENT_BRIDGE_CONFIG_KEY),
     getPlainConfigValue(CONNECT_CONFIG_KEY),
   ]);
-  return mergePlacementBridgeScopes(
-    parsePlacementBridgeScope(bridgeRaw),
+  const bridgeScope = parsePlacementBridgeScope(bridgeRaw);
+  const merged = mergePlacementBridgeScopes(
+    bridgeScope,
     // The two flags share a value grammar on purpose (unset/"all"/id list), so
     // the bridge's own parser reads the Connect flag correctly.
     parsePlacementBridgeScope(connectRaw),
   );
+
+  // Say so when one flag turns another one on.
+  //
+  // An operator who sets `connect_enabled_classes` is enabling the Connect
+  // pilot; they are also, whether they know it or not, enabling the placement
+  // bridge for those classes, which raises staff queue items and prefills
+  // SPOKES records. An implication nobody can see is how a feature ends up
+  // running in a class nobody meant to include, so it is stated once per
+  // process per distinct scope — once, because this runs on every hire and
+  // every alert sync, and a line per call would be noise nobody reads.
+  //
+  // No class ids in the payload: they identify a roster, and the operator can
+  // read the flag itself. The COUNT is what tells them the scope is bigger
+  // than they set.
+  const signature = scopeSignature(merged);
+  if (
+    scopeSignature(bridgeScope) !== signature &&
+    !announcedBridgeWidenings.has(signature)
+  ) {
+    announcedBridgeWidenings.add(signature);
+    logger.info("Connect pilot flag widened the placement bridge scope", {
+      bridgeMode: bridgeScope.mode,
+      mergedMode: merged.mode,
+      mergedClassCount: merged.mode === "classes" ? merged.classIds.length : null,
+    });
+  }
+
+  return merged;
 }
 
 export function isPlacementBridgeEnabledForStudent(

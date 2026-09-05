@@ -3,8 +3,11 @@ import { z } from "zod";
 
 import { forbidden, withTeacherAuth } from "@/lib/api-error";
 import { listManagedStudentIds } from "@/lib/classroom";
-import { ConnectionError, closeConnection } from "@/lib/connect/connections";
-import { prisma } from "@/lib/db";
+import {
+  ConnectionError,
+  closeConnection,
+  connectionOwner,
+} from "@/lib/connect/connections";
 import { parseBody } from "@/lib/schemas";
 
 /**
@@ -25,16 +28,13 @@ export const POST = withTeacherAuth(
     const { id } = await context.params;
     const { reason } = await parseBody(req, closeSchema);
 
-    const connection = await prisma.connection.findUnique({
-      where: { id },
-      select: { studentId: true },
-    });
-    if (!connection) {
+    const ownerId = await connectionOwner(id);
+    if (!ownerId) {
       return NextResponse.json({ error: "That connection wasn't found." }, { status: 404 });
     }
 
     const managed = await listManagedStudentIds(session);
-    if (!managed.includes(connection.studentId)) {
+    if (!managed.includes(ownerId)) {
       throw forbidden("That student isn't in your classes.");
     }
 

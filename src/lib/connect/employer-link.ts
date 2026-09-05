@@ -113,6 +113,84 @@ export async function resolveEmployerLink(
 }
 
 /**
+ * The packet's résumé file, resolved through the token.
+ *
+ * SCOPED TO THE CONNECTION'S OWN STUDENT. The first cut looked the upload up by
+ * id alone, so a `resumeFileUploadId` pointing anywhere — a stale packet, a
+ * copy-paste, a tampered row — would have served ANOTHER student's file to an
+ * unauthenticated stranger. The student id never leaves this function.
+ *
+ * Returns null for every failure, so the route answers 404 without telling a
+ * stranger whether a document exists behind the token they tried.
+ */
+export async function resolvePacketFile(
+  rawToken: string,
+  connectScopeRaw: string | null,
+  now: Date = new Date(),
+): Promise<{ storageKey: string; mimeType: string; candidateName: string } | null> {
+  const token = normalizeEmployerToken(rawToken);
+  if (!token) return null;
+
+  const scope = parseConnectScope(connectScopeRaw);
+  if (scope.mode === "off") return null;
+
+  const connection = await prismaAdmin.connection.findUnique({
+    where: { employerTokenHash: hashEmployerToken(token) },
+    select: {
+      studentId: true,
+      status: true,
+      packet: true,
+      tokenExpiresAt: true,
+      jobLead: { select: { classId: true } },
+    },
+  });
+  if (!connection) return null;
+  if (!connection.tokenExpiresAt || connection.tokenExpiresAt.getTime() <= now.getTime()) {
+    return null;
+  }
+  if (!isConnectionStatus(connection.status) || !isEmployerLinkActive(connection.status)) {
+    return null;
+  }
+  const leadClassId = connection.jobLead.classId;
+  if (!isConnectEnabledForClasses(scope, leadClassId ? [leadClassId] : [])) return null;
+
+  const packet = parsePacket(connection.packet);
+  if (!packet?.resumeFileUploadId) return null;
+  if (!(packet.includedFields as readonly string[]).includes("resume")) return null;
+
+  const upload = await prismaAdmin.fileUpload.findFirst({
+    where: { id: packet.resumeFileUploadId, studentId: connection.studentId },
+    select: { storageKey: true, mimeType: true },
+  });
+  if (!upload) return null;
+
+  return {
+    storageKey: upload.storageKey,
+    mimeType: upload.mimeType,
+    candidateName: packet.candidateName,
+  };
+}
+
+/**
+ * The contact the token was minted FOR.
+ *
+ * `Connection.tokenContactId`, not the lead's current contact: a lead whose
+ * contact was changed after the packet went out would otherwise put the new
+ * person's name and address on an appointment the old one booked.
+ */
+export async function tokenContactFor(connectionId: string) {
+  const connection = await prismaAdmin.connection.findUnique({
+    where: { id: connectionId },
+    select: { tokenContactId: true },
+  });
+  if (!connection?.tokenContactId) return null;
+  return prismaAdmin.employerContact.findUnique({
+    where: { id: connection.tokenContactId },
+    select: { name: true, email: true },
+  });
+}
+
+/**
  * Record that the employer opened the link, at most once an hour.
  *
  * Rate-limited by reading the last `employer_viewed` event rather than by a

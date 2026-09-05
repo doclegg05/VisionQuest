@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { withErrorHandler } from "@/lib/api-error";
-import { EmployerActionError, recordInterested } from "@/lib/connect/employer-actions";
 import {
-  contactForConnection,
+  ConnectionConflictError,
+  TransitionNotAllowedError,
+} from "@/lib/connect/pipeline";
+import { EmployerActionError, recordInterested } from "@/lib/connect/employer-actions";
+import { tokenContactFor } from "@/lib/connect/employer-link";
+import {
+  clientIpFrom,
   employerTokenBodySchema,
   resolveEmployerRequest,
 } from "@/lib/connect/employer-request";
@@ -26,10 +31,13 @@ export const POST = withErrorHandler(
     const { token } = await context.params;
     const body = await parseBody(req, bodySchema);
 
-    const resolved = await resolveEmployerRequest(token, body.token);
+    const resolved = await resolveEmployerRequest(token, body.token, clientIpFrom(req));
     if (!resolved.ok) return resolved.response;
 
-    const contact = await contactForConnection(resolved.view.connectionId);
+    // The contact the TOKEN was minted for, not the lead's current contact: a
+    // lead whose contact changed after the packet went out must not put the new
+    // person on an appointment the old one booked.
+    const contact = await tokenContactFor(resolved.view.connectionId);
 
     try {
       const result = await recordInterested({
@@ -47,12 +55,21 @@ export const POST = withErrorHandler(
       if (error instanceof EmployerActionError) {
         return NextResponse.json({ error: error.message }, { status: error.status });
       }
-      // A transition that is no longer legal (somebody withdrew, or a second
-      // tab already answered) is a conflict, never a 500.
-      return NextResponse.json(
-        { error: "That link is no longer active." },
-        { status: 409 },
-      );
+      // A transition that is no longer legal, or a row that moved under us, is
+      // a conflict. Anything ELSE is a programming error and must reach
+      // withErrorHandler as a 500 — the first cut caught everything here and
+      // reported real bugs to the employer as "This link is no longer active",
+      // which is both wrong and unreportable.
+      if (
+        error instanceof ConnectionConflictError ||
+        error instanceof TransitionNotAllowedError
+      ) {
+        return NextResponse.json(
+          { error: "That link is no longer active." },
+          { status: 409 },
+        );
+      }
+      throw error;
     }
   },
 );

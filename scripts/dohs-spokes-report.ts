@@ -21,6 +21,15 @@
  * report an empty program as success. Probes `rolbypassrls` first and
  * refuses to run without it, same reasoning as the employer backfill.
  *
+ * SEC-W5 (2026-09 security review): the output file is written `mode: 0o600`
+ * (owner read/write only — this is a PII-bearing file on whatever host runs
+ * it), and every successful run writes one `AuditLog` row through this
+ * script's own Prisma client (`actorRole: "script"`, no student ids in the
+ * metadata) — this export previously had no audit trail at all when run
+ * outside the API route. An unknown `--class` id now exits non-zero with a
+ * message BEFORE anything is queried or written, rather than silently
+ * matching zero students and producing an empty-but-successful file.
+ *
  * No student identifiers are printed to the console — only written to the
  * CSV file, whose path the operator chose.
  *
@@ -30,7 +39,7 @@
  *   ADMIN_DATABASE_URL="..." npx tsx scripts/dohs-spokes-report.ts --class=<SpokesClass id> --out=report.csv
  *
  * Exit codes: 0 written, 2 no connection string, a connection whose role
- * cannot see the rows, or a missing/malformed argument.
+ * cannot see the rows, an unknown --class id, or a missing/malformed argument.
  */
 
 import { writeFileSync } from "node:fs";
@@ -38,7 +47,9 @@ import { writeFileSync } from "node:fs";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
+import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "../src/lib/classroom";
 import { buildDohsExportCsv, buildDohsExportRows } from "../src/lib/connect/dohs-export-shared";
+import { reportDateRangeBoundsUtc } from "../src/lib/timezone";
 
 loadEnvConfig(process.cwd(), true);
 
@@ -113,17 +124,30 @@ async function main(): Promise<number> {
       return EXIT_USAGE;
     }
 
-    const from = fromRaw ? new Date(fromRaw) : undefined;
-    const to = toRaw ? new Date(toRaw) : undefined;
+    if (classId) {
+      const spokesClass = await prisma.spokesClass.findUnique({ where: { id: classId }, select: { id: true } });
+      if (!spokesClass) {
+        console.error(`--class "${classId}" does not match any SpokesClass. Nothing was written.`);
+        return EXIT_USAGE;
+      }
+    }
+
+    const { from, to } = reportDateRangeBoundsUtc(fromRaw, toRaw);
 
     const records = await prisma.spokesRecord.findMany({
       where: {
         studentId: { not: null },
         ...(classId
-          ? { student: { classEnrollments: { some: { classId, status: "active" } } } }
+          ? {
+              student: {
+                classEnrollments: {
+                  some: { classId, status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] } },
+                },
+              },
+            }
           : {}),
         ...(from || to
-          ? { enrolledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+          ? { enrolledAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }
           : {}),
       },
       select: {
@@ -136,8 +160,11 @@ async function main(): Promise<number> {
         student: {
           select: {
             studentId: true,
+            // NON_ARCHIVED_ENROLLMENT_STATUSES (not "active" alone, W9): a
+            // graduate's enrollment is "completed", and excluding that
+            // status left the Class column blank for every graduate.
             classEnrollments: {
-              where: { status: "active" },
+              where: { status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] } },
               orderBy: { enrolledAt: "desc" },
               take: 1,
               select: { class: { select: { name: true } } },
@@ -148,14 +175,19 @@ async function main(): Promise<number> {
           select: {
             verificationStatus: true,
             connection: {
-              select: { status: true, packet: true, jobLead: { select: { schedule: true } } },
+              select: {
+                packet: true,
+                jobLead: { select: { schedule: true } },
+                events: { select: { toStatus: true } },
+              },
             },
           },
         },
+        // Every follow-up (not `take: 1`) — C1's retention derivation checks
+        // every "employed" checkpoint's date against the employment start
+        // date, not only the most recent row.
         employmentFollowUps: {
-          orderBy: { checkedAt: "desc" },
-          take: 1,
-          select: { checkedAt: true },
+          select: { checkpointMonths: true, status: true, checkedAt: true },
         },
       },
       orderBy: { enrolledAt: "asc" },
@@ -175,19 +207,46 @@ async function main(): Promise<number> {
               verificationStatus: record.placementApplication.verificationStatus,
               connection: record.placementApplication.connection
                 ? {
-                    status: record.placementApplication.connection.status,
                     packet: record.placementApplication.connection.packet,
                     jobLeadSchedule: record.placementApplication.connection.jobLead.schedule,
+                    eventToStatuses: record.placementApplication.connection.events.map(
+                      (event) => event.toStatus,
+                    ),
                   }
                 : null,
             }
           : null,
-        latestFollowUpAt: record.employmentFollowUps[0]?.checkedAt ?? null,
+        employmentFollowUps: record.employmentFollowUps,
       })),
     );
 
-    writeFileSync(out, buildDohsExportCsv(rows));
+    // Owner-read-only: this file carries a working login identifier per row
+    // (SEC-W3) — never leave it world- or group-readable on whatever host
+    // runs this script.
+    writeFileSync(out, buildDohsExportCsv(rows), { mode: 0o600 });
     console.log(`Wrote ${rows.length} rows to ${out}.`);
+
+    // SEC-W5: an audit row every time this runs, through this script's own
+    // client (no import from @/lib/audit — that resolves its own DB URL
+    // independently of the one this script was pointed at). No student ids
+    // in the metadata, matching the API route's export audit event.
+    await prisma.auditLog.create({
+      data: {
+        actorId: null,
+        actorRole: "script",
+        action: "connect.dohs_export.exported",
+        targetType: "connect_dohs_export",
+        targetId: out,
+        summary: `Exported ${rows.length} DoHS statistical-report rows via CLI.`,
+        metadata: JSON.stringify({
+          rowCount: rows.length,
+          classId: classId ?? null,
+          from: fromRaw ?? null,
+          to: toRaw ?? null,
+        }),
+      },
+    });
+
     return EXIT_OK;
   } finally {
     await prisma.$disconnect();

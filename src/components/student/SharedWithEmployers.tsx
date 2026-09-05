@@ -49,10 +49,10 @@ export function SharedWithEmployers({ packets }: { packets: SharedPacket[] }) {
                 <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">
                   What they got:
                 </p>
-                <ul className="mt-1 flex flex-col gap-1">
+                <ul className="mt-1 list-disc pl-5">
                   {packet.fields.map((field) => (
                     <li key={field} className="text-sm text-[var(--ink-muted)]">
-                      • {field}
+                      {field}
                     </li>
                   ))}
                 </ul>

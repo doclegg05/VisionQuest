@@ -71,8 +71,13 @@ describe("listStudentVisibleAlerts", () => {
     assert.equal(store.findMany.mock.callCount(), 1);
     const call = store.findMany.mock.calls[0].arguments[0];
     assert.deepEqual(call.where, EXPECTED_WHERE);
+    // `type` is selected on purpose (Match & Connect Phase 5): the Advising
+    // page renders `connect_weekly_jobs_ready` as an answer with a link rather
+    // than as a triage card, so it needs to tell the allowlisted types apart.
+    // The pin stays exact so a future select cannot quietly widen.
     assert.deepEqual(call.select, {
       id: true,
+      type: true,
       severity: true,
       title: true,
       summary: true,

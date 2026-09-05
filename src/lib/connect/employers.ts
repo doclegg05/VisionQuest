@@ -140,6 +140,23 @@ export async function listEmployers(options: { status?: string; limit?: number }
   });
 }
 
+/**
+ * `{id, name}` only — for a plain picker (the Connect report's employer
+ * filter dropdown) that never renders any of `listEmployers`'s other columns
+ * (relationship owner, subsidy flags, lead/contact counts). Same ordering as
+ * `listEmployers` so the two lists present employers in the same order.
+ */
+export async function listEmployerOptions(
+  options: { status?: string; limit?: number } = {},
+): Promise<Array<{ id: string; name: string }>> {
+  return prisma.employer.findMany({
+    where: options.status ? { status: options.status } : {},
+    orderBy: [{ hiredSpokesGradBefore: "desc" }, { lastHiredAt: "desc" }, { name: "asc" }],
+    take: Math.min(options.limit ?? MAX_EMPLOYER_PAGE, MAX_EMPLOYER_PAGE),
+    select: { id: true, name: true },
+  });
+}
+
 export async function getEmployer(id: string) {
   return prisma.employer.findUnique({
     where: { id },

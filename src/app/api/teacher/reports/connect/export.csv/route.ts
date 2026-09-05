@@ -9,9 +9,10 @@ import { fetchDohsExport } from "@/lib/connect/dohs-export";
  * GET /api/teacher/reports/connect/export.csv — the DoHS-facing export
  * (Match & Connect Task 6.2).
  *
- * `classId` is validated against `assertStaffCanManageClass` inside
- * `fetchDohsExport` — an instructor typing another class's id here 403s,
- * the same as the funnel report route and `intervention-queue`.
+ * `classId` is validated against `assertClassIsManaged` inside
+ * `fetchDohsExport` — an instructor typing another class's id here 404s
+ * (see that function's header for why the wider `assertStaffCanManageClass`
+ * would be the wrong check here).
  *
  * Every exported row is a staff read of a student's data, so each one goes
  * through `recordStudentView` (fire, don't await individually — the
@@ -75,6 +76,9 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      // A PII-bearing export must never be cached by an intermediary or the
+      // browser (precedent: teacher/forms/[templateId]/export/route.ts).
+      "Cache-Control": "no-store",
     },
   });
 });

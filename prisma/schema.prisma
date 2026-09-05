@@ -715,6 +715,7 @@ model SpokesClass {
   jobConfig    JobClassConfig?
   requirements ClassRequirement[]
   jobLeads     JobLead[]
+  connections  Connection[]
 
   @@index([status, name])
   @@index([programType])
@@ -895,6 +896,14 @@ model Opportunity {
   status      String    @default("open")
   deadline    DateTime?
   createdById String?
+  /// The JobLead this row mirrors, when Match & Connect created it so a hire
+  /// could hang an Application off something (Application.opportunityId is
+  /// required and the placement bridge reads through it). Unique, so the mirror
+  /// is an idempotent upsert rather than a `description LIKE` scan that two
+  /// concurrent hires from one lead would both miss. INTERIM until owner
+  /// decision D5 retires Opportunity in favour of JobLead — this column is
+  /// also the list of rows to migrate when it does.
+  sourceJobLeadId String? @unique
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -1193,14 +1202,34 @@ model Connection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Which class the student was in when this was proposed, copied from the
+  /// lead (or their active enrollment when the lead is program-wide). A
+  /// reporting dimension for the Phase 6 funnel, which is per class and per
+  /// employer; nullable because neither source is guaranteed to exist.
+  /// SetNull on class deletion — losing the dimension is acceptable, losing
+  /// the disclosure record is not.
+  classId String?
+
   student             Student           @relation("StudentConnections", fields: [studentId], references: [id], onDelete: Cascade)
-  jobLead             JobLead           @relation(fields: [jobLeadId], references: [id], onDelete: Cascade)
-  employer            Employer          @relation(fields: [employerId], references: [id], onDelete: Cascade)
-  proposedBy          Student           @relation("ProposedConnections", fields: [proposedById], references: [id], onDelete: Cascade)
+  /// Restrict, NOT Cascade, on all three of these.
+  ///
+  /// A Connection is the program's record that a student's information left
+  /// it — who saw what, when, and with whose consent. Deleting an employer, a
+  /// lead, or the staff member who proposed it must not silently destroy that
+  /// record: the row has to outlive every party to it. Restrict makes the
+  /// delete fail loudly instead, which is the correct outcome — an employer
+  /// with disclosure history is not a row to delete.
+  ///
+  /// `studentId` stays Cascade: a student's own data is theirs, and offboarding
+  /// deliberately deletes it after the export bundle is written.
+  jobLead             JobLead           @relation(fields: [jobLeadId], references: [id], onDelete: Restrict)
+  employer            Employer          @relation(fields: [employerId], references: [id], onDelete: Restrict)
+  proposedBy          Student           @relation("ProposedConnections", fields: [proposedById], references: [id], onDelete: Restrict)
   sentBy              Student?          @relation("SentConnections", fields: [sentById], references: [id], onDelete: SetNull)
   consentRecord       ConsentRecord?    @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)
   interviewAppointment Appointment?     @relation("InterviewAppointment", fields: [interviewAppointmentId], references: [id], onDelete: SetNull)
   application         Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  class               SpokesClass?      @relation(fields: [classId], references: [id], onDelete: SetNull)
   events              ConnectionEvent[]
   messages            OutboundMessage[]
 
@@ -1208,6 +1237,16 @@ model Connection {
   @@index([studentId, status])
   @@index([employerId, status])
   @@index([status, statusChangedAt])
+  /// The console's per-lead reverse-match view and the funnel's per-lead counts.
+  @@index([jobLeadId, status])
+  @@index([classId, status])
+  /// Every FK that is not already the leading column of an index above. Without
+  /// these, deleting or reassigning any of these rows sequentially scans
+  /// Connection, and the Restrict checks above run on every such delete.
+  @@index([proposedById])
+  @@index([sentById])
+  @@index([consentRecordId])
+  @@index([interviewAppointmentId])
   @@schema("visionquest")
 }
 
@@ -1256,6 +1295,14 @@ model OutboundMessage {
   status String @default("sent")
 
   connectionId String?
+  /// Denormalised from the connection, and load-bearing rather than a
+  /// convenience: the per-employer send limit counts rows in a rolling 7-day
+  /// window, and counting through the `connection` relation compiles to an
+  /// EXISTS against Connection — which is RLS-scoped to the CALLER's own
+  /// students. Two instructors would each have seen only their own sends and
+  /// the limit would admit six packets a week instead of three. It also
+  /// survives `connectionId` going NULL on SetNull.
+  employerId String?
 
   /// The question this message asked, when it asked one, as a routing token:
   /// "weekly_jobs", "heard_back:<savedJobId>", "retention:<connectionId>:<30|60|90>".
@@ -1277,6 +1324,8 @@ model OutboundMessage {
   /// batch of `heard_back:<savedJobId>` tokens in one query, and without this
   /// it seq-scans the whole outbound log every sweep.
   @@index([templateKey, expectsReply])
+  /// The rolling-window count for the per-employer send limit.
+  @@index([employerId, sentAt])
   @@schema("visionquest")
 }
 

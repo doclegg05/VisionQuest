@@ -96,8 +96,18 @@ mock.module("@/lib/db", {
         },
       },
       consentRecord: { findFirst: async () => ({ id: "consent-1" }) },
+      studentClassEnrollment: { findFirst: async () => null },
     },
-    prismaAdmin: {},
+    // The rolling per-employer count runs on the ADMIN client: through the
+    // `connection` relation it would be RLS-scoped to the caller's own
+    // students, and each instructor would then see only their own sends.
+    prismaAdmin: {
+      outboundMessage: {
+        get count() {
+          return mockOutboundCount;
+        },
+      },
+    },
   },
 });
 

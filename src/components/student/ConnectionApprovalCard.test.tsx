@@ -24,8 +24,17 @@ function connection(overrides: Partial<PendingConnection> = {}): PendingConnecti
       "Your first name and the first letter of your last name",
       "Your résumé, written for this job",
       "The cards you earned that a teacher checked",
+      "The days and times you can work",
+      "The soonest day you can start",
+      "What your teacher wrote about your work",
     ],
     endorsement: "Dana came to every class and earned the forklift card.",
+    candidateName: "Dana R.",
+    certifications: ["Forklift Operator"],
+    availabilitySummary: "Weekdays: mornings, afternoons",
+    earliestStart: "2026-09-15",
+    subsidyLine: null,
+    hasResume: true,
     ...overrides,
   };
 }
@@ -53,13 +62,41 @@ describe("ConnectionApprovalCard", () => {
     assert.ok(html.includes("take it back"));
   });
 
-  it("offers exactly ONE action", () => {
+  it("offers exactly ONE decision, plus a way to walk away that decides nothing", () => {
     const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
-    // The read-aloud control is not a decision, so it does not count; what must
-    // not appear is a second way to decide, like a "No" that records a refusal.
-    assert.ok(!html.includes(">No<"));
+    assert.ok(html.includes("OK, send it"));
+    assert.ok(html.includes("Not right now"));
+    // "Not right now" hides the card locally. What must NOT appear is a second
+    // control that records a refusal — a student who is unsure has not said no.
     assert.ok(!html.toLowerCase().includes("decline"));
     assert.ok(!html.toLowerCase().includes("reject"));
+    assert.ok(!html.toLowerCase().includes("say no"));
+  });
+
+  it("shows the VALUES an employer would see, not just the field names", () => {
+    // The employer page renders the availability line, the start date and the
+    // cert names; a card listing only "The days and times you can work" would
+    // be asking a student to consent to a category.
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.ok(html.includes("Dana R."));
+    assert.ok(html.includes("Forklift Operator"));
+    assert.ok(html.includes("Weekdays: mornings, afternoons"));
+    assert.ok(html.includes("2026-09-15"));
+  });
+
+  it("says the résumé is not ready rather than letting a student consent to a blank", () => {
+    const html = renderToString(
+      <ConnectionApprovalCard connection={connection({ hasResume: false })} />,
+    );
+    assert.match(html, /still putting your résumé together/);
+  });
+
+  it("discloses that saying OK also grants the standing permission", () => {
+    // approveConnection calls grantConsent, so this tap does two things. The
+    // card has to say the second one out loud.
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.match(html, /ask about other jobs later/);
+    assert.match(html, /turn this off any time in Settings/);
   });
 
   it("reads at or below the plain-language ceiling", () => {

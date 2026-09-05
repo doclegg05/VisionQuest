@@ -8,7 +8,7 @@
 // /memory page and the instructor's ledger are built from.
 // =============================================================================
 
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
 
@@ -27,8 +27,34 @@ export * from "./pipeline-shared";
  * (the employer path, which has no session to derive RLS context from), or a
  * transaction client. Kept structural rather than importing a concrete type so
  * a caller inside `$transaction` can pass its `tx`.
+ *
+ * Passing one means "I have already opened a transaction; run inside it".
+ * Omitting it means "open one for me".
+ *
+ * Typed STRUCTURALLY, by the three calls this module makes, rather than as
+ * `Pick<PrismaClient, …>`. Three different clients have to satisfy it — the
+ * extended app client, the plain `prismaAdmin`, and the `tx` handed to a
+ * `$transaction` callback — and Prisma's generated generics do not unify
+ * across those three. Narrowing to the operations actually used keeps all
+ * three assignable and documents the module's real surface.
  */
-export type ConnectionWriteClient = Pick<PrismaClient, "connection" | "connectionEvent">;
+export interface ConnectionWriteClient {
+  connection: {
+    findUnique(args: {
+      where: { id: string };
+      select: { id: true; status: true; studentId: true };
+    }): Promise<{ id: string; status: string; studentId: string } | null>;
+    updateMany(args: {
+      where: { id: string; status: string };
+      data: Prisma.ConnectionUncheckedUpdateManyInput;
+    }): Promise<{ count: number }>;
+  };
+  connectionEvent: {
+    create(args: {
+      data: Prisma.ConnectionEventUncheckedCreateInput;
+    }): Promise<unknown>;
+  };
+}
 
 export class ConnectionNotFoundError extends Error {
   constructor() {
@@ -44,8 +70,18 @@ export interface TransitionInput {
   /** Student.id for a student/staff actor. Null for the employer and system. */
   actorId?: string | null;
   note?: string | null;
-  /** Extra columns to write with the status (sentAt, hiredAt, packet, …). */
-  data?: Prisma.ConnectionUpdateInput;
+  /**
+   * Extra COLUMNS to write with the status (sentAt, hiredAt, packet, …).
+   *
+   * Unchecked, and that is the whole point: the write below is an
+   * `updateMany`, which takes scalars only. The first cut typed this as
+   * `ConnectionUpdateInput` and cast it, so every call site that passed a
+   * relation — `sentBy: { connect }`, `consentRecord`, `application`,
+   * `interviewAppointment` — compiled and then threw
+   * `PrismaClientValidationError` at runtime. Every one of the four did.
+   * Use the scalar FK (`sentById`, `consentRecordId`, …); the type now says so.
+   */
+  data?: Prisma.ConnectionUncheckedUpdateManyInput;
   /** The status the caller believed the row was in. A mismatch is a conflict. */
   expectedFrom?: ConnectionStatus;
   client?: ConnectionWriteClient;
@@ -68,8 +104,21 @@ export class ConnectionConflictError extends Error {
  * "Interested" would otherwise book two interviews.
  */
 export async function transitionConnection(input: TransitionInput) {
-  const db = input.client ?? prisma;
+  // Atomic, because the status change and its event are one fact. Without the
+  // transaction a crash between them leaves a moved connection with no ledger
+  // row — and the ledger is what the student's /memory page and the
+  // instructor's audit trail are built from, so the gap would be invisible
+  // exactly where it matters.
+  //
+  // A caller that passes a `client` has ALREADY opened its own transaction
+  // (the hire path wraps the Application write and this transition together),
+  // so this runs directly on it: that caller's transaction is the unit, and
+  // nesting would only weaken it.
+  if (input.client) return runTransition(input, input.client);
+  return prisma.$transaction((tx) => runTransition(input, tx));
+}
 
+async function runTransition(input: TransitionInput, db: ConnectionWriteClient) {
   const current = await db.connection.findUnique({
     where: { id: input.connectionId },
     select: { id: true, status: true, studentId: true },
@@ -97,7 +146,7 @@ export async function transitionConnection(input: TransitionInput) {
   const updated = await db.connection.updateMany({
     where: { id: input.connectionId, status: from },
     data: {
-      ...(input.data as Prisma.ConnectionUpdateManyMutationInput | undefined),
+      ...input.data,
       status: input.to,
       statusChangedAt: now,
     },

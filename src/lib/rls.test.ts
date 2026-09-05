@@ -31,7 +31,7 @@
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * The roles `app.current_role` can carry. "coordinator" is included so the
@@ -1658,6 +1658,8 @@ if (!SHOULD_RUN) {
       let connectionA = "";
       let connectionC = "";
       let eventA = "";
+      let messageA = "";
+      let messageC = "";
 
       before(async () => {
         const employer = await db.employer.create({
@@ -1722,21 +1724,51 @@ if (!SHOULD_RUN) {
         });
         eventA = event.id;
 
-        await db.outboundMessage.create({
-          data: {
-            channel: "email",
-            toKind: "employer_contact",
-            toId: "contact-rls-test",
-            templateKey: "connect.employer_packet",
-            body: "packet email body",
-            connectionId: connectionC,
-          },
-        });
+        // One message per connection, so the teacher cases can prove the
+        // outbound_message_read scoping in BOTH directions: each teacher sees
+        // their own student's row and not the other's. A single seeded row
+        // could pass a broken policy by accident.
+        const [msgA, msgC] = await Promise.all([
+          db.outboundMessage.create({
+            data: {
+              channel: "email",
+              toKind: "employer_contact",
+              toId: "contact-rls-test-a",
+              templateKey: "connect.employer_packet",
+              body: "packet email body for A",
+              connectionId: connectionA,
+              employerId,
+            },
+          }),
+          db.outboundMessage.create({
+            data: {
+              channel: "email",
+              toKind: "employer_contact",
+              toId: "contact-rls-test-c",
+              templateKey: "connect.employer_packet",
+              body: "packet email body for C",
+              connectionId: connectionC,
+              employerId,
+            },
+          }),
+        ]);
+        messageA = msgA.id;
+        messageC = msgC.id;
       });
 
       after(async () => {
-        // Connection and ConnectionEvent cascade from Employer through JobLead.
-        await db.outboundMessage.deleteMany({ where: { connectionId: { in: [connectionA, connectionC] } } });
+        // Deleted child-first, deliberately. Connection's FKs to JobLead,
+        // Employer and proposedBy are Restrict, not Cascade — a disclosure
+        // record has to outlive every party to it — so deleting the employer
+        // while a Connection points at it now FAILS instead of quietly taking
+        // the connection with it. That is the behaviour under test elsewhere;
+        // here it just means the fixture tears down in order.
+        await db.outboundMessage.deleteMany({ where: { employerId } });
+        await db.connectionEvent.deleteMany({
+          where: { connection: { jobLeadId: leadId } },
+        });
+        await db.connection.deleteMany({ where: { jobLeadId: leadId } });
+        await db.jobLead.deleteMany({ where: { id: leadId } });
         await db.employer.deleteMany({ where: { id: employerId } });
       });
 
@@ -1835,9 +1867,78 @@ if (!SHOULD_RUN) {
         assert.equal(updated.count, 0);
       });
 
+      it("a student's own UPDATE must LEAVE 'proposed' — standing still is refused", async () => {
+        // connection_update's WITH CHECK is written on the row the student
+        // leaves behind, not on the change they made, so an update that keeps
+        // the status at 'proposed' fails it even though the student owns the
+        // row and 'proposed' is where it already was. That is deliberate: the
+        // only two things a student may do to a connection are approve it and
+        // withdraw it, and "edit it in place" is neither.
+        //
+        // A throw, not count 0: USING passes (it is their row), so the row IS
+        // matched and Postgres evaluates WITH CHECK against the new version.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.connection.updateMany({
+                where: { id: connectionA },
+                data: { responseReason: "let me add a note" },
+              }),
+            ),
+          /row-level security/i,
+          "a student was able to edit their connection without moving it",
+        );
+      });
+
+      it("the DATABASE alone would let a student rewrite the packet — the app is the guard", async () => {
+        // This case pins a LIMIT, not a protection, and it is here so that
+        // nobody reads connection_update and concludes the frozen packet is
+        // safe at this layer. RLS is row-level, never column-level: a student
+        // whose UPDATE lands on their own row and leaves 'student_approved'
+        // behind may change any other column in the same statement, `packet`
+        // included. Postgres offers no role-conditional column privilege that
+        // would help — column GRANTs are per database role, and vq_app is
+        // every application role at once.
+        //
+        // The real guard is the approve route, which builds the packet from
+        // server-side data and never accepts one from the request body. If
+        // that ever changes, this test still passes and the product breaks —
+        // which is exactly why the fact is written down here rather than
+        // assumed.
+        const forged = { includedFields: ["everything"], endorsement: "hire me" };
+        const updated = await asRole("student", fixtures.studentA, (tx) =>
+          tx.connection.updateMany({
+            where: { id: connectionA },
+            data: { status: "student_approved", packet: forged },
+          }),
+        );
+        assert.equal(updated.count, 1, "the student's own approval was refused");
+
+        const after = await db.connection.findUnique({
+          where: { id: connectionA },
+          select: { packet: true },
+        });
+        assert.deepEqual(
+          after?.packet,
+          forged,
+          "the database rejected the packet rewrite — if this now fails, the column IS protected here and the migration comment must be corrected",
+        );
+
+        await db.connection.update({
+          where: { id: connectionA },
+          data: { status: "proposed", packet: Prisma.DbNull },
+        });
+      });
+
       it("a student may insert their OWN proposal, and only in 'proposed'", async () => {
         // The bounded student branch that makes propose_connection possible
         // without an admin bypass. Uses studentB, who has no row on this lead.
+        //
+        // The write shape here is the REAL one `proposeConnection` emits, not
+        // a minimal row: the packet is assembled before the insert and written
+        // in it, so a policy that happened to admit a bare row while rejecting
+        // the one the app actually sends would pass a thinner test and fail in
+        // production. `classId` is included for the same reason.
         const created = await asRole("student", fixtures.studentB, (tx) =>
           tx.connection.create({
             data: {
@@ -1847,6 +1948,8 @@ if (!SHOULD_RUN) {
               proposedById: fixtures.studentB,
               proposedVia: "sage",
               status: "proposed",
+              packet: { includedFields: ["resume"], endorsement: "" },
+              classId: null,
             },
             select: { id: true },
           }),
@@ -1894,14 +1997,19 @@ if (!SHOULD_RUN) {
       });
 
       it("ConnectionEvent is APPEND-ONLY: no update and no delete, for anyone", async () => {
-        // Count 0, not a throw, and the reason is worth being exact about: the
-        // append-only property comes from the ABSENCE OF A POLICY for UPDATE
-        // and DELETE, not from withholding the privilege. The baseline's
-        // ALTER DEFAULT PRIVILEGES grants vq_app all four verbs on every table
-        // created in this schema, so the migration's narrower explicit GRANT
-        // takes nothing away. With RLS on and no policy for a command, no row
-        // is ever matched — so there is no USING to pass and no WITH CHECK to
-        // violate, for any role including admin.
+        // A THROW, not count 0, and the difference is the whole point of the
+        // guard being doubled. Two mechanisms are stacked here:
+        //
+        //   1. No UPDATE or DELETE policy exists, so with RLS on no row is
+        //      ever matched for those commands, for any role including admin.
+        //      On its own that yields a silent `count: 0` — which reads like
+        //      "there was nothing to update" rather than "you may not".
+        //   2. The privileges are REVOKED from vq_app, so the statement is
+        //      rejected outright with 42501 before any row is considered.
+        //
+        // The regex accepts either message because the mechanisms overlap and
+        // Postgres reports whichever it reaches first; what must never happen
+        // is a call that succeeds, or one that quietly reports zero rows.
         for (const role of ["student", "teacher", "admin"] as const) {
           const actor =
             role === "student"
@@ -1909,16 +2017,70 @@ if (!SHOULD_RUN) {
               : role === "teacher"
                 ? fixtures.teacher
                 : fixtures.admin;
-          const updated = await asRole(role, actor, (tx) =>
-            tx.connectionEvent.updateMany({ where: { id: eventA }, data: { note: "rewritten" } }),
+          await assert.rejects(
+            () =>
+              asRole(role, actor, (tx) =>
+                tx.connectionEvent.updateMany({ where: { id: eventA }, data: { note: "rewritten" } }),
+              ),
+            /permission denied|row-level security/i,
+            `${role} was able to edit the audit trail`,
           );
-          assert.equal(updated.count, 0, `${role} was able to edit the audit trail`);
 
-          const deleted = await asRole(role, actor, (tx) =>
-            tx.connectionEvent.deleteMany({ where: { id: eventA } }),
+          await assert.rejects(
+            () =>
+              asRole(role, actor, (tx) =>
+                tx.connectionEvent.deleteMany({ where: { id: eventA } }),
+              ),
+            /permission denied|row-level security/i,
+            `${role} was able to delete an audit row`,
           );
-          assert.equal(deleted.count, 0, `${role} was able to delete an audit row`);
         }
+
+        // And the row is still exactly as it was written.
+        const after = await db.connectionEvent.findUnique({
+          where: { id: eventA },
+          select: { note: true },
+        });
+        assert.equal(after?.note ?? null, null, "the audit row was modified");
+      });
+
+      it("OutboundMessage is append-only too, and a Connection cannot be deleted", async () => {
+        // The same shape as ConnectionEvent, for the same reason: these are the
+        // records of what left the program. Connection keeps UPDATE (its whole
+        // life is status transitions) but loses DELETE — a disclosure record is
+        // closed or withdrawn, never removed.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.outboundMessage.updateMany({ where: { id: messageA }, data: { status: "edited" } }),
+            ),
+          /permission denied|row-level security/i,
+          "a teacher was able to rewrite the outbound message log",
+        );
+
+        await assert.rejects(
+          () =>
+            asRole("admin", fixtures.admin, (tx) =>
+              tx.outboundMessage.deleteMany({ where: { id: messageA } }),
+            ),
+          /permission denied|row-level security/i,
+          "an admin was able to delete from the outbound message log",
+        );
+
+        await assert.rejects(
+          () =>
+            asRole("admin", fixtures.admin, (tx) =>
+              tx.connection.deleteMany({ where: { id: connectionA } }),
+            ),
+          /permission denied|row-level security/i,
+          "an admin was able to delete a disclosure record",
+        );
+
+        const stillThere = await db.connection.findUnique({
+          where: { id: connectionA },
+          select: { id: true },
+        });
+        assert.ok(stillThere, "the connection was deleted");
       });
 
       it("a student reads the events on their own connection", async () => {
@@ -1935,11 +2097,68 @@ if (!SHOULD_RUN) {
         assert.deepEqual(rows, [], "OutboundMessage is staff-read only");
       });
 
-      it("a teacher reads OutboundMessage rows", async () => {
-        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
-          tx.outboundMessage.findMany({ select: { id: true } }),
+      it("a teacher reads OutboundMessage only for students they manage", async () => {
+        // The scoping that outbound_message_read exists for. The first cut
+        // admitted any role in ('admin','teacher') to every row, so one
+        // student's message log — which names them, their employer and what
+        // was said about them — was readable by staff with no relationship to
+        // them at all. Asserted in both directions, so a policy that simply
+        // returned everything cannot pass.
+        const mine = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.outboundMessage.findMany({
+            where: { id: { in: [messageA, messageC] } },
+            select: { id: true },
+          }),
         );
-        assert.ok(rows.length > 0);
+        assert.deepEqual(
+          mine.map((row) => row.id),
+          [messageA],
+          "a teacher must not read the message log of a student they do not manage",
+        );
+
+        const theirs = await asRole("teacher", fixtures.teacherB, (tx) =>
+          tx.outboundMessage.findMany({
+            where: { id: { in: [messageA, messageC] } },
+            select: { id: true },
+          }),
+        );
+        assert.deepEqual(
+          theirs.map((row) => row.id),
+          [messageC],
+          "the other teacher must still read their own student's row",
+        );
+      });
+
+      it("an unattached OutboundMessage row is admin-only", async () => {
+        // connectionId is nullable (the FK is SET NULL, and Phase 5's nudges
+        // may have no connection at all). There is no student to scope such a
+        // row by, so it falls to admin rather than to every teacher —
+        // "unscoped therefore visible to all staff" is the exact default this
+        // policy replaced.
+        const orphan = await db.outboundMessage.create({
+          data: {
+            channel: "sms",
+            toKind: "student",
+            toId: "unattached-rls-test",
+            templateKey: "connect.nudge",
+            body: "no connection attached",
+          },
+          select: { id: true },
+        });
+
+        try {
+          const teacherRows = await asRole("teacher", fixtures.teacher, (tx) =>
+            tx.outboundMessage.findMany({ where: { id: orphan.id }, select: { id: true } }),
+          );
+          assert.deepEqual(teacherRows, [], "a teacher read an unattached message row");
+
+          const adminRows = await asRole("admin", fixtures.admin, (tx) =>
+            tx.outboundMessage.findMany({ where: { id: orphan.id }, select: { id: true } }),
+          );
+          assert.deepEqual(adminRows.map((row) => row.id), [orphan.id]);
+        } finally {
+          await db.outboundMessage.deleteMany({ where: { id: orphan.id } });
+        }
       });
 
       it("a student cannot INSERT an OutboundMessage, even one addressed to themselves", async () => {
