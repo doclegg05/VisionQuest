@@ -78,10 +78,16 @@ export function planTotalCost(planNode) {
 /**
  * Builds each hot query's {model, args} using real production
  * pure-helpers/constants — see the file header for why. Returns a plain
- * descriptor list rather than executing anything, so the shape is
- * unit-testable without a database (see query-plans.test.mjs).
+ * descriptor list.
+ *
+ * NOT database-free by default: it awaits connectManagedStudentIds(), which
+ * runs a real Student.findMany() to get realistic ids for the funnel
+ * query's `where`. Pass `studentIds` (e.g. from a fixture) to skip that
+ * call entirely and make this function pure/unit-testable without a
+ * database — see query-plans.test.mjs's "buildHotQueries" cases, which do
+ * exactly that.
  */
-export async function buildHotQueries({ bench }) {
+export async function buildHotQueries({ bench, studentIds: providedStudentIds }) {
   const { LEAD_LIST_SELECT, MAX_LEAD_PAGE } = await import("../../../src/lib/connect/leads.ts");
   const { interventionQueueStudentSelect } = await import(
     "../../../src/lib/teacher/intervention-queue-select.ts"
@@ -92,6 +98,8 @@ export async function buildHotQueries({ bench }) {
   );
   const { reportDateRangeBoundsUtc } = await import("../../../src/lib/timezone.ts");
   const { intersectScopeClassIds } = await import("../../../src/lib/connect/flags-shared.ts");
+  const { rlsContextFor } = await import("../../../src/lib/api-error.ts");
+  const { withRlsContext } = await import("../../../src/lib/rls-context.ts");
 
   const instructorSession = {
     id: bench.instructorId,
@@ -104,8 +112,26 @@ export async function buildHotQueries({ bench }) {
   // Real ids from the seeded cohort, via the real (pure-ish, DB-reading)
   // production helper — not one of the "5 hot queries" itself, so it is
   // allowed to run on the app's own client uncaptured; it just needs to
-  // return realistic ids to parameterize the funnel query below with.
-  const studentIds = await connectManagedStudentIds(instructorSession, undefined);
+  // return realistic ids to parameterize the funnel query below with. A
+  // caller that already has ids (a fixture, a unit test) can pass them in
+  // `studentIds` and this function never touches a database at all.
+  //
+  // connectManagedStudentIds runs prisma.student.findMany on the APP client
+  // (src/lib/db.ts's `prisma`, not this file's own capturing client), and in
+  // production every real caller reaches it through `withTeacherAuth`, which
+  // wraps the request in exactly this context (`rlsContextFor`). Under
+  // RLS_CONTEXT_STRICT an app-client query with no context throws rather
+  // than silently returning RLS-filtered rows, so this benchmark is not
+  // exempt from providing one just because it is not a route — same fix
+  // shape as packet-privacy's (32440a0). Note the `async` + `await` INSIDE
+  // the callback, not `withRlsContext(ctx, () => connectManagedStudentIds(...))`:
+  // a Prisma promise is lazy, so returning it unawaited hands back a promise
+  // that starts executing after the context scope has already closed.
+  const studentIds =
+    providedStudentIds ??
+    (await withRlsContext(rlsContextFor(instructorSession), async () => {
+      return connectManagedStudentIds(instructorSession, undefined);
+    }));
   const { from, to } = reportDateRangeBoundsUtc(undefined, undefined);
   const scopedClassIds = intersectScopeClassIds({ mode: "all" }, { mode: "all" }); // null: both scopes "all"
 
@@ -323,7 +349,7 @@ export async function run(ctx) {
         {
           id: "plans_captured",
           value: plansCaptured.length,
-          details: { hotQueryCount: (await buildHotQueries({ bench })).length, perQuery: perQueryDetails },
+          details: { hotQueryCount: hotQueries.length, perQuery: perQueryDetails },
         },
         {
           id: "avg_estimated_cost",
