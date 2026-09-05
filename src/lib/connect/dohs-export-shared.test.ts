@@ -276,6 +276,32 @@ describe("buildDohsExportRow — retention (C1)", () => {
     assert.equal(row.retained90, false);
   });
 
+  it("W1: a 'not_employed' follow-up at 3 months is authoritative even when the Connection's event history reached retained_90", () => {
+    // This is the exact W1 bug: gating the fallback on "zero EMPLOYED
+    // follow-ups" (rather than zero follow-ups of ANY status) let a
+    // not_employed observation fall through to the event-history fallback,
+    // which then reported "retained" from stale/incorrect system history —
+    // overriding a real, human-confirmed negative check-in. A follow-up row
+    // existing at all must end the analysis right there.
+    const row = buildDohsExportRow(
+      source({
+        unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [followUp({ checkpointMonths: 3, status: "not_employed", checkedAt: "2026-09-01" })],
+        placementApplication: {
+          verificationStatus: "verified",
+          connection: {
+            eventToStatuses: ["proposed", "sent", "hired", "started", "retained_30", "retained_60", "retained_90"],
+            packet: null,
+            jobLeadSchedule: null,
+          },
+        },
+      }),
+    );
+    assert.equal(row.retained30, false, "a real not_employed check-in must not be overridden by event history");
+    assert.equal(row.retained60, false);
+    assert.equal(row.retained90, false);
+  });
+
   it("FALLBACK: a self-directed placement with NO follow-up but a Connection event history derives from that history", () => {
     // Self-directed placements normally have no Connection at all, but this
     // proves the fallback branch itself: given a connection and zero
