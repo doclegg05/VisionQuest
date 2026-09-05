@@ -1,0 +1,74 @@
+{
+  "suite": "nudge-sweep",
+  "title": "The hourly nudge sweep against a real database",
+  "area": "nudges",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/nudge-sweep.mjs",
+  "requires": ["postgres", "cohort"],
+  "metrics": [
+    {
+      "id": "sweep_blocked",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "send_errors",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "daily_cap_exceeded",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "duplicate_open_questions",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "concurrent_run_not_skipped",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "deadline_overrun_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    },
+    {
+      "id": "sweep_duration_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": null,
+      "reason": "The design proposes p95 <= 120 s (half the lock deadline) for 200 students; the cohort is 50, and no run has happened on CI hardware yet, so a floor set today would be a guess rather than a bar. First measurement, on an ephemeral local Postgres 16 in the authoring container: 407 ms for the full Monday-slot sweep (11 texts, 5 alerts, 50 students ranked) — three orders of magnitude inside the budget, so the interesting question is the trend, not the level. Tracked; raise it to a real number once a few CI runs have established the spread. deadline_overrun_ms is the hard bound in the meantime, and it is the one that actually matters — a sweep that outlives its own lock is the failure, a slow one is a cost.",
+      "tolerance": 5000
+    },
+    {
+      "id": "sends_per_run",
+      "unit": "count",
+      "direction": "higher",
+      "floor": null,
+      "reason": "descriptive: how much work the sweep found to do on the fixture. It moves whenever the cohort or the rules change, and neither direction is by itself good or bad — it is here so a sweep that suddenly sends nothing (the F63 'went quiet' failure) is visible next to the timings rather than hidden behind them.",
+      "tolerance": 0
+    }
+  ],
+  "notes": "THIS SUITE'S FIRST RUN FOUND A COMPLETE, SILENT OUTAGE OF THE SMS NUDGE FEATURE, fixed in the same change. Both advisory locks were called as `pg_try_advisory_xact_lock(<class>, hashtext(<key>))` with the class id bound by Prisma as a JavaScript number, which Postgres types as bigint. Postgres has exactly two overloads — (bigint) and (int, int) — so (bigint, integer) matched neither and raised 42883 on every call. The run lock's catch turned that into `skipped: \"run lock unavailable\"`, so the hourly sweep did nothing on every run while answering 200; sendPolicySms is total, so every individual text became `refused: send_error`. Nothing in the unit suite could see it: schedule.test.ts mocks $queryRaw and sms-policy.test.ts mocks $executeRaw, and the session-level predecessor used the single-argument bigint form, which is valid — the two-argument class-id namespacing was added later and never met a real Postgres. The fix is a `::int` cast at both call sites, with the reason written beside each. sweep_blocked and send_errors were added as gates in the same change so this shape can never read as a pass again: before the fix sweep_blocked measures 3, after it 0. Runs the real runNudges over the seeded synthetic cohort in the hermetic CI Postgres, with Twilio replaced by a globalThis.fetch stub that answers only api.twilio.com and THROWS for any other host — so an unexpected outbound call fails the benchmark instead of leaving it. `now` is Monday 2026-10-12 10:00 America/New_York: the weekly slot, which is the heaviest hour the sweep has, because it ranks every student's leads. Three measurements beyond the timing: two sweeps started at once, of which exactly one may do work (the transaction-scoped run lock, whose session-scoped predecessor was measured leaking through the pool and silencing the feature after one run); ten concurrent sendPolicySms calls for one recipient, which the per-recipient advisory lock plus the queued reservation must hold to SMS_DAILY_CAP; and a read-back for any recipient left with two open questions at once, which is what makes a bare 'Y' ambiguous. deadline_overrun_ms is measured against RUN_LOCK_TIMEOUT_MS - SEND_DEADLINE_MARGIN_MS parsed out of src/lib/nudges/schedule.ts, never restated here, because the metric is exactly about those two numbers staying one number. The suite declares no fixture: its corpus is the committed cohort, reached through `requires: [\"cohort\"]`. It SKIPS without a database and reports skipped rather than failing when the cohort is not seeded. Measured for real before merge on an ephemeral Postgres 16 + pgvector cluster started inside the authoring container (NOT the Mac the memory file describes): sweep_blocked 0, send_errors 0, daily_cap_exceeded 0, duplicate_open_questions 0, concurrent_run_not_skipped 0, deadline_overrun_ms 0, sweep_duration_ms 407, sends_per_run 11 over 12 recipients. Every gate was also shown able to fail against that same database — reverting the ::int cast puts sweep_blocked at 3; making the run lock always grant puts concurrent_run_not_skipped at 1; removing the per-recipient send lock puts daily_cap_exceeded at 6 (ten concurrent sends for one recipient, eight of them over a cap of two); disabling the runner's one-open-question guard puts duplicate_open_questions at 4. Baselines are still unset, on this suite and every other, and should be taken from a CI run rather than from container hardware. The harness refuses any database that is not local- or CI-scoped, with a production-shape check that has no override, and removes every row it created in a finally block."
+}
