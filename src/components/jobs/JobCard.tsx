@@ -5,6 +5,7 @@ import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } fro
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
+import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -204,6 +205,16 @@ export function JobCard({
           </span>
         )}
       </div>
+
+      {/* Read the posting's own facts out loud — title, employer, place, pay.
+          Hidden where the browser has no speech synthesis. */}
+      {!compact && (
+        <div className="mt-2">
+          <ReadAloudButton
+            text={`${title} at ${company}. ${location}.${salary ? ` Pay: ${salary}.` : ""}`}
+          />
+        </div>
+      )}
 
       {!compact && visibleReasons.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">

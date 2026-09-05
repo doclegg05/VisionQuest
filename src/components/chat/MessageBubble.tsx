@@ -2,6 +2,8 @@
 
 import { useReducedMotion } from "framer-motion";
 
+import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
+
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
@@ -48,6 +50,15 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
           {content}
           {isStreaming && shouldReduceMotion ? "…" : ""}
         </p>
+        {/* Read-aloud lives on Sage's finished replies: this is where a
+            plain-language job explanation (explain_job) actually reaches the
+            student, since the SSE tool_result event carries only a summary.
+            Renders nothing where speechSynthesis is unavailable. */}
+        {!isUser && !isStreaming && (
+          <div className="mt-2">
+            <ReadAloudButton text={content} />
+          </div>
+        )}
       </div>
     </div>
   );
