@@ -13,23 +13,36 @@
  * ./prompt-revision.ts): a benchmark scorer must be able to import it without
  * dragging in the prompt stack or Prisma.
  *
+ * A PROPERTY UNION, NOT AN ENUMERATION. The first version of this module listed
+ * the ranges by hand, and an enumerated allowlist of "everything invisible" is
+ * incomplete by construction: a review found nine more that forged a live
+ * marker straight past it (the four Hangul fillers U+115F/U+1160/U+3164/U+FFA0,
+ * U+206A and U+206F, the Khmer inherent vowels at U+17B4, the reserved
+ * default-ignorable U+2065, and the combining grapheme joiner U+034F). Unicode
+ * already maintains exactly the list we want, so we ask it instead of
+ * re-deriving it: Default_Ignorable_Code_Point (characters that should render
+ * as nothing), Cf (format characters) and Cc (controls). Anything Unicode adds
+ * to those properties is covered the day the runtime's ICU learns about it.
+ *
  * TWO SETS, TWO REMEDIES, because the hazards are not the same:
  *
- *   INVISIBLE_CHAR_CLASS is DELETED. These render as nothing at all, so they
- *   hide content from a human reviewer while a tokenizer still sees them. That
- *   is what lets "[GROUNDING<ZWSP>_DATA_END]" read as a fence marker to the
- *   model while being invisible in the teacher console. Deleting rejoins the
- *   token into the canonical shape the delimiter sweeps already remove;
- *   replacing with a space would leave "[GROUNDING _DATA_END]", which
- *   DELIMITER_SHAPED does not match because it allows whitespace only at a
- *   token's edges.
+ *   INVISIBLE_CHAR_PATTERN is DELETED. These render as nothing at all, so they
+ *   hide content from a human reviewer while a tokenizer still sees them.
  *
  *   AMBIGUOUS_SPACE_CLASS is NORMALIZED to a plain ASCII space. These DO have
- *   visible width, so deleting them would fuse two words in text a human
- *   reads. They are still not safe to pass through: JS `\s` matches most of
- *   them, so they can stand in for a space anywhere our own parsing assumes
- *   one, and U+2028/U+2029 act as line breaks in some renderers — the same
- *   "forge a second message" hazard `sanitizeSmsValue` guards against.
+ *   visible width, so deleting them would fuse two words in text a human reads
+ *   ("Charleston,<NNBSP>WV" must not become "Charleston,WV"). Passing them
+ *   through is not an option either: JS `\s` matches most of them, so they
+ *   stand in for a space wherever our own parsing assumes one, and
+ *   U+2028/U+2029 act as line breaks in some renderers.
+ *
+ *   NORMALIZATION IS NOT SUFFICIENT ON ITS OWN, and this module said so before
+ *   it was true: turning "[GROUNDING<NNBSP>_DATA_END]" into
+ *   "[GROUNDING _DATA_END]" leaves a live forged marker, because the delimiter
+ *   sweep allows whitespace only at a token's EDGES. The marker sweep in
+ *   ./system-prompts.ts therefore collapses whitespace INSIDE a bracketed token
+ *   before testing its shape — that is the half of the fix that lives there,
+ *   and neither half works alone.
  *
  * WHAT IS DELIBERATELY KEPT: "\n" and "\t". They are prompt structure — the
  * grounding fence and every rendered context block are built out of newlines.
@@ -39,7 +52,9 @@
  * it: U+200D (zero-width joiner) is deleted, which breaks ZWJ emoji sequences
  * (a family emoji degrades into its component people) and Devanagari/Indic
  * conjunct forms. U+FE0F is deleted, so an emoji may render in its text rather
- * than emoji presentation. "\r" is deleted, so CRLF input becomes LF. These
+ * than emoji presentation. "\r" is deleted, so CRLF input becomes LF. Plain
+ * emoji, skin-tone modifiers, accented Latin, Arabic, Hebrew, CJK and Thai
+ * combining marks are all untouched (verified by the collateral probe). These
  * are worth it here because this text is third-party job-feed and staff-typed
  * content, not user-authored messages — but note that `sanitizeForPrompt` is
  * NOT prompt-only: its output is persisted by
@@ -48,28 +63,18 @@
  */
 
 /**
- * Character class BODY (no enclosing brackets) for characters that are deleted
- * outright. Ordered by code point. Requires the `u` flag for the astral tag
- * range.
+ * Source for the invisible-character matcher. A lookahead exempts "\n" and
+ * "\t" — both are Cc, and both are prompt structure — so the union can be
+ * asked for as a whole rather than picked apart. Requires the `u` flag.
  */
-export const INVISIBLE_CHAR_CLASS =
-  "\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F" + // C0/C1 controls, minus \t and \n
-  "\\u00AD" + // soft hyphen
-  "\\u061C" + // arabic letter mark
-  "\\u180E" + // mongolian vowel separator
-  "\\u200B-\\u200F" + // ZWSP, ZWNJ, ZWJ, LRM, RLM
-  "\\u202A-\\u202E" + // bidi embeddings and overrides
-  "\\u2060-\\u2064" + // word joiner, invisible times/separator/plus
-  "\\u2066-\\u2069" + // bidi isolates
-  "\\uFE00-\\uFE0F" + // variation selectors
-  "\\uFEFF" + // BOM / zero-width no-break space
-  "\\uFFF9-\\uFFFB" + // interlinear annotation anchors
-  "\\u{E0000}-\\u{E007F}" + // tag characters (the "invisible text" block)
-  "\\u{E0100}-\\u{E01EF}"; // variation selectors supplement
+export const INVISIBLE_CHAR_SOURCE =
+  "(?![\\n\\t])[\\p{Default_Ignorable_Code_Point}\\p{Cf}\\p{Cc}]";
 
 /**
  * Character class BODY for whitespace that is not a plain ASCII space and is
- * normalized to one.
+ * normalized to one. Enumerated deliberately: `\p{Zs}` would also swallow the
+ * ASCII space itself, and U+2028/U+2029 are Zl/Zp rather than Zs, so the
+ * property shorthand is both too wide and too narrow here.
  */
 export const AMBIGUOUS_SPACE_CLASS =
   "\\u00A0" + // no-break space
@@ -81,10 +86,10 @@ export const AMBIGUOUS_SPACE_CLASS =
   "\\u3000"; // ideographic space
 
 /** Non-global, so `.test()`/`.exec()` carry no `lastIndex` state for callers. */
-export const INVISIBLE_CHAR_RE = new RegExp(`[${INVISIBLE_CHAR_CLASS}]`, "u");
+export const INVISIBLE_CHAR_RE = new RegExp(INVISIBLE_CHAR_SOURCE, "u");
 export const AMBIGUOUS_SPACE_RE = new RegExp(`[${AMBIGUOUS_SPACE_CLASS}]`, "u");
 
-const INVISIBLE_CHAR_RE_G = new RegExp(`[${INVISIBLE_CHAR_CLASS}]`, "gu");
+const INVISIBLE_CHAR_RE_G = new RegExp(INVISIBLE_CHAR_SOURCE, "gu");
 const AMBIGUOUS_SPACE_RE_G = new RegExp(`[${AMBIGUOUS_SPACE_CLASS}]`, "gu");
 
 /**

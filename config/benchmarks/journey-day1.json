@@ -1,0 +1,46 @@
+{
+  "suite": "journey-day1",
+  "title": "A student's first session, at 375px",
+  "area": "journeys",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/journey-day1.mjs",
+  "fixture": "config/benchmarks/fixtures/journey-day1.json",
+  "requires": [
+    "browser",
+    "server",
+    "postgres"
+  ],
+  "metrics": [
+    {
+      "id": "completed",
+      "unit": "count",
+      "direction": "higher",
+      "floor": 1,
+      "tolerance": 0
+    },
+    {
+      "id": "steps_with_next_signal",
+      "unit": "count",
+      "direction": "higher",
+      "floor": 8,
+      "tolerance": 0
+    },
+    {
+      "id": "student_taps",
+      "unit": "count",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "The design proposes 8 or fewer (spec section 4.6, dagger). It is not set as a floor yet because no run has established today's real number — the authoring worktree had no dev server or database, the standing 'a worktree has no .env.local' gotcha, so this suite has never been executed. Counting the controls on the path by hand suggests about ten, and adopting 8 sight-unseen would red the gate on a product fact nobody has agreed to act on. Set the baseline from the first CI run, then floor it. Same measure-then-gate shape as touch-targets."
+    },
+    {
+      "id": "total_seconds",
+      "unit": "seconds",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Wall clock on whatever machine ran it, including the app's own network and Playwright's waits — a trend line across runs on one machine, never a latency number. The design's 90-second default is about SCRIPTED INTERACTION, which is not what this measures; flooring this value would fail a slow CI runner and teach everyone to ignore the gate (the reasoning connect-journey's elapsed_ms records)."
+    }
+  ],
+  "notes": "Scores the run e2e/bench-journey-day1.spec.ts performed: sign in, welcome, meet Sage, the first orientation win, the path choice, the first message to Sage, the dashboard's next step, the first saved goal — at 375 px, on a student reset to true day-one state. Sage is stubbed at POST /api/chat/send: the step being measured is sending a first message and seeing an answer come back, and no gate should spend a cloud model call. `steps_with_next_signal` is the charter's Phase 2 'one next signal' promise as a number — a step where the student has to work out what to press is invisible to a pass/fail spec, which knows where the button is. It is checked against the report's OWN step count so a shortened journey cannot report 6 of 6 and look like an improvement. Reports `skipped` when the spec has not run, and treats a report older than 24 hours as absent."
+}

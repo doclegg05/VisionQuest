@@ -19,7 +19,7 @@ import {
 } from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { rosterReadiness } from "@/lib/progression/readiness-consumers";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
   buildInterventionQueueEntry,
@@ -545,20 +545,24 @@ export async function getTeacherDashboardPage(
     const bhagCompleted = student.goals.some(
       (goal) => goal.level === "bhag" && goal.status === "completed",
     );
-    const readiness = computeReadinessScore(
-      {
-        orientationComplete:
-          student.orientationProgress.length >= orientationTotal && orientationTotal > 0,
-        completedGoalLevels,
-        bhagCompleted,
-        certificationsEarned: certDone,
-        portfolioItemCount: student._count.portfolioItems,
-        resumeCreated: !!student.resumeData,
-        portfolioShared,
-        longestStreak,
-      },
-      certTemplates.filter((template) => template.required).length,
-    );
+    // The roster's mapping lives in readiness-consumers.ts alongside the six
+    // other surfaces that show a readiness number, so the three definitions
+    // cannot drift apart unremarked. `orientationTotal` is
+    // prisma.orientationItem.count() — ALL items (2026-07-31 decision).
+    const readiness = rosterReadiness({
+      orientationCompletedCount: student.orientationProgress.length,
+      orientationTotalCount: orientationTotal,
+      completedGoalLevels,
+      bhagCompleted,
+      certificationRequirementsDone: certDone,
+      portfolioItemCount: student._count.portfolioItems,
+      hasResume: !!student.resumeData,
+      portfolioShared,
+      longestStreak,
+      requiredCertificationTemplateCount: certTemplates.filter(
+        (template) => template.required,
+      ).length,
+    });
     const lastActiveAt =
       latestDate(
         student.createdAt,
