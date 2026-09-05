@@ -1,6 +1,52 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { collectSeqScans, planTotalCost } from "./query-plans.mjs";
+import { buildHotQueries, collectSeqScans, planTotalCost } from "./query-plans.mjs";
+
+const BENCH = {
+  instructorId: "cbenchinstr1",
+  instructorLogin: "bench-instructor-1",
+  studentId: "cbenchstu01",
+};
+
+test("buildHotQueries: with `studentIds` provided, builds all 6 descriptors without touching a database (no DATABASE_URL needed)", async () => {
+  // No DATABASE_URL is set anywhere in this process for this test — if
+  // buildHotQueries reached for connectManagedStudentIds() instead of the
+  // provided studentIds, it would throw here (real Prisma call, no context,
+  // no connection string), not silently pass.
+  const descriptors = await buildHotQueries({ bench: BENCH, studentIds: ["cbenchstu01", "cbenchstu02"] });
+  assert.equal(descriptors.length, 6);
+  const names = descriptors.map((d) => d.name).sort();
+  assert.deepEqual(names, [
+    "connect_console_lead_list",
+    "dashboard_bundle_certifications",
+    "dashboard_bundle_progression_events",
+    "funnel_report",
+    "intervention_queue",
+    "weekly_nudge_roster",
+  ]);
+  for (const d of descriptors) {
+    assert.equal(typeof d.name, "string");
+    assert.equal(typeof d.model, "string");
+    assert.equal(typeof d.args, "object");
+  }
+});
+
+test("buildHotQueries: the provided studentIds parameterize the funnel_report descriptor directly", async () => {
+  const descriptors = await buildHotQueries({ bench: BENCH, studentIds: ["cbenchstu01", "cbenchstu02"] });
+  const funnel = descriptors.find((d) => d.name === "funnel_report");
+  assert.deepEqual(funnel.args.where.studentId.in, ["cbenchstu01", "cbenchstu02"]);
+});
+
+test("buildHotQueries: an empty provided studentIds list still builds a valid (non-matching) funnel_report where clause, not an unfiltered scan", async () => {
+  const descriptors = await buildHotQueries({ bench: BENCH, studentIds: [] });
+  const funnel = descriptors.find((d) => d.name === "funnel_report");
+  // Mirrors the run()-time guard against an unbounded `studentId: { in: [] }`
+  // (which Postgres treats as "matches nothing" anyway, but a query plan for
+  // "matches nothing" is not a useful EXPLAIN sample) — see the funnel_report
+  // descriptor's own fallback in the source.
+  assert.ok(Array.isArray(funnel.args.where.studentId.in));
+  assert.ok(funnel.args.where.studentId.in.length > 0);
+});
 
 test("collectSeqScans: finds a Seq Scan at the root", () => {
   const plan = { "Node Type": "Seq Scan", "Relation Name": "Student", "Total Cost": 12.3 };

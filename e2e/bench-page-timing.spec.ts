@@ -21,8 +21,18 @@ import { loginContext } from "./helpers/auth";
  *
  *   npx tsx scripts/bench/seed-cohort.ts
  *
- * Each route is navigated REPEATS times so the scorer has a real
- * distribution to take a p95 over rather than a single noisy sample.
+ * Each route gets ONE untimed, discarded warm-up navigation, then REPEATS
+ * timed navigations so the scorer has a real distribution to take a p95
+ * over rather than a single noisy sample. Without the warm-up, the FIRST of
+ * the REPEATS navigations is the page's genuinely cold first load (fresh
+ * route compilation, cold caches), and scripts/lib/percentile.mjs's
+ * nearest-rank p95 resolves to the literal maximum recorded sample at any
+ * REPEATS below 20 (ceil(0.95*n) reaches n for every n<20 — see that file),
+ * so the reported "p95" WAS that one cold sample, not a tail statistic over
+ * steady-state loads (PR review round 2). Discarding a warm-up nav first
+ * means the maximum among the REPEATS timed samples is a worst-of-the-
+ * steady-state number instead.
+ *
  * Navigation Timing entries are read from the freshly-loaded document after
  * each `page.goto` (Chromium/WebKit/Firefox each start a fresh
  * `performance` object per document, so `getEntriesByType("navigation")[0]`
@@ -31,7 +41,7 @@ import { loginContext } from "./helpers/auth";
  */
 
 const VIEWPORT = { width: 375, height: 667 } as const;
-const REPEATS = 5;
+const REPEATS = 8;
 
 interface RouteSpec {
   id: string;
@@ -81,6 +91,11 @@ test.describe("Benchmark data: page timing at 375px", () => {
 
       for (const spec of ROUTES) {
         const page = spec.role === "student" ? studentPage : teacherPage;
+
+        // Untimed, discarded — cold route compilation and cache misses live
+        // here, not in the recorded samples. See the header comment.
+        await measureRoute(page, spec.route);
+
         const samples: NavSample[] = [];
         let failures = 0;
         for (let i = 0; i < REPEATS; i += 1) {
