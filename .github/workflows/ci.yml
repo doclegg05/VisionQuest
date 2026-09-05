@@ -291,6 +291,22 @@ jobs:
         # student. Removable with --clean.
         run: npx tsx scripts/seed-e2e-users.ts
 
+      - name: Seed the synthetic benchmark cohort
+        # e2e/bench-page-timing.spec.ts (and e2e/bench-connect-journey.spec.ts)
+        # log in as the cohort's own BENCH_INSTRUCTOR/BENCH_JOURNEY_STUDENT
+        # (e2e/bench-fixtures.ts), a separate fixture set from
+        # scripts/seed-e2e-users.ts above. Same guard as the verify job's
+        # identically-named step, so this workflow is correct before the
+        # script lands and needs no edit after — this job's DATABASE_URL is
+        # already the real hermetic Postgres (set at job level), so no
+        # per-step override is needed here.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort-backed e2e benchmarks will fail their login."
+          fi
+
       - name: Build
         run: npm run build
 
@@ -316,22 +332,23 @@ jobs:
       # Run the runner first and each scorer errors, by design, because the
       # environment says browser+server are available and the raw data is not.
       #
-      # These are the only two suites whose `requires` include `browser` and
+      # These are the only three suites whose `requires` include `browser` and
       # `server`, so this job is the one place they can run at all; without it
       # they would report `skipped` forever, which is the quiet-instrument
       # failure this whole suite exists to prevent.
       - name: Collect browser benchmark data (non-blocking)
-        # Non-blocking for the same reason as the soak scan below: both suites
-        # are watch tier today, and a collector that breaks is reported by the
-        # runner as an `error` row in the table and the uploaded artifact
-        # rather than by reddening the gating e2e job. When touch-targets is
-        # promoted to gate (see docs/runbooks/benchmarks.md), drop
+        # Non-blocking for the same reason as the soak scan below: all three
+        # suites are watch tier today, and a collector that breaks is reported
+        # by the runner as an `error` row in the table and the uploaded
+        # artifact rather than by reddening the gating e2e job. When a suite
+        # is promoted to gate (see docs/runbooks/benchmarks.md), drop
         # continue-on-error here so a missing collection fails honestly.
         continue-on-error: true
         run: >-
           npx playwright test
           e2e/bench-touch-targets.spec.ts
           e2e/bench-axe-authenticated.spec.ts
+          e2e/bench-page-timing.spec.ts
           --reporter=line --timeout=180000
 
       - name: Score browser benchmarks
@@ -340,7 +357,7 @@ jobs:
           # above already drove the real browser against the job's own server.
           PLAYWRIGHT: "1"
           BENCH_BASE_URL: "http://localhost:3000"
-        run: npm run bench -- --suite=touch-targets --suite=axe-authenticated --compare
+        run: npm run bench -- --suite=touch-targets --suite=axe-authenticated --suite=page-timing --compare
 
       - name: Upload browser benchmark results
         if: always()

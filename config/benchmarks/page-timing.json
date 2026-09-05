@@ -1,0 +1,20 @@
+{
+  "suite": "page-timing",
+  "title": "Page timing at 375px",
+  "area": "performance",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/page-timing.mjs",
+  "fixture": "config/benchmarks/fixtures/page-timing.json",
+  "requires": ["browser", "server"],
+  "metrics": [
+    { "id": "p95_ttfb_ms_dashboard", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_dcl_ms_dashboard", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_ttfb_ms_career", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_dcl_ms_career", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_ttfb_ms_teacher", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_dcl_ms_teacher", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_ttfb_ms_teacher_connect", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 },
+    { "id": "p95_dcl_ms_teacher_connect", "unit": "ms", "direction": "lower", "floor": 800, "tolerance": 100 }
+  ],
+  "notes": "TIER IS WATCH, NOT GATE (design §4.7: 'watch → gate'), same reason as touch-targets (builder A8): this worktree has no dev server or DATABASE_URL (standing 'a worktree has no .env.local either' gotcha), so e2e/bench-page-timing.spec.ts could not actually be run here to establish today's real numbers. Promote to gate once a CI run with a live server + seeded cohort (npx tsx scripts/bench/seed-cohort.ts) confirms real p95s under the floor. The 800ms floor on every metric is design §4.7's adopted default (plan item 1, floors marked †) applied uniformly to both server-response (p95_ttfb_ms_*, Navigation Timing's responseStart) and DOMContentLoaded (p95_dcl_ms_*, domContentLoadedEventEnd) for each of the four hottest pages named in the task brief — the student home (/dashboard), the student jobs page (/career — /jobs is a redirect stub to /career#jobs, the repo's retired-route pattern), the teacher dashboard (/teacher), and the Connect console (/teacher/connect). Each metric is a p95 over 5 repeated navigations (e2e/bench-page-timing.spec.ts's REPEATS), read from the freshly-loaded document's own Navigation Timing entry after each goto."
+}
