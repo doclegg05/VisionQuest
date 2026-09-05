@@ -11,13 +11,14 @@ import {
   type AvailabilityDay,
   type AvailabilityGrid,
   type AvailabilitySlot,
-} from "./work-profile";
+} from "./work-profile-shared";
 
 /**
- * Task 2.1 of the Match & Connect plan. These cover the pure halves of
- * src/lib/connect/work-profile.ts — the grid math and the transport matrix —
- * which Phase 3's matcher will use as hard blocks. Nothing here touches a
- * database.
+ * Task 2.1 of the Match & Connect plan. These cover
+ * src/lib/connect/work-profile-shared.ts — the grid math, the transport
+ * matrix, and the Zod schema — which Phase 3's matcher will use as hard
+ * blocks. Nothing here touches a database, and the module under test imports
+ * no server-only code (see client-import-guard.test.ts for why that matters).
  */
 
 function gridWith(cells: Partial<Record<AvailabilityDay, AvailabilitySlot[]>>): AvailabilityGrid {

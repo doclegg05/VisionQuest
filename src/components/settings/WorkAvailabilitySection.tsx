@@ -12,7 +12,7 @@ import {
   type AvailabilitySlot,
   type TransportMode,
   type WorkProfile,
-} from "@/lib/connect/work-profile";
+} from "@/lib/connect/work-profile-shared";
 
 /**
  * The student's own "Work availability" form — the fallback for Sage's
