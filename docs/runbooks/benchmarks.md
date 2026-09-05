@@ -233,6 +233,54 @@ meaning anything, which is the failure mode this whole suite exists to prevent.
 belongs in a PR that shows the new value being met. *Lowering* a floor needs an
 owner decision recorded in the suite's config `notes`.
 
+**Never hand-edit `reports/benchmarks/baseline.json`.** Every row must come from
+a real measured run, through the runner, carrying the commit, host and reason
+that make it auditable. A number typed by hand looks identical to a measured
+one and is not.
+
+### What is baselined today, and what is deliberately not
+
+The initial baseline (29 metric rows across 13 suites) was measured on the
+build container with:
+
+```bash
+npm run bench -- \
+  --suite=matching-quality --suite=hard-blocks --suite=connection-walks \
+  --suite=explain-faithfulness-check --suite=form-ranking --suite=posting-injection \
+  --suite=readability-by-surface --suite=sms-readability --suite=scheduled-layer-drift \
+  --suite=pii-log-grep --suite=orientation-readiness --suite=rls-coverage \
+  --suite=migration-drift \
+  --update-baseline \
+  --reason="initial: deterministic in-process suites, measured on the build container at <HEAD>; timing and DB/browser suites deferred to the first nightly CI run"
+```
+
+Those thirteen share one property: they are **deterministic and
+hardware-independent** — gate tier, `requires: []`, in-process, no database, no
+browser, no model, and no `ms`/`seconds` metric. A number measured on one
+machine is the same number on another, so a baseline taken here is meaningful
+in CI.
+
+**Deferred on purpose, and how each gets its first baseline:**
+
+| Deferred | Why | Where its baseline comes from |
+|---|---|---|
+| `crisis-latency`, `job-refresh`, `matching-scale`, `page-timing`, `sage-latency`, `nudge-sweep` (`sweep_ms`), `classroom-concurrency` | they report `ms`/`seconds`, so the number is a property of the machine, not of the code | the nightly `benchmarks.yml` run on `main`, whose commit-back seeds them from CI hardware |
+| `nudge-sweep`, `packet-privacy`, `query-plans`, `consent-scopes`, `migration-drift-schema` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
+| `connect-journey`, `journey-day1`, `journey-teacher-loop`, `touch-targets`, `axe-authenticated` | need a browser and a running server | the `e2e` job's collectors |
+| `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when `GEMINI_API_KEY` is present |
+| `cron-health`, `cost-per-student`, `ferpa-routing`, `backup-drill` | need the prod read-only URL (an owner step) | once that secret exists |
+
+**A timing metric must never be baselined from a laptop or a build container.**
+The 2026-08-21 rule — every local-model number in this repo's history has an
+unrecorded host, which is why they contradict each other — applies to every
+wall-clock number, not only to model runs. The baseline row records its host
+precisely so a number measured somewhere else is visibly a different number
+rather than a silent regression.
+
+Four gate suites meet the deterministic criteria but were left out of this
+first pass and can be added the same way whenever someone wants them pinned:
+`nudge-consent`, `nudge-quiet-hours`, `nudge-attribution`, `report-parity`.
+
 ---
 
 ## The rules this suite inherits
