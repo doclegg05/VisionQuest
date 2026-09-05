@@ -126,11 +126,30 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // Recall is untouched: bare "kms", "gonna kms", "i might kms tonight" and
   // every "kys" form still alert, in either language, because none of them
   // carries a quantity frame or a distance preposition.
+  //
+  // KNOWN LIMITS, written down rather than claimed closed — an earlier version
+  // of this comment said the Spanish frames were covered while one of its own
+  // guards was dead code, so the standard here is now "name what still leaks":
+  //   - a Spanish distance frame whose preposition is not "de"/"del" still
+  //     alerts: "queda a kms DESPUÉS de la gasolinera". Guarding on "después"
+  //     would start an enumeration of prepositions, which is the shape that
+  //     failed before; the quantity lookbehind covers the common phrasings.
+  //   - an English distance word outside away/from/down/up/apart does the same
+  //     ("kms east of town").
+  // Both are false POSITIVES on distance talk, never missed disclosures, so
+  // the failure direction is an instructor dismissing an alert.
   {
     category: "self_harm",
     pattern: new RegExp(
       "(?<!\\d)(?<!\\d\\s)" +
-        "(?<!\\b(?:a\\s+(?:few|couple\\s+of|unos|unas|pocos|pocas|varios|varias|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)|about|around|roughly|some|several)\\s)" +
+        // Spanish quantity words, with the "a" OPTIONAL. Requiring it was
+        // wrong in a way only running it shows: "camino unos kms todos los
+        // días", "recorrí varios kms" and "son diez kms" have no "a" at all and
+        // were alerting — with the ENGLISH 988 block, since this entry carries
+        // no lang tag.
+        "(?<!\\b(?:a\\s+)?(?:unos|unas|pocos|pocas|varios|varias|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\s)" +
+        // English quantity frames, which do require their article.
+        "(?<!\\b(?:a\\s+(?:few|couple\\s+of)|about|around|roughly|some|several)\\s)" +
         "\\b(?:kms|kys)\\b" +
         "(?!\\s+(?:away|from|down|up|apart)\\b)" +
         "(?!\\s+del?(?![\\wáéíóúüñ]))",
@@ -194,7 +213,31 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // talk reads ("i take all my pills every morning", pinned silent) and must
   // stay out. The quantity + medication bounds are unchanged, so nothing that
   // used to alert on the NOUN side stops alerting.
-  { category: "self_harm", pattern: /\b(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
+  // The verb list refuses a THIRD-PERSON SUBJECT rather than requiring a
+  // first-person one, and the difference matters: "took all my pills last
+  // night" with no subject at all is a real student message and must keep
+  // alerting, so anchoring on "i" would have cost recall to buy precision.
+  // Measured before and after — "she has taken too many pills", "my brother
+  // swallowed all the pills", "the patient had taken all the medication" and
+  // "they swallowed a bunch of pills" were silent before the widening and
+  // alerting after it, so a student describing someone else's overdose was
+  // raising a CRITICAL alert on themselves. The lookbehind spans up to two
+  // words so an auxiliary ("has", "had") between the subject and the verb does
+  // not carry it out of range.
+  {
+    category: "self_harm",
+    pattern:
+      /(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|your|the|my)\s(?:\w+\s){0,2})\b(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
+  },
+  // S1: "od'd" as a completed act. The only od entry required an intent verb
+  // ("gonna od"), so the past tense — the higher-risk disclosure of the two —
+  // was silent. Same first-person frame and same third-person refusal as the
+  // "overdosed on" entry above, so "he od'd on pills" stays silent.
+  {
+    category: "self_harm",
+    pattern:
+      /\bi(?:'?m|'?ve|'?d)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+od(?:'|\u2019)?(?:d|ed)\b/i,
+  },
   // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
   // all my pills tonight"). The two entries above between them only covered
   // intent toward the bare verb ("gonna od") and the completed act ("took all
@@ -228,7 +271,12 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", lang: "es", pattern: /\b(acabar|terminar)\s+con\s+mi\s+vida\b/i },
   { category: "self_harm", lang: "es", pattern: /\bno\s+quiero\s+(vivir|seguir\s+viviendo)\b/i },
   { category: "self_harm", lang: "es", pattern: /\b(no\s+vale\s+la\s+pena\s+vivir|la\s+vida\s+no\s+vale\s+la\s+pena)\b/i },
-  { category: "self_harm", lang: "es", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer)\s+da(ñ|n)o|lastimarme|cortarme\s+las\s+venas)\b/i },
+  // The progressive forms are included ("me estoy haciendo daño", "me estoy
+  // lastimando"): English covers the ongoing act and Spanish did not, which the
+  // sage-ai.md parity rule treats as a gap needing a fix or a written note. The
+  // clitic must be "me" — "le estoy haciendo daño a mi relación" and "está
+  // haciendo daño a la comunidad" are ordinary talk and stay silent, pinned.
+  { category: "self_harm", lang: "es", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer|me\s+estoy\s+haciendo)\s+da(ñ|n)o|lastimarme|me\s+estoy\s+lastimando|cortarme\s+las\s+venas)\b/i },
   // CUTTING REGISTER (es) — parity with the English hurt/harm/cutting family.
   // English covers the act in every tense ("i hurt myself yesterday", "i been
   // hurting myself"); Spanish covered only the fixed phrase "cortarme las
@@ -248,6 +296,12 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "me hice cortes" needs no body part: making cuts on oneself has no
   // everyday sense. Both clitic positions are handled ("cortarme los brazos" /
   // "me corté los brazos"), the same climbing the sobredosis entry handles.
+  //
+  // KNOWN LIMIT: a WORK ACCIDENT naming a listed body part still alerts —
+  // "me corté la pierna en el trabajo". The body-part list is what separates
+  // disclosure from a kitchen cut, so narrowing it to exclude legs would cost
+  // a real self-injury site to buy one false positive back. Recall-first
+  // stands; recorded so the next reader knows it was weighed, not missed.
   { category: "self_harm", lang: "es", pattern: /\b(?:me\s+(?:hice|hago|voy\s+a\s+hacer|quiero\s+hacer)\s+cortes|(?:cortarme|me\s+cort(?:o|é|e|aba|aré|are)|me\s+(?:voy\s+a|quiero)\s+cortar)\s+(?:l[oa]s|el|la|mis?)\s+(?:brazos?|mu(?:ñ|n)ecas?|piernas?|muslos?|venas|cuerpo))/i },
   { category: "self_harm", lang: "es", pattern: /\b(mejor\s+muert[oa]|quisiera\s+estar\s+muert[oa])\b/i },
   // Ambiguous like the English "can't go on" — included per err-toward-alerting.
@@ -287,7 +341,12 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   //    pastillas" (fires) and "…dijo que me tome todas las pastillas"
   //    (silent). The guard spans the optional clitic so the bare-verb
   //    alternative cannot re-enter the match after "que me".
-  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tomé|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?tome)\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
+  // "tragué" (swallowed) sits beside "tomé" for the same reason the English
+  // entry gained "swallowed": it is the same disclosure in the same register.
+  // Third person keeps it silent ("se tragó todas las pastillas"), and the
+  // quantity + medication bounds keep an accidental swallow silent too
+  // ("me tragué un hueso de pollo sin querer"), both pinned.
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tom(?:é|é)|(?:me\s+)?tragué|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?(?:tome|trague))\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
   // 2. Stated intent: an intent verb ("quiero/quisiera", "voy a"/"me voy a",
   //    "pienso en", "pensé en") governing the take-verb, the synthetic future
   //    ("me tomaré"), or a time-of-intent marker framing the bare present

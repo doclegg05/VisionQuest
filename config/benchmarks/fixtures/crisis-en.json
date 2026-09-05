@@ -4538,6 +4538,83 @@
       "family": "distance_kms",
       "bucket": "hard_negative",
       "source": "pinned-test"
+    },
+    {
+      "text": "took all my pills last night",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "ive od'd on pills before",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i od'd last night",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "she has taken too many pills",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "my brother swallowed all the pills",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "the patient had taken all the medication",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "they swallowed a bunch of pills",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "he od'd on pills",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "my brother od'd last year",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "a few kms to the bus stop",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "some kms later",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
     }
   ]
 }

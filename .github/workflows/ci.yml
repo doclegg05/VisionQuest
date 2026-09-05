@@ -121,6 +121,13 @@ jobs:
         # src/**/*.test.ts glob, so they need their own step.
         run: npm run bench:test
 
+      - name: Benchmark scorer unit tests
+        # The scorers' own tests, same reason: scripts/bench/suites/**/*.test
+        # .mjs sits outside every other glob and so ran in no workflow at all.
+        # Keep the glob QUOTED in package.json — unquoted, the shell expands
+        # `**` one level and silently runs 47 of the 153 cases.
+        run: npm run bench:suites:test
+
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
         # type (fetching ProgramDocument rows to diff title/audience/category

@@ -105,6 +105,44 @@ const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/gi;
 /** A forged marker cannot need more nesting than this to be worth defeating. */
 const MAX_SANITIZE_PASSES = 10;
 
+/**
+ * One bracketed token, with no nesting. The negated class has no overlap with
+ * anything that follows it, so this cannot backtrack super-linearly however
+ * many brackets or underscores an attacker supplies.
+ */
+const BRACKETED_TOKEN = /\[[^[\]]*\]/g;
+
+/**
+ * The marker shape, tested against a token whose INTERIOR whitespace has been
+ * collapsed away. Same shape the final sweep uses, anchored so it describes the
+ * whole token rather than a substring of it.
+ */
+const COLLAPSED_MARKER = /^\[[A-Za-z0-9_]+_(?:START|END)\]$/i;
+
+/**
+ * Delete any bracketed token that IS a marker once its internal whitespace is
+ * ignored.
+ *
+ * This exists because normalizing an ambiguous space to " " (see
+ * ./invisible-chars.ts) hands an attacker the one thing DELIMITER_SHAPED cannot
+ * see: interior whitespace. "[GROUNDING<NNBSP>_DATA_END]" became
+ * "[GROUNDING _DATA_END]" — a live forged fence to a tokenizer, invisible to a
+ * sweep that allows whitespace only at a token's edges, and invisible to the
+ * benchmark too, because after normalization there was no longer an ambiguous
+ * space for its detector to find. A plain ASCII space did the same thing and
+ * always had; nothing pinned it.
+ *
+ * Keying on the collapsed SHAPE rather than on "a bracket containing a space"
+ * is what keeps ordinary prose intact: "[morning shift]" collapses to
+ * "[morningshift]", which is not marker-shaped, so it is left exactly as
+ * written.
+ */
+function stripWhitespaceHiddenMarkers(value: string): string {
+  return value.replace(BRACKETED_TOKEN, (token) =>
+    COLLAPSED_MARKER.test(token.replace(/\s+/g, "")) ? "" : token,
+  );
+}
+
 export function sanitizeForPrompt(value: string): string {
   // Invisible characters go FIRST, and the two classes get different remedies
   // (deleted vs normalized to a space) for reasons spelled out in
@@ -123,8 +161,13 @@ export function sanitizeForPrompt(value: string): string {
   // the join can be a live marker: "[GROUNDING_DATA_[GROUNDING_DATA_END]END]"
   // becomes "[GROUNDING_DATA_END]" after a single replace. Loop until the
   // output stops changing, bounded so adversarial nesting cannot spin here.
+  // The whitespace-collapsing sweep runs inside the loop for the same reason:
+  // removing one token can join its neighbours into a marker that is only
+  // recognisable once its interior whitespace is ignored.
   for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass += 1) {
-    const next = current.replace(DELIMITER_TOKEN, "").replace(SNIPPET_TAG, "");
+    const next = stripWhitespaceHiddenMarkers(
+      current.replace(DELIMITER_TOKEN, "").replace(SNIPPET_TAG, ""),
+    );
     if (next === current) break;
     current = next;
   }
@@ -133,7 +176,9 @@ export function sanitizeForPrompt(value: string): string {
   // a marker added to the prompt layer later would look like here until
   // someone remembers to add it. "[morning]" and other ordinary bracketed
   // prose do not match: the shape requires an _START/_END suffix.
-  return current.replace(DELIMITER_SHAPED, "").replace(SNIPPET_TAG, "");
+  return stripWhitespaceHiddenMarkers(
+    current.replace(DELIMITER_SHAPED, "").replace(SNIPPET_TAG, ""),
+  );
 }
 
 const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
