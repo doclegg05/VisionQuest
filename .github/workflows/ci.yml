@@ -300,6 +300,31 @@ jobs:
         # student. Removable with --clean.
         run: npx tsx scripts/seed-e2e-users.ts
 
+      - name: Seed the synthetic benchmark cohort
+        # The connect-journey collector below drives cohort people, not the
+        # e2e fixture users above: it logs in as cbenchinstr1 and acts on
+        # cbenchstu01, so without this step it has no instructor to log in as
+        # and reports `skipped` forever — the quiet-instrument failure this
+        # suite exists to prevent.
+        #
+        # The two seeds are safe to run together because their delete scopes
+        # are disjoint by construction: seed-cohort scopes every deleteMany to
+        # `{ startsWith: "cbench" }`, and seed-e2e-users to its three e2e-*
+        # logins plus the e2e class code. Neither can reach the other's rows.
+        #
+        # Ordering: after `migrate deploy` so it meets a real schema, and
+        # before the first `playwright test` — which is when the webServer
+        # boots — so the app never serves a half-seeded database.
+        #
+        # Guarded the same way as the verify job's copy so the workflow is
+        # correct before the script lands and needs no edit after.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
+          fi
+
       - name: Build
         run: npm run build
 
@@ -358,7 +383,15 @@ jobs:
           e2e/bench-axe-authenticated.spec.ts
           e2e/bench-journey-day1.spec.ts
           e2e/bench-journey-teacher-loop.spec.ts
+          e2e/bench-connect-journey.spec.ts
           --workers=1 --reporter=line --timeout=180000
+        env:
+          # connect-journey asserts the employer email actually reached an
+          # outbox, so the SERVER has to divert mail to a directory the spec
+          # can read. Playwright starts the webServer as a child of THIS step,
+          # so setting it here reaches both sides; naming it explicitly beats
+          # relying on both processes defaulting to the same relative path.
+          EMAIL_SINK_DIR: "${{ github.workspace }}/.bench-outbox"
 
       - name: Score browser benchmarks
         env:
@@ -372,6 +405,7 @@ jobs:
           --suite=axe-authenticated
           --suite=journey-day1
           --suite=journey-teacher-loop
+          --suite=connect-journey
           --compare
 
       - name: Upload browser benchmark results
