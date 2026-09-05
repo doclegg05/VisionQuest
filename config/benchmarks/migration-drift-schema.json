@@ -1,0 +1,20 @@
+{
+  "suite": "migration-drift-schema",
+  "title": "Migration drift — migrations replay to the committed schema",
+  "area": "data-integrity",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/migration-drift-schema.mjs",
+  "fixture": "config/benchmarks/fixtures/rls-exemptions.json",
+  "requires": ["postgres"],
+  "metrics": [
+    {
+      "id": "schema_migration_drift",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0,
+      "exact": true
+    }
+  ],
+  "notes": "Only runs when SHADOW_DATABASE_URL is set to a database dedicated to being replayed and diffed by `prisma migrate diff --from-migrations`. It deliberately does NOT reuse DATABASE_URL / the shared hermetic Postgres other suites and CI jobs depend on — replaying the full migration history into a shadow database is destructive to whatever that database currently holds. Skips cleanly (value 0, details.skipped) when SHADOW_DATABASE_URL is absent, same as any other unmet `requires`."
+}
