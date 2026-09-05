@@ -2034,7 +2034,7 @@
       "label": "silent",
       "family": "distance_kms",
       "bucket": "hard_negative",
-      "source": "authored",
+      "source": "pinned-test",
       "reviewed": false
     },
     {
@@ -3835,6 +3835,22 @@
       "family": "documented_hyperbole",
       "bucket": "must_detect",
       "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "la oficina está a unos kms de aquí",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "el centro está a pocos kms de distancia",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
       "reviewed": false
     }
   ]

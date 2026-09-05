@@ -59,7 +59,14 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
   // crisis-paraphrase scenario, which this detector previously missed.
   { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
-  { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
+  // The verb list is spelled out rather than suffixed, so the PROGRESSIVE form
+  // of every member is covered. The old alternation offered only "ting" or "t"
+  // after the stem, which happens to spell "cutting" and nothing else: "hurting
+  // myself" and "harming myself" were both verified misses, and they are the
+  // ordinary way a student describes an act that is still going on ("i keep
+  // hurting myself", "i been harming myself"). "cuting" is accepted as the
+  // predictable single-t typo of the one member whose progressive doubles.
+  { category: "self_harm", pattern: /\b((?:hurt|harm|cut)(?:t?ing|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
 
   // --- Informal register (VQ-R-004). The patterns above all require formal
   // "want to" constructions, but the product targets adults at a ~6th-grade
@@ -88,7 +95,27 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // are unambiguously distance: a digit immediately before (with or without a
   // space), and a following "away"/"from". Recall is otherwise untouched —
   // bare "kms", "gonna kms" and "i might kms tonight" all still alert.
-  { category: "self_harm", pattern: /(?<!\d)(?<!\d\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)/i },
+  //
+  // The distance guards must hold in BOTH languages, and they did not: the
+  // English frame is "a few kms away/from here", and its Spanish equivalent
+  // frames the distance on the other side of the noun — "a unos kms de aquí",
+  // "a pocos kms de distancia". Neither the digit lookbehind nor the
+  // away/from lookahead sees those, so an ordinary sentence about a commute
+  // raised a CRITICAL alert and, because this entry carries no lang tag,
+  // served that student the ENGLISH 988 block. Same leak the "caminé 5 kms
+  // hoy" row closed, one frame over — which is exactly why parity is an
+  // invariant here and not a nicety.
+  //
+  // Both new guards are on senses that are unambiguously distance: a Spanish
+  // quantity frame immediately before ("a unos/unas/pocos/pocas <n> kms"), or
+  // a Spanish distance phrase immediately after ("de aquí", "de distancia").
+  // Recall is untouched — bare "kms", "gonna kms" and "i might kms tonight"
+  // all still alert, in either language.
+  {
+    category: "self_harm",
+    pattern:
+      /(?<!\d)(?<!\d\s)(?<!\ba\s(?:unos|unas|pocos|pocas)\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)(?!\s+de\s+(?:aqu(?:í|i)|distancia)\b)/i,
+  },
   // "ending things" — the formal pattern only covered "my life" / "it all".
   // PRECISION EXCEPTION to this module's recall-first policy, written down so
   // the owner can veto it in review: "end things WITH <someone>" is a breakup,
@@ -113,7 +140,17 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "sobredosis" twin below has required a first-person frame all along; this
   // restores the parity.
   { category: "self_harm", pattern: /\boverdos(?:e|ed|ing)\s+myself\b/i },
-  { category: "self_harm", pattern: /\bi(?:'m|'ve|'d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
+  // The frame accepts the UNPUNCTUATED contractions too ("im", "ive", "id").
+  // This population writes without apostrophes — the informal-register set
+  // exists because of it — so "im overdosing on these pills right now" was a
+  // miss while "i'm overdosing on these pills" alerted, and a disclosure in
+  // progress is the worst possible place for that gap. Widening the pronoun
+  // costs no precision here: the frame still demands the overdose verb and its
+  // "on" object within two words, so a bare "im" or a stray "id" elsewhere in
+  // a sentence cannot reach it, and the third-person guards below
+  // ("my mom overdosed on pills when i was little") are unaffected because
+  // their "i" sits AFTER the verb.
+  { category: "self_harm", pattern: /\bi(?:'?m|'?ve|'?d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
   { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
   // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
   // all my pills tonight"). The two entries above between them only covered
