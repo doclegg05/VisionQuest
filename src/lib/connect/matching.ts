@@ -7,14 +7,20 @@
 //
 // Every loader here obeys one rule: a fixed number of queries, whatever the
 // size of the roster or the board. `rankStudentsForLead` issues four,
-// `summarizeLeadFits` three, `rankLeadsForStudent` six. None loops a query
-// over a list. The N+1 guard in matching.test.ts counts the calls on a mocked
-// client, so a per-student `findUnique` added later turns it red rather than
-// quietly making a class of 30 into 90 round trips.
+// `summarizeLeadFits` four, `rankRoster` four, `rankLeadsForStudent` seven.
+// None loops a query over a list, and matching.test.ts pins the exact call
+// list for all four, so a per-student `findUnique` added later turns red
+// rather than quietly making a class of 30 into 90 round trips.
 //
-// All three are capped. An unbounded program-wide rank is a page that gets
-// slower every term; MAX_CANDIDATES / MAX_LEADS bound the work, and the
-// result says whether the cap was hit so a caller can page.
+// All are capped. An unbounded program-wide rank is a page that gets slower
+// every term; MAX_CANDIDATES / MAX_LEADS bound the work, and the result says
+// whether the cap was hit so a caller can page.
+//
+// One rule shapes the SELECTs: the student path must never touch the Employer
+// table. `employer_access` has no student branch, so a student-session query
+// that filtered or selected through the relation would come back empty under
+// RLS — a silent wrong answer, not an error. That is why JobLead carries a
+// denormalised `employerName`, and why there are two selects below.
 // =============================================================================
 
 import { prisma } from "@/lib/db";
@@ -38,37 +44,13 @@ const VERIFIED = "verified";
 // Lead rows
 // ---------------------------------------------------------------------------
 
-interface LeadRow {
-  id: string;
-  title: string;
-  description: string | null;
-  employerId: string;
-  status: string;
-  location: string;
-  clusters: string[];
-  requirements: unknown;
-  schedule: unknown;
-  payMin: number | null;
-  payMax: number | null;
-  payPeriod: string;
-  transitNotes: string | null;
-  distanceMiles: number | null;
-  source: string;
-  classId: string | null;
-  employer: {
-    id: string;
-    name: string;
-    status: string;
-    hiredSpokesGradBefore: boolean;
-    subsidyFlags: unknown;
-  };
-}
-
-const LEAD_SELECT = {
+/** The lead columns both paths read. No relation, by design. */
+const LEAD_BASE_SELECT = {
   id: true,
   title: true,
   description: true,
   employerId: true,
+  employerName: true,
   status: true,
   location: true,
   clusters: true,
@@ -81,6 +63,20 @@ const LEAD_SELECT = {
   distanceMiles: true,
   source: true,
   classId: true,
+} as const;
+
+/**
+ * The STUDENT path. Lead columns only — no `employer` relation, no filter that
+ * reaches through one. `employerStatus` is not read at all here because a
+ * student cannot see it: an employer moving to `do_not_contact` pauses its
+ * open leads instead (see updateEmployer), so the lead's own `status` already
+ * carries that fact.
+ */
+const LEAD_STUDENT_SELECT = LEAD_BASE_SELECT;
+
+/** The STAFF path, which may read the employer. */
+const LEAD_STAFF_SELECT = {
+  ...LEAD_BASE_SELECT,
   employer: {
     select: {
       id: true,
@@ -92,15 +88,46 @@ const LEAD_SELECT = {
   },
 } as const;
 
-function toMatchLead(row: LeadRow): MatchLead {
+interface LeadBaseRow {
+  id: string;
+  title: string;
+  description: string | null;
+  employerId: string;
+  employerName: string;
+  status: string;
+  location: string;
+  clusters: string[];
+  requirements: unknown;
+  schedule: unknown;
+  payMin: number | null;
+  payMax: number | null;
+  payPeriod: string;
+  transitNotes: string | null;
+  distanceMiles: number | null;
+  source: string;
+  classId: string | null;
+}
+
+interface LeadRow extends LeadBaseRow {
+  employer: {
+    id: string;
+    name: string;
+    status: string;
+    hiredSpokesGradBefore: boolean;
+    subsidyFlags: unknown;
+  };
+}
+
+function baseMatchLead(row: LeadBaseRow): Omit<
+  MatchLead,
+  "employerStatus" | "employerHiredSpokesGradBefore"
+> {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     employerId: row.employerId,
-    employerName: row.employer.name,
-    employerStatus: row.employer.status,
-    employerHiredSpokesGradBefore: row.employer.hiredSpokesGradBefore,
+    employerName: row.employerName,
     status: row.status,
     location: row.location,
     clusters: row.clusters,
@@ -112,6 +139,29 @@ function toMatchLead(row: LeadRow): MatchLead {
     transitNotes: row.transitNotes,
     distanceMiles: row.distanceMiles,
     source: row.source,
+  };
+}
+
+function toMatchLead(row: LeadRow): MatchLead {
+  return {
+    ...baseMatchLead(row),
+    employerStatus: row.employer.status,
+    employerHiredSpokesGradBefore: row.employer.hiredSpokesGradBefore,
+  };
+}
+
+/**
+ * The student's view of a lead. `employerStatus` is asserted "active" because
+ * the query could not read it and a paused employer's leads are paused: if
+ * that invariant ever broke, the lead would still be gated by its own status.
+ * `hiredSpokesGradBefore` is false, so the student's ranking simply does not
+ * use that bonus — a number they never see anyway.
+ */
+function toStudentMatchLead(row: LeadBaseRow): MatchLead {
+  return {
+    ...baseMatchLead(row),
+    employerStatus: "active",
+    employerHiredSpokesGradBefore: false,
   };
 }
 
@@ -189,22 +239,50 @@ interface Candidate {
 }
 
 /**
+ * Enrollment statuses that still count as "in the program".
+ *
+ * Mirrors visionquest.active_enrolled_class_ids() in the migration, and must
+ * stay in step with it: a graduate IS the placement population, so cutting
+ * `completed` would hide every class-scoped lead from exactly the students
+ * this feature exists for. `withdrawn` is the status that ends access.
+ */
+const ENROLLED_STATUSES = ["active", "completed"] as const;
+
+/**
  * One query for the whole candidate pool, with every per-student scoring input
  * selected alongside. `take` is limit + 1 so a caller can tell "exactly at the
  * cap" from "more than the cap" without a second count query.
+ *
+ * A student enrolled in two classes has two enrollment rows, so the result is
+ * deduped by student id — otherwise they would appear twice on the board and
+ * be counted twice in "N fit". When a classId is named, the row for THAT class
+ * wins, because it carries the region the location score uses.
  */
 async function loadCandidates(classId: string | null, limit: number): Promise<Candidate[]> {
-  const rows = await prisma.studentClassEnrollment.findMany({
+  const rows = (await prisma.studentClassEnrollment.findMany({
     where: {
-      status: "active",
+      status: { in: [...ENROLLED_STATUSES] },
       ...(classId ? { classId } : {}),
       student: { isActive: true, role: "student" },
     },
-    take: limit + 1,
-    orderBy: { studentId: "asc" },
+    // Over-fetch so the cap still yields `limit` DISTINCT students after
+    // dedupe. Doubling covers a student in two classes, which is the real
+    // case; a third enrollment costs one candidate off the end of the page.
+    take: limit * 2 + 1,
+    orderBy: [{ studentId: "asc" }, { classId: "asc" }],
     select: CANDIDATE_SELECT,
-  });
-  return rows as Candidate[];
+  })) as Candidate[];
+
+  const byStudent = new Map<string, Candidate>();
+  for (const row of rows) {
+    const existing = byStudent.get(row.student.id);
+    if (!existing) {
+      byStudent.set(row.student.id, row);
+      continue;
+    }
+    if (classId && row.classId === classId) byStudent.set(row.student.id, row);
+  }
+  return [...byStudent.values()];
 }
 
 function toMatchStudent(
@@ -262,9 +340,12 @@ export interface LeadMatchResult {
 /**
  * Which students fit one lead, and which are blocked and why.
  *
- * Staff-only: the caller must already have established that the session may
- * see this class. The candidate pool is the lead's class when it names one,
- * and every actively enrolled student when the lead is program-wide.
+ * Staff-only. The lead is read through the CALLER'S OWN RLS context, so a
+ * session that cannot see it gets null rather than a leak — the class check
+ * lives here rather than at the call site, because this function is what the
+ * console's drill-in and any future route both go through. The candidate pool
+ * is the lead's class when it names one, and every enrolled student when the
+ * lead is program-wide.
  */
 export async function rankStudentsForLead(
   jobLeadId: string,
@@ -275,7 +356,7 @@ export async function rankStudentsForLead(
   // 1 — the lead and its employer.
   const leadRow = await prisma.jobLead.findUnique({
     where: { id: jobLeadId },
-    select: LEAD_SELECT,
+    select: LEAD_STAFF_SELECT,
   });
   if (!leadRow) return null;
 
@@ -318,8 +399,18 @@ export async function rankStudentsForLead(
     else fits.push(entry);
   }
 
-  fits.sort((a, b) => b.fit.score - a.fit.score || a.displayName.localeCompare(b.displayName));
-  blocked.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  // The studentId tiebreaker makes the order total: two students with the same
+  // score AND the same display name would otherwise shuffle between requests.
+  fits.sort(
+    (a, b) =>
+      b.fit.score - a.fit.score ||
+      a.displayName.localeCompare(b.displayName) ||
+      a.studentId.localeCompare(b.studentId),
+  );
+  blocked.sort(
+    (a, b) =>
+      a.displayName.localeCompare(b.displayName) || a.studentId.localeCompare(b.studentId),
+  );
 
   return {
     lead,
@@ -335,11 +426,27 @@ export async function rankStudentsForLead(
 // summarizeLeadFits — the console's leads board
 // ---------------------------------------------------------------------------
 
+export interface BlockedStudent {
+  studentId: string;
+  displayName: string;
+  /** One grade-6 sentence. Never a code. */
+  reason: string;
+}
+
 export interface LeadFitCounts {
   jobLeadId: string;
   fitCount: number;
   blockedCount: number;
+  /**
+   * The first few blocked students and why, for the console's drill-in. Named
+   * students, so a caller that returns this over HTTP must strip it unless the
+   * surface is one that already shows the roster.
+   */
+  blocked: BlockedStudent[];
 }
+
+/** How many blocked students a lead card lists before "and N more". */
+export const MAX_BLOCKED_SHOWN = 5;
 
 /**
  * "N fit / M blocked" for a whole board of leads.
@@ -362,7 +469,7 @@ export async function summarizeLeadFits(
 
   const leadRows = (await prisma.jobLead.findMany({
     where: { id: { in: jobLeadIds } },
-    select: LEAD_SELECT,
+    select: LEAD_STAFF_SELECT,
   })) as LeadRow[];
   if (leadRows.length === 0) return [];
 
@@ -383,20 +490,36 @@ export async function summarizeLeadFits(
       : candidates;
 
     let fitCount = 0;
-    let blockedCount = 0;
+    const blocked: BlockedStudent[] = [];
     for (const candidate of pool) {
-      const result = fit(
-        toMatchStudent(candidate, {
-          workProfile: workProfiles.get(candidate.student.id) ?? null,
-          withdrewFromEmployer: withdrawn.get(candidate.student.id)?.has(employerKey) ?? false,
-          employerId: lead.employerId,
-        }),
-        lead,
-      );
-      if (result.hardBlocks.length > 0) blockedCount += 1;
-      else fitCount += 1;
+      const matchStudent = toMatchStudent(candidate, {
+        workProfile: workProfiles.get(candidate.student.id) ?? null,
+        withdrewFromEmployer: withdrawn.get(candidate.student.id)?.has(employerKey) ?? false,
+        employerId: lead.employerId,
+      });
+      const result = fit(matchStudent, lead);
+      if (result.hardBlocks.length > 0) {
+        blocked.push({
+          studentId: candidate.student.id,
+          displayName: candidate.student.displayName,
+          // The FIRST reason only. A card listing four sentences per student
+          // is a card nobody reads; the drill-in names the one thing to fix.
+          reason: result.blockReasons[0] ?? "Not a fit right now.",
+        });
+      } else {
+        fitCount += 1;
+      }
     }
-    return { jobLeadId: row.id, fitCount, blockedCount };
+    blocked.sort(
+      (a, b) =>
+        a.displayName.localeCompare(b.displayName) || a.studentId.localeCompare(b.studentId),
+    );
+    return {
+      jobLeadId: row.id,
+      fitCount,
+      blockedCount: blocked.length,
+      blocked: blocked.slice(0, MAX_BLOCKED_SHOWN),
+    };
   });
 }
 
@@ -434,11 +557,15 @@ export async function rankRoster(
   const limit = Math.min(options.limit ?? MAX_CANDIDATES, MAX_CANDIDATES);
   const leadsPerStudent = options.leadsPerStudent ?? 3;
 
+  // Staff surface, so reading the employer is allowed. The status filter is on
+  // the LEAD, not the employer: updateEmployer pauses open leads when an
+  // employer goes do_not_contact, so `status: "open"` already excludes them
+  // and the query keeps one shape for both callers.
   const leadRows = (await prisma.jobLead.findMany({
-    where: { status: "open", employer: { status: { not: "do_not_contact" } } },
+    where: { status: "open" },
     take: MAX_LEADS,
-    orderBy: { postedAt: "desc" },
-    select: LEAD_SELECT,
+    orderBy: [{ postedAt: "desc" }, { id: "asc" }],
+    select: LEAD_STAFF_SELECT,
   })) as LeadRow[];
 
   const candidates = (await loadCandidates(options.classId ?? null, limit)).slice(0, limit);
@@ -478,7 +605,7 @@ export async function rankRoster(
       });
     }
 
-    leads.sort((a, b) => b.score - a.score);
+    leads.sort((a, b) => b.score - a.score || a.jobLeadId.localeCompare(b.jobLeadId));
 
     return {
       studentId: candidate.student.id,
@@ -512,7 +639,7 @@ export async function rankLeadsForStudent(
   const limit = Math.min(options.limit ?? MAX_LEADS, MAX_LEADS);
 
   const enrollments = await prisma.studentClassEnrollment.findMany({
-    where: { studentId, status: "active" },
+    where: { studentId, status: { in: [...ENROLLED_STATUSES] } },
     select: { classId: true, class: { select: { jobConfig: { select: { region: true } } } } },
   });
   const classIds = enrollments.map((enrollment) => enrollment.classId);
@@ -522,15 +649,20 @@ export async function rankLeadsForStudent(
 
   const [leadRows, workProfiles, discovery, resumeRecord, certifications, withdrawnRows] =
     await Promise.all([
+      // LEAD COLUMNS ONLY. Filtering or selecting through `employer` here would
+      // run against a policy with no student branch, and Prisma answers that
+      // with zero rows or an inconsistency error — a silently empty job list
+      // for the student, which is the worst possible failure for this feature.
+      // An employer marked do_not_contact has its open leads paused instead,
+      // so `status: "open"` covers that case using a lead column.
       prisma.jobLead.findMany({
         where: {
           status: "open",
-          employer: { status: { not: "do_not_contact" } },
           OR: [{ classId: null }, { classId: { in: classIds } }],
         },
         take: limit,
-        orderBy: { postedAt: "desc" },
-        select: LEAD_SELECT,
+        orderBy: [{ postedAt: "desc" }, { id: "asc" }],
+        select: LEAD_STUDENT_SELECT,
       }),
       getWorkProfiles([studentId]),
       prisma.careerDiscovery.findUnique({
@@ -548,7 +680,7 @@ export async function rankLeadsForStudent(
   const resume = resumeRecord ? parseStoredResumeData(resumeRecord.data) : null;
   const withdrawnKeys = withdrawnKeysByStudent(withdrawnRows).get(studentId) ?? new Set<string>();
 
-  const leads = (leadRows as LeadRow[]).map(toMatchLead);
+  const leads = (leadRows as LeadBaseRow[]).map(toStudentMatchLead);
   const withdrawnEmployerIds = leads
     .filter((lead) => withdrawnKeys.has(employerNameKey(lead.employerName)))
     .map((lead) => lead.employerId);
@@ -571,5 +703,5 @@ export async function rankLeadsForStudent(
   return leads
     .map((lead) => ({ lead, fit: fit(student, lead) }))
     .filter((entry) => entry.fit.hardBlocks.length === 0)
-    .sort((a, b) => b.fit.score - a.fit.score);
+    .sort((a, b) => b.fit.score - a.fit.score || a.lead.id.localeCompare(b.lead.id));
 }

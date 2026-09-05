@@ -2,41 +2,66 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
+import { READY_TO_WORK_SCORE } from "@/lib/connect/workforce-batch";
 import { mockRequest, mockTeacherSession } from "@/lib/test-helpers";
 
 /**
- * GET /api/teacher/connect/batch-workforce-wv — the roster this program hands
+ * POST /api/teacher/connect/batch-workforce-wv — the roster this program hands
  * to the WorkForce WV Business Services Rep (Match & Connect Task 3.4).
  *
  * This is the one route in Phase 3 that sends student data OUTSIDE the
- * program, so the assertions are about scope and traceability: it exports only
- * the caller's own students, it audits the export and each student read, and
- * the file it produces carries none of the SPOKES record's benefits or
- * barrier fields.
+ * program, so the assertions are about who gets in and what is recorded:
+ * ready AND consented only, one named class only, POST only, rate-limited, and
+ * audited over the exported rows rather than the roster that was considered.
  */
 
 const session = mockTeacherSession();
 let currentRole = "teacher";
 
-const mockListManagedStudentIds = mock.fn(async () => ["stu-1", "stu-2"]) as any;
-const mockStudentFindMany = mock.fn(async () => [
-  {
-    id: "stu-1",
-    displayName: "Dana Rivers",
-    certifications: [{ certType: "ready-to-work" }],
-    classEnrollments: [{ class: { name: "SPOKES Fall 2026" } }],
-  },
-  {
-    id: "stu-2",
-    displayName: "Sam Ford",
-    certifications: [],
-    classEnrollments: [],
-  },
+const CLASS_ID = "clh0000000000000000000abc";
+
+/** displayName, readiness score, consent — the three inputs that decide. */
+let roster = [
+  { id: "stu-ready", displayName: "Rivers Dana", score: 90, consented: true },
+  { id: "stu-notready", displayName: "Ford Sam", score: READY_TO_WORK_SCORE - 1, consented: true },
+  { id: "stu-noconsent", displayName: "Adams Kim", score: 95, consented: false },
+];
+
+const mockListManagedClasses = mock.fn(async () => [
+  { id: CLASS_ID, name: "SPOKES Fall 2026" },
 ]) as any;
+const mockEnrollmentFindMany = mock.fn(async () =>
+  roster.map((student) => ({
+    class: { name: "SPOKES Fall 2026" },
+    student: {
+      id: student.id,
+      displayName: student.displayName,
+      certifications: [{ certType: "ready-to-work" }],
+    },
+  })),
+) as any;
 const mockWorkProfileFindMany = mock.fn(async () => []) as any;
-const mockFetchReadiness = mock.fn(async () => ({ readiness: { score: 80 } })) as any;
+const mockFetchReadiness = mock.fn(async (studentId: string) => ({
+  readiness: { score: roster.find((row) => row.id === studentId)?.score ?? 0 },
+})) as any;
+const mockHasActiveConsent = mock.fn(
+  async (studentId: string) => roster.find((row) => row.id === studentId)?.consented ?? false,
+) as any;
 const mockRecordStudentView = mock.fn(async () => {}) as any;
 const mockLogAuditEvent = mock.fn(async () => {}) as any;
+let rateLimitOk = true;
+const mockRateLimit = mock.fn(async () => ({
+  success: rateLimitOk,
+  remaining: 4,
+  resetTime: Date.now() + 3_600_000,
+  degraded: false,
+})) as any;
+
+function makeHttpError(statusCode: number, message: string) {
+  const error = new Error(message) as Error & { statusCode: number };
+  error.statusCode = statusCode;
+  return error;
+}
 
 mock.module("@/lib/api-error", {
   namedExports: {
@@ -48,17 +73,29 @@ mock.module("@/lib/api-error", {
         if (currentRole !== "teacher" && currentRole !== "admin") {
           return Response.json({ error: "Forbidden" }, { status: 403 });
         }
-        return handler({ ...session, role: currentRole }, ...args);
+        try {
+          return await handler({ ...session, role: currentRole }, ...args);
+        } catch (error) {
+          if (error && typeof error === "object" && "statusCode" in error) {
+            const statusCode = Number((error as { statusCode: number }).statusCode);
+            const message = error instanceof Error ? error.message : "Request failed";
+            return Response.json({ error: message }, { status: statusCode });
+          }
+          throw error;
+        }
       },
+    badRequest: (message: string) => makeHttpError(400, message),
+    notFound: (message: string) => makeHttpError(404, message),
+    rateLimited: (message: string) => makeHttpError(429, message),
   },
 });
 
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
-      student: {
+      studentClassEnrollment: {
         get findMany() {
-          return mockStudentFindMany;
+          return mockEnrollmentFindMany;
         },
       },
       studentWorkProfile: {
@@ -72,8 +109,8 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/classroom", {
   namedExports: {
-    get listManagedStudentIds() {
-      return mockListManagedStudentIds;
+    get listManagedClasses() {
+      return mockListManagedClasses;
     },
   },
 });
@@ -82,6 +119,22 @@ mock.module("@/lib/progression/fetch-readiness-data", {
   namedExports: {
     get fetchStudentReadinessData() {
       return mockFetchReadiness;
+    },
+  },
+});
+
+mock.module("@/lib/consent", {
+  namedExports: {
+    get hasActiveConsent() {
+      return mockHasActiveConsent;
+    },
+  },
+});
+
+mock.module("@/lib/rate-limit", {
+  namedExports: {
+    get rateLimit() {
+      return mockRateLimit;
     },
   },
 });
@@ -105,30 +158,109 @@ before(async () => {
 
 beforeEach(() => {
   currentRole = "teacher";
-  mockListManagedStudentIds.mock.resetCalls();
-  mockStudentFindMany.mock.resetCalls();
+  rateLimitOk = true;
+  roster = [
+    { id: "stu-ready", displayName: "Rivers Dana", score: 90, consented: true },
+    {
+      id: "stu-notready",
+      displayName: "Ford Sam",
+      score: READY_TO_WORK_SCORE - 1,
+      consented: true,
+    },
+    { id: "stu-noconsent", displayName: "Adams Kim", score: 95, consented: false },
+  ];
+  mockListManagedClasses.mock.resetCalls();
+  mockEnrollmentFindMany.mock.resetCalls();
   mockRecordStudentView.mock.resetCalls();
   mockLogAuditEvent.mock.resetCalls();
+  mockRateLimit.mock.resetCalls();
 });
 
-describe("GET /api/teacher/connect/batch-workforce-wv", () => {
+function post(body: unknown = { classId: CLASS_ID }) {
+  return route.POST(
+    mockRequest("/api/teacher/connect/batch-workforce-wv", { method: "POST", body }),
+  );
+}
+
+describe("POST /api/teacher/connect/batch-workforce-wv", () => {
   it("refuses a student session before reading any roster", async () => {
     currentRole = "student";
-    const response = await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
+    const response = await post();
     assert.equal(response.status, 403);
-    assert.equal(mockListManagedStudentIds.mock.callCount(), 0);
+    assert.equal(mockListManagedClasses.mock.callCount(), 0);
   });
 
-  it("scopes the export to the caller's own students", async () => {
-    await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
-    assert.equal(mockListManagedStudentIds.mock.callCount(), 1);
-    const args = mockStudentFindMany.mock.calls[0].arguments[0];
-    assert.deepEqual(args.where.id.in, ["stu-1", "stu-2"]);
+  it("requires a class — there is no program-wide export", async () => {
+    const response = await post({});
+    assert.equal(response.status, 400);
+    assert.equal(mockEnrollmentFindMany.mock.callCount(), 0);
+  });
+
+  it("refuses a class the caller does not manage", async () => {
+    const response = await post({ classId: "clh0000000000000000000zzz" });
+    assert.equal(response.status, 404);
+    assert.equal(mockEnrollmentFindMany.mock.callCount(), 0);
+  });
+
+  it("excludes a student who is not ready yet", async () => {
+    const csv = await (await post()).text();
+    assert.ok(!csv.includes("Ford Sam"), csv);
+  });
+
+  it("excludes a ready student who has not consented to being referred", async () => {
+    const csv = await (await post()).text();
+    assert.ok(
+      !csv.includes("Adams Kim"),
+      "no student data leaves the program without employer_referral consent",
+    );
+  });
+
+  it("includes the student who is both ready and consented", async () => {
+    const response = await post();
+    assert.equal(response.status, 200);
+    const lines = (await response.text()).trim().split("\r\n");
+    assert.equal(lines.length, 2, "header plus exactly one student");
+    assert.ok(lines[1].includes("Rivers Dana"), lines[1]);
+  });
+
+  it("orders rows by last name", async () => {
+    roster = [
+      { id: "a", displayName: "Dana Zephyr", score: 90, consented: true },
+      { id: "b", displayName: "Sam Anders", score: 90, consented: true },
+    ];
+    const lines = (await (await post()).text()).trim().split("\r\n");
+    assert.ok(lines[1].includes("Sam Anders"), lines[1]);
+    assert.ok(lines[2].includes("Dana Zephyr"), lines[2]);
+  });
+
+  it("audits a staff read for the EXPORTED students only", async () => {
+    await post();
+    assert.equal(mockRecordStudentView.mock.callCount(), 1, "not the whole roster");
+    const call = mockRecordStudentView.mock.calls[0].arguments[0];
+    assert.equal(call.targetStudentId, "stu-ready");
+    assert.equal(call.surface, "export");
+  });
+
+  it("records a count that equals the rows, plus why the others were left out", async () => {
+    const response = await post();
+    const rows = (await response.text()).trim().split("\r\n").length - 1;
+    const entry = mockLogAuditEvent.mock.calls[0].arguments[0];
+    assert.equal(entry.action, "connect.workforce_batch.exported");
+    assert.equal(entry.metadata.studentCount, rows);
+    assert.equal(entry.metadata.excludedNotReady, 1);
+    assert.equal(entry.metadata.excludedNoConsent, 1);
+    assert.ok(!JSON.stringify(entry).includes("Rivers Dana"), "names belong in the file");
+  });
+
+  it("carries no benefits or barrier data out of the program", async () => {
+    const csv = await (await post()).text();
+    for (const forbidden of ["barrier", "TANF", "SNAP", "household", "birth"]) {
+      assert.ok(!csv.toLowerCase().includes(forbidden.toLowerCase()), forbidden);
+    }
   });
 
   it("returns a downloadable CSV named for today", async () => {
-    const response = await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
-    assert.equal(response.status, 200);
+    const response = await post();
     assert.match(response.headers.get("content-type") ?? "", /text\/csv/u);
     assert.match(
       response.headers.get("content-disposition") ?? "",
@@ -136,42 +268,32 @@ describe("GET /api/teacher/connect/batch-workforce-wv", () => {
     );
   });
 
-  it("carries a header and one row per student, and no benefits or barrier data", async () => {
-    const response = await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
-    const csv = await response.text();
-    const lines = csv.trim().split("\r\n");
-    assert.equal(lines.length, 3, "header plus two students");
-    assert.ok(lines[1].includes("Dana Rivers"), lines[1]);
-    for (const forbidden of ["barrier", "TANF", "SNAP", "household", "birth"]) {
-      assert.ok(
-        !csv.toLowerCase().includes(forbidden.toLowerCase()),
-        `"${forbidden}" must not appear in a file that leaves the program`,
-      );
-    }
+  it("enforces a per-session rate limit", async () => {
+    rateLimitOk = false;
+    const response = await post();
+    assert.equal(response.status, 429);
+    assert.equal(mockLogAuditEvent.mock.callCount(), 0, "a refused export is not a disclosure");
   });
 
-  it("audits a staff read for every student in the file", async () => {
-    await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
-    assert.equal(mockRecordStudentView.mock.callCount(), 2);
-    const first = mockRecordStudentView.mock.calls[0].arguments[0];
-    assert.equal(first.actorId, session.id);
-    assert.equal(first.surface, "export");
+  it("keys the rate limit on the session, not the network", async () => {
+    await post();
+    assert.match(mockRateLimit.mock.calls[0].arguments[0], new RegExp(session.id));
   });
 
-  it("audits the export itself with a count, not a list of names", async () => {
-    await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
-    const entry = mockLogAuditEvent.mock.calls[0].arguments[0];
-    assert.equal(entry.action, "connect.workforce_batch.exported");
-    assert.equal(entry.metadata.studentCount, 2);
-    assert.ok(!JSON.stringify(entry).includes("Dana Rivers"), JSON.stringify(entry));
-  });
-
-  it("returns a header-only file, and audits nothing, when the caller has no students", async () => {
-    mockListManagedStudentIds.mock.mockImplementationOnce(async () => []);
-    const response = await route.GET(mockRequest("/api/teacher/connect/batch-workforce-wv"));
+  it("returns a header-only file, and audits nothing, when nobody qualifies", async () => {
+    roster = [];
+    const response = await post();
     const csv = await response.text();
     assert.equal(csv.trim().split("\r\n").length, 1);
     assert.equal(mockRecordStudentView.mock.callCount(), 0);
+  });
+});
+
+describe("GET /api/teacher/connect/batch-workforce-wv", () => {
+  it("is 405 — a cross-site GET must not be able to trigger an export", async () => {
+    const response = await route.GET();
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get("allow"), "POST");
     assert.equal(mockLogAuditEvent.mock.callCount(), 0);
   });
 });

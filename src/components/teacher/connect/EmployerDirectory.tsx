@@ -1,4 +1,10 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
 import { SUBSIDY_KEYS, type SubsidyFlags } from "@/lib/connect/employers-shared";
+
+import { BoardFilter, ShowMore, useBoardPaging } from "./BoardControls";
 
 /**
  * The employer directory: who owns the relationship, whether they have hired a
@@ -38,6 +44,21 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function EmployerDirectory({ employers }: { employers: EmployerDirectoryItem[] }) {
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return employers;
+    return employers.filter(
+      (employer) =>
+        employer.name.toLowerCase().includes(needle) ||
+        employer.city.toLowerCase().includes(needle) ||
+        employer.county.toLowerCase().includes(needle),
+    );
+  }, [employers, query]);
+
+  const { visible, hiddenCount, expanded, expand } = useBoardPaging(filtered);
+
   if (employers.length === 0) {
     return (
       <div className="theme-card rounded-xl p-5">
@@ -57,8 +78,21 @@ export function EmployerDirectory({ employers }: { employers: EmployerDirectoryI
       >
         Employers ({employers.length})
       </h2>
+
+      <BoardFilter
+        id="employers-filter"
+        label="Find an employer"
+        hint="Type a name, a town, or a county."
+        value={query}
+        onChange={setQuery}
+      />
+
+      {filtered.length === 0 && (
+        <p className="mt-4 text-sm text-[var(--ink-muted)]">No employer matches that.</p>
+      )}
+
       <ul className="mt-4 grid gap-3 md:grid-cols-2">
-        {employers.map((employer) => {
+        {visible.map((employer) => {
           const known = SUBSIDY_KEYS.filter((key) => employer.subsidyFlags[key] === "known");
           return (
             <li key={employer.id} className="theme-card-subtle rounded-lg p-4">
@@ -87,6 +121,8 @@ export function EmployerDirectory({ employers }: { employers: EmployerDirectoryI
           );
         })}
       </ul>
+
+      <ShowMore hiddenCount={hiddenCount} expanded={expanded} onExpand={expand} noun="employers" />
     </section>
   );
 }

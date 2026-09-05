@@ -43,6 +43,7 @@ const leadRow = {
   title: "Production Associate",
   description: "Runs the press line.",
   employerId: "emp-1",
+  employerName: "Mountain Metal",
   status: "open",
   location: "Beckley, WV",
   clusters: ["career-readiness"],
@@ -224,7 +225,32 @@ describe("rankLeadsForStudent", () => {
     const args = mockLeadFindMany.mock.calls.at(-1)?.arguments[0];
     assert.equal(args.where.status, "open");
     assert.deepEqual(args.where.OR, [{ classId: null }, { classId: { in: ["class-1"] } }]);
-    assert.deepEqual(args.where.employer, { status: { not: "do_not_contact" } });
+  });
+
+  it("NEVER filters or selects through the Employer relation on the student path", async () => {
+    // employer_access has no student branch, so a query that reached through
+    // the relation would return zero rows under RLS — a silently empty job
+    // list for the student. The denormalised employerName exists for this.
+    await matching.rankLeadsForStudent("stu-1");
+    const args = mockLeadFindMany.mock.calls.at(-1)?.arguments[0];
+    assert.equal(args.where.employer, undefined, "no filter through Employer");
+    assert.equal(args.select.employer, undefined, "no select through Employer");
+    assert.equal(args.select.employerName, true, "the denormalised column is what it reads");
+  });
+
+  it("reads the employer's name off the lead itself", async () => {
+    const results = await matching.rankLeadsForStudent("stu-1");
+    assert.equal(results[0].lead.employerName, "Mountain Metal");
+  });
+
+  it("admits a completed enrollment, matching the RLS helper", async () => {
+    await matching.rankLeadsForStudent("stu-1");
+    const args = mockEnrollmentFindMany.mock.calls.at(-1)?.arguments[0];
+    assert.deepEqual(
+      args.where.status,
+      { in: ["active", "completed"] },
+      "a graduate is the placement population and must keep their class's leads",
+    );
   });
 
   it("caps the number of leads it will rank", async () => {
@@ -248,5 +274,115 @@ describe("rankLeadsForStudent", () => {
     assert.equal(results[0].lead.employerName, "Mountain Metal");
     assert.ok(results[0].fit.score > 0);
     assert.ok(results[0].fit.reasons.length > 0);
+  });
+
+  it("issues a fixed seven queries whatever the board holds (N+1 guard)", async () => {
+    await matching.rankLeadsForStudent("stu-1");
+    assert.deepEqual(
+      calls.slice().sort(),
+      [
+        "application.findMany",
+        "careerDiscovery.findUnique",
+        "certification.findMany",
+        "enrollment.findMany",
+        "jobLead.findMany",
+        "resumeData.findUnique",
+        "workProfile.findMany",
+      ],
+      `expected one query per source, got: ${calls.join(", ")}`,
+    );
+  });
+});
+
+describe("rankRoster", () => {
+  it("gives every student their best leads", async () => {
+    const roster = await matching.rankRoster({ leadsPerStudent: 3 });
+    assert.equal(roster.length, ROSTER_SIZE);
+    // Half the roster has the verified forklift card the lead requires.
+    assert.equal(roster.filter((entry) => entry.leads.length > 0).length, ROSTER_SIZE / 2);
+  });
+
+  it("caps the shortlist per student", async () => {
+    const roster = await matching.rankRoster({ leadsPerStudent: 1 });
+    assert.ok(roster.every((entry) => entry.leads.length <= 1));
+  });
+
+  it("costs four queries for the whole roster (N+1 guard)", async () => {
+    await matching.rankRoster();
+    assert.deepEqual(
+      calls,
+      ["jobLead.findMany", "enrollment.findMany", "workProfile.findMany", "application.findMany"],
+      `expected 4 queries, got ${calls.length}: ${calls.join(", ")}`,
+    );
+  });
+});
+
+describe("candidate loading", () => {
+  it("counts a student enrolled in two classes once", async () => {
+    // Two enrollment rows, one person. Without the dedupe they appear twice on
+    // the board and are counted twice in "N fit".
+    mockEnrollmentFindMany.mock.mockImplementationOnce(async () => [
+      {
+        classId: "class-1",
+        class: { jobConfig: { region: "Beckley, WV" } },
+        student: {
+          id: "stu-double",
+          displayName: "Twice Enrolled",
+          careerDiscovery: null,
+          resumeData: null,
+          certifications: [{ certType: "forklift-operator" }],
+        },
+      },
+      {
+        classId: "class-2",
+        class: { jobConfig: { region: "Elsewhere, WV" } },
+        student: {
+          id: "stu-double",
+          displayName: "Twice Enrolled",
+          careerDiscovery: null,
+          resumeData: null,
+          certifications: [{ certType: "forklift-operator" }],
+        },
+      },
+    ]);
+
+    const result = await matching.rankStudentsForLead("lead-1");
+    assert.equal(result!.fits.length + result!.blocked.length, 1, "one person, one row");
+  });
+
+  it("keeps the row for the lead's own class, which carries the right region", async () => {
+    mockEnrollmentFindMany.mock.mockImplementationOnce(async () => [
+      {
+        classId: "class-2",
+        class: { jobConfig: { region: "Nowhere, XX" } },
+        student: {
+          id: "stu-double",
+          displayName: "Twice Enrolled",
+          careerDiscovery: null,
+          resumeData: null,
+          certifications: [{ certType: "forklift-operator" }],
+        },
+      },
+      {
+        classId: "class-1",
+        class: { jobConfig: { region: "Beckley, WV" } },
+        student: {
+          id: "stu-double",
+          displayName: "Twice Enrolled",
+          careerDiscovery: null,
+          resumeData: null,
+          certifications: [{ certType: "forklift-operator" }],
+        },
+      },
+    ]);
+
+    // The lead is scoped to class-1, whose region matches its location, so the
+    // location axis only scores if the class-1 row won the dedupe.
+    const result = await matching.rankStudentsForLead("lead-1");
+    assert.equal(result!.fits.length, 1);
+    assert.ok(
+      result!.fits[0].fit.score > 40,
+      `expected the class-1 region to be used, score was ${result!.fits[0].fit.score}`,
+    );
   });
 });

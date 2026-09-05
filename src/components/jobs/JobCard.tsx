@@ -285,7 +285,7 @@ export function JobCard({
             <button
               onClick={() => void persistTracking({ status: "saved" })}
               disabled={saving}
-              className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+              className={`flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
                 savedStatus
                   ? "bg-[var(--accent)]/20 text-[var(--accent)]"
                   : "bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
@@ -298,7 +298,7 @@ export function JobCard({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+              className="flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
             >
               <ArrowSquareOut size={14} />
               View

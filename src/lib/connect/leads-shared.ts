@@ -106,14 +106,53 @@ export const EMPTY_SCHEDULE: LeadSchedule = { shifts: [] };
  * the safe default for `shifts` is "none named", which the matcher reads as
  * "nothing was asked" and therefore blocks nobody.
  */
+/**
+ * READ-side schemas: the same fields, but tolerant of extra keys.
+ *
+ * The write schemas are `.strict()` so a typo in a request body is a 400. The
+ * READ path must not be, and the reason is specific: `.strict()` fails the
+ * WHOLE object on one unknown key, and `parseLeadRequirements` answers a
+ * failure with the empty default — so a lead written by a future version that
+ * added `requirements.preferredShifts` would come back with `mustHaveCerts: []`
+ * and the matcher would silently stop enforcing a certification. Tolerating
+ * the extra key degrades to "ignore what I don't know", which is the safe
+ * direction for a hard block.
+ */
+const leadRequirementsReadSchema = leadRequirementsSchema.passthrough();
+const leadScheduleReadSchema = z
+  .object({
+    shifts: z.array(z.enum(LEAD_SHIFTS)).max(4).default([]),
+    hoursPerWeekMin: z.number().int().min(1).max(80).optional(),
+    hoursPerWeekMax: z.number().int().min(1).max(80).optional(),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/u, "startDate must be YYYY-MM-DD")
+      .optional(),
+  })
+  .passthrough();
+
 export function parseLeadRequirements(raw: unknown): LeadRequirements {
-  const parsed = leadRequirementsSchema.safeParse(raw ?? {});
-  return parsed.success ? parsed.data : { ...EMPTY_REQUIREMENTS };
+  const parsed = leadRequirementsReadSchema.safeParse(raw ?? {});
+  if (!parsed.success) return { ...EMPTY_REQUIREMENTS };
+  // Only the four known lists are handed on, so a passthrough key cannot reach
+  // the matcher or a UI that did not expect it.
+  return {
+    mustHaveCerts: parsed.data.mustHaveCerts,
+    niceToHave: parsed.data.niceToHave,
+    physical: parsed.data.physical,
+    licenses: parsed.data.licenses,
+  };
 }
 
 export function parseLeadSchedule(raw: unknown): LeadSchedule {
-  const parsed = leadScheduleSchema.safeParse(raw ?? {});
-  return parsed.success ? parsed.data : { ...EMPTY_SCHEDULE };
+  const parsed = leadScheduleReadSchema.safeParse(raw ?? {});
+  if (!parsed.success) return { ...EMPTY_SCHEDULE };
+  return {
+    shifts: parsed.data.shifts,
+    hoursPerWeekMin: parsed.data.hoursPerWeekMin,
+    hoursPerWeekMax: parsed.data.hoursPerWeekMax,
+    startDate: parsed.data.startDate,
+  };
 }
 
 // ---------------------------------------------------------------------------

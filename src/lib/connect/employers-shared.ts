@@ -49,7 +49,10 @@ export const LOCATION_NOT_LISTED = "Not listed";
  */
 export function employerNameKey(name: string | null | undefined): string {
   if (!name) return "";
-  return name.replace(/\s+/gu, " ").trim().toLowerCase();
+  // NFKC before folding: "Ｍountain" (fullwidth) and "Mountain" are the same
+  // employer typed on different keyboards, and a composed vs decomposed "é"
+  // must not create two rows either.
+  return name.normalize("NFKC").replace(/\s+/gu, " ").trim().toLowerCase();
 }
 
 export interface EmployerNameCandidate {

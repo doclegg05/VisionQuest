@@ -48,9 +48,8 @@ import {
   type LeadSchedule,
 } from "./leads-shared";
 import {
-  AVAILABILITY_DAYS,
-  AVAILABILITY_SLOTS,
   availabilityOverlap,
+  hasDeclaredAvailability,
   transportFeasible,
   type WorkProfile,
 } from "./work-profile-shared";
@@ -151,23 +150,18 @@ export interface FitResult {
 // ---------------------------------------------------------------------------
 
 /**
- * True only when at least one cell of the 7x4 grid is ticked.
+ * The share of the lead's shift this student can cover, or null for "nothing
+ * to compare".
  *
- * This is the guard that keeps an unanswered intake from reading as "cannot
- * work any shift". It also makes `fit` correct whether `availabilityOverlap`
- * reports "not declared" as 0 (its original contract) or as null: either way,
- * an undeclared grid never reaches the block.
+ * Two different things read as null and both must NOT block: a lead that names
+ * no shift (nothing was asked) and a student whose grid is untouched (nothing
+ * was answered). `hasDeclaredAvailability` comes from work-profile-shared —
+ * the same function `availabilityOverlap` uses internally — so the two can
+ * never drift into disagreeing about what "declared" means.
  */
-function hasDeclaredAvailability(profile: WorkProfile | null): boolean {
-  if (!profile) return false;
-  return AVAILABILITY_DAYS.some((day) =>
-    AVAILABILITY_SLOTS.some((slot) => profile.availability[day]?.[slot]),
-  );
-}
-
 function overlapRatio(profile: WorkProfile | null, schedule: LeadSchedule): number | null {
   if (schedule.shifts.length === 0) return null;
-  if (!hasDeclaredAvailability(profile)) return null;
+  if (!profile || !hasDeclaredAvailability(profile.availability)) return null;
   const raw = availabilityOverlap(profile, { shifts: schedule.shifts });
   return typeof raw === "number" ? raw : null;
 }
@@ -248,7 +242,11 @@ export function describeHardBlock(
     }
     case HARD_BLOCK.missingMustHaveCert: {
       const missing = missingMustHaveCerts(student, lead).map((id) => certLabel(student, id));
-      return `Needs the ${missing[0]} card. Not earned yet.`;
+      // The fallback is unreachable through `fit` (the block is only raised
+      // when the list is non-empty), but describeHardBlock is exported and a
+      // caller with a stale code would otherwise render "Needs the undefined
+      // card" to an instructor.
+      return `Needs the ${missing[0] ?? "required"} card. Not earned yet.`;
     }
     case HARD_BLOCK.payBelowFloor:
       return "Pays less than they need.";
@@ -259,13 +257,51 @@ export function describeHardBlock(
     case HARD_BLOCK.employerDoNotContact:
       return "Do not contact this employer.";
     case HARD_BLOCK.studentWithdrewFromEmployer:
-      return "They backed out of this employer before.";
+      // Not "they backed out": the record only shows an application that ended,
+      // not who ended it or why, and an instructor reading a roster should not
+      // be handed a judgement the data does not support.
+      return "This employer came up for them before and it didn't work out.";
   }
 }
 
 // ---------------------------------------------------------------------------
 // Soft score
 // ---------------------------------------------------------------------------
+
+/**
+ * Sources whose leads a person entered against a real local employer, rather
+ * than a scraper matching a location string.
+ */
+const INSTRUCTOR_ENTERED_SOURCES = new Set(["manual", "joborder", "opportunity"]);
+
+/**
+ * The location score, which the shared scorer decides from a TEXT match
+ * between the posting's location and the class region.
+ *
+ * That heuristic is right for a scraped posting and wrong for a lead. A class
+ * region is recorded as "Kanawha County, WV" and an instructor types the town
+ * — "Charleston, WV" — so the text match fails and the lead loses the whole
+ * 40-point location axis, ranking a real local employer below a remote board
+ * posting. An instructor-entered lead is local BY CONSTRUCTION: a person in
+ * the classroom typed it in because it is near their students.
+ *
+ * A `joblisting`-sourced lead keeps the scraped heuristic, because it came
+ * from the same adapters and carries the same unverified location text.
+ */
+function locationScoreForLead(
+  lead: MatchLead,
+  job: ReturnType<typeof scoredJobShape>,
+  classRegion: string,
+  priority: LocalJobPriority,
+): number {
+  if (!INSTRUCTOR_ENTERED_SOURCES.has(lead.source)) {
+    return scoreLocation(job, classRegion, priority);
+  }
+  // Reuse the scorer rather than hardcoding 40, so the axis keeps its weight
+  // if WEIGHT_LOCATION ever changes. Passing the class region as the location
+  // is what makes classifyJobProximity return "local".
+  return scoreLocation({ ...job, location: classRegion || job.location }, classRegion, priority);
+}
 
 /**
  * The shape the job-board scorer's sub-functions expect. A lead is always
@@ -381,7 +417,7 @@ export function fit(
   const job = scoredJobShape(lead);
   const jobProfile = buildStudentJobProfile({ resumeSkills: student.resumeSkills });
 
-  const locationScore = scoreLocation(job, student.classRegion, priority);
+  const locationScore = locationScoreForLead(lead, job, student.classRegion, priority);
   const clusterScore = student.discovery
     ? scoreCluster(lead.clusters, student.discovery.topClusters)
     : 0;

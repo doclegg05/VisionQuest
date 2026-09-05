@@ -18,6 +18,10 @@ import { mockRequest, mockTeacherSession } from "@/lib/test-helpers";
 const session = mockTeacherSession();
 let currentRole = "teacher";
 
+const EMPLOYER_ID = "clh0000000000000000000001";
+const CLASS_ID = "clh0000000000000000000cls";
+const CONTACT_ID = "clh0000000000000000000con";
+
 const leadRow = {
   id: "lead-1",
   title: "Production Associate",
@@ -38,14 +42,32 @@ const mockLeadFindMany = mock.fn(async (args: any) => {
   return ids ? allLeads.filter((lead) => ids.includes(lead.id)) : allLeads;
 }) as any;
 const mockEnrollmentFindMany = mock.fn(async () => []) as any;
+const mockLeadFindUnique = mock.fn(async () => ({ id: "lead-1", employerId: EMPLOYER_ID })) as any;
+const mockEmployerFindUnique = mock.fn(async () => ({
+  id: EMPLOYER_ID,
+  name: "Mountain Metal",
+})) as any;
+const mockClassFindUnique = mock.fn(async () => ({ id: CLASS_ID })) as any;
+const mockContactFindFirst = mock.fn(async () => ({ id: CONTACT_ID })) as any;
 const mockWorkProfileFindMany = mock.fn(async () => []) as any;
 const mockApplicationFindMany = mock.fn(async () => []) as any;
 const mockLogAuditEvent = mock.fn(async () => {}) as any;
 
+/**
+ * A real class, because the routes now use `error instanceof ApiError` to let
+ * a lib's own 404 ("that class isn't yours") through instead of flattening it.
+ */
+class HttpError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 function makeHttpError(statusCode: number, message: string) {
-  const error = new Error(message) as Error & { statusCode: number };
-  error.statusCode = statusCode;
-  return error;
+  return new HttpError(statusCode, message);
 }
 
 mock.module("@/lib/api-error", {
@@ -71,6 +93,7 @@ mock.module("@/lib/api-error", {
       },
     badRequest: (message: string) => makeHttpError(400, message),
     notFound: (message: string) => makeHttpError(404, message),
+    ApiError: HttpError,
   },
 });
 
@@ -86,6 +109,24 @@ mock.module("@/lib/db", {
         },
         get findMany() {
           return mockLeadFindMany;
+        },
+        get findUnique() {
+          return mockLeadFindUnique;
+        },
+      },
+      employer: {
+        get findUnique() {
+          return mockEmployerFindUnique;
+        },
+      },
+      spokesClass: {
+        get findUnique() {
+          return mockClassFindUnique;
+        },
+      },
+      employerContact: {
+        get findFirst() {
+          return mockContactFindFirst;
         },
       },
       studentClassEnrollment: {
@@ -126,10 +167,13 @@ beforeEach(() => {
   mockLeadCreate.mock.resetCalls();
   mockLeadUpdate.mock.resetCalls();
   mockLeadFindMany.mock.resetCalls();
+  mockLeadFindUnique.mock.resetCalls();
+  mockEmployerFindUnique.mock.resetCalls();
+  mockClassFindUnique.mock.resetCalls();
+  mockContactFindFirst.mock.resetCalls();
   mockLogAuditEvent.mock.resetCalls();
 });
 
-const EMPLOYER_ID = "clh0000000000000000000001";
 const validLead = {
   employerId: EMPLOYER_ID,
   title: "Production Associate",
@@ -141,6 +185,14 @@ describe("GET /api/teacher/connect/leads", () => {
     currentRole = "student";
     const response = await route.GET(mockRequest("/api/teacher/connect/leads"));
     assert.equal(response.status, 403);
+    assert.equal(mockLeadFindMany.mock.callCount(), 0);
+  });
+
+  it("rejects a misspelled status filter instead of returning every lead", async () => {
+    const response = await route.GET(
+      mockRequest("/api/teacher/connect/leads", { searchParams: { status: "oepn" } }),
+    );
+    assert.equal(response.status, 400);
     assert.equal(mockLeadFindMany.mock.callCount(), 0);
   });
 
@@ -250,6 +302,45 @@ describe("POST /api/teacher/connect/leads", () => {
     }
   });
 
+  it("refuses a class the caller does not instruct", async () => {
+    // job_lead_write's class clause is the floor; this is the clear message.
+    // Without both, a teacher could publish a job into somebody else's room.
+    mockClassFindUnique.mock.mockImplementationOnce(async () => null);
+    const response = await route.POST(
+      mockRequest("/api/teacher/connect/leads", {
+        method: "POST",
+        body: { ...validLead, classId: CLASS_ID },
+      }),
+    );
+    assert.equal(response.status, 404);
+    assert.equal(mockLeadCreate.mock.callCount(), 0);
+    const body = await response.json();
+    assert.ok(body.error.includes("class"), body.error);
+  });
+
+  it("refuses a contact who works at a different employer", async () => {
+    // Otherwise Phase 4 would email Mountain Metal's manager a packet about a
+    // Valley Foods job they never posted.
+    mockContactFindFirst.mock.mockImplementationOnce(async () => null);
+    const response = await route.POST(
+      mockRequest("/api/teacher/connect/leads", {
+        method: "POST",
+        body: { ...validLead, contactId: CONTACT_ID },
+      }),
+    );
+    assert.equal(response.status, 404);
+    assert.equal(mockLeadCreate.mock.callCount(), 0);
+  });
+
+  it("copies the employer's name onto the lead", async () => {
+    // The denormalised column is what lets a student read their own leads at
+    // all; a lead created without it would be invisible to the student path.
+    await route.POST(
+      mockRequest("/api/teacher/connect/leads", { method: "POST", body: validLead }),
+    );
+    assert.equal(mockLeadCreate.mock.calls[0].arguments[0].data.employerName, "Mountain Metal");
+  });
+
   it("audits the create", async () => {
     await route.POST(
       mockRequest("/api/teacher/connect/leads", { method: "POST", body: validLead }),
@@ -282,6 +373,18 @@ describe("PUT /api/teacher/connect/leads", () => {
       mockRequest("/api/teacher/connect/leads", { method: "PUT", body: { status: "filled" } }),
     );
     assert.equal(response.status, 400);
+    assert.equal(mockLeadUpdate.mock.callCount(), 0);
+  });
+
+  it("refuses retargeting a lead into a class the caller does not instruct", async () => {
+    mockClassFindUnique.mock.mockImplementationOnce(async () => null);
+    const response = await route.PUT(
+      mockRequest("/api/teacher/connect/leads", {
+        method: "PUT",
+        body: { id: "clh0000000000000000000002", classId: CLASS_ID },
+      }),
+    );
+    assert.equal(response.status, 404);
     assert.equal(mockLeadUpdate.mock.callCount(), 0);
   });
 

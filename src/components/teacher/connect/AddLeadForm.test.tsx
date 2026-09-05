@@ -1,14 +1,28 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, it } from "node:test";
+import { before, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
+
+// useRouter throws outside a mounted App Router; the form only calls
+// router.refresh() after a successful save, which renderToString never reaches.
+mock.module("next/navigation", {
+  namedExports: {
+    useRouter: () => ({ refresh: () => {}, push: () => {}, replace: () => {} }),
+  },
+});
 
 import { PLAIN_LANGUAGE_IDEAL_GRADE, assessReadability } from "@/lib/sage/readability";
 import { LEAD_PAY_PERIODS } from "@/lib/connect/leads-shared";
 import { LEAD_SHIFTS } from "@/lib/connect/work-profile-shared";
 
-import { AddLeadForm } from "./AddLeadForm";
+// Imported dynamically in before(), AFTER mock.module has registered — a
+// static import is hoisted and would bind the real next/navigation.
+let AddLeadForm: typeof import("./AddLeadForm").AddLeadForm;
+
+before(async () => {
+  ({ AddLeadForm } = await import("./AddLeadForm"));
+});
 
 /**
  * The "Add lead" form (Task 3.4).
@@ -30,6 +44,10 @@ function render() {
     <AddLeadForm
       employers={[{ id: "emp-1", name: "Mountain Metal" }]}
       classes={[{ id: "class-1", name: "SPOKES Fall 2026" }]}
+      certifications={[
+        { id: "ic3", label: "IC3" },
+        { id: "ready-to-work", label: "Ready to Work" },
+      ]}
     />,
   );
 }
@@ -90,6 +108,59 @@ describe("AddLeadForm — the three ways in", () => {
   it("defaults the class picker to all classes", () => {
     const html = render();
     assert.ok(html.includes("All classes"), html);
+  });
+
+  it("names the job bank, not just the acronym", () => {
+    // The apostrophe is HTML-escaped in the render, so the assertion is on the
+    // two halves rather than the exact punctuation.
+    const text = stripTags(render());
+    assert.ok(text.includes("MACC job order"), text);
+    assert.ok(
+      text.includes("WorkForce WV") && text.includes("job bank"),
+      '"MACC" alone is an acronym an instructor may not know',
+    );
+  });
+
+  it("lets an instructor require a certification the matcher will enforce", () => {
+    // Without this the requirements JSON could only ever be empty, so
+    // mustHaveCerts — the sharpest hard block in fit() — was unreachable.
+    const text = stripTags(render());
+    assert.ok(text.includes("Cards they must already have"), text);
+    assert.ok(text.includes("Ready to Work"), text);
+  });
+
+  it("warns that a required card leaves students off the lead", () => {
+    const text = stripTags(render());
+    assert.ok(
+      text.includes("A student without it is left off this lead."),
+      "a hard block needs to say it is a hard block",
+    );
+  });
+});
+
+describe("AddLeadForm — from a job on a class board", () => {
+  it("offers a picker, not a pasted id", () => {
+    // The old field asked for a posting ID: a string an instructor had no way
+    // to see without leaving the page.
+    const html = render();
+    assert.ok(!html.includes('name="jobListingId" required class'), "no bare text input");
+    assert.ok(SOURCE.includes('name="jobListingId"'), SOURCE.slice(0, 0));
+    assert.ok(
+      SOURCE.includes("Which job on the board"),
+      "the picker's label should name what it is choosing",
+    );
+  });
+
+  it("loads the picker's options from the class board endpoint", () => {
+    assert.ok(
+      SOURCE.includes("/api/teacher/connect/leads/listings?classId="),
+      "the options come from the class's own board",
+    );
+  });
+
+  it("resets and refreshes after a successful add", () => {
+    assert.ok(SOURCE.includes("formRef.current?.reset()"), "a stale form invites a duplicate lead");
+    assert.ok(SOURCE.includes("router.refresh()"), "the new lead must appear on the board");
   });
 });
 

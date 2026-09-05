@@ -1,135 +1,108 @@
-import { withTeacherAuth } from "@/lib/api-error";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { notFound, rateLimited, withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent, recordStudentView } from "@/lib/audit";
-import { listManagedStudentIds } from "@/lib/classroom";
-import { getWorkProfiles } from "@/lib/connect/work-profile";
-import {
-  AVAILABILITY_DAYS,
-  AVAILABILITY_SLOTS,
-  type WorkProfile,
-} from "@/lib/connect/work-profile-shared";
-import {
-  batchFilename,
-  buildWorkforceBatchCsv,
-  type BatchRow,
-} from "@/lib/connect/workforce-batch";
-import { prisma } from "@/lib/db";
-import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import { listManagedClasses } from "@/lib/classroom";
+import { batchFilename, buildWorkforceBatchCsv } from "@/lib/connect/workforce-batch";
+import { selectBatchStudents } from "@/lib/connect/workforce-batch-query";
+import { rateLimit } from "@/lib/rate-limit";
+import { parseBody } from "@/lib/schemas";
 
 /**
- * "Batch to WorkForce WV" — this week's ready students as one CSV for the
- * Business Services Rep (Match & Connect Task 3.4).
+ * The WorkForce WV batch: one class's ready, consented students as a CSV for
+ * the Business Services Rep (Match & Connect Task 3.4).
  *
- * Three things this route is careful about:
+ * POST, not GET, and that is a security property rather than a style choice.
+ * A GET that writes audit rows and assembles a file of student names can be
+ * fired by any cross-site image tag; POST goes through the Origin-checking
+ * CSRF middleware. GET on this path is 405 — see the handler below, which
+ * exists so the failure is explicit rather than a Next.js default.
  *
- *   1. SCOPE. `listManagedStudentIds` is the repo's one answer to "whose
- *      students are these"; the export never reaches beyond it.
- *   2. CONTENT. The column list lives in src/lib/connect/workforce-batch.ts
- *      and is pinned by a test against benefits, barriers and demographic
- *      field names. This file leaves the program.
- *   3. AUDIT. Exporting a roster to an outside agency is exactly the kind of
- *      staff read `recordStudentView` exists for, and the export itself gets
- *      its own audit row naming how many students it covered.
+ * Everything about who is included lives in selectBatchStudents: ready
+ * (`readinessScore >= READY_TO_WORK_SCORE`) AND consented (an active
+ * `employer_referral` record). The preview endpoint runs the same function, so
+ * the confirm dialog and the file can never disagree.
  *
- * Readiness comes from `fetchStudentReadinessData`, the single readiness
- * computation every other surface uses (2026-04-01 decision) — nothing is
- * recomputed here.
+ * The class is required. A program-wide export is a far bigger disclosure than
+ * anyone means to make with one tap.
  */
 
-/** Hard ceiling on one export, so a program-wide click cannot fan out forever. */
-const MAX_STUDENTS = 200;
+/** Five exports an hour per staff session. This is a rare, deliberate act. */
+const EXPORT_LIMIT = 5;
+const EXPORT_WINDOW_MS = 60 * 60 * 1000;
 
-function countAvailableCells(profile: WorkProfile | undefined): number {
-  if (!profile) return 0;
-  let count = 0;
-  for (const day of AVAILABILITY_DAYS) {
-    for (const slot of AVAILABILITY_SLOTS) {
-      if (profile.availability[day]?.[slot]) count += 1;
-    }
-  }
-  return count;
-}
+const bodySchema = z.object({ classId: z.string().cuid("Pick a class.") }).strict();
 
-export const GET = withTeacherAuth(async (session, _req: Request) => {
-  const managedIds = (await listManagedStudentIds(session)).slice(0, MAX_STUDENTS);
+export const POST = withTeacherAuth(async (session, req: Request) => {
+  const { classId } = await parseBody(req, bodySchema);
 
-  if (managedIds.length === 0) {
-    return new Response(buildWorkforceBatchCsv([]), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${batchFilename(new Date())}"`,
-      },
-    });
-  }
+  const managed = await listManagedClasses(session, { includeArchived: true });
+  const spokesClass = managed.find((row) => row.id === classId);
+  if (!spokesClass) throw notFound("That class wasn't found.");
 
-  const [students, workProfiles] = await Promise.all([
-    prisma.student.findMany({
-      where: { id: { in: managedIds } },
-      select: {
-        id: true,
-        displayName: true,
-        certifications: {
-          where: { verificationStatus: "verified" },
-          select: { certType: true },
-        },
-        classEnrollments: {
-          where: { status: "active" },
-          take: 1,
-          select: { class: { select: { name: true } } },
-        },
-      },
-      orderBy: { displayName: "asc" },
-    }),
-    getWorkProfiles(managedIds),
-  ]);
-
-  // `fetchStudentReadinessData` is per student by construction (it is the
-  // shared readiness computation, not a batch query). Running them together
-  // keeps the wall time flat; the MAX_STUDENTS ceiling bounds the fan-out.
-  const readiness = await Promise.all(
-    students.map((student) => fetchStudentReadinessData(student.id)),
+  // Keyed by session, not by IP: a shared classroom network is one IP, and the
+  // thing being limited is one staff member's exports.
+  const limit = await rateLimit(
+    `connect:workforce-batch:${session.id}`,
+    EXPORT_LIMIT,
+    EXPORT_WINDOW_MS,
   );
+  if (!limit.success) {
+    throw rateLimited("You have exported this a few times already. Try again in an hour.");
+  }
 
-  const rows: BatchRow[] = students.map((student, index) => {
-    const profile = workProfiles.get(student.id);
-    return {
-      displayName: student.displayName,
-      className: student.classEnrollments[0]?.class.name ?? "Not enrolled",
-      readinessScore: readiness[index].readiness.score,
-      earliestStart: profile?.earliestStart ?? null,
-      availableCells: countAvailableCells(profile),
-      transport: profile?.transport ?? null,
-      verifiedCertifications: student.certifications.map((cert) => cert.certType),
-    };
-  });
+  const selection = await selectBatchStudents(spokesClass.id);
 
-  // Every student whose record fed a row: a staff read of student data, on a
-  // surface of its own so the audit trail distinguishes "opened the console"
-  // from "sent the roster to WorkForce WV".
+  // Audits cover the EXPORTED rows only. A student excluded for no consent has
+  // not been disclosed, and recording a view of them here would be both a
+  // false ledger entry and a second small leak of who they are.
   await Promise.allSettled(
-    students.map((student) =>
+    selection.includedIds.map((studentId) =>
       recordStudentView({
         actorId: session.id,
         actorRole: session.role,
-        targetStudentId: student.id,
+        targetStudentId: studentId,
         surface: "export",
       }),
     ),
   );
+
+  const filename = batchFilename(new Date());
 
   await logAuditEvent({
     actorId: session.id,
     actorRole: session.role,
     action: "connect.workforce_batch.exported",
     targetType: "connect_batch",
-    targetId: batchFilename(new Date()),
-    summary: `Exported ${rows.length} students for WorkForce WV.`,
-    metadata: { studentCount: rows.length },
+    targetId: filename,
+    summary: `Exported ${selection.rows.length} students for WorkForce WV.`,
+    // The count is the disclosure's size; names belong in the file, not the
+    // ledger (.claude/rules/security.md: who did what, not the payload).
+    metadata: {
+      studentCount: selection.rows.length,
+      classId: spokesClass.id,
+      excludedNotReady: selection.excludedNotReady,
+      excludedNoConsent: selection.excludedNoConsent,
+    },
   });
 
-  return new Response(buildWorkforceBatchCsv(rows), {
+  return new Response(buildWorkforceBatchCsv(selection.rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${batchFilename(new Date())}"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
 });
+
+/**
+ * Explicitly 405 rather than letting the route 404 or fall through. A GET here
+ * is either an old bookmark or a cross-site attempt at the pre-fix behaviour,
+ * and both deserve a clear answer.
+ */
+export async function GET() {
+  return NextResponse.json(
+    { error: "Use POST to download this file." },
+    { status: 405, headers: { Allow: "POST" } },
+  );
+}
