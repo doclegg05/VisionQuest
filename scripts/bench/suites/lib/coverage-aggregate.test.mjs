@@ -17,17 +17,17 @@ test("aggregateCoverage: sums LH/LF only over eligible files, ignoring test file
   assert.equal(agg.reportedFileCount, 2);
 });
 
-test("aggregateCoverage: a file with zero lines hit is an untested module", () => {
+test("aggregateCoverage: a file with zero lines hit is a force-import zero-coverage file", () => {
   const eligible = ["src/lib/bar.ts"];
   const lcovRecords = [{ file: "src/lib/bar.ts", linesFound: 5, linesHit: 0 }];
   const agg = aggregateCoverage(eligible, lcovRecords);
-  assert.deepEqual(agg.untestedModules, ["src/lib/bar.ts"]);
+  assert.deepEqual(agg.forceImportZeroCoverageFiles, ["src/lib/bar.ts"]);
 });
 
-test("aggregateCoverage: an eligible file absent from the lcov report entirely (import failed) is an untested module", () => {
+test("aggregateCoverage: an eligible file absent from the lcov report entirely (import failed) is a force-import zero-coverage file", () => {
   const eligible = ["src/lib/never-imported.ts"];
   const agg = aggregateCoverage(eligible, []);
-  assert.deepEqual(agg.untestedModules, ["src/lib/never-imported.ts"]);
+  assert.deepEqual(agg.forceImportZeroCoverageFiles, ["src/lib/never-imported.ts"]);
   assert.equal(agg.reportedFileCount, 0);
 });
 

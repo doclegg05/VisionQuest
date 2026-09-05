@@ -85,13 +85,18 @@ function formatMetric(metric, configMetric) {
   const parts = [`  ${metric.id}: ${metric.value}`];
   if (metric.unit) parts.push(`(${metric.unit})`);
   if (metric.n !== undefined && metric.n !== null) parts.push(`n=${metric.n}`);
-  if (configMetric?.floor !== undefined) {
+  // "floor": null (with a "reason") is the deliberate, documented opt-out of
+  // gating — matches scripts/bench/lib/discover.mjs's contract. Only a real
+  // finite number is a floor to compare against; null must read as info,
+  // never coerce to 0 and report a false BREACH.
+  const hasFloor = typeof configMetric?.floor === "number" && Number.isFinite(configMetric.floor);
+  if (hasFloor) {
     const dir = configMetric.direction === "lower" ? "<=" : ">=";
     const ok =
       configMetric.direction === "lower" ? metric.value <= configMetric.floor : metric.value >= configMetric.floor;
     parts.push(`floor ${dir} ${configMetric.floor} [${ok ? "OK" : "BREACH"}]`);
   } else {
-    parts.push("(info, no floor)");
+    parts.push(configMetric?.reason ? `(info: ${configMetric.reason})` : "(info, no floor)");
   }
   return parts.join(" ");
 }
