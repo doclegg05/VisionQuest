@@ -120,14 +120,31 @@ export const AMBIGUOUS_SPACE_CLASS =
  * class exists to collapse a token down to what it would read as, and a
  * marker split by a newline is exactly the forgery being looked for.
  *
- * Exported because the benchmark scorer needs the same set. It carried its own
- * copy until 2026-09-05, which is a live hazard rather than duplication for its
- * own sake: the scorer is what proves the sanitizer works, so a widening here
- * that the copy did not track would leave the scorer under-covering and
- * reporting CLEAN for a posting the sanitizer no longer handles. One source,
- * and the detector can only ever be at least as wide as the defence.
+ * Exported as a BODY, not a finished class, and this matters. The benchmark
+ * scorer needs at least this set, and it needs it for the opposite reason the
+ * sanitizer does — so the two constraints pull in opposite directions and only
+ * a union satisfies both:
+ *
+ *   - The scorer must never be NARROWER than the defence, or a character the
+ *     sanitizer newly covers goes unmeasured. That is why the scorer stopped
+ *     keeping its own copy.
+ *   - The scorer must never NARROW WHEN THE DEFENCE DOES, or removing a class
+ *     here blinds the measurement in the same motion — the detector and the
+ *     thing it certifies going dark together, with the gate still green.
+ *
+ * The second hazard is not hypothetical: deriving the scorer's collapse from
+ * this class made `hangul-filler-in-marker` (U+3164, a Default_Ignorable that
+ * is neither Cf nor Cc) invisible to the gate the moment
+ * \p{Default_Ignorable_Code_Point} was dropped here, because the forged marker
+ * was no longer collapsed and so no longer looked forged. So the scorer unions
+ * this body with its own independent floor: widening here widens the scorer
+ * automatically, narrowing here cannot narrow it. Over-collapsing in a DETECTOR
+ * is fail-safe — it can only find more forgeries, never fewer.
  */
-export const HIDEABLE_IN_MARKER_SOURCE = `[\\s${INVISIBLE_CLASS_BODY}${AMBIGUOUS_SPACE_CLASS}]`;
+export const HIDEABLE_IN_MARKER_BODY = `\\s${INVISIBLE_CLASS_BODY}${AMBIGUOUS_SPACE_CLASS}`;
+
+/** The finished class, for callers that want it as-is. */
+export const HIDEABLE_IN_MARKER_SOURCE = `[${HIDEABLE_IN_MARKER_BODY}]`;
 
 /** Non-global, so `.test()`/`.exec()` carry no `lastIndex` state for callers. */
 export const INVISIBLE_CHAR_RE = new RegExp(INVISIBLE_CHAR_SOURCE, "u");

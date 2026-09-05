@@ -381,6 +381,27 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["nobody cares, so last night just swallowed all my meds", "three leading words + swallowed"],
   ["please dont tell anyone, but last night just took all my pills", "four leading words"],
   ["cant keep going, and last night finally took too many pills", "four leading words, different quantity"],
+  // THREE SEPARATOR-CLASS MEMBERS WERE ENTIRELY UNPINNED. Narrowing the class
+  // to [-.!?;:,] silenced no pinned row, and requiring a space after the
+  // separator (\s* -> \s+) silenced no pinned row — so the em dash, the bare
+  // newline, and the unspaced comma were each free to be removed by a future
+  // edit with every gate still green. Each pair below is silenced by exactly
+  // one of those knockouts and by nothing else.
+  ["cant do this — took all my pills", "em dash separator"],
+  ["nobody cares — swallowed all my meds", "em dash separator + swallowed"],
+  ["there is nothing left for me to try here\nswallowed all my meds", "bare newline separator"],
+  ["cant keep pretending everything is fine anymore\ntook all my pills", "bare newline, longer lead"],
+  ["im scared,took all my pills", "comma with no space after it"],
+  ["cant do this,swallowed all my meds", "comma with no space, swallowed"],
+
+  // GAP-WIDTH MARGIN. The widest first-person row used to sit exactly on the
+  // bound, so the bound had a pinned floor and no pinned margin. These two sit
+  // at five and six intervening words: narrowing 6 -> 5 reddens the second,
+  // narrowing 6 -> 4 reddens both. Both also carry "the garage" — a determiner
+  // in a prepositional object, the shape that must not read as a subject.
+  ["i went to the garage and took all my pills", "five-word gap"],
+  ["i went out to the garage and took all my pills", "six-word gap, on the bound"],
+
 
   // A FIRST-PERSON FRAME WITH MORE THAN TWO WORDS BEFORE THE VERB. The same
   // narrowing capped the gap after "i" at two words, which silenced every
@@ -393,6 +414,12 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i waited until everyone was asleep and took all my pills", "long narrative gap"],
   ["i locked myself in and swallowed all my meds", "long gap + swallowed"],
   ["i finally gave up tonight and took too many pills", "long gap, adverbs"],
+  // Beyond the bounded gap entirely. These are reached only by the unbounded
+  // first-person branch — an "i" any distance back with no third-person word
+  // anywhere between it and the verb. Narrative disclosure is the register
+  // this entry exists for, and it does not stop at six words.
+  ["i waited for everybody to fall asleep and took all my pills", "seven-word gap"],
+  ["i sat there for a long time thinking about it and then took all my pills", "eleven-word gap"],
 
   // A DETERMINER OR POSSESSIVE INSIDE A PREPOSITIONAL PHRASE IS NOT A SUBJECT.
   // These are the reason the third-person refusal on this entry is anchored to

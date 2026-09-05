@@ -178,9 +178,16 @@ export async function runDailyBriefing(
   // the student's goals, alerts and activity — and sanitizeForPrompt runs a
   // fixpoint loop whose pass budget scales with input length, so sanitizing the
   // whole thing to then throw all but 4000 characters away does work that
-  // grows with data nobody reads. Every other caller caps first. Slicing first
-  // cannot smuggle anything past the sanitizer: it only ever removes trailing
-  // input, and the sanitizer runs on exactly the text that reaches the prompt.
+  // grows with data nobody reads. Slicing first cannot smuggle anything past
+  // the sanitizer: it only ever removes trailing input, and the sanitizer runs
+  // on exactly the text that reaches the prompt.
+  //
+  // The two other callers that cap a sanitized string — the observations block
+  // further down this file, and wager-diagnosis.ts — do the same, and the
+  // "caps before sanitizing" test in briefing.test.ts pins this one by
+  // observing the length the sanitizer is actually handed. An earlier version
+  // of this comment claimed every other caller already capped first; it did not
+  // check, and both of them were doing the opposite.
   const sanitizedBundle = sanitizeForPrompt(JSON.stringify(bundle).slice(0, 4000));
 
   const baseProvider = await resolveAiProvider({
@@ -237,7 +244,7 @@ export async function runDailyBriefing(
   // Phase 2 — shape observations into a validated spec (deterministic).
   // finalText derives from untrusted input, so it stays inside the quarantine block.
   const observationsBlock =
-    `[STUDENT_CONTEXT_START]\nObservations:\n${sanitizeForPrompt(turn.finalText).slice(0, 3000)}\n[STUDENT_CONTEXT_END]`;
+    `[STUDENT_CONTEXT_START]\nObservations:\n${sanitizeForPrompt(turn.finalText.slice(0, 3000))}\n[STUDENT_CONTEXT_END]`;
   const specSystemPrompt = buildSpecSystemPrompt();
 
   let attempt = tryParseSpec(

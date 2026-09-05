@@ -266,17 +266,49 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // use — and would buy only "you took all the pills" and "i think you took too
   // many pills", each of which costs one instructor dismissal. Measured, not
   // assumed, and both disclosure rows are pinned so the trade cannot be made
-  // silently. Known and accepted limits, unchanged from before this entry was
-  // bounded at all: a proper-name third person ("i think dave took all the
-  // pills") alerts, because no name list can be complete, and a third-person
-  // subject in the clause BEFORE a separator ("she was upset, took all the
-  // pills") alerts, because the subjectless branch by construction only reads
-  // the words after the separator. Both are recall-first: an instructor
-  // dismisses a card, and no disclosure is lost.
+  // silently.
+  //
+  // A THIRD BRANCH carries the narrative register past the bounded gap: an "i"
+  // any distance back, provided NO third-person word appears anywhere between
+  // it and the verb. That is the whole-window rule an earlier round used as the
+  // ONLY rule, which was too strict to be the only rule (it silenced "i locked
+  // the door and took too many pills"); as an EXTRA branch it costs nothing,
+  // because the bounded branch above still catches everything it refuses.
+  // Measured before adding: 0 pinned rows lost, 0 must-not-detect rows leaked,
+  // and a 300-row third-person corpus unchanged at 91/300 false positives.
+  // Widening the bounded gap instead was rejected \u2014 6 -> 12 doubles those false
+  // positives to 204/300, and they land on the cohort least able to argue with
+  // a staff alert.
+  //
+  // KNOWN AND ACCEPTED LIMITS, in both directions.
+  //
+  // Missed: GAP-WIDTH TRUNCATION is now this entry's largest silent-loss mode.
+  // A disclosure whose gap exceeds six words AND contains a third-person word
+  // is reached by neither first-person branch. All four of these alerted before
+  // this entry was bounded and are silent now \u2014 recorded rather than claimed
+  // closed, because closing them means widening a bound that costs more than it
+  // buys: "i waited until everyone in the house was finally asleep and took all
+  // my pills" (gap 10, "everyone"), "im scared, last night after everyone went
+  // to bed took all my pills" (subjectless gap 7, "everyone"), "i got back from
+  // the appointment, sat down at the kitchen table and took all my pills" (the
+  // gap crosses a comma and carries "the" twice), and any narrative that puts a
+  // determiner in the two positions before the verb ("all the time" reads as a
+  // subject to the lookbehind).
+  //
+  // Alerted: a proper-name third person ("i think dave took all the pills"),
+  // because no name list can be complete; a COMMON-NOUN third person more than
+  // two positions before the verb ("i saw that my brother had swallowed all the
+  // meds", "i noticed the patient quietly took all the medication") \u2014 the
+  // lookbehind reads two word positions, so a subject pushed further back by an
+  // adverb or an auxiliary is not seen; and a third-person subject in the
+  // clause BEFORE a separator ("she was upset, took all the pills"), because
+  // the subjectless branch by construction only reads the words after the
+  // separator. All recall-first: an instructor dismisses a card, and no
+  // disclosure is lost.
   {
     category: "self_harm",
     pattern:
-      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+\w+){0,6}\s+|(?:^|[-\n.!?;:,\u2014]\s*)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,4})(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s)(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s\w+\s)(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
+      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+){0,20}\s+|\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+\w+){0,6}\s+|(?:^|[-\n.!?;:,\u2014]\s*)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,4})(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s)(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s\w+\s)(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
   },
   // S1: "od'd" as a completed act. The only od entry required an intent verb
   // ("gonna od"), so the past tense — the higher-risk disclosure of the two —
