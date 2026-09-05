@@ -133,6 +133,19 @@ const SERVER_ONLY_SPECIFIERS = [
     instead: null,
     why: "it imports prisma from @/lib/db",
   },
+  // Phase 6. The funnel report page and the DoHS export button/section only
+  // ever need the pure pieces (stage/status vocab, packet parsing, column
+  // list, CSV building) — both live in their own -shared module.
+  {
+    specifier: "@/lib/connect/funnel",
+    instead: "@/lib/connect/funnel-shared",
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/dohs-export",
+    instead: "@/lib/connect/dohs-export-shared",
+    why: "it imports prisma from @/lib/db",
+  },
 ];
 
 function collectFiles(dir: string, out: string[] = []): string[] {

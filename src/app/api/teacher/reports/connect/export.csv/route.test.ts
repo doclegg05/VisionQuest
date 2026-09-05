@@ -70,6 +70,7 @@ describe("GET /api/teacher/reports/connect/export.csv", () => {
     assert.equal(res.status, 200);
     assert.match(res.headers.get("content-type") ?? "", /text\/csv/);
     assert.match(res.headers.get("content-disposition") ?? "", /attachment; filename="dohs-spokes-report-.*\.csv"/);
+    assert.equal(res.headers.get("cache-control"), "no-store");
   });
 
   it("audits the export with actor, class, and row count — no student ids in the log", async () => {
@@ -100,16 +101,19 @@ describe("GET /api/teacher/reports/connect/export.csv", () => {
     assert.equal(mockFetchDohsExport.mock.callCount(), 0);
   });
 
-  it("instructor cannot export a class they do not teach — propagates the 403", async () => {
+  it("instructor cannot export a class they do not teach — propagates the 404", async () => {
+    // fetchDohsExport's real classId check is assertClassIsManaged, which
+    // throws notFound (404), not forbidden (403) — this mock error must
+    // match that real status.
     const classId = "clx1abcd23efgh45ijkl67mn";
     mockFetchDohsExport.mock.mockImplementationOnce(async () => {
-      throw makeHttpError(403, "You do not have access to this class.");
+      throw makeHttpError(404, "That class wasn't found.");
     });
     const req = mockRequest(`/api/teacher/reports/connect/export.csv?classId=${classId}`, {
       method: "GET",
     });
     const res = await route.GET(req as never);
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
     assert.equal(mockLogAuditEvent.mock.callCount(), 0, "a refused export must not be audited as a success");
   });
 });

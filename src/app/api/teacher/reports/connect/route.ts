@@ -9,10 +9,11 @@ import { fetchConnectFunnel } from "@/lib/connect/funnel";
  * Task 6.1). Where connections stall, per class and per employer, plus the
  * self-directed comparison line.
  *
- * `classId` is validated against `assertStaffCanManageClass` inside
- * `fetchConnectFunnel`, the same way `intervention-queue`'s route does —
- * a class the caller does not manage 403s rather than silently returning an
- * empty report.
+ * `classId` is validated against `assertClassIsManaged` inside
+ * `fetchConnectFunnel` — a class the caller does not instruct 404s (see
+ * that function's header for why the wider `assertStaffCanManageClass`
+ * would be the wrong check here) rather than silently returning an empty
+ * report.
  *
  * No `recordStudentView`: the response is aggregate counts only, no
  * per-student list leaves this route.
