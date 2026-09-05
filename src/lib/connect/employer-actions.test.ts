@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
+import { EMPLOYER_LINK_ACTIVE_STATUSES } from "./pipeline-shared";
+
 /**
  * The hire path is where Match & Connect meets the program's existing
  * placement reporting, so the property that matters is idempotency: a retried
@@ -26,6 +28,7 @@ const created = {
 };
 
 const transitions: any[] = [];
+const events: any[] = [];
 const alertSyncCalls: string[] = [];
 const rlsContexts: string[] = [];
 
@@ -44,44 +47,71 @@ const mockApplicationUpsert = mock.fn(async (args: any) => {
   return { id: row.id };
 }) as any;
 
+/**
+ * An in-memory stand-in for `prismaAdmin` that is faithful enough for the REAL
+ * `transitionConnection` to run against it: the status is read back, the
+ * guarded `updateMany` only matches when the row is still in the expected
+ * state, and events accumulate. That is what lets the production status table
+ * do its job in this suite instead of being mocked away.
+ */
+const adminClient: any = {
+  connection: {
+    findUnique: async () => state.connection,
+    updateMany: async (args: any) => {
+      if (!state.connection || state.connection.status !== args.where.status) {
+        return { count: 0 };
+      }
+      transitions.push({ ...args.data, expectedFrom: args.where.status });
+      Object.assign(state.connection, args.data);
+      return { count: 1 };
+    },
+  },
+  connectionEvent: {
+    create: async (args: any) => {
+      events.push(args.data);
+      return { id: `ev-${events.length}` };
+    },
+  },
+  opportunity: {
+    upsert: async (args: any) => {
+      const existing = created.opportunities.find(
+        (row) => row.sourceJobLeadId === args.where.sourceJobLeadId,
+      );
+      if (existing) return { id: existing.id };
+      const row = { id: `opp-${created.opportunities.length + 1}`, ...args.create };
+      created.opportunities.push(row);
+      return { id: row.id };
+    },
+  },
+  get application() {
+    return { upsert: mockApplicationUpsert };
+  },
+  appointment: {
+    create: async (args: any) => {
+      const row = { id: `appt-${created.appointments.length + 1}`, ...args.data };
+      created.appointments.push(row);
+      return { id: row.id };
+    },
+    findMany: async () => [],
+  },
+  advisorAvailability: { findMany: async () => [] },
+  $transaction: async (fn: any) => fn(adminClient),
+};
+
 mock.module("@/lib/db", {
   namedExports: {
-    prismaAdmin: {
-      connection: { findUnique: async () => state.connection },
-      opportunity: {
-        findFirst: async () => state.existingOpportunity,
-        create: async (args: any) => {
-          const row = { id: `opp-${created.opportunities.length + 1}`, ...args.data };
-          created.opportunities.push(row);
-          state.existingOpportunity = row;
-          return { id: row.id };
-        },
-      },
-      get application() {
-        return { upsert: mockApplicationUpsert };
-      },
-      appointment: {
-        create: async (args: any) => {
-          const row = { id: `appt-${created.appointments.length + 1}`, ...args.data };
-          created.appointments.push(row);
-          return { id: row.id };
-        },
-        findMany: async () => [],
-      },
-      advisorAvailability: { findMany: async () => [] },
-    },
-    prisma: {},
+    prismaAdmin: adminClient,
+    prisma: adminClient,
   },
 });
 
-mock.module("./pipeline", {
-  namedExports: {
-    transitionConnection: async (input: any) => {
-      transitions.push(input);
-      return { from: input.expectedFrom, to: input.to, studentId: "student-1" };
-    },
-  },
-});
+// `./pipeline` is deliberately NOT mocked wholesale any more.
+//
+// The first cut replaced transitionConnection with a recorder, so the REAL
+// canTransition never ran and the suite was green while recordInterested and
+// recordHired were both attempting edges the table does not contain. Only the
+// Prisma layer under it is faked (via @/lib/db above); the assertions, the
+// status table and the conflict handling are the production ones.
 
 mock.module("@/lib/advising", {
   namedExports: {
@@ -121,6 +151,7 @@ function connection(overrides: Record<string, unknown> = {}) {
     studentId: "student-1",
     sentById: "teacher-1",
     applicationId: null,
+    status: "interested",
     jobLead: {
       id: "lead-1",
       title: "Production Associate",
@@ -139,12 +170,14 @@ beforeEach(() => {
   created.applications.length = 0;
   created.appointments.length = 0;
   transitions.length = 0;
+  events.length = 0;
   alertSyncCalls.length = 0;
   rlsContexts.length = 0;
 });
 
 describe("recordHired — the outcome capture", () => {
   it("creates exactly one verified Application and one Opportunity mirror", async () => {
+    state.connection = connection({ status: "interview_scheduled" });
     await recordHired({
       connectionId: "conn-1",
       currentStatus: "interview_scheduled",
@@ -174,11 +207,15 @@ describe("recordHired — the outcome capture", () => {
       startDate: "2026-09-15",
       hourlyWage: 16.5,
     };
+    state.connection = connection({ status: "interview_scheduled" });
     const first = await recordHired(input);
 
     // Second call: the connection now carries the applicationId the first one
     // set, which is what a real retry would see.
-    state.connection = connection({ applicationId: first.applicationId });
+    state.connection = connection({
+      applicationId: first.applicationId,
+      status: "interview_scheduled",
+    });
     const second = await recordHired(input);
 
     assert.equal(second.applicationId, first.applicationId);
@@ -193,7 +230,7 @@ describe("recordHired — the outcome capture", () => {
       startDate: "2026-09-15",
       hourlyWage: 16.5,
     });
-    state.connection = connection({ id: "conn-2", studentId: "student-2" });
+    state.connection = connection({ id: "conn-2", studentId: "student-2", status: "interested" });
     await recordHired({
       connectionId: "conn-2",
       currentStatus: "interested",
@@ -224,23 +261,51 @@ describe("recordHired — the outcome capture", () => {
   });
 
   it("records the wage and start date on the connection, and links the application", async () => {
+    state.connection = connection({ status: "offered" });
     await recordHired({
       connectionId: "conn-1",
       currentStatus: "offered",
       startDate: "2026-09-15",
       hourlyWage: 16.5,
     });
+    // `transitions` records what actually reached the guarded updateMany, so
+    // these assert the real column writes rather than the caller's intent.
     const [transition] = transitions;
-    assert.equal(transition.to, "hired");
+    assert.equal(transition.status, "hired");
     assert.equal(transition.expectedFrom, "offered");
-    assert.equal(transition.actorType, "employer");
-    assert.equal(transition.data.hourlyWage, 16.5);
-    assert.equal(transition.data.startDate.toISOString().slice(0, 10), "2026-09-15");
-    assert.ok(transition.data.applicationId, "the Application is linked by its scalar FK");
+    assert.equal(transition.hourlyWage, 16.5);
+    assert.equal(transition.startDate.toISOString().slice(0, 10), "2026-09-15");
+    assert.ok(transition.applicationId, "the Application is linked by its scalar FK");
     // The token is cleared, which is what makes a replay after a hire resolve
     // to the neutral page rather than the packet.
-    assert.equal(transition.data.employerTokenHash, null);
-    assert.equal(transition.data.tokenExpiresAt, null);
+    assert.equal(transition.employerTokenHash, null);
+    assert.equal(transition.tokenExpiresAt, null);
+    // The event beside it names the employer as the actor.
+    assert.equal(events[0].toStatus, "hired");
+    assert.equal(events[0].actorType, "employer");
+  });
+
+  it("works from EVERY status the employer link can hand it", async () => {
+    // The parameterised form the reviewer asked for, and the reason the
+    // pipeline is no longer mocked here: `sent -> hired` and `viewed -> hired`
+    // were both illegal edges, so an employer who hired someone after a phone
+    // call hit a throw AFTER the verified Application had been written.
+    for (const status of EMPLOYER_LINK_ACTIVE_STATUSES) {
+      created.applications.length = 0;
+      created.opportunities.length = 0;
+      transitions.length = 0;
+      state.connection = connection({ id: `conn-${status}`, status });
+
+      await recordHired({
+        connectionId: `conn-${status}`,
+        currentStatus: status,
+        startDate: "2026-09-15",
+        hourlyWage: 16.5,
+      });
+
+      assert.equal(transitions.at(-1)?.status, "hired", `hire from "${status}" did not land`);
+      assert.equal(created.applications.length, 1, `hire from "${status}" wrote no Application`);
+    }
   });
 
   it("refuses a start date that is not a real date, before writing anything", async () => {

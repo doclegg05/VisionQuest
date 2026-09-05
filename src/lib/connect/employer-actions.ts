@@ -145,9 +145,52 @@ export async function recordInterested(input: InterestedInput) {
     throw new EmployerActionError("That link is no longer active.", 404);
   }
 
+  // An employer who already has a time booked and comes back to the link is
+  // trying to CHANGE it, which is a conversation with the instructor rather
+  // than a second appointment silently appearing on their calendar.
+  if (input.currentStatus === "interview_scheduled" || input.currentStatus === "offered") {
+    throw new EmployerActionError(
+      "You already have a time booked. Reply to the email to change it.",
+      409,
+    );
+  }
+
+  // CLAIM "interested" FIRST, before anything is created.
+  //
+  // Two things were wrong with doing this last. The employer's answer is worth
+  // recording whether or not a slot works out — `interested` is a resting
+  // state in the design (spec §4), not a step on the way to a booking — and
+  // creating the Appointment before asserting the transition meant an illegal
+  // or raced transition left a real appointment on an instructor's calendar
+  // with no connection pointing at it.
+  //
+  // So: record the answer, then book. Two events, which is also the honest
+  // ledger — the employer said yes, and then picked a time.
+  //
+  // Skipped when the row is ALREADY `interested`: an employer who said yes,
+  // found no time that worked, and came back the next day to pick one is
+  // resuming, not answering again — and `interested -> interested` is not a
+  // transition. (This case is why the call-site table test exists: the first
+  // cut threw here.)
+  if (input.currentStatus !== "interested") {
+    await transitionConnection({
+      connectionId: input.connectionId,
+      to: "interested",
+      expectedFrom: input.currentStatus,
+      actorType: "employer",
+      note: "The employer said they want to meet.",
+      data: { employerRespondedAt: new Date(), employerResponse: "interested" },
+      client: prismaAdmin,
+    });
+  }
+
   const slots = await listInstructorSlots(connection.sentById);
   const slot = slots.find((entry) => entry.startsAt === input.startsAt);
-  if (!slot) throw new EmployerActionError("That time is no longer open.", 409);
+  if (!slot) {
+    // Rests at `interested`. The instructor picks the follow-up up from there,
+    // which is exactly what should happen when no offered time worked.
+    throw new EmployerActionError("That time is no longer open.", 409);
+  }
 
   let appointmentId: string;
   try {
@@ -183,14 +226,10 @@ export async function recordInterested(input: InterestedInput) {
   await transitionConnection({
     connectionId: input.connectionId,
     to: "interview_scheduled",
-    expectedFrom: input.currentStatus,
+    expectedFrom: "interested",
     actorType: "employer",
-    note: "The employer asked to meet and picked a time.",
-    data: {
-      employerRespondedAt: new Date(),
-      employerResponse: "interested",
-      interviewAppointmentId: appointmentId,
-    },
+    note: "The employer picked a time to meet.",
+    data: { interviewAppointmentId: appointmentId },
     client: prismaAdmin,
   });
 
@@ -318,33 +357,44 @@ export async function recordHired(input: HiredInput) {
     throw new EmployerActionError("That start date isn't a real date.", 400);
   }
 
-  const applicationId =
-    connection.applicationId ??
-    (await createVerifiedApplication({
-      studentId: connection.studentId,
-      verifiedBy: connection.sentById,
-      lead: connection.jobLead,
-    }));
+  // ONE transaction for the Application and the transition.
+  //
+  // Written separately, a transition that then conflicted — a student
+  // withdrawing in the same second, a double-tapped link — left behind a
+  // verified accepted Application with no connection pointing at it. The
+  // placement bridge reads exactly that shape and would have raised a
+  // "Record employment outcome" queue item for a hire that never happened.
+  const applicationId = await prismaAdmin.$transaction(async (tx) => {
+    const id =
+      connection.applicationId ??
+      (await createVerifiedApplication(tx, {
+        studentId: connection.studentId,
+        verifiedBy: connection.sentById,
+        lead: connection.jobLead,
+      }));
 
-  await transitionConnection({
-    connectionId: input.connectionId,
-    to: "hired",
-    expectedFrom: input.currentStatus,
-    actorType: "employer",
-    note: `Hired, starting ${input.startDate}.`,
-    data: {
-      employerRespondedAt: new Date(),
-      employerResponse: "hired",
-      hiredAt: new Date(),
-      startDate,
-      hourlyWage: input.hourlyWage,
-      applicationId,
-      // The link has done its job. Clearing the token is what makes a replay
-      // after a hire resolve to the neutral page rather than the packet.
-      employerTokenHash: null,
-      tokenExpiresAt: null,
-    },
-    client: prismaAdmin,
+    await transitionConnection({
+      connectionId: input.connectionId,
+      to: "hired",
+      expectedFrom: input.currentStatus,
+      actorType: "employer",
+      note: `Hired, starting ${input.startDate}.`,
+      data: {
+        employerRespondedAt: new Date(),
+        employerResponse: "hired",
+        hiredAt: new Date(),
+        startDate,
+        hourlyWage: input.hourlyWage,
+        applicationId: id,
+        // The link has done its job. Clearing the token is what makes a replay
+        // after a hire resolve to the neutral page rather than the packet.
+        employerTokenHash: null,
+        tokenExpiresAt: null,
+      },
+      client: tx,
+    });
+
+    return id;
   });
 
   // The bridge reads a verified accepted Application and raises its own queue
@@ -400,36 +450,42 @@ export async function recordHired(input: HiredInput) {
  * findable when D5 retires Opportunity — and reused on any later hire from the
  * same lead. The marker goes in `description`; Opportunity has no notes column.
  */
-async function createVerifiedApplication(input: {
-  studentId: string;
-  verifiedBy: string | null;
-  lead: { id: string; title: string; location: string; employer: { name: string } };
-}): Promise<string> {
-  const existingOpportunity = await prismaAdmin.opportunity.findFirst({
-    where: { description: { contains: `${OPPORTUNITY_MIRROR_MARKER}${input.lead.id}` } },
+type OpportunityWriteClient = Pick<typeof prismaAdmin, "opportunity" | "application">;
+
+async function createVerifiedApplication(
+  db: OpportunityWriteClient,
+  input: {
+    studentId: string;
+    verifiedBy: string | null;
+    lead: { id: string; title: string; location: string; employer: { name: string } };
+  },
+): Promise<string> {
+  // Upsert on `sourceJobLeadId`, which is UNIQUE.
+  //
+  // The first cut searched `description LIKE '%[connect:job-lead]<id>%'` and
+  // created on a miss — a read-then-write that two concurrent hires from the
+  // same lead would both pass, ending with two Opportunity rows and the
+  // placement counted twice. A unique column makes the database decide.
+  const opportunity = await db.opportunity.upsert({
+    where: { sourceJobLeadId: input.lead.id },
+    update: {},
+    create: {
+      title: input.lead.title,
+      company: input.lead.employer.name,
+      location: input.lead.location,
+      type: "job",
+      status: "closed",
+      sourceJobLeadId: input.lead.id,
+      // The marker stays in `description` for the human reading the row; it is
+      // no longer what the lookup keys on.
+      description: `${OPPORTUNITY_MIRROR_MARKER}${input.lead.id}`,
+    },
     select: { id: true },
   });
-
-  const opportunityId =
-    existingOpportunity?.id ??
-    (
-      await prismaAdmin.opportunity.create({
-        data: {
-          title: input.lead.title,
-          company: input.lead.employer.name,
-          location: input.lead.location,
-          type: "job",
-          status: "closed",
-          // Opportunity has no `notes` column, so the marker lives in
-          // `description` — the field an instructor reading the row sees.
-          description: `${OPPORTUNITY_MIRROR_MARKER}${input.lead.id}`,
-        },
-        select: { id: true },
-      })
-    ).id;
+  const opportunityId = opportunity.id;
 
   const now = new Date();
-  const application = await prismaAdmin.application.upsert({
+  const application = await db.application.upsert({
     where: { studentId_opportunityId: { studentId: input.studentId, opportunityId } },
     // Never downgrade an existing row: a student who had already recorded this
     // application keeps their own history, and only the verification is added.
