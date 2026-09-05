@@ -1,0 +1,19 @@
+{
+  "suite": "example-smoke",
+  "title": "Example smoke (runner reference suite)",
+  "area": "meta",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/example-smoke.mjs",
+  "fixture": "config/benchmarks/fixtures/example-smoke.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "accuracy",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 1,
+      "tolerance": 0
+    }
+  ],
+  "notes": "The reference suite: copy this file and scripts/bench/suites/example-smoke.mjs when adding a benchmark. It needs no database, no key and no browser, so it exercises the runner end to end on every machine and in every CI job. Deliberately watch tier — it measures the shared percentile helper, not a product promise, so it must never be the reason a PR is red. See docs/runbooks/benchmarks.md."
+}
