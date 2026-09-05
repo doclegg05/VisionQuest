@@ -2,12 +2,13 @@ import { redirect } from "next/navigation";
 
 import { ConnectReportFilters } from "@/components/teacher/connect/ConnectReportFilters";
 import PageIntro from "@/components/ui/PageIntro";
-import { isStaffRole } from "@/lib/api-error";
+import { ApiError, isStaffRole, rlsContextFor } from "@/lib/api-error";
 import { getSession } from "@/lib/auth";
 import { listConnectClasses } from "@/lib/connect/classes";
+import { subsidyLinesEnabled } from "@/lib/connect/flags";
 import { fetchConnectFunnel } from "@/lib/connect/funnel";
 import { FUNNEL_STAGE_ORDER, type FunnelResult } from "@/lib/connect/funnel-shared";
-import { listEmployers } from "@/lib/connect/employers";
+import { listEmployerOptions } from "@/lib/connect/employers";
 import { prisma } from "@/lib/db";
 import { buildPathwayPlacementReport, type PathwayPlacementReport } from "@/lib/pathway-outcomes";
 import { withRlsContext } from "@/lib/rls-context";
@@ -68,18 +69,13 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
   const from = firstValue(params.from) || undefined;
   const to = firstValue(params.to) || undefined;
 
-  const rlsContext = {
-    userId: session.id,
-    role: session.role === "admin" ? ("admin" as const) : ("teacher" as const),
-    studentId: "",
-  };
-
-  const { funnel, pathwayOutcomes, classes, employers, error } = await withRlsContext(
-    rlsContext,
+  const { funnel, pathwayOutcomes, classes, employers, subsidyLinesOn, error } = await withRlsContext(
+    rlsContextFor(session),
     async () => {
-      const [classRows, employerRows] = await Promise.all([
+      const [classRows, employerRows, subsidyLinesOnValue] = await Promise.all([
         listConnectClasses(session),
-        listEmployers(),
+        listEmployerOptions(),
+        subsidyLinesEnabled(),
       ]);
 
       try {
@@ -92,22 +88,40 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
           pathwayOutcomes: pathwayResult,
           classes: classRows.map((row) => ({ id: row.id, name: row.name })),
           employers: employerRows.map((row) => ({ id: row.id, name: row.name })),
+          subsidyLinesOn: subsidyLinesOnValue,
           error: null as string | null,
         };
-      } catch {
-        // A class the instructor does not manage (typed into the URL by hand)
-        // gets a plain message here instead of a 500 page — the API route
-        // itself still 403s for any programmatic caller.
+      } catch (err) {
+        // A class the instructor does not manage (typed into the URL by
+        // hand) gets a plain message here instead of a 500 page — the API
+        // route itself still 404s for any programmatic caller. Anything
+        // else (a genuine bug, a DB outage) must NOT be swallowed into the
+        // same friendly message — it re-throws so it surfaces as a real
+        // error rather than a silently wrong "you don't have access" (W7).
+        const isKnownAccessError =
+          err instanceof ApiError && (err.statusCode === 403 || err.statusCode === 404);
+        if (!isKnownAccessError) throw err;
         return {
           funnel: null as FunnelResult | null,
           pathwayOutcomes: null as PathwayPlacementReport | null,
           classes: classRows.map((row) => ({ id: row.id, name: row.name })),
           employers: employerRows.map((row) => ({ id: row.id, name: row.name })),
+          subsidyLinesOn: subsidyLinesOnValue,
           error: "You do not have access to that class.",
         };
       }
     },
   );
+
+  // W8: the export must see the SAME filters the report is showing —
+  // classId alone silently dropped from/to, so a teacher exporting a
+  // filtered period got the whole program's dates instead.
+  const exportParams = new URLSearchParams();
+  if (classId) exportParams.set("classId", classId);
+  if (from) exportParams.set("from", from);
+  if (to) exportParams.set("to", to);
+  const exportQuery = exportParams.toString();
+  const exportHref = `/api/teacher/reports/connect/export.csv${exportQuery ? `?${exportQuery}` : ""}`;
 
   return (
     <div className="page-shell space-y-6">
@@ -199,25 +213,31 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
             <h2 id="subsidy-heading" className="text-base font-semibold text-[var(--ink-strong)]">
               Hiring incentives
             </h2>
+            {!subsidyLinesOn && (
+              <p className="mt-2 text-sm text-[var(--ink-muted)]">
+                Hiring-incentive notes are turned off program-wide right now, so every packet counts as
+                &ldquo;no note&rdquo; below — this is not saying employers were offered nothing.
+              </p>
+            )}
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <div>
-                <dt className="text-[var(--ink-muted)]">Packets with a note</dt>
+                <dt className="text-[var(--ink-muted)]">Packets that mentioned a hiring incentive</dt>
                 <dd className="font-semibold text-[var(--ink-strong)]">{funnel.subsidy.attached}</dd>
               </div>
               <div>
-                <dt className="text-[var(--ink-muted)]">Packets with no note</dt>
+                <dt className="text-[var(--ink-muted)]">Packets with no hiring-incentive note</dt>
                 <dd className="font-semibold text-[var(--ink-strong)]">
                   {funnel.subsidy.notAttached}
                 </dd>
               </div>
               <div>
-                <dt className="text-[var(--ink-muted)]">Hired, with a note</dt>
+                <dt className="text-[var(--ink-muted)]">Hired, with a hiring-incentive note</dt>
                 <dd className="font-semibold text-[var(--ink-strong)]">
                   {funnel.subsidy.hiredWithSubsidy}
                 </dd>
               </div>
               <div>
-                <dt className="text-[var(--ink-muted)]">Hired, no note</dt>
+                <dt className="text-[var(--ink-muted)]">Hired, no hiring-incentive note</dt>
                 <dd className="font-semibold text-[var(--ink-strong)]">
                   {funnel.subsidy.hiredWithout}
                 </dd>
@@ -331,9 +351,9 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
             Pathway outcomes
           </h2>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">
-            Which suggested career pathway {pathwayOutcomes.totalVerifiedPlacements === 1 ? "a" : ""}{" "}
-            verified placement{pathwayOutcomes.totalVerifiedPlacements === 1 ? "" : "s"} actually came
-            from ({pathwayOutcomes.pathwayCoveragePct}% traced back to a pathway).
+            Which suggested career pathway actually led to a hire. {pathwayOutcomes.placementsWithPathway}{" "}
+            of {pathwayOutcomes.totalVerifiedPlacements} verified placements (
+            {pathwayOutcomes.pathwayCoveragePct}%) can be traced back to a suggested pathway.
           </p>
           {pathwayOutcomes.byCluster.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--ink-muted)]">
@@ -380,7 +400,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
           A CSV of enrollment, placement, and retention for the state report.
         </p>
         <a
-          href={`/api/teacher/reports/connect/export.csv${classId ? `?classId=${classId}` : ""}`}
+          href={exportHref}
           className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-medium hover:opacity-90"
         >
           Download DoHS export (CSV)
