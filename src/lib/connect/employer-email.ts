@@ -13,7 +13,7 @@
 // opaque token. `buildEmployerEmail`'s test asserts that property directly.
 // =============================================================================
 
-import { SUBSIDY_FALLBACK_LINE, packetFieldList, type Packet } from "./packet-shared";
+import { EMPLOYER_FIELD_LABELS, SUBSIDY_FALLBACK_LINE, type Packet } from "./packet-shared";
 
 export interface EmployerEmailInput {
   packet: Packet;
@@ -41,8 +41,12 @@ export interface EmployerEmail {
  * taken.
  */
 export function buildEmployerEmail(input: EmployerEmailInput): EmployerEmail {
-  const fields = packetFieldList(input.packet);
-  const subsidy = input.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE;
+  // The EMPLOYER's wording. `packetFieldList` renders the consent-screen
+  // labels — "Your résumé", "The cards you earned" — which are written to the
+  // student. Sent to an employer they read as though this email were telling
+  // them about their own résumé, over a line that begins "They agreed to
+  // share:". Same keys, different audience, one map each.
+  const fields = input.packet.includedFields.map((key) => EMPLOYER_FIELD_LABELS[key]);
 
   const lines = [
     `Hello ${input.contactName},`,
@@ -52,8 +56,14 @@ export function buildEmployerEmail(input: EmployerEmailInput): EmployerEmail {
     `The candidate is ${input.packet.candidateName}. They agreed to share:`,
     ...fields.map((field) => `- ${field}`),
     "",
-    subsidy,
-    "",
+    // Only when the student approved it, exactly as the employer page and the
+    // approval card do. The line says nothing about the student, which is why
+    // it was printed unconditionally — but "what goes out is what was
+    // approved" is not a rule with a harmlessness exception, and an email
+    // cannot be un-sent the way a page can be re-rendered.
+    ...(input.packet.includedFields.includes("subsidy_line")
+      ? [input.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE, ""]
+      : []),
     "Open this link to see their information and reply:",
     input.responseUrl,
     "",

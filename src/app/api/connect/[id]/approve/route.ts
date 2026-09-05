@@ -7,7 +7,6 @@ import {
   connectionProvenance,
 } from "@/lib/connect/connections";
 import { isConnectEnabledForStudent } from "@/lib/connect/flags";
-import { packetFieldList } from "@/lib/connect/packet-shared";
 import { operationIdFor, recordOperation } from "@/lib/sage/operations";
 
 /**
@@ -65,7 +64,11 @@ export const POST = withAuth(
 
       return NextResponse.json({
         success: true,
-        data: { id, status: "student_approved", fields: packetFieldList(packet) },
+        // KEYS, matching /api/connect/pending. Every client renders its own
+        // labels from PACKET_FIELD_LABELS, so one endpoint returning rendered
+        // strings and the other returning keys is how a caller ends up
+        // reverse-mapping labels again — the drift S8 removed.
+        data: { id, status: "student_approved", fields: packet.includedFields },
       });
     } catch (error) {
       if (error instanceof ConnectionError) {
