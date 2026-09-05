@@ -1,9 +1,9 @@
 {
   "suite": "report-parity",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:18:59.805Z",
-  "durationMs": 263,
-  "commit": "b700d71",
+  "startedAt": "2026-09-05T17:13:47.388Z",
+  "durationMs": 60,
+  "commit": "cfde387",
   "provider": null,
   "model": null,
   "host": {
@@ -24,7 +24,7 @@
       "tolerance": 0,
       "exact": true,
       "baseline": null,
-      "status": "info",
+      "status": "pass",
       "details": {
         "violations": [],
         "counts": {
@@ -74,5 +74,5 @@
       "status": "info"
     }
   ],
-  "status": "info"
+  "status": "pass"
 }

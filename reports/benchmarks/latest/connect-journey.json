@@ -1,9 +1,9 @@
 {
   "suite": "connect-journey",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:44:29.775Z",
-  "durationMs": 12,
-  "commit": "96c5acc",
+  "startedAt": "2026-09-05T17:14:15.627Z",
+  "durationMs": 17,
+  "commit": "cfde387",
   "provider": null,
   "model": null,
   "host": {
@@ -28,7 +28,7 @@
       "details": {
         "connectionId": "cmtom4bto001i7dyv1lug8fsa",
         "measuredAt": "2026-09-05T16:44:22.252Z",
-        "ageHours": 0
+        "ageHours": 0.5
       }
     },
     {

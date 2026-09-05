@@ -1,9 +1,9 @@
 {
   "suite": "connection-walks",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:24:03.493Z",
-  "durationMs": 384,
-  "commit": "f6d7c25",
+  "startedAt": "2026-09-05T17:07:00.148Z",
+  "durationMs": 527,
+  "commit": "cfde387",
   "provider": null,
   "model": null,
   "host": {

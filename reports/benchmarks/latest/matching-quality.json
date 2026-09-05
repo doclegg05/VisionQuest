@@ -1,9 +1,9 @@
 {
   "suite": "matching-quality",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:19:00.990Z",
-  "durationMs": 245,
-  "commit": "b700d71",
+  "startedAt": "2026-09-05T17:07:02.731Z",
+  "durationMs": 69,
+  "commit": "cfde387",
   "provider": null,
   "model": null,
   "host": {
