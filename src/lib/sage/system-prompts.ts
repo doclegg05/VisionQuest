@@ -88,13 +88,39 @@ const PATHWAY_CONTEXTS: Record<ProgramType, string> = {
  * staff-authored snippets are injected) can apply the same defense before
  * embedding untrusted text in the prompt.
  */
+const DELIMITER_TOKEN =
+  /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|STUDENT_CONTEXT|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT|MEMORY|GROUNDING_DATA)_(START|END)\s*\]/gi;
+
+const SNIPPET_TAG = /<\s*\/?\s*staff_authored_snippet\s*>/gi;
+
+/**
+ * Anything shaped like a delimiter, whatever it is named. The final sweep
+ * after the loop, so a marker name added to the prompt layer later cannot be
+ * smuggled through by the same nesting trick before someone remembers to add
+ * it to DELIMITER_TOKEN.
+ */
+const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/gi;
+
+/** A forged marker cannot need more nesting than this to be worth defeating. */
+const MAX_SANITIZE_PASSES = 10;
+
 export function sanitizeForPrompt(value: string): string {
-  return value
-    .replace(
-      /\[\s*(STUDENT_NAME|STUDENT_GOAL|STUDENT_GOALS|STUDENT_CONTEXT|CAREER_PROFILE|DISCOVERY|SKILL_GAP|PATHWAY|COACHING_ARC|STAFF_STUDENT_CONTEXT|MEMORY|GROUNDING_DATA)_(START|END)\s*\]/gi,
-      "",
-    )
-    .replace(/<\s*\/?\s*staff_authored_snippet\s*>/gi, "");
+  // One pass is not enough. Removing an inner token JOINS its neighbours, and
+  // the join can be a live marker: "[GROUNDING_DATA_[GROUNDING_DATA_END]END]"
+  // becomes "[GROUNDING_DATA_END]" after a single replace. Loop until the
+  // output stops changing, bounded so adversarial nesting cannot spin here.
+  let current = value;
+  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass += 1) {
+    const next = current.replace(DELIMITER_TOKEN, "").replace(SNIPPET_TAG, "");
+    if (next === current) break;
+    current = next;
+  }
+  // Final sweep, always — not only when the cap is reached. It catches a
+  // delimiter-shaped token whose NAME is not in the list above, which is what
+  // a marker added to the prompt layer later would look like here until
+  // someone remembers to add it. "[morning]" and other ordinary bracketed
+  // prose do not match: the shape requires an _START/_END suffix.
+  return current.replace(DELIMITER_SHAPED, "").replace(SNIPPET_TAG, "");
 }
 
 const CLASSROOM_CONFIRMATION_INSTRUCTION = `CLASSROOM CONFIRMATION (one-time onboarding beat):
