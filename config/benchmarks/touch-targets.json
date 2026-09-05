@@ -1,0 +1,19 @@
+{
+  "suite": "touch-targets",
+  "title": "Touch targets at 375px (student routes)",
+  "area": "a11y",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/touch-targets.mjs",
+  "fixture": "config/benchmarks/fixtures/touch-targets.json",
+  "requires": ["browser", "server"],
+  "metrics": [
+    {
+      "id": "undersized_targets",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "TIER IS WATCH, NOT GATE (builder A8, 2026-09-05): this worktree has no DATABASE_URL/dev server (standing 'a worktree has no .env.local either' gotcha), so e2e/bench-touch-targets.spec.ts could not actually be run here to establish today's real count — per the task brief ('if the count is > 0 today, set tier watch ... do not fix pages in this task'), the safe default when the count is UNKNOWN is the same as when it is known-nonzero: watch, not gate. Promote to gate once someone with a working local server + DATABASE_URL (or CI) runs `npx playwright test e2e/bench-touch-targets.spec.ts` and confirms undersized_targets is 0 — if it is not 0, this suite's `details.violations` names every offending route/selector for a follow-up fix, deliberately not attempted in this task. e2e spec walks /dashboard, /career, /goals, /orientation, /settings, /appointments, /memory at 375x667 as the seeded E2E_STUDENT fixture; excludes not-visible, disabled, and .sr-only elements."
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Nearest-rank percentile cases for the example benchmark suite. Each case is a labelled expectation against scripts/lib/percentile.mjs — the shared helper four scripts used to each reimplement (PR #159). The p argument is always on the 0-100 scale; an empty input answers null. No student data: these are arithmetic fixtures.",
+  "cases": [
+    { "label": "median of five", "values": [1, 2, 3, 4, 5], "p": 50, "expected": 3 },
+    { "label": "p95 of five", "values": [1, 2, 3, 4, 5], "p": 95, "expected": 5 },
+    { "label": "p0 clamps to the first value", "values": [1, 2, 3, 4, 5], "p": 0, "expected": 1 },
+    { "label": "p100 is the last value", "values": [1, 2, 3, 4, 5], "p": 100, "expected": 5 },
+    { "label": "single sample", "values": [10], "p": 50, "expected": 10 },
+    { "label": "p90 of ten", "values": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "p": 90, "expected": 9 },
+    { "label": "p95 of ten rounds up a rank", "values": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "p": 95, "expected": 10 },
+    { "label": "p25 of four", "values": [2, 4, 6, 8], "p": 25, "expected": 2 },
+    { "label": "p75 of four", "values": [2, 4, 6, 8], "p": 75, "expected": 6 },
+    { "label": "empty input is null, never zero", "values": [], "p": 50, "expected": null }
+  ]
+}

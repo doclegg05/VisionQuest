@@ -123,3 +123,8 @@ broken-documents-backup-*.json
 
 # Agent worktrees (isolated builder checkouts; never commit)
 .claude/worktrees/
+
+# Benchmark suite raw browser-walk data (e2e/bench-*.spec.ts output) —
+# regenerated per run, never a durable artifact like reports/benchmarks/latest/.
+reports/benchmarks/raw/*.json
+!reports/benchmarks/raw/.gitkeep

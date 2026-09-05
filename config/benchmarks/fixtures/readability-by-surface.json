@@ -1,0 +1,66 @@
+{
+  "_comment": "Route-family -> source roots this suite scans, and which audience floor each family counts toward. Paths are repo-relative and reused verbatim by scanReadabilityForRoots() in scripts/ui-copy-readability.mjs, so a family with no matching directory in a given checkout simply contributes zero candidates rather than erroring (mirrors that script's own [skip] behavior for absent SCAN_ROOTS entries).",
+  "families": [
+    {
+      "id": "student_home",
+      "label": "Student home (chat-first dashboard)",
+      "audience": "student",
+      "paths": [
+        "src/app/(student)/dashboard",
+        "src/components/dashboard",
+        "src/components/progression",
+        "src/components/chat",
+        "src/lib/progression/student-next-step.ts"
+      ]
+    },
+    {
+      "id": "career",
+      "label": "Career",
+      "audience": "student",
+      "paths": ["src/app/(student)/career", "src/components/career"]
+    },
+    {
+      "id": "goals",
+      "label": "Goals",
+      "audience": "student",
+      "paths": ["src/app/(student)/goals", "src/components/goals"]
+    },
+    {
+      "id": "orientation",
+      "label": "Orientation",
+      "audience": "student",
+      "paths": ["src/app/(student)/orientation", "src/components/orientation"]
+    },
+    {
+      "id": "settings",
+      "label": "Settings (incl. SMS + employer-intro consent)",
+      "audience": "student",
+      "paths": [
+        "src/app/(student)/settings",
+        "src/components/settings",
+        "src/lib/nudges/sms-policy-shared.ts"
+      ]
+    },
+    {
+      "id": "connect_student",
+      "label": "Connect, student-visible surfaces (Advising)",
+      "audience": "student",
+      "paths": ["src/components/advising"]
+    },
+    {
+      "id": "teacher_connect",
+      "label": "Teacher Connect job-developer console",
+      "audience": "employer",
+      "paths": [
+        "src/app/(teacher)/teacher/connect",
+        "src/components/teacher/connect"
+      ]
+    },
+    {
+      "id": "employer_page",
+      "label": "Public employer response page",
+      "audience": "employer",
+      "paths": ["src/app/connect"]
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  GSM7_BASIC,
   SMS_DAILY_CAP,
   SMS_MAX_LENGTH,
   SMS_PREFIX,
@@ -256,6 +257,21 @@ describe("every body names SPOKES, carries the opt-out, and fits one segment", (
 
   it("refuses to compose a body that cannot fit", () => {
     assert.throws(() => composeSmsBody("x".repeat(200)), /160/);
+  });
+
+  it("every body's characters are within the real GSM7_BASIC set", () => {
+    // GSM7_BASIC is exported (2026-09-05) so the sms-readability benchmark
+    // suite (config/benchmarks/sms-readability.json) can check a rendered
+    // body against the real set instead of a second, driftable copy. This
+    // pins the export's shape: every character in every fixed body above is
+    // a member, and it is not accidentally empty or missing plain ASCII.
+    const gsm7 = new Set(GSM7_BASIC.split(""));
+    assert.ok(gsm7.has("A") && gsm7.has("z") && gsm7.has(" ") && gsm7.has("."), "missing basic ASCII");
+    for (const body of [...bodies, buildInterviewDeclineAckSms(), buildWeeklyJobsSms(1)]) {
+      for (const char of body) {
+        assert.ok(gsm7.has(char), `"${char}" (U+${char.codePointAt(0)?.toString(16)}) not in GSM7_BASIC: ${body}`);
+      }
+    }
   });
 });
 
