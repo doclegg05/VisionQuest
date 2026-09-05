@@ -357,8 +357,12 @@ export function composeSmsBody(core: string): string {
  * or two septets). Anything outside it flips the whole message to UCS-2, which
  * halves the segment to 70 characters — so an employer name copied out of a
  * job feed with a curly apostrophe would silently truncate or split the text.
+ *
+ * Exported (2026-09-05) so the sms-readability benchmark suite
+ * (config/benchmarks/sms-readability.json) can verify a rendered template
+ * against the real set instead of a second, driftable copy.
  */
-const GSM7_BASIC =
+export const GSM7_BASIC =
   "@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
   "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà" +
   "\n\r^{}\\[~]|€";
