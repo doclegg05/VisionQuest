@@ -11,7 +11,6 @@ import {
 } from "@/lib/connect/connections";
 import { isConnectEnabledForStudent } from "@/lib/connect/flags";
 import { MAX_ENDORSEMENT_CHARS } from "@/lib/connect/endorsement-shared";
-import { packetFieldList } from "@/lib/connect/packet-shared";
 import { parseBody } from "@/lib/schemas";
 
 /**
@@ -85,7 +84,13 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
     data: {
       connectionId: result.id,
       status: "proposed",
-      fields: packetFieldList(result.packet),
+      // `includedFields` (PacketFieldKey[]), not packetFieldList's labels
+      // (2026-09 second-pass review): every other packet-bearing payload —
+      // GET /api/connect/pending, the ConnectionsBoard row shape — returns
+      // the raw keys under `fields`, and the teacher console
+      // ((teacher)/teacher/connect/page.tsx) maps `row.fields` through
+      // PACKET_FIELD_LABELS itself.
+      fields: result.packet.includedFields,
     },
   });
 });
