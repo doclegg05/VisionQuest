@@ -33,7 +33,17 @@ export interface PendingConnection {
   jobTitle: string;
   employerName: string;
   location: string;
-  fields: string[];
+  /**
+   * PACKET FIELD KEYS, not labels.
+   *
+   * The API used to send the rendered labels and this file mapped them back to
+   * keys by reverse lookup, which made the two sides agree only as long as
+   * every label string stayed byte-identical across a server file and a client
+   * file. One copy-edit to a label — the exact thing the readability gate
+   * encourages — would have silently dropped that row from the card while the
+   * employer still received the value. Keys travel; labels are rendered here.
+   */
+  fields: PacketFieldKey[];
   endorsement: string;
   candidateName: string;
   certifications: string[];
@@ -99,19 +109,6 @@ function valueFor(field: PacketFieldKey, connection: PendingConnection): string 
   }
 }
 
-/** The field keys behind the labels the API sent, in the same order. */
-function fieldKeys(labels: string[]): PacketFieldKey[] {
-  const byLabel = new Map(
-    (Object.entries(PACKET_FIELD_LABELS) as [PacketFieldKey, string][]).map(
-      ([key, label]) => [label, key],
-    ),
-  );
-  return labels.flatMap((label) => {
-    const key = byLabel.get(label);
-    return key ? [key] : [];
-  });
-}
-
 export function ConnectionApprovalCard({
   connection,
   onApproved,
@@ -126,7 +123,7 @@ export function ConnectionApprovalCard({
   const [dismissed, setDismissed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const keys = fieldKeys(connection.fields);
+  const keys = connection.fields;
   const rows = keys.flatMap((key) => {
     const value = valueFor(key, connection);
     return value ? [{ key, label: PACKET_FIELD_LABELS[key], value }] : [];

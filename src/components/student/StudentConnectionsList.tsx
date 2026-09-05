@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import {
+  isPostHireStatus,
   withdrawConfirmation,
   type ConnectionStatus,
 } from "@/lib/connect/pipeline-shared";
@@ -91,6 +92,17 @@ export function StudentConnectionsList({
             {done[connection.id] ? (
               <p className="mt-3 text-base font-semibold text-[var(--ink-strong)]" role="status">
                 {done[connection.id]}
+              </p>
+            ) : isPostHireStatus(connection.status) ? (
+              // The row STAYS — a student must be able to see the job they
+              // got — but the take-back goes. After a hire, "take this back"
+              // would rewrite a verified placement that the grant report and
+              // the DoHS export both read, while the accepted Application it
+              // names stayed accepted. A hire recorded wrongly is a
+              // conversation, so this points at the person who can fix both
+              // records rather than offering a button that would half-fix one.
+              <p className="mt-3 text-base text-[var(--ink-muted)]">
+                Something wrong here? Tell your teacher and they will fix it with you.
               </p>
             ) : (
               <>

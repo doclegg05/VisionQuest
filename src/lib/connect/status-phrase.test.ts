@@ -98,13 +98,24 @@ describe("withdrawConfirmation", () => {
     );
   });
 
-  it("names the employer once the packet has actually gone", () => {
+  it("names the employer once the packet has actually gone, and promises only what happens", () => {
     for (const status of ["sent", "viewed", "interested", "interview_scheduled", "offered"] as const) {
       const message = withdrawConfirmation(status, EMPLOYER);
       assert.match(message, /Mountain Metal/, status);
-      assert.match(message, /changed your mind/, status);
       // It must NOT claim nothing was sent, because something was.
       assert.ok(!message.includes("not to send"), status);
+
+      // And it must not claim a message this program does not send. The old
+      // wording said "We told Mountain Metal you changed your mind" — an email
+      // nobody writes, read by a student deciding whether they still need to
+      // make the call themselves. What actually happens is that the link stops
+      // working and the instructor is notified, so that is what it says.
+      assert.ok(
+        !/changed your mind/.test(message),
+        `"${message}" promises the employer was told`,
+      );
+      assert.match(message, /turned off the link/i, status);
+      assert.match(message, /teacher will follow up/i, status);
     }
   });
 

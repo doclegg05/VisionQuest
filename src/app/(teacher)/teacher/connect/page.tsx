@@ -194,8 +194,10 @@ export default async function ConnectPage() {
         See the funnel report — where connections stall, and the DoHS export →
       </Link>
 
-      {/* Phase 4 slot: the connection pipeline and today's follow-ups go here,
-          above the boards — they are the day's work, not a directory. */}
+      {/* Order is the point: the pipeline sits ABOVE the leads and roster
+          boards because live introductions are the day's work and the boards
+          are a directory. (This was a placeholder comment describing a slot
+          for work that has since landed as ConnectionsBoard.) */}
 
       <LeadsBoard leads={leads} />
       <ConnectionsBoard connections={connections} />

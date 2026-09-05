@@ -16,7 +16,7 @@
 // =============================================================================
 
 import assert from "node:assert/strict";
-import { before, describe, it, mock } from "node:test";
+import { before, beforeEach, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
 
 import { PACKET_FIELD_LABELS, type Packet } from "./packet-shared";
@@ -55,12 +55,15 @@ const DISCLOSED_VALUES = [
   PACKET.endorsement,
 ];
 
+/** Mutable so one case can narrow the approved field list. */
+const resolved: { packet: Packet } = { packet: PACKET };
+
 mock.module("@/lib/connect/employer-link", {
   namedExports: {
     resolveEmployerLink: async () => ({
       connectionId: "clconn000000000000000001",
       status: "sent",
-      packet: PACKET,
+      packet: resolved.packet,
       jobTitle: "Production Associate",
       employerName: "Mountain Metal",
       instructorName: "Ms. Legg",
@@ -85,6 +88,10 @@ let EmployerConnectPage: (props: {
   params: Promise<{ token: string }>;
 }) => Promise<React.ReactElement>;
 
+beforeEach(() => {
+  resolved.packet = PACKET;
+});
+
 before(async () => {
   ({ ConnectionApprovalCard } = await import("@/components/student/ConnectionApprovalCard"));
   EmployerConnectPage = (await import("@/app/connect/[token]/page")).default as typeof EmployerConnectPage;
@@ -99,7 +106,7 @@ describe("the approval card and the employer page render the SAME packet", () =>
           jobTitle: "Production Associate",
           employerName: "Mountain Metal",
           location: "Beckley, WV",
-          fields: PACKET.includedFields.map((key) => PACKET_FIELD_LABELS[key]),
+          fields: PACKET.includedFields,
           endorsement: PACKET.endorsement,
           candidateName: PACKET.candidateName,
           certifications: PACKET.certifications,
@@ -147,6 +154,43 @@ describe("the approval card and the employer page render the SAME packet", () =>
         `the employer page rendered "${never}", which is not in the packet`,
       );
     }
+  });
+
+  it("omits from the EMPLOYER page whatever the student left out of the list", async () => {
+    // The reverse direction, and the one that is a disclosure failure rather
+    // than a display bug. `includedFields` is the consent record: a value can
+    // sit in the packet's columns and still be something the student did not
+    // agree to send — a narrower approval, or a field a later version stopped
+    // offering. Every block on that page has to read the list, not the value.
+    //
+    // `subsidy_line` is in here on purpose. It used to render its fallback
+    // sentence even when excluded, justified as harmless because the text says
+    // nothing about the student. Harmless or not, a block that ignores the
+    // list is the precedent that lets the next one ignore it too.
+    const narrowed = {
+      ...PACKET,
+      includedFields: PACKET.includedFields.filter(
+        (field) => field !== "endorsement" && field !== "subsidy_line",
+      ),
+    };
+    resolved.packet = narrowed;
+
+    const html = renderToString(
+      await EmployerConnectPage({ params: Promise.resolve({ token: "t".repeat(24) }) }),
+    );
+
+    assert.ok(
+      !html.includes(PACKET.endorsement),
+      "the employer read a teacher's endorsement the student did not approve",
+    );
+    assert.ok(
+      !html.includes("Money for hiring"),
+      "the subsidy block rendered despite being left out of the approved list",
+    );
+    // The fields that ARE approved still render, so this is not passing by
+    // rendering nothing at all.
+    assert.ok(html.includes(PACKET.candidateName));
+    assert.ok(html.includes(PACKET.certifications[0]));
   });
 
   it("keeps the two surfaces on ONE label vocabulary", async () => {

@@ -39,12 +39,16 @@ export const GET = withErrorHandler(
       return NextResponse.json({ error: EMPLOYER_LINK_INACTIVE_MESSAGE }, { status: 404 });
     }
 
+    // The filename an employer sees carries the candidate's display name
+    // (first name + last initial), never their id or full surname. Built once
+    // so the presigned redirect and the streamed fallback cannot drift into
+    // showing two different names for the same document.
+    const disposition = `inline; filename="${file.candidateName.replace(/[^\w. -]/g, "")} resume.pdf"`;
+
     const presigned = await getPresignedDownloadUrl(file.storageKey, {
       expiresIn: PRESIGN_TTL_SECONDS,
       contentType: file.mimeType,
-      // The filename an employer sees carries the candidate's display name
-      // (first name + last initial), never their id or full surname.
-      contentDisposition: `inline; filename="${file.candidateName.replace(/[^\w. -]/g, "")} resume.pdf"`,
+      contentDisposition: disposition,
     });
     if (presigned) return NextResponse.redirect(presigned);
 
@@ -53,10 +57,17 @@ export const GET = withErrorHandler(
       return NextResponse.json({ error: EMPLOYER_LINK_INACTIVE_MESSAGE }, { status: 404 });
     }
 
-    return new NextResponse(new Uint8Array(bytes.buffer), {
+    const body = new Uint8Array(bytes.buffer);
+    return new NextResponse(body, {
       headers: {
         "Content-Type": bytes.mimeType,
-        "Content-Disposition": "inline",
+        // Same name as the presigned path. Without it the fallback saved as
+        // "packet" or "route", which is not obviously a résumé to somebody
+        // deciding whether to open an attachment from a link.
+        "Content-Disposition": disposition,
+        // Declared so the browser can show progress and detect a truncated
+        // transfer, rather than treating a cut connection as a short PDF.
+        "Content-Length": String(body.byteLength),
         // Never cached by a proxy: this is one candidate's résumé behind a
         // capability URL, not a public asset.
         "Cache-Control": "private, no-store",

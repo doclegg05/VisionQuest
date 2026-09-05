@@ -161,9 +161,13 @@ describe("generateStudentArchive — work profile and disclosures", () => {
   });
 
   it("writes connections.json — the record of who this program told about them", async () => {
-    // Offboarding deletes the Connection rows along with the Student. Without
-    // this file the student can never afterwards answer "who did SPOKES tell
-    // about me, and what did they say", which is the point of exporting first.
+    // Offboarding does NOT delete these rows today — it deactivates the
+    // account and stamps `offboardedAt`, and the Connection is a disclosure
+    // record deliberately kept. The export still has to carry them, for two
+    // reasons: the bundle is the copy the student takes WITH them, and the
+    // retention policy's eventual purge is what the export exists to precede.
+    // Without this file a student who has left can never afterwards answer
+    // "who did SPOKES tell about me, and what did they say".
     mockStudentFindUnique.mock.mockImplementation(async () =>
       studentRow(null, [connectionRow()]),
     );

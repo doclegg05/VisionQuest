@@ -110,12 +110,42 @@ export async function transitionConnection(input: TransitionInput) {
   // instructor's audit trail are built from, so the gap would be invisible
   // exactly where it matters.
   //
-  // A caller that passes a `client` has ALREADY opened its own transaction
-  // (the hire path wraps the Application write and this transition together),
-  // so this runs directly on it: that caller's transaction is the unit, and
-  // nesting would only weaken it.
-  if (input.client) return runTransition(input, input.client);
-  return prisma.$transaction((tx) => runTransition(input, tx));
+  // WHICH transaction depends on what the caller handed over, and the first
+  // cut got this backwards. It treated "a client was passed" as "the caller is
+  // already inside a transaction", which is true of exactly one call site —
+  // the hire path, which wraps the Application write and this transition
+  // together. Six others pass a plain `prismaAdmin` because the employer has
+  // no session to derive RLS context from, and those all ran the updateMany
+  // and the event create UNWRAPPED while this comment claimed otherwise.
+  //
+  // So ask the client instead of guessing: a top-level client exposes
+  // `$transaction` and a `tx` handed to a callback does not. A client that can
+  // open one, does; a client that is already one, runs directly, because
+  // nesting would only weaken the caller's unit.
+  const client = input.client ?? prisma;
+  return withTransaction(client, (db) => runTransition(input, db));
+}
+
+/**
+ * Run `work` inside a transaction when `client` can open one, and directly
+ * when it already is one.
+ *
+ * The capability test is structural on purpose. There is no flag a caller
+ * could set wrongly, no list of client types to keep in step with Prisma, and
+ * a future caller that passes something new gets the safe branch by default:
+ * anything that can open a transaction will be asked to.
+ */
+async function withTransaction<T>(
+  client: ConnectionWriteClient,
+  work: (db: ConnectionWriteClient) => Promise<T>,
+): Promise<T> {
+  const maybeTransactional = client as {
+    $transaction?: (fn: (tx: ConnectionWriteClient) => Promise<T>) => Promise<T>;
+  };
+  if (typeof maybeTransactional.$transaction === "function") {
+    return maybeTransactional.$transaction((tx) => work(tx));
+  }
+  return work(client);
 }
 
 async function runTransition(input: TransitionInput, db: ConnectionWriteClient) {

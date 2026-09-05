@@ -21,6 +21,11 @@ const state = {
   rateLimit: { success: true, remaining: 2, resetTime: 0, degraded: false },
   employerStatus: "active" as string,
   leadStatus: "open" as string,
+  emailConfigured: true,
+  /** Make sendEmail throw, to exercise the claim -> fail -> rollback path. */
+  emailThrows: false,
+  /** Rows the guarded rollback updateMany reports as changed. */
+  rollbackCount: 1,
   contact: {
     id: "contact-1",
     name: "Pat Buyer",
@@ -73,6 +78,19 @@ const mockConnectionFindUnique = mock.fn(async () => ({
   },
 })) as any;
 
+const rollbackUpdates: Array<Record<string, unknown>> = [];
+const compensatingEvents: Array<Record<string, unknown>> = [];
+const refunds: Array<{ key: string; resetTime: number }> = [];
+
+const mockConnectionUpdateMany = mock.fn(async (args: any) => {
+  rollbackUpdates.push(args);
+  return { count: state.rollbackCount };
+}) as any;
+const mockEventCreate = mock.fn(async (args: any) => {
+  compensatingEvents.push(args.data);
+  return {};
+}) as any;
+
 const mockOutboundCount = mock.fn(async () => state.recentSends) as any;
 const mockOutboundCreate = mock.fn(async (args: any) => {
   outboundRows.push(args.data);
@@ -86,6 +104,9 @@ mock.module("@/lib/db", {
         get findUnique() {
           return mockConnectionFindUnique;
         },
+        get updateMany() {
+          return mockConnectionUpdateMany;
+        },
       },
       outboundMessage: {
         get count() {
@@ -97,6 +118,11 @@ mock.module("@/lib/db", {
       },
       consentRecord: { findFirst: async () => ({ id: "consent-1" }) },
       studentClassEnrollment: { findFirst: async () => null },
+      connectionEvent: {
+        get create() {
+          return mockEventCreate;
+        },
+      },
     },
     // The rolling per-employer count runs on the ADMIN client: through the
     // `connection` relation it would be RLS-scoped to the caller's own
@@ -121,14 +147,17 @@ mock.module("@/lib/consent", {
 mock.module("@/lib/rate-limit", {
   namedExports: {
     rateLimit: async () => state.rateLimit,
-    refundRateLimit: async () => undefined,
+    refundRateLimit: async (key: string, resetTime: number) => {
+      refunds.push({ key, resetTime });
+    },
   },
 });
 
 mock.module("@/lib/email", {
   namedExports: {
-    isEmailDeliveryConfigured: () => true,
+    isEmailDeliveryConfigured: () => state.emailConfigured,
     sendEmail: async (payload: any) => {
+      if (state.emailThrows) throw new Error("SMTP said no");
       sentEmails.push(payload);
     },
   },
@@ -202,6 +231,9 @@ beforeEach(() => {
   state.rateLimit = { success: true, remaining: 2, resetTime: 0, degraded: false };
   state.employerStatus = "active";
   state.leadStatus = "open";
+  state.emailConfigured = true;
+  state.emailThrows = false;
+  state.rollbackCount = 1;
   state.contact = {
     id: "contact-1",
     name: "Pat Buyer",
@@ -213,6 +245,14 @@ beforeEach(() => {
   auditRows.length = 0;
   outboundRows.length = 0;
   logLines.length = 0;
+  rollbackUpdates.length = 0;
+  compensatingEvents.length = 0;
+  refunds.length = 0;
+  // Call counts are cumulative across tests otherwise, which turns "this never
+  // ran" into "this ran eight times in earlier cases".
+  mockOutboundCount.mock.resetCalls();
+  mockConnectionUpdateMany.mock.resetCalls();
+  mockEventCreate.mock.resetCalls();
   transitions.length = 0;
 });
 
@@ -342,5 +382,102 @@ describe("sendConnection — what may never leave the program", () => {
     assert.equal(outboundRows[0].toKind, "employer_contact");
     assert.equal(outboundRows[0].toId, "contact-1");
     assert.equal(outboundRows[0].connectionId, "conn-1");
+  });
+
+  it("checks email config BEFORE the limiter, so a 503 never burns a weekly slot", async () => {
+    // `assertEmployerSendAllowed` increments an atomic counter — that is what
+    // makes it safe against two instructors clicking Send at once — so
+    // reaching it and then failing on unconfigured email spends one of the
+    // three packets this employer may receive in seven days. A misconfigured
+    // deployment would quietly spend all three and then refuse real sends for
+    // a week, with nothing in the pipeline showing why.
+    state.emailConfigured = false;
+
+    await assert.rejects(
+      () => sendConnection("conn-1", OPTIONS),
+      (error: unknown) => error instanceof ConnectionError && error.status === 503,
+    );
+
+    assert.equal(
+      mockOutboundCount.mock.callCount(),
+      0,
+      "the rolling send count ran before the email-config check",
+    );
+    assert.equal(transitions.length, 0, "the send was claimed with no way to deliver it");
+    assert.equal(
+      refunds.length,
+      0,
+      "a slot was taken and then refunded, rather than never taken",
+    );
+  });
+
+  it("rolls the claim back and refunds the slot when the email throws", async () => {
+    // The claim-first order is deliberate: the token that exists in the world
+    // is always one the database knows about. The cost is that a failed send
+    // leaves a claimed row, so the undo has to be complete — status back,
+    // token cleared, a compensating event on the ledger, and the employer's
+    // weekly allowance returned.
+    state.emailThrows = true;
+
+    await assert.rejects(
+      () => sendConnection("conn-1", OPTIONS),
+      (error: unknown) => error instanceof ConnectionError && error.status === 502,
+    );
+
+    assert.equal(rollbackUpdates.length, 1);
+    const [rollback] = rollbackUpdates;
+    const where = rollback.where as Record<string, unknown>;
+    const data = rollback.data as Record<string, unknown>;
+    // Guarded on the exact token hash it wrote, so an employer action or a
+    // student withdrawal that already moved the row wins instead.
+    assert.equal(where.status, "sent");
+    assert.equal(typeof where.employerTokenHash, "string");
+    assert.equal(data.status, "student_approved");
+    assert.equal(data.sentAt, null);
+    assert.equal(data.employerTokenHash, null);
+    assert.equal(data.tokenExpiresAt, null);
+
+    assert.equal(compensatingEvents.length, 1, "the rollback left no trace on the ledger");
+    assert.equal(compensatingEvents[0].fromStatus, "sent");
+    assert.equal(compensatingEvents[0].toStatus, "student_approved");
+    assert.equal(compensatingEvents[0].actorType, "system");
+
+    assert.equal(refunds.length, 1, "the employer's weekly slot was not given back");
+    assert.equal(refunds[0].key, "connect-send:emp-1");
+
+    assert.equal(outboundRows.length, 0, "a failed send was logged as if it had gone out");
+  });
+
+  it("says the email MAY have arrived when the rollback finds the row already moved", async () => {
+    // Zero rows means the token-hash guard did its job: something else moved
+    // the connection between the claim and the undo — most often the employer
+    // OPENING the link, which means the mail did arrive and only our side
+    // failed. Telling that instructor "nothing was sent" invites them to send
+    // the same packet again, to an employer who already has it, and to burn a
+    // second slot doing it.
+    state.emailThrows = true;
+    state.rollbackCount = 0;
+
+    await assert.rejects(
+      () => sendConnection("conn-1", OPTIONS),
+      (error: unknown) =>
+        error instanceof ConnectionError && /may have gone through/i.test(error.message),
+    );
+
+    assert.equal(
+      compensatingEvents.length,
+      0,
+      "a row nothing rolled back still got a rollback event",
+    );
+  });
+
+  it("never lets the token reach the rollback log line", async () => {
+    state.emailThrows = true;
+    await assert.rejects(() => sendConnection("conn-1", OPTIONS), ConnectionError);
+
+    for (const line of logLines) {
+      const serialized = JSON.stringify(line);
+      assert.ok(!/tokenHash|employerTokenHash/.test(serialized), line.message);
+    }
   });
 });

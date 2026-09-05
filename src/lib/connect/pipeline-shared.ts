@@ -148,6 +148,24 @@ export const ALLOWED_TRANSITIONS: Record<ConnectionStatus, readonly ConnectionSt
  * admits: approve their own proposal, or take it back. A student never marks
  * a connection sent, viewed, or answered — those are the instructor's and the
  * employer's facts about the world.
+ *
+ * POST-HIRE IS EMPTY, and that is the one entry here worth arguing about.
+ *
+ * Withdrawing is "don't send this / stop this going further". After a hire it
+ * would mean something else entirely: `Connection.applicationId` points at an
+ * accepted, instructor-VERIFIED Application, the placement bridge has raised
+ * its queue item, and the row feeds the grant KPI report and the DoHS export.
+ * A student tapping "Take this back" on a job they actually got would rewrite
+ * a verified placement to "withdrawn" while the Application it names stays
+ * accepted — the two records would then disagree, and the funnel would count
+ * the same person as both placed and not.
+ *
+ * That is not a decision to hand to a one-tap button, and it is not one the
+ * student is being denied: a hire recorded in error is a conversation with
+ * their instructor, who can close the connection and unverify the Application
+ * together. Revoking consent has the same shape and the same carve-out — see
+ * `withdrawConnectionsForConsentRevocation`, which skips post-hire rows for
+ * exactly this reason: turning the setting off does not un-get someone a job.
  */
 export const STUDENT_ALLOWED_TRANSITIONS: Record<
   ConnectionStatus,
@@ -160,10 +178,10 @@ export const STUDENT_ALLOWED_TRANSITIONS: Record<
   interested: ["withdrawn"],
   interview_scheduled: ["withdrawn"],
   offered: ["withdrawn"],
-  hired: ["withdrawn"],
-  started: ["withdrawn"],
-  retained_30: ["withdrawn"],
-  retained_60: ["withdrawn"],
+  hired: [],
+  started: [],
+  retained_30: [],
+  retained_60: [],
   retained_90: [],
   not_now: [],
   withdrawn: [],
@@ -315,5 +333,13 @@ export function withdrawConfirmation(
   if (status === "proposed" || status === "student_approved") {
     return "Done. We told your teacher not to send this.";
   }
-  return `Done. We told ${employer} you changed your mind.`;
+  // NOT "we told {employer} you changed your mind".
+  //
+  // Nothing emails the employer on a withdrawal. The old wording described a
+  // message this program does not send, to a student deciding whether they
+  // still need to make a phone call — the worst place to be wrong, because
+  // they would reasonably stop worrying about it. What actually happens is
+  // that the link stops working and the instructor is notified, so that is
+  // what the sentence says.
+  return `Done. We turned off the link we sent ${employer}. Your teacher will follow up.`;
 }

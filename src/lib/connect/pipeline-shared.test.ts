@@ -11,6 +11,7 @@ import {
   TransitionNotAllowedError,
   assertTransition,
   canTransition,
+  isPostHireStatus,
   isTerminalConnectionStatus,
   type ConnectionStatus,
 } from "./pipeline-shared";
@@ -89,11 +90,27 @@ describe("connection pipeline — every transition pair", () => {
     }
   });
 
-  it("lets a student withdraw from every non-terminal state and approve only from proposed", () => {
+  it("lets a student withdraw before a hire, never after, and approve only from proposed", () => {
     for (const status of CONNECTION_STATUSES) {
       const allowed = STUDENT_ALLOWED_TRANSITIONS[status] ?? [];
       if (isTerminalConnectionStatus(status)) {
         assert.deepEqual(allowed, [], `${status} is terminal — the student may do nothing`);
+        continue;
+      }
+      if (isPostHireStatus(status)) {
+        // Withdrawing means "don't send this / stop this going further". After
+        // a hire it would mean rewriting a verified placement — the row names
+        // an accepted, instructor-verified Application and feeds the grant KPI
+        // report and the DoHS export, so a one-tap "take this back" would
+        // leave the two records disagreeing about whether the person is
+        // employed. Fixing a wrongly recorded hire is a conversation with the
+        // instructor, who can close the connection and unverify the
+        // Application together.
+        assert.deepEqual(
+          allowed,
+          [],
+          `a student must not drive a "${status}" connection anywhere`,
+        );
         continue;
       }
       assert.ok(allowed.includes("withdrawn"), `student cannot withdraw from ${status}`);

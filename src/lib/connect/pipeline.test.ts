@@ -68,6 +68,25 @@ function fakeClient(options: {
   };
 }
 
+/**
+ * A TOP-LEVEL client: it exposes `$transaction`, so `transitionConnection`
+ * must wrap the write rather than running it bare. `prismaAdmin` — which six
+ * of the seven call sites pass, because the employer has no session to derive
+ * RLS context from — is exactly this shape.
+ */
+function transactionalClient(row: { id: string; status: string; studentId: string }) {
+  const inner = fakeClient({ row });
+  let opened = 0;
+  return {
+    ...inner,
+    transactionCount: () => opened,
+    $transaction: async <T>(fn: (tx: ConnectionWriteClient) => Promise<T>): Promise<T> => {
+      opened += 1;
+      return fn(inner);
+    },
+  };
+}
+
 const ROW = { id: "conn1", status: "student_approved", studentId: "stu1" };
 
 describe("transitionConnection", () => {
@@ -99,6 +118,53 @@ describe("transitionConnection", () => {
     // The event carries the SAME timestamp as the row it describes, so the
     // ledger and the connection cannot disagree about when this happened.
     assert.deepEqual(event.at, update.data.statusChangedAt);
+  });
+
+  it("OPENS a transaction when the client it was given can open one", async () => {
+    // The bug this pins: "a client was passed" was read as "the caller is
+    // already inside a transaction". That is true of exactly ONE call site —
+    // the hire path, which wraps the Application write and this transition
+    // together. Six others hand over a plain `prismaAdmin`, and every one of
+    // them ran the updateMany and the event create unwrapped, so a crash
+    // between them left a moved connection with no ledger row: invisible,
+    // and in the one place the ledger is the evidence.
+    const client = transactionalClient(ROW);
+
+    await transitionConnection({
+      connectionId: "conn1",
+      to: "sent",
+      actorType: "teacher",
+      client,
+    });
+
+    assert.equal(
+      client.transactionCount(),
+      1,
+      "a top-level client's write was not wrapped in a transaction",
+    );
+    assert.equal(client.recorded.updates.length, 1);
+    assert.equal(client.recorded.events.length, 1);
+  });
+
+  it("runs DIRECTLY on a client that is already a transaction", async () => {
+    // A `tx` handed to a $transaction callback has no `$transaction` of its
+    // own. Nesting there would only weaken the caller's unit — the hire path
+    // wraps the Application write and this transition together on purpose.
+    const client = fakeClient({ row: ROW });
+    assert.ok(
+      !("$transaction" in client),
+      "the tx-shaped fixture must not expose $transaction, or this proves nothing",
+    );
+
+    await transitionConnection({
+      connectionId: "conn1",
+      to: "sent",
+      actorType: "teacher",
+      client,
+    });
+
+    assert.equal(client.recorded.updates.length, 1);
+    assert.equal(client.recorded.events.length, 1);
   });
 
   it("guards the update by the status it read, so a racing caller loses", async () => {
@@ -190,6 +256,51 @@ describe("transitionConnection", () => {
     );
 
     assert.equal(client.recorded.updates.length, 0);
+  });
+
+  it("refuses to let a STUDENT withdraw a hire, at every post-hire status", async () => {
+    // A hire is not a thing to take back on your own.
+    // `Connection.applicationId` names an accepted, instructor-verified
+    // Application, and the row feeds the placement bridge, the grant KPI
+    // report and the DoHS export. Rewriting it to "withdrawn" would leave two
+    // records of one event disagreeing, with the funnel counting the person as
+    // both placed and not.
+    for (const status of ["hired", "started", "retained_30", "retained_60"] as const) {
+      const client = fakeClient({ row: { ...ROW, status } });
+
+      await assert.rejects(
+        () =>
+          transitionConnection({
+            connectionId: "conn1",
+            to: "withdrawn",
+            actorType: "student",
+            actorId: "stu1",
+            client,
+          }),
+        /cannot/i,
+        `a student was able to withdraw a "${status}" connection`,
+      );
+
+      assert.equal(client.recorded.updates.length, 0);
+    }
+  });
+
+  it("still lets STAFF close a post-hire connection", async () => {
+    // The student's route out is closed; the instructor's is not. A hire
+    // recorded in error has to be fixable by the person who can also unverify
+    // the Application.
+    const client = fakeClient({ row: { ...ROW, status: "hired" } });
+
+    const result = await transitionConnection({
+      connectionId: "conn1",
+      to: "closed",
+      actorType: "teacher",
+      actorId: "tea1",
+      note: "Recorded by mistake.",
+      client,
+    });
+
+    assert.equal(result.to, "closed");
   });
 
   it("lets a student withdraw their own connection", async () => {

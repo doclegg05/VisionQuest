@@ -126,5 +126,28 @@ export const UNKNOWN_TOKEN_LIMIT = 20;
  */
 export function clientIpFrom(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || null;
+  const first = forwarded?.split(",")[0]?.trim();
+  if (!first) return null;
+
+  // The value becomes part of a RateLimitEntry key, and the header is
+  // attacker-controlled. Unbounded, a caller could mint a distinct bucket per
+  // request — each one a row — and turn a rate limiter into a way to fill the
+  // table. So anything that is not IP-shaped collapses to one shared bucket:
+  // a spoofer gets to share a queue with every other spoofer, which is the
+  // correct outcome for a signal that gates nothing but this.
+  //
+  // 45 is the longest possible textual IPv6 address
+  // (an IPv4-mapped form: 45 characters), so no real client is truncated.
+  if (first.length > MAX_FORWARDED_IP_CHARS || !IP_SHAPED.test(first)) return "unknown";
+  return first;
 }
+
+/** Longest textual IPv6 address, including the IPv4-mapped form. */
+const MAX_FORWARDED_IP_CHARS = 45;
+
+/**
+ * Deliberately a SHAPE test, not a parser. Hex, digits, dots and colons is
+ * every character a v4 or v6 address can contain; anything else is not an
+ * address and does not need to be told apart from anything else.
+ */
+const IP_SHAPED = /^[0-9a-fA-F.:]+$/u;

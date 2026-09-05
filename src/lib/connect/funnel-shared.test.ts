@@ -45,7 +45,13 @@ function stageCount(result: ReturnType<typeof computeFunnel>, status: string): n
 
 describe("computeFunnel — furthest-stage counting", () => {
   it("counts a connection at the furthest funnel stage its events reached", () => {
-    const connections = [connection({ id: "c1", status: "interested" })];
+    // `sentAt` is set because the send SUCCEEDED. A connection carrying a
+    // "sent" event with no `sentAt` is specifically a rolled-back send, and is
+    // covered by its own case below — the fixture default of null was
+    // describing a state the app cannot produce.
+    const connections = [
+      connection({ id: "c1", status: "interested", sentAt: "2026-06-02T00:00:00.000Z" }),
+    ];
     const events = [
       event({ connectionId: "c1", toStatus: "proposed" }),
       event({ connectionId: "c1", toStatus: "student_approved" }),
@@ -59,7 +65,9 @@ describe("computeFunnel — furthest-stage counting", () => {
   });
 
   it("a CLOSED connection that reached 'interested' still counts at interested, not at closed", () => {
-    const connections = [connection({ id: "c1", status: "closed" })];
+    const connections = [
+      connection({ id: "c1", status: "closed", sentAt: "2026-06-02T00:00:00.000Z" }),
+    ];
     const events = [
       event({ connectionId: "c1", toStatus: "proposed" }),
       event({ connectionId: "c1", toStatus: "student_approved" }),
@@ -73,6 +81,52 @@ describe("computeFunnel — furthest-stage counting", () => {
     // a stage count; it belongs in `exits` instead.
     assert.ok(!result.stages.some((s) => (s.status as string) === "closed"));
     assert.equal(result.exits.closed, 1);
+  });
+
+  it("does NOT count a rolled-back send as sent", () => {
+    // `sendConnection` claims the transition to "sent" BEFORE it emails, so
+    // the token that exists in the world is always one the database knows
+    // about. When the email then fails, `rollBackFailedSend` puts the row back
+    // and nulls `sentAt` — but the "sent" event stays, because the log is
+    // append-only and the claim genuinely happened.
+    //
+    // Counting that as "sent" is the one number on this report nobody would
+    // question and nobody could reproduce: a broken mail server would show a
+    // healthy send rate beside a mysterious zero response rate.
+    const connections = [
+      connection({ id: "c1", status: "student_approved", sentAt: null }),
+    ];
+    const events = [
+      event({ connectionId: "c1", toStatus: "proposed" }),
+      event({ connectionId: "c1", toStatus: "student_approved" }),
+      event({ connectionId: "c1", toStatus: "sent" }),
+      // The compensating row rollBackFailedSend writes.
+      event({ connectionId: "c1", toStatus: "student_approved" }),
+    ];
+
+    const result = computeFunnel(connections, events);
+    assert.equal(stageCount(result, "sent"), 0, "a packet that never left counted as sent");
+    assert.equal(stageCount(result, "student_approved"), 1);
+  });
+
+  it("DOES count a re-send that succeeded after an earlier rollback", () => {
+    // The discriminator is `sentAt`, not the absence of a "sent" event — so a
+    // second attempt that worked writes a new `sentAt` and the connection
+    // counts from then on, with the failed first attempt still in the log.
+    const connections = [
+      connection({ id: "c1", status: "sent", sentAt: "2026-06-02T00:00:00.000Z" }),
+    ];
+    const events = [
+      event({ connectionId: "c1", toStatus: "proposed" }),
+      event({ connectionId: "c1", toStatus: "student_approved" }),
+      event({ connectionId: "c1", toStatus: "sent" }),
+      event({ connectionId: "c1", toStatus: "student_approved" }),
+      event({ connectionId: "c1", toStatus: "sent" }),
+    ];
+
+    const result = computeFunnel(connections, events);
+    assert.equal(stageCount(result, "sent"), 1);
+    assert.equal(stageCount(result, "student_approved"), 0);
   });
 
   it("defaults to 'proposed' when a connection somehow has no funnel-stage event", () => {
