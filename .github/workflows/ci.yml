@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: nothing in this workflow writes to the repository, opens an
+# issue, or touches a deployment. Declaring it at the workflow level means a
+# job added later starts read-only rather than inheriting whatever the
+# repository default happens to be.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -301,6 +308,47 @@ jobs:
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
+
+      # --- Browser-collected benchmarks -----------------------------------
+      # Two steps, in this order, and the order is load-bearing: the Playwright
+      # specs are COLLECTORS — they walk the running app and write
+      # reports/benchmarks/raw/<suite>.json — and the scorers read those files.
+      # Run the runner first and each scorer errors, by design, because the
+      # environment says browser+server are available and the raw data is not.
+      #
+      # These are the only two suites whose `requires` include `browser` and
+      # `server`, so this job is the one place they can run at all; without it
+      # they would report `skipped` forever, which is the quiet-instrument
+      # failure this whole suite exists to prevent.
+      - name: Collect browser benchmark data (non-blocking)
+        # Non-blocking for the same reason as the soak scan below: both suites
+        # are watch tier today, and a collector that breaks is reported by the
+        # runner as an `error` row in the table and the uploaded artifact
+        # rather than by reddening the gating e2e job. When touch-targets is
+        # promoted to gate (see docs/runbooks/benchmarks.md), drop
+        # continue-on-error here so a missing collection fails honestly.
+        continue-on-error: true
+        run: >-
+          npx playwright test
+          e2e/bench-touch-targets.spec.ts
+          e2e/bench-axe-authenticated.spec.ts
+          --reporter=line --timeout=180000
+
+      - name: Score browser benchmarks
+        env:
+          # The runner's `requires` check reads presence only; the collectors
+          # above already drove the real browser against the job's own server.
+          PLAYWRIGHT: "1"
+          BENCH_BASE_URL: "http://localhost:3000"
+        run: npm run bench -- --suite=touch-targets --suite=axe-authenticated --compare
+
+      - name: Upload browser benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-e2e
+          path: reports/benchmarks/latest/
+          if-no-files-found: ignore
 
       - name: Authenticated a11y scans (soak — red baseline, non-blocking)
         # Zero-violation bar per route; fails today by design (see the job
