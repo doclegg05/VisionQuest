@@ -1,0 +1,39 @@
+{
+  "suite": "journey-teacher-loop",
+  "title": "The teacher's core loop, queue to action and back",
+  "area": "journeys",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/journey-teacher-loop.mjs",
+  "fixture": "config/benchmarks/fixtures/journey-teacher-loop.json",
+  "requires": [
+    "browser",
+    "server",
+    "postgres"
+  ],
+  "metrics": [
+    {
+      "id": "completed",
+      "unit": "count",
+      "direction": "higher",
+      "floor": 1,
+      "tolerance": 0
+    },
+    {
+      "id": "teacher_taps",
+      "unit": "count",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "The design proposes 6 or fewer (spec section 4.6, dagger). Not set as a floor yet because no run has established today's number — the authoring worktree had no dev server or database (the standing 'a worktree has no .env.local' gotcha), so this suite has never been executed. Set the baseline from the first CI run, then floor it; measure-then-gate, the shape touch-targets shipped in."
+    },
+    {
+      "id": "queue_to_action_seconds",
+      "unit": "seconds",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Wall clock on whatever machine ran it, including the app's own network and Playwright's waits — a trend line across runs on one machine, never a latency number. Flooring it would fail a slow CI runner and teach everyone to ignore the gate (the reasoning connect-journey's elapsed_ms records)."
+    }
+  ],
+  "notes": "Scores the run e2e/bench-journey-teacher-loop.spec.ts performed: the intervention queue scoped to the fixture class, the student at the top of it, one recorded action, and back to the queue. The recorded action is a case note rather than the seeded pending orientation verification — verifying consumes the fixture, so the next run would quietly measure a shorter loop; a case note is a real audit-logged action that can be taken again tomorrow. `completed` requires all four steps, because the loop is only a loop if it CLOSES: an instructor who has to rebuild their place in the queue after every action is doing a different job, and a pass/fail spec on each surface separately cannot see that. Reports `skipped` when the spec has not run, and treats a report older than 24 hours as absent."
+}

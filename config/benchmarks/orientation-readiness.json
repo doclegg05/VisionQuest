@@ -1,0 +1,34 @@
+{
+  "suite": "orientation-readiness",
+  "title": "Readiness, as every surface reports it",
+  "area": "journeys",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/orientation-readiness.mjs",
+  "fixture": "config/benchmarks/fixtures/orientation-readiness.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "consumer_disagreements",
+      "unit": "count",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Nonzero today, and closing it changes what three surfaces show every teacher — a product call, not a build one. The teacher roster passes no orientationProgress, so partial orientation earns 0 of 10 there; the class-progress panel and the KPI report read certifications, portfolio, resume and shared-page facts only out of the stored Progression.state, never reconciled against live rows. Recorded and watched until those two mappings are settled, then floored at 0 (design section 4.6: 'identical score across surfaces'). Same shape as axe-authenticated's burn-down: measure first, then gate."
+    },
+    {
+      "id": "denominator_is_all_items",
+      "unit": "count",
+      "direction": "higher",
+      "floor": 1,
+      "tolerance": 0
+    },
+    {
+      "id": "score_decreases_on_completion",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "Drives all seven readiness surfaces from one set of facts per cohort student through src/lib/progression/readiness-consumers.ts, the Prisma-free home of the three mappings the product actually uses. `denominator_is_all_items` reads the five production queries that supply the orientation denominator and is 0 if any grew a `where` — the 2026-07-31 decision ('readiness counts ALL orientation items on every surface') lived in the QUERY, so a source check is what can catch it coming back. `score_decreases_on_completion` is the design's monotonicity half: completing an orientation item must never lower a score. Floors read in each metric's own direction; `denominator_is_all_items` is 1 or 0, so a floor of 1 means 'no offender'."
+}
