@@ -14,33 +14,49 @@
  *
  * Contract (docs/superpowers/plans/2026-09-05-benchmark-suite.md):
  *   run(ctx) -> { metrics: [{ id, value, n, details }] }
+ *
+ * `details` is committed (reports/benchmarks/latest/*.json) — never student
+ * data. The collector spec records only route SHAPES (e.g.
+ * "/teacher/students/:id"), never a resolved student id — see that spec's
+ * own comment and axe-authenticated.test.mjs's pinning test.
  */
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { selfTest } from "../lib/self-test.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
 const RAW_DATA_PATH = join(REPO_ROOT, "reports/benchmarks/raw/axe-authenticated.json");
+const COLLECTOR_SPEC = "e2e/bench-axe-authenticated.spec.ts";
 
 export async function run(ctx) {
   const rawPath = ctx?.rawDataPath ?? RAW_DATA_PATH;
+  const requirementsMet = Boolean(ctx?.env?.playwright) && Boolean(ctx?.env?.baseUrl);
+
   let raw;
   try {
     raw = JSON.parse(readFileSync(rawPath, "utf8"));
-  } catch {
-    return {
-      metrics: [
-        {
-          id: "violations_total",
-          value: null,
-          n: 0,
-          details: {
-            skipped: true,
-            reason: `no raw data at ${rawPath} — run: npx playwright test e2e/bench-axe-authenticated.spec.ts (needs a running dev server + seeded DB)`,
+  } catch (err) {
+    if (!requirementsMet) {
+      return {
+        metrics: [
+          {
+            id: "violations_total",
+            value: null,
+            n: 0,
+            details: {
+              skipped: true,
+              reason: `no raw data at ${rawPath} — run: npx playwright test ${COLLECTOR_SPEC} (needs a running dev server + seeded DB)`,
+            },
           },
-        },
-      ],
-    };
+        ],
+      };
+    }
+    throw new Error(
+      `axe-authenticated: browser+server are available but no raw data at ${rawPath}. ` +
+        `Run the collector first: npx playwright test ${COLLECTOR_SPEC}`,
+      { cause: err },
+    );
   }
 
   const perRoute = {};
@@ -63,38 +79,4 @@ export async function run(ctx) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// --self-test — skips cleanly (exit 0) when the raw browser-walk data is
-// absent, per this task's gate: "browser suites skip cleanly here".
-// ---------------------------------------------------------------------------
-const isMainModule = (() => {
-  if (!process.argv[1]) return false;
-  try {
-    return import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href;
-  } catch {
-    return false;
-  }
-})();
-
-if (isMainModule && process.argv.includes("--self-test")) {
-  run({})
-    .then((result) => {
-      const metric = result.metrics[0];
-      console.log("axe-authenticated --self-test");
-      if (metric.details?.skipped) {
-        console.log(`  SKIPPED: ${metric.details.reason}`);
-        console.log("\n--self-test: SKIP (not a failure — no browser/server available)");
-        return;
-      }
-      console.log(`  violations_total: ${metric.value} (routes scanned=${metric.n})`);
-      for (const [route, data] of Object.entries(metric.details.perRoute)) {
-        console.log(`    ${route}: ${data.violationCount}`);
-      }
-      console.log("\n--self-test: PASS");
-    })
-    .catch((err) => {
-      console.error("--self-test: FAIL");
-      console.error(err);
-      process.exitCode = 1;
-    });
-}
+await selfTest(import.meta.url, run);

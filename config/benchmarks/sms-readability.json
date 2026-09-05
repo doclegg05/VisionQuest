@@ -2,16 +2,24 @@
   "suite": "sms-readability",
   "title": "SMS template reading grade and segment fit",
   "area": "a11y",
-  "tier": "watch",
+  "tier": "gate",
   "scorer": "scripts/bench/suites/sms-readability.mjs",
   "fixture": "config/benchmarks/fixtures/sms-readability.json",
   "requires": [],
   "metrics": [
     {
-      "id": "max_grade",
+      "id": "fixed_text_max_grade",
       "unit": "grade",
       "direction": "lower",
       "floor": 6,
+      "tolerance": 0.5
+    },
+    {
+      "id": "rendered_max_grade",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": null,
+      "reason": "job titles and employer names are third-party text; tracked, not gated",
       "tolerance": 0.5
     },
     {
@@ -22,5 +30,5 @@
       "tolerance": 0
     }
   ],
-  "notes": "Renders every SMS template builder in src/lib/nudges/sms-policy-shared.ts (buildWeeklyJobsSms, buildInterviewConfirmSms, buildInterviewDeclineAckSms, buildHeardBackSms, buildRetentionSms, buildNotificationSms) against every realistic value in the fixture (long employer names, long job titles) and scores each rendered body with the same Flesch-Kincaid scorer used everywhere else (src/lib/sage/readability.ts). max_grade is the raw FK grade (not the >=12-word `scorable` gate — SMS bodies are short by design and the noisy-short-text carve-out would exempt exactly the strings this benchmark exists to check). over_160_gsm7 counts renders that either exceed SMS_MAX_LENGTH (composeSmsBody throws SmsBodyTooLongError) or contain a character outside the real GSM7_BASIC set (exported from sms-policy-shared.ts for this purpose) — either one means the message would silently split into two paid segments or truncate on some carriers. TIER IS WATCH, NOT GATE, pending an owner call (2026-09-05, builder A8): first measurement is max_grade=8.3 (buildHeardBackSms with 'Customer Service Representative - Bilingual Preferred'), above the floor=6 the design/plan specify. This is not a fixable copy bug — the grade is driven by the verbatim job title text, which the message must carry — so either the floor needs an owner-authorized exception for templates that interpolate a real job title, or the template needs a design rethink (e.g. dropping the title from the SMS and pointing at the app instead). over_160_gsm7 is clean (0) on the same run and would be gate-ready on its own. Do not silently loosen the floor to make this pass — report the real number and let Britt decide, same as the touch-targets suite's pattern for a measured-but-unresolved breach."
+  "notes": "Owner call, 2026-09-05: the suite's first measurement (a single pooled max_grade over realistic values) breached floor=6 at 8.3, driven entirely by verbatim third-party job titles the message must carry (e.g. buildHeardBackSms with 'Customer Service Representative - Bilingual Preferred'). Rather than loosen the floor or leave the whole suite at watch, the metric is split: fixed_text_max_grade renders every template with every caller-supplied slot replaced by the one-syllable placeholder 'X' (numeric slots get their minimal value, 1) — this measures the English sentences VisionQuest authored and controls, floor 6, gate. rendered_max_grade is the same measurement this suite always had, with realistic values from the fixture — floor null, tracked but not gated, because a real job title is not something copy-editing can fix. Red-first: scripts/bench/suites/sms-readability.test.mjs proves the fixed_text_max_grade check can actually fail (a synthetic grade-7.4 fixed template) before asserting every real template passes it (they do, max observed 3.5 — buildInterviewConfirmSms's 'place given' branch — see scripts/bench/suites/sms-readability.mjs's --self-test output for the current per-template breakdown). rendered_max_grade's first (and still current) measurement is 8.3. over_160_gsm7 stays floor 0, gate, computed from the realistic renders only (placeholder text is always short and would never stress the segment limit) — clean at 0/75."
 }

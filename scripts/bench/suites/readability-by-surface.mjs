@@ -15,11 +15,13 @@
  *   run(ctx) -> { metrics: [{ id, value, n, details }] }
  *   ctx = { fixture, fixturePath, env, log, now }
  *
- * `--self-test` runs against the real fixture and prints the metrics.
+ * `--self-test` (scripts/bench/lib/self-test.mjs, the shared helper) runs
+ * against the real fixture and prints the metrics.
  */
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { selfTest } from "../lib/self-test.mjs";
 
 // Repo root: this file lives at scripts/bench/suites/<name>.mjs, three
 // levels under the repo root.
@@ -117,44 +119,4 @@ export async function run(ctx) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// --self-test: run against the real fixture, print the metrics, exit 1 on a
-// thrown error. No runner exists yet (this suite ships ahead of Phase 0's
-// A0 runner per the build plan), so this bootstrap is self-contained rather
-// than shared — see the sibling suites in this directory for the same
-// pattern.
-// ---------------------------------------------------------------------------
-const isMainModule = (() => {
-  if (!process.argv[1]) return false;
-  try {
-    return import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href;
-  } catch {
-    return false;
-  }
-})();
-
-if (isMainModule && process.argv.includes("--self-test")) {
-  const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
-  const started = Date.now();
-  run({ fixture, fixturePath: FIXTURE_PATH, env: {}, log: console, now: () => new Date() })
-    .then((result) => {
-      console.log("readability-by-surface --self-test");
-      console.log(`  duration: ${Date.now() - started}ms\n`);
-      for (const metric of result.metrics) {
-        console.log(`  ${metric.id}: ${metric.value} (n=${metric.n})`);
-      }
-      console.log("\nPer-family breakdown:");
-      const byFamily = result.metrics[0].details.byFamily;
-      for (const [id, fam] of Object.entries(byFamily)) {
-        console.log(
-          `  [${fam.audience}] ${id} (${fam.label}) — files=${fam.files} n=${fam.n} median=${fam.median ?? "n/a"} max=${fam.max ?? "n/a"}`,
-        );
-      }
-      console.log("\n--self-test: PASS");
-    })
-    .catch((err) => {
-      console.error("--self-test: FAIL");
-      console.error(err);
-      process.exitCode = 1;
-    });
-}
+await selfTest(import.meta.url, run);

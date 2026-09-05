@@ -21,8 +21,10 @@ import { loginContext } from "./helpers/auth";
  *
  * Walks the interactive-element rule from .claude/rules/ui-patterns.md
  * ("Touch targets: minimum 44x44px for interactive elements") against every
- * `a[href], button, input, select, textarea, [role=button], [role=tab]` on
- * each student route, and writes every one under 44x44px — after excluding
+ * `a[href], button, input, select, textarea, [role=button], [role=tab],
+ * [role=checkbox], [role=radio], [role=switch], [role=menuitem],
+ * [tabindex="0"]` on each student route, and writes every one under
+ * 44x44px — after excluding
  * elements that are not visible, are disabled, or are intentionally
  * screen-reader-only (`.sr-only` — a 1x1 clipped box is not a touch target
  * a sighted or motor-impaired user could tap, and flagging it would just be
@@ -42,7 +44,9 @@ const STUDENT_ROUTES = [
   "/memory",
 ] as const;
 
-const INTERACTIVE_SELECTOR = "a[href], button, input, select, textarea, [role=button], [role=tab]";
+const INTERACTIVE_SELECTOR =
+  "a[href], button, input, select, textarea, [role=button], [role=tab], " +
+  '[role=checkbox], [role=radio], [role=switch], [role=menuitem], [tabindex="0"]';
 
 const OUTPUT_PATH = join(process.cwd(), "reports/benchmarks/raw/touch-targets.json");
 

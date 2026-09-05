@@ -48,9 +48,9 @@
  * after this addition, byte-identical.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -441,10 +441,35 @@ export async function scanReadabilityForRoots(rootRelPaths) {
   return candidates;
 }
 
+// --json-out must resolve under this directory. A CLI flag that accepted an
+// arbitrary path was a write-anywhere primitive with no consumer to justify
+// it (security review, 2026-09-05); constraining the destination rather than
+// removing the flag keeps the additive capability the benchmark suite's
+// contract asked for while closing that off.
+const REPORTS_DIR = join(REPO_ROOT, "reports");
+
+/** Null when `pathArg` resolves under REPORTS_DIR, else an error message. */
+function jsonOutPathError(pathArg) {
+  const resolved = resolve(REPO_ROOT, pathArg);
+  const rel = relative(REPORTS_DIR, resolved);
+  if (rel === "" || rel.startsWith(`..${sep}`) || rel === ".." || isAbsolute(rel)) {
+    return `--json-out must resolve under reports/ (got: ${relative(REPO_ROOT, resolved)})`;
+  }
+  return null;
+}
+
 async function main() {
   const gate = process.argv.includes("--gate");
   const jsonOutArg = process.argv.find((arg) => arg.startsWith("--json-out="));
   const jsonOutPath = jsonOutArg ? jsonOutArg.slice("--json-out=".length) : null;
+  if (jsonOutPath) {
+    const invalidReason = jsonOutPathError(jsonOutPath);
+    if (invalidReason) {
+      console.error(invalidReason);
+      process.exitCode = 1;
+      return;
+    }
+  }
 
   const { assessReadability, PLAIN_LANGUAGE_MAX_GRADE, PLAIN_LANGUAGE_IDEAL_GRADE } = await import(
     "../src/lib/sage/readability.ts"
@@ -618,10 +643,18 @@ async function main() {
 // re-running the whole CLI report as an import side effect. Compares against
 // `process.argv[1]` rather than running unconditionally, which is what a
 // bare `main().catch(...)` at module scope would do on every import.
+//
+// Uses `pathToFileURL(realpathSync(...))` rather than a bare `file://`
+// template (security review, 2026-09-05; matches the form
+// scripts/bench/lib/self-test.mjs's shared helper uses): `realpathSync`
+// resolves symlinks so a symlinked invocation still matches, and
+// `pathToFileURL` percent-encodes the path the same way `import.meta.url`
+// already is, which a manual `file://${...}` template does not do on a path
+// with spaces or other reserved characters.
 const isMainModule = (() => {
   if (!process.argv[1]) return false;
   try {
-    return import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href;
+    return pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;
   } catch {
     return false;
   }
