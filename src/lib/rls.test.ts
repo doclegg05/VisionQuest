@@ -33,6 +33,9 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Prisma, PrismaClient } from "@prisma/client";
 
+import { takeSendLock, tryTakeRunLock } from "./nudges/advisory-locks";
+import { ADVISORY_LOCK_CLASS } from "./nudges/sms-policy-shared";
+
 /**
  * The roles `app.current_role` can carry. "coordinator" is included so the
  * fail-closed cases can actually assert it: a policy that names only student /
@@ -2349,6 +2352,92 @@ if (!SHOULD_RUN) {
         assert.deepEqual(connections, [], "Connection must be empty with no context");
         assert.deepEqual(events, [], "ConnectionEvent must be empty with no context");
         assert.deepEqual(messages, [], "OutboundMessage must be empty with no context");
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // The nudge advisory locks, as SQL.
+    //
+    // NOT an RLS case, and deliberately here anyway: this is the suite that
+    // runs against a real, migrated Postgres, and it runs BEFORE the benchmark
+    // cohort is seeded, so it is the only place in CI where a guard on this
+    // SQL holds without depending on a fixture.
+    //
+    // What it guards: on 2026-09-05 both nudge locks were written as
+    // `pg_try_advisory_xact_lock(<class>, hashtext(<key>))` with the class id
+    // interpolated as a JavaScript number. Prisma binds that as bigint, and
+    // Postgres has exactly two overloads — (bigint) and (int, int) — so
+    // (bigint, integer) matched neither and raised 42883 on every call. The
+    // run lock's catch turned that into `skipped: "run lock unavailable"`, and
+    // `sendPolicySms`, being total, turned it into `refused: send_error` — so
+    // the SMS nudge feature was completely dead while answering 200 and
+    // logging one line. Every unit test in src/lib/nudges/ mocks `$queryRaw`
+    // or `$executeRaw`, so none of them could see it; it took a real database.
+    //
+    // These cases CALL THE PRODUCTION FUNCTIONS — `tryTakeRunLock` and
+    // `takeSendLock` from ./nudges/advisory-locks, the same two the runner and
+    // the sender call — rather than re-typing their SQL here. That is the
+    // whole point: a test carrying its own copy of the statement would have
+    // stayed green through the outage it is meant to catch. Dropping a `::int`
+    // in that module reds these cases; there is nowhere else the SQL lives.
+    describe("nudge advisory locks (SQL shape, not RLS)", () => {
+      const RUN_LOCK_KEY = "connect-nudges";
+
+      it("takes the run lock through the function src/lib/nudges/schedule.ts calls", async () => {
+        const locked = await db.$transaction((tx) => tryTakeRunLock(tx, RUN_LOCK_KEY));
+        assert.equal(
+          typeof locked,
+          "boolean",
+          "tryTakeRunLock must return a boolean. A 42883 here means the `::int` cast on " +
+            "ADVISORY_LOCK_CLASS.nudgeRun was dropped from advisory-locks.ts — which silently kills " +
+            "the entire hourly nudge sweep. Restore the cast; do not relax this test.",
+        );
+        assert.equal(locked, true, "an uncontended run lock must be granted");
+      });
+
+      it("takes the per-recipient send lock through the function sms-policy.ts calls", async () => {
+        // The blocking form. Uncontended inside its own transaction, so it
+        // returns at once; a 42883 here is the same outage on the per-message
+        // path rather than on the sweep path.
+        await db.$transaction((tx) => takeSendLock(tx, fixtures.studentA));
+      });
+
+      it("lets vq_app execute the lock functions, not only the admin role", async () => {
+        // The sweep runs on `prismaAdmin` while the inbound reply path can
+        // reach the send lock through the app client, so a missing EXECUTE
+        // grant on either function would reproduce the same silent outage for
+        // one caller and not the other. Cheap to pin, and genuinely
+        // role-shaped — this is the one case here that belongs in an RLS suite
+        // on its own merits.
+        await asRole("student", fixtures.studentA, (tx) => takeSendLock(tx, fixtures.studentA));
+        const locked = await asRole("student", fixtures.studentA, (tx) =>
+          tryTakeRunLock(tx, `${RUN_LOCK_KEY}-vq-app-probe`),
+        );
+        assert.equal(typeof locked, "boolean", "vq_app must be able to take both nudge locks");
+      });
+
+      it("the uncast two-argument form still fails, which is why the cast exists", async () => {
+        // A negative control, so this block documents its own reason for
+        // existing rather than asserting a cast that a later reader cannot
+        // justify and therefore deletes.
+        let raised: unknown = null;
+        try {
+          await db.$transaction(
+            async (tx) =>
+              tx.$queryRaw<Array<{ locked: boolean }>>`
+                SELECT pg_try_advisory_xact_lock(${ADVISORY_LOCK_CLASS.nudgeRun}, hashtext(${RUN_LOCK_KEY})) AS locked
+              `,
+          );
+        } catch (error) {
+          raised = error;
+        }
+        assert.ok(
+          raised !== null && String((raised as Error).message).includes("42883"),
+          "The uncast form no longer raises 42883. That is not a failure of the fix — it means either " +
+            "Prisma stopped binding a JavaScript number as bigint, or Postgres gained a (bigint, integer) " +
+            "overload. Confirm which, then simplify the two call sites and this block together. Do NOT " +
+            "delete this case and leave the casts unexplained.",
+        );
       });
     });
   });
