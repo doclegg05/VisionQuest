@@ -32,10 +32,15 @@ describe("usajobs adapter", () => {
 
   it("maps USAJobs fields to NormalizedJob (headers/query preserved)", async () => {
     let capturedUrl = "";
-    let capturedHeaders: Headers | null = null;
+    let capturedAuthKey: string | null = null;
+    let capturedUserAgent: string | null = null;
+    let capturedHost: string | null = null;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       capturedUrl = String(input);
-      capturedHeaders = new Headers(init?.headers);
+      const headers = new Headers(init?.headers);
+      capturedAuthKey = headers.get("authorization-key");
+      capturedUserAgent = headers.get("user-agent");
+      capturedHost = headers.get("host");
       return mockSearchResponse([
         {
           MatchedObjectId: "u1",
@@ -57,9 +62,9 @@ describe("usajobs adapter", () => {
     assert.equal(jobs[0].sourceId, "usajobs:u1");
     assert.ok(capturedUrl.startsWith("https://data.usajobs.gov/api/search?"));
     assert.ok(capturedUrl.includes("LocationName=Beckley%2C+WV") || capturedUrl.includes("LocationName=Beckley%2C%20WV"));
-    assert.equal(capturedHeaders?.get("authorization-key"), "test-usajobs-key");
-    assert.equal(capturedHeaders?.get("user-agent"), "test@example.com");
-    assert.equal(capturedHeaders?.get("host"), "data.usajobs.gov");
+    assert.equal(capturedAuthKey, "test-usajobs-key");
+    assert.equal(capturedUserAgent, "test@example.com");
+    assert.equal(capturedHost, "data.usajobs.gov");
   });
 
   it("returns [] when the API errors", async () => {

@@ -152,7 +152,7 @@ describe("talroo adapter", () => {
     assertWarnLogsAreCredentialFree(warnMock);
   });
 
-  it("sends the Talroo API key as a Bearer Authorization header, never in the URL", async (t: TestContext) => {
+  it("sends the Talroo API key as a Bearer Authorization header, never in the URL", async () => {
     let capturedUrl = "";
     let capturedAuth: string | null = null;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -30,10 +30,13 @@ describe("jsearch adapter", () => {
 
   it("maps JSearch fields to NormalizedJob (headers/query preserved)", async () => {
     let capturedUrl = "";
-    let capturedHeaders: Headers | null = null;
+    let capturedRapidApiKey: string | null = null;
+    let capturedRapidApiHost: string | null = null;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       capturedUrl = String(input);
-      capturedHeaders = new Headers(init?.headers);
+      const headers = new Headers(init?.headers);
+      capturedRapidApiKey = headers.get("x-rapidapi-key");
+      capturedRapidApiHost = headers.get("x-rapidapi-host");
       return mockSearchResponse([
         {
           job_id: "j1",
@@ -57,8 +60,8 @@ describe("jsearch adapter", () => {
     assert.equal(jobs[0].sourceId, "jsearch:j1");
     assert.ok(capturedUrl.includes("jsearch.p.rapidapi.com/search"));
     assert.ok(capturedUrl.includes("query=jobs+in+Beckley%2C+WV") || capturedUrl.includes("query=jobs%20in%20Beckley%2C%20WV"));
-    assert.equal(capturedHeaders?.get("x-rapidapi-key"), "test-jsearch-key");
-    assert.equal(capturedHeaders?.get("x-rapidapi-host"), "jsearch.p.rapidapi.com");
+    assert.equal(capturedRapidApiKey, "test-jsearch-key");
+    assert.equal(capturedRapidApiHost, "jsearch.p.rapidapi.com");
   });
 
   it("returns [] when the API errors", async () => {
