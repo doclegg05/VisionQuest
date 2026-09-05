@@ -68,6 +68,51 @@ const SERVER_ONLY_SPECIFIERS = [
     instead: "@/lib/connect/employers-shared",
     why: "it imports prisma from @/lib/db",
   },
+  // Phase 4. The student approval card wants the status labels and the packet
+  // field labels; the employer response page's client half wants the "not now"
+  // reason list. All three live in a -shared module beside the Prisma one.
+  {
+    specifier: "@/lib/connect/pipeline",
+    instead: "@/lib/connect/pipeline-shared",
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/packet",
+    instead: "@/lib/connect/packet-shared",
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/subsidies",
+    instead: "@/lib/connect/subsidies-shared",
+    why: "it reads SystemConfig, which imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/flags",
+    instead: "@/lib/connect/flags-shared",
+    why: "it reads SystemConfig, which imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/employer-link",
+    instead: "@/lib/connect/employer-link-shared",
+    why: "it imports prismaAdmin from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/employer-actions",
+    instead: "@/lib/connect/employer-actions-shared",
+    why: "it imports prismaAdmin from @/lib/db",
+  },
+  // No client half at all: these are server-only end to end. The escape hatch
+  // named here is the vocabulary a component would actually have been after.
+  {
+    specifier: "@/lib/connect/connections",
+    instead: "@/lib/connect/pipeline-shared",
+    why: "it imports prisma from @/lib/db",
+  },
+  {
+    specifier: "@/lib/connect/endorsement",
+    instead: "@/lib/connect/endorsement-shared",
+    why: "it resolves an AI provider, which imports prisma from @/lib/db",
+  },
 ];
 
 function collectFiles(dir: string, out: string[] = []): string[] {
