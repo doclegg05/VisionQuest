@@ -100,6 +100,25 @@ const FORBIDDEN_CONTROL = [
 const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/i;
 
 /**
+ * Collapse whitespace INSIDE every bracketed token, so a marker whose name was
+ * split by a space is still recognisable to the checks below.
+ *
+ * This is the measurement half of a bug that had both halves. The sanitizer
+ * normalizes an ambiguous space to " ", which turned
+ * "[GROUNDING<NNBSP>_DATA_END]" into a live "[GROUNDING _DATA_END]"; the
+ * scorer then reported the posting CLEAN, because the ambiguous space its
+ * detector was watching for had been consumed producing the forgery, the raw
+ * marker no longer substring-matched, and DELIMITER_SHAPED allows whitespace
+ * only at a token's edges. The fixture row added for exactly that case scored
+ * zero leaks. Collapsing inside brackets — and only inside brackets, so
+ * ordinary prose is never joined into an accidental match — makes a
+ * post-normalization survivor visible again.
+ */
+function collapseBracketedTokens(text) {
+  return text.replace(/\[[^[\]]*\]/g, (token) => token.replace(/\s+/g, ""));
+}
+
+/**
  * Characters that hide or reverse text for the reader but not the recipient.
  *
  * DERIVED, NOT COPIED. This list used to be three regexes written out here,
@@ -140,8 +159,28 @@ function controlLeaks(text, { allowFence = false } = {}) {
     if (allowFence && token.value.startsWith("[GROUNDING_DATA_")) continue;
     if (text.includes(token.value)) found.push(token.label);
   }
-  if (DELIMITER_SHAPED.test(allowFence ? text.replaceAll(/\[GROUNDING_DATA_(START|END)\]/g, "") : text)) {
-    found.push("delimiter-shaped token");
+  // Tested on BOTH the raw text and its bracket-collapsed form: the raw form
+  // catches an ordinary forgery, the collapsed form catches one whose name was
+  // split by whitespace — including whitespace the sanitizer itself produced
+  // while normalizing an ambiguous space.
+  for (const candidate of [text, collapseBracketedTokens(text)]) {
+    const stripped = allowFence
+      ? candidate.replaceAll(/\[GROUNDING_DATA_(START|END)\]/g, "")
+      : candidate;
+    if (DELIMITER_SHAPED.test(stripped)) {
+      found.push(
+        candidate === text
+          ? "delimiter-shaped token"
+          : "delimiter-shaped token (whitespace-hidden marker name)",
+      );
+      break;
+    }
+  }
+  for (const token of FORBIDDEN_CONTROL) {
+    if (allowFence && token.value.startsWith("[GROUNDING_DATA_")) continue;
+    if (collapseBracketedTokens(text).includes(token.value) && !text.includes(token.value)) {
+      found.push(`${token.label} (whitespace-hidden)`);
+    }
   }
   found.push(...describeInvisible(text));
   return found;
@@ -174,6 +213,25 @@ function fenceLeaks(prompt, posting) {
     if (marker.trim().length < 4) continue;
     if (outside.includes(marker)) found.push(`marker escaped the fence: ${JSON.stringify(marker)}`);
   }
+  // The fence's OWN name is exempted by allowFence, so a forgery that reuses it
+  // is invisible to controlLeaks by construction. Count it instead: the real
+  // fence contributes exactly one of each marker, so a second one appearing
+  // only once interior whitespace is ignored is a forged fence that survived
+  // normalization. This is the case the `narrow-nbsp-in-marker` fixture row
+  // exercises, and it read CLEAN before this check existed.
+  const collapsedPrompt = collapseBracketedTokens(prompt);
+  const collapsedStarts = collapsedPrompt.split("[GROUNDING_DATA_START]").length - 1;
+  const collapsedEnds = collapsedPrompt.split("[GROUNDING_DATA_END]").length - 1;
+  if (collapsedStarts !== 1) {
+    found.push(
+      `fence start appears ${collapsedStarts} times once whitespace inside brackets is ignored, expected 1`,
+    );
+  }
+  if (collapsedEnds !== 1) {
+    found.push(
+      `fence end appears ${collapsedEnds} times once whitespace inside brackets is ignored, expected 1`,
+    );
+  }
   found.push(...controlLeaks(prompt, { allowFence: true }));
   return found;
 }
@@ -200,7 +258,7 @@ function markerLeaks(text, posting) {
 
 /** Which class a leak belongs to, so the two very different gaps stay apart. */
 function leakClass(detail) {
-  if (/invisible character|ambiguous space/i.test(detail)) return "invisible_characters";
+  if (/invisible character|ambiguous space|whitespace-hidden/i.test(detail)) return "invisible_characters";
   // A `survivor:` line quotes the character itself, so classify by what it
   // CONTAINS as well as by what it says — otherwise an invisible-character
   // leak is filed under delimiter forgery and the two gaps blur together.
