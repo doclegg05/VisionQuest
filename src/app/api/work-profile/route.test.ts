@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { Prisma } from "@prisma/client";
 import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
 
 /**
@@ -111,6 +112,35 @@ describe("PUT /api/work-profile", () => {
     assert.equal(args.update.homeZip, "25301");
   });
 
+  it("clears a nullable JSON column with Prisma.DbNull, not a bare null", async () => {
+    // A bare `null` on a nullable Json column means the JSON literal null and
+    // Prisma refuses it — so "delete my childcare note" was a broken write
+    // while the payload was typed Record<string, unknown>. Typing the payload
+    // is what surfaced it; this pins the behaviour.
+    const res = await route.PUT(
+      mockRequest("/api/work-profile", {
+        method: "PUT",
+        body: { childcareHours: null, shiftLimits: null },
+      }),
+    );
+    assert.equal(res.status, 200);
+    const args = mockUpsert.mock.calls[0].arguments[0];
+    assert.equal(args.update.childcareHours, Prisma.DbNull);
+    assert.equal(args.update.shiftLimits, Prisma.DbNull);
+  });
+
+  it("rejects a calendar date that does not exist", async () => {
+    // "2026-09-31" used to store October 1 — a start date the student never
+    // picked — and "2026-13-01" produced a 500 instead of a correctable 400.
+    for (const bad of ["2026-09-31", "2026-02-30", "2026-13-01"]) {
+      const res = await route.PUT(
+        mockRequest("/api/work-profile", { method: "PUT", body: { earliestStart: bad } }),
+      );
+      assert.equal(res.status, 400, `${bad} should be refused`);
+    }
+    assert.equal(mockUpsert.mock.callCount(), 0);
+  });
+
   it("rejects a payload carrying another student's id", async () => {
     const res = await route.PUT(
       mockRequest("/api/work-profile", {
@@ -184,7 +214,8 @@ describe("GET /api/work-profile", () => {
     const res = await route.GET();
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.workProfile, null);
+    assert.equal(body.success, true);
+    assert.equal(body.data.workProfile, null);
   });
 
   it("reads the caller's own row", async () => {
@@ -206,7 +237,7 @@ describe("GET /api/work-profile", () => {
     const res = await route.GET();
     const body = await res.json();
     assert.deepEqual(mockFindUnique.mock.calls[0].arguments[0].where, { studentId: session.id });
-    assert.equal(body.workProfile.transport, "bus");
-    assert.equal(body.workProfile.earliestStart, "2026-10-01");
+    assert.equal(body.data.workProfile.transport, "bus");
+    assert.equal(body.data.workProfile.earliestStart, "2026-10-01");
   });
 });

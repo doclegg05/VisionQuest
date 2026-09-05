@@ -16,6 +16,7 @@
 
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { redactContactInfo } from "@/lib/log-redaction";
 import {
   sageWorkProfileInputSchema,
   TRANSPORT_MODES,
@@ -162,7 +163,12 @@ export async function executeAndLedger(
     return { status: "success", summary, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Write tool ${toolName} failed`, { error: message });
+    // A Prisma validation error quotes the offending VALUE back — for
+    // update_work_profile that is the student's own childcare note, and for
+    // other tools it can be an email or a phone number pulled from a
+    // provider error. redactContactInfo strips the contact forms; the ledger
+    // row below is where the full payload legitimately lives.
+    logger.error(`Write tool ${toolName} failed`, { error: redactContactInfo(message) });
     await recordOperation({
       id: operationId,
       actorType: actorTypeFor(ctx.session.role),

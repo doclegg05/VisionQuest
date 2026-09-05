@@ -974,6 +974,42 @@ if (!SHOULD_RUN) {
         assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA], "Student C is Teacher B's");
       });
 
+      it("teacher can update a managed student's profile, and only that one", async () => {
+        // Instructors correct a profile with the student in front of them
+        // (updatedVia "teacher"), so the teacher branch must be writable —
+        // and must stop at the classroom boundary.
+        const managed = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentA },
+            data: { maxCommuteMinutes: 30 },
+          }),
+        );
+        assert.equal(managed.count, 1, "Teacher A manages Student A");
+
+        const unmanaged = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentC },
+            data: { maxCommuteMinutes: 999 },
+          }),
+        );
+        assert.equal(unmanaged.count, 0, "Student C is Teacher B's");
+      });
+
+      it("student cannot re-key their own row onto another student", async () => {
+        // The WITH CHECK clause is what catches this: the UPDATE passes USING
+        // (it is their row) and must still fail on the row it would become.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentWorkProfile.update({
+                where: { studentId: fixtures.studentA },
+                data: { studentId: fixtures.studentB },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
       it("returns zero rows with no RLS context", async () => {
         // The "no RLS context" block above runs before these fixture rows
         // exist, so this table's empty-GUC case has to be asserted here, with

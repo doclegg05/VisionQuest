@@ -23,6 +23,13 @@ import { parseBody } from "@/lib/schemas";
  * Teachers read a student's profile through the student-detail route, which
  * already audits the read; this endpoint is the student's own surface and
  * refuses staff outright rather than creating a work profile on a staff row.
+ *
+ * Why its own route rather than an extension of /api/settings/profile: that
+ * endpoint writes SpokesRecord, the DoHS-reporting record, whose fields are
+ * program demographics a teacher may correct. A work profile is a different
+ * table with a different owner (the student alone), a different writer set
+ * (the student, Sage, or an instructor via updatedVia), and its own retention
+ * row. Folding it in would put two lifecycles behind one schema.
  */
 
 function requireStudent(session: Session): void {
@@ -34,12 +41,12 @@ function requireStudent(session: Session): void {
 export const GET = withAuth(async (session: Session) => {
   requireStudent(session);
   const workProfile = await getWorkProfile(session.id);
-  return NextResponse.json({ workProfile });
+  return NextResponse.json({ success: true, data: { workProfile } });
 });
 
 export const PUT = withAuth(async (session: Session, req: Request) => {
   requireStudent(session);
   const body = await parseBody(req, workProfileInputSchema);
   const workProfile = await upsertWorkProfile(session.id, body, "student");
-  return NextResponse.json({ workProfile });
+  return NextResponse.json({ success: true, data: { workProfile } });
 });

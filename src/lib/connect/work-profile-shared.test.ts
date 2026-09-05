@@ -11,14 +11,25 @@ import {
   type AvailabilityDay,
   type AvailabilityGrid,
   type AvailabilitySlot,
-} from "./work-profile";
+} from "./work-profile-shared";
 
 /**
- * Task 2.1 of the Match & Connect plan. These cover the pure halves of
- * src/lib/connect/work-profile.ts — the grid math and the transport matrix —
- * which Phase 3's matcher will use as hard blocks. Nothing here touches a
- * database.
+ * Task 2.1 of the Match & Connect plan. These cover
+ * src/lib/connect/work-profile-shared.ts — the grid math, the transport
+ * matrix, and the Zod schema — which Phase 3's matcher will use as hard
+ * blocks. Nothing here touches a database, and the module under test imports
+ * no server-only code (see client-import-guard.test.ts for why that matters).
  */
+
+/**
+ * Round an overlap for comparison. Asserts it is a number first: since
+ * availabilityOverlap may return null for "nothing declared", a null slipping
+ * into a ratio assertion must fail loudly rather than compare as NaN.
+ */
+function rounded(value: number | null): string {
+  assert.ok(value !== null, "expected a declared overlap, got null");
+  return value.toFixed(4);
+}
 
 function gridWith(cells: Partial<Record<AvailabilityDay, AvailabilitySlot[]>>): AvailabilityGrid {
   const grid = emptyAvailability();
@@ -104,7 +115,7 @@ describe("availabilityOverlap", () => {
     const profile = { availability: gridWith({ monday: ["evening"] }) };
     // day (10 cells) + evening (5 cells) = 15 requested, 1 available.
     assert.equal(
-      Number(availabilityOverlap(profile, { shifts: ["day", "evening"] }).toFixed(4)),
+      Number(rounded(availabilityOverlap(profile, { shifts: ["day", "evening"] }))),
       Number((1 / 15).toFixed(4)),
     );
   });
@@ -127,10 +138,12 @@ describe("availabilityOverlap", () => {
     full.sunday.overnight = false;
     assert.equal(
       Number(
-        availabilityOverlap(
-          { availability: full },
-          { shifts: ["day", "evening", "night", "weekend"] },
-        ).toFixed(4),
+        rounded(
+          availabilityOverlap(
+            { availability: full },
+            { shifts: ["day", "evening", "night", "weekend"] },
+          ),
+        ),
       ),
       Number((27 / 28).toFixed(4)),
     );
@@ -141,8 +154,21 @@ describe("availabilityOverlap", () => {
     assert.equal(availabilityOverlap(profile, { shifts: [] }), 1);
   });
 
-  it("returns 0 for a student with no profile", () => {
-    assert.equal(availabilityOverlap(null, { shifts: ["day"] }), 0);
+  it("returns null, not 0, when the student has not declared any availability", () => {
+    // Spec §5 makes an overlap of 0 a HARD BLOCK. upsertWorkProfile creates an
+    // all-false grid whenever a student answers only, say, their pay floor, so
+    // returning 0 here would hide every lead from every student who skipped
+    // the grid. "Not declared" has to be its own answer.
+    assert.equal(availabilityOverlap({ availability: emptyAvailability() }, { shifts: ["day"] }), null);
+    assert.equal(availabilityOverlap(null, { shifts: ["day"] }), null);
+    assert.equal(availabilityOverlap(undefined, { shifts: ["day"] }), null);
+  });
+
+  it("still returns 0 for a real mismatch, so the hard block keeps working", () => {
+    // Weekend-only availability against a weekday day shift: declared, and
+    // genuinely incompatible.
+    const profile = { availability: gridWith({ saturday: ["morning"], sunday: ["morning"] }) };
+    assert.equal(availabilityOverlap(profile, { shifts: ["day"] }), 0);
   });
 });
 
@@ -170,6 +196,20 @@ describe("transportFeasible", () => {
     assert.equal(
       transportFeasible({ transport: "bus" }, { transitNotes: "   ", distanceMiles: null }),
       "unknown",
+    );
+  });
+
+  it("honours a transit note for a walker, the same way it does for someone with no ride", () => {
+    // The two branches disagreed: `none` + a transit note was "yes" while
+    // `walk` + the same note fell through to the distance rule and could
+    // return "no". A student who walks can also take the bus that stops out
+    // front — the note is the same evidence either way.
+    assert.equal(
+      transportFeasible(
+        { transport: "walk" },
+        { transitNotes: "Route 4 stops out front", distanceMiles: 12 },
+      ),
+      "yes",
     );
   });
 
@@ -244,6 +284,18 @@ describe("workProfileInputSchema", () => {
   it("rejects an earliestStart that is not a plain date", () => {
     assert.equal(workProfileInputSchema.safeParse({ earliestStart: "next Tuesday" }).success, false);
     assert.equal(workProfileInputSchema.safeParse({ earliestStart: "2026-10-01" }).success, true);
+  });
+
+  it("rejects a date that matches the pattern but is not on the calendar", () => {
+    // The regex alone accepted these. "2026-09-31" silently became October 1
+    // in the database — a start date the student never chose — and month 13
+    // produced an Invalid Date that surfaced as a 500 from the route.
+    assert.equal(workProfileInputSchema.safeParse({ earliestStart: "2026-09-31" }).success, false);
+    assert.equal(workProfileInputSchema.safeParse({ earliestStart: "2026-02-30" }).success, false);
+    assert.equal(workProfileInputSchema.safeParse({ earliestStart: "2026-13-01" }).success, false);
+    assert.equal(workProfileInputSchema.safeParse({ earliestStart: "2026-00-10" }).success, false);
+    // A real leap day still passes.
+    assert.equal(workProfileInputSchema.safeParse({ earliestStart: "2028-02-29" }).success, true);
   });
 
   it("allows every field to be cleared with null", () => {

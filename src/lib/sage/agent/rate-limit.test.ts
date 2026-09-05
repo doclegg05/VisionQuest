@@ -76,6 +76,20 @@ describe("checkToolRateLimit — window + default limits per tier", () => {
     assert.equal(d.window, "hour");
   });
 
+  it("read_ai → hourly window, default 20 (far tighter than plain read)", async () => {
+    // A read tool that GENERATES is not the same cost as a lookup: explain_job
+    // can make two model calls per invocation, so 200/hour would be up to 400
+    // generations an hour for one student on the FERPA-local box everyone in
+    // the classroom shares.
+    const d = await checkToolRateLimit("stu-1", "explain_job", "read_ai");
+    assert.equal(dailyCalls.length, 0);
+    assert.equal(windowCalls.length, 1);
+    assert.equal(windowCalls[0].limit, 20);
+    assert.equal(windowCalls[0].windowMs, 60 * 60 * 1000);
+    assert.equal(windowCalls[0].key, "sage-tool:hour:stu-1:explain_job");
+    assert.equal(d.window, "hour");
+  });
+
   it("blocks when the underlying store denies", async () => {
     nextSuccess = false;
     const d = await checkToolRateLimit("stu-1", "book_appointment", "mutate_consequential");
@@ -95,6 +109,12 @@ describe("checkToolRateLimit — env overrides", () => {
     process.env.SAGE_TOOL_RATE_READ = "50";
     await checkToolRateLimit("stu-1", "present_form", "read");
     assert.equal(windowCalls[0].limit, 50);
+  });
+
+  it("honors SAGE_TOOL_RATE_READ_AI", async () => {
+    process.env.SAGE_TOOL_RATE_READ_AI = "7";
+    await checkToolRateLimit("stu-1", "explain_job", "read_ai");
+    assert.equal(windowCalls[0].limit, 7);
   });
 
   it("ignores a non-positive / non-numeric override and keeps the default", async () => {
