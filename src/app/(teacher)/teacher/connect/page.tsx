@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AddLeadForm } from "@/components/teacher/connect/AddLeadForm";
@@ -149,6 +150,13 @@ export default async function ConnectPage() {
         title="Connect"
         description="Open jobs, who fits each one, and the employers behind them. Add a lead by hand, from a job order (a job posted on WorkForce WV's job bank), or from a job on a class board."
       />
+
+      <Link
+        href="/teacher/connect/report"
+        className="theme-card inline-block rounded-xl p-4 text-sm font-medium text-[var(--ink-strong)] hover:opacity-90"
+      >
+        See the funnel report — where connections stall, and the DoHS export →
+      </Link>
 
       {/* Phase 4 slot: the connection pipeline and today's follow-ups go here,
           above the boards — they are the day's work, not a directory. */}
