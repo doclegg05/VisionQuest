@@ -46,6 +46,15 @@ export const SYSTEM_CONFIG_KEYS = [
   // comma-separated list of SpokesClass IDs whose actively enrolled
   // students get the "Record employment outcome" queue item.
   "placement_bridge_classes",
+  // Match & Connect Phase 4 pilot flag (plain value). Unset/empty → Connect
+  // OFF. "all" → every class. Otherwise a comma-separated list of SpokesClass
+  // IDs. Gates the Sage tool, the student pending endpoint, the console's
+  // connection actions and the employer response page.
+  "connect_enabled_classes",
+  // "true"/"on"/"1" lets a VERIFIED subsidy rule render on an employer page.
+  // Unset → OFF, and every figure in src/lib/connect/subsidies-shared.ts also
+  // ships unverified, so both gates have to be opened deliberately.
+  "connect_subsidy_lines_enabled",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

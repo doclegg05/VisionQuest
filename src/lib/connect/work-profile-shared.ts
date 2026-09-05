@@ -226,7 +226,7 @@ export function parseIsoDate(value: string): Date {
  * (or by a future column edit) degrades to the safe default rather than
  * throwing inside a student's chat turn.
  */
-function parseAvailability(raw: unknown): AvailabilityGrid {
+export function parseAvailability(raw: unknown): AvailabilityGrid {
   const parsed = availabilitySchema.safeParse(raw);
   return parsed.success ? parsed.data : emptyAvailability();
 }

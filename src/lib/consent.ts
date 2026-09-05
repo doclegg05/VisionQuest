@@ -14,7 +14,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
-export const CONSENT_SCOPES = ["cloud_file_processing"] as const;
+/**
+ * `employer_referral` (Match & Connect Phase 4) is blanket permission to be
+ * INTRODUCED to employers — revocable, and never on its own enough to send
+ * anything: each Connection still needs the student's per-disclosure tap on a
+ * card showing that packet's exact field list (design spec §4).
+ *
+ * Revoking it withdraws every non-terminal connection; see revokeConsent.
+ */
+export const CONSENT_SCOPES = ["cloud_file_processing", "employer_referral"] as const;
 export type ConsentScope = (typeof CONSENT_SCOPES)[number];
 
 export const consentScopeSchema = z.enum(CONSENT_SCOPES);
@@ -62,6 +70,17 @@ export async function revokeConsent(
     data: { revokedAt: new Date() },
   });
   if (count === 0) return { revoked: false };
+
+  // Taking back permission to be introduced has to actually stop the
+  // introductions. Dynamically imported to keep the dependency one-way:
+  // connect/connections.ts imports this module for grantConsent, and a static
+  // import here would close the cycle.
+  if (scope === "employer_referral") {
+    const { withdrawConnectionsForConsentRevocation } = await import(
+      "@/lib/connect/connections"
+    );
+    await withdrawConnectionsForConsentRevocation(studentId, recordedBy);
+  }
 
   await logAuditEvent({
     actorId: recordedBy,
