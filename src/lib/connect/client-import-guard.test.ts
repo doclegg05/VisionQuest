@@ -113,6 +113,29 @@ const SERVER_ONLY_SPECIFIERS = [
     instead: "@/lib/connect/endorsement-shared",
     why: "it resolves an AI provider, which imports prisma from @/lib/db",
   },
+  // Phase 5. The settings page renders the SMS consent copy, which lives in
+  // sms-policy-shared beside the quiet-hours and cap rules; the sending half
+  // imports prismaAdmin. schedule/replies/alerts have no client half at all.
+  {
+    specifier: "@/lib/nudges/sms-policy",
+    instead: "@/lib/nudges/sms-policy-shared",
+    why: "it imports prismaAdmin from @/lib/db",
+  },
+  {
+    specifier: "@/lib/nudges/schedule",
+    instead: "@/lib/nudges/schedule-shared",
+    why: "it imports prismaAdmin from @/lib/db",
+  },
+  {
+    specifier: "@/lib/nudges/replies",
+    instead: "@/lib/nudges/schedule-shared",
+    why: "it imports prismaAdmin from @/lib/db",
+  },
+  {
+    specifier: "@/lib/nudges/alerts",
+    instead: "@/lib/nudges/schedule-shared",
+    why: "it imports prisma from @/lib/db",
+  },
 ];
 
 function collectFiles(dir: string, out: string[] = []): string[] {

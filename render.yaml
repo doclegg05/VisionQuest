@@ -69,6 +69,16 @@ services:
         sync: false
       - key: CRON_SECRET
         generateValue: true
+      # SMS (Match & Connect Phase 5) — optional, and unset means OFF at every
+      # level: sendSms is a no-op and /api/sms/inbound rejects every request.
+      # TWILIO_AUTH_TOKEN also verifies Twilio's inbound X-Twilio-Signature.
+      # Enable steps: docs/runbooks/connect-nudges.md
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
       - key: SENTRY_DSN
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN
