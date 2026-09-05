@@ -18,6 +18,9 @@ import { describe, it } from "node:test";
 import {
   checkExplanationFaithfulness,
   ungroundedDollarValues,
+  BARE_RATE,
+  CITY_STATE,
+  MAX_CHECKED_CHARS,
   type ExplainPosting,
 } from "./explain-faithfulness";
 
@@ -306,5 +309,113 @@ describe("a wage written out in words is still a wage", () => {
 
   it("does not read a wage out of a spelled-out number with no money word", () => {
     assert.deepEqual(kinds("Good to know: You work with about twenty other people."), []);
+  });
+});
+
+// =============================================================================
+// ReDoS. A super-linear pattern here is reachable by whoever writes a job
+// posting: `explain_job` reads third-party feed text, and the checks run over
+// it before anything reaches a student.
+//
+// Both cases below were measured, not reasoned about. The shape they pin is
+// GROWTH, not a stopwatch reading: a wall-clock threshold on a shared CI runner
+// would flake, but a quadratic pattern grows ~64x across an 8x input increase
+// while a linear one grows ~8x, and no amount of machine noise closes that gap.
+// =============================================================================
+
+const REDOS_SIZES = [1250, 2500, 5000, 10000];
+
+function repeatTo(unit: string, n: number): string {
+  return unit.repeat(Math.ceil(n / unit.length)).slice(0, n);
+}
+
+/** Best of five, so a scheduler hiccup cannot manufacture a failure. */
+function bestMillis(pattern: RegExp, input: string): number {
+  const probe = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+  let best = Infinity;
+  for (let i = 0; i < 5; i += 1) {
+    const started = process.hrtime.bigint();
+    probe.test(input);
+    best = Math.min(best, Number(process.hrtime.bigint() - started) / 1e6);
+  }
+  return best;
+}
+
+/**
+ * How much slower the pattern gets when its input grows eight-fold.
+ *
+ * Linear is 8. The floor on the baseline keeps a sub-microsecond first reading
+ * from turning into a meaningless ratio.
+ */
+function growthRatio(pattern: RegExp, attack: (n: number) => string): number {
+  const times = REDOS_SIZES.map((n) => bestMillis(pattern, attack(n)));
+  return times[times.length - 1] / Math.max(times[0], 0.01);
+}
+
+/** Comfortably above linear (8) and far below the 73-78 the old patterns hit. */
+const LINEAR_ENOUGH = 20;
+
+describe("the patterns stay linear on adversarial input", () => {
+  it("CITY_STATE does not blow up on capitalised prose with no state after it", () => {
+    // The old `(?:[ -][A-Z][a-z]+)*` walked every remaining word from every
+    // start position: 49 ms at 10 KB, 3 s at 80 KB, ratio 78.
+    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa ", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("CITY_STATE does not blow up on hyphenated capitalised prose", () => {
+    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa-", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("BARE_RATE does not blow up on a rate word followed by spaces", () => {
+    // The reachable one -- it reads the POSTING, which is third-party text.
+    // `per\s+` beside `\s*` gave back one space and re-consumed the rest:
+    // 86 ms at 10 KB, 8.5 s at 80 KB, ratio 73.
+    const ratio = growthRatio(BARE_RATE, (n) => `1 per ${" ".repeat(Math.max(0, n - 6))}`);
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("BARE_RATE does not blow up on repeated rate phrases", () => {
+    const ratio = growthRatio(BARE_RATE, (n) => repeatTo("1 per ", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  });
+
+  it("still reads the wage and place forms it exists to read", () => {
+    // A bound is only safe if it changed nothing real.
+    assert.deepEqual(kinds("Pay: $16 an hour."), []);
+    assert.deepEqual(
+      kinds("Pay: $18 an hour.", { ...POSTING, salary: null, description: "Pays 18/hr." }),
+      [],
+    );
+    assert.deepEqual(
+      kinds("Pay: $18 an hour.", { ...POSTING, salary: null, description: "Pays 18 per hour." }),
+      [],
+    );
+    assert.deepEqual(kinds("Where: Charleston, WV."), []);
+  });
+});
+
+describe("the checked text is bounded", () => {
+  it("stops reading a posting past the cap", () => {
+    // Truncating the SOURCE can only make the check stricter: the wage sits
+    // past the cut, so it no longer grounds the draft and the draft is refused.
+    // Refusing is the safe direction, which is why the cap is not a hole.
+    const posting: ExplainPosting = {
+      ...POSTING,
+      salary: null,
+      description: `${"filler. ".repeat(MAX_CHECKED_CHARS / 4)}Pays $37 an hour.`,
+    };
+    assert.ok(posting.description.length > MAX_CHECKED_CHARS);
+    assert.deepEqual(kinds("Pay: $37 an hour.", posting), ["wage"]);
+  });
+
+  it("reads a posting that fits under the cap normally", () => {
+    const posting: ExplainPosting = {
+      ...POSTING,
+      salary: null,
+      description: "Pays $37 an hour. Evening shifts.",
+    };
+    assert.deepEqual(kinds("Pay: $37 an hour.", posting), []);
   });
 });

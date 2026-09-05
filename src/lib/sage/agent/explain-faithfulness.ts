@@ -15,8 +15,8 @@
 // posting doesn't say." for a missing fact, and a check that punished silence
 // would push it the other way.
 //
-//   wage         a dollar figure the posting never states (the original check,
-//                behaviour unchanged);
+//   wage         a dollar figure the posting never states, in numerals or
+//                spelled out;
 //   hours        an hours-per-week or per-day figure the posting never states;
 //   place        a "City, ST" the posting never names;
 //   requirement  a credential from a closed vocabulary that the posting never
@@ -26,6 +26,12 @@
 // grade-6 rewrite produces false refusals, and a false refusal costs a student
 // their explanation and tells them to go ask their instructor — the check has
 // to be one nobody has to argue with.
+//
+// EVERY PATTERN HERE READS ATTACKER-INFLUENCED TEXT. The posting arrives from a
+// third-party feed, so a super-linear pattern is a denial of service anybody
+// who can publish a job can trigger. Two were found and fixed that way (see
+// BARE_RATE and CITY_STATE); `explain-faithfulness.test.ts` pins their growth
+// across an 8x input increase, and `MAX_CHECKED_CHARS` bounds the rest.
 // =============================================================================
 
 /** What the checker was given to compare against. */
@@ -136,8 +142,16 @@ function wordMoneyValues(text: string): number[] {
  * Bare "15/hr" and "15 an hour" count as the posting stating a wage. Only
  * applied to the POSTING side: a draft has to name its unit, and treating any
  * bare number in a draft as money would flag "40 pounds".
+ *
+ * The unit words are `\b`-terminated rather than followed by `\s+`. The
+ * original had `per\s+` immediately followed by `\s*` -- two whitespace
+ * quantifiers competing for the same run of spaces -- which is quadratic: on
+ * "1 per " plus 10,000 spaces the `\s+` gives back one space at a time and the
+ * `\s*` re-consumes the rest each time. Measured at 86 ms for 10 KB and 8.5 s
+ * for 80 KB. This one reads a POSTING, i.e. third-party job-feed text of
+ * unbounded shape, so it was the reachable one. One quantifier, one pass.
  */
-const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\s+|an\s+|a\s+)\s*(?:hr|hour|h)\b/gi;
+export const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\b|an\b|a\b)\s*(?:hr|hour|h)\b/gi;
 
 /** Rounding a posted rate to whole dollars is not a fabrication. */
 const ROUNDING_TOLERANCE = 1;
@@ -165,7 +179,7 @@ export function ungroundedDollarValues(
   draft: string,
   job: { salary: string | null; description: string },
 ): number[] {
-  const source = `${job.salary ?? ""} ${job.description}`;
+  const source = clamp(`${job.salary ?? ""} ${job.description}`);
   const grounded = [
     ...numbersMatching(source, MONEY_PATTERNS),
     ...numbersMatching(source, [BARE_RATE]),
@@ -235,7 +249,14 @@ function ungroundedHourValues(draft: string, source: string): number[] {
  * honest place for it is a fixture case somebody can point at, not a looser
  * pattern that produces refusals nobody can explain.
  */
-const CITY_STATE = /\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+)*),\s*([A-Z]{2})\b/gu;
+/**
+ * Bounded on purpose. The unbounded `(?:[ -][A-Z][a-z]+)*` was quadratic on
+ * capitalised prose with no comma after it -- "Aa " repeated measured 49 ms at
+ * 10 KB and 3 s at 80 KB -- because every start position walked the whole run
+ * of words before failing. No place name in this corpus is five words long,
+ * so `{0,4}` costs nothing real and makes the walk bounded.
+ */
+export const CITY_STATE = /\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,4}),[ \t]{0,3}([A-Z]{2})\b/gu;
 
 /** "Beckley,WV" and "Beckley,  WV" both compare as "beckley, wv". */
 function normalizePlace(text: string): string {
@@ -382,15 +403,38 @@ function ungroundedRequirements(draft: string, source: string): string[] {
 // The check
 // ---------------------------------------------------------------------------
 
+/**
+ * How much of either side these checks will read.
+ *
+ * Defense in depth, not the fix. The two super-linear patterns are fixed where
+ * they live; this is the bound that keeps the NEXT one from mattering. A job
+ * description arrives from a third-party feed and nothing upstream limits its
+ * length, so an unbounded scan is an unbounded amount of work triggerable by
+ * whoever writes the posting.
+ *
+ * 20,000 characters is roughly ten times the longest description in the
+ * benchmark corpus. Truncating the SOURCE can only make the check STRICTER --
+ * a wage stated past the cut stops grounding a draft that repeats it, so the
+ * draft is refused rather than passed. That is the safe direction, and it is
+ * why the cap is not a hole.
+ */
+export const MAX_CHECKED_CHARS = 20_000;
+
+function clamp(text: string): string {
+  return text.length > MAX_CHECKED_CHARS ? text.slice(0, MAX_CHECKED_CHARS) : text;
+}
+
 function postingText(job: ExplainPosting): string {
-  return [
-    job.title ?? "",
-    job.company ?? "",
-    job.location ?? "",
-    job.salary ?? "",
-    job.employmentType ?? "",
-    job.description,
-  ].join("\n");
+  return clamp(
+    [
+      job.title ?? "",
+      job.company ?? "",
+      job.location ?? "",
+      job.salary ?? "",
+      job.employmentType ?? "",
+      job.description,
+    ].join("\n"),
+  );
 }
 
 /**
@@ -406,18 +450,19 @@ export function checkExplanationFaithfulness(
   job: ExplainPosting,
 ): FaithfulnessFinding[] {
   const source = postingText(job);
+  const checked = clamp(draft);
   const findings: FaithfulnessFinding[] = [];
 
-  for (const value of ungroundedDollarValues(draft, job)) {
+  for (const value of ungroundedDollarValues(checked, job)) {
     findings.push({ kind: "wage", detail: `$${value}` });
   }
-  for (const value of ungroundedHourValues(draft, source)) {
+  for (const value of ungroundedHourValues(checked, source)) {
     findings.push({ kind: "hours", detail: `${value} hours` });
   }
-  for (const place of ungroundedPlaces(draft, source)) {
+  for (const place of ungroundedPlaces(checked, source)) {
     findings.push({ kind: "place", detail: place });
   }
-  for (const credential of ungroundedRequirements(draft, source)) {
+  for (const credential of ungroundedRequirements(checked, source)) {
     findings.push({ kind: "requirement", detail: credential });
   }
 

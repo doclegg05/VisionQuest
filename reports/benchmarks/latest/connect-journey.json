@@ -1,9 +1,9 @@
 {
   "suite": "connect-journey",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:33:56.879Z",
-  "durationMs": 11,
-  "commit": "f6d7c25",
+  "startedAt": "2026-09-05T16:44:29.775Z",
+  "durationMs": 12,
+  "commit": "96c5acc",
   "provider": null,
   "model": null,
   "host": {
@@ -26,8 +26,8 @@
       "baseline": null,
       "status": "pass",
       "details": {
-        "connectionId": "cmtolqgiz00027dyvoepyheew",
-        "measuredAt": "2026-09-05T16:33:47.520Z",
+        "connectionId": "cmtom4bto001i7dyv1lug8fsa",
+        "measuredAt": "2026-09-05T16:44:22.252Z",
         "ageHours": 0
       }
     },
@@ -47,7 +47,7 @@
     },
     {
       "id": "elapsed_ms",
-      "value": 39451,
+      "value": 23815,
       "unit": "ms",
       "reason": "Wall clock including database polling and Playwright's own waits, on whatever machine ran it. A trend line across runs on one machine, never a latency number — flooring it would fail a slow CI runner and teach everyone to ignore the gate.",
       "direction": "lower",

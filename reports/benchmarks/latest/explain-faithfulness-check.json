@@ -1,9 +1,9 @@
 {
   "suite": "explain-faithfulness-check",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:22:10.621Z",
-  "durationMs": 31,
-  "commit": "f6d7c25",
+  "startedAt": "2026-09-05T16:42:24.674Z",
+  "durationMs": 44,
+  "commit": "96c5acc",
   "provider": null,
   "model": null,
   "host": {
