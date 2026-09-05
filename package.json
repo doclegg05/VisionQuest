@@ -58,6 +58,7 @@
     "report:pathway-outcomes": "tsx scripts/pathway-outcomes-report.ts",
     "clusters:backfill": "node scripts/backfill-national-clusters.mjs",
     "cos:smoke": "tsx scripts/cos-smoke.mjs",
+    "talroo:smoke": "tsx scripts/talroo-smoke.mjs",
     "ui-copy:readability": "tsx scripts/ui-copy-readability.mjs",
     "seed:e2e": "tsx scripts/seed-e2e-users.ts",
     "test:e2e:journeys": "playwright test e2e/student-journey.spec.ts e2e/teacher-loop.spec.ts",
