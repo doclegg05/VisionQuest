@@ -45,6 +45,10 @@ const state = {
   /** The `take` the enrollment query asked for, and the roster it was asked about. */
   enrollmentTake: undefined as number | undefined,
   weeklyDedupeIds: [] as string[],
+  /** Forces one send outcome, so a dead SMS leg can be driven on the mock path. */
+  sendOutcome: null as null | { status: string; reason?: string; outboundMessageId?: string },
+  /** Every `logger.error` the run made, so the escalation can be asserted. */
+  errorLogs: [] as Array<{ message: string; payload: Record<string, unknown> }>,
 };
 
 const prismaAdmin = {
@@ -204,13 +208,22 @@ mock.module("./sms-policy", {
       // Lets a test move the clock BETWEEN sends, which is the only way to
       // exercise a deadline that falls part-way through the loop.
       state.onSend?.();
-      return { status: "sent" as const, outboundMessageId: "om_1" };
+      return state.sendOutcome ?? { status: "sent" as const, outboundMessageId: "om_1" };
     },
   },
 });
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+    logger: {
+      info: () => {},
+      warn: () => {},
+      // Captured, not discarded: the escalation cases assert on the `alert:`
+      // key, which is the whole mechanism monitoring keys off.
+      error: (message: string, payload?: Record<string, unknown>) => {
+        state.errorLogs.push({ message, payload: payload ?? {} });
+      },
+      debug: () => {},
+    },
   },
 });
 
@@ -275,7 +288,16 @@ beforeEach(() => {
   state.transactionThrowsImmediately = false;
   state.enrollmentTake = undefined;
   state.weeklyDedupeIds = [];
+  state.sendOutcome = null;
+  state.errorLogs = [];
 });
+
+/** The `alert:` keys a run escalated on, in order. */
+function alertKeys(): string[] {
+  return state.errorLogs
+    .map((entry) => entry.payload.alert)
+    .filter((key): key is string => typeof key === "string");
+}
 
 describe("flags gate everything", () => {
   it("does nothing at all when Connect is off", async () => {
@@ -844,5 +866,87 @@ describe("one open question at a time", () => {
     const result = await runNudges({ now: NOW });
     assert.equal(result.textsPlanned, 0);
     assert.equal(result.textOutcomes["skipped:question_already_open"], 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Escalation: a dead channel must not look like a quiet one.
+//
+// The 42883 advisory-lock outage logged `nudges_run_lock_failed` on every run
+// for as long as it lasted, and nobody saw it — because at the monitoring
+// layer a 200 carrying `skipped: "run lock unavailable"` looks exactly like a
+// 200 carrying the healthy `skipped: "already running"`. These cases pin the
+// distinction the logs alone did not carry, through the same mechanism the
+// crisis path uses (`wellbeing_no_recipients`): a logger.error with an
+// `alert:` key.
+// ---------------------------------------------------------------------------
+describe("escalation on a dead channel", () => {
+  it("escalates when the run lock cannot be taken at all", async () => {
+    state.transactionThrowsImmediately = true;
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, "run lock unavailable");
+    assert.ok(
+      alertKeys().includes("connect_nudges_channel_dead"),
+      "a sweep that could not run must raise an alert, not only a log line",
+    );
+  });
+
+  it("escalates when the admin client is not privileged", async () => {
+    state.adminPrivileged = false;
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, "admin client not privileged");
+    assert.ok(alertKeys().includes("connect_nudges_channel_dead"));
+  });
+
+  it("stays silent on healthy contention — that is the lock working", async () => {
+    state.lockAvailable = false;
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, "already running");
+    assert.deepEqual(
+      alertKeys().filter((key) => key === "connect_nudges_channel_dead"),
+      [],
+      "'already running' is the run lock doing its job and must never page anyone",
+    );
+  });
+
+  it("stays silent on an ordinary clean run", async () => {
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, null);
+    assert.deepEqual(alertKeys(), []);
+  });
+
+  it("escalates when a planned text was attempted and did not go out", async () => {
+    // The other half of the outage: with the lock working, every individual
+    // send still came back `refused: send_error`, which was only ever a
+    // counter in the response body.
+    state.connections = [{ ...unviewedConnection(), status: "started", sentAt: daysBefore(60) }];
+    state.events = [
+      { connectionId: "con_1", toStatus: "started", note: null, at: daysBefore(31) },
+    ];
+    state.sendOutcome = { status: "refused", reason: "send_error" };
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.textsPlanned, 1);
+    assert.equal(result.textsSent, 0);
+    assert.equal(result.textOutcomes["refused:send_error"], 1);
+    const escalation = state.errorLogs.find(
+      (entry) => entry.payload.alert === "connect_nudges_send_errors",
+    );
+    assert.ok(escalation, "a text that failed to send must raise an alert");
+    assert.equal(escalation?.payload.failures, 1);
+  });
+
+  it("does not escalate a text refused by policy — consent and quiet hours are not failures", async () => {
+    state.connections = [{ ...unviewedConnection(), status: "started", sentAt: daysBefore(60) }];
+    state.events = [
+      { connectionId: "con_1", toStatus: "started", note: null, at: daysBefore(31) },
+    ];
+    state.sendOutcome = { status: "refused", reason: "quiet_hours" };
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.textOutcomes["refused:quiet_hours"], 1);
+    assert.deepEqual(
+      alertKeys().filter((key) => key === "connect_nudges_send_errors"),
+      [],
+      "the policy refusing a text is the policy working, not the channel breaking",
+    );
   });
 });

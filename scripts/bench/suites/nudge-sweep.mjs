@@ -84,9 +84,16 @@ export function scoreReport(report, budgetMs) {
   const cap = report.capStress ?? { capConsumingRows: 0, dailyCap: 0 };
   const overCapForStressed = Math.max(0, cap.capConsumingRows - cap.dailyCap);
   const overCapForCohort = Math.max(0, (report.perStudentDailyMax ?? 0) - cap.dailyCap);
+  const probe = report.failureProbe ?? { attempted: 0, sendFailures: 0 };
   return {
     sweep_blocked: (report.allSkipped ?? []).filter((value) => BLOCKED_SKIPS.has(value)).length,
     send_errors: report.sendErrors ?? 0,
+    // The gate's own detector, checked every run. A send driven to fail on
+    // purpose that the detector does not see means `send_errors: 0` above
+    // proves nothing — the state this suite exists to catch blocks the sweep
+    // before any send, so without this probe the gate would only ever be
+    // observed reading zero.
+    send_error_detector_blind: probe.attempted > 0 && probe.sendFailures === 0 ? 1 : 0,
     daily_cap_exceeded: overCapForStressed + overCapForCohort,
     duplicate_open_questions: report.duplicateOpenQuestions ?? 0,
     // Of the two sweeps started at once, exactly one may do work. Anything
@@ -101,6 +108,7 @@ export function scoreReport(report, budgetMs) {
 const SKIPPED = {
   sweep_blocked: 0,
   send_errors: 0,
+  send_error_detector_blind: 0,
   daily_cap_exceeded: 0,
   duplicate_open_questions: 0,
   concurrent_run_not_skipped: 0,
@@ -155,6 +163,7 @@ export async function run(ctx) {
     firstRun: report.firstRun,
     concurrent: report.concurrent,
     capStress: report.capStress,
+    failureProbe: report.failureProbe,
     studentsWithSends: report.studentsWithSends,
     twilioCalls: report.twilioCalls,
     note: "Twilio is stubbed; a request to any host other than api.twilio.com throws in the harness.",
