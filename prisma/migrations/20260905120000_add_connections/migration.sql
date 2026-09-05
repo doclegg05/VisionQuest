@@ -438,5 +438,14 @@ CREATE POLICY "outbound_message_insert" ON "visionquest"."OutboundMessage"
 -- Same append-only shape as ConnectionEvent, and for the same reason: this is
 -- the record of what left the program. It is written once, when the message is
 -- sent, and never corrected afterwards.
+--
+-- NOTE FOR THE SMS NUDGE PATH (Phase 5): src/lib/nudges/replies.ts claims a
+-- reply with `prismaAdmin.outboundMessage.updateMany`. These REVOKEs name
+-- vq_app, so they do not touch that client while ADMIN_DATABASE_URL points at
+-- its own role. They DO bite if that variable is unset, because prismaAdmin
+-- then silently falls back to DATABASE_URL — i.e. to vq_app (finding F63). In
+-- that configuration the reply claim fails loudly with 42501 instead of
+-- quietly running without RLS, which is the better of the two failures but is
+-- worth knowing before reading the stack trace.
 GRANT SELECT, INSERT ON "visionquest"."OutboundMessage" TO vq_app;
 REVOKE UPDATE, DELETE ON "visionquest"."OutboundMessage" FROM vq_app;
