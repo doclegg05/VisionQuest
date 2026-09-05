@@ -1,0 +1,52 @@
+{
+  "suite": "nudge-attribution",
+  "title": "One reply, one question, the right one",
+  "area": "nudges",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/nudge-attribution.mjs",
+  "fixture": "config/benchmarks/fixtures/nudge-attribution.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "misattributed_replies",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "second_question_opened",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "direct_followup_writes",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "stop_revocations_incomplete",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "cases_checked",
+      "unit": "count",
+      "direction": "higher",
+      "floor": null,
+      "reason": "corpus size, not a quality bar — it counts declared expectations so a case losing its assertions is visible in the diff rather than silently weakening the four gates above",
+      "tolerance": 0
+    }
+  ],
+  "notes": "18 scripted cases through the real handleInboundSms, the real transitionConnection and (for two of them) the real runNudges, against the in-memory Prisma-shaped store. Each case declares exactly what should have happened and only the keys it names are compared, so a case stays about the one thing it is for. The corpus covers the 72-hour window from both sides, a stale question sitting behind a fresh one, a double tap, a token naming another student's connection, an unreadable token, a stranger's number, a sentence that contains 'stop' but is not the keyword, 'YES' with and without an open question, and the shared-handset trio: STOP applies to every row on the number, Y and START apply to none. Two sweep cases pin the runner's one-open-question-per-student guard from both directions — it will not stack a second question on an open one, and two rules coming due in the same hour still produce exactly one. direct_followup_writes is summed over EVERY case rather than only the ones that thought to look for it, because a grant-record write on a case that never expected one is precisely the regression it exists for. Red-first: three throwaway breaks were measured before the floors were trusted. Dropping the 72-hour sentAt bound from findPendingQuestion put misattributed_replies at 4 (the stale-question and stale-and-fresh cases flip, and double-reply flips on two keys at once). Disabling the runner's openQuestionStudents guard put second_question_opened at 2. Narrowing revokeConsent's updateMany to the first matching row put stop_revocations_incomplete at 1. All three restored; scripts/bench/suites/nudge-attribution.test.mjs keeps the comparator's own falsifiability durable, including direct_followup_writes, which no production break can raise today because nothing on this path writes that table — which is the point."
+}
