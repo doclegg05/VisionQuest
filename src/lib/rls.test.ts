@@ -911,6 +911,80 @@ if (!SHOULD_RUN) {
       });
     });
 
+    describe("StudentWorkProfile (student_work_profile_access)", () => {
+      // Match & Connect Phase 2. The row holds availability, transport, pay
+      // floor and childcare hours — student-owned answers that must reach the
+      // student's own instructors and nobody else.
+      before(async () => {
+        await db.studentWorkProfile.createMany({
+          data: [
+            { studentId: fixtures.studentA, availability: {}, transport: "bus" },
+            { studentId: fixtures.studentC, availability: {}, transport: "car" },
+          ],
+        });
+      });
+
+      it("student sees only own work profile", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentWorkProfile.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA]);
+      });
+
+      it("student can update own profile and cannot update another student's", async () => {
+        const own = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentA },
+            data: { payFloorHourly: 15 },
+          }),
+        );
+        assert.equal(own.count, 1);
+
+        const other = await asRole("student", fixtures.studentA, (tx) =>
+          tx.studentWorkProfile.updateMany({
+            where: { studentId: fixtures.studentC },
+            data: { payFloorHourly: 99 },
+          }),
+        );
+        assert.equal(other.count, 0);
+      });
+
+      it("student cannot insert a profile for another student", async () => {
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.studentWorkProfile.create({
+                data: { studentId: fixtures.studentB, availability: {} },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("teacher sees managed students' profiles only", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.studentWorkProfile.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA], "Student C is Teacher B's");
+      });
+
+      it("returns zero rows with no RLS context", async () => {
+        // The "no RLS context" block above runs before these fixture rows
+        // exist, so this table's empty-GUC case has to be asserted here, with
+        // rows on the table. Unfiltered on purpose: one row is a leak.
+        const rows = await asRole(null, null, (tx) =>
+          tx.studentWorkProfile.findMany({ select: { studentId: true } }),
+        );
+        assert.deepEqual(rows, [], "StudentWorkProfile must be empty with no context");
+      });
+    });
+
     describe("SageOperation (sage_operation_read / _write / _update)", () => {
       // sage_operation_read is the one policy that has already been wrong
       // once (any teacher could read every ledger row until 20260820140000).
