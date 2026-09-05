@@ -21,6 +21,13 @@ const ADMIN_URL = "postgresql://postgres:pw@db.example.test:5432/postgres?schema
 
 process.env.DATABASE_URL = APP_URL;
 process.env.ADMIN_DATABASE_URL = ADMIN_URL;
+// Overrides, exercised in the same load: an operator tuning the admin pool
+// from the environment is the supported way to change it without a deploy.
+process.env.ADMIN_DB_POOL_SIZE = "17";
+process.env.ADMIN_DB_POOL_TIMEOUT = "23";
+// A typo must not reach the connection string. `parseInt("five")` is NaN and
+// `connection_limit=NaN` is a URL Prisma cannot parse at all.
+process.env.DB_POOL_SIZE = "five";
 
 let withPoolDefaults: typeof import("./db").withPoolDefaults;
 
@@ -70,14 +77,23 @@ describe("what module load actually did to the env", () => {
   it("bounded the ADMIN pool, which had no bound at all before", () => {
     const url = process.env.ADMIN_DATABASE_URL ?? "";
     assert.ok(url.startsWith(ADMIN_URL), "the original URL must survive intact");
-    assert.match(url, /connection_limit=10/);
-    assert.match(url, /pool_timeout=10/);
+    assert.match(url, /connection_limit=/);
+    assert.match(url, /pool_timeout=/);
   });
 
-  it("still bounds the app pool, at its own smaller default", () => {
+  it("honours the ADMIN_DB_POOL_* overrides", () => {
+    const url = process.env.ADMIN_DATABASE_URL ?? "";
+    assert.match(url, /connection_limit=17/);
+    assert.match(url, /pool_timeout=23/);
+  });
+
+  it("falls back to the default when the env value is not a positive integer", () => {
+    // DB_POOL_SIZE is "five" in this process. parseInt gives NaN, which would
+    // otherwise be written into the URL verbatim.
     const url = process.env.DATABASE_URL ?? "";
     assert.ok(url.startsWith(APP_URL));
-    assert.match(url, /connection_limit=5/, "DB_POOL_SIZE default, unchanged by this fix");
+    assert.doesNotMatch(url, /NaN/, "a typo must never reach the connection string");
+    assert.match(url, /connection_limit=5/, "the documented default stands in");
   });
 
   it("gives the admin pool room the app pool does not need", () => {

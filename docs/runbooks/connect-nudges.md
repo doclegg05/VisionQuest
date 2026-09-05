@@ -197,12 +197,15 @@ else applies to none, because there is no way to tell whose reply it is.
   means the lock was taken by another sweep; the log line
   (`nudges_run_lock_failed`) is what tells them apart.
 
-- **`nudges_run_lock_commit_failed`, with normal counts on the response.** The
-  sweep finished and the lock transaction then failed to commit. This is NOT a
-  failed run: the transaction holds a lock and nothing else, so the texts went
-  out over Twilio and their rows were written by `sendPolicySms` on other
-  connections, none of which a rollback here touches. The counts are what
-  really happened; treat it as a connection-health signal, not a data problem.
+- **`skipped: "commit_failed"` and `nudges_run_lock_commit_failed`.** The sweep
+  finished everything it meant to do and the lock transaction then failed to
+  commit. This is NOT a failed run: the transaction holds a lock and nothing
+  else, so the texts went out over Twilio and their rows were written by
+  `sendPolicySms` on other connections, none of which a rollback here touches.
+  The counts are real and complete. It is labelled rather than left as a clean
+  `null` so nobody reads it as an ordinary run; treat it as a
+  connection-health signal, not a data problem. A run that had already hit its
+  deadline keeps `"deadline"`, the more specific fact.
 
 - **`ADMIN_DATABASE_URL` and the admin pool.** `src/lib/db.ts` gives it
   `connection_limit=10&pool_timeout=10` unless the URL already names one (an

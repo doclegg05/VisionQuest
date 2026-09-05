@@ -123,6 +123,11 @@ export interface NudgeRunResult {
    *     stay inside the lock transaction's timeout. The counts on this result
    *     are real and partial; what it did not reach is simply due again next
    *     hour, because every rule is re-derived from the rows each run.
+   *   "commit_failed" — the run finished everything it meant to do and the
+   *     lock transaction then failed to commit. The counts are real and
+   *     COMPLETE: that transaction holds a lock and nothing else, so its
+   *     rollback undoes none of the texts or rows, which were written on
+   *     other connections. A connection-health signal, not a data problem.
    */
   skipped: string | null;
   alertsPlanned: number;
@@ -579,7 +584,11 @@ async function runUnderRunLock(
   // discarding the counts would tell an operator the run failed on the one
   // occasion they most need to know what went out.
   let bodyStarted = false;
-  let outcome: NudgeRunResult | null = null;
+  // A holder rather than a bare `let`: TypeScript's control-flow analysis
+  // narrows a variable assigned only inside a callback to `never` by the time
+  // the catch reads it, which makes every property access on it an error.
+  // The object property is not narrowed that way.
+  const finished: { outcome: NudgeRunResult | null } = { outcome: null };
   try {
     return await prismaAdmin.$transaction(
       async (tx) => {
@@ -592,19 +601,24 @@ async function runUnderRunLock(
           return result;
         }
         bodyStarted = true;
-        outcome = await body(Date.now() + RUN_LOCK_TIMEOUT_MS - SEND_DEADLINE_MARGIN_MS);
-        return outcome;
+        finished.outcome = await body(Date.now() + RUN_LOCK_TIMEOUT_MS - SEND_DEADLINE_MARGIN_MS);
+        return finished.outcome;
       },
       { timeout: RUN_LOCK_TIMEOUT_MS, maxWait: RUN_LOCK_MAX_WAIT_MS },
     );
   } catch (error) {
-    if (outcome !== null) {
+    const completed = finished.outcome;
+    if (completed !== null) {
       logger.warn("nudges_run_lock_commit_failed", {
         lockKey: RUN_LOCK_KEY,
         error: String(error),
         hint: "the sweep completed; the lock transaction failed to commit afterwards",
       });
-      return outcome;
+      // Named, not silent: the counts are real, so the response must not look
+      // like an ordinary clean run. A deadline that already fired keeps its
+      // own label — it is the more specific fact about what happened.
+      if (completed.skipped === null) completed.skipped = "commit_failed";
+      return completed;
     }
     if (bodyStarted) throw error;
     // A database that cannot open this transaction cannot run the sweep
@@ -715,8 +729,36 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
 
   if (dryRun) return result;
 
+  /**
+   * True once the run must stop. Called at the top of every write loop, never
+   * inside one: stopping mid-unit would leave a half-finished write (a queued
+   * OutboundMessage whose text may already have gone out, an alert with no
+   * ledger row). Whatever is not reached is due again next hour — the rules
+   * are re-derived from the rows every run, so there is no queue to drain.
+   */
+  const outOfTime = () => {
+    if (Date.now() < deadlineAt) return false;
+    if (result.skipped !== "deadline") {
+      result.skipped = "deadline";
+      logger.warn("nudges_run_deadline", {
+        alertsPlanned: result.alertsPlanned,
+        alertsWritten: result.alertsWritten,
+        alertsResolved: result.alertsResolved,
+        textsPlanned: result.textsPlanned,
+        textsSent: result.textsSent,
+        remainingTexts: result.textsPlanned - result.textsSent,
+      });
+    }
+    return true;
+  };
+
   // --- Writes ---
   for (const plan of alertPlans) {
+    // The alert loop is checked too, not only the send loop below. A run that
+    // arrives here already past the deadline would otherwise write every
+    // alert before reaching its first deadline check — the whole employer
+    // queue, outside the lock it was supposed to hold.
+    if (outOfTime()) break;
     try {
       await withStudentRlsContext(plan.studentId, () => upsertNudgeAlert(plan, now));
       result.alertsWritten += 1;
@@ -745,6 +787,7 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
       byStudent.set(owner.studentId, list);
     }
     for (const [studentId, keys] of byStudent) {
+      if (outOfTime()) break;
       try {
         result.alertsResolved += await withStudentRlsContext(studentId, () =>
           resolveNudgeAlerts(keys, now),
@@ -759,20 +802,7 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
   }
 
   for (const plan of smsPlans) {
-    // Checked BEFORE each send, never during one: stopping mid-send would
-    // leave a `queued` row with a text possibly already delivered. Everything
-    // not reached is due again next hour — the rules are re-derived from the
-    // rows every run, so there is no queue to drain and nothing is lost.
-    if (Date.now() >= deadlineAt) {
-      result.skipped = "deadline";
-      logger.warn("nudges_run_deadline", {
-        textsPlanned: result.textsPlanned,
-        textsSent: result.textsSent,
-        alertsWritten: result.alertsWritten,
-        remaining: result.textsPlanned - result.textsSent,
-      });
-      break;
-    }
+    if (outOfTime()) break;
     // sendPolicySms is already total, but the loop is guarded anyway: one
     // student's send must never end the sweep for everyone behind them in the
     // list, and "total" is a property of today's implementation rather than of

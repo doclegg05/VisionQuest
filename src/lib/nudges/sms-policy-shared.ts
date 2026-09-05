@@ -77,6 +77,11 @@ export const ADVISORY_LOCK_CLASS = {
  * characters — so a 100-character body that "fits" here would arrive as two
  * messages, or truncated, depending on the carrier. Keep new copy to ASCII.
  */
+export const SMS_MAX_LENGTH = 160;
+
+/** ASCII, for the reason above. Never "…". */
+const TRUNCATION_MARKER = "...";
+
 /**
  * The comparable form of a phone number: bare national digits.
  *
@@ -95,11 +100,6 @@ export function normalizedPhone(value: string | null | undefined): string | null
   if (digits.length === 0) return null;
   return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
-
-export const SMS_MAX_LENGTH = 160;
-
-/** ASCII, for the reason above. Never "…". */
-const TRUNCATION_MARKER = "...";
 
 /** Every body opens with this, so a stranger's text is never anonymous. */
 export const SMS_PREFIX = "SPOKES:";

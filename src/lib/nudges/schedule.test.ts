@@ -2,6 +2,10 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
+// Real, not mocked: see the flags mock below. flags-shared has no Prisma
+// import, so it is safe to pull into a mocked module graph.
+import { intersectScopeClassIds } from "@/lib/connect/flags-shared";
+
 /**
  * The runner, with Prisma and the SMS sender mocked. What is asserted here is
  * the wiring the pure selectors cannot see: both flags have to admit a class
@@ -35,6 +39,8 @@ const state = {
   /** Set while the lock transaction is open, so a second run can contend. */
   lockHeld: false,
   commitFails: false,
+  /** Called after each send, so a test can advance the clock mid-loop. */
+  onSend: null as null | (() => void),
   transactionThrowsImmediately: false,
   /** The `take` the enrollment query asked for, and the roster it was asked about. */
   enrollmentTake: undefined as number | undefined,
@@ -163,18 +169,12 @@ mock.module("@/lib/connect/flags", {
       if (scope.mode === "all") return true;
       return classIds.some((id) => scope.classIds.includes(id));
     },
-    // The real implementation, not a stub: the roster query's correctness IS
-    // this intersection, so a permissive stand-in would make the pilot-class
-    // case below pass against the bug it was written for.
-    intersectScopeClassIds: (...scopes: any[]) => {
-      if (scopes.some((scope) => scope.mode === "off")) return [];
-      const lists = scopes
-        .filter((scope) => scope.mode === "classes")
-        .map((scope) => scope.classIds as string[]);
-      if (lists.length === 0) return null;
-      const [first, ...rest] = lists;
-      return first.filter((id) => rest.every((other) => other.includes(id)));
-    },
+    // Passed through from the real module rather than re-implemented here.
+    // The roster query's correctness IS this intersection, so a hand-copied
+    // stand-in could drift from production and let the pilot-class case pass
+    // against the very bug it was written for. flags-shared is Prisma-free,
+    // so importing it costs the mock nothing.
+    intersectScopeClassIds,
   },
 });
 mock.module("@/lib/connect/matching", {
@@ -201,6 +201,9 @@ mock.module("./sms-policy", {
   namedExports: {
     sendPolicySms: async (input: any) => {
       state.sent.push(input);
+      // Lets a test move the clock BETWEEN sends, which is the only way to
+      // exercise a deadline that falls part-way through the loop.
+      state.onSend?.();
       return { status: "sent" as const, outboundMessageId: "om_1" };
     },
   },
@@ -268,6 +271,7 @@ beforeEach(() => {
   state.txOptions = [];
   state.lockHeld = false;
   state.commitFails = false;
+  state.onSend = null;
   state.transactionThrowsImmediately = false;
   state.enrollmentTake = undefined;
   state.weeklyDedupeIds = [];
@@ -686,7 +690,11 @@ describe("guards that stop the run entirely", () => {
     state.connections = [unviewedConnection()];
 
     const result = await runNudges({ now: NOW });
-    assert.equal(result.skipped, null, "the sweep completed; only the commit failed");
+    assert.equal(
+      result.skipped,
+      "commit_failed",
+      "named, not silent: the counts are real but the run is not an ordinary clean one",
+    );
     assert.equal(result.alertsPlanned, 1);
     assert.equal(result.alertsWritten, 1, "the work it really did is still reported");
   });
@@ -730,6 +738,74 @@ describe("guards that stop the run entirely", () => {
       assert.equal(state.sent.length, 0, "it stopped BEFORE the first send, not during one");
       assert.ok(result.textsPlanned > 0, "and it reports what it had planned to do");
       assert.equal(result.textsSent, 0);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  it("stops MID-loop once the deadline passes, keeping what it already sent", async () => {
+    // The partial case, which the stop-before-the-first-send case cannot
+    // catch: if the check only ran once, or only before the loop, a run that
+    // crosses the deadline halfway through would keep texting to the end.
+    // Two students, and the clock crosses the deadline after the first send.
+    state.enrollments = [
+      { studentId: "stu_a", classId: "class_1" },
+      { studentId: "stu_b", classId: "class_1" },
+    ];
+    state.connections = ["stu_a", "stu_b"].map((studentId, index) => ({
+      ...unviewedConnection(),
+      id: `con_${index}`,
+      studentId,
+      status: "started",
+      sentAt: daysBefore(60),
+    }));
+    state.events = state.connections.map((c) => ({
+      connectionId: c.id,
+      toStatus: "started",
+      note: null,
+      at: daysBefore(31),
+    }));
+
+    const realNow = Date.now;
+    // Time only moves when a send happens, so the deadline lands between the
+    // two rather than at a turn count nobody can reason about.
+    let past = false;
+    state.onSend = () => {
+      past = true;
+    };
+    Date.now = () => (past ? realNow() + 1_000_000 : realNow());
+    try {
+      const result = await runNudges({ now: NOW });
+      assert.equal(result.skipped, "deadline");
+      assert.equal(result.textsPlanned, 2);
+      assert.equal(result.textsSent, 1, "one went out before the clock ran over");
+      assert.ok(
+        result.textsSent > 0 && result.textsSent < result.textsPlanned,
+        "a partial run is the case this pins",
+      );
+    } finally {
+      Date.now = realNow;
+      state.onSend = null;
+    }
+  });
+
+  it("stops the ALERT loop at the deadline too, not just the sends", async () => {
+    // The alert writes and the stale-alert resolves run BEFORE the send loop,
+    // so a run that arrives already past its deadline would previously write
+    // the entire employer queue before reaching any check — the whole point
+    // of the deadline being to stop writing outside the lock.
+    const realNow = Date.now;
+    let readings = 0;
+    Date.now = () => {
+      readings += 1;
+      return readings === 1 ? realNow() : realNow() + 1_000_000;
+    };
+    try {
+      state.connections = [unviewedConnection()];
+      const result = await runNudges({ now: NOW });
+      assert.equal(result.skipped, "deadline");
+      assert.equal(result.alertsPlanned, 1, "planning still happened");
+      assert.equal(state.alertUpserts.length, 0, "but nothing was written past the deadline");
     } finally {
       Date.now = realNow;
     }

@@ -49,11 +49,6 @@ import {
   normalizedPhone,
 } from "./sms-policy-shared";
 
-// Re-exported because this module is where callers look for phone matching,
-// and because moving it was a fix, not a rename: it lives in
-// sms-policy-shared.ts so the settings page can reach it without pulling
-// replies.ts — which imports Prisma — into a client bundle.
-export { normalizedPhone };
 import {
   NUDGE_ALERT_TYPES,
   interviewDeclineAckTemplateKey,
@@ -61,6 +56,12 @@ import {
   type ReplyToken,
   type RetentionDay,
 } from "./schedule-shared";
+
+// Re-exported because this module is where callers look for phone matching,
+// and because moving it was a fix, not a rename: it lives in
+// sms-policy-shared.ts so the settings page can reach it without pulling
+// replies.ts -- which imports Prisma -- into a client bundle.
+export { normalizedPhone };
 
 /**
  * How long a question stays answerable.
