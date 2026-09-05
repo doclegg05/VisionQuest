@@ -53,14 +53,84 @@ export interface FaithfulnessFinding {
 /**
  * Money in a draft or a posting, in the forms either actually uses:
  * "$15", "15 dollars", "USD 15", "15 usd". A check that understood only the
- * "$" form was bypassed by the model simply writing the number out, and
- * refused a correct explanation whenever the POSTING wrote it out instead.
+ * "$" form was bypassed by the model simply writing "15 dollars", and refused
+ * a correct explanation whenever the POSTING wrote it that way instead.
  */
 const MONEY_PATTERNS = [
   /\$\s?(\d[\d,]*(?:\.\d+)?)/gi,
   /\b(\d[\d,]*(?:\.\d+)?)\s*(?:dollars|usd)\b/gi,
   /\busd\s*(\d[\d,]*(?:\.\d+)?)/gi,
 ];
+
+/**
+ * The same figure written out in words: "twenty-five dollars an hour".
+ *
+ * Numerals alone left the check bypassable by spelling the number out, which is
+ * the shape an injected instruction would use precisely BECAUSE it reads as
+ * prose. Deliberately narrow in two ways: only cardinals up to "ninety-nine
+ * hundred", and only when a money word follows immediately. Without that second
+ * condition "you work with about twenty other people" becomes a wage, and a
+ * student loses a correct explanation over a sentence about their coworkers.
+ *
+ * Applied to BOTH sides, so a posting that spells its rate out grounds a draft
+ * that repeats it.
+ */
+const SMALL_WORD_NUMBERS: Readonly<Record<string, number>> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+};
+
+const TENS_WORD_NUMBERS: Readonly<Record<string, number>> = {
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+const SMALL_WORDS = Object.keys(SMALL_WORD_NUMBERS).join("|");
+const TENS_WORDS = Object.keys(TENS_WORD_NUMBERS).join("|");
+
+/** "twenty-five dollars", "sixteen bucks", "one hundred dollars". */
+const WORD_MONEY = new RegExp(
+  `\\b(?:(${TENS_WORDS})(?:[\\s-](${SMALL_WORDS}))?|(${SMALL_WORDS}))` +
+    `(\\s+hundred)?\\s+(?:dollars?|bucks?)\\b`,
+  "gi",
+);
+
+function wordMoneyValues(text: string): number[] {
+  const values: number[] = [];
+  for (const match of text.matchAll(WORD_MONEY)) {
+    const [, tens, tensUnit, small, hundred] = match;
+    let value = tens
+      ? TENS_WORD_NUMBERS[tens.toLowerCase()] + (tensUnit ? SMALL_WORD_NUMBERS[tensUnit.toLowerCase()] : 0)
+      : SMALL_WORD_NUMBERS[small.toLowerCase()];
+    if (hundred) value *= 100;
+    if (Number.isFinite(value)) values.push(value);
+  }
+  return values;
+}
 
 /**
  * Bare "15/hr" and "15 an hour" count as the posting stating a wage. Only
@@ -99,8 +169,10 @@ export function ungroundedDollarValues(
   const grounded = [
     ...numbersMatching(source, MONEY_PATTERNS),
     ...numbersMatching(source, [BARE_RATE]),
+    ...wordMoneyValues(source),
   ];
-  return numbersMatching(draft, MONEY_PATTERNS).filter(
+  const stated = [...numbersMatching(draft, MONEY_PATTERNS), ...wordMoneyValues(draft)];
+  return stated.filter(
     (value) => !grounded.some((posted) => Math.abs(posted - value) < ROUNDING_TOLERANCE),
   );
 }
@@ -165,12 +237,21 @@ function ungroundedHourValues(draft: string, source: string): number[] {
  */
 const CITY_STATE = /\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+)*),\s*([A-Z]{2})\b/gu;
 
+/** "Beckley,WV" and "Beckley,  WV" both compare as "beckley, wv". */
+function normalizePlace(text: string): string {
+  return text.toLowerCase().replace(/,\s*/gu, ", ");
+}
+
 function ungroundedPlaces(draft: string, source: string): string[] {
-  const normalized = source.toLowerCase();
+  // The CITY AND THE STATE, together. Comparing the city alone accepted
+  // "Beckley, VA" against a "Beckley, WV" posting -- the state was captured and
+  // then thrown away, so the one part of the address that decides whether a
+  // student can get there was unchecked.
+  const normalized = normalizePlace(source);
   const found: string[] = [];
   for (const match of draft.matchAll(CITY_STATE)) {
-    const [whole, city] = match;
-    if (!normalized.includes(city.toLowerCase())) found.push(whole);
+    const [whole, city, state] = match;
+    if (!normalized.includes(normalizePlace(`${city}, ${state}`))) found.push(whole);
   }
   return found;
 }
@@ -216,44 +297,81 @@ const NEGATION = /\b(?:no|not|don'?t|doesn'?t|without|never|isn'?t|aren'?t)\b/i;
 const NEGATION_WINDOW = 40;
 
 /**
- * The text between the start of the current sentence and `index`.
+ * The clause containing `index` -- from the start of its sentence to the end of
+ * it, minus the term itself.
  *
- * A fixed-width window was the first cut and it silently broke the check: the
- * five sections sit one per line and one of them is "Pay: The posting doesn't
- * say.", so a `CDL` invented in the NEXT section had "doesn't" forty characters
- * behind it and was read as a negation. A fabricated credential went
- * undetected because of a sentence about the pay.
+ * TWO fixes live here, and they pull in opposite directions, which is why both
+ * are pinned by tests.
  *
- * Clamping to the sentence — the last `.`, newline or `:` — makes the negation
- * belong to the clause it actually negates.
+ * A fixed-width window backwards was the first cut and it silently broke the
+ * check: the sections sit one per line and one of them is "Pay: The posting
+ * doesn't say.", so a CDL invented in the NEXT section had "doesn't" forty
+ * characters behind it and was read as a negation. Clamping to the last `.`,
+ * newline or `:` makes the negation belong to the clause it actually negates.
+ *
+ * Looking only BACKWARDS was the second bug: "A CDL is not required." puts the
+ * negation after the term, and refusing that sentence trains the model out of
+ * the most reassuring thing this tool can say to a student worried about a card
+ * they do not have. So the clause after the term is read too, clamped the same
+ * way.
  */
-function clauseBefore(haystack: string, index: number): string {
-  const boundary = Math.max(
+function clauseAround(haystack: string, index: number, length: number): string {
+  const startBoundary = Math.max(
     haystack.lastIndexOf(".", index - 1),
     haystack.lastIndexOf("\n", index - 1),
     haystack.lastIndexOf(":", index - 1),
   );
-  return haystack.slice(Math.max(boundary + 1, index - NEGATION_WINDOW), index);
+  const before = haystack.slice(Math.max(startBoundary + 1, index - NEGATION_WINDOW), index);
+
+  const after = index + length;
+  const endCandidates = [
+    haystack.indexOf(".", after),
+    haystack.indexOf("\n", after),
+    haystack.indexOf(":", after),
+  ].filter((at) => at !== -1);
+  const endBoundary = endCandidates.length ? Math.min(...endCandidates) : haystack.length;
+
+  return `${before} ${haystack.slice(after, Math.min(endBoundary, after + NEGATION_WINDOW))}`;
 }
 
+/** `\b`-anchored so the alias is a word, with an optional plural. */
+function aliasPattern(alias: string): RegExp {
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`\\b${escaped}s?\\b`, "gi");
+}
+
+const CREDENTIAL_PATTERNS: ReadonlyArray<ReadonlyArray<{ alias: string; pattern: RegExp }>> =
+  CREDENTIAL_VOCABULARY.map((aliases) =>
+    aliases.map((alias) => ({ alias, pattern: aliasPattern(alias) })),
+  );
+
 function ungroundedRequirements(draft: string, source: string): string[] {
-  const haystack = draft.toLowerCase();
-  const grounded = source.toLowerCase();
   const found: string[] = [];
 
-  for (const aliases of CREDENTIAL_VOCABULARY) {
-    if (aliases.some((alias) => grounded.includes(alias))) continue;
+  for (const aliases of CREDENTIAL_PATTERNS) {
+    // WORD BOUNDARIES, on both sides. A plain substring search read "ged" out
+    // of "changed", "managed", "encouraged" -- which broke the check in BOTH
+    // directions at once from one bug: a true draft saying "your schedule can
+    // be changed" was refused, and a posting saying "you will be managed by a
+    // shift lead" GROUNDED a fabricated GED, so the exact thing this check
+    // exists to catch went through.
+    if (aliases.some(({ pattern }) => new RegExp(pattern.source, "iu").test(source))) continue;
 
-    for (const alias of aliases) {
-      let index = haystack.indexOf(alias);
-      while (index !== -1) {
-        if (!NEGATION.test(clauseBefore(haystack, index))) {
-          found.push(alias);
+    for (const { alias, pattern } of aliases) {
+      pattern.lastIndex = 0;
+      let match = pattern.exec(draft);
+      let stated = false;
+      while (match) {
+        if (!NEGATION.test(clauseAround(draft, match.index, match[0].length))) {
+          stated = true;
           break;
         }
-        index = haystack.indexOf(alias, index + alias.length);
+        match = pattern.exec(draft);
       }
-      if (found.includes(alias)) break;
+      if (stated) {
+        found.push(alias);
+        break;
+      }
     }
   }
 

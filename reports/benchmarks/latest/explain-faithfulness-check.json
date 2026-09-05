@@ -1,9 +1,9 @@
 {
   "suite": "explain-faithfulness-check",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:19:04.190Z",
-  "durationMs": 49,
-  "commit": "b700d71",
+  "startedAt": "2026-09-05T16:22:10.621Z",
+  "durationMs": 31,
+  "commit": "f6d7c25",
   "provider": null,
   "model": null,
   "host": {
@@ -24,7 +24,7 @@
       "tolerance": 0,
       "exact": true,
       "baseline": null,
-      "status": "info",
+      "status": "pass",
       "details": {
         "missed": [],
         "wrongByKind": {
@@ -45,7 +45,7 @@
       "tolerance": 0,
       "exact": true,
       "baseline": null,
-      "status": "info",
+      "status": "pass",
       "details": {
         "falsePositives": []
       }
@@ -63,5 +63,5 @@
       "status": "info"
     }
   ],
-  "status": "info"
+  "status": "pass"
 }

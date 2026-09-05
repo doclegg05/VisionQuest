@@ -1,9 +1,9 @@
 {
   "suite": "packet-privacy",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:18:46.965Z",
-  "durationMs": 2318,
-  "commit": "b700d71",
+  "startedAt": "2026-09-05T16:34:37.483Z",
+  "durationMs": 1437,
+  "commit": "f6d7c25",
   "provider": null,
   "model": null,
   "host": {
@@ -24,7 +24,7 @@
       "tolerance": 0,
       "exact": true,
       "baseline": null,
-      "status": "info",
+      "status": "pass",
       "details": {
         "findings": [],
         "surfaces": [
@@ -48,5 +48,5 @@
       "status": "info"
     }
   ],
-  "status": "info"
+  "status": "pass"
 }

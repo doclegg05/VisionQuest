@@ -18,9 +18,10 @@ import { describe, it } from "node:test";
 import {
   checkExplanationFaithfulness,
   ungroundedDollarValues,
+  type ExplainPosting,
 } from "./explain-faithfulness";
 
-const POSTING = {
+const POSTING: ExplainPosting = {
   title: "Warehouse Selector",
   company: "Blackwater Logistics",
   location: "Charleston, WV",
@@ -31,7 +32,7 @@ const POSTING = {
     "load pallets. A forklift card helps but is not required.",
 };
 
-function kinds(draft: string, posting = POSTING) {
+function kinds(draft: string, posting: ExplainPosting = POSTING) {
   return checkExplanationFaithfulness(draft, posting).map((finding) => finding.kind);
 }
 
@@ -177,5 +178,133 @@ describe("the whole check", () => {
     ].join("\n");
 
     assert.deepEqual(kinds(draft).sort(), ["hours", "place", "wage"]);
+  });
+});
+
+// =============================================================================
+// Code review, 2026-09-05. Each block below reproduces a defect a reviewer
+// executed against the shipped checker, with the reviewer's own inputs.
+// =============================================================================
+
+describe("credentials are matched as words, not as substrings", () => {
+  // CRITICAL. `haystack.indexOf(alias)` matched "ged" inside "changed",
+  // "managed", "encouraged" -- so the check both REFUSED true drafts and
+  // ACCEPTED the fabrication it exists to catch, from the same bug.
+
+  it("does not refuse a true draft over the letters g-e-d inside an ordinary word", () => {
+    const draft =
+      "What it is: You pull orders and load pallets.\n" +
+      "Pay: $16 an hour.\n" +
+      "Hours: 24 hours a week.\n" +
+      "Where: Charleston, WV.\n" +
+      "What you need: Nothing special to start.\n" +
+      "Good to know: Your schedule can be changed by your shift lead.";
+    assert.deepEqual(checkExplanationFaithfulness(draft, POSTING), []);
+  });
+
+  it("still catches a fabricated GED when the posting only contains 'managed'", () => {
+    // The posting grounds nothing; "managed" must not launder "ged" through the
+    // source side of the same substring match.
+    const posting = {
+      ...POSTING,
+      salary: null,
+      employmentType: null,
+      description: "You will be managed by a shift lead. Load trucks.",
+    };
+    assert.deepEqual(kinds("What you need: You must have a GED.", posting), ["requirement"]);
+  });
+
+  const ORDINARY_WORDS = [
+    "changed",
+    "managed",
+    "encouraged",
+    "arranged",
+    "damaged",
+    "engaged",
+    "logged",
+    "tagged",
+    "aged",
+    "packaged",
+  ];
+
+  for (const word of ORDINARY_WORDS) {
+    it(`does not read a credential out of "${word}"`, () => {
+      assert.deepEqual(kinds(`Good to know: Shifts are ${word} by the shift lead.`), []);
+    });
+  }
+});
+
+describe("negation is read across the whole clause, not only before the term", () => {
+  // WARNING. "A CDL is not required." was refused because the negation sits
+  // after the credential. Reassurance about a card a student does not have is
+  // the most useful sentence this tool can write; refusing it trains the model
+  // out of writing it.
+
+  it("accepts a negation that follows the credential", () => {
+    assert.deepEqual(kinds("What you need: A CDL is not required."), []);
+  });
+
+  it("accepts a negation that precedes the credential", () => {
+    assert.deepEqual(kinds("What you need: No CDL needed."), []);
+  });
+
+  it("accepts a contracted negation before the credential", () => {
+    assert.deepEqual(kinds("What you need: You don't need a CDL."), []);
+  });
+
+  it("still refuses a credential invented in the section after a negated one", () => {
+    // The clamp that made this work stays: the "doesn't" belongs to the pay
+    // line, and must not reach across the line break to excuse the CDL.
+    assert.deepEqual(kinds("Pay: The posting doesn't say.\nWhat you need: a CDL."), [
+      "requirement",
+    ]);
+  });
+});
+
+describe("a place is the whole 'City, ST', not the city alone", () => {
+  // WARNING. The check captured the state and then dropped it, so a draft that
+  // moved the job to another state was accepted as long as the town name
+  // matched. A student drives to the wrong Beckley.
+
+  const BECKLEY = {
+    ...POSTING,
+    location: "Beckley, WV",
+    description: "Evening warehouse work in Beckley.",
+  };
+
+  it("refuses the right town in the wrong state", () => {
+    assert.deepEqual(kinds("Where: Beckley, VA.", BECKLEY), ["place"]);
+  });
+
+  it("accepts the town the posting names", () => {
+    assert.deepEqual(kinds("Where: Beckley, WV.", BECKLEY), []);
+  });
+
+  it("still does not attempt a bare town name", () => {
+    // The documented limit, pinned so a later reader sees it is a decision.
+    assert.deepEqual(kinds("Where: the job is in Bluefield.", BECKLEY), []);
+  });
+});
+
+describe("a wage written out in words is still a wage", () => {
+  // SUGGESTION, taken rather than documented: the numeral check was trivially
+  // bypassed by spelling the number out, which is exactly the shape an
+  // injected instruction would use.
+
+  it("catches a spelled-out figure the posting never states", () => {
+    assert.deepEqual(kinds("Pay: twenty-five dollars an hour."), ["wage"]);
+  });
+
+  it("accepts the posted figure spelled out", () => {
+    assert.deepEqual(kinds("Pay: sixteen dollars an hour."), []);
+  });
+
+  it("accepts a spelled-out figure the posting itself spells out", () => {
+    const posting = { ...POSTING, salary: null, description: "Pay is twenty dollars an hour." };
+    assert.deepEqual(kinds("Pay: twenty dollars an hour.", posting), []);
+  });
+
+  it("does not read a wage out of a spelled-out number with no money word", () => {
+    assert.deepEqual(kinds("Good to know: You work with about twenty other people."), []);
   });
 });

@@ -115,6 +115,16 @@ test("Connect journey: propose → approve → send → employer views, books, h
   /** Every tap the STUDENT makes. The employer and the instructor are not students. */
   let studentTaps = 0;
   let connectionId: string | null = null;
+  /**
+   * What `connect_enabled_classes` and `placement_bridge_classes` said before
+   * this spec touched them. `null` means the row did not exist.
+   *
+   * These are PROGRAM-WIDE rows, not per-test fixtures: the upsert below
+   * REPLACES whichever classes the pilot had open with the bench class alone.
+   * Leaving that in place would close Connect for every real class, silently,
+   * as a side effect of running a benchmark.
+   */
+  const configBefore = new Map<string, string | null>();
 
   try {
     // ── Preconditions ────────────────────────────────────────────────────
@@ -136,6 +146,11 @@ test("Connect journey: propose → approve → send → employer views, books, h
     // the hire produces a verified Application and NO queue item, and the last
     // assertion below would fail against a working product.
     for (const key of ["connect_enabled_classes", "placement_bridge_classes"]) {
+      const existing = await prisma.systemConfig.findUnique({
+        where: { key },
+        select: { value: true },
+      });
+      configBefore.set(key, existing?.value ?? null);
       await prisma.systemConfig.upsert({
         where: { key },
         update: { value: BENCH_CLASS.id, updatedBy: "bench-connect-journey" },
@@ -391,6 +406,21 @@ test("Connect journey: propose → approve → send → employer views, books, h
     await prisma.studentAlert.deleteMany({
       where: { studentId: BENCH_JOURNEY_STUDENT.id, type: "placement_outcome_pending" },
     });
+
+    // Put the two flags back exactly as they were, including "did not exist" —
+    // a spec that leaves a feature flag flipped has changed the product, not
+    // measured it.
+    for (const [key, value] of configBefore) {
+      if (value === null) {
+        await prisma.systemConfig.deleteMany({ where: { key } });
+      } else {
+        await prisma.systemConfig.update({
+          where: { key },
+          data: { value, updatedBy: "bench-connect-journey" },
+        });
+      }
+    }
+
     rmSync(SINK_DIR, { recursive: true, force: true });
     await prisma.$disconnect();
   }

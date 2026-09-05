@@ -1,9 +1,9 @@
 {
   "suite": "connection-walks",
   "tier": "gate",
-  "startedAt": "2026-09-05T16:19:03.048Z",
-  "durationMs": 453,
-  "commit": "b700d71",
+  "startedAt": "2026-09-05T16:24:03.493Z",
+  "durationMs": 384,
+  "commit": "f6d7c25",
   "provider": null,
   "model": null,
   "host": {
@@ -24,7 +24,7 @@
       "tolerance": 0,
       "exact": true,
       "baseline": null,
-      "status": "info",
+      "status": "pass",
       "details": {
         "examples": [],
         "pathsCovered": 100,
@@ -42,12 +42,12 @@
       "tolerance": 0,
       "exact": true,
       "baseline": null,
-      "status": "info",
+      "status": "pass",
       "details": {
         "eventsWritten": 5932,
         "violations": []
       }
     }
   ],
-  "status": "info"
+  "status": "pass"
 }

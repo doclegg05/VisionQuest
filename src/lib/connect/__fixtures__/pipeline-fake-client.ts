@@ -13,7 +13,7 @@
 // where its own behaviour is pinned.
 // =============================================================================
 
-import type { ConnectionWriteClient } from "./pipeline";
+import type { ConnectionWriteClient } from "../pipeline";
 
 export interface RecordedCalls {
   findUnique: { id: string }[];
