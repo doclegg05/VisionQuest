@@ -7,7 +7,14 @@
 //   2  a config or usage error
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -206,6 +213,90 @@ test("a configured metric the scorer never returned is an error, not a silent pa
   }
 });
 
+test("a gate metric that comes back null with its requires met is an error, not a skip", () => {
+  // `skipped` means "we could not measure this", and the runner already says
+  // that for unmet `requires`. A null from a scorer that DID run is a broken
+  // measurement, and on a gate tier it would otherwise slip past every floor.
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer: `export async function run() { return { metrics: [{ id: "accuracy", value: null }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "error");
+    assert.match(result.error, /accuracy/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a watch-tier null value stays informational rather than erroring", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics,
+      scorer: `export async function run() { return { metrics: [{ id: "accuracy", value: null }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.equal(readResult(root, "demo").metrics[0].status, "skipped");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a secret in a scorer's error, skip note or details never reaches the result file", () => {
+  const root = makeRepo();
+  const secret = "postgresql://ro:hunter2isverylong@prod.host:5432/visionquest";
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics,
+      scorer: `export async function run(ctx) {
+        throw new Error("connect failed: " + ctx.env.prodReadonlyUrl);
+      }`,
+    });
+    const out = bench(root, ["--suite=demo"], { BENCH_PROD_READONLY_URL: secret });
+    assert.equal(out.status, 0, out.stderr);
+    const raw = readFileSync(
+      join(root, "reports", "benchmarks", "latest", "demo.json"),
+      "utf8"
+    );
+    assert.ok(!raw.includes("hunter2isverylong"), "the secret was written to disk");
+    assert.match(raw, /\[redacted:BENCH_PROD_READONLY_URL\]/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a secret inside metric details is redacted too", () => {
+  const root = makeRepo();
+  const secret = "postgresql://ro:hunter2isverylong@prod.host:5432/visionquest";
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics,
+      scorer: `export async function run(ctx) {
+        return { metrics: [{ id: "accuracy", value: 1, details: { note: ctx.env.prodReadonlyUrl } }] };
+      }`,
+    });
+    const out = bench(root, ["--suite=demo"], { BENCH_PROD_READONLY_URL: secret });
+    assert.equal(out.status, 0, out.stderr);
+    const raw = readFileSync(
+      join(root, "reports", "benchmarks", "latest", "demo.json"),
+      "utf8"
+    );
+    assert.ok(!raw.includes("hunter2isverylong"), raw);
+    assert.match(raw, /\[redacted:BENCH_PROD_READONLY_URL\]/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("--tier selects every suite of that tier whose requires are met", () => {
   const root = makeRepo();
   try {
@@ -265,6 +356,82 @@ test("--update-baseline --reason writes value, commit, host and reason", () => {
     assert.ok("commit" in baseline.demo.accuracy);
     assert.ok("provider" in baseline.demo.accuracy);
     assert.ok("model" in baseline.demo.accuracy);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--update-baseline rewrites only the suites it ran, byte for byte", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "one", { metrics, scorer: passingScorer });
+    addSuite(root, "two", { metrics, scorer: passingScorer });
+    // Deliberately non-alphabetical keys inside the untouched row: a writer
+    // that re-sorts every key would change these bytes.
+    const seeded = {
+      two: {
+        accuracy: {
+          value: 0.42,
+          reason: "seeded by hand",
+          measuredAt: "2026-01-01T00:00:00.000Z",
+          commit: "0000000",
+          host: "someone else's machine",
+          provider: null,
+          model: null,
+        },
+      },
+    };
+    writeFileSync(
+      join(root, "reports", "benchmarks", "baseline.json"),
+      `${JSON.stringify(seeded, null, 2)}\n`
+    );
+
+    const out = bench(root, ["--suite=one", "--update-baseline", "--reason=first measurement"]);
+    assert.equal(out.status, 0, out.stderr);
+
+    const after = readBaseline(root);
+    assert.equal(after.one.accuracy.value, 1, "the measured suite was written");
+    assert.deepEqual(after.two, seeded.two, "the untouched suite kept its values");
+    assert.equal(
+      JSON.stringify(after.two),
+      JSON.stringify(seeded.two),
+      "the untouched suite kept its key order too"
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--suite may be repeated as well as comma-separated", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "one", { metrics, scorer: passingScorer });
+    addSuite(root, "two", { metrics, scorer: passingScorer });
+    addSuite(root, "three", { metrics, scorer: passingScorer });
+
+    const repeated = bench(root, ["--suite=one", "--suite=two", "--json"]);
+    assert.equal(repeated.status, 0, repeated.stderr);
+    assert.deepEqual(
+      JSON.parse(repeated.stdout).map((result) => result.suite),
+      ["one", "two"]
+    );
+
+    const commas = bench(root, ["--suite=two,three", "--json"]);
+    assert.equal(commas.status, 0, commas.stderr);
+    assert.deepEqual(
+      JSON.parse(commas.stdout).map((result) => result.suite),
+      ["two", "three"]
+    );
+
+    const mixed = bench(root, ["--suite=one,two", "--suite=three", "--json"]);
+    assert.equal(mixed.status, 0, mixed.stderr);
+    assert.deepEqual(
+      JSON.parse(mixed.stdout).map((result) => result.suite),
+      ["one", "two", "three"]
+    );
+
+    const unknown = bench(root, ["--suite=one", "--suite=nope"]);
+    assert.equal(unknown.status, 2, "an unknown name in any --suite still exits 2");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
