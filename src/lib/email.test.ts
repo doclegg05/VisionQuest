@@ -25,6 +25,8 @@ const saved = {
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
   from: process.env.SMTP_FROM,
+  hermetic: process.env.EMAIL_SINK_ALLOW_HERMETIC,
+  databaseUrl: process.env.DATABASE_URL,
 };
 
 /**
@@ -46,6 +48,8 @@ afterEach(() => {
   restore("host", "SMTP_HOST");
   restore("port", "SMTP_PORT");
   restore("from", "SMTP_FROM");
+  restore("hermetic", "EMAIL_SINK_ALLOW_HERMETIC");
+  restore("databaseUrl", "DATABASE_URL");
 });
 
 describe("the email sink", () => {
@@ -127,5 +131,126 @@ describe("the email sink", () => {
       () => sendEmail({ to: "a@example.invalid", subject: "s", text: "t" }),
       /not configured/i,
     );
+  });
+});
+
+// =============================================================================
+// The production refusal, and the one hole deliberately left in it.
+//
+// A file sink on a real deployment is a silent mail black hole — crisis
+// notifications, password resets, employer packets, all appearing to send and
+// reaching nobody. It stays refused. What CI needs is narrower than "allow it
+// in production": the e2e job runs the BUILT server, which hard-sets
+// NODE_ENV=production, against a hermetic throwaway database.
+//
+// So the hole is shaped like the rig and not like a deployment: an explicit
+// opt-in AND a database that `isSafeE2eSeedTarget` — the same guard that
+// gates the committed-password seed — recognises as local or CI. Every case
+// below that flips one of those to a production-shaped value must refuse.
+// =============================================================================
+
+const HERMETIC_DB = "postgresql://postgres:postgres@localhost:5432/visionquest_e2e";
+const PRODUCTION_DB = "postgresql://user:pw@db.abcdefgh.supabase.co:5432/postgres";
+
+describe("the sink's production refusal", () => {
+  it("refuses in production with no hermetic opt-in, however the sink is set", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-email-prod-"));
+    try {
+      process.env.EMAIL_SINK_DIR = dir;
+      setEnv("NODE_ENV", "production");
+      setEnv("EMAIL_SINK_ALLOW_HERMETIC", undefined);
+      setEnv("DATABASE_URL", HERMETIC_DB);
+      assert.equal(isEmailSinkActive(), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses in production when the opt-in is set but the database is a real one", () => {
+    // The load-bearing case. An operator who copies EMAIL_SINK_ALLOW_HERMETIC
+    // into a real dashboard must still not get a mail black hole, and the
+    // database is what tells the two apart.
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-email-prod-"));
+    try {
+      process.env.EMAIL_SINK_DIR = dir;
+      setEnv("NODE_ENV", "production");
+      setEnv("EMAIL_SINK_ALLOW_HERMETIC", "1");
+      setEnv("DATABASE_URL", PRODUCTION_DB);
+      assert.equal(isEmailSinkActive(), false);
+      assert.equal(isEmailDeliveryConfigured(), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses in production when the opt-in is set but there is no database at all", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-email-prod-"));
+    try {
+      process.env.EMAIL_SINK_DIR = dir;
+      setEnv("NODE_ENV", "production");
+      setEnv("EMAIL_SINK_ALLOW_HERMETIC", "1");
+      setEnv("DATABASE_URL", undefined);
+      assert.equal(isEmailSinkActive(), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a truthy-but-not-1 opt-in, so a stray 'true' does not open it", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-email-prod-"));
+    try {
+      process.env.EMAIL_SINK_DIR = dir;
+      setEnv("NODE_ENV", "production");
+      setEnv("DATABASE_URL", HERMETIC_DB);
+      for (const value of ["true", "yes", "0", ""]) {
+        setEnv("EMAIL_SINK_ALLOW_HERMETIC", value);
+        assert.equal(isEmailSinkActive(), false, `EMAIL_SINK_ALLOW_HERMETIC=${value} must refuse`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ALLOWS it when both locks are turned, which is what CI's built server needs", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-email-hermetic-"));
+    try {
+      process.env.EMAIL_SINK_DIR = dir;
+      setEnv("NODE_ENV", "production");
+      setEnv("EMAIL_SINK_ALLOW_HERMETIC", "1");
+      setEnv("DATABASE_URL", HERMETIC_DB);
+
+      assert.equal(isEmailSinkActive(), true);
+      // The 503 the send route raises comes from this predicate, so it is the
+      // one that actually has to flip.
+      assert.equal(isEmailDeliveryConfigured(), true);
+
+      await sendEmail({ to: "hiring@example.invalid", subject: "S", text: "body" });
+      const lines = readFileSync(path.join(dir, "outbox.jsonl"), "utf8").trim().split("\n");
+      assert.equal(lines.length, 1);
+      assert.equal(JSON.parse(lines[0]).subject, "S");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still needs EMAIL_SINK_DIR — the opt-in alone diverts nothing", () => {
+    setEnv("EMAIL_SINK_DIR", undefined);
+    setEnv("NODE_ENV", "production");
+    setEnv("EMAIL_SINK_ALLOW_HERMETIC", "1");
+    setEnv("DATABASE_URL", HERMETIC_DB);
+    assert.equal(isEmailSinkActive(), false);
+  });
+
+  it("leaves non-production behaviour exactly as it was, with no opt-in needed", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-email-dev-"));
+    try {
+      process.env.EMAIL_SINK_DIR = dir;
+      setEnv("NODE_ENV", "development");
+      setEnv("EMAIL_SINK_ALLOW_HERMETIC", undefined);
+      setEnv("DATABASE_URL", PRODUCTION_DB);
+      assert.equal(isEmailSinkActive(), true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
