@@ -14,7 +14,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
-export const CONSENT_SCOPES = ["cloud_file_processing"] as const;
+export const CONSENT_SCOPES = [
+  "cloud_file_processing",
+  // Match & Connect: blanket, revocable permission to be introduced to an
+  // employer. Added in Phase 3 because the WorkForce WV batch is the first
+  // thing that sends a student's name outside the program and must not do so
+  // without it. Phase 4 owns the student-facing toggle, the per-disclosure
+  // approval card, and the /memory page section — this is the scope only.
+  "employer_referral",
+] as const;
 export type ConsentScope = (typeof CONSENT_SCOPES)[number];
 
 export const consentScopeSchema = z.enum(CONSENT_SCOPES);

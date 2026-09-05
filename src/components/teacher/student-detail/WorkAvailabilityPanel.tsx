@@ -114,15 +114,20 @@ export function WorkAvailabilityPanel({ workProfile }: { workProfile: WorkProfil
             <Row label="Soonest they can start" value={workProfile.earliestStart ?? NOT_SET} />
             <Row label="Kids' hours" value={workProfile.childcareHours?.note ?? NOT_SET} />
             <Row label="ZIP code" value={workProfile.homeZip ?? NOT_SET} />
-            <Row label="County" value={workProfile.county ?? NOT_SET} />
-            <Row
-              label="Longest drive they can make"
-              value={
-                workProfile.maxCommuteMinutes !== null
-                  ? `${workProfile.maxCommuteMinutes} minutes`
-                  : NOT_SET
-              }
-            />
+            {/* County and maxCommuteMinutes are on the model but have no input
+                anywhere a student can reach — only Sage or a future teacher
+                form could set them — so rendering "Not set" forever told an
+                instructor the student had skipped something they were never
+                asked. Shown only when a value actually exists. Adding the two
+                inputs to the Work availability section is the alternative and
+                belongs with whoever owns that form. */}
+            {workProfile.county && <Row label="County" value={workProfile.county} />}
+            {workProfile.maxCommuteMinutes !== null && (
+              <Row
+                label="Longest drive they can make"
+                value={`${workProfile.maxCommuteMinutes} minutes`}
+              />
+            )}
           </dl>
           <p className="mt-3 text-xs text-[var(--ink-muted)]">
             Last saved by {SOURCE_LABELS[workProfile.updatedVia]} on{" "}

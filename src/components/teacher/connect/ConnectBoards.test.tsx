@@ -46,6 +46,18 @@ const lead: LeadsBoardItem = {
   openings: 2,
   fitCount: 4,
   blockedCount: 2,
+  blocked: [
+    {
+      studentId: "stu-1",
+      displayName: "Sam Ford",
+      reason: "Needs the forklift operator card. Not earned yet.",
+    },
+    {
+      studentId: "stu-2",
+      displayName: "Kim Adams",
+      reason: "No way to get there yet.",
+    },
+  ],
 };
 
 describe("LeadsBoard", () => {
@@ -70,6 +82,44 @@ describe("LeadsBoard", () => {
   it("says pay is not listed rather than showing a blank", () => {
     const html = renderToString(<LeadsBoard leads={[{ ...lead, pay: null, shifts: [] }]} />);
     assert.ok(html.includes("Pay not listed."), html);
+  });
+
+  it("shows WHO is blocked and why, not just a count", () => {
+    // fit() has produced these sentences since Phase 3 shipped and nothing
+    // rendered them, so an instructor saw "4 fit / 2 blocked" with no way to
+    // learn that one of the two just needs a certificate.
+    const html = renderToString(<LeadsBoard leads={[lead]} />);
+    assert.ok(html.includes("Who is blocked, and why"), html);
+    assert.ok(html.includes("Sam Ford"), html);
+    assert.ok(html.includes("Needs the forklift operator card"), html);
+  });
+
+  it("summarises the rest when more are blocked than are listed", () => {
+    // Stripped text, because React inserts comment separators around every
+    // interpolated value and the assertion is about what a person reads.
+    const text = stripTags(
+      renderToString(<LeadsBoard leads={[{ ...lead, blockedCount: 9, fitCount: 1 }]} />),
+    );
+    assert.ok(text.includes("and 7 more"), text);
+  });
+
+  it("omits the disclosure entirely when nobody is blocked", () => {
+    const html = renderToString(
+      <LeadsBoard leads={[{ ...lead, blocked: [], blockedCount: 0 }]} />,
+    );
+    assert.ok(!html.includes("Who is blocked"), html);
+  });
+
+  it("offers a filter and collapses past ten leads", () => {
+    const many = Array.from({ length: 14 }, (_, index) => ({
+      ...lead,
+      id: `lead-${index}`,
+      title: `Job ${index}`,
+    }));
+    const html = renderToString(<LeadsBoard leads={many} />);
+    assert.ok(html.includes('id="leads-filter"'), "a board with no filter is unusable by term two");
+    assert.ok(stripTags(html).includes("Show 4 more leads"), stripTags(html));
+    assert.ok(!html.includes("Job 13"), "the eleventh onward are behind Show more");
   });
 
   it("gives an empty board a next step, at grade 6", () => {
@@ -109,10 +159,25 @@ describe("StudentsBoard", () => {
     assert.ok(!/\b\d{1,3}%/u.test(html), html);
   });
 
-  it("says plainly when nothing fits yet, and what to do", () => {
+  it("says plainly when nothing fits yet, and names the screen to check", () => {
     const html = renderToString(<StudentsBoard students={[{ ...student, leads: [] }]} />);
     assert.ok(html.includes("No lead fits them yet"), html);
+    assert.ok(
+      html.includes("Work availability"),
+      '"check their work answers" did not say WHICH answers or where they live',
+    );
     assertGradeSix(html, "StudentsBoard no-fit state");
+  });
+
+  it("offers a filter and collapses past ten students", () => {
+    const many = Array.from({ length: 13 }, (_, index) => ({
+      ...student,
+      studentId: `stu-${index}`,
+      displayName: `Student ${index}`,
+    }));
+    const html = renderToString(<StudentsBoard students={many} />);
+    assert.ok(html.includes('id="students-filter"'), html);
+    assert.ok(stripTags(html).includes("Show 3 more students"), stripTags(html));
   });
 
   it("reads at grade 6", () => {
@@ -179,6 +244,17 @@ describe("EmployerDirectory", () => {
     );
     assert.ok(html.includes("Do not contact"), html);
     assert.ok(!html.includes("do_not_contact"), html);
+  });
+
+  it("offers a filter and collapses past ten employers", () => {
+    const many = Array.from({ length: 12 }, (_, index) => ({
+      ...employer,
+      id: `emp-${index}`,
+      name: `Employer ${index}`,
+    }));
+    const html = renderToString(<EmployerDirectory employers={many} />);
+    assert.ok(html.includes('id="employers-filter"'), html);
+    assert.ok(stripTags(html).includes("Show 2 more employers"), stripTags(html));
   });
 
   it("says owner 'Not set' rather than leaving it blank", () => {

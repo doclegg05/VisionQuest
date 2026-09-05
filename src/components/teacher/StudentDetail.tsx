@@ -36,6 +36,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [verifying, setVerifying] = useState<string | null>(null);
   const [certOutcomeVerifying, setCertOutcomeVerifying] = useState(false);
   const [applicationVerifying, setApplicationVerifying] = useState<string | null>(null);
+  const [applicationVerifyError, setApplicationVerifyError] = useState<string | null>(null);
   const [orientationVerifying, setOrientationVerifying] = useState<string | null>(null);
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -162,15 +163,25 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
    */
   async function handleApplicationVerify(applicationId: string) {
     setApplicationVerifying(applicationId);
+    setApplicationVerifyError(null);
     try {
-      await fetch("/api/teacher/outcomes/verify", {
+      const res = await fetch("/api/teacher/outcomes/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetType: "application", targetId: applicationId }),
       });
+      // A failed verify that silently reloaded left the row looking exactly as
+      // it did before, so the instructor would conclude the button did nothing
+      // and try again — or worse, assume it had worked. Say so, and do not
+      // reload: the data has not changed.
+      if (!res.ok) {
+        setApplicationVerifyError("Could not verify that.");
+        return;
+      }
       await loadData();
     } catch (err) {
       console.error("Failed to verify application:", err instanceof Error ? err.message : "Unknown error");
+      setApplicationVerifyError("Could not verify that.");
     } finally {
       setApplicationVerifying(null);
     }
@@ -561,6 +572,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               certOutcomeVerifying={certOutcomeVerifying}
               onCertOutcomeVerify={handleCertOutcomeVerify}
               applicationVerifying={applicationVerifying}
+              applicationVerifyError={applicationVerifyError}
               onApplicationVerify={handleApplicationVerify}
               orientationVerifying={orientationVerifying}
               onOrientationVerify={handleOrientationVerify}

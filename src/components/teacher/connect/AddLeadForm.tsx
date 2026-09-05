@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import {
   JOB_LEAD_SOURCES,
@@ -27,7 +28,9 @@ import { LEAD_SHIFTS } from "@/lib/connect/work-profile-shared";
 /** The three ways a lead gets entered. "listing" posts to a different route. */
 const MODES = [
   { value: "manual", label: "Type it in" },
-  { value: "joborder", label: "From a MACC job order" },
+  // MACC is WorkForce WV's job bank; instructors know the site, not always the
+  // acronym, so the label says both.
+  { value: "joborder", label: "From a MACC job order (WorkForce WV's job bank)" },
   { value: "listing", label: "From a job on a class board" },
 ] as const;
 
@@ -36,20 +39,78 @@ type Mode = (typeof MODES)[number]["value"];
 export interface AddLeadFormProps {
   employers: Array<{ id: string; name: string }>;
   classes: Array<{ id: string; name: string }>;
+  /**
+   * Catalog certification ids an instructor can require on a lead. Passed in
+   * rather than imported so this component never reaches a Prisma-backed
+   * module.
+   */
+  certifications: Array<{ id: string; label: string }>;
+}
+
+interface ConvertibleListing {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
 }
 
 const inputClass =
   "mt-1 min-h-[44px] w-full rounded-lg border border-[var(--border)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--ink-strong)]";
 
-export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
+export function AddLeadForm({ employers, classes, certifications }: AddLeadFormProps) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("manual");
   const [shifts, setShifts] = useState<string[]>([]);
+  const [mustHaveCerts, setMustHaveCerts] = useState<string[]>([]);
+  const [classId, setClassId] = useState("");
+  const [listings, setListings] = useState<ConvertibleListing[]>([]);
+  const [listingsState, setListingsState] = useState<"idle" | "loading" | "error">("idle");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  /**
+   * The board picker replaces a pasted posting id (UX review WARNING #3). It
+   * needs a class, because a JobListing belongs to one class's board — so the
+   * list reloads whenever the class changes, and says so when none is picked.
+   */
+  useEffect(() => {
+    if (mode !== "listing" || !classId) {
+      setListings([]);
+      setListingsState("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setListingsState("loading");
+    fetch(`/api/teacher/connect/leads/listings?classId=${encodeURIComponent(classId)}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("failed");
+        const body = await response.json();
+        if (cancelled) return;
+        setListings(body.listings ?? []);
+        setListingsState("idle");
+      })
+      .catch(() => {
+        if (!cancelled) setListingsState("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, classId]);
 
   function toggleShift(shift: string) {
     setShifts((current) =>
       current.includes(shift) ? current.filter((value) => value !== shift) : [...current, shift],
+    );
+  }
+
+  function toggleCert(certId: string) {
+    setMustHaveCerts((current) =>
+      current.includes(certId)
+        ? current.filter((value) => value !== certId)
+        : [...current, certId],
     );
   }
 
@@ -59,7 +120,6 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
     setMessage(null);
 
     const form = new FormData(event.currentTarget);
-    const classId = String(form.get("classId") ?? "");
 
     try {
       const response =
@@ -83,6 +143,12 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
                 classId: classId || null,
                 source: mode,
                 schedule: { shifts },
+                requirements: {
+                  mustHaveCerts,
+                  niceToHave: [],
+                  physical: [],
+                  licenses: [],
+                },
                 payMin: form.get("payMin") ? Number(form.get("payMin")) : null,
                 payMax: form.get("payMax") ? Number(form.get("payMax")) : null,
                 payPeriod: (form.get("payPeriod") as LeadPayPeriod) || "hour",
@@ -96,6 +162,13 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
         return;
       }
       setMessage(body.created === false ? "That job was already a lead." : "Lead added.");
+      // Clear the form and pull the boards down again, so the new lead shows
+      // up and a second lead does not start from the first one's answers.
+      formRef.current?.reset();
+      setShifts([]);
+      setMustHaveCerts([]);
+      setClassId("");
+      router.refresh();
     } catch {
       setMessage("That did not save. Check your connection and try again.");
     } finally {
@@ -109,7 +182,7 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
         Add a lead
       </h2>
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="mt-4 space-y-4">
         <fieldset>
           <legend className="text-sm font-medium text-[var(--ink-strong)]">Where is it from?</legend>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -134,10 +207,27 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
 
         {mode === "listing" ? (
           <label className="block text-sm font-medium text-[var(--ink-strong)]">
-            Job posting ID
-            <input name="jobListingId" required className={inputClass} />
+            Which job on the board
+            <select name="jobListingId" required disabled={listings.length === 0} className={inputClass}>
+              <option value="">
+                {!classId
+                  ? "Pick a class first"
+                  : listingsState === "loading"
+                    ? "Loading jobs..."
+                    : listingsState === "error"
+                      ? "Could not load the jobs"
+                      : listings.length === 0
+                        ? "No jobs left to add"
+                        : "Pick a job"}
+              </option>
+              {listings.map((listing) => (
+                <option key={listing.id} value={listing.id}>
+                  {listing.title} — {listing.company}
+                </option>
+              ))}
+            </select>
             <span className="mt-1 block text-sm font-normal text-[var(--ink-muted)]">
-              Copy it from the job on the class board.
+              Jobs already added as leads are not on this list.
             </span>
           </label>
         ) : (
@@ -188,6 +278,31 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
               </p>
             </fieldset>
 
+            <fieldset>
+              <legend className="text-sm font-medium text-[var(--ink-strong)]">
+                Cards they must already have
+              </legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {certifications.map((cert) => (
+                  <label
+                    key={cert.id}
+                    className="flex min-h-[44px] items-center gap-2 text-sm text-[var(--ink-muted)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={mustHaveCerts.includes(cert.id)}
+                      onChange={() => toggleCert(cert.id)}
+                      className="h-5 w-5"
+                    />
+                    {cert.label}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                Only pick a card the job really needs. A student without it is left off this lead.
+              </p>
+            </fieldset>
+
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="block text-sm font-medium text-[var(--ink-strong)]">
                 Pay from
@@ -226,7 +341,12 @@ export function AddLeadForm({ employers, classes }: AddLeadFormProps) {
 
         <label className="block text-sm font-medium text-[var(--ink-strong)]">
           Which class can see it
-          <select name="classId" defaultValue="" className={inputClass}>
+          <select
+            name="classId"
+            value={classId}
+            onChange={(event) => setClassId(event.target.value)}
+            className={inputClass}
+          >
             <option value="">All classes</option>
             {classes.map((spokesClass) => (
               <option key={spokesClass.id} value={spokesClass.id}>

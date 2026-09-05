@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { notFound, withTeacherAuth } from "@/lib/api-error";
+import { badRequest, notFound, withTeacherAuth } from "@/lib/api-error";
+import { z } from "zod";
 import { logAuditEvent } from "@/lib/audit";
 import {
   createContactSchema,
@@ -23,7 +24,14 @@ import { parseBody } from "@/lib/schemas";
 
 export const POST = withTeacherAuth(
   async (session, req: Request, context: { params: Promise<{ id: string }> }) => {
-    const { id: employerId } = await context.params;
+    const { id: rawId } = await context.params;
+
+    // A path parameter is request input like any other (.claude/rules/
+    // security.md: validate IDs with z.string().cuid()). Without this, a
+    // malformed id reaches Prisma and comes back as a driver error.
+    const parsed = z.string().cuid("Invalid employer ID.").safeParse(rawId);
+    if (!parsed.success) throw badRequest("Invalid employer ID.");
+    const employerId = parsed.data;
 
     // Existence is checked through the caller's own RLS context, so a session
     // that cannot see the employer gets "not found" rather than a foreign-key

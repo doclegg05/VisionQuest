@@ -155,8 +155,12 @@ export function WorkAvailabilitySection() {
         <legend className="mb-2 text-sm font-medium text-[var(--ink-strong)]">
           Days and times you can work
         </legend>
+        {/* No min-width floor: at 375px it forced a horizontal scroll, and a
+            sideways scroll is a discovery cost for exactly the readers this
+            grid is for. The buttons already shrink, and the overflow wrapper
+            stays as a safety net for a browser that cannot fit them. */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[22rem] border-collapse text-sm">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
                 <th scope="col" className="p-1 text-left text-xs text-[var(--ink-muted)]">

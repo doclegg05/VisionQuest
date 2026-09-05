@@ -736,7 +736,12 @@ const explainJob: AgentTool = {
         },
       },
       modelHint:
-        `Plain-language explanation of "${safe.title}" at ${safe.company}:\n${explanation}\n\n` +
+        // The explanation is MODEL output written FROM third-party posting
+        // text, so it goes back into the prompt through the same sanitizer the
+        // grounding block uses. A posting that smuggled an instruction through
+        // the rewrite would otherwise re-enter the next turn as trusted prose.
+        `Plain-language explanation of "${safe.title}" at ${safe.company}:\n` +
+        `${sanitizeForPrompt(explanation)}\n\n` +
         "Give this to the student as written, or shorter. Do not add facts to it — anything the " +
         `posting did not say must stay "${MISSING_FIELD_LINE}"`,
     };
