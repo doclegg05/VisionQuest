@@ -4,7 +4,7 @@ import { ConnectReportFilters } from "@/components/teacher/connect/ConnectReport
 import PageIntro from "@/components/ui/PageIntro";
 import { isStaffRole } from "@/lib/api-error";
 import { getSession } from "@/lib/auth";
-import { listManagedClasses } from "@/lib/classroom";
+import { listConnectClasses } from "@/lib/connect/classes";
 import { fetchConnectFunnel } from "@/lib/connect/funnel";
 import { FUNNEL_STAGE_ORDER, type FunnelResult } from "@/lib/connect/funnel-shared";
 import { listEmployers } from "@/lib/connect/employers";
@@ -78,7 +78,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
     rlsContext,
     async () => {
       const [classRows, employerRows] = await Promise.all([
-        listManagedClasses(session),
+        listConnectClasses(session),
         listEmployers(),
       ]);
 

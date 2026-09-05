@@ -9,9 +9,10 @@
 // =============================================================================
 
 import type { Session } from "@/lib/api-error";
-import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
+import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
+import { assertClassIsManaged } from "./classes";
 import { buildDohsExportRows, type DohsExportRow } from "./dohs-export-shared";
 
 export interface FetchDohsExportOptions {
@@ -30,8 +31,12 @@ export async function fetchDohsExport(
   session: Session,
   options: FetchDohsExportOptions = {},
 ): Promise<DohsExportResult> {
+  // Same reasoning as funnel.ts: SpokesRecord/Application RLS narrows through
+  // `managed_student_ids()`, the instructor-assignment boundary
+  // `connectClassWhere`/`assertClassIsManaged` express at the app level —
+  // not the broader "any teacher may see any class" `assertStaffCanManageClass`.
   if (options.classId) {
-    await assertStaffCanManageClass(session, options.classId);
+    await assertClassIsManaged(options.classId, session);
   }
 
   const studentIds = await listManagedStudentIds(session, {

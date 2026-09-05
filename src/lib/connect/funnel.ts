@@ -14,9 +14,10 @@
 // =============================================================================
 
 import type { Session } from "@/lib/api-error";
-import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
+import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
+import { assertClassIsManaged } from "./classes";
 import { computeFunnel, type FunnelResult } from "./funnel-shared";
 
 export interface FetchFunnelOptions {
@@ -30,8 +31,16 @@ export async function fetchConnectFunnel(
   session: Session,
   options: FetchFunnelOptions = {},
 ): Promise<FunnelResult> {
+  // `assertClassIsManaged` (not the broader `assertStaffCanManageClass`) —
+  // Connection RLS narrows through `managed_student_ids()`, the same
+  // instructor-assignment boundary `connectClassWhere` expresses at the app
+  // level (see classes.ts's header). Authorizing against the wider "any
+  // teacher may see any class" check would let a classId the caller does not
+  // instruct pass here and come back with a silently EMPTY funnel (RLS still
+  // filters the underlying rows correctly), which reads as "no connections"
+  // rather than "you don't have access" — this 404s instead.
   if (options.classId) {
-    await assertStaffCanManageClass(session, options.classId);
+    await assertClassIsManaged(options.classId, session);
   }
 
   const studentIds = await listManagedStudentIds(session, {
