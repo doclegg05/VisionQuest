@@ -360,6 +360,34 @@ function renderGrounding(input: TailoringInput, description: string): string {
  * Returns null on any failure. The employer page then shows the packet summary
  * without a PDF link rather than a broken download.
  */
+/**
+ * The résumé content that goes into the employer's PDF: the student's own
+ * résumé with the CONTACT BLOCK STRIPPED.
+ *
+ * packet-shared promises the employer learns the candidate's name at the
+ * interview the instructor arranges — but the résumé PDF carried their phone,
+ * email and home location, behind a capability URL that can be forwarded
+ * anywhere. The card's label ("Your résumé, written for this job") does not
+ * disclose that either. So the document goes out headed by the same
+ * first-name-and-initial the rest of the packet uses.
+ *
+ * OWNER VETO ITEM: Britt may prefer to keep the contact details and change the
+ * label instead. Recorded in the PR notes.
+ *
+ * Exported because it is the one transformation in `renderPacketPdf` that
+ * carries a privacy promise, and the rest of that function is storage and a
+ * database write. The `packet-privacy` benchmark scans this content across the
+ * whole synthetic cohort; reaching it through the storage path would have
+ * meant either a stubbed uploader or 20 PDFs to parse, and neither would have
+ * checked anything this does not.
+ */
+export function packetResumeContent(stored: ResumeContent): ResumeContent {
+  return {
+    ...stored,
+    contact: { email: "", phone: "", location: "", website: "", linkedin: "" },
+  };
+}
+
 export async function renderPacketPdf(
   studentId: string,
   packet: Packet,
@@ -374,21 +402,7 @@ export async function renderPacketPdf(
     if (!version) return null;
 
     const stored = parseStoredResumeData(JSON.stringify(version.content));
-    // STRIP the contact block.
-    //
-    // packet-shared promises the employer learns the candidate's name at the
-    // interview the instructor arranges — but the résumé PDF carried their
-    // phone, email and home location, behind a capability URL that can be
-    // forwarded anywhere. The card's label ("Your résumé, written for this
-    // job") does not disclose that either. So the document goes out headed by
-    // the same first-name-and-initial the rest of the packet uses.
-    //
-    // OWNER VETO ITEM: Britt may prefer to keep the contact details and change
-    // the label instead. Recorded in the PR notes.
-    const content = {
-      ...stored,
-      contact: { email: "", phone: "", location: "", website: "", linkedin: "" },
-    };
+    const content = packetResumeContent(stored);
     const buffer = Buffer.from(
       await generateResumePdfArrayBuffer(packet.candidateName, content),
     );

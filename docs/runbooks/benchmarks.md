@@ -191,12 +191,17 @@ key was never set teaches everyone to ignore the gate.
 
 Statuses:
 
+Statuses are decided in one fixed order — **floor first, for every metric**,
+then the `exact` rule, then the tolerance. A floor is the one promise a gate
+rests on, so it is checkable on its own: before any baseline exists, and
+whether or not the metric is `exact`.
+
 | Status | Meaning |
 |---|---|
-| `pass` | inside the floor and inside the tolerance |
+| `pass` | inside the floor and inside the tolerance; for an `exact` metric, equal to its baseline — or floor-met with no baseline recorded yet |
 | `watch` | below `baseline − tolerance` (above `baseline + tolerance` for a `lower` metric) but still inside the floor |
-| `fail` | the floor was crossed, or an `exact` metric moved |
-| `info` | nothing to judge against — no floor and no baseline |
+| `fail` | the floor was crossed, or an `exact` metric moved off its baseline |
+| `info` | nothing to judge against — no floor **and** no baseline |
 | `skipped` | no value: the suite's `requires` were unmet |
 | `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met |
 

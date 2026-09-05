@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "cohort": "config/benchmarks/synthetic-cohort",
+  "note": "The cohort carries no withdrawn-from-employer history, because nothing in it models a student backing out of an application. `student_withdrew_from_employer` would therefore never fire and would go untested. These rows supply it: each names a student and the employers they have withdrawn from, which the scorer feeds to the ranker as `withdrawnEmployerIds` and to its own mechanical rule at the same time.",
+  "withdrawals": [
+    { "studentId": "cbenchstu02", "employerIds": ["cbenchemp01"] },
+    { "studentId": "cbenchstu07", "employerIds": ["cbenchemp03", "cbenchemp04"] },
+    { "studentId": "cbenchstu23", "employerIds": ["cbenchemp09"] }
+  ],
+  "expectEveryCodeExercised": [
+    "availability_no_overlap",
+    "missing_must_have_cert",
+    "pay_below_floor",
+    "transport_infeasible",
+    "lead_not_open",
+    "employer_do_not_contact",
+    "student_withdrew_from_employer"
+  ]
+}

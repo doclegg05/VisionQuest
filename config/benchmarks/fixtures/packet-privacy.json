@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "note": "The denylist is the union of the two the unit tests already pin — packet-shared.test.ts and workforce-batch.test.ts — kept in one place because a field that must never reach an employer must never reach one by ANY route, and two independently-maintained lists drift. These are real column names on SpokesRecord, StudentWorkProfile and Student, so a future 'just add the county' shows up here by name rather than as a silent widening.",
+  "forbiddenTerms": [
+    "barriersOnEntry",
+    "barriersRemaining",
+    "householdType",
+    "referralEmail",
+    "requiredParticipationHours",
+    "birthDate",
+    "race",
+    "ethnicity",
+    "gender",
+    "TANF",
+    "SNAP",
+    "benefit",
+    "barrier",
+    "caseNote",
+    "moodEntry",
+    "payFloor",
+    "maxCommute",
+    "readinessScore",
+    "urgencyScore",
+    "hourlyWage"
+  ],
+  "termNote": "Deliberately field NAMES rather than values. A value ('bus', 'Raleigh') appears legitimately in other contexts, so scanning for values produces noise; a camelCase column name in employer-facing output means somebody spread a record into a payload, which is exactly the mistake this catches.",
+  "patterns": [
+    {
+      "id": "phone",
+      "regex": "\\(?\\b\\d{3}\\)?[-. ]\\d{3}[-. ]\\d{4}\\b",
+      "why": "A student's phone number must never reach an employer through the packet — the instructor arranges contact."
+    },
+    {
+      "id": "email",
+      "regex": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+      "why": "Same: the packet's contact route is the instructor, and the résumé's own contact block is stripped before the PDF is rendered.",
+      "allow": ["spokes@test.local"]
+    },
+    {
+      "id": "zip",
+      "regex": "\\b\\d{5}(?:-\\d{4})?\\b",
+      "why": "StudentWorkProfile.homeZip is not in the packet allowlist and must not arrive through a résumé location line either."
+    }
+  ],
+  "allowNote": "The `allow` list on the email pattern holds the PROGRAM's own sender address, which the employer email carries by design — it is who the employer replies to. Nothing student-shaped is allowed through.",
+  "programEmail": "spokes@test.local",
+  "programName": "SPOKES",
+  "instructorName": "Marlow Denbrook"
+}

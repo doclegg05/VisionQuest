@@ -8,11 +8,17 @@
  * scripts/bench/__tests__/status.test.mjs and nothing else in the runner is
  * allowed to decide a status.
  *
+ * Order of judgement, and it matters: **floor first, for every metric**, then
+ * the `exact` rule, then the tolerance. A floor is the one promise a gate
+ * rests on, so it has to be checkable on its own — before any baseline exists,
+ * and regardless of whether the metric is `exact`.
+ *
  * Vocabulary (design §3, plan "Result file"):
- *   pass    — inside the floor and inside the tolerance
+ *   pass    — inside the floor and inside the tolerance; for an `exact`
+ *             metric, equal to its baseline, or floor-met with no baseline yet
  *   watch   — below baseline − tolerance (or above baseline + tolerance for a
  *             `lower` metric) but still inside the floor: report, never fail
- *   fail    — the floor was crossed, or an `exact` metric moved
+ *   fail    — the floor was crossed, or an `exact` metric moved off its baseline
  *   info    — nothing to judge against (no floor, no baseline)
  *   skipped — no value was produced (unmet `requires`)
  *   error   — the scorer threw, or did not return a configured metric; set by
@@ -55,21 +61,30 @@ export function metricStatus(metric, value, baseline) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "fail";
 
   const hasBaseline = typeof baseline === "number" && Number.isFinite(baseline);
-
-  // `exact` is its own contract: the value must equal the committed baseline.
-  // Floor and tolerance are meaningless for it and are ignored rather than
-  // half-applied.
-  if (metric.exact === true) {
-    if (!hasBaseline) return "info";
-    return value === baseline ? "pass" : "fail";
-  }
-
   const direction = metric.direction === "lower" ? "lower" : "higher";
   const hasFloor = typeof metric.floor === "number" && Number.isFinite(metric.floor);
 
+  // The floor comes first for EVERY metric, `exact` included. A floor is the
+  // one promise a gate rests on, so it must be checkable with nothing else
+  // present — a metric that cannot fail is not a gate. This ordering was a
+  // real bug: the exact branch used to return early with `info` whenever
+  // there was no baseline, which made three live gate metrics
+  // (hard-blocks.blocks_expected_fired floor 1, connection-walks
+  // .illegal_accepted floor 0, report-parity.parity_violations) unable to
+  // fail at all against the empty starting baseline.json — 40 illegal
+  // transitions accepted would have reported INFO.
   if (hasFloor) {
     const breached = direction === "higher" ? value < metric.floor : value > metric.floor;
     if (breached) return "fail";
+  }
+
+  // `exact` then adds its own contract on top: the value must EQUAL the
+  // committed baseline. With no baseline there is nothing to compare against,
+  // so the floor's verdict stands — a kept promise is a `pass`, and a metric
+  // that promised nothing is `info`.
+  if (metric.exact === true) {
+    if (!hasBaseline) return hasFloor ? "pass" : "info";
+    return value === baseline ? "pass" : "fail";
   }
 
   const hasTolerance = typeof metric.tolerance === "number" && Number.isFinite(metric.tolerance);
