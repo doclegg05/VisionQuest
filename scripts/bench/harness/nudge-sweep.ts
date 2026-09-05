@@ -50,6 +50,16 @@ interface Report {
   allSkipped?: Array<string | null>;
   /** Sends the policy refused with `send_error` — the shape a broken lock takes. */
   sendErrors?: number;
+  /**
+   * The `send_errors` gate, falsified on every run.
+   *
+   * The broken state that motivated this suite blocks the sweep BEFORE any
+   * send, so `send_errors` stayed 0 through it and was the one gate never
+   * shown able to fire. This probe drives a real send failure — Twilio
+   * answering 503 through the real `sendPolicySms` — so the detector is
+   * proven on the same database, in the same run, every time.
+   */
+  failureProbe?: { attempted: number; sendFailures: number };
   capStress?: { attempts: number; accepted: number; capConsumingRows: number; dailyCap: number };
   perStudentDailyMax?: number;
   duplicateOpenQuestions?: number;
@@ -83,8 +93,9 @@ function assertSafeTarget(databaseUrl: string): void {
  * Stand in for Twilio. Answers only api.twilio.com and throws for anything
  * else, so an unexpected outbound call is a failure rather than a real request.
  */
-function installFakeTwilio(): { count: () => number } {
+function installFakeTwilio(): { count: () => number; setFailing: (failing: boolean) => void } {
   let calls = 0;
+  let failing = false;
   process.env.TWILIO_ACCOUNT_SID = "AC_bench_sid";
   process.env.TWILIO_AUTH_TOKEN = "bench_token";
   process.env.TWILIO_FROM_NUMBER = "+13045550199";
@@ -95,12 +106,21 @@ function installFakeTwilio(): { count: () => number } {
       throw new Error(`nudge-sweep: unexpected outbound request to ${url}`);
     }
     calls += 1;
+    if (failing) {
+      // A real Twilio outage, in the shape the code actually meets it:
+      // `sendSms` swallows the error and returns false, so the only trace is
+      // a `failed` OutboundMessage row. This is what the failure probe drives.
+      return new Response(JSON.stringify({ message: "Service unavailable" }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ sid: `SM${calls}`, status: "queued" }), {
       status: 201,
       headers: { "content-type": "application/json" },
     });
   }) as typeof fetch;
-  return { count: () => calls };
+  return { count: () => calls, setFailing: (next: boolean) => { failing = next; } };
 }
 
 async function main(): Promise<void> {
@@ -192,11 +212,21 @@ async function main(): Promise<void> {
       ran: pair.filter((result) => result.skipped === null).length,
     };
     report.allSkipped = [first.skipped, ...pair.map((result) => result.skipped)];
+    // The three shapes a failed send takes, matching `countSendFailures` in
+    // src/lib/nudges/schedule.ts: the runner's own catch, the policy's catch,
+    // and `sendSms` returning false — which is the ONLY trace a Twilio outage
+    // leaves, because sendSms swallows the error and returns a boolean.
+    // Counting only the middle one is why RED B below first read 0.
     report.sendErrors = [first, ...pair].reduce(
       (total, result) =>
         total +
         Object.entries(result.textOutcomes)
-          .filter(([key]) => key.startsWith("refused:send_error"))
+          .filter(
+            ([key]) =>
+              key === "error" ||
+              key.startsWith("refused:send_error") ||
+              key.startsWith("failed"),
+          )
           .reduce((sum, [, count]) => sum + count, 0),
       0,
     );
@@ -237,6 +267,28 @@ async function main(): Promise<void> {
       capConsumingRows: capRows,
       dailyCap: SMS_DAILY_CAP,
     };
+
+    // 3b. Falsify the send_errors gate, on this same database, this same run.
+    //     A second recipient, cleared to zero, with Twilio answering 503: the
+    //     real sendPolicySms must report a failure and the detector must see
+    //     it. Without this the gate is only ever observed reading 0, which is
+    //     indistinguishable from a gate that cannot fire at all.
+    const probeStudent = studentIds[1];
+    await prismaAdmin.outboundMessage.deleteMany({
+      where: { toKind: "student", toId: probeStudent },
+    });
+    twilio.setFailing(true);
+    const probeOutcome = await sendPolicySms({
+      studentId: probeStudent,
+      templateKey: "bench_failure_probe",
+      body: composeSmsBody("Failure probe, from the benchmark suite."),
+      now: SWEEP_NOW,
+    });
+    twilio.setFailing(false);
+    const probeFailed =
+      probeOutcome.status === "failed" ||
+      (probeOutcome.status === "refused" && probeOutcome.reason === "send_error");
+    report.failureProbe = { attempted: 1, sendFailures: probeFailed ? 1 : 0 };
 
     // 4. Read back what the database now holds for the whole cohort.
     const rows = await prismaAdmin.outboundMessage.findMany({

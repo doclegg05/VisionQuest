@@ -4615,6 +4615,97 @@
       "family": "distance_kms",
       "bucket": "hard_negative",
       "source": "pinned-test"
+    },
+    {
+      "text": "just took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "they know i took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "she said i took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "he knows i swallowed all my meds",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "her fault i took too many pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "his fault i took too many pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "my fault i took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "they saw i took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "the reason i took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "their fault i swallowed all my meds",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "your fault i took too many pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i heard she took all my pills",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i think my brother swallowed all the pills",
+      "label": "silent",
+      "family": "means_pills",
+      "bucket": "hard_negative",
+      "source": "pinned-test"
     }
   ]
 }

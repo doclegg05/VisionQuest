@@ -20,6 +20,7 @@ import {
   ungroundedDollarValues,
   BARE_RATE,
   CITY_STATE,
+  MONEY_PATTERNS,
   MAX_CHECKED_CHARS,
   type ExplainPosting,
 } from "./explain-faithfulness";
@@ -317,82 +318,140 @@ describe("a wage written out in words is still a wage", () => {
 // posting: `explain_job` reads third-party feed text, and the checks run over
 // it before anything reaches a student.
 //
-// Both cases below were measured, not reasoned about. The shape they pin is
-// GROWTH, not a stopwatch reading: a wall-clock threshold on a shared CI runner
-// would flake, but a quadratic pattern grows ~64x across an 8x input increase
-// while a linear one grows ~8x, and no amount of machine noise closes that gap.
+// These drive `matchAll` with the `g` flag, because that is what production
+// does (`numbersMatching`, `ungroundedPlaces`) and a benchmark should measure
+// the call the code actually makes.
+//
+// But be clear about why the earlier version of this block missed a live
+// quadratic, because the tempting explanation is the wrong one. It was NOT
+// `.test()` vs `matchAll`: measured on the old pattern over the comma-run
+// input, `.test()` costs 158 ms at 10 KB and `matchAll` 157 ms — identical,
+// because with no match anywhere `.test()` has to try every start position
+// too. The miss was INPUT COVERAGE. The old cases only ever fed these patterns
+// whitespace-shaped attacks, so the digit/comma quantifier was never put under
+// load by anything. A timing test is only as good as the input classes it
+// tries, and "we have a ReDoS test" is not the same as "we tried the shape
+// that breaks it".
+//
+// What they pin is GROWTH, not a stopwatch reading: a wall-clock threshold on a
+// shared CI runner would flake, but across a 4x input a quadratic pattern grows
+// ~16x and a linear one ~4x, and no amount of machine noise closes that gap.
 // =============================================================================
 
-const REDOS_SIZES = [1250, 2500, 5000, 10000];
+/**
+ * Big enough that the quadratic signal dwarfs timer noise. The fixed patterns
+ * cost well under a millisecond at 40 KB, so this is cheap until it regresses,
+ * which is exactly when it should stop being cheap.
+ */
+const REDOS_SIZES = [10_000, 20_000, 40_000];
 
 function repeatTo(unit: string, n: number): string {
   return unit.repeat(Math.ceil(n / unit.length)).slice(0, n);
 }
 
-/** Best of five, so a scheduler hiccup cannot manufacture a failure. */
-function bestMillis(pattern: RegExp, input: string): number {
-  const probe = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+/** Best of three, so a scheduler hiccup cannot manufacture a failure. */
+function bestMatchAllMillis(pattern: RegExp, input: string): number {
+  const probe = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
   let best = Infinity;
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 3; i += 1) {
     const started = process.hrtime.bigint();
-    probe.test(input);
+    // Counted, not discarded: iterating is the work being measured, and an
+    // unused loop body is the kind of thing an optimiser is entitled to drop.
+    let _seen = 0;
+    for (const _match of input.matchAll(probe)) _seen += 1;
     best = Math.min(best, Number(process.hrtime.bigint() - started) / 1e6);
   }
   return best;
 }
 
 /**
- * How much slower the pattern gets when its input grows eight-fold.
+ * How much slower the pattern gets when its input grows four-fold.
  *
- * Linear is 8. The floor on the baseline keeps a sub-microsecond first reading
- * from turning into a meaningless ratio.
+ * Linear is 4, quadratic is 16. The floor on the baseline keeps a
+ * sub-microsecond first reading from turning into a meaningless ratio.
  */
 function growthRatio(pattern: RegExp, attack: (n: number) => string): number {
-  const times = REDOS_SIZES.map((n) => bestMillis(pattern, attack(n)));
+  const times = REDOS_SIZES.map((n) => bestMatchAllMillis(pattern, attack(n)));
   return times[times.length - 1] / Math.max(times[0], 0.01);
 }
 
-/** Comfortably above linear (8) and far below the 73-78 the old patterns hit. */
-const LINEAR_ENOUGH = 20;
+/** Above linear (4) with headroom, far below the ~16 a quadratic pattern hits. */
+const LINEAR_ENOUGH = 10;
+
+/** The second money pattern -- the `dollars|usd` one -- by index, named once. */
+const MONEY_DOLLARS_WORD = MONEY_PATTERNS[1];
 
 describe("the patterns stay linear on adversarial input", () => {
-  it("CITY_STATE does not blow up on capitalised prose with no state after it", () => {
-    // The old `(?:[ -][A-Z][a-z]+)*` walked every remaining word from every
-    // start position: 49 ms at 10 KB, 3 s at 80 KB, ratio 78.
-    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa ", n));
-    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  it("BARE_RATE does not blow up on a run of digits and commas", () => {
+    // The one `.test()` hid. `\d[\d,]*` swallowed the whole tail from each of
+    // ~n digit positions and gave it back a character at a time:
+    // 154 ms at 10 KB, 9.9 s at 80 KB. A posting is third-party text, so that
+    // was CPU whoever wrote the posting got to choose the length of.
+    const ratio = growthRatio(BARE_RATE, (n) => repeatTo("1,", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over a 4x input`);
   });
 
-  it("CITY_STATE does not blow up on hyphenated capitalised prose", () => {
-    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa-", n));
-    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over an 8x input`);
+  it("the dollars/usd money pattern does not blow up on the same run", () => {
+    // Same sub-pattern, same fault, one copy over. It is in this list because
+    // fixing only the pattern that was reported would have left the identical
+    // quadratic reachable through the same `ungroundedDollarValues` call.
+    const ratio = growthRatio(MONEY_DOLLARS_WORD, (n) => repeatTo("1,", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `MONEY dollars/usd grew ${ratio.toFixed(1)}x over a 4x input`);
+  });
+
+  it("BARE_RATE does not blow up on a long run of bare digits", () => {
+    const ratio = growthRatio(BARE_RATE, (n) => "1".repeat(n));
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over a 4x input`);
   });
 
   it("BARE_RATE does not blow up on a rate word followed by spaces", () => {
-    // The reachable one -- it reads the POSTING, which is third-party text.
-    // `per\s+` beside `\s*` gave back one space and re-consumed the rest:
-    // 86 ms at 10 KB, 8.5 s at 80 KB, ratio 73.
+    // The earlier fault, kept pinned: `per\s+` beside `\s*` gave back one
+    // space and re-consumed the rest. 86 ms at 10 KB, 8.5 s at 80 KB.
     const ratio = growthRatio(BARE_RATE, (n) => `1 per ${" ".repeat(Math.max(0, n - 6))}`);
-    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over an 8x input`);
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over a 4x input`);
   });
 
   it("BARE_RATE does not blow up on repeated rate phrases", () => {
     const ratio = growthRatio(BARE_RATE, (n) => repeatTo("1 per ", n));
-    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over an 8x input`);
+    assert.ok(ratio < LINEAR_ENOUGH, `BARE_RATE grew ${ratio.toFixed(1)}x over a 4x input`);
   });
 
-  it("still reads the wage and place forms it exists to read", () => {
-    // A bound is only safe if it changed nothing real.
+  it("CITY_STATE does not blow up on capitalised prose with no state after it", () => {
+    // The old `(?:[ -][A-Z][a-z]+)*` walked every remaining word from every
+    // start position: 49 ms at 10 KB, 3 s at 80 KB.
+    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa ", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over a 4x input`);
+  });
+
+  it("CITY_STATE does not blow up on hyphenated capitalised prose", () => {
+    const ratio = growthRatio(CITY_STATE, (n) => repeatTo("Aa-", n));
+    assert.ok(ratio < LINEAR_ENOUGH, `CITY_STATE grew ${ratio.toFixed(1)}x over a 4x input`);
+  });
+
+  it("still reads every wage and place form it exists to read", () => {
+    // A bound is only safe if it changed nothing real. The grouped/ungrouped
+    // pair matters most: a comma-grouped-only number pattern would have
+    // silently stopped reading "1200 dollars", which is an ordinary way to
+    // write a monthly wage, and a student would have lost a correct answer.
+    const posting = (description: string) => ({ ...POSTING, salary: null, description });
     assert.deepEqual(kinds("Pay: $16 an hour."), []);
-    assert.deepEqual(
-      kinds("Pay: $18 an hour.", { ...POSTING, salary: null, description: "Pays 18/hr." }),
-      [],
-    );
-    assert.deepEqual(
-      kinds("Pay: $18 an hour.", { ...POSTING, salary: null, description: "Pays 18 per hour." }),
-      [],
-    );
+    assert.deepEqual(kinds("Pay: $18 an hour.", posting("Pays 18/hr.")), []);
+    assert.deepEqual(kinds("Pay: $18 an hour.", posting("Pays 18 per hour.")), []);
+    assert.deepEqual(kinds("Pay: $1200 a month.", posting("Pays 1200 dollars a month.")), []);
+    assert.deepEqual(kinds("Pay: $1,200 a month.", posting("Pays $1,200 a month.")), []);
+    assert.deepEqual(kinds("Pay: $15.50 an hour.", posting("Pays 15.50 dollars an hour.")), []);
+    assert.deepEqual(kinds("Pay: $12345 a year.", posting("Pays 12345 dollars a year.")), []);
+    assert.deepEqual(kinds("Pay: $1,234,567 a year.", posting("Pays $1,234,567 a year.")), []);
+    assert.deepEqual(kinds("Pay: $22 an hour.", posting("Pays usd 22 an hour.")), []);
     assert.deepEqual(kinds("Where: Charleston, WV."), []);
+  });
+
+  it("still refuses a wage the posting never states", () => {
+    // The bound must not have turned the check off.
+    assert.deepEqual(
+      kinds("Pay: $37 an hour.", { ...POSTING, salary: null, description: "Pays 1200 dollars a month." }),
+      ["wage"],
+    );
   });
 });
 

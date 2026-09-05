@@ -466,7 +466,93 @@ async function countNewLeadsForStudent(
 // The run
 // ---------------------------------------------------------------------------
 
+/**
+ * `skipped` values that mean the channel is DEAD, not quiet.
+ *
+ * Both of these end a sweep having sent nothing and written nothing, and both
+ * are already logged — which is exactly the point: the 42883 outage logged
+ * `nudges_run_lock_failed` on every single run for as long as it lasted, and
+ * nobody saw it, because at the monitoring layer a 200 carrying
+ * `skipped: "run lock unavailable"` is indistinguishable from a 200 carrying
+ * the healthy `skipped: "already running"`. A log line nothing alerts on is
+ * not observability.
+ *
+ * `already running` is deliberately absent — that is the run lock working.
+ * So are `deadline` and `commit_failed`: both mean a sweep really ran and
+ * really sent texts, and both already carry their own specific labels.
+ */
+const DEAD_CHANNEL_SKIPS = new Set<NonNullable<NudgeRunResult["skipped"]>>([
+  "run lock unavailable",
+  "admin client not privileged",
+]);
+
+/**
+ * Outcome keys that mean a text was attempted and did not go out.
+ *
+ * Three shapes, because the send path fails in three places:
+ *   "error"               — the runner's own loop caught a throw.
+ *   "refused:send_error"  — `sendPolicySms` caught one (the 42883 shape).
+ *   "failed:*"            — `sendSms` returned false, i.e. Twilio answered
+ *                           non-2xx, timed out, or is unconfigured. It
+ *                           swallows the error and returns a boolean, so this
+ *                           is the ONLY trace a Twilio outage leaves.
+ *
+ * A refusal by policy (no consent, quiet hours, daily cap) is none of these:
+ * that is the program working as designed, and paging on it would train
+ * everyone to ignore the page.
+ */
+function countSendFailures(outcomes: Record<string, number>): number {
+  return Object.entries(outcomes)
+    .filter(
+      ([key]) =>
+        key === "error" || key.startsWith("refused:send_error") || key.startsWith("failed"),
+    )
+    .reduce((total, [, count]) => total + count, 0);
+}
+
+/**
+ * Escalate a sweep that ended with the SMS channel dead.
+ *
+ * Mirrors `wellbeing_no_recipients` (crisis-detection.ts) rather than
+ * inventing a channel: a `logger.error` carrying an `alert:` key, which is
+ * what monitoring is wired to. Counts only — no student identifiers, per
+ * .claude/rules/security.md.
+ */
+function escalateDeadChannel(result: NudgeRunResult): void {
+  if (result.skipped !== null && DEAD_CHANNEL_SKIPS.has(result.skipped)) {
+    logger.error("Connect nudges: the sweep could not run; nobody was texted", {
+      alert: "connect_nudges_channel_dead",
+      skipped: result.skipped,
+      lockKey: RUN_LOCK_KEY,
+    });
+  }
+
+  const failures = countSendFailures(result.textOutcomes);
+  if (failures > 0) {
+    logger.error("Connect nudges: texts were attempted and did not go out", {
+      alert: "connect_nudges_send_errors",
+      failures,
+      textsPlanned: result.textsPlanned,
+      textsSent: result.textsSent,
+    });
+  }
+}
+
+/**
+ * One hourly sweep.
+ *
+ * A thin wrapper so that EVERY exit — the two early returns below, the run
+ * lock's own failure path, and a completed run's send tally — passes through
+ * one escalation check. Putting it at each return instead is how the next
+ * dead-channel exit gets added without one.
+ */
 export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRunResult> {
+  const result = await runNudgesInner(options);
+  escalateDeadChannel(result);
+  return result;
+}
+
+async function runNudgesInner(options: NudgeRunOptions = {}): Promise<NudgeRunResult> {
   const now = options.now ?? new Date();
   const dryRun = options.dryRun ?? false;
 

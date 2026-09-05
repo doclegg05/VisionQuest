@@ -102,8 +102,32 @@ const SNIPPET_TAG = /<\s*\/?\s*staff_authored_snippet\s*>/gi;
  */
 const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/gi;
 
-/** A forged marker cannot need more nesting than this to be worth defeating. */
-const MAX_SANITIZE_PASSES = 10;
+/**
+ * Pass budget for the stabilization loop, derived from the input rather than
+ * fixed.
+ *
+ * It was a flat 10, and nesting is cheap to write: 22 levels of
+ * "[GROUNDING_DATA_" wrapped around a real marker is 460 characters, and the
+ * loop ran out of passes with a byte-identical fence still standing in the
+ * output tail. Depth 50 left a run of them.
+ *
+ * Each pass is a linear scan, and a pass that changes anything removes at least
+ * a whole marker, so the loop cannot run more times than the input has room for
+ * markers — the cap is a backstop, not the normal exit. Ordinary text leaves on
+ * the first pass because nothing changed.
+ *
+ * The ABSOLUTE cap matters as much as the derived one. Each pass is linear, so
+ * an unbounded budget makes the whole function quadratic in its input, and a
+ * megabyte of deliberate nesting would spin for a minute. 512 unwinds far more
+ * nesting than any real posting carries — the deepest pinned case is 200 — and
+ * anything deeper falls through to the fail-closed branch in
+ * `sanitizeForPrompt`, which is bounded and safe rather than slow.
+ */
+const MAX_SANITIZE_PASSES = 512;
+
+function sanitizePassBudget(length: number): number {
+  return Math.min(MAX_SANITIZE_PASSES, Math.ceil(length / 8) + 2);
+}
 
 /**
  * One bracketed token, with no nesting. The negated class has no overlap with
@@ -137,11 +161,19 @@ const COLLAPSED_MARKER = /^\[[A-Za-z0-9_]+_(?:START|END)\]$/i;
  * "[morningshift]", which is not marker-shaped, so it is left exactly as
  * written.
  */
+function collapseBracketedWhitespace(value: string): string {
+  return value.replace(BRACKETED_TOKEN, (token) => token.replace(/\s+/g, ""));
+}
+
 function stripWhitespaceHiddenMarkers(value: string): string {
   return value.replace(BRACKETED_TOKEN, (token) =>
     COLLAPSED_MARKER.test(token.replace(/\s+/g, "")) ? "" : token,
   );
 }
+
+/** Non-global twins: a /g regex carries lastIndex between .test() calls. */
+const DELIMITER_SHAPED_ONCE = new RegExp(DELIMITER_SHAPED.source, "i");
+const SNIPPET_TAG_ONCE = new RegExp(SNIPPET_TAG.source, "i");
 
 export function sanitizeForPrompt(value: string): string {
   // Invisible characters go FIRST, and the two classes get different remedies
@@ -157,6 +189,7 @@ export function sanitizeForPrompt(value: string): string {
   // set — when it carried its own copy the gate could only ever check the
   // characters this file already stripped, which is a gate that cannot fail.
   let current = stripInvisibleChars(value);
+  const maxPasses = sanitizePassBudget(current.length);
   // One pass is not enough. Removing an inner token JOINS its neighbours, and
   // the join can be a live marker: "[GROUNDING_DATA_[GROUNDING_DATA_END]END]"
   // becomes "[GROUNDING_DATA_END]" after a single replace. Loop until the
@@ -164,7 +197,7 @@ export function sanitizeForPrompt(value: string): string {
   // The whitespace-collapsing sweep runs inside the loop for the same reason:
   // removing one token can join its neighbours into a marker that is only
   // recognisable once its interior whitespace is ignored.
-  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass += 1) {
+  for (let pass = 0; pass < maxPasses; pass += 1) {
     const next = stripWhitespaceHiddenMarkers(
       current.replace(DELIMITER_TOKEN, "").replace(SNIPPET_TAG, ""),
     );
@@ -176,8 +209,31 @@ export function sanitizeForPrompt(value: string): string {
   // a marker added to the prompt layer later would look like here until
   // someone remembers to add it. "[morning]" and other ordinary bracketed
   // prose do not match: the shape requires an _START/_END suffix.
-  return stripWhitespaceHiddenMarkers(
+  const swept = stripWhitespaceHiddenMarkers(
     current.replace(DELIMITER_SHAPED, "").replace(SNIPPET_TAG, ""),
+  );
+  if (!hasLiveMarker(swept)) return swept;
+  // FAIL CLOSED. Reaching here means the loop hit its budget with a marker
+  // still standing, which no ordinary text can do — it takes deliberate
+  // nesting deeper than the input length allows passes for. Rather than return
+  // a forged fence, remove every square bracket in the string: a marker is a
+  // BRACKETED token, so with no brackets left there is nothing for the model to
+  // read as our framing, and deleting a character can never create one. The
+  // prose survives; only the punctuation that made it a marker does not.
+  return swept.replace(/[[\]]/g, "");
+}
+
+/**
+ * Is a live marker still present? Checks the raw text and its
+ * whitespace-collapsed form, the same pair the sweeps above use, so a marker
+ * hidden by interior whitespace counts too.
+ */
+function hasLiveMarker(text: string): boolean {
+  const collapsed = collapseBracketedWhitespace(text);
+  return (
+    DELIMITER_SHAPED_ONCE.test(text) ||
+    DELIMITER_SHAPED_ONCE.test(collapsed) ||
+    SNIPPET_TAG_ONCE.test(text)
   );
 }
 

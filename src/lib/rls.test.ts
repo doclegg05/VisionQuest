@@ -1234,13 +1234,30 @@ if (!SHOULD_RUN) {
           }),
         );
 
+        // Scoped to THIS test's own five leads rather than asserting the whole
+        // table. The query is deliberately unfiltered by id — that is the
+        // production shape — but the assertion must not be, or any other row
+        // in the database reds it. That is not hypothetical: the benchmark
+        // cohort seeds `cbenchlead*` rows which are open and program-wide, so
+        // this case fails if the cohort is seeded before the RLS suite runs.
+        // CI orders those steps safely today; this makes a reorder harmless
+        // instead of mysterious. (The advisory-lock block at the end of this
+        // file documents that same ordering dependency from the other side.)
+        const ownLeads = new Set([
+          leadProgramWide,
+          leadProgramWideClosed,
+          leadAlphaOpen,
+          leadAlphaClosed,
+          leadBetaOpen,
+        ]);
+        const mine = rows.filter((row) => ownLeads.has(row.id));
         assert.deepEqual(
-          rows.map((row) => row.id).sort(),
+          mine.map((row) => row.id).sort(),
           [leadProgramWide, leadAlphaOpen].sort(),
           "open + (program-wide or my class); the closed and other-class leads must not appear",
         );
         assert.ok(
-          rows.every((row) => row.employerName.length > 0),
+          mine.every((row) => row.employerName.length > 0),
           "the denormalised employerName is what makes this query possible at all",
         );
       });
