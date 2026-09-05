@@ -32,6 +32,7 @@ import "server-only";
 
 import type { AlertDescriptor } from "./advising-alerts";
 import { OUTCOME_VERIFICATION } from "./outcome-verification";
+import { CONNECT_CONFIG_KEY } from "./connect/flags-shared";
 import { getPlainConfigValue } from "./system-config";
 
 export const PLACEMENT_ALERT_TYPE = "placement_outcome_pending";
@@ -59,9 +60,47 @@ export function parsePlacementBridgeScope(raw: string | null): PlacementBridgeSc
   return classIds.length > 0 ? { mode: "classes", classIds } : { mode: "off" };
 }
 
-/** Reads the pilot scope from SystemConfig (cached upstream for 60s). */
+/**
+ * The union of two scopes.
+ *
+ * Match & Connect Task 4.5: a class in the Connect pilot needs the placement
+ * bridge as well, or a hire recorded through a Connection creates a verified
+ * Application and then nothing happens — no queue item, no SPOKES prefill —
+ * because `placement_bridge_classes` was left unset. Making the Connect flag
+ * imply the bridge flag is the fix; asking an operator to keep two lists in
+ * step is the trap.
+ *
+ * "all" on either side wins, because either flag saying "every class" means
+ * every class.
+ */
+export function mergePlacementBridgeScopes(
+  a: PlacementBridgeScope,
+  b: PlacementBridgeScope,
+): PlacementBridgeScope {
+  if (a.mode === "all" || b.mode === "all") return { mode: "all" };
+  const classIds = [
+    ...(a.mode === "classes" ? a.classIds : []),
+    ...(b.mode === "classes" ? b.classIds : []),
+  ];
+  const unique = [...new Set(classIds)];
+  return unique.length > 0 ? { mode: "classes", classIds: unique } : { mode: "off" };
+}
+
+/**
+ * Reads the pilot scope from SystemConfig (cached upstream for 60s), unioned
+ * with the Match & Connect pilot scope — see mergePlacementBridgeScopes.
+ */
 export async function getPlacementBridgeScope(): Promise<PlacementBridgeScope> {
-  return parsePlacementBridgeScope(await getPlainConfigValue(PLACEMENT_BRIDGE_CONFIG_KEY));
+  const [bridgeRaw, connectRaw] = await Promise.all([
+    getPlainConfigValue(PLACEMENT_BRIDGE_CONFIG_KEY),
+    getPlainConfigValue(CONNECT_CONFIG_KEY),
+  ]);
+  return mergePlacementBridgeScopes(
+    parsePlacementBridgeScope(bridgeRaw),
+    // The two flags share a value grammar on purpose (unset/"all"/id list), so
+    // the bridge's own parser reads the Connect flag correctly.
+    parsePlacementBridgeScope(connectRaw),
+  );
 }
 
 export function isPlacementBridgeEnabledForStudent(

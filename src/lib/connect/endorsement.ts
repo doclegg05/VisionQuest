@@ -1,0 +1,155 @@
+// =============================================================================
+// Drafting the instructor endorsement — the model call.
+//
+// FERPA routing: `sensitivity: "student_record"` and the new `draft_endorsement`
+// AiTask, classified into the `draft` role (src/lib/ai/roles.ts). The prompt
+// carries verified facts about one named student, so unlike explain_job it is
+// student-derived text from end to end — this is exactly the content the
+// local-only routing policy exists for.
+//
+// Every exit logs an AI audit event (routed, then completed or failed): the
+// accountability report reads AuditLog, and a student_record call that skips
+// it is invisible to the FERPA review precisely where the review matters.
+//
+// The draft is REFUSED, never trimmed, when it asserts anything the facts do
+// not support. An instructor edits it before it can be sent; nothing here is
+// authoritative on its own.
+// =============================================================================
+
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
+import { resolveAiProvider } from "@/lib/ai/provider";
+import { withUsageLogging } from "@/lib/llm-usage";
+import { sanitizeForPrompt } from "@/lib/sage/system-prompts";
+
+import {
+  MAX_ENDORSEMENT_CHARS,
+  findUngroundedSentences,
+  type EndorsementFacts,
+} from "./endorsement-shared";
+
+export * from "./endorsement-shared";
+
+const SYSTEM_PROMPT = `You write one short paragraph a teacher will send to an employer about a student.
+
+Rules:
+- Use ONLY the facts between the markers. Never add an employer, a job, a date, a skill, or a credential that is not there.
+- Three sentences at most. Short words. Short sentences.
+- Say what the student did and what they are ready for. Do not promise anything about the future.
+- Do not mention money, benefits, housing, health, family, or any barrier.
+- Write it as the teacher, in plain language a sixth grader can read.
+
+Return the paragraph and nothing else.`;
+
+export type EndorsementResult =
+  | { status: "ok"; text: string }
+  | { status: "refused"; reason: "empty" | "ungrounded" | "unavailable" };
+
+function renderFacts(studentName: string, facts: EndorsementFacts): string {
+  const lines = [
+    "[GROUNDING_DATA_START]",
+    `Student: ${sanitizeForPrompt(studentName)}`,
+    `Cards a teacher checked: ${
+      facts.verifiedCertifications.map((value) => sanitizeForPrompt(value)).join(", ") ||
+      "none yet"
+    }`,
+    `Skills from their own resume: ${
+      facts.skills.map((value) => sanitizeForPrompt(value)).join(", ") || "none listed"
+    }`,
+    `Places they have worked: ${
+      facts.employers.map((value) => sanitizeForPrompt(value)).join(", ") || "none listed"
+    }`,
+    `Attendance: ${facts.attendanceSummary ? sanitizeForPrompt(facts.attendanceSummary) : "not recorded"}`,
+    `Teacher's notes: ${facts.instructorNotes ? sanitizeForPrompt(facts.instructorNotes) : "none"}`,
+    "[GROUNDING_DATA_END]",
+  ];
+  return lines.join("\n");
+}
+
+/**
+ * Draft an endorsement from verified facts.
+ *
+ * `studentId` is the FERPA actor for routing and audit; the returned text is a
+ * DRAFT the instructor edits and approves. A refusal is a normal outcome and
+ * the console shows an empty box with the reason rather than a broken page.
+ */
+export async function draftEndorsement(
+  studentId: string,
+  studentName: string,
+  facts: EndorsementFacts,
+): Promise<EndorsementResult> {
+  const grounding = renderFacts(studentName, facts);
+
+  const baseProvider = await resolveAiProvider({
+    studentId,
+    task: "draft_endorsement",
+    sensitivity: "student_record",
+  });
+
+  const providerClass = getProviderClass(baseProvider.name);
+  const auditBase = {
+    actorId: studentId,
+    actorRole: "teacher",
+    route: "connect.draft_endorsement",
+    task: "draft_endorsement" as const,
+    sensitivity: "student_record" as const,
+    policyDecision: policyDecisionForProvider(baseProvider.name),
+    providerName: baseProvider.name,
+    providerClass,
+    // Derived, never hardcoded: a hardcoded false would report "local only" on
+    // a cloud-routed call, which is the one thing the report exists to notice.
+    allowCloud: providerClass === "cloud",
+  };
+  await logAiAuditEvent({ ...auditBase, status: "routed", inputChars: grounding.length });
+
+  const provider = withUsageLogging(baseProvider, {
+    studentId,
+    callSite: "connect.draft_endorsement",
+  });
+
+  let draft = "";
+  try {
+    draft = (
+      await provider.generateResponse(SYSTEM_PROMPT, [
+        { role: "user", content: `${grounding}\n\nWrite the paragraph now.` },
+      ])
+    ).trim();
+  } catch (error) {
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "failed",
+      errorCode: "provider_error",
+      reason: String(error).slice(0, 200),
+    });
+    return { status: "refused", reason: "unavailable" };
+  }
+
+  if (draft.length === 0) {
+    await logAiAuditEvent({ ...auditBase, status: "failed", errorCode: "empty_reply" });
+    return { status: "refused", reason: "empty" };
+  }
+
+  const violations = findUngroundedSentences(draft, facts);
+  if (violations.length > 0) {
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "failed",
+      errorCode: "ungrounded_endorsement",
+      reason: `The draft asserted ${violations.length} thing(s) the facts do not support.`,
+      outputChars: draft.length,
+    });
+    return { status: "refused", reason: "ungrounded" };
+  }
+
+  await logAiAuditEvent({
+    ...auditBase,
+    status: "completed",
+    inputChars: grounding.length,
+    outputChars: draft.length,
+  });
+
+  return { status: "ok", text: draft.slice(0, MAX_ENDORSEMENT_CHARS) };
+}

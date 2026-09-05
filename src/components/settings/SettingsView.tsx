@@ -413,6 +413,20 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           so the control would promise more than it delivers. */}
       {sessionRole !== "teacher" && sessionRole !== "admin" && <ConsentSection />}
 
+      {/* Student-only for the same reason, and student-owned in a stronger
+          sense: this is the student's blanket permission to be introduced to
+          employers. Turning it OFF withdraws every introduction that has not
+          already ended (src/lib/consent.ts), which is why the copy says so
+          rather than leaving them to find out. */}
+      {sessionRole !== "teacher" && sessionRole !== "admin" && (
+        <ConsentSection
+          scope="employer_referral"
+          eyebrow="Job introductions"
+          title="Let your teacher introduce you to employers"
+          description="When this is on, your teacher can ask you about sending your résumé to a real job. You still see exactly what would be sent, and nothing goes until you tap OK on that card. When you turn this off, we take back any introduction that has not finished yet. You can change this any time."
+        />
+      )}
+
       <div className="surface-section p-6">
         <div className="mb-6">
           <button

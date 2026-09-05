@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { BoardFilter, ShowMore, useBoardPaging } from "./BoardControls";
+import { ProposeConnectionButton } from "./ProposeConnectionButton";
 
 /**
  * The roster, each student with their best leads.
@@ -85,6 +86,11 @@ export function StudentsBoard({ students }: { students: StudentsBoardItem[] }) {
                           {lead.reasons.slice(0, 2).join(" ")}
                         </p>
                       )}
+                      <ProposeConnectionButton
+                        studentId={student.studentId}
+                        jobLeadId={lead.jobLeadId}
+                        jobTitle={lead.title}
+                      />
                     </li>
                   ))}
                 </ol>
