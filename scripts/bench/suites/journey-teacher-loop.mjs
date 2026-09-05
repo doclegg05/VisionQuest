@@ -21,11 +21,16 @@
 // =============================================================================
 
 import { selfTest } from "../lib/self-test.mjs";
-import { readRunReport } from "./lib/raw-report.mjs";
+import { readRunReportOrExplain } from "./lib/raw-report.mjs";
 
 export async function run(ctx) {
-  const read = readRunReport(ctx);
-  if (read.skipped) return read;
+  // Either the report, or a well-formed `{ metrics }` explaining its absence —
+  // never a bare object. `run(ctx)` must resolve to `{ metrics: [...] }`, and
+  // the first cut of this line returned `{ skipped }`, which is the exact
+  // failure CI reported: "run(ctx) must resolve to { metrics: [...] }" in
+  // place of "the collector never ran". See lib/raw-report.mjs.
+  const read = readRunReportOrExplain(ctx, "journey-teacher-loop");
+  if (read.metrics) return read;
 
   const { report, ageHours } = read;
   const expected = ctx.fixture.expectedStepCount;

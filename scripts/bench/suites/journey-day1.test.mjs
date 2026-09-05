@@ -12,32 +12,75 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { buildResult, validateResult } from "../lib/result.mjs";
 import { run as runDay1 } from "./journey-day1.mjs";
 import { run as runTeacherLoop } from "./journey-teacher-loop.mjs";
 
 const REPO_ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
 
-function loadFixture(name) {
-  return JSON.parse(
-    readFileSync(path.join(REPO_ROOT, "config/benchmarks/fixtures", `${name}.json`), "utf8"),
-  );
+function loadJson(...segments) {
+  return JSON.parse(readFileSync(path.join(REPO_ROOT, ...segments), "utf8"));
 }
 
-/** A ctx whose report lives in a scratch directory, so runs cannot collide. */
-function ctxFor(fixtureName, report) {
+/**
+ * A ctx whose report lives in a scratch directory, so runs cannot collide.
+ *
+ * It carries the suite's real `config` and an `env`, because both are load-
+ * bearing on the missing-report path: the config supplies the declared metric
+ * ids, and the env decides between throwing and returning nulls.
+ */
+function ctxFor(suiteName, report, env = {}) {
   const repoRoot = mkdtempSync(path.join(tmpdir(), "bench-journey-"));
-  const fixture = loadFixture(fixtureName);
+  const config = loadJson("config/benchmarks", `${suiteName}.json`);
+  const fixture = loadJson("config/benchmarks/fixtures", `${suiteName}.json`);
   if (report !== undefined) {
     const full = path.join(repoRoot, fixture.reportPath);
     mkdirSync(path.dirname(full), { recursive: true });
     writeFileSync(full, JSON.stringify(report));
   }
-  return { repoRoot, fixture };
+  return { repoRoot, config, fixture, suite: suiteName, env };
+}
+
+/** The environment the CI collection step presents: browser, server, database. */
+const COLLECTOR_ENV = {
+  playwright: "1",
+  baseUrl: "http://localhost:3000",
+  databaseUrl: "postgresql://localhost:5432/x",
+};
+
+/**
+ * Assert a scorer's return value is something the RUNNER can carry, by
+ * pushing it through the runner's own `buildResult` + `validateResult`.
+ *
+ * Checking `Array.isArray(output.metrics)` here would only restate the
+ * assertion; running the real validator is what proves the shape survives the
+ * path that rejected it in CI.
+ */
+function assertRunnerAccepts(suiteName, output) {
+  assert.ok(output, "the scorer returned nothing");
+  assert.ok(Array.isArray(output.metrics), "run(ctx) must resolve to { metrics: [...] }");
+  const config = loadJson("config/benchmarks", `${suiteName}.json`);
+  const result = buildResult({
+    suite: suiteName,
+    tier: config.tier,
+    startedAt: new Date().toISOString(),
+    durationMs: 1,
+    commit: null,
+    host: { os: "linux", cpus: 1, memGb: 1, node: process.version },
+    metrics: output.metrics.map((metric) => ({
+      ...metric,
+      unit: config.metrics.find((declared) => declared.id === metric.id)?.unit,
+      status: metric.value === null ? "skipped" : "info",
+    })),
+    status: "skipped",
+  });
+  assert.deepEqual(validateResult(result), [], "the runner's schema rejected the result");
+  return result;
 }
 
 function metric(result, id) {
@@ -66,11 +109,63 @@ const GOOD_DAY1 = {
 };
 
 describe("journey-day1", () => {
-  it("skips when the spec has not run, and says how to run it", async () => {
+  // --- the missing-report contract ---------------------------------------
+  //
+  // This is the path CI failed on: the scorer returned a bare `{ skipped }`
+  // and the runner could only say "run(ctx) must resolve to { metrics: [...] }"
+  // — a complaint about the return type in place of the fact that the
+  // collector never ran. Both branches are pinned, for both scorers.
+
+  it("returns runner-shaped metrics, not a bare object, when the report is missing", async () => {
     const result = await runDay1(ctxFor("journey-day1"));
-    assert.equal(result.metrics, undefined);
-    assert.match(result.skipped, /no run report/u);
-    assert.match(result.skipped, /bench-journey-day1\.spec\.ts/u);
+    assertRunnerAccepts("journey-day1", result);
+    assert.equal(result.skipped, undefined, "a bare { skipped } is the bug this pins");
+  });
+
+  it("reports every DECLARED metric as null when the report is missing", async () => {
+    // Per declared id, because the runner errors on any declared metric the
+    // scorer did not return — a partial list would trade one error for another.
+    const config = loadJson("config/benchmarks", "journey-day1.json");
+    const result = await runDay1(ctxFor("journey-day1"));
+    assert.deepEqual(
+      result.metrics.map((metric) => metric.id),
+      config.metrics.map((metric) => metric.id),
+    );
+    for (const metric of result.metrics) {
+      assert.equal(metric.value, null);
+      assert.equal(metric.details.skipped, true);
+      assert.match(metric.details.reason, /no run report/u);
+      assert.match(metric.details.reason, /bench-journey-day1\.spec\.ts/u);
+    }
+  });
+
+  it("THROWS when browser+server+database are available but the report is missing", async () => {
+    // The CI case. A collector that could have run and did not is a real
+    // failure, so the runner must record `status: "error"` rather than a row
+    // of nulls that reads like "nothing to see here".
+    await assert.rejects(
+      () => runDay1(ctxFor("journey-day1", undefined, COLLECTOR_ENV)),
+      (error) => {
+        assert.match(error.message, /journey-day1/u);
+        assert.match(error.message, /browser\+server are available/u);
+        assert.match(error.message, /bench-journey-day1\.spec\.ts/u);
+        return true;
+      },
+    );
+  });
+
+  it("THROWS on a stale report too, rather than scoring last week's run", async () => {
+    const ctx = ctxFor("journey-day1", GOOD_DAY1, COLLECTOR_ENV);
+    const full = path.join(ctx.repoRoot, ctx.fixture.reportPath);
+    const old = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    utimesSync(full, old, old);
+    await assert.rejects(
+      () => runDay1(ctx),
+      (error) => {
+        assert.match(error.message, /run report is 72\.0 h old \(limit 24 h\)/u);
+        return true;
+      },
+    );
   });
 
   it("scores a complete run", async () => {
@@ -152,9 +247,40 @@ const GOOD_LOOP = {
 };
 
 describe("journey-teacher-loop", () => {
-  it("skips when the spec has not run", async () => {
+  // The suite CI actually named in its failure. Same three pins as day-1's:
+  // the shape, the per-declared-id nulls, and the throw when the collector
+  // could have run.
+
+  it("returns runner-shaped metrics, not a bare object, when the report is missing", async () => {
     const result = await runTeacherLoop(ctxFor("journey-teacher-loop"));
-    assert.match(result.skipped, /bench-journey-teacher-loop\.spec\.ts/u);
+    assertRunnerAccepts("journey-teacher-loop", result);
+    assert.equal(result.skipped, undefined, "a bare { skipped } is the bug this pins");
+  });
+
+  it("reports every DECLARED metric as null when the report is missing", async () => {
+    const config = loadJson("config/benchmarks", "journey-teacher-loop.json");
+    const result = await runTeacherLoop(ctxFor("journey-teacher-loop"));
+    assert.deepEqual(
+      result.metrics.map((metric) => metric.id),
+      config.metrics.map((metric) => metric.id),
+    );
+    for (const metric of result.metrics) {
+      assert.equal(metric.value, null);
+      assert.equal(metric.details.skipped, true);
+      assert.match(metric.details.reason, /bench-journey-teacher-loop\.spec\.ts/u);
+    }
+  });
+
+  it("THROWS when browser+server+database are available but the report is missing", async () => {
+    await assert.rejects(
+      () => runTeacherLoop(ctxFor("journey-teacher-loop", undefined, COLLECTOR_ENV)),
+      (error) => {
+        assert.match(error.message, /journey-teacher-loop/u);
+        assert.match(error.message, /browser\+server are available/u);
+        assert.match(error.message, /bench-journey-teacher-loop\.spec\.ts/u);
+        return true;
+      },
+    );
   });
 
   it("scores a complete loop", async () => {

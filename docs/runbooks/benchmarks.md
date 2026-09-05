@@ -331,26 +331,31 @@ that measured nothing, which is worse than no number because it reads as proof.
   `lower` with `tolerance: 0`, so once a real run sets today's number as the
   baseline it can never creep upward while the burn-down proceeds (design §4.9:
   "burn down to 0, then gate").
-- **`journey-day1` and `journey-teacher-loop` have no tap or time floors yet.**
-  Both suites gate on what can be judged without a measurement —
-  `completed` (all steps, all the way to a saved goal / back to the queue) and
-  `steps_with_next_signal` (8 of 8) — while `student_taps`, `total_seconds`,
-  `teacher_taps` and `queue_to_action_seconds` ship as owner-documented `info`
-  metrics carrying the design's proposed values in `details.designFloor`. The
-  reason is the same one `touch-targets` shipped at `watch` for: the authoring
-  worktree had no dev server and no `DATABASE_URL`, so neither collector has
-  ever been executed and nobody knows today's real number. **After the first
-  green CI run**: read `student_taps` and `teacher_taps` out of
-  `reports/benchmarks/latest/`, set the baseline with a `--reason`, then
-  replace the `"floor": null` + `"reason"` pair with a real floor.
-  The design's defaults are 8 taps for day 1 and 6 for the teacher loop
-  (§4.6, daggered); counting the controls on the day-1 path by hand suggests
-  about ten, so if the run agrees, **the finding is the product's** — the
-  journey costs more than the design's floor — and the fix is the flow, not the
-  floor (floors extend, never relax). The two `seconds` metrics stay unfloored
-  regardless: they are wall clock on whatever machine ran them, a trend line
-  rather than a latency number, and the same reasoning `connect-journey`'s
-  `elapsed_ms` records.
+- **`journey-day1` and `journey-teacher-loop` have no tap or time floors yet —
+  but both collectors have now been RUN, so the numbers exist.** Measured
+  against a real server and a migrated hermetic Postgres (Chromium, 375 px,
+  Sage stubbed at the route):
+
+  | metric | measured | design's daggered floor (§4.6) |
+  |---|---|---|
+  | `journey-day1` · `student_taps` | **12** | 8 |
+  | `journey-day1` · `steps_with_next_signal` | **8 of 8** | 8 (gates today) |
+  | `journey-teacher-loop` · `teacher_taps` | **5** | 6 |
+
+  **The teacher loop meets its floor; the day-1 journey does not.** Twelve taps
+  against a proposed eight is a **product finding, not a bad floor** — the fix
+  is the flow, and floors extend, never relax. So do NOT floor `student_taps`
+  at 12 to make it green: that ratifies the regression the metric exists to
+  catch. Either floor it at 8 and let it fail until the journey is shortened
+  (an honest red), or leave it `info` with an owner-dated note saying when the
+  flow work is scheduled. `teacher_taps` can be floored at 6 immediately —
+  measured 5, so it passes today with one tap of headroom. Set baselines with
+  `--reason` first either way.
+
+  The two `seconds` metrics stay unfloored regardless: they are wall clock on
+  whatever machine ran them (9.3 s and 3.5 s here), a trend line rather than a
+  latency number, and the same reasoning `connect-journey`'s `elapsed_ms`
+  records.
 - **`orientation-readiness`'s `consumer_disagreements` is a burn-down, not yet
   a gate.** It is 116 of 300 (student, surface) pairs today, and the two
   mappings behind it are product decisions rather than defects to fix quietly:

@@ -30,9 +30,9 @@
     "totalSeconds": 90
   },
   "howToRun": [
-    "npx tsx scripts/seed-e2e-users.ts",
+    "npx tsx scripts/seed-e2e-users.ts   # idempotent; also clears login rate limits",
     "npm run dev   # or npm run start against a build",
     "npx playwright test e2e/bench-journey-day1.spec.ts --workers=1"
   ],
-  "workersNote": "--workers=1 is not optional. /api/auth/login rate-limits to 10 attempts per IP per 15 minutes, and parallel specs sharing one IP exhaust it and fail with 429 (see the standing note in .claude/MEMORY.md)."
+  "workersNote": "--workers=1 is not optional, and it is not sufficient on its own. /api/auth/login applies TWO limiters: login:<ip> at 10 attempts per 15 minutes, and login:user:<studentId> at 5 — and since every e2e spec signs in as the same handful of fixture accounts, the PER-USER cap binds first (measured: the 429 lands on the 6th attempt, not the 11th). The buckets are RateLimitEntry rows, so they outlive the webServer and are shared by every `playwright test` invocation against one database. Re-run `npx tsx scripts/seed-e2e-users.ts` before a collection pass that follows another suite run — it is idempotent and clears the login buckets, and it refuses any non-local, non-CI database by construction (src/lib/e2e-seed-guard.ts). CI does exactly this between its gate step and its collection step."
 }
