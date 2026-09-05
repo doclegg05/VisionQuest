@@ -55,6 +55,10 @@ export const SYSTEM_CONFIG_KEYS = [
   // Unset → OFF, and every figure in src/lib/connect/subsidies-shared.ts also
   // ships unverified, so both gates have to be opened deliberately.
   "connect_subsidy_lines_enabled",
+  // Match & Connect Phase 5 pilot flag, same shape as connect_enabled_classes.
+  // Unset/empty → no student is ever texted by the nudge runner. Both this and
+  // connect_enabled_classes must admit a class before its students get SMS.
+  "sms_nudges_enabled_classes",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

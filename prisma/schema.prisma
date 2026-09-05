@@ -106,6 +106,16 @@ model NotificationPreference {
   channel     String // "email" | "sms"
   enabled     Boolean  @default(true)
   destination String? // phone number or email override (null = use student's default)
+  /// When this person said yes to texts, in their own words, on the settings
+  /// page. NULL means no recorded consent and no text may be sent, whatever
+  /// `enabled` says: `enabled` is a preference, this is permission
+  /// (Match & Connect design spec §10, "SMS requires recorded consent").
+  smsConsentAt DateTime?
+  /// When they took it back — a STOP text, or turning the channel off. Set
+  /// alongside `enabled = false` rather than instead of it, so a revocation
+  /// survives any later code path that flips `enabled` back on without asking
+  /// again. START/YES clears it, and only when `smsConsentAt` is already set.
+  smsRevokedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1240,6 +1250,16 @@ model OutboundMessage {
   status String @default("sent")
 
   connectionId String?
+
+  /// The question this message asked, when it asked one, as a routing token:
+  /// "weekly_jobs", "heard_back:<savedJobId>", "retention:<connectionId>:<30|60|90>".
+  /// A one-character SMS reply carries no context of its own and the inbound
+  /// webhook knows only a phone number, so the pointer has to live on the
+  /// outbound side. NULL = this message expects no answer.
+  expectsReply String?
+  /// When a reply consumed this question. A question is answered once:
+  /// without it, a second "Y" days later would re-run the same handler.
+  repliedAt DateTime?
 
   sentAt DateTime @default(now())
 

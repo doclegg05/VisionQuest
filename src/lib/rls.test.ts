@@ -1942,6 +1942,71 @@ if (!SHOULD_RUN) {
         assert.ok(rows.length > 0);
       });
 
+      it("a student cannot INSERT an OutboundMessage, even one addressed to themselves", async () => {
+        // This is the invariant that forces the SMS sender onto prismaAdmin
+        // (src/lib/nudges/sms-policy.ts): the nudge runner impersonates the
+        // student for their own rows, and if that context could write this
+        // table the outbound log would stop being a staff-only audit trail.
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.outboundMessage.create({
+                data: {
+                  channel: "sms",
+                  toKind: "student",
+                  toId: fixtures.studentA,
+                  templateKey: "weekly_jobs",
+                  body: "SPOKES: forged. Reply STOP to stop.",
+                },
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("a student reads and revokes their OWN SMS consent, and nobody else's", async () => {
+        // Phase 5 adds smsConsentAt / smsRevokedAt to NotificationPreference,
+        // which already has notification_preference_access. Pinned because the
+        // settings page writes these as the student: a column that inherited
+        // the wrong reach would let one student silence another's texts.
+        const own = await asRole("student", fixtures.studentA, async (tx) => {
+          const created = await tx.notificationPreference.create({
+            data: {
+              studentId: fixtures.studentA,
+              channel: "sms",
+              enabled: true,
+              destination: "+13045550123",
+              smsConsentAt: new Date(),
+            },
+          });
+          return created.id;
+        });
+
+        const readBack = await asRole("student", fixtures.studentA, (tx) =>
+          tx.notificationPreference.findMany({
+            where: { id: own },
+            select: { id: true, smsConsentAt: true },
+          }),
+        );
+        assert.equal(readBack.length, 1);
+        assert.ok(readBack[0].smsConsentAt, "the student can see their own consent stamp");
+
+        const otherStudentSees = await asRole("student", fixtures.studentB, (tx) =>
+          tx.notificationPreference.findMany({ where: { id: own }, select: { id: true } }),
+        );
+        assert.deepEqual(otherStudentSees, [], "another student must not see the row at all");
+
+        const revoked = await asRole("student", fixtures.studentA, (tx) =>
+          tx.notificationPreference.updateMany({
+            where: { id: own },
+            data: { enabled: false, smsRevokedAt: new Date() },
+          }),
+        );
+        assert.equal(revoked.count, 1, "a student can always revoke their own consent");
+
+        await db.notificationPreference.deleteMany({ where: { id: own } });
+      });
+
       it("returns zero rows for all three tables with no RLS context", async () => {
         const [connections, events, messages] = await Promise.all([
           asRole(null, null, (tx) => tx.connection.findMany({ select: { id: true } })),
