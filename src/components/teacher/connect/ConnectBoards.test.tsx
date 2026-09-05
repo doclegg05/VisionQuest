@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
 import { renderToString } from "react-dom/server";
 
@@ -266,5 +268,36 @@ describe("EmployerDirectory", () => {
 
   it("reads at grade 6", () => {
     assertGradeSix(renderToString(<EmployerDirectory employers={[employer]} />), "EmployerDirectory");
+  });
+});
+
+describe("the console's audit of who it names", () => {
+  // Asserted on the page SOURCE: this is about whether the audit write is
+  // awaited, which no rendered output can show. The page names every student
+  // on two boards, so each one is a staff read of student data — and a
+  // fire-and-forget write is not guaranteed to survive the response being
+  // sent, which is the one thing an audit trail may not do.
+  const PAGE = readFileSync(
+    path.join(process.cwd(), "src/app/(teacher)/teacher/connect/page.tsx"),
+    "utf8",
+  );
+
+  it("awaits every recordStudentView instead of firing and forgetting", () => {
+    assert.ok(
+      !/void\s+recordStudentView/u.test(PAGE),
+      "a fire-and-forget audit write can be dropped when the response is sent",
+    );
+    assert.match(PAGE, /await Promise\.allSettled\(/u);
+  });
+
+  it("still cannot let a failed audit sample break the page", () => {
+    // allSettled, not all, on the call that WRAPS recordStudentView:
+    // recordStudentView swallows its own errors, and this is the second layer
+    // that keeps a rejected one from taking the page down. The page's other
+    // Promise.all — the four parallel data loads — is a different call.
+    const at = PAGE.indexOf("recordStudentView({");
+    assert.ok(at > -1, "the page no longer audits the students it names");
+    const wrapper = PAGE.slice(Math.max(0, at - 300), at);
+    assert.ok(wrapper.includes("Promise.allSettled("), wrapper);
   });
 });

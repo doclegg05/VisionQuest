@@ -31,7 +31,15 @@ let roster = [
   { id: "stu-noconsent", displayName: "Adams Kim", score: 95, consented: false },
 ];
 
-const mockListManagedClasses = mock.fn(async () => [
+let rateLimitOk = true;
+const mockRateLimit = mock.fn(async () => ({
+  success: rateLimitOk,
+  remaining: 59,
+  resetTime: Date.now() + 3_600_000,
+  degraded: false,
+})) as any;
+
+const mockListConnectClasses = mock.fn(async () => [
   { id: CLASS_ID, name: "SPOKES Fall 2026" },
 ]) as any;
 const mockEnrollmentFindMany = mock.fn(async () =>
@@ -83,6 +91,7 @@ mock.module("@/lib/api-error", {
       },
     badRequest: (message: string) => makeHttpError(400, message),
     notFound: (message: string) => makeHttpError(404, message),
+    rateLimited: (message: string) => makeHttpError(429, message),
   },
 });
 
@@ -103,10 +112,21 @@ mock.module("@/lib/db", {
   },
 });
 
-mock.module("@/lib/classroom", {
+mock.module("@/lib/connect/classes", {
   namedExports: {
-    get listManagedClasses() {
-      return mockListManagedClasses;
+    // Kept real: selectBatchStudents reads it as a value, and a mocked module
+    // replaces the WHOLE module, so omitting it makes the query throw.
+    ENROLLED_STATUSES: ["active", "completed"],
+    get listConnectClasses() {
+      return mockListConnectClasses;
+    },
+  },
+});
+
+mock.module("@/lib/rate-limit", {
+  namedExports: {
+    get rateLimit() {
+      return mockRateLimit;
     },
   },
 });
@@ -156,7 +176,9 @@ beforeEach(() => {
     },
     { id: "stu-noconsent", displayName: "Adams Kim", score: 95, consented: false },
   ];
-  mockListManagedClasses.mock.resetCalls();
+  mockListConnectClasses.mock.resetCalls();
+  mockRateLimit.mock.resetCalls();
+  rateLimitOk = true;
   mockEnrollmentFindMany.mock.resetCalls();
   mockRecordStudentView.mock.resetCalls();
   mockLogAuditEvent.mock.resetCalls();
@@ -176,7 +198,7 @@ describe("GET /api/teacher/connect/batch-workforce-wv/preview", () => {
     currentRole = "student";
     const response = await preview();
     assert.equal(response.status, 403);
-    assert.equal(mockListManagedClasses.mock.callCount(), 0);
+    assert.equal(mockListConnectClasses.mock.callCount(), 0);
   });
 
   it("requires a class", async () => {
@@ -189,6 +211,30 @@ describe("GET /api/teacher/connect/batch-workforce-wv/preview", () => {
     const response = await preview("clh0000000000000000000zzz");
     assert.equal(response.status, 404);
     assert.equal(mockEnrollmentFindMany.mock.callCount(), 0);
+  });
+
+  it("does not spend the rate-limit bucket on a class the caller cannot see", async () => {
+    // Otherwise probing for other people's class ids would lock the caller out
+    // of previewing their own.
+    await preview("clh0000000000000000000zzz");
+    assert.equal(mockRateLimit.mock.callCount(), 0);
+  });
+
+  it("refuses once the preview bucket is empty, before reading any roster", async () => {
+    // A preview names a whole class and writes audit rows, so an unbounded
+    // loop over class ids would enumerate the program without ever touching
+    // the download's own ceiling.
+    rateLimitOk = false;
+    const response = await preview();
+    assert.equal(response.status, 429);
+    assert.equal(mockEnrollmentFindMany.mock.callCount(), 0);
+    assert.equal(mockRecordStudentView.mock.callCount(), 0);
+  });
+
+  it("keys the preview limit on the session, not the network", async () => {
+    // A classroom shares one IP; the thing being limited is one staff member.
+    await preview();
+    assert.match(mockRateLimit.mock.calls[0].arguments[0] as string, new RegExp(session.id));
   });
 
   it("returns the exact field allowlist the download will use", async () => {

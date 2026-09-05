@@ -47,7 +47,7 @@ const mockEmployerFindUnique = mock.fn(async () => ({
   id: EMPLOYER_ID,
   name: "Mountain Metal",
 })) as any;
-const mockClassFindUnique = mock.fn(async () => ({ id: CLASS_ID })) as any;
+const mockClassFindFirst = mock.fn(async () => ({ id: CLASS_ID })) as any;
 const mockContactFindFirst = mock.fn(async () => ({ id: CONTACT_ID })) as any;
 const mockWorkProfileFindMany = mock.fn(async () => []) as any;
 const mockApplicationFindMany = mock.fn(async () => []) as any;
@@ -120,8 +120,8 @@ mock.module("@/lib/db", {
         },
       },
       spokesClass: {
-        get findUnique() {
-          return mockClassFindUnique;
+        get findFirst() {
+          return mockClassFindFirst;
         },
       },
       employerContact: {
@@ -169,7 +169,7 @@ beforeEach(() => {
   mockLeadFindMany.mock.resetCalls();
   mockLeadFindUnique.mock.resetCalls();
   mockEmployerFindUnique.mock.resetCalls();
-  mockClassFindUnique.mock.resetCalls();
+  mockClassFindFirst.mock.resetCalls();
   mockContactFindFirst.mock.resetCalls();
   mockLogAuditEvent.mock.resetCalls();
 });
@@ -305,7 +305,7 @@ describe("POST /api/teacher/connect/leads", () => {
   it("refuses a class the caller does not instruct", async () => {
     // job_lead_write's class clause is the floor; this is the clear message.
     // Without both, a teacher could publish a job into somebody else's room.
-    mockClassFindUnique.mock.mockImplementationOnce(async () => null);
+    mockClassFindFirst.mock.mockImplementationOnce(async () => null);
     const response = await route.POST(
       mockRequest("/api/teacher/connect/leads", {
         method: "POST",
@@ -316,6 +316,39 @@ describe("POST /api/teacher/connect/leads", () => {
     assert.equal(mockLeadCreate.mock.callCount(), 0);
     const body = await response.json();
     assert.ok(body.error.includes("class"), body.error);
+  });
+
+  it("asks for the class BY INSTRUCTOR, not merely that it exists", async () => {
+    // The pre-fix check was a findUnique on the id: any teacher could publish
+    // a job into any classroom in the program, and `job_lead_write` would then
+    // reject the insert as a 500. This is the app asking the same question the
+    // RLS policy asks — `instructor_class_ids()` — so the refusal is a clear
+    // 404 and the two layers agree.
+    await route.POST(
+      mockRequest("/api/teacher/connect/leads", {
+        method: "POST",
+        body: { ...validLead, classId: CLASS_ID },
+      }),
+    );
+    const where = mockClassFindFirst.mock.calls[0].arguments[0].where;
+    assert.equal(where.id, CLASS_ID);
+    assert.deepEqual(
+      where.instructors,
+      { some: { instructorId: session.id } },
+      "a plain teacher is scoped to the classes they instruct",
+    );
+  });
+
+  it("leaves an admin unscoped, as everywhere else in this schema", async () => {
+    currentRole = "admin";
+    await route.POST(
+      mockRequest("/api/teacher/connect/leads", {
+        method: "POST",
+        body: { ...validLead, classId: CLASS_ID },
+      }),
+    );
+    const where = mockClassFindFirst.mock.calls[0].arguments[0].where;
+    assert.equal(where.instructors, undefined);
   });
 
   it("refuses a contact who works at a different employer", async () => {
@@ -377,7 +410,7 @@ describe("PUT /api/teacher/connect/leads", () => {
   });
 
   it("refuses retargeting a lead into a class the caller does not instruct", async () => {
-    mockClassFindUnique.mock.mockImplementationOnce(async () => null);
+    mockClassFindFirst.mock.mockImplementationOnce(async () => null);
     const response = await route.PUT(
       mockRequest("/api/teacher/connect/leads", {
         method: "PUT",
@@ -386,6 +419,18 @@ describe("PUT /api/teacher/connect/leads", () => {
     );
     assert.equal(response.status, 404);
     assert.equal(mockLeadUpdate.mock.callCount(), 0);
+  });
+
+  it("asks for the retarget class by instructor too", async () => {
+    await route.PUT(
+      mockRequest("/api/teacher/connect/leads", {
+        method: "PUT",
+        body: { id: "clh0000000000000000000002", classId: CLASS_ID },
+      }),
+    );
+    assert.deepEqual(mockClassFindFirst.mock.calls[0].arguments[0].where.instructors, {
+      some: { instructorId: session.id },
+    });
   });
 
   it("rejects a status outside the vocabulary", async () => {
