@@ -122,6 +122,11 @@ export function packetFieldList(packet: Packet): string[] {
 export function candidateDisplayName(displayName: string): string {
   const parts = displayName.trim().split(/\s+/u).filter(Boolean);
   if (parts.length === 0) return "A SPOKES student";
+  // A display name that contains an address is not a name. Some accounts are
+  // created with an email in the field, and abbreviating "dana@example.com"
+  // to "dana@example.com" would put a contact address on the employer page
+  // under a label that promises only a first name.
+  if (parts.some((part) => part.includes("@"))) return "A SPOKES student";
   if (parts.length === 1) return parts[0];
   const last = parts[parts.length - 1];
   return `${parts[0]} ${last.charAt(0).toUpperCase()}.`;

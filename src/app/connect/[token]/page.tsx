@@ -26,6 +26,9 @@ import { getPlainConfigValue } from "@/lib/system-config";
  * whether a real candidate sits behind a token they guessed.
  */
 export const dynamic = "force-dynamic";
+// One candidate's packet behind a capability URL — never cached by a proxy or
+// a shared browser, and never indexed.
+export const revalidate = 0;
 
 function formatSlot(startsAt: string): string {
   return new Date(startsAt).toLocaleString("en-US", {
