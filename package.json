@@ -69,7 +69,11 @@
     "audit:api-auth": "node scripts/audit-api-auth.mjs",
     "ci-pipeline:validate": "node scripts/validate-ci-pipeline-command.mjs",
     "a11y-pipeline:validate": "node scripts/validate-a11y-pipeline-command.mjs",
-    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate"
+    "bench": "node --import tsx scripts/bench/run.mjs",
+    "bench:compare": "node scripts/bench/compare.mjs",
+    "bench:validate": "node scripts/bench/validate.mjs",
+    "bench:test": "node --test \"scripts/bench/__tests__/*.test.mjs\"",
+    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate && npm run bench:validate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1042.0",
