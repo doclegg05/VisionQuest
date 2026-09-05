@@ -1,0 +1,29 @@
+{
+  "suite": "explain-faithfulness-check",
+  "title": "The explain_job faithfulness checker itself",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/explain-faithfulness-check.mjs",
+  "fixture": "config/benchmarks/fixtures/explain-faithfulness.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "checker_recall",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 1,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "checker_false_positives",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    { "id": "kind_attributed", "unit": "ratio", "direction": "higher", "tolerance": 0.02 }
+  ],
+  "notes": "The deterministic half of `explain-faithfulness`. That suite needs a model and runs nightly; this one runs on every PR against 50 committed explanations (20 faithful, 30 with exactly one clause mutated) and asserts the post-generation checker catches every wrong one and refuses none of the faithful ones. Both floors are absolute: a missed fabrication reaches a student as fact, and a false refusal costs a student their explanation, so neither has an acceptable non-zero rate. `kind_attributed` is informational — it says whether the checker named the RIGHT fact, which decides whether the student is told something useful."
+}
