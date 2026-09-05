@@ -1933,6 +1933,12 @@ if (!SHOULD_RUN) {
       it("a student may insert their OWN proposal, and only in 'proposed'", async () => {
         // The bounded student branch that makes propose_connection possible
         // without an admin bypass. Uses studentB, who has no row on this lead.
+        //
+        // The write shape here is the REAL one `proposeConnection` emits, not
+        // a minimal row: the packet is assembled before the insert and written
+        // in it, so a policy that happened to admit a bare row while rejecting
+        // the one the app actually sends would pass a thinner test and fail in
+        // production. `classId` is included for the same reason.
         const created = await asRole("student", fixtures.studentB, (tx) =>
           tx.connection.create({
             data: {
@@ -1942,6 +1948,8 @@ if (!SHOULD_RUN) {
               proposedById: fixtures.studentB,
               proposedVia: "sage",
               status: "proposed",
+              packet: { includedFields: ["resume"], endorsement: "" },
+              classId: null,
             },
             select: { id: true },
           }),

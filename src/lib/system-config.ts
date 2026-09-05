@@ -50,6 +50,14 @@ export const SYSTEM_CONFIG_KEYS = [
   // OFF. "all" → every class. Otherwise a comma-separated list of SpokesClass
   // IDs. Gates the Sage tool, the student pending endpoint, the console's
   // connection actions and the employer response page.
+  //
+  // IT ALSO TURNS ON `placement_bridge_classes` for the same classes
+  // (mergePlacementBridgeScopes in src/lib/placement-bridge.ts), because a
+  // hire recorded through a Connection otherwise creates a verified
+  // Application and then nothing happens — no staff queue item, no SPOKES
+  // prefill. Setting this key therefore starts raising placement queue items
+  // in those classes even if the bridge key is still unset. The widening is
+  // logged once per process so it is visible in the logs and not only here.
   "connect_enabled_classes",
   // "true"/"on"/"1" lets a VERIFIED subsidy rule render on an employer page.
   // Unset → OFF, and every figure in src/lib/connect/subsidies-shared.ts also
