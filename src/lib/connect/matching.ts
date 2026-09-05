@@ -28,7 +28,14 @@ import { prisma } from "@/lib/db";
 import { ENROLLED_STATUSES } from "./classes";
 import { employerNameKey, readSubsidyFlags, type SubsidyFlags } from "./employers-shared";
 import { parseLeadRequirements, parseLeadSchedule } from "./leads-shared";
-import { fit, type FitResult, type MatchLead, type MatchStudent } from "./matching-shared";
+import {
+  fit,
+  rankLeadFits,
+  type FitResult,
+  type LeadFit,
+  type MatchLead,
+  type MatchStudent,
+} from "./matching-shared";
 import { getWorkProfiles } from "./work-profile";
 import { parseTransferableSkillNames } from "@/lib/job-board/recommendation";
 import { parseStoredResumeData } from "@/lib/resume";
@@ -610,11 +617,6 @@ export async function rankRoster(
 // rankLeadsForStudent — the student's own view and Sage's search_jobs
 // ---------------------------------------------------------------------------
 
-export interface LeadFit {
-  lead: MatchLead;
-  fit: FitResult;
-}
-
 /**
  * The open leads visible to one student, best first, hard blocks removed.
  *
@@ -691,8 +693,9 @@ export async function rankLeadsForStudent(
     withdrawnEmployerIds,
   };
 
-  return leads
-    .map((lead) => ({ lead, fit: fit(student, lead) }))
-    .filter((entry) => entry.fit.hardBlocks.length === 0)
-    .sort((a, b) => b.fit.score - a.fit.score || a.lead.id.localeCompare(b.lead.id));
+  // The ordering rule lives in matching-shared.ts so the `matching-quality`
+  // benchmark can measure the ranking a student actually gets without standing
+  // up a database — and, more to the point, without a second copy of the sort
+  // that could drift from this one.
+  return rankLeadFits(student, leads);
 }

@@ -6,6 +6,7 @@ import { PLAIN_LANGUAGE_IDEAL_GRADE, assessReadability } from "@/lib/sage/readab
 import {
   HARD_BLOCK,
   fit,
+  rankLeadFits,
   type MatchLead,
   type MatchStudent,
 } from "./matching-shared";
@@ -555,5 +556,53 @@ describe("fit — reasons", () => {
     for (const reason of everyBlock.blockReasons) {
       assert.ok(reason.length > 0 && reason.endsWith("."), reason);
     }
+  });
+});
+
+describe("rankLeadFits — the order a student actually sees", () => {
+  // This is the whole student-facing ranking, lifted out of
+  // `rankLeadsForStudent` so it can be exercised (and benchmarked) without a
+  // database. The three properties below are what the `matching-quality`
+  // benchmark's precision@3 is a statement about, so they are pinned here
+  // rather than left implicit in the query that used to contain them.
+
+  it("drops every hard-blocked lead rather than ranking it last", () => {
+    const blocked = lead({ id: "lead-blocked", status: "closed" });
+    const open = lead({ id: "lead-open" });
+
+    const ranked = rankLeadFits(student({}), [blocked, open]);
+
+    assert.deepEqual(
+      ranked.map((entry) => entry.lead.id),
+      ["lead-open"],
+    );
+  });
+
+  it("puts the best score first", () => {
+    // Same student, two leads differing only in whether the employer has hired
+    // a SPOKES grad before — an 8-point bonus, so the order is decided.
+    const plain = lead({ id: "lead-b", employerHiredSpokesGradBefore: false });
+    const better = lead({ id: "lead-a", employerHiredSpokesGradBefore: true });
+
+    const ranked = rankLeadFits(student({}), [plain, better]);
+
+    assert.equal(ranked[0].lead.id, "lead-a");
+    assert.ok(ranked[0].fit.score > ranked[1].fit.score);
+  });
+
+  it("breaks ties on lead id, so the top three never depend on input order", () => {
+    // Not cosmetic. The shared sub-scorers are coarse and identical scores are
+    // common; without a deterministic second key the top three would follow
+    // whatever order the rows arrived in, and precision@3 would flap between
+    // runs on unchanged code.
+    const a = lead({ id: "lead-aaa" });
+    const b = lead({ id: "lead-bbb" });
+    const c = lead({ id: "lead-ccc" });
+
+    const ascending = rankLeadFits(student({}), [a, b, c]).map((entry) => entry.lead.id);
+    const descending = rankLeadFits(student({}), [c, b, a]).map((entry) => entry.lead.id);
+
+    assert.deepEqual(ascending, ["lead-aaa", "lead-bbb", "lead-ccc"]);
+    assert.deepEqual(descending, ascending);
   });
 });

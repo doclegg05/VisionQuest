@@ -63,7 +63,28 @@ import {
   PLAIN_LANGUAGE_MAX_GRADE,
 } from "@/lib/sage/readability";
 import { sanitizeForPrompt } from "@/lib/sage/system-prompts";
+import {
+  REFUSAL_ERROR_CODE,
+  REFUSAL_GUIDANCE,
+  checkExplanationFaithfulness,
+  type FaithfulnessKind,
+} from "./explain-faithfulness";
 import type { AgentTool, AgentToolResult } from "./types";
+
+/**
+ * What the STUDENT reads when a draft is refused, per invented fact.
+ *
+ * Specific rather than generic on purpose: "I couldn't explain that job"
+ * invites them to ask again and get the same refusal, while naming the missing
+ * fact tells them what to ask their instructor for.
+ */
+const REFUSAL_SUMMARY: Record<FaithfulnessKind, string> = {
+  wage: "I couldn't explain that job without guessing at the pay, so I stopped.",
+  hours: "I couldn't explain that job without guessing at the hours, so I stopped.",
+  place: "I couldn't explain that job without guessing where it is, so I stopped.",
+  requirement:
+    "I couldn't explain that job without guessing what you need to have, so I stopped.",
+};
 
 const MAX_RESULTS = 3;
 
@@ -398,7 +419,13 @@ const EXPLAIN_SECTIONS = [
 
 const MISSING_FIELD_LINE = "The posting doesn't say.";
 
-const EXPLAIN_SYSTEM_PROMPT = [
+/**
+ * Exported so the `explain-faithfulness` benchmark can generate drafts with
+ * THIS prompt rather than a copy of it. A benchmark whose prompt drifts from
+ * production measures a system nobody ships (the 2026-08-21 bake-off rule:
+ * prompts are imported from production, never copied).
+ */
+export const EXPLAIN_SYSTEM_PROMPT = [
   "You rewrite one job posting so a student reading at a 6th-grade level understands it.",
   "",
   "Use EXACTLY these five sections, in this order, each on its own line:",
@@ -425,7 +452,7 @@ const EXPLAIN_SYSTEM_PROMPT = [
  * BEFORE the description is truncated so a marker cannot survive by sitting
  * across the cut.
  */
-function explainGrounding(job: {
+export function explainGrounding(job: {
   title: string;
   company: string;
   location: string;
@@ -472,62 +499,6 @@ function sanitizePostingFields<T extends PostingFields>(job: T): T {
     location: sanitizeForPrompt(job.location),
     salary: job.salary === null ? null : sanitizeForPrompt(job.salary),
   };
-}
-
-/**
- * Money in a draft or a posting, in the forms either actually uses:
- * "$15", "15 dollars", "USD 15", "15 usd". A check that understood only the
- * "$" form was bypassed by the model simply writing the number out, and
- * refused a correct explanation whenever the POSTING wrote it out instead.
- */
-const MONEY_PATTERNS = [
-  /\$\s?(\d[\d,]*(?:\.\d+)?)/gi,
-  /\b(\d[\d,]*(?:\.\d+)?)\s*(?:dollars|usd)\b/gi,
-  /\busd\s*(\d[\d,]*(?:\.\d+)?)/gi,
-];
-
-/**
- * Bare "15/hr" and "15 an hour" count as the posting stating a wage. Only
- * applied to the POSTING side: a draft has to name its unit, and treating any
- * bare number in a draft as money would flag "40 pounds".
- */
-const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\s+|an\s+|a\s+)\s*(?:hr|hour|h)\b/gi;
-
-/** Rounding a posted rate to whole dollars is not a fabrication. */
-const ROUNDING_TOLERANCE = 1;
-
-function moneyValues(text: string, patterns: RegExp[]): number[] {
-  const values: number[] = [];
-  for (const pattern of patterns) {
-    for (const match of text.matchAll(pattern)) {
-      const value = Number(match[1].replace(/,/g, ""));
-      if (Number.isFinite(value)) values.push(value);
-    }
-  }
-  return values;
-}
-
-/**
- * Dollar figures in the draft that appear nowhere in the posting.
- *
- * A wage is the single fact a student will act on hardest, and this tool's
- * output is handed to them as written. A number the posting never gave is a
- * fabrication whether the model guessed it, averaged it, or read it out of an
- * injected instruction — so the check is on the OUTPUT, not on the prompt.
- */
-function ungroundedDollarValues(
-  draft: string,
-  job: { salary: string | null; description: string },
-): number[] {
-  const source = `${job.salary ?? ""} ${job.description}`;
-  const grounded = [
-    ...moneyValues(source, MONEY_PATTERNS),
-    ...moneyValues(source, [BARE_RATE]),
-  ];
-  return moneyValues(draft, MONEY_PATTERNS).filter(
-    (value) =>
-      !grounded.some((posted) => Math.abs(posted - value) < ROUNDING_TOLERANCE),
-  );
 }
 
 const explainJob: AgentTool = {
@@ -684,23 +655,34 @@ const explainJob: AgentTool = {
       };
     }
 
-    const invented = ungroundedDollarValues(explanation, job);
-    if (invented.length > 0) {
+    // The draft is checked against the POSTING, not against the prompt: a
+    // posting can carry an injected instruction, and a guard that inspected
+    // only the prompt would be arguing with the attacker's own text. Wage was
+    // the original check; hours, place and required credentials were added
+    // because a student acts on all four the same way, and the design's
+    // faithfulness floor names all four.
+    const findings = checkExplanationFaithfulness(explanation, job);
+    if (findings.length > 0) {
+      // Named by the FIRST finding rather than generically, so the student is
+      // told the posting does not say — which is true and actionable —
+      // instead of "something went wrong". Wage keeps its original error code
+      // so the existing audit rows stay one series.
+      const [worst] = findings;
       await logAiAuditEvent({
         ...auditBase,
         status: "failed",
-        errorCode: "ungrounded_wage",
-        reason: "The draft named a pay figure the posting does not contain; it was refused.",
+        errorCode: REFUSAL_ERROR_CODE[worst.kind],
+        reason:
+          `The draft named a ${worst.kind} the posting does not contain; it was refused.`,
         outputChars: explanation.length,
       });
       return {
         status: "error",
-        summary: "I couldn't explain that job without guessing at the pay, so I stopped.",
+        summary: REFUSAL_SUMMARY[worst.kind],
         modelHint:
-          "explain_job refused its own draft: it contained a dollar figure " +
-          `(${invented.map((value) => `$${value}`).join(", ")}) that appears nowhere in the ` +
-          "posting. Tell the student the posting does not say what it pays and that they can " +
-          "ask their instructor. Do NOT state a wage for this job.",
+          "explain_job refused its own draft: it contained " +
+          `${findings.map((finding) => `${finding.kind} "${finding.detail}"`).join(", ")} ` +
+          `that appears nowhere in the posting. ${REFUSAL_GUIDANCE[worst.kind]}`,
       };
     }
 

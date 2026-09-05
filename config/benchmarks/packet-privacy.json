@@ -1,0 +1,31 @@
+{
+  "suite": "packet-privacy",
+  "title": "Packet privacy across every employer-facing surface",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/packet-privacy.mjs",
+  "fixture": "config/benchmarks/fixtures/packet-privacy.json",
+  "requires": [
+    "postgres",
+    "cohort"
+  ],
+  "metrics": [
+    {
+      "id": "forbidden_fields_found",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "surfaces_scanned",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "A denominator, not a quality. Its job is to make `forbidden_fields_found = 0` readable \u2014 zero findings over zero surfaces is not a pass \u2014 and a page that failed to render is already reported as a finding, so the check that matters is gated there rather than here."
+    }
+  ],
+  "notes": "Assembles a packet for every cohort connection through the real assemblePacket against a seeded database, then scans the three things that actually leave the program \u2014 the employer response page (rendered), the employer email, and the r\u00e9sum\u00e9 content the PDF carries \u2014 against the same denylist packet-shared.test.ts and workforce-batch.test.ts pin, plus phone/email/ZIP patterns. R\u00e9sum\u00e9 tailoring is not mocked: the scorer seeds a ResumeVersion for each (student, lead) pair, which is the reuse branch assemblePacket already takes, so no AI call happens and no module has to be stubbed. Reports `skipped` without a database rather than failing."
+}
