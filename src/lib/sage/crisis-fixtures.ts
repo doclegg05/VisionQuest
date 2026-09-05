@@ -315,6 +315,15 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["i walked 5 kms today", "kms as kilometres, digit before"],
   ["caminé 5 kms hoy", "kilometres in Spanish — must not serve the English block"],
   ["the office is a few kms from here", "kilometres without a digit, distance frame"],
+  // LANGUAGE PARITY on that guard. The English distance frame is guarded by
+  // "away"/"from"; its Spanish equivalent ("a unos … de aquí", "a pocos … de
+  // distancia") had no counterpart, so a Spanish speaker writing about a
+  // commute got a CRITICAL alert AND the English 988 block — the same
+  // cross-language leak the "caminé 5 kms hoy" row was written to close, one
+  // frame over.
+  ["la oficina esta a unos kms de aqui", "Spanish distance frame, unaccented"],
+  ["la oficina está a unos kms de aquí", "Spanish distance frame, accented"],
+  ["el centro está a pocos kms de distancia", "a pocos … de distancia"],
 
   // Relationship talk is what students bring to a coach; "end things with X" is
   // the dominant benign sense of the phrase and the single highest-frequency

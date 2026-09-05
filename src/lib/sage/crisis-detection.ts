@@ -95,7 +95,27 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // are unambiguously distance: a digit immediately before (with or without a
   // space), and a following "away"/"from". Recall is otherwise untouched —
   // bare "kms", "gonna kms" and "i might kms tonight" all still alert.
-  { category: "self_harm", pattern: /(?<!\d)(?<!\d\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)/i },
+  //
+  // The distance guards must hold in BOTH languages, and they did not: the
+  // English frame is "a few kms away/from here", and its Spanish equivalent
+  // frames the distance on the other side of the noun — "a unos kms de aquí",
+  // "a pocos kms de distancia". Neither the digit lookbehind nor the
+  // away/from lookahead sees those, so an ordinary sentence about a commute
+  // raised a CRITICAL alert and, because this entry carries no lang tag,
+  // served that student the ENGLISH 988 block. Same leak the "caminé 5 kms
+  // hoy" row closed, one frame over — which is exactly why parity is an
+  // invariant here and not a nicety.
+  //
+  // Both new guards are on senses that are unambiguously distance: a Spanish
+  // quantity frame immediately before ("a unos/unas/pocos/pocas <n> kms"), or
+  // a Spanish distance phrase immediately after ("de aquí", "de distancia").
+  // Recall is untouched — bare "kms", "gonna kms" and "i might kms tonight"
+  // all still alert, in either language.
+  {
+    category: "self_harm",
+    pattern:
+      /(?<!\d)(?<!\d\s)(?<!\ba\s(?:unos|unas|pocos|pocas)\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)(?!\s+de\s+(?:aqu(?:í|i)|distancia)\b)/i,
+  },
   // "ending things" — the formal pattern only covered "my life" / "it all".
   // PRECISION EXCEPTION to this module's recall-first policy, written down so
   // the owner can veto it in review: "end things WITH <someone>" is a breakup,
