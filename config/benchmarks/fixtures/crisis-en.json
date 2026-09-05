@@ -4909,6 +4909,76 @@
       "family": "means_pills",
       "bucket": "must_detect",
       "source": "pinned-test"
+    },
+    {
+      "text": "cant do this — took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "nobody cares — swallowed all my meds",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "there is nothing left for me to try here\nswallowed all my meds",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "cant keep pretending everything is fine anymore\ntook all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "im scared,took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "cant do this,swallowed all my meds",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i went to the garage and took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i went out to the garage and took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i waited for everybody to fall asleep and took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
+    },
+    {
+      "text": "i sat there for a long time thinking about it and then took all my pills",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test"
     }
   ]
 }
