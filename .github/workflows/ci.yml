@@ -301,11 +301,13 @@ jobs:
         run: npx tsx scripts/seed-e2e-users.ts
 
       - name: Seed the synthetic benchmark cohort
-        # The connect-journey collector below drives cohort people, not the
-        # e2e fixture users above: it logs in as cbenchinstr1 and acts on
-        # cbenchstu01, so without this step it has no instructor to log in as
-        # and reports `skipped` forever — the quiet-instrument failure this
-        # suite exists to prevent.
+        # e2e/bench-page-timing.spec.ts, e2e/bench-connect-journey.spec.ts,
+        # e2e/bench-journey-day1.spec.ts and e2e/bench-journey-teacher-loop
+        # .spec.ts all log in as cohort people (BENCH_INSTRUCTOR/
+        # BENCH_JOURNEY_STUDENT, e2e/bench-fixtures.ts) — cbenchinstr1 acting
+        # on cbenchstu01 — not the e2e fixture users above, so without this
+        # step they have no instructor to log in as and report `skipped`
+        # forever, the quiet-instrument failure this suite exists to prevent.
         #
         # The two seeds are safe to run together because their delete scopes
         # are disjoint by construction: seed-cohort scopes every deleteMany to
@@ -314,15 +316,18 @@ jobs:
         #
         # Ordering: after `migrate deploy` so it meets a real schema, and
         # before the first `playwright test` — which is when the webServer
-        # boots — so the app never serves a half-seeded database.
+        # boots — so the app never serves a half-seeded database. This job's
+        # DATABASE_URL is already the real hermetic Postgres (set at job
+        # level), so no per-step override is needed here.
         #
-        # Guarded the same way as the verify job's copy so the workflow is
-        # correct before the script lands and needs no edit after.
+        # Guarded the same way as the verify job's identically-named step, so
+        # this workflow is correct before the script lands and needs no edit
+        # after.
         run: |
           if [ -f scripts/bench/seed-cohort.ts ]; then
             npx tsx scripts/bench/seed-cohort.ts
           else
-            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort-backed e2e benchmarks will fail their login."
           fi
 
       - name: Build
@@ -362,6 +367,8 @@ jobs:
         # Non-blocking for the same reason as the soak scan below: a collector
         # that breaks is reported by the runner as an `error` row in the table
         # and the uploaded artifact rather than by reddening the gating e2e job.
+        # touch-targets, axe-authenticated and page-timing are watch tier
+        # today, so a broken one of those three is silently informative only.
         #
         # For the two GATE-tier journey suites that is still honest rather than
         # quiet: their scorers return `{ skipped }` when the raw report is
@@ -369,7 +376,7 @@ jobs:
         # environment says browser and server ARE available, and `--compare`
         # exits 1 on an error at gate tier. So a broken journey collector fails
         # the scoring step below by design; it just does not mask which step
-        # actually broke. When touch-targets is promoted to gate (see
+        # actually broke. When a watch-tier suite here is promoted to gate (see
         # docs/runbooks/benchmarks.md), drop continue-on-error here entirely.
         #
         # --workers=1: /api/auth/login rate-limits to 10 attempts per IP per 15
@@ -381,6 +388,7 @@ jobs:
           npx playwright test
           e2e/bench-touch-targets.spec.ts
           e2e/bench-axe-authenticated.spec.ts
+          e2e/bench-page-timing.spec.ts
           e2e/bench-journey-day1.spec.ts
           e2e/bench-journey-teacher-loop.spec.ts
           e2e/bench-connect-journey.spec.ts
@@ -403,6 +411,7 @@ jobs:
           npm run bench --
           --suite=touch-targets
           --suite=axe-authenticated
+          --suite=page-timing
           --suite=journey-day1
           --suite=journey-teacher-loop
           --suite=connect-journey

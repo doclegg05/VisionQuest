@@ -1,0 +1,10 @@
+{
+  "_comment": "Documents the ladder scripts/bench/suites/classroom-concurrency.mjs runs; the scorer's own defaults are the source of truth for anything omitted here. Real Sage prompt text and student data are never used — the synthetic system prompt/user message come from scripts/sage-load-test.mjs's own buildSyntheticSystemPrompt/syntheticUserMessage, sized to match a real Sage prompt's character count.",
+  "concurrencyLevels": [1, 5, 15],
+  "turns": 1,
+  "promptChars": 20000,
+  "maxOutputTokens": 768,
+  "model": null,
+  "url": null,
+  "note": "model/url null means: fall back to OLLAMA_MODEL/OLLAMA_URL env vars, then \"gemma4:latest\"/http://localhost:11434 — same defaults scripts/sage-load-test.mjs's own CLI uses."
+}
