@@ -1,0 +1,53 @@
+{
+  "suite": "connection-walks",
+  "tier": "gate",
+  "startedAt": "2026-09-05T16:19:03.048Z",
+  "durationMs": 453,
+  "commit": "b700d71",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.7,
+    "node": "v22.22.2",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "illegal_accepted",
+      "value": 0,
+      "unit": "count",
+      "direction": "lower",
+      "n": 1000,
+      "floor": 0,
+      "tolerance": 0,
+      "exact": true,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "examples": [],
+        "pathsCovered": 100,
+        "edgesCovered": 44,
+        "coverageShortfall": []
+      }
+    },
+    {
+      "id": "events_per_transition",
+      "value": 1,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 5932,
+      "floor": 1,
+      "tolerance": 0,
+      "exact": true,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "eventsWritten": 5932,
+        "violations": []
+      }
+    }
+  ],
+  "status": "info"
+}

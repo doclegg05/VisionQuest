@@ -29,6 +29,14 @@
 //   3. The fixture contains the rows every hard-block code needs to fire on (a
 //      non-open lead, a do_not_contact employer), so `hard-blocks` measures all
 //      seven codes rather than the four that happen to be easy.
+//   4. No two SCHEDULED appointments share (advisorId, startsAt), and none sits
+//      inside a bookable availability window. The first is a real partial
+//      unique index that a `prisma db push` database does not have — so a local
+//      run passed while CI, which runs `prisma migrate deploy`, failed on it.
+//
+// Point 4 is why local verification of anything touching this fixture must go
+// through `prisma migrate deploy` against a fresh database, never `db push`:
+// Prisma cannot express a partial index, so it exists only in migration SQL.
 //
 // The one property this file cannot check — that every student has at least
 // three unblocked, visible leads, so precision@3 has three slots to fill —
@@ -863,19 +871,106 @@ function buildSavedJobs(students, listings) {
  * `interview_scheduled` connection points at — the console's booking flow
  * writes exactly that link and a fixture without it cannot exercise it.
  */
+/**
+ * Weekly advising availability, Monday to Friday, 09:00-12:00 UTC, 30-minute
+ * slots.
+ *
+ * Part of the COHORT rather than the seed script, because the appointments
+ * below have to be checked against it and a generator cannot assert a
+ * relationship to data it does not hold. `listInstructorSlots` builds the
+ * employer response page's "pick a time to meet" list from these rows; without
+ * them that page tells every employer "There are no open times right now" and
+ * the interview-booking half of the Connect journey cannot run at all.
+ *
+ * UTC on purpose: `buildBookableAdvisorSlots` compares `day.getUTCDay()` to
+ * `weekday` and builds each slot with `setUTCHours`, so these minutes are UTC
+ * minutes whatever the reader assumes.
+ */
+const AVAILABILITY_WEEKDAYS = [1, 2, 3, 4, 5];
+const AVAILABILITY_START_MINUTES = 9 * 60;
+const AVAILABILITY_END_MINUTES = 12 * 60;
+const AVAILABILITY_SLOT_MINUTES = 30;
+
+function buildAdvisorAvailability(instructors) {
+  const blocks = [];
+  for (const instructor of instructors) {
+    for (const weekday of AVAILABILITY_WEEKDAYS) {
+      blocks.push({
+        id: `cbenchavail${instructor.id.slice(-1)}${weekday}`,
+        advisorId: instructor.id,
+        weekday,
+        startMinutes: AVAILABILITY_START_MINUTES,
+        endMinutes: AVAILABILITY_END_MINUTES,
+        slotMinutes: AVAILABILITY_SLOT_MINUTES,
+        locationType: "in_person",
+        locationLabel: "Room 2",
+        active: true,
+      });
+    }
+  }
+  return blocks;
+}
+
+/**
+ * The hour seeded appointments sit at, in UTC.
+ *
+ * Deliberately OUTSIDE the 09:00-12:00 availability window above. A seeded
+ * appointment inside it would be silently swallowed by
+ * `buildBookableAdvisorSlots`, which drops any slot overlapping a scheduled
+ * appointment — so the employer page would quietly offer fewer times, and the
+ * Connect journey would book a different slot than the one a reader of this
+ * file would predict. Keeping them apart makes the two sets independent.
+ */
+const APPOINTMENT_HOUR_UTC = 14;
+
+/** An instant `daysAfterEpoch` days after the cohort epoch, at 14:00 UTC. */
+function appointmentSlot(daysAfterEpoch) {
+  const at = new Date(EPOCH_MS + daysAfterEpoch * DAY_MS);
+  at.setUTCHours(APPOINTMENT_HOUR_UTC, 0, 0, 0);
+  return at.toISOString();
+}
+
+/**
+ * A handful of appointments, including the interview the
+ * `interview_scheduled` connection points at — the console's booking flow
+ * writes exactly that link and a fixture without it cannot exercise it.
+ *
+ * Slots are ALLOCATED PER ADVISOR from a counter, not drawn at random, and
+ * that is the whole point of this function's shape. The first cut assigned
+ * advisors round-robin over three classes for four appointments — so two
+ * landed on the same instructor — and then drew each day with `rng.int(1, 14)`.
+ * The two collided, and migration `20260902140000` has a PARTIAL UNIQUE INDEX
+ * on `(advisorId, startsAt) WHERE status = 'scheduled'`, so the second insert
+ * was refused and the CI seed step died.
+ *
+ * It passed locally because a database built with `prisma db push` does not
+ * have that index at all: Prisma cannot express a partial index, so it lives
+ * only in raw migration SQL. A counter makes the uniqueness structural — there
+ * is no draw that can repeat — and `assertInvariants` checks it besides.
+ */
 function buildAppointments(students, connections, classes) {
-  const rng = createRng("cohort/appointments/v1");
   const appointments = [];
+  /** How many slots each advisor has already been given. */
+  const takenByAdvisor = new Map();
+
+  const nextSlot = (advisorId) => {
+    const used = takenByAdvisor.get(advisorId) ?? 0;
+    takenByAdvisor.set(advisorId, used + 1);
+    // Two days apart so a reader can tell them apart at a glance, and starting
+    // two days out so none is in the past relative to the cohort epoch.
+    return appointmentSlot(2 + used * 2);
+  };
 
   const interview = connections.find((connection) => connection.key === "interview");
   if (interview) {
+    const advisorId = classes[0].instructorId;
     appointments.push({
       id: "cbenchappt01",
       studentId: interview.studentId,
-      advisorId: classes[0].instructorId,
+      advisorId,
       connectionId: interview.id,
       kind: "interview",
-      scheduledAt: daysBefore(-4),
+      scheduledAt: nextSlot(advisorId),
       durationMinutes: 45,
       status: "scheduled",
       location: interview.employerName,
@@ -883,13 +978,14 @@ function buildAppointments(students, connections, classes) {
   }
 
   students.slice(20, 24).forEach((student, index) => {
+    const advisorId = classes[index % classes.length].instructorId;
     appointments.push({
       id: `cbenchappt${String(index + 2).padStart(2, "0")}`,
       studentId: student.id,
-      advisorId: classes[index % classes.length].instructorId,
+      advisorId,
       connectionId: null,
       kind: "advising",
-      scheduledAt: daysBefore(-rng.int(1, 14)),
+      scheduledAt: nextSlot(advisorId),
       durationMinutes: 30,
       status: "scheduled",
       location: "Room 2",
@@ -959,6 +1055,61 @@ function assertInvariants(cohort) {
     }
   }
 
+  // No two SCHEDULED appointments may share (advisorId, startsAt).
+  //
+  // Migration `20260902140000_add_appointment_scheduled_slot_unique` puts a
+  // PARTIAL UNIQUE INDEX there, and the seed's second insert is refused with
+  // 23505. This check exists because that is not reproducible on a database
+  // built with `prisma db push`: Prisma cannot express a partial index, so it
+  // exists only in the raw migration SQL, and a local run passed while CI —
+  // which runs `prisma migrate deploy` — died on it. A generator assertion
+  // fails at the point of the mistake instead.
+  const bookedSlots = new Map();
+  for (const appointment of cohort.appointments) {
+    if (appointment.status !== "scheduled") continue;
+    const key = `${appointment.advisorId} @ ${appointment.scheduledAt}`;
+    const already = bookedSlots.get(key);
+    if (already) {
+      problems.push(
+        `${already} and ${appointment.id} are both scheduled for ${key} — the partial unique ` +
+          "index on (advisorId, startsAt) WHERE status = 'scheduled' refuses the second",
+      );
+    }
+    bookedSlots.set(key, appointment.id);
+  }
+
+  // ...and none of them may sit inside a bookable availability window.
+  //
+  // Not a database constraint — a silent one. `buildBookableAdvisorSlots`
+  // drops any slot that overlaps a scheduled appointment, so an appointment
+  // inside the window would quietly remove a time the employer page would
+  // otherwise have offered, and the Connect journey would book a different
+  // slot than this file predicts.
+  const windowsByAdvisor = new Map();
+  for (const block of cohort.advisorAvailability) {
+    const list = windowsByAdvisor.get(block.advisorId) ?? [];
+    list.push(block);
+    windowsByAdvisor.set(block.advisorId, list);
+  }
+  for (const appointment of cohort.appointments) {
+    if (appointment.status !== "scheduled") continue;
+    const at = new Date(appointment.scheduledAt);
+    const minutes = at.getUTCHours() * 60 + at.getUTCMinutes();
+    const clash = (windowsByAdvisor.get(appointment.advisorId) ?? []).find(
+      (block) =>
+        block.active &&
+        block.weekday === at.getUTCDay() &&
+        minutes >= block.startMinutes &&
+        minutes < block.endMinutes,
+    );
+    if (clash) {
+      problems.push(
+        `${appointment.id} sits inside ${appointment.advisorId}'s bookable window ` +
+          `(${clash.id}), so it would silently remove a slot the employer page offers`,
+      );
+    }
+  }
+
   if (!cohort.leads.some((lead) => lead.status !== "open")) {
     problems.push("no closed/filled/paused lead — `lead_not_open` would never fire");
   }
@@ -988,6 +1139,7 @@ export function generateCohort() {
   const applications = buildApplications(students, connections);
   const jobListings = buildJobListings(classes);
   const savedJobs = buildSavedJobs(students, jobListings);
+  const advisorAvailability = buildAdvisorAvailability(instructors);
   const appointments = buildAppointments(students, connections, classes);
 
   const cohort = {
@@ -1010,6 +1162,7 @@ export function generateCohort() {
     applications,
     jobListings,
     savedJobs,
+    advisorAvailability,
     appointments,
   };
 
@@ -1036,6 +1189,7 @@ export const COHORT_FILES = {
   "applications.json": "applications",
   "job-listings.json": "jobListings",
   "saved-jobs.json": "savedJobs",
+  "advisor-availability.json": "advisorAvailability",
   "appointments.json": "appointments",
 };
 

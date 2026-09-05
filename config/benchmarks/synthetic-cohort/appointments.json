@@ -5,7 +5,7 @@
     "advisorId": "cbenchinstr1",
     "connectionId": "cbenchconn11",
     "kind": "interview",
-    "scheduledAt": "2026-09-05T12:00:00.000Z",
+    "scheduledAt": "2026-09-03T14:00:00.000Z",
     "durationMinutes": 45,
     "status": "scheduled",
     "location": "Tygart Freight Lines"
@@ -16,7 +16,7 @@
     "advisorId": "cbenchinstr1",
     "connectionId": null,
     "kind": "advising",
-    "scheduledAt": "2026-09-06T12:00:00.000Z",
+    "scheduledAt": "2026-09-05T14:00:00.000Z",
     "durationMinutes": 30,
     "status": "scheduled",
     "location": "Room 2"
@@ -27,7 +27,7 @@
     "advisorId": "cbenchinstr2",
     "connectionId": null,
     "kind": "advising",
-    "scheduledAt": "2026-09-05T12:00:00.000Z",
+    "scheduledAt": "2026-09-03T14:00:00.000Z",
     "durationMinutes": 30,
     "status": "scheduled",
     "location": "Room 2"
@@ -38,7 +38,7 @@
     "advisorId": "cbenchinstr3",
     "connectionId": null,
     "kind": "advising",
-    "scheduledAt": "2026-09-06T12:00:00.000Z",
+    "scheduledAt": "2026-09-03T14:00:00.000Z",
     "durationMinutes": 30,
     "status": "scheduled",
     "location": "Room 2"
@@ -49,7 +49,7 @@
     "advisorId": "cbenchinstr1",
     "connectionId": null,
     "kind": "advising",
-    "scheduledAt": "2026-09-06T12:00:00.000Z",
+    "scheduledAt": "2026-09-07T14:00:00.000Z",
     "durationMinutes": 30,
     "status": "scheduled",
     "location": "Room 2"
