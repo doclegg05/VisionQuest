@@ -29,16 +29,31 @@
 import type { Session } from "@/lib/api-error";
 import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
-import { reportDateRangeBoundsUtc } from "@/lib/timezone";
+import { dateOnlyBoundsUtc } from "@/lib/timezone";
 
-import { assertClassIsManaged, connectManagedStudentIds } from "./classes";
+import { assertClassIsManaged, connectManagedStudentIds, MAX_CONNECT_REPORT_ROWS } from "./classes";
 import { buildDohsExportRows, type DohsExportRow } from "./dohs-export-shared";
 
 export interface FetchDohsExportOptions {
   classId?: string;
-  /** "YYYY-MM-DD" — resolved to ET-aware UTC instants via reportDateRangeBoundsUtc. */
+  /**
+   * Filters to SpokesRecords whose placement traces to a Connection with
+   * this employerId (2026-09 second-pass review "Take" — the funnel report
+   * page already accepts an employer filter via `fetchConnectFunnel`; this
+   * export previously silently ignored it with no on-page note either). A
+   * record with no placement, or a self-directed one with no Connection,
+   * is excluded when this is set — there is no employer to match.
+   */
+  employerId?: string;
+  /**
+   * "YYYY-MM-DD" bounds on `SpokesRecord.enrolledAt`, a Prisma `@db.Date`
+   * column — resolved via `dateOnlyBoundsUtc` (plain UTC `Date.UTC`
+   * arithmetic, no timezone conversion), NOT `reportDateRangeBoundsUtc`
+   * (which is for real `DateTime` columns and would shift this whole
+   * window back one day — see that function's header). `from` inclusive,
+   * `to` the EXCLUSIVE UTC start of the day after.
+   */
   from?: string;
-  /** "YYYY-MM-DD" — resolved to the EXCLUSIVE start of the ET day after. */
   to?: string;
 }
 
@@ -62,7 +77,7 @@ export async function fetchDohsExport(
     return { rows: [], studentIds: [] };
   }
 
-  const { from, to } = reportDateRangeBoundsUtc(options.from, options.to);
+  const { from, to } = dateOnlyBoundsUtc(options.from, options.to);
 
   const records = await prisma.spokesRecord.findMany({
     where: {
@@ -74,6 +89,9 @@ export async function fetchDohsExport(
               ...(to ? { lt: to } : {}),
             },
           }
+        : {}),
+      ...(options.employerId
+        ? { placementApplication: { is: { connection: { is: { employerId: options.employerId } } } } }
         : {}),
     },
     select: {
@@ -117,6 +135,9 @@ export async function fetchDohsExport(
       },
     },
     orderBy: { enrolledAt: "asc" },
+    // Bounded read-only report query, no pagination UI (W12 partial, 2026-09
+    // second-pass review) — see MAX_CONNECT_REPORT_ROWS's header.
+    take: MAX_CONNECT_REPORT_ROWS,
   });
 
   const rows = buildDohsExportRows(
