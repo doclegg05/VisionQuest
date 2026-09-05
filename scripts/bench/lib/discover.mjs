@@ -9,10 +9,19 @@
  * is read as text rather than imported, so `bench:validate` is fast, safe to
  * run on every PR, and cannot be tripped by a suite's own import side
  * effects.
+ *
+ * The cost of that choice, stated plainly: the `run`-export check is a text
+ * match, not a syntax-aware one. A file whose only `export function run(` is
+ * inside a comment or a string passes this check and then fails at run time
+ * with "does not export run(ctx)" from the runner, which DOES import the
+ * module. The trade is deliberate — a validator that executes arbitrary suite
+ * code on every PR is a worse hazard than a false pass that the first actual
+ * run reports precisely. Suite ordering is codepoint, never locale, for the
+ * same reason results must be comparable across machines.
  */
 
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve, sep } from "node:path";
 
 import { REQUIREMENTS } from "./env.mjs";
 
@@ -44,6 +53,25 @@ const RUN_EXPORT_PATTERNS = [
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A suite config is data that the runner then EXECUTES (the scorer) and READS
+ * (the fixture), so every path it names must stay inside the checkout.
+ * Without this, "add a benchmark" is "run this file", and an absolute path or
+ * a `../..` escape would be honoured. Containment is checked before
+ * existence, so a real file outside the repo is refused rather than reported
+ * as merely missing.
+ *
+ * @param {string} repoRoot absolute path to the checkout
+ * @param {string} candidate the config's path value
+ */
+export function isInsideRepo(repoRoot, candidate) {
+  if (typeof candidate !== "string" || candidate.length === 0) return false;
+  if (isAbsolute(candidate)) return false;
+  const root = resolve(repoRoot);
+  const target = resolve(root, candidate);
+  return target === root || target.startsWith(root + sep);
 }
 
 /**
@@ -85,6 +113,11 @@ export function validateSuiteConfig(config, options) {
   // --- scorer ------------------------------------------------------------
   if (typeof config.scorer !== "string" || config.scorer.trim().length === 0) {
     errors.push('"scorer" must be a path to the module exporting run(ctx)');
+  } else if (!isInsideRepo(repoRoot, config.scorer)) {
+    errors.push(
+      `scorer resolves outside the repository: ${config.scorer} — ` +
+        "a suite may only execute code from this checkout"
+    );
   } else {
     const scorerPath = resolve(repoRoot, config.scorer);
     if (!existsSync(scorerPath)) {
@@ -117,6 +150,11 @@ export function validateSuiteConfig(config, options) {
     );
   } else if (typeof config.fixture !== "string" || config.fixture.trim().length === 0) {
     errors.push('"fixture", when present, must be a path');
+  } else if (!isInsideRepo(repoRoot, config.fixture)) {
+    errors.push(
+      `fixture resolves outside the repository: ${config.fixture} — ` +
+        "a suite may only read committed data from this checkout"
+    );
   } else if (!existsSync(resolve(repoRoot, config.fixture))) {
     errors.push(`fixture not found: ${config.fixture}`);
   }
@@ -269,7 +307,11 @@ export function discoverSuites(options) {
 
   const byName = new Map();
 
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+  // Codepoint order, never localeCompare: that varies with process locale and
+  // ICU build, so the same suites would list — and print — in different orders
+  // on two machines (same rule as the confirm-token canonicalisation,
+  // 2026-08-20).
+  for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
     if (NON_SUITE_FILES.has(entry.name)) continue;
 
