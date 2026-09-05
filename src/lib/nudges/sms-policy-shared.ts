@@ -43,8 +43,19 @@ export const QUIET_HOURS_END_HOUR = 8;
  */
 export const SMS_DAILY_CAP = 2;
 
-/** One GSM-7 segment. A longer body silently becomes two paid messages. */
+/**
+ * One GSM-7 segment. A longer body silently becomes two paid messages.
+ *
+ * GSM-7 is also why every template below is plain ASCII, including the
+ * truncation marker: a single non-GSM character (a curly quote, an en dash, a
+ * "…") switches the whole message to UCS-2, which cuts the segment to 70
+ * characters — so a 100-character body that "fits" here would arrive as two
+ * messages, or truncated, depending on the carrier. Keep new copy to ASCII.
+ */
 export const SMS_MAX_LENGTH = 160;
+
+/** ASCII, for the reason above. Never "…". */
+const TRUNCATION_MARKER = "...";
 
 /** Every body opens with this, so a stranger's text is never anonymous. */
 export const SMS_PREFIX = "SPOKES:";
@@ -68,6 +79,17 @@ export const SMS_CONSENT_POINTS = [
 ] as const;
 export const SMS_CONSENT_CHECKBOX_LABEL =
   "Yes, SPOKES can text me at this number. I can text STOP to stop.";
+
+/**
+ * Shown to someone whose SMS channel is ON but who has no consent on file —
+ * every account that opted in before consent was recorded. There is no
+ * backfill: a checkbox nobody ticked is not consent, so those students are
+ * asked once and texts stop until they answer.
+ */
+export const SMS_CONSENT_CONFIRM_HEADING = "Confirm to keep getting texts";
+export const SMS_CONSENT_CONFIRM_NOTICE =
+  "You had texts turned on before. We need you to say yes one more time. " +
+  "Until you do, SPOKES will not text you.";
 
 export interface SmsPreferenceSnapshot {
   enabled: boolean;
@@ -286,40 +308,145 @@ export function composeSmsBody(core: string): string {
  * sixty characters; the sentence around it must survive intact or the message
  * stops making sense.
  */
+/**
+ * The GSM-7 basic set (plus the escape-table characters carriers accept as one
+ * or two septets). Anything outside it flips the whole message to UCS-2, which
+ * halves the segment to 70 characters — so an employer name copied out of a
+ * job feed with a curly apostrophe would silently truncate or split the text.
+ */
+const GSM7_BASIC =
+  "@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
+  "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà" +
+  "\n\r^{}\\[~]|€";
+const GSM7_SET = new Set(GSM7_BASIC.split(""));
+
+/** Look-alikes worth keeping rather than dropping. */
+const GSM7_TRANSLITERATIONS: Record<string, string> = {
+  "‘": "'",
+  "’": "'",
+  "‚": "'",
+  "“": '"',
+  "”": '"',
+  "–": "-",
+  "—": "-",
+  "−": "-",
+  "…": "...",
+  " ": " ",
+  "•": "-",
+};
+
+/**
+ * Make a third-party string safe to put inside a message we sign our name to.
+ *
+ * Employer names, job titles and appointment labels reach here from job feeds
+ * and from whatever an instructor typed. Five things have to go:
+ *
+ *   1. C0/C1 controls, including NUL and ESC — a newline lets a value forge
+ *      what looks like a second, separate message inside one body;
+ *   2. bidi overrides (U+202A-202E, U+2066-2069), which can visually reverse
+ *      the text so the STOP line reads as something else;
+ *   3. zero-width characters, which hide content from a reviewer but not from
+ *      the recipient;
+ *   4. our own control phrases — a title containing "SPOKES:" or "Reply STOP"
+ *      lets a feed impersonate the program's framing inside its own message;
+ *   5. anything outside GSM-7, which would double the cost and halve the room.
+ */
+export function sanitizeSmsValue(value: string): string {
+  const withoutControls = value
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .replace(/[\u202a-\u202e\u2066-\u2069]/g, "")
+    .replace(/[\u200b-\u200d\ufeff]/g, "");
+
+  const transliterated = Array.from(withoutControls)
+    .map((char) => {
+      if (GSM7_SET.has(char)) return char;
+      const replacement = GSM7_TRANSLITERATIONS[char];
+      if (replacement !== undefined) return replacement;
+      // Unknown and un-encodable: a space, not a drop, so two words do not
+      // fuse into one when an emoji sat between them.
+      return " ";
+    })
+    .join("");
+
+  return transliterated
+    .replace(/SPOKES\s*:/gi, "SPOKES")
+    .replace(/reply\s+stop/gi, "reply")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function composeSmsBodyWith(render: (value: string) => string, value: string): string {
   const fixedLength = composeSmsBody(render("")).length;
   const budget = SMS_MAX_LENGTH - fixedLength;
-  const clean = value.trim().replace(/\s+/g, " ");
+  const clean = sanitizeSmsValue(value);
   const fitted =
-    clean.length <= budget ? clean : `${clean.slice(0, Math.max(0, budget - 1)).trimEnd()}…`;
+    clean.length <= budget
+      ? clean
+      : `${clean.slice(0, Math.max(0, budget - TRUNCATION_MARKER.length)).trimEnd()}${TRUNCATION_MARKER}`;
   return composeSmsBody(render(fitted));
 }
 
+/**
+ * "1 new job" / "4 new jobs". A program that texts an adult learner "1 new
+ * jobs" has told them, in three words, how much care went into the rest of it.
+ */
 export function buildWeeklyJobsSms(count: number): string {
-  return composeSmsBody(`${count} new jobs near you this week. Reply Y and Sage will show them.`);
+  const noun = count === 1 ? "new job" : "new jobs";
+  return composeSmsBody(
+    `${count} ${noun} near you this week. Reply Y to see them on your Career page.`,
+  );
 }
 
+/**
+ * The interview reminder.
+ *
+ * It deliberately does NOT try to carry the address: no student page shows one
+ * today, `Appointment.locationLabel` is free text that routinely does not fit a
+ * segment, and a text that names a wrong or truncated place is worse than one
+ * that names none. So it says where to get the address instead, which is a
+ * thing the student can act on. When the appointment DOES carry a location,
+ * `place` is the short label and the copy points at the appointments page,
+ * which now renders these.
+ */
 export function buildInterviewConfirmSms(input: {
   employerName: string;
   when: string;
+  place?: string | null;
 }): string {
-  // The time is fixed text and the employer name is the elastic part: a
-  // student who cannot read the day and hour has been sent nothing useful.
+  const tail = input.place
+    ? `See where on your SPOKES appointments page.`
+    : `Ask your teacher for the address.`;
+  // The time and the tail are fixed text and the employer name is the elastic
+  // part: a student who cannot read the day and hour has been sent nothing.
   return composeSmsBodyWith(
-    (employer) => `Your interview with ${employer} is ${input.when}. Reply Y to confirm.`,
+    (employer) => `Interview with ${employer}, ${input.when}. ${tail} Reply Y to confirm.`,
     input.employerName,
   );
 }
 
+/** The ack after an interview "N". Sent through the policy, never inline. */
+export function buildInterviewDeclineAckSms(): string {
+  return composeSmsBody("Got it. Your teacher will call you.");
+}
+
+/**
+ * "Got an interview?" rather than "did you hear back?": Y moves the saved job
+ * to `interviewing`, and the old wording asked a broader question than the
+ * answer records — a student who heard "no thanks" would also have said Y.
+ */
 export function buildHeardBackSms(jobTitle: string): string {
   return composeSmsBodyWith(
-    (title) => `Did you hear back about the ${title} job? Reply Y or N.`,
+    (title) => `Got an interview for the ${title} job? Reply Y or N.`,
     jobTitle,
   );
 }
 
+/** Says what "N" actually does, now that it raises a staff alert. */
 export function buildRetentionSms(employerName: string): string {
-  return composeSmsBodyWith((employer) => `Still working at ${employer}? Reply Y or N.`, employerName);
+  return composeSmsBodyWith(
+    (employer) => `Still working at ${employer}? Reply Y or N. If no, your coach will reach out.`,
+    employerName,
+  );
 }
 
 /**
@@ -344,7 +471,8 @@ export function buildNotificationSms(title: string, actionUrl: string): string {
 export type InboundSmsIntent = "stop" | "start" | "yes" | "no" | "unknown";
 
 const STOP_WORDS = new Set(["STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"]);
-const START_WORDS = new Set(["START", "YES"]);
+const YES_WORDS = new Set(["Y", "YES", "YEAH", "YEP"]);
+const NO_WORDS = new Set(["N", "NO", "NOPE"]);
 
 /**
  * What a reply means, on an exact-keyword basis.
@@ -356,12 +484,28 @@ const START_WORDS = new Set(["START", "YES"]);
  * the carrier-level state and produce a preference row that says one thing
  * while the carrier says another.
  */
-export function classifyInboundSms(raw: string): InboundSmsIntent {
+export function classifyInboundSms(
+  raw: string,
+  context: { hasPendingQuestion?: boolean } = {},
+): InboundSmsIntent {
   const word = raw.trim().replace(/[.!,?]+$/, "").toUpperCase();
   if (STOP_WORDS.has(word)) return "stop";
-  if (START_WORDS.has(word)) return "start";
-  if (word === "Y") return "yes";
-  if (word === "N") return "no";
+  if (word === "START") return "start";
+
+  // "NO" and "N" are the same answer to a person, and treating "NO" as
+  // unknown silently discarded the very answer the retention question exists
+  // to capture — the one that opens a staff alert.
+  if (NO_WORDS.has(word)) return "no";
+
+  // "YES" is ambiguous by design: Twilio treats it as an opt-in keyword, and a
+  // student answering "Still working at X?" also types it. Context decides —
+  // an open question wins, because someone with a question in front of them is
+  // answering it, and someone with none is restarting the channel.
+  if (YES_WORDS.has(word)) {
+    if (word === "Y") return "yes";
+    return context.hasPendingQuestion ? "yes" : "start";
+  }
+
   return "unknown";
 }
 
@@ -373,7 +517,18 @@ export function classifyInboundSms(raw: string): InboundSmsIntent {
  * know a link was sent, never which one.
  */
 export function redactLinks(body: string): string {
-  return body
-    .replace(/\bhttps?:\/\/\S+/gi, "[link]")
-    .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)+\/\S*/gi, "[link]");
+  return (
+    body
+      .replace(/\bhttps?:\/\/\S+/gi, "[link]")
+      // With a path…
+      .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)+\/\S*/gi, "[link]")
+      // …and without one. A bare "visionquest.onrender.com" is still a link a
+      // reader will follow, and the first cut left it in the stored body.
+      // The TLD list is deliberate: matching any dotted token would eat
+      // ordinary prose like "Reply Y or N." and employer names with initials.
+      .replace(
+        /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|org|net|gov|edu|io|co|us)\b/gi,
+        "[link]",
+      )
+  );
 }

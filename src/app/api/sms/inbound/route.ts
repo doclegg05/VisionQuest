@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isSignedWebhookPath } from "@/lib/csrf";
 import { logger } from "@/lib/logger";
+import { adminClientIsPrivileged } from "@/lib/nudges/admin-guard";
 import { handleInboundSms } from "@/lib/nudges/replies";
 import { verifyTwilioSignature } from "@/lib/nudges/twilio-signature";
 import { rateLimit } from "@/lib/rate-limit";
@@ -21,9 +22,17 @@ import { rateLimit } from "@/lib/rate-limit";
  * The reply is always empty TwiML. Twilio renders whatever comes back to the
  * sender, so an error message here would text a student a stack trace; the
  * outcome of the request belongs in our logs, not in their inbox.
+ *
+ * Twilio's signature carries no nonce and no timestamp, so a captured request
+ * verifies forever. Every handler this route reaches must therefore be
+ * idempotent, and they are: STOP and START are settings writes, and a reply
+ * claims its question with a conditional UPDATE that a replay loses.
  */
 
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
+
+/** A real Twilio webhook is a few hundred bytes; 16 KB is generous. */
+const MAX_BODY_BYTES = 16 * 1024;
 
 /** Per-number, so one handset cannot be used to hammer the reply handler. */
 const INBOUND_LIMIT = 10;
@@ -44,6 +53,13 @@ function twiml(): NextResponse {
  * http and can carry the internal host. APP_BASE_URL is the configured public
  * origin, so it is preferred; the request URL is the fallback for a local run
  * where the two are the same.
+ *
+ * LIMITATION: this rebuilds the URL from APP_BASE_URL's ORIGIN plus the
+ * request's path, so an APP_BASE_URL carrying a base path
+ * ("https://host/spokes") would drop that path and the signature would never
+ * verify. VisionQuest is deployed at a bare origin, so this is not a live
+ * problem — but if the app is ever mounted under a sub-path, join the base
+ * path back on here first.
  */
 export function signedRequestUrl(req: Request): string {
   const requestUrl = new URL(req.url);
@@ -71,6 +87,15 @@ export async function POST(req: Request): Promise<NextResponse> {
   // route should stop pretending it is reachable without an Origin.
   if (!isSignedWebhookPath(new URL(req.url).pathname)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Bound the body BEFORE parsing it. This is an unauthenticated endpoint
+  // until the signature check below, so `formData()` on an unbounded stream is
+  // a free way for anyone who knows the URL to make the server buffer whatever
+  // they send. A real Twilio webhook is well under a kilobyte.
+  const declaredLength = Number(req.headers.get("content-length"));
+  if (!Number.isFinite(declaredLength) || declaredLength <= 0 || declaredLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 
   let form: FormData;
@@ -107,6 +132,15 @@ export async function POST(req: Request): Promise<NextResponse> {
     // Still 200 with empty TwiML: Twilio retries a non-2xx, and a retry storm
     // on a limiter is worse than dropping one message.
     logger.warn("Inbound SMS rate limit reached", { channel: "sms" });
+    return twiml();
+  }
+
+  // F63 again: with an unprivileged admin client the phone lookup returns
+  // nothing and a STOP would be silently dropped, which is the one failure in
+  // this route that must never be quiet. 200 with empty TwiML so Twilio does
+  // not retry into the same broken state; the error is in the log.
+  if (!(await adminClientIsPrivileged())) {
+    logger.error("nudges_admin_client_missing", { surface: "sms_inbound" });
     return twiml();
   }
 

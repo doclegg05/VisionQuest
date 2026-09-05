@@ -19,8 +19,16 @@
 
 -- AlterTable
 ALTER TABLE "visionquest"."NotificationPreference" ADD COLUMN     "smsConsentAt" TIMESTAMP(3),
-ADD COLUMN     "smsRevokedAt" TIMESTAMP(3);
+ADD COLUMN     "smsRevokedAt" TIMESTAMP(3),
+ADD COLUMN     "smsVerifyCodeHash" TEXT,
+ADD COLUMN     "smsVerifyExpiresAt" TIMESTAMP(3);
 
 -- AlterTable
 ALTER TABLE "visionquest"."OutboundMessage" ADD COLUMN     "expectsReply" TEXT,
 ADD COLUMN     "repliedAt" TIMESTAMP(3);
+
+-- CreateIndex
+-- The nudge runner's "have we already asked this?" lookup resolves a batch of
+-- `heard_back:<savedJobId>` tokens in one query every sweep; without this it
+-- seq-scans the whole outbound log hourly.
+CREATE INDEX "OutboundMessage_templateKey_expectsReply_idx" ON "visionquest"."OutboundMessage"("templateKey", "expectsReply");

@@ -92,6 +92,17 @@ const SCAN_ROOTS = [
   { label: "components/chat", relPath: "src/components/chat" },
   { label: "components/student", relPath: "src/components/student" },
   { label: "next-step copy data (src/lib carve-out)", relPath: "src/lib/progression/student-next-step.ts" },
+  // Added with Match & Connect Phase 5. The settings page carries the SMS
+  // consent step — the one screen where a student agrees to be texted — and
+  // the advising hub renders the alerts a nudge produces. Both were outside
+  // every existing root, so their copy was unmeasured.
+  { label: "components/settings", relPath: "src/components/settings" },
+  { label: "components/advising", relPath: "src/components/advising" },
+  // A second src/lib carve-out, same shape as the next-step one above: every
+  // SMS body and the consent copy are DATA in sms-policy-shared.ts, only ever
+  // interpolated by the settings component, so scanning the component alone
+  // would find none of the words a student actually reads.
+  { label: "SMS + consent copy data (src/lib carve-out)", relPath: "src/lib/nudges/sms-policy-shared.ts" },
 ];
 
 // ---------------------------------------------------------------------------

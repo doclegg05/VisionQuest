@@ -260,17 +260,29 @@ export async function sendMultiChannelNotification(
   // actually goes out, in the OutboundMessage row.
   if (smsPref?.destination) {
     void (async () => {
-      const { buildNotificationSms, sendPolicySms } = await import("@/lib/nudges/sms-policy");
-      const outcome = await sendPolicySms({
-        studentId,
-        templateKey: `notification:${payload.type}`,
-        body: buildNotificationSms(payload.title, actionUrl),
-      });
-      logger.info("Notification SMS decision", {
-        channel: "sms",
-        type: payload.type,
-        outcome: outcome.status,
-      });
+      // Same shape as the email branch above: this is fire-and-forget, so a
+      // throw here has no caller to catch it and becomes an unhandled
+      // rejection. Provider text is redacted because Twilio quotes the
+      // recipient number inside its own error bodies.
+      try {
+        const { buildNotificationSms, sendPolicySms } = await import("@/lib/nudges/sms-policy");
+        const outcome = await sendPolicySms({
+          studentId,
+          templateKey: `notification:${payload.type}`,
+          body: buildNotificationSms(payload.title, actionUrl),
+        });
+        logger.info("Notification SMS decision", {
+          channel: "sms",
+          type: payload.type,
+          outcome: outcome.status,
+        });
+      } catch (err) {
+        logger.error("Notification SMS failed", {
+          channel: "sms",
+          type: payload.type,
+          error: redactContactInfo(String(err)),
+        });
+      }
     })();
     result.sms = true;
   }

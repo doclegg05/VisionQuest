@@ -30,9 +30,15 @@ const restrictedSyntaxEverywhere = [
   // StudentWorkProfile (Match & Connect Phase 2): a home ZIP beside a class
   // roster is close to an address, and a childcare note is the student's own
   // words about their household.
+  //
+  // destination / toNumber / fromNumber / smsTo / phone joined with the SMS
+  // layer (Phase 5). `destination` is the name the NotificationPreference
+  // column uses, so it is what a log line would naturally be called — and a
+  // phone number is the one identifier in this system that reaches a person
+  // directly, without anyone needing database access first.
   {
     selector:
-      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile)$/]",
+      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile|destination|toNumber|fromNumber|smsTo|phone)$/]",
     message:
       "No student identifier in server logs. Use studentLogKey(studentId) from @/lib/log-keys for a correlation key, or drop the field.",
   },

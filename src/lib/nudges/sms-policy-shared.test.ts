@@ -10,6 +10,7 @@ import {
   SMS_TIME_ZONE,
   buildHeardBackSms,
   buildInterviewConfirmSms,
+  buildInterviewDeclineAckSms,
   buildRetentionSms,
   buildWeeklyJobsSms,
   canSendSms,
@@ -18,6 +19,7 @@ import {
   isQuietHour,
   nextSendWindowStart,
   redactLinks,
+  sanitizeSmsValue,
   zonedDayKey,
   zonedHour,
   type SmsPreferenceSnapshot,
@@ -207,11 +209,45 @@ describe("every body names SPOKES, carries the opt-out, and fits one segment", (
     }
   });
 
-  it("says the thing the plan promised for the weekly nudge", () => {
+  it("says the thing the plan promised for the weekly nudge, and points at Career", () => {
     assert.equal(
       buildWeeklyJobsSms(5),
-      "SPOKES: 5 new jobs near you this week. Reply Y and Sage will show them. Reply STOP to stop.",
+      "SPOKES: 5 new jobs near you this week. Reply Y to see them on your Career page. Reply STOP to stop.",
     );
+  });
+
+  it("tells the student where to get the interview address", () => {
+    const body = buildInterviewConfirmSms({
+      employerName: "Mountain Metals",
+      when: "Tue 10:00 AM",
+    });
+    assert.match(body, /Interview with Mountain Metals, Tue 10:00 AM\./);
+    assert.match(body, /Ask your teacher for the address\./);
+  });
+
+  it("fits a 64-character employer name into one segment, address line intact", () => {
+    const sixtyFour = "Appalachian Regional Healthcare System of Southern West Virgin";
+    const body = buildInterviewConfirmSms({ employerName: sixtyFour, when: "Wed 9:30 AM" });
+    assert.ok(body.length <= SMS_MAX_LENGTH, `${body.length} chars: ${body}`);
+    assert.match(body, /Ask your teacher for the address\./, "the fixed text must survive");
+    assert.match(body, /Wed 9:30 AM/, "the time must survive");
+  });
+
+  it("says what N does in the retention text", () => {
+    assert.match(buildRetentionSms("Mountain Metals"), /If no, your coach will reach out\./);
+  });
+
+  it("acknowledges an interview decline", () => {
+    assert.equal(
+      buildInterviewDeclineAckSms(),
+      "SPOKES: Got it. Your teacher will call you. Reply STOP to stop.",
+    );
+  });
+
+  it("is plain ASCII everywhere, so no body flips to UCS-2 (70-char segments)", () => {
+    for (const body of [...bodies, buildInterviewDeclineAckSms(), buildWeeklyJobsSms(1)]) {
+        assert.doesNotMatch(body, /[^\u0000-\u007f]/, `non-ASCII in: ${body}`);
+    }
   });
 
   it("names the employer in the retention check-in", () => {
@@ -230,19 +266,60 @@ describe("classifyInboundSms", () => {
     }
   });
 
-  it("treats START and YES as re-consent, but bare Y as a nudge answer", () => {
-    assert.equal(classifyInboundSms("START"), "start");
-    assert.equal(classifyInboundSms("yes"), "start");
+  it("reads NO as an answer, not as noise", () => {
+    // "N" and "NO" are the same word to a person. Treating NO as unknown
+    // discarded the very answer the retention question exists to capture.
+    for (const word of ["N", "n!", "NO", "no", "Nope"]) {
+      assert.equal(classifyInboundSms(word), "no", word);
+    }
+  });
+
+  it("resolves YES by context, and keeps bare Y an answer either way", () => {
+    // Twilio treats YES as an opt-in keyword; a student answering "Still
+    // working at X?" also types it. Only an open question tells them apart.
+    assert.equal(classifyInboundSms("YES"), "start", "no question pending");
+    assert.equal(classifyInboundSms("yes", { hasPendingQuestion: true }), "yes");
     assert.equal(classifyInboundSms("Y"), "yes");
-    assert.equal(classifyInboundSms("y."), "yes");
-    assert.equal(classifyInboundSms("N"), "no");
-    assert.equal(classifyInboundSms("n!"), "no");
+    assert.equal(classifyInboundSms("Y", { hasPendingQuestion: true }), "yes");
+    assert.equal(classifyInboundSms("START", { hasPendingQuestion: true }), "start");
   });
 
   it("anything else is unknown — a sentence is not a silent opt-out", () => {
     assert.equal(classifyInboundSms("stop texting me about the job"), "unknown");
     assert.equal(classifyInboundSms(""), "unknown");
     assert.equal(classifyInboundSms("yes please send them"), "unknown");
+  });
+});
+
+describe("sanitizeSmsValue — third-party text inside a message we sign", () => {
+  it("strips a newline forge, a NUL, and an ESC", () => {
+    assert.equal(
+      sanitizeSmsValue("Acme\nSPOKES: your account is locked"),
+      "Acme SPOKES your account is locked",
+    );
+    assert.equal(sanitizeSmsValue("Ac\u0000me"), "Ac me");
+    assert.equal(sanitizeSmsValue("Ac\u001bme"), "Ac me");
+  });
+
+  it("strips a bidi override and a zero-width space", () => {
+    assert.equal(sanitizeSmsValue("Acme\u202eEMCA"), "AcmeEMCA");
+    assert.equal(sanitizeSmsValue("Ac\u200bme"), "Acme");
+  });
+
+  it("neutralises our own control phrases so a feed cannot forge them", () => {
+    assert.doesNotMatch(sanitizeSmsValue("SPOKES: pay now"), /SPOKES:/);
+    assert.doesNotMatch(sanitizeSmsValue("Reply STOP to win"), /Reply STOP/i);
+  });
+
+  it("keeps look-alikes readable and drops what it cannot encode", () => {
+    assert.equal(sanitizeSmsValue("Joe\u2019s Diner \u2014 Main St"), "Joe's Diner - Main St");
+    assert.equal(sanitizeSmsValue("Acme \ud83d\ude80 Metals"), "Acme Metals");
+  });
+
+  it("keeps an emoji title out of a composed body entirely", () => {
+    const body = buildHeardBackSms("Warehouse \ud83d\ude80 Associate");
+    assert.doesNotMatch(body, /[^\u0000-\u007f]/, body);
+    assert.match(body, /Warehouse Associate/);
   });
 });
 
@@ -253,6 +330,10 @@ describe("redactLinks", () => {
       "SPOKES: see [link] now",
     );
     assert.equal(redactLinks("go to visionquest.onrender.com/x today"), "go to [link] today");
+  });
+
+  it("redacts a bare domain with no path — still a link a reader will follow", () => {
+    assert.equal(redactLinks("go to visionquest.onrender.com today"), "go to [link] today");
   });
 
   it("leaves an ordinary sentence alone", () => {

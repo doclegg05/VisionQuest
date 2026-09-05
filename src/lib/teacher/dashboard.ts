@@ -18,6 +18,7 @@ import {
   normalizeInactivityAlertType,
 } from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
+import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
 import { computeReadinessScore } from "@/lib/progression/readiness-score";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
@@ -607,7 +608,15 @@ export async function getTeacherDashboardPage(
         where: {
           status: "open",
           studentId: { in: managedStudentIds },
-          type: { notIn: [...ALL_INACTIVITY_ALERT_TYPES] },
+          // Inactivity alerts have their own panel below. `connect_weekly_jobs_ready`
+          // is excluded for a different reason: it is the one alert type
+          // written FOR the student ("your jobs are ready"), it resolves the
+          // moment they open /career, and there is nothing an instructor can
+          // do about it. A queue row nobody can action is a queue row people
+          // learn to scroll past.
+          type: {
+            notIn: [...ALL_INACTIVITY_ALERT_TYPES, NUDGE_ALERT_TYPES.weeklyJobsReady],
+          },
         },
         select: {
           id: true,

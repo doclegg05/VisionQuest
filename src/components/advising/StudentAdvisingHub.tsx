@@ -2,11 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AskSageLink from "@/components/sage/AskSageLink";
+import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
+
+/**
+ * Student-visible alerts that are GOOD NEWS, and where they lead.
+ *
+ * These render as an answer with a button rather than as a triage card. The
+ * queue's chrome — a severity chip and a "Detected <date>" line — is staff
+ * vocabulary for work somebody else picks up; applied to "your jobs are
+ * ready" it reads as a problem report about the thing the student asked for.
+ */
+const GOOD_NEWS_ALERT_TYPES: Record<string, { href: string; label: string }> = {
+  [NUDGE_ALERT_TYPES.weeklyJobsReady]: { href: "/career", label: "See My Jobs" },
+};
 
 interface StudentAdvisingHubProps {
   alerts: Array<{
     id: string;
+    type: string;
     severity: string;
     title: string;
     summary: string;
@@ -146,7 +161,7 @@ export default function StudentAdvisingHub({
           <div>
             <h2 className="font-display text-2xl text-[var(--ink-strong)]">Book Advising Time</h2>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              Reserve an open slot with a teacher without waiting for someone else to schedule it.
+              Pick an open time with a teacher. You do not have to wait for someone to set it up.
             </p>
           </div>
           <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
@@ -357,20 +372,43 @@ export default function StudentAdvisingHub({
             </div>
           ) : (
             <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="rounded-[1.2rem] border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                    <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
-                      {alert.severity}
-                    </span>
+              {alerts.map((alert) =>
+                GOOD_NEWS_ALERT_TYPES[alert.type] ? (
+                  // A student who texted "Y, show me the jobs" gets an answer,
+                  // not a triage card. The staff chrome — a "LOW" severity chip
+                  // and a "Detected <date>" line — is the vocabulary of a queue
+                  // someone else works, and reading it about good news teaches
+                  // this page is not for them.
+                  <div
+                    key={alert.id}
+                    className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4"
+                  >
+                    <p className="break-words font-semibold text-[var(--ink-strong)]">
+                      {alert.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                    <Link
+                      href={GOOD_NEWS_ALERT_TYPES[alert.type].href}
+                      className="primary-button mt-3 inline-flex min-h-11 items-center px-4 py-2 text-sm"
+                    >
+                      {GOOD_NEWS_ALERT_TYPES[alert.type].label}
+                    </Link>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
-                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
-                    Detected {dateFormatter.format(new Date(alert.detectedAt))}
-                  </p>
-                </div>
-              ))}
+                ) : (
+                  <div key={alert.id} className="rounded-[1.2rem] border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
+                      <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
+                        {alert.severity}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                    <p className="mt-2 text-xs text-[var(--ink-muted)]">
+                      Detected {dateFormatter.format(new Date(alert.detectedAt))}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           )}
         </section>
@@ -397,7 +435,7 @@ export default function StudentAdvisingHub({
               </p>
               <div className="mt-3">
                 <AskSageLink
-                  prompt="Help me choose one productive advising follow-up task I can do today based on my VisionQuest progress."
+                  prompt="Help me pick one advising task I can do today. Use my progress to choose it."
                   label="Ask Sage for a next task"
                 />
               </div>

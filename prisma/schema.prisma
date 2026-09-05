@@ -116,6 +116,12 @@ model NotificationPreference {
   /// survives any later code path that flips `enabled` back on without asking
   /// again. START/YES clears it, and only when `smsConsentAt` is already set.
   smsRevokedAt DateTime?
+  /// sha256 of the 6-digit code sent to `destination` during opt-in, and its
+  /// expiry. Consent is only stamped once a code sent TO THAT HANDSET comes
+  /// back, so a typo cannot sign someone else's phone up for texts about a
+  /// student's job search. Both are cleared on success.
+  smsVerifyCodeHash  String?
+  smsVerifyExpiresAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1267,6 +1273,10 @@ model OutboundMessage {
 
   @@index([connectionId, sentAt])
   @@index([toKind, toId, sentAt])
+  /// The nudge runner's "have we already asked this?" lookup: it resolves a
+  /// batch of `heard_back:<savedJobId>` tokens in one query, and without this
+  /// it seq-scans the whole outbound log every sweep.
+  @@index([templateKey, expectsReply])
   @@schema("visionquest")
 }
 

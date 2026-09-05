@@ -37,13 +37,19 @@ import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { withStudentRlsContext } from "@/lib/rls-context";
 
+import { adminClientIsPrivileged } from "./admin-guard";
 import { resolveNudgeAlerts, upsertNudgeAlert } from "./alerts";
+import { studentsWithOpenQuestions } from "./replies";
 import { sendPolicySms } from "./sms-policy";
 import {
   EMPLOYER_NO_RESPONSE_DAYS,
   NUDGE_ALERT_TYPES,
   WEEKLY_NUDGE_LOOKBACK_DAYS,
+  deliveredAsks,
+  heardBackTemplateKey,
+  inFailureBackoff,
   isWeeklyNudgeSlot,
+  selectDeferredInterviewAcks,
   selectEmployerNoResponse,
   selectEmployerNoView,
   selectHeardBackChecks,
@@ -54,6 +60,7 @@ import {
   type NudgeAlertPlan,
   type NudgeSmsPlan,
   type SavedJobSnapshot,
+  type SentMessage,
 } from "./schedule-shared";
 
 /**
@@ -82,6 +89,9 @@ const MAX_CONNECTIONS = 500;
 const MAX_SAVED_JOBS = 500;
 const MAX_WEEKLY_STUDENTS = 200;
 
+/** Concurrent per-student lead rankings. See mapWithConcurrency below. */
+const WEEKLY_RANK_CONCURRENCY = 4;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface NudgeRunOptions {
@@ -96,6 +106,11 @@ export interface NudgeRunResult {
   connectScope: ConnectScope["mode"];
   smsScope: ConnectScope["mode"];
   weeklySlot: boolean;
+  /**
+   * Set when the run declined to do anything: another sweep holds the lock, or
+   * the admin client is not privileged. `null` on a normal run.
+   */
+  skipped: string | null;
   alertsPlanned: number;
   alertsWritten: number;
   alertsResolved: number;
@@ -132,7 +147,12 @@ async function loadActiveClassIds(studentIds: string[]): Promise<Map<string, str
 
 async function loadConnectionSnapshots(): Promise<ConnectionSnapshot[]> {
   const connections = await prismaAdmin.connection.findMany({
-    where: { status: { in: LIVE_STATUSES } },
+    where: {
+      status: { in: LIVE_STATUSES },
+      // A deactivated student is off the programme. Their connections stay for
+      // the record; texting them does not.
+      student: { isActive: true },
+    },
     take: MAX_CONNECTIONS,
     orderBy: { statusChangedAt: "asc" },
     select: {
@@ -140,10 +160,14 @@ async function loadConnectionSnapshots(): Promise<ConnectionSnapshot[]> {
       studentId: true,
       status: true,
       sentAt: true,
+      statusChangedAt: true,
       employerViewedAt: true,
+      interviewAppointmentId: true,
       employer: { select: { name: true } },
       jobLead: { select: { title: true } },
-      interviewAppointment: { select: { startsAt: true, status: true } },
+      interviewAppointment: {
+        select: { startsAt: true, status: true, locationLabel: true, locationType: true },
+      },
     },
   });
   if (connections.length === 0) return [];
@@ -160,7 +184,7 @@ async function loadConnectionSnapshots(): Promise<ConnectionSnapshot[]> {
     }),
     prismaAdmin.outboundMessage.findMany({
       where: { connectionId: { in: ids }, channel: "sms" },
-      select: { connectionId: true, templateKey: true },
+      select: { connectionId: true, templateKey: true, sentAt: true, status: true },
     }),
     prismaAdmin.studentAlert.findMany({
       where: { sourceType: "connection", sourceId: { in: ids }, status: "open" },
@@ -179,12 +203,16 @@ async function loadConnectionSnapshots(): Promise<ConnectionSnapshot[]> {
       startedAt.set(event.connectionId, event.at);
     }
   }
-  const templateKeys = new Map<string, string[]>();
+  const sentMessages = new Map<string, SentMessage[]>();
   for (const message of messages) {
     if (!message.connectionId) continue;
-    const list = templateKeys.get(message.connectionId) ?? [];
-    list.push(message.templateKey);
-    templateKeys.set(message.connectionId, list);
+    const list = sentMessages.get(message.connectionId) ?? [];
+    list.push({
+      templateKey: message.templateKey,
+      sentAt: message.sentAt,
+      status: message.status,
+    });
+    sentMessages.set(message.connectionId, list);
   }
   const alertTypes = new Map<string, string[]>();
   for (const alert of alerts) {
@@ -208,12 +236,26 @@ async function loadConnectionSnapshots(): Promise<ConnectionSnapshot[]> {
         // written only on the sent -> viewed transition, so a second look at an
         // already-viewed connection appends an event and leaves the column.
         lastViewAt: lastViewAt.get(row.id) ?? row.employerViewedAt,
-        startedAt: startedAt.get(row.id) ?? null,
+        // The `started` EVENT is the right anchor, but a connection that
+        // reached `started` before this sweep existed (or whose event row was
+        // lost) would otherwise never be asked at all. `statusChangedAt` is the
+        // conservative fallback: it is never EARLIER than the real start, so a
+        // check-in can be late but never premature.
+        startedAt:
+          startedAt.get(row.id) ??
+          (row.status === "started" || row.status.startsWith("retained_")
+            ? row.statusChangedAt
+            : null),
         interviewStartsAt:
           row.interviewAppointment?.status === "scheduled"
             ? row.interviewAppointment.startsAt
             : null,
-        sentTemplateKeys: templateKeys.get(row.id) ?? [],
+        interviewAppointmentId: row.interviewAppointmentId,
+        interviewPlace:
+          row.interviewAppointment?.status === "scheduled"
+            ? (row.interviewAppointment.locationLabel ?? null)
+            : null,
+        sentMessages: sentMessages.get(row.id) ?? [],
         openAlertTypes: alertTypes.get(row.id) ?? [],
       },
     ];
@@ -223,7 +265,11 @@ async function loadConnectionSnapshots(): Promise<ConnectionSnapshot[]> {
 async function loadSavedJobSnapshots(now: Date): Promise<SavedJobSnapshot[]> {
   const cutoff = new Date(now.getTime() - 60 * DAY_MS);
   const savedJobs = await prismaAdmin.studentSavedJob.findMany({
-    where: { status: "applied", appliedAt: { not: null, gte: cutoff } },
+    where: {
+      status: "applied",
+      appliedAt: { not: null, gte: cutoff },
+      student: { isActive: true },
+    },
     take: MAX_SAVED_JOBS,
     orderBy: { appliedAt: "asc" },
     select: {
@@ -236,29 +282,41 @@ async function loadSavedJobSnapshots(now: Date): Promise<SavedJobSnapshot[]> {
   });
   if (savedJobs.length === 0) return [];
 
-  // "Already asked" is recorded on the outbound row's reply token rather than
-  // on StudentSavedJob: the tracker belongs to the student and should not grow
-  // a column because the nudge layer needs a memory.
-  const asked = await prismaAdmin.outboundMessage.findMany({
-    where: {
-      channel: "sms",
-      templateKey: "heard_back",
-      expectsReply: { in: savedJobs.map((job) => `heard_back:${job.id}`) },
-    },
-    select: { expectsReply: true },
+  // "Already asked" is recorded on the outbound row rather than on
+  // StudentSavedJob: the tracker belongs to the student and should not grow a
+  // column because the nudge layer needs a memory.
+  //
+  // A DELIVERED ask and a FAILED one answer different questions — "have they
+  // been asked?" and "should we try again yet?" — so both are read. The
+  // templateKey carries the saved-job id because `expectsReply` is written
+  // only on delivery, and a failed row has to be findable too.
+  const heardBackKeys = savedJobs.map((job) => heardBackTemplateKey(job.id));
+  const attempts = await prismaAdmin.outboundMessage.findMany({
+    where: { channel: "sms", templateKey: { in: heardBackKeys } },
+    select: { templateKey: true, status: true, sentAt: true },
   });
-  const askedIds = new Set(
-    asked.map((row) => (row.expectsReply ?? "").split(":")[1]).filter(Boolean),
-  );
+  const attemptsByJob = new Map<string, SentMessage[]>();
+  for (const row of attempts) {
+    const jobId = row.templateKey.split(":")[1];
+    if (!jobId) continue;
+    const list = attemptsByJob.get(jobId) ?? [];
+    list.push({ templateKey: row.templateKey, status: row.status, sentAt: row.sentAt });
+    attemptsByJob.set(jobId, list);
+  }
 
-  return savedJobs.map((job) => ({
-    id: job.id,
-    studentId: job.studentId,
-    jobTitle: job.jobListing?.title ?? "the job",
-    status: job.status,
-    appliedAt: job.appliedAt,
-    alreadyAsked: askedIds.has(job.id),
-  }));
+  return savedJobs.map((job) => {
+    const history = attemptsByJob.get(job.id) ?? [];
+    const key = heardBackTemplateKey(job.id);
+    return {
+      id: job.id,
+      studentId: job.studentId,
+      jobTitle: job.jobListing?.title ?? "the job",
+      status: job.status,
+      appliedAt: job.appliedAt,
+      alreadyAsked: deliveredAsks(history, key).length > 0,
+      askFailedRecently: inFailureBackoff(history, key, now),
+    };
+  });
 }
 
 /**
@@ -300,6 +358,59 @@ async function staleEmployerAlertKeys(now: Date): Promise<string[]> {
       );
     })
     .map((alert) => alert.alertKey);
+}
+
+/**
+ * "Your jobs are ready" cards older than the week they were about.
+ *
+ * The student asked for these by texting Y, and the Home next-step points at
+ * /career on the strength of one being open. Left alone, a card from three
+ * weeks ago keeps hijacking the next step and pointing at jobs that are gone.
+ * The card is also resolved the moment they actually open /career
+ * (resolveWeeklyJobsAlertOnView in ./alerts.ts); this is the backstop for the
+ * student who never does.
+ */
+async function staleWeeklyAlertKeys(now: Date): Promise<string[]> {
+  const cutoff = new Date(now.getTime() - WEEKLY_NUDGE_LOOKBACK_DAYS * DAY_MS);
+  const rows = await prismaAdmin.studentAlert.findMany({
+    where: {
+      status: "open",
+      type: NUDGE_ALERT_TYPES.weeklyJobsReady,
+      detectedAt: { lt: cutoff },
+    },
+    select: { alertKey: true },
+  });
+  return rows.map((row) => row.alertKey);
+}
+
+/**
+ * Run `work` over `items` a few at a time.
+ *
+ * `countNewLeadsForStudent` is six queries per student under that student's
+ * RLS context; a class of 30 run sequentially is 180 serial round trips inside
+ * one cron slot, and run all at once it is 180 concurrent ones against a pool
+ * sized for a web app. Four is the middle: the sweep finishes in a fraction of
+ * the serial time without ever holding more than four connections.
+ *
+ * Deliberately not a dependency — p-limit for eight lines would be a supply
+ * chain for a for-loop.
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await work(items[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 /**
@@ -349,6 +460,7 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
     connectScope: connectScope.mode,
     smsScope: smsScope.mode,
     weeklySlot,
+    skipped: null,
     alertsPlanned: 0,
     alertsWritten: 0,
     alertsResolved: 0,
@@ -358,10 +470,97 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
     plan: [],
   };
 
+  // F63: if ADMIN_DATABASE_URL is unset, prismaAdmin is the ordinary vq_app
+  // client and every cross-student read below returns zero rows. The sweep is
+  // written to be resilient, so without this probe the whole feature would go
+  // quiet and look exactly like "nothing was due".
+  if (!(await adminClientIsPrivileged())) {
+    result.skipped = "admin client not privileged";
+    return result;
+  }
+
   // Connect off means the whole feature is off, including its alerts. There is
   // no state to catch up on later: every rule is re-derived from the rows each
   // run, so turning the flag back on resumes rather than replays.
   if (connectScope.mode === "off") return result;
+
+  // One sweep at a time across the whole deployment. Without it the hourly
+  // cron and a hand-run curl (or two Render instances) plan from the same rows
+  // and both act: the per-recipient lock in sms-policy.ts keeps the daily cap
+  // honest, but two runs would still each write half the alerts and burn two
+  // retention asks where the rules intended one.
+  //
+  // A dry run takes no lock: it writes nothing, and blocking an operator's
+  // "what would this send?" behind a live sweep is exactly backwards.
+  const body = () => runNudgesBody({ now, dryRun, result, connectScope, smsScope, weeklySlot });
+  if (dryRun) return body();
+
+  if (!(await tryRunLock(RUN_LOCK_KEY))) {
+    result.skipped = "already running";
+    logger.warn("nudges_run_lock_contended", { lockKey: RUN_LOCK_KEY });
+    return result;
+  }
+  try {
+    return await body();
+  } finally {
+    await releaseRunLock(RUN_LOCK_KEY);
+  }
+}
+
+const RUN_LOCK_KEY = "connect-nudges";
+
+/**
+ * The advisory lock that keeps one sweep at a time.
+ *
+ * SESSION-level, so it survives the many queries a run makes — which also
+ * means it is bound to whichever pooled backend answered, and the release has
+ * to reach that same backend. `releaseRunLock` therefore checks the result and
+ * shouts when it did not land: a leaked lock would make every later run report
+ * `already running` and silently stop the feature, which is a worse failure
+ * than the race it prevents. The runbook carries the query to inspect and
+ * clear one.
+ */
+async function tryRunLock(key: string): Promise<boolean> {
+  try {
+    const rows = await prismaAdmin.$queryRaw<Array<{ locked: boolean }>>`
+      SELECT pg_try_advisory_lock(hashtext(${key})) AS locked
+    `;
+    return rows[0]?.locked === true;
+  } catch (error) {
+    // A database that cannot answer this cannot run the sweep either; let the
+    // route's own catch report it rather than sweeping unserialized.
+    logger.error("nudges_run_lock_failed", { lockKey: key, error: String(error) });
+    return false;
+  }
+}
+
+async function releaseRunLock(key: string): Promise<void> {
+  try {
+    const rows = await prismaAdmin.$queryRaw<Array<{ released: boolean }>>`
+      SELECT pg_advisory_unlock(hashtext(${key})) AS released
+    `;
+    if (rows[0]?.released !== true) {
+      logger.error("nudges_run_lock_not_released", {
+        lockKey: key,
+        hint: "the unlock reached a different pooled backend; see docs/runbooks/connect-nudges.md",
+      });
+    }
+  } catch (error) {
+    logger.error("nudges_run_lock_release_failed", { lockKey: key, error: String(error) });
+  }
+}
+
+interface RunBodyContext {
+  now: Date;
+  dryRun: boolean;
+  result: NudgeRunResult;
+  connectScope: ConnectScope;
+  smsScope: ConnectScope;
+  weeklySlot: boolean;
+}
+
+async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
+  const { now, dryRun, result, connectScope, smsScope, weeklySlot } = ctx;
 
   const [connections, savedJobs] = await Promise.all([
     loadConnectionSnapshots(),
@@ -380,9 +579,15 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
 
   // --- Employer side: instructor alerts, never a message to the employer ---
   const inScopeConnections = connections.filter((c) => connectOk(c.studentId));
+  const smsConnections = connections.filter((c) => smsOk(c.studentId));
+  const retention = selectRetentionChecks(smsConnections, now);
+
   const alertPlans: NudgeAlertPlan[] = [
     ...selectEmployerNoView(inScopeConnections, now),
     ...selectEmployerNoResponse(inScopeConnections, now),
+    // Raised by a rule that also produces texts: two unanswered asks means the
+    // texting stops and a person takes over.
+    ...retention.alerts,
   ];
   result.alertsPlanned = alertPlans.length;
   for (const plan of alertPlans) {
@@ -390,19 +595,42 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
   }
 
   // --- Student side: texts ---
-  const smsConnections = connections.filter((c) => smsOk(c.studentId));
-  const smsPlans: NudgeSmsPlan[] = [
+  const candidateSms: NudgeSmsPlan[] = [
     ...selectInterviewConfirmations(smsConnections, now),
-    ...selectRetentionChecks(smsConnections, now),
+    ...retention.texts,
     ...selectHeardBackChecks(
       savedJobs.filter((job) => smsOk(job.studentId)),
       now,
     ),
+    ...selectDeferredInterviewAcks(smsConnections, now),
   ];
 
   if (weeklySlot && smsScope.mode !== "off") {
-    smsPlans.push(...(await planWeeklyJobsNudges(smsScope, connectScope, now)));
+    candidateSms.push(...(await planWeeklyJobsNudges(smsScope, connectScope, now)));
   }
+
+  // One open question at a time per student.
+  //
+  // Every question is answered with a single character, and the reply resolves
+  // the MOST RECENT unanswered one. Two in flight therefore means a "Y" meant
+  // for the first silently answers the second — a student confirming an
+  // interview would be recorded as still employed at a job they left. An
+  // acknowledgement (no expectsReply) is exempt: it asks nothing.
+  const openQuestionStudents = await studentsWithOpenQuestions(
+    Array.from(new Set(candidateSms.map((plan) => plan.studentId))),
+    now,
+  );
+  const claimedThisRun = new Set<string>();
+  const smsPlans = candidateSms.filter((plan) => {
+    if (!plan.expectsReply) return true;
+    if (openQuestionStudents.has(plan.studentId) || claimedThisRun.has(plan.studentId)) {
+      result.textOutcomes["skipped:question_already_open"] =
+        (result.textOutcomes["skipped:question_already_open"] ?? 0) + 1;
+      return false;
+    }
+    claimedThisRun.add(plan.studentId);
+    return true;
+  });
 
   result.textsPlanned = smsPlans.length;
   for (const plan of smsPlans) {
@@ -429,7 +657,7 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
     }
   }
 
-  const stale = await staleEmployerAlertKeys(now);
+  const stale = [...(await staleEmployerAlertKeys(now)), ...(await staleWeeklyAlertKeys(now))];
   if (stale.length > 0) {
     // The alerts belong to many students, and resolveNudgeAlerts runs on the
     // app client, so each key is closed inside its own student's context. The
@@ -459,17 +687,30 @@ export async function runNudges(options: NudgeRunOptions = {}): Promise<NudgeRun
   }
 
   for (const plan of smsPlans) {
-    const outcome = await sendPolicySms({
-      studentId: plan.studentId,
-      templateKey: plan.templateKey,
-      body: plan.body,
-      expectsReply: plan.expectsReply,
-      connectionId: plan.connectionId ?? null,
-      now,
-    });
-    const key = outcome.status === "sent" ? "sent" : `${outcome.status}:${reasonOf(outcome)}`;
-    result.textOutcomes[key] = (result.textOutcomes[key] ?? 0) + 1;
-    if (outcome.status === "sent") result.textsSent += 1;
+    // sendPolicySms is already total, but the loop is guarded anyway: one
+    // student's send must never end the sweep for everyone behind them in the
+    // list, and "total" is a property of today's implementation rather than of
+    // the call site.
+    try {
+      const outcome = await sendPolicySms({
+        studentId: plan.studentId,
+        templateKey: plan.templateKey,
+        body: plan.body,
+        expectsReply: plan.expectsReply,
+        connectionId: plan.connectionId ?? null,
+        now,
+      });
+      const key = outcome.status === "sent" ? "sent" : `${outcome.status}:${reasonOf(outcome)}`;
+      result.textOutcomes[key] = (result.textOutcomes[key] ?? 0) + 1;
+      if (outcome.status === "sent") result.textsSent += 1;
+    } catch (error) {
+      result.textOutcomes["error"] = (result.textOutcomes["error"] ?? 0) + 1;
+      logger.error("Nudge send threw", {
+        templateKey: plan.templateKey,
+        student: studentLogKey(plan.studentId),
+        error: String(error),
+      });
+    }
   }
 
   return result;
@@ -501,7 +742,12 @@ async function planWeeklyJobsNudges(
       ...(smsScope.mode === "classes" ? { classId: { in: smsScope.classIds } } : {}),
       student: { role: "student", isActive: true },
     },
-    take: MAX_WEEKLY_STUDENTS,
+    // Ordered, because an unordered `take` makes WHICH students get the text a
+    // property of the planner. Deduped BEFORE the cap, because a student in
+    // two classes has two enrollment rows and would otherwise consume two of
+    // the run's slots — an unordered, row-counted cap silently drops the tail
+    // of the roster and nobody notices which end.
+    orderBy: [{ studentId: "asc" }, { classId: "asc" }],
     select: { studentId: true, classId: true },
   });
 
@@ -510,6 +756,7 @@ async function planWeeklyJobsNudges(
     const list = classesByStudent.get(row.studentId) ?? [];
     list.push(row.classId);
     classesByStudent.set(row.studentId, list);
+    if (classesByStudent.size >= MAX_WEEKLY_STUDENTS && !classesByStudent.has(row.studentId)) break;
   }
 
   // One weekly text per week, whatever else happens. The Monday-10:00 gate
@@ -530,15 +777,20 @@ async function planWeeklyJobsNudges(
   });
   const recentlyTexted = new Set(alreadyTexted.map((row) => row.toId));
 
-  const candidates: Array<{ studentId: string; newLeadCount: number }> = [];
-  for (const [studentId, classIds] of classesByStudent) {
-    if (!isConnectEnabledForClasses(connectScope, classIds)) continue;
-    if (!isConnectEnabledForClasses(smsScope, classIds)) continue;
-    if (recentlyTexted.has(studentId)) continue;
-    candidates.push({
-      studentId,
-      newLeadCount: await countNewLeadsForStudent(studentId, recentLeadIds),
-    });
-  }
-  return selectWeeklyJobsRecipients(candidates);
+  const eligible = Array.from(classesByStudent.entries())
+    .filter(
+      ([studentId, classIds]) =>
+        isConnectEnabledForClasses(connectScope, classIds) &&
+        isConnectEnabledForClasses(smsScope, classIds) &&
+        !recentlyTexted.has(studentId),
+    )
+    .slice(0, MAX_WEEKLY_STUDENTS)
+    .map(([studentId]) => studentId);
+
+  const counts = await mapWithConcurrency(eligible, WEEKLY_RANK_CONCURRENCY, (studentId) =>
+    countNewLeadsForStudent(studentId, recentLeadIds),
+  );
+  return selectWeeklyJobsRecipients(
+    eligible.map((studentId, index) => ({ studentId, newLeadCount: counts[index] })),
+  );
 }

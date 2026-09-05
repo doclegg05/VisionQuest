@@ -5,11 +5,18 @@ import { PathToEmployment } from "@/components/progression/PathToEmployment";
 import PageIntro from "@/components/ui/PageIntro";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { resolveWeeklyJobsAlertOnView } from "@/lib/nudges/alerts";
 import { getStudentNextStep } from "@/lib/progression/student-next-step";
 
 export default async function CareerPage() {
   const session = await getSession();
   if (!session) return null;
+
+  // The "new jobs are ready" card was raised because the student texted Y
+  // asking to see them. Arriving here IS the answer, so it is closed on view
+  // rather than left to expire — otherwise the Home next-step keeps pointing
+  // at the page they are already on.
+  await resolveWeeklyJobsAlertOnView(session.id);
 
   const [opportunities, events, nextStep] = await Promise.all([
     prisma.opportunity.findMany({

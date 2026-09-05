@@ -36,6 +36,12 @@ export type StudentVisibleAlertType = (typeof STUDENT_VISIBLE_ALERT_TYPES)[numbe
 
 export interface StudentVisibleAlert {
   id: string;
+  /**
+   * The alert type, so a surface can render a POSITIVE one differently. The
+   * Advising page shows `connect_weekly_jobs_ready` as an answer with a link
+   * rather than as a triage card with a severity chip.
+   */
+  type: string;
   severity: string;
   title: string;
   summary: string;
@@ -56,6 +62,7 @@ export async function listStudentVisibleAlerts(studentId: string): Promise<Stude
     where: studentVisibleAlertWhere(studentId),
     select: {
       id: true,
+      type: true,
       severity: true,
       title: true,
       summary: true,

@@ -19,6 +19,15 @@ export interface ConsentSectionProps {
   eyebrow?: string;
   title?: string;
   description?: string;
+  /**
+   * Extra lines rendered as a short bulleted list under the description.
+   *
+   * A consent paragraph is the one place on this page where every clause
+   * matters, and at a grade-6 reading level a four-sentence block is where
+   * people stop. Splitting the promises into bullets makes each one a thing
+   * that can be read on its own.
+   */
+  points?: readonly string[];
 }
 
 export function ConsentSection({
@@ -26,6 +35,7 @@ export function ConsentSection({
   eyebrow = "Document reading",
   title = "Let Sage read documents you upload",
   description = "When this is on, files you hand to Sage in chat (like signed forms) can be read by our AI service so Sage understands them better. When it is off, Sage still accepts your files — she just reads them with a simpler tool that works on typed text only. You can change this any time.",
+  points = [],
 }: ConsentSectionProps = {}) {
   const [granted, setGranted] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
@@ -75,6 +85,16 @@ export function ConsentSection({
           </p>
           <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">{title}</p>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">{description}</p>
+          {points.length > 0 && (
+            <ul className="mt-2 space-y-1.5 text-sm text-[var(--ink-muted)]">
+              {points.map((point) => (
+                <li key={point} className="flex gap-2">
+                  <span aria-hidden="true">&bull;</span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         </div>
         <button

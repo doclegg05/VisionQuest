@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth, badRequest } from "@/lib/api-error";
+import { phoneNumberInUseByAnotherStudent } from "@/lib/nudges/phone-verification";
 
 const preferencesSchema = z.object({
   email: z
@@ -16,13 +17,6 @@ const preferencesSchema = z.object({
         .string()
         .regex(/^\+?[1-9]\d{1,14}$/)
         .optional(),
-      /**
-       * The student ticking the consent box on this request. Consent is
-       * PERMISSION and `enabled` is only a preference, so turning the channel
-       * on requires either this flag now or an `smsConsentAt` already on file
-       * (Match & Connect design spec §10).
-       */
-      consent: z.boolean().optional(),
     })
     .optional(),
 });
@@ -85,17 +79,30 @@ export const PUT = withAuth(async (session, req: Request) => {
     const now = new Date();
     const existing = await prisma.notificationPreference.findUnique({
       where: { studentId_channel: { studentId: session.id, channel: "sms" } },
-      select: { smsConsentAt: true, smsRevokedAt: true },
+      select: { smsConsentAt: true, smsRevokedAt: true, destination: true },
     });
     const alreadyConsented = Boolean(existing?.smsConsentAt) && !existing?.smsRevokedAt;
 
-    // Turning the channel ON needs permission: this request's consent tick, or
-    // a consent already on file that has not been revoked. Without one the
-    // request is refused rather than quietly saved as "on" — a preference row
-    // that says enabled with no consent behind it is exactly the state the SMS
-    // policy exists to make impossible.
-    if (sms.enabled && !alreadyConsented && !sms.consent) {
-      throw badRequest("Agree to get texts from SPOKES before you turn texts on.");
+    if (sms.phoneNumber && sms.phoneNumber !== existing?.destination) {
+      // A number that is already another student's active SMS destination is
+      // refused. The nudge texts name an employer and a job title, and the
+      // inbound handler cannot tell whose "Y" a shared handset just sent — so
+      // it applies nothing, and both students silently stop being heard.
+      // The message never says WHOSE number it is.
+      if (await phoneNumberInUseByAnotherStudent(sms.phoneNumber, session.id)) {
+        throw badRequest(
+          "This number is already set up for texts by another SPOKES student. " +
+            "Ask your teacher for help.",
+        );
+      }
+    }
+
+    // Turning the channel ON needs permission, and permission now means a code
+    // that came back from the handset — see
+    // /api/notifications/preferences/verify-phone. This route can turn the
+    // channel on only for someone who has already been through that.
+    if (sms.enabled && !alreadyConsented) {
+      throw badRequest("Confirm your phone number first, then we can turn texts on.");
     }
 
     upserts.push(
@@ -104,23 +111,23 @@ export const PUT = withAuth(async (session, req: Request) => {
         create: {
           studentId: session.id,
           channel: "sms",
-          enabled: sms.enabled,
+          // A brand-new row cannot be enabled: there is nothing to have
+          // consented with yet. Save the number, then verify it.
+          enabled: false,
           destination: sms.phoneNumber ?? null,
-          smsConsentAt: sms.enabled ? now : null,
         },
         update: {
           enabled: sms.enabled,
           ...(sms.phoneNumber !== undefined ? { destination: sms.phoneNumber } : {}),
           // Turning the channel off records the revocation as well as the
           // preference, so the SMS policy still refuses if some later code path
-          // flips `enabled` back on without asking again. Turning it on clears
-          // the revocation and stamps consent only the first time.
-          ...(sms.enabled
-            ? {
-                smsRevokedAt: null,
-                ...(existing?.smsConsentAt ? {} : { smsConsentAt: now }),
-              }
-            : { smsRevokedAt: now }),
+          // flips `enabled` back on without asking again.
+          ...(sms.enabled ? { smsRevokedAt: null } : { smsRevokedAt: now }),
+          // A NEW number is a new handset: the old consent proved nothing
+          // about it, so verification starts again.
+          ...(sms.phoneNumber && sms.phoneNumber !== existing?.destination
+            ? { smsConsentAt: null, smsVerifyCodeHash: null, smsVerifyExpiresAt: null }
+            : {}),
         },
       }),
     );

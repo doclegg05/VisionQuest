@@ -26,14 +26,46 @@ and the weekly nudge gates on its own Monday-10:00 ET slot.
 |---|---|---|---|
 | `sent` with no `employer_viewed` event for 3 days | Instructor (`connect_employer_no_view`) | "…has not opened the packet. A phone call usually settles it faster." | — |
 | Awaiting the employer for 7 days | Instructor (`connect_employer_no_response`) | "…you may want to consider re-sending it or calling." **Never re-sent automatically.** | — |
-| `interview_scheduled` with an appointment inside 24 h | Student, SMS | "Your interview with X is Tue 10:00 AM. Reply Y to confirm." | `Y` records the confirmation. `N` raises `connect_interview_unconfirmed` for the instructor — nothing is cancelled by machine. |
-| `StudentSavedJob` applied 7 days ago, still `applied` | Student, SMS | "Did you hear back about the X job? Reply Y or N." | `Y` → saved job becomes `interviewing`. `N` → nothing. |
-| 30 / 60 / 90 days after the `started` event | Student, SMS | "Still working at X? Reply Y or N." | `Y` → `SpokesEmploymentFollowUp` (1/2/3-month checkpoint, `employed`) **and** the connection advances to `retained_30/60/90`. `N` → follow-up `not_employed`, connection `closed` (`retention_lost`), `connect_retention_lost` alert. |
-| Monday 10:00 ET, leads created in the last 7 days above the fit floor | Student, SMS | "N new jobs near you this week. Reply Y and Sage will show them." | `Y` → `connect_weekly_jobs_ready` (student-visible; Home next-step opens `/career`). `N` → nothing. Skipped entirely when N is 0. |
+| `interview_scheduled` with an appointment inside 24 h | Student, SMS | "Interview with X, Tue 10:00 AM. Ask your teacher for the address. Reply Y to confirm." (points at the appointments page instead when the appointment has a location) | `Y` records the confirmation. `N` raises `connect_interview_unconfirmed` for the instructor and sends one ack ("Got it. Your teacher will call you.") — nothing is cancelled by machine. Keyed on the APPOINTMENT, so a rescheduled interview gets a fresh reminder. |
+| `StudentSavedJob` applied 7 days ago, still `applied` | Student, SMS | "Got an interview for the X job? Reply Y or N." | `Y` → saved job becomes `interviewing`. `N` → nothing. |
+| 30 / 60 / 90 days after the `started` event | Student, SMS | "Still working at X? Reply Y or N. If no, your coach will reach out." | `Y` → connection advances to `retained_30/60/90` **and** `connect_retention_confirm` asks staff to record the SPOKES follow-up. `N` → connection `closed` (`retention_lost`) + `connect_retention_lost`. **Neither answer writes `SpokesEmploymentFollowUp`** — see "Two clocks" below. Unanswered: re-asked after 7 days, then `connect_retention_unanswered` and no more texts for that checkpoint. |
+| Monday from 10:00 ET, leads created in the last 7 days above the fit floor | Student, SMS | "N new jobs near you this week. Reply Y to see them on your Career page." | `Y` → `connect_weekly_jobs_ready` (student-visible; Home next-step opens `/career`; resolved when they open Career, and expired after 7 days). `N` → nothing. Skipped entirely when N is 0. One per student per week. |
 
-Every body starts `SPOKES:`, ends `Reply STOP to stop.`, and fits one
-160-character segment. Every send writes an `OutboundMessage` row with links
-replaced by `[link]`; the phone number is never in the row or the logs.
+Every body starts `SPOKES:`, ends `Reply STOP to stop.`, is plain ASCII (a
+single non-GSM-7 character halves the segment to 70 chars), and fits one
+160-character segment. Employer names and job titles arrive from third-party
+feeds and are sanitised before they go in a body — control characters, bidi
+overrides, zero-width characters and our own "SPOKES:"/"Reply STOP" phrases are
+stripped. Every send writes an `OutboundMessage` row with links replaced by
+`[link]`; the phone number is never in the row or the logs.
+
+### Two clocks, and why the texts never write the grant record
+
+`SpokesEmploymentFollowUp` is the DoHS/WIOA retention record. Its checkpoints
+are **1, 3 and 6 MONTHS** from `SpokesRecord.unsubsidizedEmploymentAt`, and
+`grant-kpi.ts` reports months 3 and 6. The Connect funnel counts **30/60/90
+DAYS** from `Connection.startedAt` — a different anchor on a different scale.
+
+A one-character text therefore never writes that record. Mapping day 30 onto
+month 1 would overwrite a teacher's verified row on the shared
+`(recordId, checkpointMonths)` unique key with no provenance to tell them
+apart, and would park the day-60 answer at a `checkpointMonths` nothing reads.
+Instead the answer moves the funnel and raises `connect_retention_confirm`,
+which is the reconciliation point: a person confirms the employment and records
+the SPOKES follow-up themselves.
+
+### Replies
+
+`Y`/`N` (and `YES`/`NO`) answer the most recent unanswered question sent to
+that number in the last 72 hours. `YES` is ambiguous — Twilio treats it as an
+opt-in keyword — so it is read as an ANSWER when a question is open and as
+`START` when none is. `START` on its own only ever resumes a channel someone
+already consented to; it cannot create consent. The runner never sends a second
+question to a student who has one open.
+
+A number on file for two students (a shared family phone) is handled
+asymmetrically on purpose: a **STOP applies to all of them**, and everything
+else applies to none, because there is no way to tell whose reply it is.
 
 ## Enable steps
 
@@ -60,11 +92,20 @@ replaced by `[link]`; the phone number is never in the row or the logs.
      `all` = every class, otherwise a comma-separated list of `SpokesClass` ids.
    Turning `connect_enabled_classes` off also stops the texts; there is no
    second switch to remember.
-5. **Consent.** Each student opts in on **Settings → Text Messages**: the
-   consent block names SPOKES, the frequency ("up to 2 a day, usually 1 a
-   week"), quiet hours, STOP, and that texts are not required for the program.
-   The API refuses to enable the channel without it, so there is no way to
-   turn texts on for someone administratively.
+5. **Consent — and note that it is NOT backfilled.** Each student opts in on
+   **Settings → Text Messages**: the consent block names SPOKES, the frequency
+   ("up to 2 a day, usually 1 a week"), quiet hours, STOP, and that texts are
+   not required for the program. They tick the box, we text a 6-digit code to
+   the number, and consent is stamped only when that code comes back — so a
+   typo cannot sign a stranger up for texts about a student's job search.
+   There is no way to turn texts on for someone administratively.
+
+   **Existing opted-in students stop receiving texts until they confirm.**
+   Nobody's `smsConsentAt` was backfilled — a checkbox nobody ticked is not
+   consent — so anyone who had SMS enabled before this shipped sees a
+   "Confirm to keep getting texts" panel and gets nothing until they complete
+   it. That includes the daily coaching prompt, which also runs through this
+   policy now.
 
 ## Verify
 
@@ -94,12 +135,41 @@ replaced by `[link]`; the phone number is never in the row or the logs.
   is later flipped back on by some other path.
 - **The job itself:** `SELECT cron.unschedule('connect-nudges');`
 
+## When something looks stuck
+
+- **Every run reports `already running`.** One sweep at a time is enforced by
+  a SESSION-level advisory lock (`pg_try_advisory_lock(hashtext('connect-nudges'))`).
+  A session lock is bound to the pooled backend that took it, so an unlock that
+  lands on a different backend leaves it held — the runner logs
+  `nudges_run_lock_not_released` when that happens. To inspect and clear:
+  ```sql
+  SELECT pid, objid, granted FROM pg_locks
+   WHERE locktype = 'advisory' AND objid = hashtext('connect-nudges');
+  -- then, having identified the holder:
+  SELECT pg_terminate_backend(<pid>);
+  ```
+- **`nudges_admin_client_missing` in the logs, and nothing sends.** The admin
+  Prisma client is not RLS-bypassing — `ADMIN_DATABASE_URL` is unset or points
+  at `vq_app`. Both the runner and the inbound webhook refuse to act rather
+  than sweeping over rows they cannot see (review finding F63). Fix the env
+  var and redeploy; the probe is cached per process.
+- **`net._http_response` shows a timeout but texts went out.** pg_net's default
+  timeout is 5 seconds; the job sets `timeout_milliseconds := 240000`. If a
+  timeout still appears, the run took over four minutes — check
+  `MAX_WEEKLY_STUDENTS` and the ranking concurrency in `schedule.ts`.
+
 ## Known limits
 
 - The retention question is keyed off the connection's **current status**, so a
-  student who never answers the 30-day text is asked it again on the next
-  eligible slot rather than skipping to 60. That is deliberate: an unanswered
-  checkpoint is not a recorded outcome.
-- A phone number shared by two students matches two preference rows; the
-  inbound handler applies nothing and logs a warning, because there is no way
-  to tell whose reply it is.
+  student who never answers the 30-day text is asked it again a week later, and
+  then stops. The connection does NOT advance on silence: an unanswered
+  checkpoint is not a recorded outcome, and `retained_30` has to mean somebody
+  said so.
+- A phone number shared by two students matches two preference rows. STOP
+  applies to all of them; nothing else applies to any of them, and the run logs
+  a warning. Those students cannot use the reply-based nudges until one of them
+  uses a different number.
+- Twilio's request signature carries no nonce and no timestamp, so a captured
+  webhook request verifies forever. Every handler behind `/api/sms/inbound` is
+  therefore idempotent (STOP/START are settings writes; a reply claims its
+  question with a conditional UPDATE that a replay loses). Keep it that way.

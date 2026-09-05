@@ -21,6 +21,7 @@
 import { prismaAdmin } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { redactContactInfo } from "@/lib/log-redaction";
 import { sendSms } from "@/lib/sms";
 
 import {
@@ -41,7 +42,7 @@ export type SmsSendResult =
   | { status: "failed"; outboundMessageId: string }
   | { status: "would_send" }
   | { status: "deferred"; reason: SmsRefusalReason; until: Date }
-  | { status: "refused"; reason: SmsRefusalReason | "malformed_body" };
+  | { status: "refused"; reason: SmsRefusalReason | "malformed_body" | "send_error" };
 
 /** The student's SMS preference row, or null when they have never set one. */
 export async function loadSmsPreference(
@@ -104,15 +105,31 @@ function localMidnight(year: number, month: number, day: number): Date {
   return new Date(naive - offsetAt(firstGuess));
 }
 
+/**
+ * Statuses that consume the daily cap.
+ *
+ * `failed` counts: the attempt reached Twilio and was billed, and a number
+ * that fails is usually a number that will fail again — letting failures run
+ * free turns a bad number into an unbounded hourly retry loop with a bill
+ * attached. `queued` counts because it is a reservation held by a concurrent
+ * send that has not reported back yet; that is what makes the cap safe under
+ * two overlapping runs.
+ */
+const CAP_CONSUMING_STATUSES = ["sent", "queued", "failed"];
+
 /** How many texts this recipient has already had in their own local day. */
-export async function countSmsSentToday(studentId: string, now: Date): Promise<number> {
+export async function countSmsSentToday(
+  studentId: string,
+  now: Date,
+  client: Pick<typeof prismaAdmin, "outboundMessage"> = prismaAdmin,
+): Promise<number> {
   const window = localDayWindow(now);
-  return prismaAdmin.outboundMessage.count({
+  return client.outboundMessage.count({
     where: {
       channel: "sms",
       toKind: "student",
       toId: studentId,
-      status: "sent",
+      status: { in: CAP_CONSUMING_STATUSES },
       sentAt: { gte: window.gte, lt: window.lt },
     },
   });
@@ -155,6 +172,41 @@ export interface SendPolicySmsInput {
  * the student sends about something else.
  */
 export async function sendPolicySms(input: SendPolicySmsInput): Promise<SmsSendResult> {
+  // This runs inside a sweep over many students and inside a webhook that must
+  // answer 200. Nothing it can do is worth taking either of those down, so the
+  // whole body is guarded and every failure becomes a value.
+  try {
+    return await sendPolicySmsUnsafe(input);
+  } catch (error) {
+    logger.error("SMS send failed unexpectedly", {
+      channel: "sms",
+      templateKey: input.templateKey,
+      student: studentLogKey(input.studentId),
+      error: redactContactInfo(String(error)),
+    });
+    return { status: "refused", reason: "send_error" };
+  }
+}
+
+/**
+ * Reserve, send, record.
+ *
+ * The reservation is the point. The cap used to be a read-then-write — count
+ * today's rows, decide, send, insert — so two overlapping runs (the hourly
+ * cron and someone curling the route, or two Render instances) could both read
+ * "1 sent today" and both send, putting three texts on one phone in a day the
+ * policy caps at two. Now the count and the INSERT happen in one transaction
+ * holding `pg_advisory_xact_lock(hashtext(studentId))`, so concurrent callers
+ * for the same recipient serialise on that key, and the row they insert is a
+ * `queued` reservation that counts against the cap immediately.
+ *
+ * The Twilio call stays OUTSIDE the transaction: holding a database
+ * transaction open across a network call to a third party is how a pool gets
+ * exhausted by one slow provider. The row is updated to `sent` or `failed`
+ * afterwards. A crash between the two leaves a `queued` row, which counts
+ * against the cap for the rest of that local day — the safe direction.
+ */
+async function sendPolicySmsUnsafe(input: SendPolicySmsInput): Promise<SmsSendResult> {
   const now = input.now ?? new Date();
 
   if (!bodyIsWellFormed(input.body)) {
@@ -165,41 +217,81 @@ export async function sendPolicySms(input: SendPolicySmsInput): Promise<SmsSendR
     return { status: "refused", reason: "malformed_body" };
   }
 
-  const [pref, sentTodayCount] = await Promise.all([
-    loadSmsPreference(input.studentId),
-    countSmsSentToday(input.studentId, now),
-  ]);
-
-  const decision = canSendSms({ pref, now, sentTodayCount });
-  if (decision.decision === "refuse") {
-    return { status: "refused", reason: decision.reason };
+  if (input.dryRun) {
+    // A dry run must not reserve anything, so it asks the question outside the
+    // lock and reports the answer it would have got.
+    const pref = await loadSmsPreference(input.studentId);
+    const decision = canSendSms({
+      pref,
+      now,
+      sentTodayCount: await countSmsSentToday(input.studentId, now),
+    });
+    if (decision.decision === "refuse") return { status: "refused", reason: decision.reason };
+    if (decision.decision === "defer") {
+      return { status: "deferred", reason: decision.reason, until: decision.until };
+    }
+    return { status: "would_send" };
   }
-  if (decision.decision === "defer") {
-    return { status: "deferred", reason: decision.reason, until: decision.until };
-  }
-  if (input.dryRun) return { status: "would_send" };
 
-  // canSendSms already refused a null destination; this narrows the type.
-  const destination = pref?.destination;
-  if (!destination) return { status: "refused", reason: "no_phone_number" };
+  const reserved = await prismaAdmin.$transaction(async (tx) => {
+    // Serialises every concurrent send to THIS recipient, and releases at
+    // commit or rollback — no session-level lock to leak across a pooled
+    // connection. hashtext() is stable within a database version, which is all
+    // this needs: a collision between two students costs one serialised write.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.studentId}))`;
+
+    // Consent is re-read inside the lock so a STOP that landed a millisecond
+    // ago is honoured rather than raced.
+    const pref = await tx.notificationPreference.findFirst({
+      where: { studentId: input.studentId, channel: "sms" },
+      select: { enabled: true, destination: true, smsConsentAt: true, smsRevokedAt: true },
+    });
+    const sentTodayCount = await countSmsSentToday(input.studentId, now, tx);
+    const decision = canSendSms({ pref, now, sentTodayCount });
+    if (decision.decision !== "allow") return { decision, row: null, destination: null };
+
+    const row = await tx.outboundMessage.create({
+      data: {
+        channel: "sms",
+        toKind: "student",
+        toId: input.studentId,
+        templateKey: input.templateKey,
+        // The stored copy carries no link: staff read this table, and a link
+        // in one of these messages is student-scoped or token-bearing.
+        body: redactLinks(input.body),
+        status: "queued",
+        connectionId: input.connectionId ?? null,
+        // Written only once delivery is confirmed: a question that never
+        // arrived must not consume the next "Y" about something else.
+        expectsReply: null,
+        sentAt: now,
+      },
+      select: { id: true },
+    });
+    return { decision, row, destination: pref?.destination ?? null };
+  });
+
+  if (reserved.decision.decision === "refuse") {
+    return { status: "refused", reason: reserved.decision.reason };
+  }
+  if (reserved.decision.decision === "defer") {
+    return {
+      status: "deferred",
+      reason: reserved.decision.reason,
+      until: reserved.decision.until,
+    };
+  }
+  const { row, destination } = reserved;
+  if (!row || !destination) return { status: "refused", reason: "no_phone_number" };
 
   const delivered = await sendSms(destination, input.body);
 
-  const row = await prismaAdmin.outboundMessage.create({
+  await prismaAdmin.outboundMessage.update({
+    where: { id: row.id },
     data: {
-      channel: "sms",
-      toKind: "student",
-      toId: input.studentId,
-      templateKey: input.templateKey,
-      // The stored copy carries no link: staff read this table, and a link in
-      // one of these messages is student-scoped or token-bearing.
-      body: redactLinks(input.body),
       status: delivered ? "sent" : "failed",
-      connectionId: input.connectionId ?? null,
       expectsReply: delivered ? (input.expectsReply ?? null) : null,
-      sentAt: now,
     },
-    select: { id: true },
   });
 
   logger.info("Nudge SMS attempted", {
