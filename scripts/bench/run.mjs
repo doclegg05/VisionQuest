@@ -41,8 +41,10 @@ import {
   baselineValue,
   validateSuiteConfig,
 } from "./lib/discover.mjs";
+import { isMainModule } from "./lib/entry.mjs";
 import { checkRequires, describeUnmet, resolveEnv } from "./lib/env.mjs";
 import { describeHost, hostFingerprint, withOllama } from "./lib/host.mjs";
+import { redactDeep, redactSecrets } from "./lib/redact.mjs";
 import { buildResult, validateResult } from "./lib/result.mjs";
 import { metricStatus } from "./lib/status.mjs";
 import { compareResults, formatTable, formatValue } from "./compare.mjs";
@@ -59,12 +61,20 @@ const KNOWN_FLAGS = new Set([
 ]);
 
 const USAGE = `Usage:
-  npm run bench -- --suite=<name>[,<name>] [--compare] [--json]
+  npm run bench -- --suite=<name> [--suite=<name> ...] [--compare] [--json]
+  npm run bench -- --suite=<name>,<name> [--compare] [--json]
   npm run bench -- --tier=${TIERS.join("|")} [--compare] [--json]
   npm run bench -- --suite=<name> --update-baseline --reason="why this moved"
   npm run bench -- --list`;
 
-/** Parse `--key=value` and bare `--flag`; anything else is a usage error. */
+/** Flags that may appear more than once; their values accumulate in order. */
+const REPEATABLE_FLAGS = new Set(["suite"]);
+
+/**
+ * Parse `--key=value` and bare `--flag`; anything else is a usage error.
+ * A repeatable flag always comes back as an array, even when given once, so
+ * callers never have to test for both shapes.
+ */
 export function parseArgs(argv) {
   const flags = {};
   const unknown = [];
@@ -77,6 +87,10 @@ export function parseArgs(argv) {
     const [, key, value] = match;
     if (!KNOWN_FLAGS.has(key)) {
       unknown.push(arg);
+      continue;
+    }
+    if (REPEATABLE_FLAGS.has(key)) {
+      (flags[key] ??= []).push(value === undefined ? true : value);
       continue;
     }
     flags[key] = value === undefined ? true : value;
@@ -229,6 +243,27 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
     };
   });
 
+  // A null value from a scorer that actually RAN is a broken measurement, not
+  // a skip: `skipped` already has a meaning here (unmet `requires`, reported
+  // above). On a gate or nightly tier that distinction is load-bearing — a
+  // null slips past every floor, so the suite would report green while
+  // measuring nothing. `status.mjs` stays untouched: it answers about one
+  // metric, and this is a fact about the run.
+  const nulled = metrics.filter((metric) => metric.value === null).map((metric) => metric.id);
+  if (nulled.length > 0 && ["gate", "nightly"].includes(config.tier)) {
+    return buildResult({
+      ...common,
+      durationMs: Date.now() - started,
+      provider: output.provider ?? null,
+      model: output.model ?? null,
+      metrics: [],
+      status: "error",
+      error:
+        `the scorer ran but returned no value for ${config.tier}-tier metric(s): ${nulled.join(", ")} — ` +
+        "a null on a floored metric would pass every floor while measuring nothing",
+    });
+  }
+
   return buildResult({
     ...common,
     durationMs: Date.now() - started,
@@ -238,8 +273,25 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
   });
 }
 
-/** Write one result file, refusing to write anything the schema rejects. */
+/**
+ * Write one result file, refusing to write anything the schema rejects.
+ *
+ * Everything a scorer authored — its error, its skip note, and every string
+ * inside `details` — is redacted first. A scorer is handed live connection
+ * strings through `ctx.env`, and `throw new Error(\`connect failed:
+ * ${ctx.env.prodReadonlyUrl}\`)` is the natural thing to write; the result
+ * file is then committed to main, uploaded as an artifact, printed in a step
+ * summary and quoted into a public issue. Redaction happens BEFORE schema
+ * validation so nothing unredacted is ever held in the object that gets
+ * written.
+ */
 function writeResult(repoRoot, result, out) {
+  if (typeof result.error === "string") result.error = redactSecrets(result.error);
+  if (typeof result.skipped === "string") result.skipped = redactSecrets(result.skipped);
+  for (const metric of result.metrics ?? []) {
+    if (metric.details !== undefined) metric.details = redactDeep(metric.details);
+  }
+
   const errors = validateResult(result);
   if (errors.length > 0) {
     throw new Error(
@@ -281,17 +333,24 @@ function updateBaseline({ repoRoot, results, baseline, reason, out }) {
   }
   const path = resolve(repoRoot, BASELINE_PATH);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(sortKeys(next), null, 2)}\n`);
+  writeFileSync(path, `${JSON.stringify(sortSuiteKeys(next), null, 2)}\n`);
   out(`  wrote ${BASELINE_PATH}`);
 }
 
-/** Deterministic key order so a baseline diff shows only what moved. */
-function sortKeys(value) {
-  if (Array.isArray(value) || typeof value !== "object" || value === null) return value;
+/**
+ * Suite names in codepoint order (never localeCompare — the file is read on
+ * every machine) so the file has one canonical shape and a diff shows only
+ * what moved. Deliberately shallow: everything BELOW a suite name is written
+ * back exactly as it was parsed, so updating one suite leaves every other
+ * suite's rows byte-identical. A deep re-sort would rewrite rows nobody
+ * measured, and a baseline diff must only ever show numbers that actually
+ * changed.
+ */
+function sortSuiteKeys(baseline) {
   return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, sortKeys(value[key])])
+    Object.keys(baseline)
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+      .map((key) => [key, baseline[key]])
   );
 }
 
@@ -376,8 +435,17 @@ async function main() {
 
   // --- selection ---------------------------------------------------------
   let selected;
-  if (typeof flags.suite === "string") {
-    const names = flags.suite.split(",").map((name) => name.trim()).filter(Boolean);
+  if (Array.isArray(flags.suite)) {
+    // `--suite=a --suite=b`, `--suite=a,b`, and any mix of the two. Order is
+    // the order given, and duplicates are dropped so a repeated name does not
+    // run (and overwrite its own result) twice.
+    const names = [];
+    for (const value of flags.suite) {
+      if (typeof value !== "string") continue;
+      for (const name of value.split(",").map((part) => part.trim()).filter(Boolean)) {
+        if (!names.includes(name)) names.push(name);
+      }
+    }
     selected = [];
     for (const name of names) {
       const match = suites.find((suite) => suite.config.suite === name);
@@ -493,6 +561,6 @@ async function main() {
   process.exit(0);
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMainModule(import.meta.url)) {
   await main();
 }

@@ -645,12 +645,20 @@ async function main() {
 // bare `main().catch(...)` at module scope would do on every import.
 //
 // Uses `pathToFileURL(realpathSync(...))` rather than a bare `file://`
-// template (security review, 2026-09-05; matches the form
-// scripts/bench/lib/self-test.mjs's shared helper uses): `realpathSync`
-// resolves symlinks so a symlinked invocation still matches, and
-// `pathToFileURL` percent-encodes the path the same way `import.meta.url`
-// already is, which a manual `file://${...}` template does not do on a path
-// with spaces or other reserved characters.
+// template or a raw argv[1] comparison (security review, 2026-09-05):
+// `realpathSync` resolves symlinks first — Node resolves a module's real
+// path when it loads it, so `import.meta.url` points at the target of any
+// symlink while a raw argv[1] keeps the link, and invoked through one a raw
+// comparison is false, main() never runs, and this gate EXITS 0 having
+// checked nothing (a gate that reports success without running is worse
+// than no gate) — and `pathToFileURL` percent-encodes the path the same way
+// `import.meta.url` already is, which a manual `file://${...}` template
+// does not do on a path with spaces or other reserved characters.
+//
+// The benchmark runner shares an equivalent implementation at
+// scripts/bench/lib/entry.mjs; this copy stays local deliberately, so the
+// readability gate never depends on the benchmark runner to check its own
+// copy.
 const isMainModule = (() => {
   if (!process.argv[1]) return false;
   try {

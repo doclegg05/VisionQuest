@@ -50,7 +50,7 @@ const EXIT_NOT_RUN = 2;
 
 loadEnvFile();
 
-function resolveConnectionUrl(env) {
+export function resolveConnectionUrl(env) {
   const url = env.CRON_CHECK_DATABASE_URL || env.DATABASE_URL || "";
   return url.trim() || null;
 }
@@ -146,15 +146,21 @@ async function fetchBackgroundJobs(prisma) {
   };
 }
 
-async function main() {
-  const url = resolveConnectionUrl(process.env);
-  if (!url) {
-    console.error(
-      "cron-health-check did not run: set CRON_CHECK_DATABASE_URL (or DATABASE_URL) to the postgres-role connection string."
-    );
-    return EXIT_NOT_RUN;
-  }
-
+/**
+ * Importable core: runs the same queries and verdict logic as the CLI, for a
+ * given postgres-role connection string, and returns the structured result
+ * (no printing, no process.exit). Used by the CLI below and by
+ * scripts/bench/suites/cron-health.mjs so the benchmark suite measures the
+ * exact same evaluateCronHealth() verdict rather than a second copy of it.
+ *
+ * Throws on a query failure (missing table, wrong role, bad connection
+ * string) — callers decide how to report that; the CLI below maps it to
+ * EXIT_NOT_RUN, as it always has.
+ *
+ * @param {string} url postgres-role connection string
+ * @returns {Promise<{ evaluation: ReturnType<typeof evaluateCronHealth>, backgroundJobs: object, connection: { host: string, database: string, role: string } }>}
+ */
+export async function runCronHealthCheck(url) {
   const names = [...EXPECTED_CRON_JOBS];
   const prisma = new PrismaClient({ datasources: { db: { url } } });
 
@@ -168,17 +174,34 @@ async function main() {
     ]);
 
     const evaluation = evaluateCronHealth({ jobs, latestRuns, httpResponses });
+    return { evaluation, backgroundJobs, connection: { ...describeConnection(url), role } };
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function main() {
+  const url = resolveConnectionUrl(process.env);
+  if (!url) {
+    console.error(
+      "cron-health-check did not run: set CRON_CHECK_DATABASE_URL (or DATABASE_URL) to the postgres-role connection string."
+    );
+    return EXIT_NOT_RUN;
+  }
+
+  try {
+    const { evaluation, backgroundJobs, connection } = await runCronHealthCheck(url);
     const lines = formatCronHealthReport({
       evaluation,
       backgroundJobs,
-      connection: { ...describeConnection(url), role },
+      connection,
       generatedAt: new Date().toISOString(),
     });
     for (const line of lines) console.log(line);
 
-    if (role !== "postgres") {
+    if (connection.role !== "postgres") {
       console.log(
-        `note: connected as ${role}, not postgres; cron.job rows are visible only to the scheduling role and BackgroundJob is RLS-protected, so a MISSING/empty report may be a role problem.`
+        `note: connected as ${connection.role}, not postgres; cron.job rows are visible only to the scheduling role and BackgroundJob is RLS-protected, so a MISSING/empty report may be a role problem.`
       );
     }
 
@@ -186,11 +209,15 @@ async function main() {
   } catch (error) {
     console.error(`cron-health-check did not run: ${describeError(error)}`);
     return EXIT_NOT_RUN;
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
-main().then((code) => {
-  process.exitCode = code;
-});
+// Only auto-run when executed directly — importing this module for
+// runCronHealthCheck() (contract tests, the benchmark suite) must never
+// start a live CLI run or call process.exit.
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main().then((code) => {
+    process.exitCode = code;
+  });
+}

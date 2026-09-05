@@ -157,6 +157,52 @@ test("every documented export form of run is accepted", () => {
   }
 });
 
+test("a scorer or fixture outside the repository is refused", () => {
+  // A suite config is data the runner then EXECUTES. Escaping the checkout
+  // turns "add a benchmark" into "run this file", so containment is checked
+  // before existence — an absolute path or a `..` escape is refused even when
+  // the file is really there.
+  const root = makeRepo();
+  try {
+    const escapes = ["../outside/evil.mjs", "scripts/../../outside/evil.mjs", "/etc/passwd"];
+    for (const scorer of escapes) {
+      const { errors } = validateSuiteConfig(
+        { ...validConfig, scorer },
+        { path: "config/benchmarks/demo.json", repoRoot: root }
+      );
+      assert.ok(
+        errors.some((e) => /outside the repository/i.test(e)),
+        `${scorer}: ${errors.join("; ")}`
+      );
+    }
+    for (const fixture of escapes) {
+      const { errors } = validateSuiteConfig(
+        { ...validConfig, fixture },
+        { path: "config/benchmarks/demo.json", repoRoot: root }
+      );
+      assert.ok(
+        errors.some((e) => /outside the repository/i.test(e)),
+        `${fixture}: ${errors.join("; ")}`
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a path that only looks like an escape but stays inside is fine", () => {
+  const root = makeRepo();
+  try {
+    const { errors } = validateSuiteConfig(
+      { ...validConfig, scorer: "scripts/bench/../bench/suites/demo.mjs" },
+      { path: "config/benchmarks/demo.json", repoRoot: root }
+    );
+    assert.deepEqual(errors, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a declared fixture that does not exist is a config error", () => {
   const root = makeRepo();
   try {
@@ -427,6 +473,31 @@ test("discoverSuites reads every top-level config and ignores the result schema"
     assert.deepEqual(
       suites.map((s) => s.config.suite),
       ["demo"]
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("discoverSuites orders suites by codepoint, not by locale", () => {
+  // `localeCompare` varies with process locale and ICU build, so two machines
+  // can list the same suites in different orders and print different tables
+  // (the 2026-08-20 rule from the confirm-token canonicalisation work).
+  // "Beta" sorts before "alpha" by codepoint (0x42 < 0x61); most locales
+  // would put "alpha" first.
+  const root = makeRepo();
+  try {
+    writeSuite(root, "alpha", { ...validConfig, suite: "alpha" });
+    writeSuite(root, "Beta", { ...validConfig, suite: "Beta" });
+    const { suites, errors } = discoverSuites({ repoRoot: root });
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      suites.map((s) => s.name),
+      ["Beta", "alpha"].sort() // default Array#sort is codepoint order
+    );
+    assert.deepEqual(
+      suites.map((s) => s.name),
+      ["Beta", "alpha"]
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

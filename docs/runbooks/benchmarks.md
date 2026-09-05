@@ -17,6 +17,7 @@ so the number means something across weeks.
 |---|---|
 | `npm run bench -- --list` | every suite, its tier, its `requires`, and whether this machine can run it |
 | `npm run bench -- --suite=<name>` | run one suite, write its result, print the table |
+| `npm run bench -- --suite=a --suite=b` | run several — repeat the flag, or use `--suite=a,b`, or mix the two; they run in the order given and a repeat is ignored |
 | `npm run bench -- --suite=<name> --compare` | …and fail (exit 1) if a gate/nightly metric crossed its floor |
 | `npm run bench -- --tier=gate --compare` | every gate-tier suite whose `requires` are met — what CI runs |
 | `npm run bench -- --suite=<name> --json` | results as JSON on stdout (human output moves to stderr) |
@@ -81,6 +82,16 @@ await selfTest(import.meta.url, run); // inert unless run directly with --self-t
   the benchmark measures a copy that cannot drift with the app.
 - `details` is free-form evidence (which cases missed, which offenders) — and
   is written to a committed result file, so it must never contain student data.
+- The scorer's paths must stay **inside the checkout**: `bench:validate`
+  refuses an absolute `scorer`/`fixture` or one that escapes with `..`,
+  because a suite config is data the runner then executes.
+- Anything a scorer writes into its error, its skip note, or `details` is run
+  through `redactSecrets` (`scripts/bench/lib/redact.mjs`) before it reaches
+  disk — `throw new Error(\`connect failed: ${ctx.env.prodReadonlyUrl}\`)` is
+  a natural thing to write and would otherwise publish a production credential
+  to a committed file, a CI artifact, a job summary and a public issue at once.
+  Redaction is a safety net, not a licence: do not put a secret in a message
+  on purpose.
 - Return one entry per declared metric. A declared metric the scorer does not
   return is an `error`, not a silent pass; an undeclared metric is dropped with
   a warning.
@@ -187,7 +198,7 @@ Statuses:
 | `fail` | the floor was crossed, or an `exact` metric moved |
 | `info` | nothing to judge against — no floor and no baseline |
 | `skipped` | no value: the suite's `requires` were unmet |
-| `error` | the scorer threw, or did not return a declared metric |
+| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met |
 
 The suite's own `status` is the worst of its metrics, except `skipped` and
 `error`, which are facts about the run rather than about any metric.
@@ -260,6 +271,46 @@ Suites needing `GEMINI_API_KEY` never run per-PR — only nightly, and only when
 the secret exists (nightly Gemini spend is an owner decision, design §9.4).
 
 ---
+
+### The browser-collected suites
+
+`touch-targets` and `axe-authenticated` are the only suites whose `requires`
+include `browser` and `server`, so the `e2e` job in `ci.yml` is the one place
+they can run. Two steps, and **the order is load-bearing**: the Playwright
+specs `e2e/bench-touch-targets.spec.ts` and `e2e/bench-axe-authenticated.spec.ts`
+are *collectors* — they walk the running app and write
+`reports/benchmarks/raw/<suite>.json` — and the scorers read those files. Run
+the runner first and each scorer errors by design, because the environment says
+browser and server are available while the raw data is not.
+
+The collection step is `continue-on-error: true` today, matching the existing
+authenticated-a11y soak: both suites are `watch` tier, so a broken collector
+surfaces as an `error` row in the table and the uploaded artifact rather than
+reddening the gating e2e job.
+
+## Open items
+
+- **`touch-targets` promotes from `watch` to `gate` once its count is 0 in
+  CI.** It shipped at `watch` because the authoring worktree had no dev server
+  or `DATABASE_URL` to establish today's real number (the standing
+  "a worktree has no `.env.local`" gotcha), and the safe default for an
+  *unknown* count is the same as for a known-nonzero one. When a CI run
+  reports `undersized_targets: 0`, flip `tier` to `gate` in
+  `config/benchmarks/touch-targets.json`, set the baseline with a `--reason`,
+  and drop `continue-on-error` from the collection step in `ci.yml` so a
+  missing collection fails honestly instead of quietly. If the count is **not**
+  0, the result's `details.violations` names every offending route and selector
+  — that is the fix list, not a reason to lower the floor.
+- **`axe-authenticated` has no floor yet** and no baseline. Its metric is
+  `lower` with `tolerance: 0`, so once a real run sets today's number as the
+  baseline it can never creep upward while the burn-down proceeds (design §4.9:
+  "burn down to 0, then gate").
+- **Four scorers carry their own copy of the entry-point guard**
+  (`scripts/bench/suites/{touch-targets,axe-authenticated,sms-readability,readability-by-surface}.mjs`)
+  using a raw `argv[1]` comparison, which fails open through a symlink. The
+  shared, symlink-safe implementation is `isMainModule` in
+  `scripts/bench/lib/entry.mjs`; those four were left to their author rather
+  than edited underneath them.
 
 ## Owner steps
 
