@@ -27,6 +27,10 @@ const dateOnly = z
 
 const querySchema = z.object({
   classId: z.string().cuid("Invalid classId.").optional(),
+  // employerId is Opportunity.id-shaped, same as Connection.employerId — not
+  // necessarily a cuid (2026-09 second-pass "Take": the report page's
+  // employer filter was silently dropped by this route; now forwarded).
+  employerId: z.string().min(1, "Invalid employerId.").optional(),
   from: dateOnly,
   to: dateOnly,
 });
@@ -35,6 +39,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const parsed = querySchema.safeParse({
     classId: url.searchParams.get("classId") ?? undefined,
+    employerId: url.searchParams.get("employerId") ?? undefined,
     from: url.searchParams.get("from") ?? undefined,
     to: url.searchParams.get("to") ?? undefined,
   });
@@ -45,6 +50,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
 
   const { rows, studentIds } = await fetchDohsExport(session, {
     classId: query.classId,
+    employerId: query.employerId,
     from: query.from,
     to: query.to,
   });
@@ -69,7 +75,13 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     targetType: "connect_dohs_export",
     targetId: filename,
     summary: `Exported ${rows.length} DoHS statistical-report rows.`,
-    metadata: { rowCount: rows.length, classId: query.classId ?? null, from: query.from ?? null, to: query.to ?? null },
+    metadata: {
+      rowCount: rows.length,
+      classId: query.classId ?? null,
+      employerId: query.employerId ?? null,
+      from: query.from ?? null,
+      to: query.to ?? null,
+    },
   });
 
   return new Response(buildDohsExportCsv(rows), {
