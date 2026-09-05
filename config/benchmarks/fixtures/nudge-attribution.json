@@ -1,0 +1,273 @@
+{
+  "phoneBase": "+1304555",
+  "nowIso": "2026-10-11T15:00:00.000Z",
+  "notes": [
+    "A scripted reply corpus. Each case seeds preference rows, outbound questions, connections and saved jobs, then either delivers inbound texts through the real handleInboundSms or runs the real runNudges, and declares exactly what should have happened. Every `expect` key the case names is compared; anything it does not name is not asserted, so a case stays about the one thing it is for.",
+    "`sentHoursAgo` is relative to nowIso. REPLY_WINDOW_MS is 72 hours, so 80 is outside it and 2 is inside — the boundary this corpus is built around.",
+    "Phones are +1304555 01xx, the reserved fiction range. Two cases put two students on one handset, which is real in this population (a shared family phone) and is the case the whole ambiguous-sender rule exists for.",
+    "claimedTemplateKeys is the load-bearing observation: it names WHICH question a reply was applied to, which is the difference between 'a reply was handled' and 'the right reply was handled'."
+  ],
+  "cases": [
+    {
+      "id": "single-open-question",
+      "why": "the ordinary path: one question, one answer, applied to it",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "started" }],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con0:30", "sentHoursAgo": 2 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "outcomes": [{ "outcome": "handled", "kind": "retention" }],
+        "claimedTemplateKeys": ["retention_30"],
+        "alertTypes": ["connect_retention_confirm"],
+        "connectionStatuses": { "con0": "retained_30" },
+        "followUpWrites": 0
+      }
+    },
+    {
+      "id": "retention-no-closes-and-alerts",
+      "why": "a 'no' is an answer, not silence, and still writes no grant record",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "retained_30" }],
+      "questions": [
+        { "student": 0, "templateKey": "retention_60", "token": "retention:con0:60", "sentHoursAgo": 2 }
+      ],
+      "inbound": [{ "phone": 0, "body": "N" }],
+      "expect": {
+        "outcomes": [{ "outcome": "handled", "kind": "retention" }],
+        "claimedTemplateKeys": ["retention_60"],
+        "alertTypes": ["connect_retention_lost"],
+        "connectionStatuses": { "con0": "closed" },
+        "followUpWrites": 0
+      }
+    },
+    {
+      "id": "stale-question-only",
+      "why": "a 'Y' typed a fortnight later must not mark somebody employed",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "started" }],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con0:30", "sentHoursAgo": 80 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "outcomes": [{ "outcome": "no_pending_question" }],
+        "claimedTemplateKeys": [],
+        "alertTypes": [],
+        "connectionStatuses": { "con0": "started" },
+        "followUpWrites": 0
+      }
+    },
+    {
+      "id": "stale-and-fresh",
+      "why": "the fresh question wins; the stale one is not reachable at all",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "savedJobs": [{ "id": "sj0", "student": 0, "status": "applied" }],
+      "questions": [
+        { "student": 0, "templateKey": "weekly_jobs", "token": "weekly_jobs", "sentHoursAgo": 80 },
+        { "student": 0, "templateKey": "heard_back:sj0", "token": "heard_back:sj0", "sentHoursAgo": 2 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "outcomes": [{ "outcome": "handled", "kind": "heard_back" }],
+        "claimedTemplateKeys": ["heard_back:sj0"],
+        "savedJobStatuses": { "sj0": "interviewing" }
+      }
+    },
+    {
+      "id": "two-open-questions-most-recent-wins",
+      "why": "the state the runner refuses to create; if it ever exists, the newest question is the one answered, deterministically",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "started" }],
+      "savedJobs": [{ "id": "sj0", "student": 0, "status": "applied" }],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con0:30", "sentHoursAgo": 10 },
+        { "student": 0, "templateKey": "heard_back:sj0", "token": "heard_back:sj0", "sentHoursAgo": 1 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "outcomes": [{ "outcome": "handled", "kind": "heard_back" }],
+        "claimedTemplateKeys": ["heard_back:sj0"],
+        "connectionStatuses": { "con0": "started" }
+      }
+    },
+    {
+      "id": "double-reply-runs-once",
+      "why": "a double tap on the keyboard must not answer twice",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "started" }],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con0:30", "sentHoursAgo": 2 }
+      ],
+      "inbound": [
+        { "phone": 0, "body": "Y" },
+        { "phone": 0, "body": "Y" }
+      ],
+      "expect": {
+        "outcomes": [
+          { "outcome": "handled", "kind": "retention" },
+          { "outcome": "no_pending_question" }
+        ],
+        "claimedTemplateKeys": ["retention_30"],
+        "connectionStatuses": { "con0": "retained_30" }
+      }
+    },
+    {
+      "id": "shared-phone-answer-applies-to-nobody",
+      "why": "two students, one handset: a bare Y cannot say whose it is",
+      "prefs": [
+        { "student": 0, "phone": 0 },
+        { "student": 1, "phone": 0 }
+      ],
+      "connections": [
+        { "id": "con0", "student": 0, "status": "started" },
+        { "id": "con1", "student": 1, "status": "started" }
+      ],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con0:30", "sentHoursAgo": 2 },
+        { "student": 1, "templateKey": "retention_30", "token": "retention:con1:30", "sentHoursAgo": 1 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "outcomes": [{ "outcome": "ambiguous_sender" }],
+        "claimedTemplateKeys": [],
+        "alertTypes": [],
+        "connectionStatuses": { "con0": "started", "con1": "started" },
+        "prefsRevoked": 0
+      }
+    },
+    {
+      "id": "shared-phone-start-applies-to-nobody",
+      "why": "START is a reply like any other, and just as unattributable here",
+      "prefs": [
+        { "student": 0, "phone": 0, "enabled": false, "revoked": true },
+        { "student": 1, "phone": 0, "enabled": false, "revoked": true }
+      ],
+      "inbound": [{ "phone": 0, "body": "START" }],
+      "expect": {
+        "outcomes": [{ "outcome": "ambiguous_sender" }],
+        "prefsEnabled": 0
+      }
+    },
+    {
+      "id": "shared-phone-stop-applies-to-everybody",
+      "why": "the one direction where over-applying is the safe answer",
+      "prefs": [
+        { "student": 0, "phone": 0 },
+        { "student": 1, "phone": 0 },
+        { "student": 2, "phone": 1 }
+      ],
+      "inbound": [{ "phone": 0, "body": "STOP" }],
+      "expect": {
+        "outcomes": [{ "outcome": "revoked" }],
+        "prefsRevokedOnRepliedNumber": 2,
+        "prefsRevokedElsewhere": 0
+      }
+    },
+    {
+      "id": "stop-beats-an-open-question",
+      "why": "a STOP must never be read as an answer to what we last asked",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "started" }],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con0:30", "sentHoursAgo": 2 }
+      ],
+      "inbound": [{ "phone": 0, "body": "STOP" }],
+      "expect": {
+        "outcomes": [{ "outcome": "revoked" }],
+        "claimedTemplateKeys": [],
+        "connectionStatuses": { "con0": "started" },
+        "prefsRevokedOnRepliedNumber": 1
+      }
+    },
+    {
+      "id": "yes-with-no-question-is-an-opt-in",
+      "why": "Twilio's YES keyword and a person's answer are the same word; only an open question tells them apart",
+      "prefs": [{ "student": 0, "phone": 0, "enabled": false, "revoked": true }],
+      "inbound": [{ "phone": 0, "body": "YES" }],
+      "expect": {
+        "outcomes": [{ "outcome": "reconsented" }],
+        "prefsEnabled": 1
+      }
+    },
+    {
+      "id": "start-cannot-manufacture-consent",
+      "why": "someone who never opted in on the settings page cannot opt in by texting a word",
+      "prefs": [{ "student": 0, "phone": 0, "consent": false, "enabled": false }],
+      "inbound": [{ "phone": 0, "body": "START" }],
+      "expect": {
+        "outcomes": [{ "outcome": "no_prior_consent" }],
+        "prefsEnabled": 0
+      }
+    },
+    {
+      "id": "a-sentence-is-not-a-keyword",
+      "why": "'stop texting me about the job' is a person talking, and must reach one",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "inbound": [{ "phone": 0, "body": "stop texting me about the job" }],
+      "expect": {
+        "outcomes": [{ "outcome": "ignored" }],
+        "prefsRevokedOnRepliedNumber": 0
+      }
+    },
+    {
+      "id": "token-naming-another-students-connection",
+      "why": "a token is not authority; the row it names is re-checked against whose phone replied",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [
+        { "id": "con0", "student": 0, "status": "started" },
+        { "id": "con1", "student": 1, "status": "started" }
+      ],
+      "questions": [
+        { "student": 0, "templateKey": "retention_30", "token": "retention:con1:30", "sentHoursAgo": 2 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "connectionStatuses": { "con0": "started", "con1": "started" },
+        "alertTypes": [],
+        "followUpWrites": 0
+      }
+    },
+    {
+      "id": "unreadable-token-is-ignored",
+      "why": "a row this module did not write must not be acted on",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "questions": [
+        { "student": 0, "templateKey": "mystery", "token": "not_a_real_token:xyz", "sentHoursAgo": 2 }
+      ],
+      "inbound": [{ "phone": 0, "body": "Y" }],
+      "expect": {
+        "outcomes": [{ "outcome": "ignored" }],
+        "alertTypes": []
+      }
+    },
+    {
+      "id": "unknown-number",
+      "why": "a stranger's text is never an error and never an enumeration oracle",
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "inbound": [{ "phone": 7, "body": "Y" }],
+      "expect": { "outcomes": [{ "outcome": "unknown_sender" }] }
+    },
+    {
+      "id": "sweep-will-not-open-a-second-question",
+      "why": "the runner's guard: one open question per student at a time",
+      "sweep": true,
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "savedJobs": [{ "id": "sj0", "student": 0, "status": "applied", "appliedDaysAgo": 20 }],
+      "questions": [
+        { "student": 0, "templateKey": "weekly_jobs", "token": "weekly_jobs", "sentHoursAgo": 2 }
+      ],
+      "expect": { "questionsOpenedByStudent": { "0": 0 } }
+    },
+    {
+      "id": "sweep-two-due-rules-opens-one",
+      "why": "two rules coming due in the same hour still make only one question",
+      "sweep": true,
+      "prefs": [{ "student": 0, "phone": 0 }],
+      "connections": [{ "id": "con0", "student": 0, "status": "started", "startedDaysAgo": 40 }],
+      "savedJobs": [{ "id": "sj0", "student": 0, "status": "applied", "appliedDaysAgo": 20 }],
+      "expect": { "questionsOpenedByStudent": { "0": 1 } }
+    }
+  ]
+}

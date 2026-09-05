@@ -1,0 +1,52 @@
+{
+  "suite": "nudge-quiet-hours",
+  "title": "Quiet hours and the daily cap, across a full year of hourly ticks",
+  "area": "nudges",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/nudge-quiet-hours.mjs",
+  "fixture": "config/benchmarks/fixtures/nudge-quiet-hours.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "outside_window_sends",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "cap_violations",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "deferral_outside_window",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "deferral_not_in_future",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "ticks_evaluated",
+      "unit": "count",
+      "direction": "higher",
+      "floor": null,
+      "reason": "corpus size, not a quality bar — it exists so a shrinking corpus is visible in the diff rather than silently weakening the four gates above",
+      "tolerance": 0
+    }
+  ],
+  "notes": "8,760 hourly ticks x 4 sentTodayCount values = 35,040 canSendSms decisions against the real policy in src/lib/nudges/sms-policy-shared.ts, with a fully-consented preference row so nothing but timing can refuse. The window oracle is written independently of the production helper: the scorer derives the local hour with Date#toLocaleString + hourCycle h23, while zonedHour uses Intl.DateTimeFormat#formatToParts, so a bug in one formatting path does not hide itself in the other. deferral_outside_window is the DST metric that matters — nextSendWindowStart has to land on local 08:00 on all 365 days including both transitions, and a naive 'add 24 hours to the UTC instant' implementation lands on 07:00 or 09:00 on exactly two of them, which is the kind of bug a spot-check misses. Red-first: scripts/bench/suites/nudge-quiet-hours.test.mjs feeds the scorer's pure classifier a synthetic decision set that allows a send at 03:00 local and one over the cap, and asserts both counters rise, before the suite is trusted at 0."
+}

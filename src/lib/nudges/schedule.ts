@@ -592,8 +592,17 @@ async function runUnderRunLock(
   try {
     return await prismaAdmin.$transaction(
       async (tx) => {
+        // `::int` on the class id is load-bearing, not decoration. Postgres
+        // offers exactly two overloads — (bigint) and (int, int) — and Prisma
+        // binds a JavaScript number as bigint, so the untyped two-argument form
+        // resolves to (bigint, integer), which matches NEITHER and raises
+        // 42883. The catch below then turns that into `skipped: "run lock
+        // unavailable"`, so the whole sweep goes quiet on every run with a 200
+        // response and one log line — the same silent-outage shape finding F63
+        // is about. Found by the nudge-sweep benchmark against a real Postgres;
+        // every unit test here mocks $queryRaw, so no amount of them can see it.
         const rows = await tx.$queryRaw<Array<{ locked: boolean }>>`
-          SELECT pg_try_advisory_xact_lock(${ADVISORY_LOCK_CLASS.nudgeRun}, hashtext(${RUN_LOCK_KEY})) AS locked
+          SELECT pg_try_advisory_xact_lock(${ADVISORY_LOCK_CLASS.nudgeRun}::int, hashtext(${RUN_LOCK_KEY})) AS locked
         `;
         if (rows[0]?.locked !== true) {
           result.skipped = "already running";
